@@ -201,19 +201,19 @@
 
 ## P3.A — Compose module and API
 
-- [ ] **T-27**. Write `apps/node/src/core/link/modules/docker/compose.ts` (`compose ls`, `config`, `ps`
+- [x] **T-27**. Write `apps/node/src/core/link/modules/docker/compose.ts` (`compose ls`, `config`, `ps` (`machine-facts/compose.ts`, verbs in `modules/docker.ts`)
       merge into `FleetComposeDescription`; `filesMissing`; actions up/down/restart/pull as
       operations, optional `service`; `down` never passes `-v`) and wire `compose.list|describe|action`
       in `docker/index.ts`.
     - **Test**: `compose.spec.ts` — depends_on conditions, missing files → Down only, argv never has `-v`.
-- [ ] **T-28**. Extend `fleet-docker.service.ts` / `fleet-docker.controller.ts` with the compose
+- [x] **T-28**. Extend `fleet-docker.service.ts` / `fleet-docker.controller.ts` with the compose (`execInContainer` starts the owner Session through `FleetSessionService.start` with a container target)
       routes (plan §5: `GET /nodes/:id/docker/compose[?project=]`, `POST …/compose/:project/:action`)
       and `exec` (`{ sessionId }` via FL-04 `FleetSessionService.startOwner`).
     - **Test**: service/controller specs; e2e compose lifecycle with the fake peer.
 
 ## P3.B — Compose web
 
-- [ ] **T-29**. Write `ComposeList.tsx`, `ComposeProject.tsx`, `ComposePicture.tsx` (SVG),
+- [x] **T-29**. Write `ComposeList.tsx`, `ComposeProject.tsx`, `ComposePicture.tsx` (SVG), (`ComposeView.tsx` holds the picture and the service table; Logs links to the Logs tab)
       `compose-layout.ts` (layered DAG, deterministic), `ComposeServiceTable.tsx` under
       `apps/web/src/components/fleet/docker/`; **Logs** view calls FL-08's `openMergedLogs`.
     - **Test**: `compose-layout.unit.spec.ts` (layering, cycle tolerance, stable order),
@@ -221,24 +221,24 @@
 
 ## P3.C — Shell inside
 
-- [ ] **T-30**. Write `apps/node/src/core/link/modules/docker/exec-session.ts` (shell detection inside the
+- [x] **T-30**. Write `apps/node/src/core/link/modules/docker/exec-session.ts` (shell detection inside the (no node `exec-session.ts`: the session module runs `docker exec` from the validated `container` param — decision 21)
       image; daemon start request `['docker','exec','-it',id,shell]`, kind owner, title
       `Shell · inside <name>`); add **Shell inside ▾** to `ContainersList.tsx`, the picture and the
       service table, opening the Session via FL-04's terminal route; audit `node.docker.container.exec` + `node.session.start`.
     - **Test**: `exec-session.spec.ts`; e2e: shell appears on the Sessions tab and ends with the Session.
-- [ ] **T-31**. Add `fleet_docker_compose_list`, `fleet_docker_compose_describe`,
+- [x] **T-31**. Add `fleet_docker_compose_list`, `fleet_docker_compose_describe`, (compose tools; `fleet_docker_exec` not offered to Agents — owner question 6)
       `fleet_docker_compose_action`, `fleet_docker_exec` to `agent-fleet-docker-tools.ts` and the MCP whitelist; `fleet.docker.compose.*`
       i18n; finish `flow-fleet-docker.spec.ts` (P3 part).
     - **Test**: tool spec; whitelist spec; e2e.
 
 ## Docs and rollout
 
-- [ ] **T-32**. Write `docs/features/fleet-services-docker.md` (the three tabs, the root rule and how
+- [x] **T-32**. Write `docs/features/fleet-services-docker.md` (the three tabs, the root rule and how
       to pre-authorise `sudo -n` for the node's user, blast-radius sentences, Docker CLI-only policy
       and refused run options, Compose views, shell inside, Agent tools); add after `'features/fleet'`
       in `apps/docs/sidebarsPlatform.ts` (`:183`, after FL-08's entry) and a row in `docs/features/index.md`.
     - **Test**: `pnpm --filter ever-works-docs build` — no broken links.
-- [ ] **T-33**. Update [`../TRACKER.md`](../TRACKER.md) FL-09 row and the `Status` fields of the three
+- [x] **T-33**. Update [`../TRACKER.md`](../TRACKER.md) FL-09 row and the `Status` fields of the three (TRACKER row; the CONTRACTS §10 rows were already in revision 4)
       documents; add the CONTRACTS §10 rows raised in spec §8b in the same PR.
     - **Test**: docs build clean; the banned-terms grep over this folder prints nothing.
 - [ ] **T-34**. Run `pnpm format && pnpm lint && pnpm test && pnpm build`; run the banned-terms grep over

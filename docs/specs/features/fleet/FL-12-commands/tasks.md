@@ -87,11 +87,11 @@
 
 ## P3 — Folder picker, re-run, hand-over
 
-- [ ] **T-25**. Folder picker from FL-14 checkouts in `CommandComposer.tsx` (falls back to a path field when FL-14 is off).
+- [x] **T-25**. Folder picker from FL-14 checkouts in `CommandComposer.tsx` (falls back to a path field when FL-14 is off).
       **Test**: `CommandComposer.unit.spec.tsx`.
-- [ ] **T-26**. Re-run from Recent (opens the confirm dialog pre-filled).
+- [x] **T-26**. Re-run from Recent (opens the confirm dialog pre-filled).
       **Test**: Playwright extension.
-- [ ] **T-27**. Retention sweep for `fleet_command_runs` bodies in `apps/api/src/fleet/fleet-job-retention.service.ts` (null head/tail after 30 days, keep rows).
+- [x] **T-27**. Retention sweep for `fleet_command_runs` bodies in `apps/api/src/fleet/fleet-job-retention.service.ts` (null head/tail after 30 days, keep rows).
       **Test**: extend its spec.
 
 ## Docs and rollout
@@ -113,6 +113,9 @@
 
 - P2 (#2846): T-20…T-24. T-20's run is always held for the owner's approval (lane-log decision 15); T-23 is a
   streamed download, not an FL-02 operation (decision 14); specs `agent-fleet-command-tools.spec.ts` (not run).
+
+- P3: T-25 (a `datalist` of the picked computers' ready checkouts, lane-log decision 18), T-26 (decision 19),
+  T-27 (`purgeExpiredCommandOutputs`, decision 20); spec `fleet-command-retention.spec.ts` (not run).
 
 ## Definition of done
 

@@ -14,7 +14,7 @@ import type { FleetComputerTabProps } from '../registry';
 import { readSessionError } from '../sessions/sessions.shared';
 import { LogSourceTree } from './LogSourceTree';
 import { LogViewer } from './LogViewer';
-import { logsDeepLinkSource, logsTabCard, type LogsError, type LogsTabCard } from './logs.shared';
+import { logsDeepLinkSources, logsTabCard, toggleMergedSource, type LogsError, type LogsTabCard } from './logs.shared';
 
 /**
  * Logs on computers (FL-08, spec §5, T-13) — the computer page's Logs tab:
@@ -32,11 +32,21 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
     const t = useTranslations('fleet.logs');
     const locale = useLocale();
     const search = useSearchParams();
-    const linked = search ? logsDeepLinkSource((name) => search.get(name)) : null;
+    const linked = search
+        ? logsDeepLinkSources(
+              (name) => search.getAll(name),
+              (name) => search.get(name),
+          )
+        : [];
+    const linkedTitle = search?.get('title')?.slice(0, 80) ?? null;
+    // P3 (FR-39): `?at=<iso>` positions the first-opened view at that time (a failed service).
+    const linkedAtRaw = search?.get('at') ?? null;
+    const linkedAt = linkedAtRaw && !Number.isNaN(Date.parse(linkedAtRaw)) ? new Date(Date.parse(linkedAtRaw)).toISOString() : null;
     const [list, setList] = useState<FleetLogSourcesResponse | null>(null);
     const [error, setError] = useState<LogsError | null>(null);
     const [loading, setLoading] = useState(true);
-    const [selected, setSelected] = useState<string | null>(linked);
+    // One source, or (P2) a merged set: ctrl/cmd-click adds or removes a source.
+    const [selected, setSelected] = useState<string[]>(linked);
 
     const reload = useCallback(async () => {
         if (node.kind === 'desktop-node' || node.status === 'offline') {
@@ -72,7 +82,10 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
 
     const card = logsTabCard(node, error);
     const sources = list?.sources ?? [];
-    const selectedSource = useMemo(() => sources.find((source) => source.id === selected) ?? null, [sources, selected]);
+    const selectedSource = useMemo(
+        () => (selected.length === 1 ? (sources.find((source) => source.id === selected[0]) ?? null) : null),
+        [sources, selected],
+    );
     const permissionDenied = card?.kind === 'permission-denied';
 
     if (card && !permissionDenied) {
@@ -112,18 +125,26 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
                         sources={sources}
                         selected={selected}
                         disabled={permissionDenied}
-                        onSelect={(id) => setSelected(id)}
+                        onSelect={(id, additive) =>
+                            setSelected((current) => (additive ? toggleMergedSource(current, id) : [id]))
+                        }
                     />
+                )}
+                {!permissionDenied && sources.length > 1 && (
+                    <p className="text-[11px] text-text-muted dark:text-text-muted-dark">{t('viewer.mergedHint')}</p>
                 )}
             </aside>
             <div className="min-w-0">
-                {selected && !permissionDenied ? (
+                {selected.length > 0 && !permissionDenied ? (
                     <LogViewer
-                        key={selected}
+                        key={selected.join('|')}
                         nodeId={node.id}
                         nodeName={node.name}
                         source={selectedSource}
-                        sources={[selected]}
+                        sources={selected}
+                        listed={sources}
+                        title={selected.length > 1 ? linkedTitle : null}
+                        at={linkedAt && selected.join('|') === linked.join('|') ? linkedAt : null}
                     />
                 ) : list && sources.length === 0 ? (
                     <LogsEmpty nodeName={node.name} />

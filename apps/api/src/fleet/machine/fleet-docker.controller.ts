@@ -17,6 +17,12 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { fleetMachineError, FleetMachineActionsService } from '@ever-works/agent/fleet';
 import {
+    isFleetComposeAction,
+    isFleetComposeProject,
+    isFleetComposeService,
+    type FleetComposeDescription,
+    type FleetComposeListResult,
+    type FleetContainerShellsResult,
     isFleetContainerAction,
     isFleetContainerRef,
     isFleetDockerId,
@@ -35,6 +41,9 @@ import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
     confirmFieldsOf,
     FleetActionConfirmDto,
+    FleetComposeActionDto,
+    FleetComposeQueryDto,
+    FleetContainerExecDto,
     FleetPullImageDto,
     FleetPruneImagesQueryDto,
     FleetRunContainerDto,
@@ -124,13 +133,22 @@ export class FleetDockerController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('cid') container: string,
         @Param('action') action: string,
-        @Body() body: FleetActionConfirmDto,
+        @Body() body: FleetContainerExecDto,
         @Res({ passthrough: true }) res?: StatusResponse,
         @Req() req?: MachinePrincipalRequest,
     ): Promise<object> {
         refuseMachinePrincipalAction(auth, req, 'change a container on a computer', REFUSAL_WHY);
         if (!isFleetContainerRef(container)) {
             throw fleetMachineError('invalid', 'that is not a container id or name', { field: 'cid' });
+        }
+        // Shell inside (FL-09 P3, FR-35): an owner Session whose process is a shell in the container.
+        if (action === 'exec') {
+            const shell = body.shell;
+            return this.machine.execInContainer(
+                id,
+                { kind: 'user', userId: auth.userId },
+                { container, shell: shell === 'bash' ? 'bash' : 'sh' },
+            );
         }
         if (!isFleetContainerAction(action)) {
             throw fleetMachineError('invalid', 'action must be start, stop, restart or remove', {
@@ -142,6 +160,86 @@ export class FleetDockerController {
                 id,
                 { kind: 'user', userId: auth.userId },
                 { container, action, fields: confirmFieldsOf(body) },
+            ),
+            res,
+        );
+    }
+
+    @Get('nodes/:id/docker/containers/:cid/shells')
+    @ApiOperation({
+        summary: 'Which shells (`bash`, `sh`) a running container has, for “Shell inside”. Needs `--manage`.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async shells(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('cid') container: string,
+    ): Promise<FleetContainerShellsResult> {
+        if (!isFleetContainerRef(container)) {
+            throw fleetMachineError('invalid', 'that is not a container id or name', { field: 'cid' });
+        }
+        return this.machine.containerShells(id, { kind: 'user', userId: auth.userId }, container);
+    }
+
+    @Get('nodes/:id/docker/compose')
+    @ApiOperation({
+        summary:
+            'Every Compose project on a computer (name, status, service count, config files; files missing → only Down), or with `?project=` that project’s services with image, state, health, ports, networks, volumes and `depends_on`. Needs `--manage`.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async compose(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: FleetComposeQueryDto,
+    ): Promise<FleetComposeListResult | FleetComposeDescription> {
+        const caller = { kind: 'user' as const, userId: auth.userId };
+        if (query.project !== undefined) {
+            if (!isFleetComposeProject(query.project)) {
+                throw fleetMachineError('invalid', 'that is not a Compose project name', { field: 'project' });
+            }
+            return this.machine.describeComposeProject(id, caller, query.project);
+        }
+        return this.machine.listComposeProjects(id, caller);
+    }
+
+    @Post('nodes/:id/docker/compose/:project/:action')
+    @ApiOperation({
+        summary:
+            'Bring a Compose project (or one service) up, down, restart it or pull its images — an operation (202 `{ operationId }`). Send `confirm: true`. Down never removes named volumes.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async composeAction(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('project') project: string,
+        @Param('action') action: string,
+        @Body() body: FleetComposeActionDto,
+        @Res({ passthrough: true }) res?: StatusResponse,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<object> {
+        refuseMachinePrincipalAction(auth, req, 'change a Compose project on a computer', REFUSAL_WHY);
+        if (!isFleetComposeProject(project)) {
+            throw fleetMachineError('invalid', 'that is not a Compose project name', { field: 'project' });
+        }
+        if (!isFleetComposeAction(action)) {
+            throw fleetMachineError('invalid', 'action must be up, down, restart or pull', { field: 'action' });
+        }
+        if (body.service !== undefined && !isFleetComposeService(body.service)) {
+            throw fleetMachineError('invalid', 'that is not a Compose service name', { field: 'service' });
+        }
+        return accepted(
+            await this.machine.composeAction(
+                id,
+                { kind: 'user', userId: auth.userId },
+                {
+                    project,
+                    action,
+                    ...(body.service ? { service: body.service } : {}),
+                    fields: confirmFieldsOf(body),
+                },
             ),
             res,
         );

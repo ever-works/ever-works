@@ -1,4 +1,7 @@
 import {
+    isFleetComposeAction,
+    isFleetComposeProject,
+    isFleetComposeService,
     isFleetContainerAction,
     isFleetContainerRef,
     isFleetDockerId,
@@ -55,6 +58,9 @@ export const FLEET_MACHINE_TOOL_ANNOTATIONS: Readonly<
     fleet_docker_run: { destructive: false, confirmationClass: 'confirm' },
     fleet_docker_images_list: { readOnly: true },
     fleet_docker_image_action: { destructive: true, confirmationClass: 'confirm' },
+    fleet_docker_compose_list: { readOnly: true },
+    fleet_docker_compose_describe: { readOnly: true },
+    fleet_docker_compose_action: { destructive: true, confirmationClass: 'confirm' },
 };
 
 /** What a held act stores so a person's approval can run exactly it (no model-authored field). */
@@ -66,7 +72,8 @@ export interface FleetMachineActionProposalPayload {
         | 'docker.container.action'
         | 'docker.run'
         | 'docker.image.remove'
-        | 'docker.image.prune';
+        | 'docker.image.prune'
+        | 'compose.action';
     nodeId: string;
     agentId: string;
     /** `services.action`: name, action, scope, manager. `processes.signal`: pid, signal. */
@@ -104,6 +111,9 @@ export function buildFleetMachineTools(args: {
         | 'containerAction'
         | 'listImages'
         | 'pullImage'
+        | 'listComposeProjects'
+        | 'describeComposeProject'
+        | 'composeAction'
     >;
     /** The approval seam for held acts; null = held acts are refused (fail closed). */
     proposals: AgentProposalToolSource | null;
@@ -443,6 +453,94 @@ export function buildFleetMachineTools(args: {
                     );
                 }
                 return invalid('action', 'action must be pull, remove or prune');
+            } catch (error) {
+                return toolError(error);
+            }
+        },
+    } as TaskToolDescriptor);
+
+    // ─── Compose (P3) ─────────────────────────────────────────────────────
+
+    out.push({
+        name: 'fleet_docker_compose_list',
+        description:
+            'List the Compose projects on one of the owner’s computers with status, service count and config files (files missing → only Down). Read-only. Needs `--manage`.',
+        parameters: {
+            type: 'object',
+            properties: { nodeId: { type: 'string', description: 'The computer (Fleet node id).' } },
+            required: ['nodeId'],
+        },
+        invoke: async (raw) => {
+            const a = (raw ?? {}) as { nodeId?: unknown };
+            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            try {
+                return await args.service.listComposeProjects(a.nodeId, caller);
+            } catch (error) {
+                return toolError(error);
+            }
+        },
+    } as TaskToolDescriptor);
+
+    out.push({
+        name: 'fleet_docker_compose_describe',
+        description:
+            'Describe one Compose project on one of the owner’s computers: each service’s image, state, health, ports, networks, volumes and depends_on. Read-only.',
+        parameters: {
+            type: 'object',
+            properties: {
+                nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
+                project: { type: 'string', description: 'The project name from fleet_docker_compose_list.' },
+            },
+            required: ['nodeId', 'project'],
+        },
+        invoke: async (raw) => {
+            const a = (raw ?? {}) as Record<string, unknown>;
+            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (!isFleetComposeProject(a.project)) return invalid('project', 'that is not a Compose project name');
+            try {
+                return await args.service.describeComposeProject(a.nodeId, caller, a.project);
+            } catch (error) {
+                return toolError(error);
+            }
+        },
+    } as TaskToolDescriptor);
+
+    out.push({
+        name: 'fleet_docker_compose_action',
+        description:
+            'Bring a Compose project (or one service) up, restart it or pull its images on one of the owner’s computers — runs as this Agent, audited, as an operation. Down is held for the owner’s approval (it never removes named volumes).',
+        parameters: {
+            type: 'object',
+            properties: {
+                nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
+                project: { type: 'string', description: 'The project name.' },
+                action: { type: 'string', description: 'up, down, restart or pull.' },
+                service: { type: 'string', description: 'Optional: one service of the project.' },
+            },
+            required: ['nodeId', 'project', 'action'],
+        },
+        invoke: async (raw) => {
+            const a = (raw ?? {}) as Record<string, unknown>;
+            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (!isFleetComposeProject(a.project)) return invalid('project', 'that is not a Compose project name');
+            if (!isFleetComposeAction(a.action)) return invalid('action', 'action must be up, down, restart or pull');
+            if (a.service !== undefined && !isFleetComposeService(a.service)) {
+                return invalid('service', 'that is not a Compose service name');
+            }
+            const service = typeof a.service === 'string' ? a.service : undefined;
+            try {
+                if (a.action === 'down') {
+                    return hold(
+                        { verb: 'compose.action', nodeId: a.nodeId, args: { project: a.project, action: 'down' }, reason: 'destructive' },
+                        `Bring ${a.project} down`,
+                    );
+                }
+                return await args.service.composeAction(a.nodeId, caller, {
+                    project: a.project,
+                    action: a.action,
+                    ...(service ? { service } : {}),
+                    fields: { confirm: true },
+                });
             } catch (error) {
                 return toolError(error);
             }

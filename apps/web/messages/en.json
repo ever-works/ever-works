@@ -13672,6 +13672,12 @@
                 "label": "Last command:",
                 "ago": "{time} ago",
                 "open": "Commands"
+            },
+            "rerun": {
+                "action": "Run again",
+                "label": "Run {command} again",
+                "redacted": "The stored command was redacted — type it again to run it.",
+                "none": "None of these computers can take a command right now."
             }
         },
         "sessions": {
@@ -14183,7 +14189,10 @@
                 "footerBytes": "{bytes} read",
                 "footerRedactions": "{count, plural, one {# redaction} other {# redactions}}",
                 "footerDropped": "Skipped {count} lines — the log is faster than the link",
-                "footerDiscarded": "{count} older lines discarded (5 000 held at most)"
+                "footerDiscarded": "{count} older lines discarded (5 000 held at most)",
+                "mergedTitle": "{title} · {count} sources · {node}",
+                "mergedTitleNoName": "{count} logs merged · {node}",
+                "mergedHint": "Ctrl- or ⌘-click a source to add it to this view (up to 12)."
             },
             "notices": {
                 "groupMembership": "Only this user's entries. To see the whole system log, run on {node}:",
@@ -14333,11 +14342,70 @@
                 "run": "Run"
             },
             "compose": {
-                "arrives": "Compose projects arrive with the next update."
+                "arrives": "Compose projects arrive with the next update.",
+                "loading": "Reading the Compose projects…",
+                "empty": "No Compose projects on {name}.",
+                "projects": "Compose projects",
+                "pick": "Pick a project to see its services.",
+                "filesMissing": "files missing",
+                "filesMissingHint": "The Compose files of this project are gone; only Down is possible.",
+                "picture": "Picture",
+                "list": "List",
+                "logs": "Logs",
+                "pictureLabel": "A picture of {count} services and how they depend on each other",
+                "act": {
+                    "up": "Up",
+                    "down": "Down",
+                    "restart": "Restart",
+                    "pull": "Pull"
+                },
+                "dialog": {
+                    "up": "Bring {name} up on {machine}?",
+                    "down": "Bring {name} down on {machine}?",
+                    "restart": "Restart {name} on {machine}?",
+                    "pull": "Pull the images of {name} on {machine}?",
+                    "downKeeps": "Its {count} containers and network are removed. Named volumes ({volumes}) are kept.",
+                    "downKeepsNone": "Its {count} containers and network are removed. Named volumes are never removed from here."
+                },
+                "running": {
+                    "up": "Bringing {name} up on {machine}",
+                    "down": "Bringing {name} down on {machine}",
+                    "restart": "Restarting {name} on {machine}",
+                    "pull": "Pulling the images of {name} on {machine}"
+                },
+                "done": {
+                    "up": "{name} is up",
+                    "down": "{name} is down",
+                    "restart": "Restarted {name}",
+                    "pull": "Pulled the images of {name}"
+                },
+                "edge": {
+                    "grey": "{from} depends on {to}",
+                    "amber": "{from} waits for {to} to be healthy",
+                    "red": "{from} depends on {to}, which is down"
+                },
+                "state": {
+                    "absent": "not created",
+                    "stopped": "stopped"
+                },
+                "columns": {
+                    "service": "Service",
+                    "image": "Image",
+                    "state": "State",
+                    "health": "Health",
+                    "ports": "Ports",
+                    "volumes": "Volumes",
+                    "networks": "Networks"
+                }
             },
             "runsHere": {
                 "title": "Runs here",
                 "open": "Docker"
+            },
+            "shell": {
+                "label": "Shell inside",
+                "failed": "The shell could not start.",
+                "failedWith": "The shell could not start: {hint}"
             }
         }
     }

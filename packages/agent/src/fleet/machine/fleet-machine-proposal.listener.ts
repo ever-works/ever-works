@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import {
+    isFleetComposeProject,
     isFleetContainerRef,
     isFleetDockerId,
     isFleetDockerName,
@@ -99,6 +100,19 @@ export class FleetMachineProposalListener {
                     return;
                 }
                 await this.machine.removeImage(payload.nodeId, caller, { id: args.id, fields: { confirm: true } });
+                return;
+            }
+            if (payload.verb === 'compose.action') {
+                // Only `down` is ever held.
+                if (args.action !== 'down' || !isFleetComposeProject(args.project)) {
+                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid project; not run`);
+                    return;
+                }
+                await this.machine.composeAction(payload.nodeId, caller, {
+                    project: args.project,
+                    action: 'down',
+                    fields: { confirm: true },
+                });
                 return;
             }
             if (payload.verb === 'docker.image.prune') {

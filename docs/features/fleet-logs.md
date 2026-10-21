@@ -78,6 +78,28 @@ The footer says what the view is doing and what it received: following or paused
 5 000 — older ones go first, and it says so), bytes read, and how many spans the secret scan replaced
 (`[redacted secret]`).
 
+### Several logs at once, and older lines
+
+**Ctrl-click** (⌘-click on a Mac) another source to add it to the open view: up to **12** sources show in one
+viewer, merged by time, each line carrying a coloured chip with its source's name; the filter applies across all
+of them. A Compose project's **Logs** on the Docker tab opens its containers this way. When one of them ends (a
+container removed or stopped), the others keep following.
+
+**Load 500 earlier** adds the 500 lines before the oldest one on screen, without moving what you were reading.
+It works for the system journal, the Windows event logs and files; container logs are bounded by Docker's log
+driver and say so, and the macOS unified log has no earlier page here.
+
+### From a failed service, and keeping a copy
+
+On the **Services** tab, a failed service's **Log** opens the Logs tab on that service **positioned at the time it
+failed**: the first line at or after the failure is highlighted, and the viewer pages back on its own (up to four
+pages) when the failure is older than the last 500 lines. A "needs a look" item for failed services joins once
+the hub has a kind for it.
+
+**Download shown lines** saves the lines on screen — after the filter — as a plain-text file named
+`<computer>-<source>-<time>.log`. The file is made in your browser from what the viewer already holds (lines
+already secret-scanned on the machine); nothing is stored on the platform.
+
 ### Limits and what happens at them
 
 - Live lines arrive at no more than **1 MiB/s**. A log that writes faster has its oldest unsent lines dropped

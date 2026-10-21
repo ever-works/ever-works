@@ -8,8 +8,10 @@ import {
     FLEET_COMMAND_RECENT,
     FLEET_COMMAND_TIMEOUT_CHOICES_SEC,
     type FleetCommandConfirmationDetails,
+    type FleetCommandRunRequest,
     type FleetCommandView,
 } from '@ever-works/contracts';
+import { listNodeCheckoutsAction } from '@/app/actions/fleet-checkouts';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { FleetHubTabProps } from '../registry';
@@ -28,6 +30,17 @@ import {
 
 /** How often a live Command is read again (lane-log decision 1). */
 const POLL_MS = 1_000;
+
+/** The timeout menu's choice for a stored timeout: the smallest choice that is not shorter. */
+function snapTimeout(seconds: number): number {
+    return (
+        FLEET_COMMAND_TIMEOUT_CHOICES_SEC.find((choice) => choice >= seconds) ??
+        FLEET_COMMAND_TIMEOUT_CHOICES_SEC[FLEET_COMMAND_TIMEOUT_CHOICES_SEC.length - 1]
+    );
+}
+
+/** Most computers whose checkouts the folder picker reads at once (P3). */
+const FOLDER_PICKER_MAX_COMPUTERS = 5;
 
 function agoLabel(iso: string | null, now: number): string | null {
     if (!iso) return null;
@@ -54,7 +67,7 @@ function agoLabel(iso: string | null, now: number): string | null {
  * shows it, and only "Run on N" repeats the call with `confirm: true`. Output
  * is read by polling the Command once a second while any run is live.
  */
-export default function CommandsPanel({ nodes }: FleetHubTabProps) {
+export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
     const t = useTranslations('fleet.commands');
     const searchParams = useSearchParams();
     const onlyNode = searchParams?.get('node') ?? null;
@@ -64,6 +77,9 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
     const [cwd, setCwd] = useState('');
     const [timeoutSec, setTimeoutSec] = useState<number>(FLEET_COMMAND_DEFAULT_TIMEOUT_SEC);
     const [confirm, setConfirm] = useState<FleetCommandConfirmationDetails | null>(null);
+    /** Exactly the request the confirmation summarised — what "Run on N" sends. */
+    const [confirmFor, setConfirmFor] = useState<FleetCommandRunRequest | null>(null);
+    const [folders, setFolders] = useState<Array<{ path: string; label: string }>>([]);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<CommandErrorRead | null>(null);
     const [current, setCurrent] = useState<FleetCommandView | null>(null);
@@ -103,19 +119,55 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
     const selectable = rows.filter((row) => row.selectable);
     const chosen = selected.filter((id) => selectable.some((row) => row.nodeId === id));
 
-    const request = () => ({
+    const request = (): FleetCommandRunRequest => ({
         command,
         nodeIds: chosen,
         ...(cwd.trim() ? { cwd: cwd.trim() } : {}),
         timeoutSec,
     });
 
-    /** "Run on N": the platform answers with the confirmation to show. */
-    const onRun = async () => {
-        if (!command.trim() || chosen.length === 0 || pending) return;
+    // Folder picker (P3, T-25): the ready checkouts of the picked computers
+    // (FL-14), offered under the folder field; the field still takes any path.
+    const checkoutsOn = flags?.FLEET_CHECKOUTS_ENABLED === true;
+    const chosenKey = chosen.join(',');
+    useEffect(() => {
+        const ids = chosenKey ? chosenKey.split(',') : [];
+        if (!checkoutsOn || ids.length === 0 || ids.length > FOLDER_PICKER_MAX_COMPUTERS) {
+            setFolders([]);
+            return;
+        }
+        let cancelled = false;
+        void Promise.all(
+            ids.map(async (nodeId) => {
+                const result = await listNodeCheckoutsAction(nodeId, { state: 'ready' }).catch(() => null);
+                if (!result || !result.success) return [];
+                const name = nodes.find((node) => node.id === nodeId)?.name ?? '';
+                return result.data.data.map((checkout) => ({
+                    path: checkout.path,
+                    label: checkout.repository ? `${name} · ${checkout.repository}` : name,
+                }));
+            }),
+        ).then((lists) => {
+            if (cancelled) return;
+            const seen = new Set<string>();
+            const out: Array<{ path: string; label: string }> = [];
+            for (const entry of lists.flat()) {
+                if (seen.has(entry.path)) continue;
+                seen.add(entry.path);
+                out.push(entry);
+            }
+            setFolders(out.slice(0, 100));
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [checkoutsOn, chosenKey, nodes]);
+
+    /** Ask the platform: it answers with the confirmation to show (CONTRACTS §2.2). */
+    const ask = async (next: FleetCommandRunRequest) => {
         setPending(true);
         setError(null);
-        const result = await commandsClient.run(request());
+        const result = await commandsClient.run(next);
         setPending(false);
         if (result.ok) {
             // A platform that needs no confirmation (never today) ran it already.
@@ -125,16 +177,56 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
         }
         const details =
             result.error.code === 'confirmation_required' ? readCommandConfirmation(result.error.details) : null;
-        if (details) setConfirm(details);
-        else setError(result.error);
+        if (details) {
+            setConfirm(details);
+            setConfirmFor(next);
+        } else setError(result.error);
+    };
+
+    /** "Run on N". */
+    const onRun = async () => {
+        if (!command.trim() || chosen.length === 0 || pending) return;
+        await ask(request());
+    };
+
+    /**
+     * Re-run from Recent (P3, T-26, spec FR-17): the composer is filled from the
+     * stored Command and the confirmation opens. A command line the platform
+     * stored redacted is not re-run (it would run the placeholder): the person
+     * types it again.
+     */
+    const onRerun = async (view: FleetCommandView) => {
+        if (pending) return;
+        if (view.commandRedacted) {
+            setError({ code: 'invalid', hint: t('rerun.redacted'), details: {}, status: 400 });
+            return;
+        }
+        const nodeIds = view.nodeIds.filter((id) => selectable.some((row) => row.nodeId === id));
+        const snapped = snapTimeout(view.timeoutSec);
+        setCommand(view.command);
+        setCwd(view.cwd ?? '');
+        setTimeoutSec(snapped);
+        setSelected(nodeIds);
+        if (nodeIds.length === 0) {
+            setError({ code: 'unreachable', hint: t('rerun.none'), details: {}, status: 503 });
+            return;
+        }
+        await ask({
+            command: view.command,
+            nodeIds,
+            ...(view.cwd ? { cwd: view.cwd } : {}),
+            timeoutSec: snapped,
+        });
     };
 
     const onConfirm = async () => {
+        if (!confirmFor) return;
         setPending(true);
         setError(null);
-        const result = await commandsClient.run({ ...request(), confirm: true });
+        const result = await commandsClient.run({ ...confirmFor, confirm: true });
         setPending(false);
         setConfirm(null);
+        setConfirmFor(null);
         if (!result.ok) {
             setError(result.error);
             return;
@@ -278,9 +370,17 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
                             onChange={(event) => setCwd(event.target.value)}
                             placeholder={t('composer.folderPlaceholder')}
                             spellCheck={false}
+                            list={folders.length > 0 ? 'fleet-command-folders' : undefined}
                             className="mt-1 rounded-md border border-border bg-transparent px-2 py-1 font-mono text-sm text-text dark:border-border-dark dark:text-text-dark"
                             data-testid="fleet-command-folder"
                         />
+                        {folders.length > 0 && (
+                            <datalist id="fleet-command-folders" data-testid="fleet-command-folder-checkouts">
+                                {folders.map((folder) => (
+                                    <option key={folder.path} value={folder.path} label={folder.label} />
+                                ))}
+                            </datalist>
+                        )}
                     </label>
                     <Button
                         variant="primary"
@@ -313,9 +413,20 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
                 <section data-testid="fleet-command-result" data-command-id={current.id}>
                     <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                         <code className="truncate font-mono text-sm text-text dark:text-text-dark">{`$ ${current.command}`}</code>
-                        {commandIsLive(current.runs) && (
+                        {commandIsLive(current.runs) ? (
                             <Button variant="secondary" size="sm" onClick={() => void onStop()} data-testid="fleet-command-stop">
                                 {t('stop')}
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => void onRerun(current)}
+                                disabled={pending}
+                                title={current.commandRedacted ? t('rerun.redacted') : undefined}
+                                data-testid="fleet-command-rerun"
+                            >
+                                {t('rerun.action')}
                             </Button>
                         )}
                     </header>
@@ -347,15 +458,26 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
                 ) : (
                     <ul className="flex flex-wrap gap-2">
                         {recent.map((entry) => (
-                            <li key={entry.id}>
+                            <li key={entry.id} className="flex items-stretch">
                                 <button
                                     type="button"
                                     onClick={() => void openRecent(entry.id)}
-                                    className="max-w-[18rem] truncate rounded border border-border px-2 py-1 font-mono text-xs text-text hover:bg-black/5 dark:border-border-dark dark:text-text-dark dark:hover:bg-white/5"
+                                    className="max-w-[18rem] truncate rounded-l border border-border px-2 py-1 font-mono text-xs text-text hover:bg-black/5 dark:border-border-dark dark:text-text-dark dark:hover:bg-white/5"
                                     title={entry.command}
                                     data-testid="fleet-command-recent-item"
                                 >
                                     {entry.command}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => void onRerun(entry)}
+                                    disabled={pending}
+                                    className="rounded-r border border-l-0 border-border px-1.5 text-xs text-text-muted hover:bg-black/5 disabled:opacity-50 dark:border-border-dark dark:text-text-muted-dark dark:hover:bg-white/5"
+                                    aria-label={t('rerun.label', { command: entry.command })}
+                                    title={t('rerun.action')}
+                                    data-testid="fleet-command-recent-rerun"
+                                >
+                                    ↻
                                 </button>
                             </li>
                         ))}
@@ -367,7 +489,10 @@ export default function CommandsPanel({ nodes }: FleetHubTabProps) {
                 open={confirm !== null}
                 details={confirm}
                 pending={pending}
-                onCancel={() => setConfirm(null)}
+                onCancel={() => {
+                    setConfirm(null);
+                    setConfirmFor(null);
+                }}
                 onConfirm={() => void onConfirm()}
             />
         </div>
