@@ -20,6 +20,7 @@ import {
 } from '../policy/promotion-merge-guard.port';
 import { TaskWorkspaceService, type TaskAgentMergeOutcome } from './task-workspace.service';
 import { taskRepositoryFullName } from './task-repository';
+import { appHumanMergePathsEnforced } from './app-work-change-gate.port';
 
 /** What one post-CI evaluation did, for logs and for the sweep summary. */
 export type TaskMergeGateOutcome =
@@ -152,6 +153,17 @@ export class TaskMergeGateService {
         if (task.status === TaskStatus.BLOCKED) {
             return { action: 'skipped', reason: 'task-blocked' };
         }
+        // Works-security (2026-10-18, item 7b) — the pull request is merged by
+        // NUMBER, and everything that judged it (the App Work change gate, the
+        // reviewer stage, the approval the human reads) judged the Task's
+        // BRANCH. Pin the two together: a pull request whose live head is not
+        // the Task's branch, or does not live in the Task's repository, is not
+        // this Task's pull request — whatever `tasks.prNumber` says.
+        const headMismatch = pullRequestHeadMismatch(task, status);
+        if (headMismatch) {
+            this.logger.warn(`Task ${task.id}: PR #${task.prNumber} ${headMismatch} — refusing the merge.`);
+            return { action: 'skipped', reason: 'pr-head-ref-mismatch' };
+        }
 
         // Release promotion lane (slice AI) — the extra refusal, applied
         // BEFORE any approval is raised and before any merge is attempted.
@@ -178,6 +190,15 @@ export class TaskMergeGateService {
 
         const work = await this.works.findById(task.workId);
         if (!work) return { action: 'skipped', reason: 'no-work' };
+        // Works-security (2026-10-18, item 7b) — the head's repository too:
+        // a fork that reused the Task's branch name is not the Task's branch.
+        const headRepoMismatch = pullRequestHeadRepoMismatch(taskRepositoryFullName(work), status);
+        if (headRepoMismatch) {
+            this.logger.warn(
+                `Task ${task.id}: PR #${task.prNumber} ${headRepoMismatch} — refusing the merge.`,
+            );
+            return { action: 'skipped', reason: 'pr-head-repo-mismatch' };
+        }
 
         // APW-08 — an App Work pull request is judged AGAIN at its current head
         // before anyone is asked to approve it or it is merged. The status check
@@ -189,6 +210,16 @@ export class TaskMergeGateService {
         if (appVerdict && appVerdict.allowed !== true) {
             return { action: 'skipped', reason: appVerdict.reason };
         }
+        // Works-security (2026-10-18, item 5) — the change touches a path the
+        // App spec's `agents.requireHumanMergePaths` (read at the BASE commit,
+        // so not one the agent wrote) reserves for a person: it may merge only
+        // with a recorded human approval, whatever the merge policy says.
+        // Raised below exactly like the protected-branch floor.
+        const humanMergePaths =
+            appVerdict && appVerdict.allowed === true && appHumanMergePathsEnforced()
+                ? (appVerdict.humanMergePaths ?? [])
+                : [];
+        const humanMergeRequired = humanMergePaths.length > 0;
 
         // Post-deploy verification and revert (slice AJ, EW-809) — the
         // SECOND narrowing, and it exists because undoing a promotion is
@@ -281,7 +312,8 @@ export class TaskMergeGateService {
             resolved.policy.requireHumanApproval ||
             promotion !== null ||
             revertBase !== null ||
-            floorTarget;
+            floorTarget ||
+            humanMergeRequired;
 
         if (!needsApproval) {
             // The operator opted out of approvals for this scope. Green
@@ -315,7 +347,8 @@ export class TaskMergeGateService {
                 // the promotion landed on. Never the Work's default; see
                 // `attemptMergeForOpenPullRequest`.
                 baseRef: promotion?.baseBranch ?? revertBase,
-                requireHumanApproval: promotion !== null || revertBase !== null || floorTarget,
+                requireHumanApproval:
+                    promotion !== null || revertBase !== null || floorTarget || humanMergeRequired,
             });
             return { action: 'merge-attempted', merge };
         }
@@ -454,4 +487,44 @@ function resolveRevertBase(
     const rung = releaseRevertRungFromLabels(task.labels);
     if (!rung) return null;
     return resolvePromotionBranches(work.releaseLadder, rung)?.base ?? null;
+}
+
+/**
+ * Works-security (2026-10-18, item 7b) — why the live pull request is not the
+ * Task's own, or `null` when it is (or nothing can be compared).
+ *
+ * The provider reports the head BRANCH name (`headRef`); the Task records the
+ * branch every gate judged (`branchRef`). Compared only when both are known:
+ * a provider read without `headRef` (older plugin, a double) and a Task with
+ * no recorded branch (a promotion, which pins its own branches) keep the
+ * previous behaviour.
+ */
+export function pullRequestHeadMismatch(
+    task: Pick<Task, 'branchRef'>,
+    status: Pick<GitPullRequestStatus, 'headRef'>,
+): string | null {
+    const recorded = typeof task.branchRef === 'string' ? task.branchRef.trim() : '';
+    const live = typeof status.headRef === 'string' ? status.headRef.trim() : '';
+    if (!recorded || !live) return null;
+    if (live === recorded) return null;
+    return `merges branch \`${live}\`, not the Task's branch \`${recorded}\``;
+}
+
+/**
+ * Works-security (2026-10-18, item 7b) — why the live pull request's head does
+ * not live in the Task's repository, or `null` when it does (or either side is
+ * unknown). A Task's pull request is opened from a branch of its own
+ * repository; one whose head lives in another repository (a fork that reused
+ * the branch name) carries commits no gate here ever read.
+ */
+export function pullRequestHeadRepoMismatch(
+    expectedFullName: string | null,
+    status: Pick<GitPullRequestStatus, 'headRepoFullName'>,
+): string | null {
+    const expected = (expectedFullName ?? '').trim().toLowerCase();
+    const live =
+        typeof status.headRepoFullName === 'string' ? status.headRepoFullName.trim().toLowerCase() : '';
+    if (!expected || !live) return null;
+    if (live === expected) return null;
+    return `has its head in \`${status.headRepoFullName}\`, not in \`${expectedFullName}\``;
 }

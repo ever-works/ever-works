@@ -43,6 +43,23 @@ export const APP_WORK_CHANGE_GATE = Symbol('APP_WORK_CHANGE_GATE');
  */
 export const APP_WORK_SPEC_PATH = '.works/works.yml';
 
+/**
+ * Works-security (2026-10-18) — `agents.requireHumanMergePaths` ("paths whose
+ * changes only a person may merge, whatever the merge policy says") was
+ * resolved into the Work's rules and then read by nobody, so a Work whose
+ * policy lets agents merge on green CI merged a change the spec said a person
+ * must merge. The change guard now names the matching paths on an allowed
+ * verdict and `TaskMergeGateService` raises a recorded human approval for
+ * them. Declared HERE (no runtime imports) so the merge gate can read it
+ * without importing `app-works/`. On unless the operator sets it to `false`.
+ */
+export const APP_HUMAN_MERGE_PATHS_ENV = 'APP_HUMAN_MERGE_PATHS_ENFORCED' as const;
+
+/** Default-safe: only an explicit `false` stops the merge gate asking a person. */
+export function appHumanMergePathsEnforced(): boolean {
+    return (process.env[APP_HUMAN_MERGE_PATHS_ENV] ?? '').trim().toLowerCase() !== 'false';
+}
+
 /** What the finalize path hands the gate. Every value is one it resolved itself. */
 export interface AppWorkChangeGateInput {
     readonly work: Work;
@@ -67,7 +84,17 @@ export interface AppWorkChangeGateInput {
  * Task to transition and a message to post, not a stack trace to surface.
  */
 export type AppWorkChangeGateVerdict =
-    | { readonly allowed: true; readonly note: string | null }
+    | {
+          readonly allowed: true;
+          readonly note: string | null;
+          /**
+           * Works-security (2026-10-18) — the changed paths matching the base
+           * commit's `agents.requireHumanMergePaths`, present only when
+           * non-empty: the change may be a pull request, but only a person may
+           * merge it (the merge gate raises the approval).
+           */
+          readonly humanMergePaths?: readonly string[];
+      }
     | { readonly allowed: false; readonly message: string; readonly paths: readonly string[] };
 
 /**

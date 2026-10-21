@@ -100,7 +100,14 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 taskOrigin: input.taskOrigin,
             });
 
-            if (verdict.allowed) return { allowed: true, note: verdict.note };
+            if (verdict.allowed) {
+                // Works-security (2026-10-18) — carried through only when the
+                // guard named human-merge paths, so every other answer keeps
+                // its exact shape.
+                return verdict.humanMergePaths && verdict.humanMergePaths.length > 0
+                    ? { allowed: true, note: verdict.note, humanMergePaths: verdict.humanMergePaths }
+                    : { allowed: true, note: verdict.note };
+            }
             return {
                 allowed: false,
                 message: verdict.message ?? 'This change was refused by the Work’s rules.',
