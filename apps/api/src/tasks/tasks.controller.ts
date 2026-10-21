@@ -155,19 +155,6 @@ function clampNumeric(raw: string | undefined, max: number): number {
 }
 
 /**
- * `requireAllApprovers` is refused for a FLEET-RUN credential unless it
- * only makes the gate stricter (found in review of self-build slice AD,
- * EW-811).
- *
- * The flag is the approver POLICY: `→ done` runs its approver check only
- * while it is true, so `false` switches the gate off for every approver,
- * human or agent — the same override as `force` on a transition. The MCP
- * whitelist withholds it (`omitArgs: ['requireAllApprovers']` on create and
- * update), but a fleet-run token acts AS the owner on routes the token
- * surface admits, and a path allowlist cannot see a body field. `true` (the
- * default) is let through: it can only keep the gate on.
- */
-/**
  * Works-security (2026-10-18) — the trailing `TasksService.create` / `update`
  * options argument that restricts a machine principal's reserved-label writes,
  * or NO argument for a person (so a person's call is exactly what it was).
@@ -180,6 +167,19 @@ function reservedLabelOptionsOf(
     return restrictReservedLabels ? [{ restrictReservedLabels }] : [];
 }
 
+/**
+ * `requireAllApprovers` is refused for a FLEET-RUN credential unless it
+ * only makes the gate stricter (found in review of self-build slice AD,
+ * EW-811).
+ *
+ * The flag is the approver POLICY: `→ done` runs its approver check only
+ * while it is true, so `false` switches the gate off for every approver,
+ * human or agent — the same override as `force` on a transition. The MCP
+ * whitelist withholds it (`omitArgs: ['requireAllApprovers']` on create and
+ * update), but a fleet-run token acts AS the owner on routes the token
+ * surface admits, and a path allowlist cannot see a body field. `true` (the
+ * default) is let through: it can only keep the gate on.
+ */
 function refuseRunTokenApproverPolicy(
     body: { requireAllApprovers?: unknown } | null | undefined,
     req: { fleetRunCredential?: unknown } | undefined,
