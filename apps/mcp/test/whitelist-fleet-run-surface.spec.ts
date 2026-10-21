@@ -141,6 +141,15 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_operations_list: "a person's long operations",
 	fleet_nodes_git_identity_get: "a computer's git identity",
 	fleet_tasks_handoff_options: "a person's computers, checkouts and agents for a Task",
+	// FL-19 P2 — the catalogue's acts on MCP: every one changes a computer.
+	fleet_services_action: 'starts and stops services on a computer',
+	fleet_processes_signal: 'signals processes on a computer',
+	fleet_docker_container_action: 'starts, stops and removes containers on a computer',
+	fleet_docker_image_action: 'removes images on a computer',
+	fleet_docker_compose_action: 'brings Compose projects up and down on a computer',
+	fleet_nodes_wake: 'wakes a computer',
+	fleet_nodes_git_identity_set: "writes a computer's git identity",
+	fleet_operations_cancel: "stops a person's operation",
 	// FL-05 P2: typing an answer into a person's session prompt.
 	fleet_sessions_answer: "answers a prompt in a person's session"
 };

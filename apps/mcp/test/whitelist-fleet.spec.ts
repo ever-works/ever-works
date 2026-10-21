@@ -25,8 +25,12 @@ const WITHHELD: Record<string, string> = {
 	fleet_nodes_get: 'legacy get_fleet_node (GET /api/fleet/nodes/{id})',
 	// Its answer carries a one-time address into the person's tunnel (FL-10 spec U15).
 	fleet_ports_preview_open: 'one-time tunnel address',
-	// A question is read off the session itself (fleet_sessions_read) until FL-05 lands.
-	fleet_sessions_question: 'same route as fleet_sessions_read'
+	// A question is read off the session itself (fleet_sessions_read).
+	fleet_sessions_question: 'same route as fleet_sessions_read',
+	// P2: a container run may carry secret values a person types in the Run dialog (FL-09 Q5).
+	fleet_docker_run: 'secret values are typed by a person',
+	// The pull is a POST on the images collection; MCP keeps one tool per image action route.
+	fleet_docker_compose_describe: 'no REST route'
 };
 
 /** FL-19 P1 exposes reads; the acts of every family arrive in P2 (they may already exist). */
@@ -44,6 +48,15 @@ describe('MCP whitelist ↔ fleet tool catalogue (FL-19)', () => {
 	it('exposes every live catalogue read with a route, unless withheld with a reason', () => {
 		const exposed = new Set(fleetEntries.map((entry) => entry.toolName));
 		const missing = liveReadRows
+			.filter((entry) => !(entry.name in WITHHELD))
+			.filter((entry) => !exposed.has(entry.name))
+			.map((entry) => entry.name);
+		expect(missing).toEqual([]);
+	});
+
+	it('exposes every live catalogue act with a route (P2), unless withheld with a reason', () => {
+		const exposed = new Set(fleetEntries.map((entry) => entry.toolName));
+		const missing = FLEET_TOOL_CATALOGUE.filter((entry) => entry.status === 'live' && !entry.readOnly && entry.route)
 			.filter((entry) => !(entry.name in WITHHELD))
 			.filter((entry) => !exposed.has(entry.name))
 			.map((entry) => entry.name);
