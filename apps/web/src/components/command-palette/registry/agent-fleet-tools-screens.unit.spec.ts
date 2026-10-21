@@ -15,7 +15,8 @@ describe('agent fleet tools palette entry', () => {
     it('offers the Fleet tools block of that Agent', () => {
         const [screen] = agentFleetToolsScreens(`/agents/${AGENT}/settings`);
         expect(screen.href).toBe(`/agents/${AGENT}/capabilities#fleet-tools`);
-        expect(screen.title((key) => key)).toBe('fleet.tools.palette.forThisAgent');
+        const t = Object.assign((key: string) => key, { has: () => true });
+        expect(screen.title(t)).toBe('fleet.tools.palette.forThisAgent');
     });
 
     it('is absent elsewhere and with the hub off', () => {
