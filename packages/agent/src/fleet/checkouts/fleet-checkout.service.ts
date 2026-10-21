@@ -575,7 +575,7 @@ export class FleetCheckoutService {
         const needsWorks = reply.checkouts.some((record) => record.remoteUrl);
         const works = needsWorks ? await this.worksOf(node.userId) : [];
         const now = new Date(this.now());
-        const state = this.lists.get(node.id) ?? {
+        const state: NodeListState = this.lists.get(node.id) ?? {
             meta: {
                 codeFolders: null,
                 scannedAt: null,
