@@ -153,6 +153,15 @@ started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDU
 on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
 'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
 
+**Revision 22 (2026-10-22)** — FL-06 P3 (lane log decisions 21–25): Clean up is `DELETE /checkouts/:id?cleanUp=1`,
+whose gate also refuses while a live session uses the worktree (`invalid`, rule `live-session`); `GET`/`PUT
+/api/fleet/agents/:agentId/action-templates` answer `FleetAgentActionTemplates { agentId, agentName, branchPrefix{ value,
+default }, actions{ <id>: { value, default } }, error, agentYml, hash }` (the PUT takes `{ branchPrefix?, actions?,
+expectedHash? }` and saves `agent.yml` through the Agent file service); Agent tools and MCP tools
+`fleet_sessions_actions_list` (readOnly), `fleet_sessions_action` (`plain`), `fleet_checkouts_changes` (readOnly),
+`fleet_checkouts_pull_request_get` (MCP, readOnly), `fleet_checkouts_open_pull_request` (`plain`, never merges); CLI
+`fleet session actions|action`, `fleet checkout changes|pull-request`, `fleet checkout delete --clean-up`.
+
 **Revision 21 (2026-10-21)** — FL-06 P2 (lane log decisions 13–20): `GET /sessions/:id/actions` answers
 `FleetSessionActionsResponse { sessionId, actions[{ id, available, reason?, update?, warning?, unresolvedComments?,
 readAsAnswer? }], templates{ <id>: { text, source: default|agent } }, context, disabled }`; `POST /sessions/:id/actions

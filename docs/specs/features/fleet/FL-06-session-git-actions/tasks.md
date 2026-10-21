@@ -168,7 +168,7 @@
 
 ## P3 — Clean up, tools, editor
 
-- [ ] **T-23**. Clean up over FL-14's delete (no new route): add the `cleanUp=1` gate (worktree,
+- [x] **T-23**. Clean up over FL-14's delete (no new route): add the `cleanUp=1` gate (worktree,
       PR merged/closed, no live session → else `invalid` with the rule named) to FL-14's
       `DELETE /api/fleet/checkouts/:id` in `apps/api/src/fleet/fleet-checkouts.controller.ts`, and
       `CleanUpButton.tsx` on FL-05's card and FL-14's `CheckoutRow.tsx` (FL-14's delete preview →
@@ -176,14 +176,14 @@
       **Test**: extend `apps/api/src/fleet/fleet-checkouts.controller.spec.ts` (gating codes; no
       gate without `cleanUp=1`), `CleanUpButton.unit.spec.tsx` (visibility matrix), FL-14 handler
       spec — branch kept.
-- [ ] **T-24**. Tools `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` in
+- [x] **T-24**. Tools `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` in
       `packages/agent/src/fleet/agent-fleet-tools.ts` with §11.3 annotations (Agent Clean up is
       FL-14's `fleet_checkouts_delete` with `cleanUp`); MCP whitelist entries;
       CLI `apps/cli/src/commands/fleet/sessions.ts` (`action`, `changes`, `pull-request`) and a
       `--clean-up` flag on FL-14's `apps/cli/src/commands/fleet/checkouts.ts` `delete`.
       **Test**: `agent-fleet-tools.spec.ts` extended (annotations, audience refusals), CLI command spec
       `apps/cli/src/commands/fleet/__tests__/sessions.spec.ts` (`--json`, exit codes).
-- [ ] **T-25**. `apps/web/src/components/agents/AgentInstructionsEditor.tsx` — **Fleet actions**
+- [x] **T-25**. `apps/web/src/components/agents/AgentInstructionsEditor.tsx` — **Fleet actions**
       section over the `agent.yml` pill: seven template fields with the default beside each, branch
       prefix; writes through the existing agent-file save path.
       **Test**: `AgentInstructionsEditor.unit.spec.tsx` extended — override round-trip, default shown,
@@ -191,12 +191,12 @@
 
 ## P4 — Docs and rollout
 
-- [ ] **T-26**. Write `docs/features/fleet-session-git.md` (git line, worktree default and naming,
+- [x] **T-26**. Write `docs/features/fleet-session-git.md` (git line, worktree default and naming,
       actions and templates, pull requests via the GitHub App, clean up, cost); add to
       `apps/docs/sidebarsPlatform.ts` beside `'features/fleet'` (`:183`); cross-link from
       `docs/features/sessions-and-steering.md` and `docs/features/task-isolation.md`.
       **Test**: docs build has no broken-link warning.
-- [ ] **T-27**. Update `docs/specs/features/fleet/TRACKER.md`; add the §11.2 paths and the
+- [x] **T-27**. Update `docs/specs/features/fleet/TRACKER.md`; add the §11.2 paths and the
       owner-session ledger resolution raised in spec §8b to CONTRACTS in the same PR (the §3.3 and
       §10 entries already landed in CONTRACTS rev 2); run the banned-terms grep over the folder.
       **Test**: grep prints nothing.
