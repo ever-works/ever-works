@@ -41,17 +41,6 @@ import {
     WorkProposalService,
     WorkProposalStatus,
 } from '@ever-works/agent/user-research';
-
-/**
- * Works-security lane (integration API gates, finding 5) — the Idea statuses
- * whose title and description an integration may still change. Once queued or
- * building, the build executor reads the description at run time as the
- * build's brief; an accepted or failed Idea is history.
- */
-const EDITABLE_IDEA_STATUSES: readonly WorkProposalStatus[] = [
-    WorkProposalStatus.PENDING,
-    WorkProposalStatus.DISMISSED,
-];
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
@@ -81,6 +70,17 @@ import {
     IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
+
+/**
+ * Works-security lane (integration API gates, finding 5) — the Idea statuses
+ * whose title and description an integration may still change. Once queued or
+ * building, the build executor reads the description at run time as the
+ * build's brief; an accepted or failed Idea is history.
+ */
+const EDITABLE_IDEA_STATUSES: readonly WorkProposalStatus[] = [
+    WorkProposalStatus.PENDING,
+    WorkProposalStatus.DISMISSED,
+];
 
 /** The Idea title limit (`work_proposals.title varchar(120)`). */
 const IDEA_TITLE_MAX = 120;
