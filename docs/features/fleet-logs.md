@@ -78,6 +78,17 @@ The footer says what the view is doing and what it received: following or paused
 5 000 — older ones go first, and it says so), bytes read, and how many spans the secret scan replaced
 (`[redacted secret]`).
 
+### Several logs at once, and older lines
+
+**Ctrl-click** (⌘-click on a Mac) another source to add it to the open view: up to **12** sources show in one
+viewer, merged by time, each line carrying a coloured chip with its source's name; the filter applies across all
+of them. A Compose project's **Logs** on the Docker tab opens its containers this way. When one of them ends (a
+container removed or stopped), the others keep following.
+
+**Load 500 earlier** adds the 500 lines before the oldest one on screen, without moving what you were reading.
+It works for the system journal, the Windows event logs and files; container logs are bounded by Docker's log
+driver and say so, and the macOS unified log has no earlier page here.
+
 ### Limits and what happens at them
 
 - Live lines arrive at no more than **1 MiB/s**. A log that writes faster has its oldest unsent lines dropped
