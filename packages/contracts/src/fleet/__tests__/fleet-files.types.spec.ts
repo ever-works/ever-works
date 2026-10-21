@@ -55,7 +55,8 @@ describe('FL-11 files — paths', () => {
 	it('names have no separator, dots or control characters', () => {
 		expect(isFleetFileName('app.ts')).toBe(true);
 		expect(isFleetFileName('.env')).toBe(true);
-		for (const bad of ['', '.', '..', 'a/b', 'a\\b', 'a\nb', 'x'.repeat(256)]) expect(isFleetFileName(bad)).toBe(false);
+		for (const bad of ['', '.', '..', 'a/b', 'a\\b', 'a\nb', 'x'.repeat(256)])
+			expect(isFleetFileName(bad)).toBe(false);
 	});
 
 	it('parses channel params', () => {
@@ -138,7 +139,13 @@ describe('FL-11 files — conflict policy (FR-13)', () => {
 
 describe('FL-11 files — the files stream', () => {
 	it('round-trips header and byte records', () => {
-		const header = encodeFleetFilesHeaderRecord({ path: 'a/b.txt', kind: 'file', size: 3, mode: 0o644, mtimeMs: 1 })!;
+		const header = encodeFleetFilesHeaderRecord({
+			path: 'a/b.txt',
+			kind: 'file',
+			size: 3,
+			mode: 0o644,
+			mtimeMs: 1
+		})!;
 		const bytes = encodeFleetFilesBytesRecord(new Uint8Array([1, 2, 3]))!;
 		const payload = new Uint8Array(header.byteLength + bytes.byteLength);
 		payload.set(header, 0);
@@ -183,7 +190,9 @@ describe('FL-11 files — the files stream', () => {
 
 	it('tracks sizes and limits', () => {
 		const tracker = new FleetFilesStreamTracker();
-		expect(tracker.push({ tag: 0x48, header: { path: 'a', kind: 'file', size: 2, mode: 0, mtimeMs: 0 } })).toBeNull();
+		expect(
+			tracker.push({ tag: 0x48, header: { path: 'a', kind: 'file', size: 2, mode: 0, mtimeMs: 0 } })
+		).toBeNull();
 		expect(tracker.complete).toBe(false);
 		expect(tracker.push({ tag: 0x42, bytes: new Uint8Array(3) })).toMatch(/longer/);
 		const ok = new FleetFilesStreamTracker();
