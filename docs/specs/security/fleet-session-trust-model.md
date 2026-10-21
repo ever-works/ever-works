@@ -153,6 +153,33 @@ finalize commit now runs `--no-verify` with `core.hooksPath` pointed at an empty
 
 ---
 
+## 4a. The node link (FL-02)
+
+The node link (`/ws/fleet/link`, [`docs/features/fleet-node-link.md`](../../features/fleet-node-link.md)) adds one
+outbound, multiplexed connection per computer. Its trust rules:
+
+- **Outbound only, token in the first frame.** The node mints a five-minute, single-use, node-bound link token through
+  its own credential; a used, expired, foreign or malformed token is one undifferentiated close (`4001`). A query
+  string on the upgrade is destroyed before any handler runs. Plain `http:` only to loopback.
+- **The platform opens channels; the node refuses what it did not consent to.** Before an open the platform checks the
+  fleet stop switch, the node's reported consent for the family, then the caller's family audience (FL-01 role
+  derivation; outside `view` → `not_found`, so a refusal never confirms a computer exists). The node re-checks the
+  consent itself and refuses any channel the platform did not open, any frame over 16 MiB, and any verb no module
+  owns.
+- **Consents are the machine owner's.** They are process-scoped start flags (or the desktop app's local file); nothing
+  on the platform can grant one. A consent withdrawn on the next heartbeat closes every channel that needed it.
+- **Viewers never drive by token alone.** A viewer attaches with a 60-second single-use token carrying a role; input
+  from a `viewer` is answered with an error frame and never forwarded. A live view's machine leg over the link is
+  opened only for a view pinned to that node and live, and the live-view relay's own control rules decide what reaches
+  the machine.
+- **Self-update is opt-in and refuses to guess.** `--auto-update` upgrades only an npm global install identified from
+  the running binary's real path, through the machine's own npm, never while a job runs; anything else is refused and
+  reported. It is a convenience, not a trust boundary: the version floor fails open on an unparseable version.
+- **Never logged.** Frames are never logged; control messages by type and id only; audit rows carry family, target and
+  caller.
+
+---
+
 ## 5. Revision log
 
 | Date       | Author                                     | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
