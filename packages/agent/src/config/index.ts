@@ -748,6 +748,20 @@ export const config = {
             );
         },
         /**
+         * Commands on computers (FL-12, CONTRACTS §9) — `FLEET_COMMANDS_ENABLED`
+         * (shared with FL-13's Schedules). Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every `/api/fleet/commands**`
+         * route answers 404 (the surface is not even confirmed). A Command needs
+         * the node link, so the link flag gates the machine calls on its own.
+         * Read per call: flipping it needs no restart.
+         */
+        isCommandsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_COMMANDS_ENABLED === 'true'
+            );
+        },
+        /**
          * Machine facts (FL-08, FL-09, FL-10 P1, FL-11 — CONTRACTS §9) —
          * `FLEET_MACHINE_FACTS_ENABLED`. Off unless set to `true`, and never
          * without `FLEET_ENABLED`: with it off every logs, services, Docker,
@@ -804,6 +818,17 @@ export const config = {
                 process.env.FLEET_ENABLED !== 'false' &&
                 process.env.FLEET_CHECKOUTS_ENABLED === 'true'
             );
+        },
+        /**
+         * Checkouts on computers (FL-14 P3, spec §8b) — the image a
+         * container-isolated checkout's sessions and commands run in
+         * (`FLEET_CHECKOUT_CONTAINER_IMAGE`). One deployment default; no per-Work
+         * override. Anything that is not a plain image reference falls back to
+         * the default rather than reaching `docker run`.
+         */
+        getCheckoutContainerImage(): string {
+            const raw = (process.env.FLEET_CHECKOUT_CONTAINER_IMAGE ?? '').trim();
+            return /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}$/.test(raw) ? raw : 'node:22-bookworm';
         },
         /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`

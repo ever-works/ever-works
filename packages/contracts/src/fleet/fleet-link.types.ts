@@ -399,7 +399,13 @@ export const FLEET_LINK_VERB_CONSENT_OVERRIDES: Readonly<Record<string, FleetLin
 	 * lists the Task worktrees it holds; DISCOVERY (`rescan`) needs `--manage`,
 	 * which the verb checks on the machine and the platform narrows to.
 	 */
-	'checkouts.list': 'work-or-manage'
+	'checkouts.list': 'work-or-manage',
+	/**
+	 * Checkouts on computers (FL-14 P2, spec S9, U2): a Task run's checkout
+	 * needs only `--work`; a person's or an Agent's needs `--manage`, which the
+	 * verb checks on the machine from `createdBy` and the platform narrows to.
+	 */
+	'checkouts.create': 'work-or-manage'
 };
 
 /** The consent one `machine` verb needs: its exception, else the family's. */

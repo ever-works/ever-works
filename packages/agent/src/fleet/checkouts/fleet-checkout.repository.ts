@@ -45,6 +45,17 @@ export class FleetCheckoutRepository {
         return this.repository.find({ where: { nodeId }, order: { path: 'ASC' } });
     }
 
+    /** Every row of one person's nodes that has a remote (the branch rule reads their branches, FR-19). */
+    async findForUser(userId: string, limit = 5000): Promise<FleetCheckout[]> {
+        return this.repository
+            .createQueryBuilder('checkout')
+            .where('checkout.userId = :userId', { userId })
+            .andWhere('checkout.remoteUrl IS NOT NULL')
+            .andWhere('checkout.branch IS NOT NULL')
+            .take(limit)
+            .getMany();
+    }
+
     /** One page of rows on these nodes, by path. */
     async listForNodes(
         nodeIds: readonly string[],
@@ -127,6 +138,21 @@ export class FleetCheckoutRepository {
             .limit(limit)
             .getRawMany<{ nodeId: string }>();
         return rows.map((row) => row.nodeId).filter((id) => typeof id === 'string');
+    }
+
+    /** Rows in the bin since before `cutoff` (the bin purge, P3), oldest first, bounded. */
+    async findArchivedBefore(cutoff: Date, limit = 500): Promise<FleetCheckout[]> {
+        return this.repository.find({
+            where: { state: 'archived', archivedAt: LessThan(cutoff) },
+            order: { archivedAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /** Remove rows by id (the bin purge). */
+    async deleteMany(ids: readonly string[]): Promise<void> {
+        if (ids.length === 0) return;
+        await this.repository.delete({ id: In([...ids]) });
     }
 
     /** Remove a row outright (a `discovered` checkout's Forget, P2). */

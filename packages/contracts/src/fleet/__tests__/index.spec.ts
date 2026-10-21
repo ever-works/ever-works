@@ -608,7 +608,21 @@ const CHECKOUT_EXPORTS = [
 	'parseFleetCheckoutsListReply',
 	'parseFleetCheckoutsSyncResult',
 	'fleetCheckoutDisplayPath',
-	'fleetCheckoutName'
+	'fleetCheckoutName',
+	'FLEET_CHECKOUT_DELETE_MODES',
+	'FLEET_CHECKOUT_CREDENTIAL_ACCESS',
+	'isFleetCheckoutDeleteMode',
+	'isFleetCheckoutCredentialAccess',
+	'isFleetCheckoutBranchName',
+	'proposeFleetCheckoutBranch',
+	'fleetCheckoutFolderName',
+	'parseFleetCheckoutChangesEvidence',
+	'parseFleetCheckoutsCreateResult',
+	'parseFleetCheckoutsDeleteResult',
+	'FLEET_CHECKOUT_SHARED_FOLDERS_MAX',
+	'FLEET_CHECKOUT_BIN_PURGE_AFTER_MS',
+	'FLEET_CHECKOUT_BIN_PURGE_CRON',
+	'isFleetCheckoutSharedFolder'
 ] as const;
 
 const ALL_EXPORTS = [
@@ -635,6 +649,15 @@ const ALL_EXPORTS = [
 ];
 
 const FUNCTION_EXPORTS = [
+	'isFleetCheckoutSharedFolder',
+	'isFleetCheckoutDeleteMode',
+	'isFleetCheckoutCredentialAccess',
+	'isFleetCheckoutBranchName',
+	'proposeFleetCheckoutBranch',
+	'fleetCheckoutFolderName',
+	'parseFleetCheckoutChangesEvidence',
+	'parseFleetCheckoutsCreateResult',
+	'parseFleetCheckoutsDeleteResult',
 	'isFleetCheckoutKind',
 	'isFleetCheckoutState',
 	'isFleetCheckoutIsolation',
@@ -885,7 +908,11 @@ describe('fleet barrel', () => {
 		// → +43 with checkouts on computers (FL-14): the twenty-six constants and
 		// seventeen helpers of `fleet-checkout.types.ts` — a NEW module, so the
 		// witness table below gains a row.
-		expect(Object.keys(fleet)).toHaveLength(455);
+		// → 465 with FL-14 P2: two constants and eight helpers more in the same
+		// module (create, delete, the scoped credential, the branch rule).
+		// → 469 with FL-14 P3: three constants and one helper (shared folders,
+		// the bin purge), same module.
+		expect(Object.keys(fleet)).toHaveLength(469);
 	});
 
 	it.each([

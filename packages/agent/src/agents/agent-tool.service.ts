@@ -67,8 +67,11 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
+import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
+import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -622,6 +625,29 @@ export class AgentToolService {
                     }),
                 );
             }
+            // Checkouts on computers (FL-14 P2): the checkout tools, when bound
+            // (and only while FLEET_CHECKOUTS_ENABLED is on — the builder reads it).
+            if (fleet.checkouts) {
+                const checkouts = fleet.checkouts;
+                add('fleet-checkouts', () =>
+                    buildFleetCheckoutTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        service: checkouts.service,
+                    }),
+                );
+            }
+            // Logs on computers (FL-08): the read-only log tools, when bound.
+            if (fleet.logs) {
+                const logs = fleet.logs;
+                add('fleet-logs', () =>
+                    buildFleetLogsTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: logs.reader,
+                    }),
+                );
+            }
         }
 
         // FL-04 P2 — the Agent's own sessions on computers (start is always an
@@ -634,6 +660,26 @@ export class AgentToolService {
                     userId: agent.userId,
                     agentId: agent.id,
                     service: fleetSessions.service,
+                }),
+            );
+        }
+
+        // FL-12 P2 — Commands on computers. `fleet_commands_run` never runs a
+        // command itself: it files an approval the owner decides in My
+        // Decisions (fail-closed without the queue). Bound only while
+        // FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetCommands) {
+            const fleetCommands = sources.fleetCommands;
+            add('fleet-commands', () =>
+                buildFleetCommandTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
                 }),
             );
         }

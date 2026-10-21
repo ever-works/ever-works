@@ -2,7 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Archive, FolderGit2, RefreshCw, RotateCcw, ScanSearch, Download } from 'lucide-react';
+import {
+    Archive,
+    ArrowDownToLine,
+    ArrowUpFromLine,
+    Download,
+    FolderGit2,
+    Plus,
+    RefreshCw,
+    RotateCcw,
+    ScanSearch,
+    Trash2,
+} from 'lucide-react';
 import {
     FLEET_CHECKOUTS_DISCOVERY_CAP,
     type FleetCheckoutView,
@@ -13,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import {
     archiveCheckoutAction,
+    deleteCheckoutAction,
     listFleetCheckoutsAction,
     listNodeCheckoutsAction,
     refreshCheckoutAction,
@@ -21,10 +33,13 @@ import {
     type CheckoutActionResult,
 } from '@/app/actions/fleet-checkouts';
 import { CopyCommand } from '../link/CopyCommand';
+import { DeleteCheckoutDialog, readDeletePreview, type CheckoutDeletePreview } from './DeleteCheckoutDialog';
 import { GitLine } from './GitLine';
+import { NewCheckoutDialog } from './NewCheckoutDialog';
 import {
     ageParts,
     checkoutActionState,
+    checkoutRowActions,
     checkoutsPollMs,
     formatCheckoutSize,
     groupCheckoutsByRepository,
@@ -54,6 +69,17 @@ export interface CheckoutsPanelProps {
 
 type RowNotice = { tone: 'ok' | 'error'; text: string };
 
+const ACTION_ICONS: Record<CheckoutRowAction, typeof Download> = {
+    fetch: Download,
+    pull: ArrowDownToLine,
+    push: ArrowUpFromLine,
+    refresh: RefreshCw,
+    archive: Archive,
+    restore: RotateCcw,
+    delete: Trash2,
+    forget: Trash2,
+};
+
 const CODE_FOLDER_COMMAND = 'ever-works-node start --manage --code-folder ~/code';
 
 /**
@@ -79,7 +105,13 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
     const [binRows, setBinRows] = useState<FleetCheckoutView[] | null>(null);
     const [pending, setPending] = useState<Set<string>>(new Set());
     const [notices, setNotices] = useState<Record<string, RowNotice>>({});
-    const [confirmArchive, setConfirmArchive] = useState<string | null>(null);
+    const [confirming, setConfirming] = useState<{ id: string; action: 'archive' | 'pull' | 'push' } | null>(null);
+    const [deleting, setDeleting] = useState<{
+        id: string;
+        mode: 'delete' | 'forget';
+        preview: CheckoutDeletePreview;
+    } | null>(null);
+    const [creating, setCreating] = useState(false);
     const [scanning, setScanning] = useState(false);
     const [nodeFilter, setNodeFilter] = useState<string>('all');
     // Ages ("found 2 h ago") are computed after mount only, so the server's
@@ -159,20 +191,39 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
             return next;
         });
         try {
-            if (action === 'refresh' || action === 'fetch') {
+            if (action === 'delete' || action === 'forget') {
+                // First ask: the computer says what would be lost (CONTRACTS §2.2 preview).
+                const result = await deleteCheckoutAction(row.id, { mode: action });
+                if (!result.success && result.code === 'confirmation_required') {
+                    const preview = readDeletePreview(result.details);
+                    if (preview) {
+                        setDeleting({ id: row.id, mode: action, preview });
+                        return;
+                    }
+                }
+                if (!result.success) {
+                    setNotices((current) => ({
+                        ...current,
+                        [row.id]: { tone: 'error', text: describeRefusal(result) },
+                    }));
+                }
+                return;
+            }
+            if (action === 'refresh' || action === 'fetch' || action === 'pull' || action === 'push') {
                 const result =
                     action === 'refresh'
                         ? await refreshCheckoutAction(row.id)
-                        : await syncCheckoutAction(row.id, 'fetch');
+                        : await syncCheckoutAction(row.id, action, action === 'fetch' ? undefined : true);
+                setConfirming(null);
                 if (result.success) {
                     replaceRow(result.data.checkout);
                     const last = result.data.checkout.lastCommand;
                     const text = result.data.operationId
                         ? t('notices.running')
-                        : action === 'fetch' && last && last.exitCode !== null && last.exitCode !== 0
-                          ? t('notices.fetchFailed', { code: last.exitCode, line: last.stderrHead ?? '' })
-                          : t(action === 'fetch' ? 'notices.fetched' : 'notices.refreshed');
-                    const tone = action === 'fetch' && last && last.exitCode !== null && last.exitCode !== 0;
+                        : action !== 'refresh' && last && last.exitCode !== null && last.exitCode !== 0
+                          ? t('notices.syncFailed', { op: action, code: last.exitCode, line: last.stderrHead ?? '' })
+                          : t(`notices.${action === 'refresh' ? 'refreshed' : action === 'fetch' ? 'fetched' : action === 'pull' ? 'pulled' : 'pushed'}`);
+                    const tone = action !== 'refresh' && last && last.exitCode !== null && last.exitCode !== 0;
                     setNotices((current) => ({ ...current, [row.id]: { tone: tone ? 'error' : 'ok', text } }));
                 } else {
                     setNotices((current) => ({
@@ -182,7 +233,7 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                 }
             } else if (action === 'archive') {
                 const result = await archiveCheckoutAction(row.id, true);
-                setConfirmArchive(null);
+                setConfirming(null);
                 if (result.success) {
                     replaceRow(result.data);
                     setBin((count) => count + 1);
@@ -292,6 +343,18 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                     {scanning ? t('actions.scanning') : t(mode === 'hub' ? 'actions.scanAll' : 'actions.scan')}
                 </Button>
                 <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setCreating((open) => !open)}
+                    aria-expanded={creating}
+                    disabled={!nodes.some((node) => isComputerOnline(node) && node.consents?.manage === true)}
+                    title={t('disabled.scan')}
+                    data-testid="fleet-checkouts-new"
+                >
+                    <Plus className="mr-1 h-4 w-4" aria-hidden />
+                    {t('actions.new')}
+                </Button>
+                <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => void openBin()}
@@ -302,6 +365,15 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                     {t('bin.toggle', { count: bin })}
                 </Button>
             </header>
+
+            {creating ? (
+                <NewCheckoutDialog
+                    nodes={nodes}
+                    rows={rows}
+                    onCreated={(checkout) => replaceRow(checkout)}
+                    onClose={() => setCreating(false)}
+                />
+            ) : null}
 
             {error ? (
                 <p role="alert" className="text-sm text-red-600 dark:text-red-400" data-testid="fleet-checkouts-error">
@@ -379,16 +451,29 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                                     showComputer={mode === 'hub'}
                                     pending={pending.has(row.id)}
                                     notice={notices[row.id] ?? null}
-                                    confirming={confirmArchive === row.id}
+                                    confirming={confirming?.id === row.id ? confirming.action : null}
                                     now={now}
                                     onAction={(action) => {
-                                        if (action === 'archive' && confirmArchive !== row.id) {
-                                            setConfirmArchive(row.id);
+                                        if (
+                                            (action === 'archive' || action === 'pull' || action === 'push') &&
+                                            !(confirming?.id === row.id && confirming.action === action)
+                                        ) {
+                                            setConfirming({ id: row.id, action });
                                             return;
                                         }
                                         void runRowAction(row, action);
                                     }}
-                                    onCancelConfirm={() => setConfirmArchive(null)}
+                                    onCancelConfirm={() => setConfirming(null)}
+                                    deleting={deleting?.id === row.id ? deleting : null}
+                                    onDeleted={(result) => {
+                                        setDeleting(null);
+                                        setRows((current) => current.filter((entry) => entry.id !== row.id));
+                                        if (!result.forgotten) {
+                                            setBin((count) => count + 1);
+                                            setBinRows(null);
+                                        }
+                                    }}
+                                    onCancelDelete={() => setDeleting(null)}
                                 />
                             ))}
                         </ul>
@@ -427,10 +512,22 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                                     showComputer={mode === 'hub'}
                                     pending={pending.has(row.id)}
                                     notice={notices[row.id] ?? null}
-                                    confirming={false}
+                                    confirming={null}
                                     now={now}
                                     onAction={(action) => void runRowAction(row, action)}
                                     onCancelConfirm={() => undefined}
+                                    deleting={deleting?.id === row.id ? deleting : null}
+                                    onDeleted={(result) => {
+                                        setDeleting(null);
+                                        setBinRows(
+                                            (current) =>
+                                                current?.map((entry) =>
+                                                    entry.id === row.id && result.checkout ? result.checkout : entry,
+                                                ).filter((entry) => !(result.forgotten && entry.id === row.id)) ?? null,
+                                        );
+                                        if (result.forgotten) setBin((count) => Math.max(0, count - 1));
+                                    }}
+                                    onCancelDelete={() => setDeleting(null)}
                                 />
                             ))}
                         </ul>
@@ -564,23 +661,30 @@ function CheckoutRow({
     now,
     onAction,
     onCancelConfirm,
+    deleting,
+    onDeleted,
+    onCancelDelete,
 }: {
     row: FleetCheckoutView;
     node: FleetNodeView | null;
     showComputer: boolean;
     pending: boolean;
     notice: RowNotice | null;
-    confirming: boolean;
+    /** The action waiting for its one confirmation (CONTRACTS §2.2 class `confirm`). */
+    confirming: 'archive' | 'pull' | 'push' | null;
     now: number | null;
     onAction: (action: CheckoutRowAction) => void;
     onCancelConfirm: () => void;
+    deleting: { mode: 'delete' | 'forget'; preview: CheckoutDeletePreview } | null;
+    onDeleted: (result: { forgotten: boolean; checkout: FleetCheckoutView | null }) => void;
+    onCancelDelete: () => void;
 }) {
     const t = useTranslations('fleet.checkouts');
     const online = isComputerOnline(node);
     const context = { node };
     const dimmed = !online || row.state === 'missing';
     const size = formatCheckoutSize(row.sizeBytes);
-    const actions: CheckoutRowAction[] = row.state === 'archived' ? ['restore'] : ['fetch', 'refresh', 'archive'];
+    const actions = checkoutRowActions(row);
     const ago = (iso: string | null) => formatAge(t, now === null ? null : ageParts(iso, now));
 
     const activity = (() => {
@@ -637,15 +741,29 @@ function CheckoutRow({
             <span className="ml-auto flex items-center gap-1">
                 {confirming ? (
                     <>
-                        <span className="text-xs">{t('confirmArchive', { name: homeRelativePath(row.path) })}</span>
+                        <span className="text-xs">
+                            {confirming === 'archive'
+                                ? t('confirmArchive', { name: homeRelativePath(row.path) })
+                                : t(confirming === 'pull' ? 'confirmPull' : 'confirmPush', {
+                                      branch: row.branch ?? '—',
+                                      remote: row.repository ?? 'origin',
+                                      name: node?.name ?? '',
+                                  })}
+                        </span>
                         <Button
                             size="sm"
                             variant="primary"
-                            onClick={() => onAction('archive')}
+                            onClick={() => onAction(confirming)}
                             disabled={pending}
-                            data-testid="fleet-checkout-archive-confirm"
+                            data-testid={`fleet-checkout-${confirming}-confirm`}
                         >
-                            {t('actions.archiveConfirm')}
+                            {t(
+                                confirming === 'archive'
+                                    ? 'actions.archiveConfirm'
+                                    : confirming === 'pull'
+                                      ? 'actions.pullConfirm'
+                                      : 'actions.pushConfirm',
+                            )}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={onCancelConfirm}>
                             {t('actions.cancel')}
@@ -654,14 +772,7 @@ function CheckoutRow({
                 ) : (
                     actions.map((action) => {
                         const state = checkoutActionState(action, row, context);
-                        const Icon =
-                            action === 'fetch'
-                                ? Download
-                                : action === 'refresh'
-                                  ? RefreshCw
-                                  : action === 'archive'
-                                    ? Archive
-                                    : RotateCcw;
+                        const Icon = ACTION_ICONS[action];
                         return (
                             <Button
                                 key={action}
@@ -679,6 +790,15 @@ function CheckoutRow({
                     })
                 )}
             </span>
+            {deleting ? (
+                <DeleteCheckoutDialog
+                    row={row}
+                    mode={deleting.mode}
+                    preview={deleting.preview}
+                    onDone={onDeleted}
+                    onCancel={onCancelDelete}
+                />
+            ) : null}
             {notice ? (
                 <p
                     role={notice.tone === 'error' ? 'alert' : 'status'}

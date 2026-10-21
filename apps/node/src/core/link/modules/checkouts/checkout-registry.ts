@@ -39,6 +39,15 @@ export interface CheckoutRegistryEntry {
 	isolation: FleetCheckoutIsolation;
 	/** ISO time it entered the registry. */
 	addedAt: string;
+	/**
+	 * The platform has it in the bin (told with every list, `archivedPaths`):
+	 * the folder is untouched, but it is not an allowed root (CONTRACTS R-41).
+	 */
+	archived?: boolean;
+	/** A public repository Ever Works cloned with no credential (no installation covers it): reads stay anonymous. */
+	anonymous?: boolean;
+	/** P3: the image a container-isolated checkout's sessions and commands run in. */
+	containerImage?: string;
 }
 
 export interface CheckoutRegistryState {
@@ -86,7 +95,12 @@ export function parseCheckoutRegistry(text: string): CheckoutRegistryState | nul
 					: null,
 			parentPath: isFleetCheckoutPath(entry.parentPath) ? entry.parentPath : null,
 			isolation: isFleetCheckoutIsolation(entry.isolation) ? entry.isolation : 'host',
-			addedAt: typeof entry.addedAt === 'string' ? entry.addedAt : new Date(0).toISOString()
+			addedAt: typeof entry.addedAt === 'string' ? entry.addedAt : new Date(0).toISOString(),
+			...(entry.archived === true ? { archived: true } : {}),
+			...(entry.anonymous === true ? { anonymous: true } : {}),
+			...(typeof entry.containerImage === 'string' && entry.containerImage.length <= 255
+				? { containerImage: entry.containerImage }
+				: {})
 		});
 		if (entries.length >= CHECKOUT_REGISTRY_MAX_ENTRIES) break;
 	}
@@ -127,6 +141,41 @@ export function mergeDiscovery(
 		});
 	}
 	return { version: 1, scannedAt: at, truncated, entries };
+}
+
+/** Add (or replace, by path) one entry the platform made (P2 create). Pure. */
+export function upsertRegistryEntry(state: CheckoutRegistryState, entry: CheckoutRegistryEntry): CheckoutRegistryState {
+	const entries = state.entries.filter((candidate) => candidate.path !== entry.path);
+	entries.push(entry);
+	return { ...state, entries: entries.slice(-CHECKOUT_REGISTRY_MAX_ENTRIES) };
+}
+
+/** Drop one entry by path (delete, forget). Pure. */
+export function removeRegistryEntry(state: CheckoutRegistryState, path: string): CheckoutRegistryState {
+	return { ...state, entries: state.entries.filter((entry) => entry.path !== path) };
+}
+
+/**
+ * Apply the platform's bin: every entry whose path is in `archivedPaths` is
+ * archived, every other one is not. Answers null when nothing changed. Pure.
+ */
+export function applyArchivedPaths(
+	state: CheckoutRegistryState,
+	archivedPaths: readonly string[],
+	keyOf: (path: string) => string = (path) => path
+): CheckoutRegistryState | null {
+	const archived = new Set(archivedPaths.map(keyOf));
+	let changed = false;
+	const entries = state.entries.map((entry) => {
+		const next = archived.has(keyOf(entry.path));
+		if ((entry.archived === true) === next) return entry;
+		changed = true;
+		const copy: CheckoutRegistryEntry = { ...entry };
+		if (next) copy.archived = true;
+		else delete copy.archived;
+		return copy;
+	});
+	return changed ? { ...state, entries } : null;
 }
 
 /** Load and save `checkouts.json`. */

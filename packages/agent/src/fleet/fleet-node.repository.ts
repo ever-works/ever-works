@@ -118,6 +118,25 @@ export class FleetNodeRepository {
         return out;
     }
 
+    /**
+     * Commands on computers (FL-12) — the id and name of each of these rows,
+     * for a Command's cards; an id with no row (a removed computer) is simply
+     * absent. Chunked like {@link findStatusesByIds}.
+     */
+    async findNamesByIds(ids: readonly string[]): Promise<Array<Pick<FleetNode, 'id' | 'name'>>> {
+        const out: Array<Pick<FleetNode, 'id' | 'name'>> = [];
+        for (let start = 0; start < ids.length; start += STATUS_READ_CHUNK) {
+            const chunk = ids.slice(start, start + STATUS_READ_CHUNK);
+            out.push(
+                ...(await this.repository.find({
+                    select: { id: true, name: true },
+                    where: { id: In([...chunk]) },
+                })),
+            );
+        }
+        return out;
+    }
+
     /** Credential lookup (sha256 hex) — enroll resolves the row by it. */
     async findByCredentialHash(hash: string): Promise<FleetNode | null> {
         return this.repository.findOne({ where: { enrollmentTokenHash: hash } });

@@ -1,6 +1,7 @@
 import type { ComputerLegBroker } from '../computer-leg';
 import { controlModule } from './control';
 import { createDesktopModule, type DesktopFamilySources } from './desktop';
+import { createDockerModule, type DockerModuleDeps } from './docker';
 import { createMachineModule, type MachineModuleOptions } from './machine';
 import { createProcessesModule, type ProcessesModuleDeps } from './processes';
 import { composeNodeModules, type ComposedNodeModules, type NodeModule } from './registry';
@@ -19,14 +20,14 @@ export const NODE_LINK_MODULES: readonly NodeModule[] = [];
 /**
  * Services, Docker, Compose and processes (FL-09) — the machine-facts modules
  * the runtime composes (`machineFacts`): `services` (systemd / launchd +
- * Homebrew / Windows services) and `processes`. A factory rather than an
+ * Homebrew / Windows services), `processes` and `docker` (the Docker CLI). A factory rather than an
  * entry in {@link NODE_LINK_MODULES}, so the runtime decides when a process
  * carries them and tests composing the link stay free of real machine verbs.
  */
 export function createMachineFactModules(
-	deps: { services?: ServicesModuleDeps; processes?: ProcessesModuleDeps } = {}
+	deps: { services?: ServicesModuleDeps; processes?: ProcessesModuleDeps; docker?: DockerModuleDeps } = {}
 ): NodeModule[] {
-	return [createServicesModule(deps.services), createProcessesModule(deps.processes)];
+	return [createServicesModule(deps.services), createProcessesModule(deps.processes), createDockerModule(deps.docker)];
 }
 
 export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions, 'verb'> {
@@ -39,6 +40,12 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 * refuses every session channel `unsupported_on_node`.
 	 */
 	session?: NodeModule;
+	/**
+	 * Commands on computers (FL-12) — the `command` family, built by the
+	 * runtime for a process started with `--manage` (`createCommandModule`).
+	 * Absent, every command channel is refused `unsupported_on_node`.
+	 */
+	command?: NodeModule;
 	/**
 	 * Servers and ports (FL-10) — the `ports` module (`ports.list`,
 	 * `ports.open`), built by the runtime around the machine's runner and its
@@ -78,6 +85,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 	const {
 		extra = [],
 		session,
+		command,
 		computerLegs,
 		checkouts,
 		machineFacts = [],
@@ -96,6 +104,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		machine,
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
+		...(command ? [command] : []),
 		...(ports ? [ports] : []),
 		...(computerLegs || desktopSourcesGiven ? [createDesktopModule(computerLegs ?? null, desktopSources)] : []),
 		...(checkouts ? [checkouts] : []),
@@ -108,10 +117,13 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from './control';
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
+export { createDockerModule, type DockerModuleDeps } from './docker';
 export { createProcessesModule, type ProcessesModuleDeps } from './processes';
 export { createServicesModule, type ServicesModuleDeps } from './services';
 export { createHealthLinkModule, type HealthLinkModuleOptions, type WakeSender } from './health';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
+export { createCommandModule, type CommandModuleOptions } from './command';
+export { CommandOutputStore } from './command/command-output-store';
 export { createCheckoutsModule, type CheckoutsModule, type CheckoutsModuleOptions } from './checkouts';
 export {
 	createDesktopFamilyModule,

@@ -101,7 +101,8 @@ describe('channel families', () => {
 	it('keeps the per-verb exceptions in one table: health.now on any link, every other verb manage (R-31)', () => {
 		expect(FLEET_LINK_VERB_CONSENT_OVERRIDES).toEqual({
 			'health.now': 'link',
-			'checkouts.list': 'work-or-manage'
+			'checkouts.list': 'work-or-manage',
+			'checkouts.create': 'work-or-manage'
 		});
 		expect(fleetLinkVerbConsent('health.now')).toBe('link');
 		expect(fleetLinkVerbConsent('services.list')).toBe('manage');
