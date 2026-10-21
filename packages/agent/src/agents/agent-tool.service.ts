@@ -66,6 +66,7 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
+import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -587,6 +588,17 @@ export class AgentToolService {
                         service: health.service,
                         history: health.history,
                         ...(health.needsALook ? { needsALook: health.needsALook } : {}),
+                    }),
+                );
+            }
+            // Logs on computers (FL-08): the read-only log tools, when bound.
+            if (fleet.logs) {
+                const logs = fleet.logs;
+                add('fleet-logs', () =>
+                    buildFleetLogsTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: logs.reader,
                     }),
                 );
             }

@@ -748,6 +748,20 @@ export const config = {
             );
         },
         /**
+         * Machine facts (FL-08 logs; FL-09 services/Docker/processes, FL-10
+         * ports, FL-11 files — CONTRACTS §9) — `FLEET_MACHINE_FACTS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every machine-facts route answers 404 (the surface is not even
+         * confirmed). Reading a machine needs the node link too, which its own
+         * flag gates. Read per call: flipping it needs no restart.
+         */
+        isMachineFactsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_MACHINE_FACTS_ENABLED === 'true'
+            );
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single
