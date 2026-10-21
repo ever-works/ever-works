@@ -110,6 +110,13 @@ its current attention (`invalid`), and types the CLI's keys itself — the platf
 guard is `validateFleetSessionRulesFile` (`fleet-session-rules.types.ts`). Tools `fleet_sessions_question` (readOnly) /
 `fleet_sessions_answer` (`confirm`), MCP `fleet_sessions_answer`, CLI `fleet session question|answer`.
 
+**Revision 16 (2026-10-21)** — FL-05 P3 (board): `GET /api/fleet/sessions?view=board[&nodeId&agentId&kind]` answers
+`FleetSessionBoardResponse { columns: { needs_you, working, done, idle }, generatedAt }` — every LIVE session on the
+computers in the reader's `sessions` audience (at most 400), each column most recently moved first, `done` only for 24 h
+after it finished (`fleetSessionBoardColumn`); the list is the existing paged `GET /api/fleet/sessions`. The Activity
+view is `sessions` (key `n`) and exists only while `FLEET_SESSIONS_ENABLED` is on; its address-bar state is `mode`
+(`board|list`), `g` (`day|week`), `agent`, `node`, `kind`, `state`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
