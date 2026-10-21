@@ -61,6 +61,17 @@ export class TriggerVariableDto {
     required?: boolean;
 }
 
+const TRIGGER_AUDIENCE_KINDS = ['review-requested', 'assigned', 'authored'] as const;
+
+/** FL-15 P3 — the "about me" group of an event matcher. */
+export class TriggerEventAudienceDto {
+    @ApiProperty({ enum: TRIGGER_AUDIENCE_KINDS, isArray: true })
+    @IsArray()
+    @ArrayMaxSize(3)
+    @IsIn(TRIGGER_AUDIENCE_KINDS as unknown as string[], { each: true })
+    me: Array<(typeof TRIGGER_AUDIENCE_KINDS)[number]>;
+}
+
 /**
  * Ingest-event matcher for `'event'`-sourced triggers. Keys are the
  * whitelist — with the global `forbidNonWhitelisted` pipe, any other
@@ -100,17 +111,6 @@ export class TriggerEventMatcherDto {
     @ValidateNested()
     @Type(() => TriggerEventAudienceDto)
     audience?: TriggerEventAudienceDto;
-}
-
-const TRIGGER_AUDIENCE_KINDS = ['review-requested', 'assigned', 'authored'] as const;
-
-/** FL-15 P3 — the "about me" group of an event matcher. */
-export class TriggerEventAudienceDto {
-    @ApiProperty({ enum: TRIGGER_AUDIENCE_KINDS, isArray: true })
-    @IsArray()
-    @ArrayMaxSize(3)
-    @IsIn(TRIGGER_AUDIENCE_KINDS as unknown as string[], { each: true })
-    me: Array<(typeof TRIGGER_AUDIENCE_KINDS)[number]>;
 }
 
 /** FL-15 P3 — body of `POST /api/inbound-triggers/presets/github-for-me` (spec FR-19). */
