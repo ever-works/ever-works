@@ -3,7 +3,9 @@ import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { FLEET_SESSION_NODE_PORT, FleetSessionsModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
+import { FleetSessionAttachService } from './fleet-session-attach.service';
 import { FleetSessionLinkAdapter } from './fleet-session-link.adapter';
+import { FleetSessionPresenceService } from './fleet-session-presence.service';
 import { FleetSessionLinkListener } from './fleet-session-link.listener';
 import { FleetSessionSweepCronService } from './fleet-session-sweep-cron.service';
 import { FleetSessionsController } from './fleet-sessions.controller';
@@ -20,7 +22,10 @@ import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
  *   - `FleetSessionLinkListener` — `session.event` / `session.list` from the
  *     machines into `FleetSessionService`;
  *   - `FleetSessionSweepCronService` — the sweeper when Trigger.dev is not
- *     the runtime.
+ *     the runtime;
+ *   - `FleetSessionPresenceService` + `FleetSessionAttachService` (P1b) — the
+ *     browser's attach token through FL-02's minter, who is attached, the
+ *     five-viewer cap and the driver-span audit.
  *
  * `@Global()` for the reason `FleetLinkApiModule` documents: the agent-side
  * `FleetSessionsModule` consumes `FLEET_SESSION_NODE_PORT` `@Optional()` and
@@ -40,6 +45,9 @@ import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
         { provide: FLEET_SESSION_NODE_PORT, useExisting: FleetSessionLinkAdapter },
         FleetSessionLinkListener,
         FleetSessionSweepCronService,
+        // P1b: who is attached (observes FL-02's viewer gateway) and the attach token.
+        FleetSessionPresenceService,
+        FleetSessionAttachService,
         DistributedTaskLockService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,

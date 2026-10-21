@@ -7,6 +7,7 @@ import {
     HealthIndicatorFunction,
     TypeOrmHealthIndicator,
 } from '@nestjs/terminus';
+import { config } from '@ever-works/agent/config';
 import { Public } from '../auth';
 import { getBuildInfo, BuildInfo } from './build-info';
 import { detectInformationalServices, getRedisUrl } from './service-detection';
@@ -92,7 +93,11 @@ export class HealthController {
     @ApiResponse({ status: 200, description: 'API is ready; details list per-dependency status' })
     @ApiResponse({ status: 503, description: 'A critical dependency is unavailable' })
     async ready(): Promise<
-        HealthCheckResult & { version: BuildInfo; fleet_relay: RelayBusHealth }
+        HealthCheckResult & {
+            version: BuildInfo;
+            fleet_relay: RelayBusHealth;
+            fleet: { sessions: boolean };
+        }
     > {
         const checks: HealthIndicatorFunction[] = [
             () => this.db.pingCheck('database', { timeout: 3000 }),
@@ -107,7 +112,13 @@ export class HealthController {
         }
 
         const result = await this.health.check(checks);
-        return { ...result, version: getBuildInfo(), fleet_relay: this.relayHealth() };
+        return {
+            ...result,
+            version: getBuildInfo(),
+            fleet_relay: this.relayHealth(),
+            // FL-04 T-48: which dark-by-default Fleet surfaces this deployment serves (no secrets).
+            fleet: { sessions: config.fleet.isSessionsEnabled() },
+        };
     }
 
     /** `fleet_relay` — the bus as it runs, or (no bus bound here) as the environment configures it. */

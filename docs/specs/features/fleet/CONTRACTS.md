@@ -41,6 +41,10 @@ failure thresholds stay fixed (§6) until the owner asks for editors.
 channel-0 `session.ack`, the `session.notice` notices, `daemon` on `session.list` and an optional `reason` on
 `session.event` (§3.3); `FleetNode.sessionDaemon` (§4.1); `FleetSession.exitCode` and `startedBy` (§4.2).
 
+**Revision 8 (2026-10-21)** — FL-04 P1b: session viewers (§3.3 "Session viewers") — the browser's
+`session.attach`, the watcher and driver JSON allow-lists of the `session` family, the attach-token body,
+`presence` on the session detail, watchers admitted under the kill switch.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
@@ -276,6 +280,17 @@ short-lived channel of its own; an attached viewer holds one channel for its lif
 daemon the platform holds an ended session's last screen, so it may forget it. `session.list` (after every
 `link.ready`) carries the daemon health block of §1.1. `session.event exited` may carry `reason` (one of the
 §4.2 `endedReason` values, e.g. `drain`, `kill-switch`) when the daemon ended the process itself.
+
+**Session viewers (FL-04 P1b, revision 8).** A browser attached through §3.4 sends `session.attach
+{ cols, rows }` on its channel right after `viewer.ready`; the node answers in the channel's own `mode` (a
+watcher's size is ignored) and the replay follows as `DATA`. A watcher (`viewer`) may send only
+`session.attach` and `session.screen` (`FLEET_LINK_VIEWER_JSON_TYPES.session`); a driver only
+`session.attach`, `session.input`, `session.resize`, `session.screen` (`FLEET_LINK_DRIVER_JSON_TYPES`) plus
+`DATA`/`RESIZE` frames — starting, ending, renaming and restarting go through the §11.2 routes, with their
+confirmation class and audit row, never through a live view. The attach-token body is `{ role, cols?, rows? }`
+(`FleetSessionAttachTokenRequest`). The detail answers `presence { attached[], drivers, watchers }` for a live
+session, counted by the API replica that serves the reader. A watcher is not kept out by the kill switch (it reads
+the stop banner); a driver is.
 
 ### 3.4 Viewer side (browser → platform)
 
