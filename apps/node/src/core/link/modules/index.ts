@@ -32,6 +32,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from './control';
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
+export { createHealthLinkModule, type HealthLinkModuleOptions, type WakeSender } from './health';
 export {
 	composeNodeModules,
 	MachineVerbError,

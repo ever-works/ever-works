@@ -71,7 +71,13 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Computer health (FL-03): the health snapshot. Its own
+	// NEWEST first. Computer health, second phase (FL-03): the primary
+	// interface's hardware address and the opaque network identity, sent only
+	// under `--manage` for Wake-on-LAN. Their own tier, newer than the
+	// snapshot: a platform that stores the snapshot but predates wake costs
+	// exactly these two fields, and the snapshot keeps flowing.
+	['macAddress', 'lanId'],
+	// Computer health (FL-03): the health snapshot. Its own
 	// tier, so a platform that predates it costs exactly this one field —
 	// the consents, pinned CLI versions and enforced limits below keep
 	// flowing (FR-3, U9). Newer than the consents: FL-02 reached `develop`
@@ -445,13 +451,16 @@ function describeStrippedTiers(tiers: number): string {
 	if (tiers >= OPTIONAL_DESCRIPTION_FIELD_TIERS.length) {
 		return 'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.';
 	}
-	if (tiers >= 3) {
+	if (tiers >= 4) {
 		return 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.';
 	}
-	if (tiers >= 2) {
+	if (tiers >= 3) {
 		return 'Platform rejected the consents field; it predates the node link. Still reporting pinned CLI versions, enforced limits, worker state and housekeeping; the node link stays closed and the health snapshot off until this node restarts.';
 	}
-	return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
+	if (tiers >= 2) {
+		return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
+	}
+	return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
 }
 
 /** The same description with the newest `tiers` tiers of droppable fields removed (absent keys dropped too). */

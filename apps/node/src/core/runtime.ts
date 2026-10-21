@@ -45,11 +45,12 @@ import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
 import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
-import type { FleetConsents } from '@ever-works/contracts';
+import type { FleetConsents, FleetNodeHealthSnapshot } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
-import { composeNodeLinkModules } from './link/modules';
+import { composeNodeLinkModules, createHealthLinkModule, type WakeSender } from './link/modules';
+import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import {
 	clampResourceLimits,
@@ -113,6 +114,19 @@ export interface NodeIo {
 	 * (`createHealthProbeIo`); every test can leave it out.
 	 */
 	health?: HealthProbeIo;
+	/**
+	 * Computer health, second phase (FL-03) — the host's network interfaces
+	 * (`os.networkInterfaces()`), read for the primary interface's hardware
+	 * address and opaque network identity. Optional: without it the node
+	 * reports neither and advertises no `wake`. Read only under `--manage`.
+	 */
+	network?: () => NetworkInterfaceMap | null;
+	/**
+	 * Computer health, second phase (FL-03) — sends a Wake-on-LAN datagram
+	 * (`node:dgram`, bound in `node-io.ts`). Optional: without it `wake.send`
+	 * is not offered on the link.
+	 */
+	wakeSender?: WakeSender;
 }
 
 /**
@@ -610,12 +624,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// and the tools it spawns — stops running too (`loopRef` is set once the
 	// loop below exists).
 	let loopRef: HeartbeatLoop | null = null;
+	let probeHealth: (() => Promise<FleetNodeHealthSnapshot | null>) | undefined;
 	if (io.health) {
-		const probeHealth = createHealthProbe(io.health, {
+		const probe = createHealthProbe(io.health, {
 			workspacePath: io.workspacePath ?? workspaceRoot,
 			...(io.now ? { now: io.now } : {})
 		});
-		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probeHealth());
+		probeHealth = probe;
+		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probe());
 	}
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
@@ -633,10 +649,39 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		manage: options.manageEnabled === true,
 		usageScan: false
 	};
+	// Computer health, second phase (FL-03): this machine's primary interface,
+	// read fresh on every call (a laptop changes networks). Reported on the
+	// beat — hardware address and the opaque network identity, never an
+	// address — only under `--manage` (spec FR-23), and only while the
+	// platform has not proven it predates the pair.
+	const readNetwork = io.network
+		? (): LocalNetworkIdentity | null => {
+				try {
+					return resolveNetworkIdentity(io.network!());
+				} catch {
+					return null;
+				}
+			}
+		: undefined;
+	if (consents.manage && readNetwork) {
+		telemetry.network = () => {
+			if (loopRef && !loopRef.acceptsField('macAddress')) return null;
+			const identity = readNetwork();
+			return identity ? { macAddress: identity.macAddress, lanId: identity.lanId } : null;
+		};
+	}
+	// The `health` link module (FL-03): `health.now` (Refresh now) over the
+	// heartbeat's own probe, `wake.send` over this machine's interface, and the
+	// `wake` tag under `--manage`. Registered here, where the probe exists.
+	const healthLinkModule = createHealthLinkModule({
+		...(probeHealth ? { probeHealth } : {}),
+		...(readNetwork ? { network: readNetwork } : {}),
+		...(io.wakeSender ? { wakeSender: io.wakeSender } : {})
+	});
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, …) describe this process's consents, not the socket.
 	const linkModules = composeNodeLinkModules({
-		...(options.linkModules ? { extra: options.linkModules } : {}),
+		extra: [healthLinkModule, ...(options.linkModules ?? [])],
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),

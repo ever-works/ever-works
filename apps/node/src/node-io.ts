@@ -1,4 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process';
+import * as dgram from 'node:dgram';
 import { accessSync, constants as fsConstants, existsSync, statSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
@@ -14,6 +15,8 @@ import { resolveModelCliPaths } from './core/model-cli-probe';
 import type { ResourceProbe, ResourceSample } from './core/resource-limits';
 import type { DiskProbeIo, DiskVolumeReading } from './core/telemetry-probe';
 import type { HealthProbeIo } from './core/health-probe';
+import type { WakeSender } from './core/link/modules/health';
+import type { NetworkInterfaceMap } from './core/network-identity';
 
 /**
  * Real IO adapters for the headless node.
@@ -441,6 +444,52 @@ export function createHealthProbeIo(runner: CommandRunner): HealthProbeIo {
 				return false;
 			}
 		}
+	};
+}
+
+/**
+ * Computer health, second phase (FL-03) — the host's network interfaces, as
+ * `os.networkInterfaces()` reports them. Read by the runtime only under
+ * `--manage`; the core picks the primary interface and hashes its network.
+ */
+export function readNetworkInterfaces(): NetworkInterfaceMap {
+	return os.networkInterfaces() as NetworkInterfaceMap;
+}
+
+/**
+ * Computer health, second phase (FL-03) — the Wake-on-LAN sender: one UDP
+ * datagram per call from a fresh, broadcast-enabled socket, closed right
+ * after. A socket per packet costs nothing at three packets a wake, and it
+ * means no socket outlives the request that needed it.
+ */
+export function createWakeSender(): WakeSender {
+	return {
+		send: (packet, address, port) =>
+			new Promise<void>((resolve, reject) => {
+				const socket = dgram.createSocket('udp4');
+				let settled = false;
+				const finish = (error?: Error | null): void => {
+					if (settled) return;
+					settled = true;
+					try {
+						socket.close();
+					} catch {
+						// already closed
+					}
+					if (error) reject(error);
+					else resolve();
+				};
+				socket.once('error', (error) => finish(error));
+				socket.bind(0, () => {
+					try {
+						socket.setBroadcast(true);
+					} catch (error) {
+						finish(error instanceof Error ? error : new Error(String(error)));
+						return;
+					}
+					socket.send(packet, port, address, (error) => finish(error));
+				});
+			})
 	};
 }
 
