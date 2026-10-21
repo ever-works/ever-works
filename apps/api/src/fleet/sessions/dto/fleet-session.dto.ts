@@ -208,3 +208,21 @@ export class FleetSessionRecordingDto {
     @IsBoolean()
     on!: boolean;
 }
+
+/** Query for `GET /api/fleet/sessions/:id/recording` (FL-04 P3): `from` asks for a page of chunks. */
+export class FleetSessionRecordingQueryDto {
+    @ApiProperty({ required: false, minimum: 0, description: 'The first sequence number of the page.' })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    from?: number;
+
+    @ApiProperty({ required: false, minimum: 1, maximum: 500 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(500)
+    limit?: number;
+}

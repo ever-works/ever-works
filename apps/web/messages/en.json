@@ -2317,7 +2317,8 @@
                 "agent": "Agent",
                 "noMission": "This run was not part of a Mission",
                 "openSchedule": "Open the schedule that ran this",
-                "openFleetSession": "Open the session on its computer"
+                "openFleetSession": "Open the session on its computer",
+                "rewatchFleetSession": "Re-watch the session"
             },
             "shortcuts": {
                 "button": "Keyboard shortcuts",
@@ -13646,7 +13647,12 @@
                 "copyLink": "Copy link",
                 "shortcuts": "Keyboard shortcuts",
                 "waiting": "Waiting for a free slot on {node}…",
-                "openRun": "Open the Run"
+                "openRun": "Open the Run",
+                "recording": "Recording",
+                "recordOn": "Record",
+                "recordOff": "Stop recording",
+                "notRecordingNow": "Not recording",
+                "rewatch": "Re-watch"
             },
             "shortcuts": {
                 "title": "Session shortcuts",
@@ -13699,6 +13705,27 @@
                 "title": "Sessions",
                 "empty": "{agent} has no sessions on your computers yet.",
                 "loadFailed": "The sessions could not be loaded."
+            },
+            "replay": {
+                "title": "Re-watch · {title} · {node} · {date}",
+                "open": "Re-watch",
+                "loading": "Loading the recording…",
+                "notRecorded": "This session was not recorded.",
+                "storageFailed": "Recording stopped — storage was unavailable.",
+                "expired": "The recording was removed after {days} days.",
+                "nothingYet": "Nothing has been recorded yet.",
+                "driverSpan": "{name} drove {from}–{to}",
+                "someone": "Someone",
+                "anAgent": "The Agent",
+                "play": "Play",
+                "pause": "Pause",
+                "restart": "From the start",
+                "back10": "Back 10 s",
+                "forward10": "Forward 10 s",
+                "speed": "Speed",
+                "position": "Position {at} of {total}",
+                "close": "Close",
+                "failed": "The recording could not be loaded."
             }
         }
     }

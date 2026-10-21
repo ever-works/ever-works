@@ -122,4 +122,102 @@ export class TerminalTranscriptChunkRepository {
         const result = await this.repository.delete({ runId: In([...runIds]) });
         return result.affected ?? 0;
     }
+
+    // ─── Sessions on computers (FL-04 P3, CONTRACTS R-9) ───────────────────
+
+    /**
+     * Insert a batch of SESSION-keyed chunks (`runId` NULL), ignoring rows whose
+     * `(fleetSessionId, seq)` already exists — the partial unique index
+     * `uq_terminal_transcript_chunks_session_seq` — so a re-sent flush writes
+     * once and never throws.
+     */
+    async appendSessionMany(chunks: ReadonlyArray<TerminalTranscriptSessionChunkWrite>): Promise<number> {
+        if (chunks.length === 0) {
+            return 0;
+        }
+        await this.repository
+            .createQueryBuilder()
+            .insert()
+            .into(TerminalTranscriptChunk)
+            .values(
+                chunks.map((chunk) => ({
+                    runId: null,
+                    fleetSessionId: chunk.fleetSessionId,
+                    seq: chunk.seq,
+                    direction: chunk.direction,
+                    text: chunk.text,
+                    byteLength: chunk.byteLength,
+                })),
+            )
+            .orIgnore()
+            .execute();
+        return chunks.length;
+    }
+
+    /** A session's chunks with `seq >= fromSeq`, oldest first. */
+    async listBySession(
+        fleetSessionId: string,
+        fromSeq: number,
+        limit: number,
+    ): Promise<TerminalTranscriptChunk[]> {
+        return this.repository
+            .createQueryBuilder('chunk')
+            .where('chunk.fleetSessionId = :fleetSessionId', { fleetSessionId })
+            .andWhere('chunk.seq >= :fromSeq', { fromSeq })
+            .orderBy('chunk.seq', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /** How many chunks a session has, its highest `seq` and the first and last write. */
+    async sessionStats(fleetSessionId: string): Promise<{
+        count: number;
+        maxSeq: number | null;
+        firstAt: Date | null;
+        lastAt: Date | null;
+    }> {
+        const row = await this.repository
+            .createQueryBuilder('chunk')
+            .select('COUNT(*)', 'count')
+            .addSelect('MAX(chunk.seq)', 'maxSeq')
+            .addSelect('MIN(chunk.createdAt)', 'firstAt')
+            .addSelect('MAX(chunk.createdAt)', 'lastAt')
+            .where('chunk.fleetSessionId = :fleetSessionId', { fleetSessionId })
+            .getRawOne<{ count: string | number; maxSeq: string | number | null; firstAt: unknown; lastAt: unknown }>();
+        const count = Number(row?.count ?? 0) || 0;
+        const maxSeq = row?.maxSeq === null || row?.maxSeq === undefined ? null : Number(row.maxSeq);
+        const toDate = (value: unknown): Date | null => {
+            if (value === null || value === undefined) return null;
+            const at = value instanceof Date ? value : new Date(String(value));
+            return Number.isFinite(at.getTime()) ? at : null;
+        };
+        return {
+            count,
+            maxSeq: maxSeq !== null && Number.isFinite(maxSeq) ? maxSeq : null,
+            firstAt: toDate(row?.firstAt),
+            lastAt: toDate(row?.lastAt),
+        };
+    }
+
+    /** Delete every session-keyed chunk older than `cutoff` (the fixed 14-day session retention). */
+    async deleteSessionChunksOlderThan(cutoff: Date): Promise<number> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .delete()
+            .from(TerminalTranscriptChunk)
+            .where('"fleetSessionId" IS NOT NULL')
+            .andWhere('"createdAt" < :cutoff', { cutoff })
+            .execute();
+        return result.affected ?? 0;
+    }
+}
+
+/** One append-ready SESSION chunk (already redacted by the service layer). */
+export interface TerminalTranscriptSessionChunkWrite {
+    fleetSessionId: string;
+    seq: number;
+    direction: TerminalTranscriptDirection;
+    /** REDACTED text. */
+    text: string;
+    byteLength: number;
 }
