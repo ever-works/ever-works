@@ -71,6 +71,8 @@ export function sanitizeStartBody(raw: Record<string, unknown>): Partial<FleetSe
     if (isUuid(raw.checkoutId)) body.checkoutId = raw.checkoutId;
     else if (isUuid(raw.newWorktreeOf)) body.newWorktreeOf = raw.newWorktreeOf;
     if (isUuid(raw.restartOf)) body.restartOf = raw.restartOf;
+    // FL-15 P1: the Task an Agent session works on.
+    if (isUuid(raw.taskId)) body.taskId = raw.taskId;
     return { ...body, ...size(raw) };
 }
 
@@ -106,7 +108,7 @@ export function sanitizeRecordingBody(raw: Record<string, unknown>): { on: boole
 const LIST_STATES = ['live', 'ended'] as const;
 
 /**
- * The list query, rebuilt (`state`, `kind`, `nodeId`, `agentId`, `since`,
+ * The list query, rebuilt (`state`, `kind`, `nodeId`, `agentId`, `taskId`, `since`,
  * `limit`, `cursor`), as a `?…` string (empty when nothing survived).
  */
 export function sanitizeListQuery(params: URLSearchParams): string {
@@ -119,6 +121,9 @@ export function sanitizeListQuery(params: URLSearchParams): string {
     if (isUuid(nodeId)) out.set('nodeId', nodeId);
     const agentId = params.get('agentId');
     if (isUuid(agentId)) out.set('agentId', agentId);
+    // FL-15 P1: the Task page's Computer block reads the Task's sessions.
+    const taskId = params.get('taskId');
+    if (isUuid(taskId)) out.set('taskId', taskId);
     const since = params.get('since');
     if (since && since.length <= 40 && !Number.isNaN(Date.parse(since))) out.set('since', since);
     const limit = Number(params.get('limit'));

@@ -33,6 +33,7 @@ import {
     type FleetSessionStartableProvider,
     type FleetSessionView,
 } from '@ever-works/contracts';
+import type { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import type { FleetSession } from '../../entities/fleet-session.entity';
 import { AgentRepository } from '../../database/repositories/agent.repository';
@@ -42,7 +43,9 @@ import { FleetAccessService } from '../fleet-access.service';
 import { FleetAuditService } from '../fleet-audit.service';
 import { FleetKillSwitchService } from '../fleet-kill-switch.service';
 import { FleetNodeRepository } from '../fleet-node.repository';
+import { FleetCheckoutRepository } from '../checkouts/fleet-checkout.repository';
 import { fleetSessionError, readFleetSessionError } from './fleet-session.errors';
+import { FleetSessionTaskService, type FleetSessionTaskAdmission } from './fleet-session-task.service';
 import {
     FLEET_SESSION_NODE_PORT,
     type FleetSessionNodePort,
@@ -204,6 +207,11 @@ export class FleetSessionService {
         @Optional()
         @Inject(FLEET_SESSION_RECORDER)
         private readonly recorder?: FleetSessionRecorderPort,
+        // FL-15 P1 — a start for a Task (its rules and the Task a Run carries)
+        // and a start in a checkout (FL-14's rows). `@Optional()`: without
+        // them a start naming a Task or a checkout is refused, as before.
+        @Optional() private readonly taskRules?: FleetSessionTaskService,
+        @Optional() private readonly checkouts?: FleetCheckoutRepository,
     ) {}
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -211,7 +219,8 @@ export class FleetSessionService {
     /** One session, with its last screen (the detail page). */
     async get(id: string, actor: FleetSessionActor): Promise<FleetSessionView> {
         const { session } = await this.resolve(id, actor);
-        return toFleetSessionView(session, { includeScreen: true });
+        const [view] = await this.withTasks([session], { includeScreen: true });
+        return view;
     }
 
     /** A node's sessions, most recently active first (the computer page's Sessions tab). */
@@ -222,7 +231,7 @@ export class FleetSessionService {
     ): Promise<FleetSessionView[]> {
         const { node } = await this.nodeFor(nodeId, actor);
         const rows = await this.sessions.listForNodes([node.id], query);
-        return rows.map((row) => toFleetSessionView(row));
+        return this.withTasks(rows);
     }
 
     /** Sessions on every node the person may see sessions on. */
@@ -233,7 +242,7 @@ export class FleetSessionService {
         if (query.nodeId) return this.listForNode(query.nodeId, actor, query);
         const nodeIds = await this.visibleNodeIds(actor);
         const rows = await this.sessions.listForNodes(nodeIds, query);
-        return rows.map((row) => toFleetSessionView(row));
+        return this.withTasks(rows);
     }
 
     /**
@@ -256,9 +265,76 @@ export class FleetSessionService {
         const rows = await this.sessions.listForNodes(nodeIds, { ...query, limit });
         const last = rows.length === limit ? rows[rows.length - 1] : undefined;
         return {
-            sessions: rows.map((row) => toFleetSessionView(row)),
+            sessions: await this.withTasks(rows),
             nextCursor: last ? fleetSessionCursor(last) : null,
         };
+    }
+
+    /**
+     * The views of these rows, each carrying the Task its Run works on (FL-15
+     * spec FR-10: the session card's Task chip). One batched read; a failed
+     * one leaves the chips off, never the list.
+     */
+    private async withTasks(
+        rows: readonly FleetSession[],
+        options: { includeScreen?: boolean } = {},
+    ): Promise<FleetSessionView[]> {
+        const views = rows.map((row) => toFleetSessionView(row, options));
+        const runIds = rows.map((row) => row.agentRunId).filter((id): id is string => !!id);
+        if (runIds.length === 0 || !this.taskRules) return views;
+        const refs = await this.taskRules.refsForRuns(runIds);
+        for (const view of views) {
+            const ref = view.agentRunId ? refs.get(view.agentRunId) : undefined;
+            if (ref) view.task = ref;
+        }
+        return views;
+    }
+
+    /**
+     * The checkout a start names (FL-15 P1, the FL-14 follow-up): on this
+     * computer, `ready`, host-isolated — a session in a container checkout
+     * waits for FL-04 to spawn through `containerArgvFor`. `newWorktreeOf` is
+     * still refused: the worktree is created through Checkouts first, then
+     * the session starts in it by `checkoutId` (one create path).
+     */
+    private async checkoutFor(
+        node: FleetNode,
+        request: FleetSessionStartRequest,
+    ): Promise<FleetCheckout | null> {
+        if (request.newWorktreeOf) {
+            throw fleetSessionError(
+                'invalid',
+                'create the worktree under Checkouts first, then start the session in it',
+                { field: 'newWorktreeOf' },
+            );
+        }
+        if (!request.checkoutId) return null;
+        if (!this.checkouts) {
+            throw fleetSessionError('invalid', 'Checkouts are not available in this deployment', {
+                field: 'checkoutId',
+            });
+        }
+        const checkout = await this.checkouts.findById(request.checkoutId);
+        if (!checkout || checkout.nodeId !== node.id) {
+            throw fleetSessionError('invalid', `that checkout is not on ${node.name}`, {
+                field: 'checkoutId',
+            });
+        }
+        if (checkout.state !== 'ready') {
+            throw fleetSessionError(
+                'invalid',
+                `the checkout is ${checkout.state}; start the session once it is ready`,
+                { field: 'checkoutId', state: checkout.state },
+            );
+        }
+        if (checkout.isolation === 'container') {
+            throw fleetSessionError(
+                'unsupported_on_node',
+                'sessions in container checkouts arrive later; choose a checkout on the computer itself',
+                { field: 'checkoutId', isolation: 'container' },
+            );
+        }
+        return checkout;
     }
 
     /** The start dialog's "Recent" folders for a node (spec FR-15). */
@@ -337,7 +413,18 @@ export class FleetSessionService {
         }
         if (!isFleetSessionStartableProvider(request.provider))
             throw fleetSessionError('invalid', 'provider');
-        const cwd = typeof request.cwd === 'string' ? request.cwd.trim() : '';
+        if (request.taskId) {
+            throw fleetSessionError('invalid', 'a Task is handed to an Agent session', {
+                field: 'taskId',
+            });
+        }
+        // FL-15 P1: a session may start in a checkout — its folder is the checkout's.
+        const checkout = await this.checkoutFor(node, request);
+        const cwd = checkout
+            ? checkout.path
+            : typeof request.cwd === 'string'
+              ? request.cwd.trim()
+              : '';
         if (cwd.length === 0 || cwd.length > FLEET_SESSION_CWD_MAX_LENGTH || cwd.includes('\0')) {
             throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
         }
@@ -347,11 +434,6 @@ export class FleetSessionService {
         if (request.container !== undefined && (!container || request.provider !== 'shell')) {
             throw fleetSessionError('invalid', 'a shell inside a container needs a container and bash or sh', {
                 field: 'container',
-            });
-        }
-        if (request.newWorktreeOf || request.checkoutId) {
-            throw fleetSessionError('invalid', 'New worktrees arrive with Checkouts', {
-                field: 'checkout',
             });
         }
         const firstMessage =
@@ -469,7 +551,7 @@ export class FleetSessionService {
                     provider: request.provider,
                     agentId: null,
                     agentRunId: null,
-                    checkoutId: null,
+                    checkoutId: checkout?.id ?? null,
                     cwd,
                     title,
                     state: 'working',
@@ -519,6 +601,7 @@ export class FleetSessionService {
             provider: request.provider,
             confirmationClass: 'plain',
             outcome: 'started',
+            ...(checkout ? { checkoutId: checkout.id } : {}),
             ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
         });
         const applied = await this.drainEarly(node.id, row.row);
@@ -552,6 +635,11 @@ export class FleetSessionService {
                 'this kind of session cannot be restarted',
             );
         }
+        // FL-15 P1: an Agent session that worked a Task starts again on the same Task.
+        let restartTaskId: string | undefined;
+        if (session.kind === 'agent' && session.agentRunId && this.taskRules) {
+            restartTaskId = (await this.taskRules.refsForRuns([session.agentRunId])).get(session.agentRunId)?.id;
+        }
         return this.start(
             node.id,
             actor,
@@ -566,6 +654,7 @@ export class FleetSessionService {
                 ...(session.kind === 'agent' && session.firstMessage
                     ? { firstMessage: session.firstMessage }
                     : {}),
+                ...(restartTaskId ? { taskId: restartTaskId } : {}),
                 ...(size.cols !== undefined ? { cols: size.cols } : {}),
                 ...(size.rows !== undefined ? { rows: size.rows } : {}),
             },
@@ -1044,14 +1133,15 @@ export class FleetSessionService {
                 { field: 'firstMessage' },
             );
         }
-        const cwd = typeof request.cwd === 'string' ? request.cwd.trim() : '';
+        // FL-15 P1: a session may start in a checkout — its folder is the checkout's.
+        const checkout = await this.checkoutFor(node, request);
+        const cwd = checkout
+            ? checkout.path
+            : typeof request.cwd === 'string'
+              ? request.cwd.trim()
+              : '';
         if (cwd.length === 0 || cwd.length > FLEET_SESSION_CWD_MAX_LENGTH || cwd.includes('\0')) {
             throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
-        }
-        if (request.newWorktreeOf || request.checkoutId) {
-            throw fleetSessionError('invalid', 'New worktrees arrive with Checkouts', {
-                field: 'checkout',
-            });
         }
         if (!this.agents || !this.runs || !this.agentDispatcher) {
             throw fleetSessionError('unreachable', 'this deployment does not run Agent sessions yet');
@@ -1081,6 +1171,7 @@ export class FleetSessionService {
         const action: FleetAuditAction = options.restartOf
             ? 'node.session.restart'
             : 'node.session.start';
+        const requestedTaskId = typeof request.taskId === 'string' ? request.taskId : '';
         const refusal = canStartFleetSession({
             node: {
                 name: node.name,
@@ -1106,8 +1197,42 @@ export class FleetSessionService {
                 confirmationClass: 'plain',
                 outcome: 'refused',
                 code: refusal.code,
+                ...(requestedTaskId ? { taskId: requestedTaskId } : {}),
             });
             throw fleetSessionError(refusal.code, refusal.hint, refusal.details);
+        }
+
+        // FL-15 P1 (spec FR-6, U5, U13, FR-3): a start for a Task — the Task is
+        // visible, the Agent is not already on it, the pin is respected (never
+        // written) and the computer has a free agent slot. The Run then
+        // carries the Task, so its history, the board and chat follow it.
+        let handoff: FleetSessionTaskAdmission | null = null;
+        if (requestedTaskId) {
+            if (!this.taskRules) {
+                throw fleetSessionError('invalid', 'this deployment does not hand Tasks to sessions yet', {
+                    field: 'taskId',
+                });
+            }
+            try {
+                handoff = await this.taskRules.admit({
+                    userId: actor.userId,
+                    agent: { id: agent.id, name: agent.name, organizationId: agent.organizationId ?? null },
+                    node,
+                    taskId: requestedTaskId,
+                });
+            } catch (error) {
+                const typed = readFleetSessionError(error);
+                await this.record(action, actor.userId, node, null, {
+                    kind: 'agent',
+                    provider,
+                    agentId,
+                    taskId: requestedTaskId,
+                    confirmationClass: 'plain',
+                    outcome: 'refused',
+                    code: typed?.code ?? 'internal',
+                });
+                throw error;
+            }
         }
 
         const id = randomUUID();
@@ -1121,7 +1246,7 @@ export class FleetSessionService {
             provider,
             agentId,
             agentRunId: null,
-            checkoutId: null,
+            checkoutId: checkout?.id ?? null,
             cwd,
             title,
             state: 'starting',
@@ -1151,6 +1276,8 @@ export class FleetSessionService {
                 organizationId: node.organizationId ?? null,
                 runnerKind: 'fleet-session',
                 fleetSessionId: id,
+                // FL-15 P1: the Task this session works on (its Work denormalised, as assign-task does).
+                ...(handoff ? { taskId: handoff.taskId, workId: handoff.workId } : {}),
             });
             runId = run.id;
             await this.sessions.update(id, { agentRunId: run.id });
@@ -1194,6 +1321,7 @@ export class FleetSessionService {
                 confirmationClass: 'plain',
                 outcome: 'refused',
                 code: 'unreachable',
+                ...(handoff ? { taskId: handoff.taskId } : {}),
             });
             throw fleetSessionError('unreachable', `${node.name} could not be asked to start the session`);
         }
@@ -1204,9 +1332,14 @@ export class FleetSessionService {
             agentRunId: runId,
             confirmationClass: 'plain',
             outcome: 'queued',
+            // FL-15 FR-11: the session-start row names the Task (and the checkout), never the first message.
+            ...(handoff ? { taskId: handoff.taskId } : {}),
+            ...(checkout ? { checkoutId: checkout.id } : {}),
             ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
         });
-        return toFleetSessionView(row);
+        const view = toFleetSessionView(row);
+        if (handoff) view.task = { id: handoff.taskId, slug: handoff.slug, title: handoff.title };
+        return view;
     }
 
     /**
