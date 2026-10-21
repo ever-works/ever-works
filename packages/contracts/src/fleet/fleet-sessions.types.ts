@@ -886,3 +886,53 @@ export interface FleetAgentSessionResult {
 export function fleetAgentSessionRequiredCapabilities(provider: FleetAgentSessionProvider): string[] {
 	return [FLEET_SESSIONS_CAPABILITY, FLEET_SESSION_PROVIDER_CAPABILITY[provider] ?? provider];
 }
+
+// ─── Recording and re-watch (FL-04 P3, CONTRACTS R-9, AW-11 P3) ─────────────
+
+/** Session recordings are kept this long, whatever the plan (spec FR-55). */
+export const FLEET_SESSION_RECORDING_RETENTION_DAYS = 14;
+
+/** `POST /api/fleet/sessions/:id/recording` body. */
+export interface FleetSessionRecordingRequest {
+	on: boolean;
+}
+
+/** One driver span on the recording's timeline (from the `node.session.input` audit rows). */
+export interface FleetSessionDriverSpan {
+	userId: string | null;
+	/** `user:<id>` or `agent:<id>` when known. */
+	requestedBy: string | null;
+	from: string;
+	to: string;
+}
+
+/** `GET /api/fleet/sessions/:id/recording` — the manifest. */
+export interface FleetSessionRecordingManifest {
+	state: FleetSessionRecordingState;
+	/** Chunks stored. 0 = nothing to play. */
+	chunks: number;
+	/** First to last stored chunk, in ms (0 with fewer than two). */
+	durationMs: number;
+	firstAt: string | null;
+	lastAt: string | null;
+	driverSpans: FleetSessionDriverSpan[];
+	/** The recording was removed after the retention window (no chunks left of an ended, recorded session). */
+	expired: boolean;
+	retentionDays: number;
+}
+
+/** One chunk of a recording, as played back (text already redacted). */
+export interface FleetSessionRecordingChunk {
+	seq: number;
+	/** Terminal text (UTF-8, redacted). */
+	text: string;
+	/** When the platform stored it (ISO) — the player's clock. */
+	at: string;
+}
+
+/** `GET /api/fleet/sessions/:id/recording?from=<seq>&limit=<n>` — one page of chunks, oldest first. */
+export interface FleetSessionRecordingPage {
+	chunks: FleetSessionRecordingChunk[];
+	lastSeq: number | null;
+	hasMore: boolean;
+}

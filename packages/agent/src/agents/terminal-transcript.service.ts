@@ -1,5 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import type { TerminalFrame } from '@ever-works/contracts';
+import {
+    FLEET_SESSION_RECORDING_RETENTION_DAYS,
+    type FleetSessionRecordingPage,
+    type TerminalFrame,
+} from '@ever-works/contracts';
 import { config } from '../config';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { UserRepository } from '../database/repositories/user.repository';
@@ -368,6 +372,111 @@ export class TerminalTranscriptService {
         } catch {
             return null;
         }
+    }
+
+    // ─── Sessions on computers (FL-04 P3, CONTRACTS R-9, AW-11 P3) ─────────
+
+    /**
+     * Persist recorded output of a SESSION (keyed by `fleetSessionId`, never a
+     * run): the same redaction and chunk cap as {@link persistFrames}, and the
+     * same posture — best effort, NEVER throws. Returns the chunks offered, or
+     * `-1` when storage failed (the recorder then stops recording and says so;
+     * a storage outage never stalls the live view). Session recordings keep
+     * {@link FLEET_SESSION_RECORDING_RETENTION_DAYS} days whatever the plan.
+     */
+    async persistSessionFrames(
+        fleetSessionId: string,
+        frames: ReadonlyArray<{ seq: number; data: Uint8Array }>,
+    ): Promise<number> {
+        try {
+            if (!config.terminal.transcript.isPersistenceEnabled()) return 0;
+            const maxChars = config.terminal.transcript.getMaxChunkChars();
+            const seen = new Set<number>();
+            const writes = [];
+            for (const frame of frames) {
+                if (!Number.isSafeInteger(frame.seq) || frame.seq < 0 || seen.has(frame.seq)) continue;
+                if (!(frame.data instanceof Uint8Array) || frame.data.byteLength === 0) continue;
+                seen.add(frame.seq);
+                const decoded = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength).toString(
+                    'utf-8',
+                );
+                const { text } = redactTerminalText(decoded);
+                writes.push({
+                    fleetSessionId,
+                    seq: frame.seq,
+                    direction: 'out' as const,
+                    text: text.length > maxChars ? text.slice(0, maxChars) : text,
+                    byteLength: frame.data.byteLength,
+                });
+            }
+            if (writes.length === 0) return 0;
+            await this.chunks.appendSessionMany(writes);
+            return writes.length;
+        } catch (error) {
+            this.logger.warn(
+                `Session recording persistence failed for session ${fleetSessionId}: ${(error as Error)?.message ?? 'unknown error'}`,
+            );
+            return -1;
+        }
+    }
+
+    /** One page of a session's recording, `seq >= fromSeq`, oldest first, doubly capped like a run's. */
+    async getSessionRecordingPage(
+        fleetSessionId: string,
+        options: { fromSeq?: number; limit?: number } = {},
+    ): Promise<FleetSessionRecordingPage> {
+        const maxChunks = config.terminal.transcript.getReplayMaxChunks();
+        const maxChars = config.terminal.transcript.getReplayMaxChars();
+        const fromSeq =
+            Number.isSafeInteger(options.fromSeq) && (options.fromSeq as number) >= 0
+                ? (options.fromSeq as number)
+                : 0;
+        const requested =
+            Number.isSafeInteger(options.limit) && (options.limit as number) > 0
+                ? (options.limit as number)
+                : maxChunks;
+        const limit = Math.min(requested, maxChunks);
+        const rows = await this.chunks.listBySession(fleetSessionId, fromSeq, limit + 1);
+        const chunks: FleetSessionRecordingPage['chunks'] = [];
+        let chars = 0;
+        let hasMore = false;
+        for (const row of rows) {
+            if (chunks.length >= limit || (chars + row.text.length > maxChars && chunks.length > 0)) {
+                hasMore = true;
+                break;
+            }
+            chars += row.text.length;
+            chunks.push({
+                seq: row.seq,
+                text: row.text,
+                at: row.createdAt?.toISOString?.() ?? new Date(0).toISOString(),
+            });
+        }
+        return { chunks, lastSeq: chunks.length > 0 ? chunks[chunks.length - 1].seq : null, hasMore };
+    }
+
+    /** What a session's recording holds: count, the highest seq, the first and last write. */
+    async sessionRecordingStats(fleetSessionId: string): Promise<{
+        count: number;
+        maxSeq: number | null;
+        firstAt: Date | null;
+        lastAt: Date | null;
+    }> {
+        return this.chunks.sessionStats(fleetSessionId);
+    }
+
+    /**
+     * The session half of the `terminal-transcript-gc` cron (T-43): session
+     * recordings past {@link FLEET_SESSION_RECORDING_RETENTION_DAYS} are
+     * deleted, whatever the plan (run transcripts keep their plan tier).
+     */
+    async sweepExpiredSessions(now: Date = new Date()): Promise<{ deletedChunks: number }> {
+        const cutoff = new Date(now.getTime() - this.daysToMs(FLEET_SESSION_RECORDING_RETENTION_DAYS));
+        const deletedChunks = await this.chunks.deleteSessionChunksOlderThan(cutoff);
+        if (deletedChunks > 0) {
+            this.logger.log(`Session recording retention swept ${deletedChunks} chunks`);
+        }
+        return { deletedChunks };
     }
 
     private daysToMs(days: number): number {

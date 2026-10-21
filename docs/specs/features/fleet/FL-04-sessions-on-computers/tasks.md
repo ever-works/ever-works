@@ -142,24 +142,24 @@
 
 # PHASE 3 — Recording and re-watch
 
-- [ ] **T-41**. Extend `packages/agent/src/agents/terminal-transcript.service.ts` with `persistSessionFrames(fleetSessionId, frames)` (same redaction and batching as `persistFrames`, `:107-124`; retention 14 days fixed for sessions) and `replaySession(fleetSessionId, from, limit)`; `FleetSessionService.setRecording(on)` flips `recordingState` and audits `node.session.recording.start|stop`; default on for Agent sessions, for owner sessions from the Node's existing `recordWatchSessions` (`packages/agent/src/entities/fleet-node.entity.ts:506`).
+- [x] **T-41**. Extend `packages/agent/src/agents/terminal-transcript.service.ts` with `persistSessionFrames(fleetSessionId, frames)` (same redaction and batching as `persistFrames`, `:107-124`; retention 14 days fixed for sessions) and `replaySession(fleetSessionId, from, limit)`; `FleetSessionService.setRecording(on)` flips `recordingState` and audits `node.session.recording.start|stop`; default on for Agent sessions, for owner sessions from the Node's existing `recordWatchSessions` (`packages/agent/src/entities/fleet-node.entity.ts:506`).
     - **Test**: extend `packages/agent/src/agents/__tests__/terminal-transcript.service.spec.ts` — session chunks keyed and redacted; default rule per kind; storage failure flips the state to `off` with a reason and never throws into the relay.
-- [ ] **T-42**. Route recorded frames: `session.family.ts` forwards `DATA` frames to `persistSessionFrames` when `recordingState === 'recording'`, fire-and-forget like `apps/api/src/terminal/terminal-internal.controller.ts:130-150`; add `GET/POST /sessions/:id/recording` to the controller (`GET` returns the manifest with driver spans from the audit rows, or a chunk page with `?from=seq&limit` — the CONTRACTS §11.2 path, no sub-route).
+- [x] **T-42**. Route recorded frames: `session.family.ts` forwards `DATA` frames to `persistSessionFrames` when `recordingState === 'recording'`, fire-and-forget like `apps/api/src/terminal/terminal-internal.controller.ts:130-150`; add `GET/POST /sessions/:id/recording` to the controller (`GET` returns the manifest with driver spans from the audit rows, or a chunk page with `?from=seq&limit` — the CONTRACTS §11.2 path, no sub-route).
     - **Test**: controller spec extended; family spec — a storage failure never stalls the viewer path.
-- [ ] **T-43**. Extend `packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts` to delete session-keyed chunks older than 14 days alongside the existing per-run retention.
+- [x] **T-43**. Extend `packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts` to delete session-keyed chunks older than 14 days alongside the existing per-run retention.
     - **Test**: `packages/tasks/src/__tests__/terminal-transcript-gc.task.spec.ts` extended — session chunks past 14 days gone, run chunks follow their plan tier.
-- [ ] **T-44**. Write `SessionReplayPlayer.tsx` (replays chunks into a `TerminalPane` renderer instance; slider 1 s / 10 s steps; speed `1× 2× 4×`; driver-span marks) and the **Re-watch** entry on the detail and the Run receipt; the footer's recording state and toggle; the "nothing to play" variants.
+- [x] **T-44**. Write `SessionReplayPlayer.tsx` (replays chunks into a `TerminalPane` renderer instance; slider 1 s / 10 s steps; speed `1× 2× 4×`; driver-span marks) and the **Re-watch** entry on the detail and the Run receipt; the footer's recording state and toggle; the "nothing to play" variants.
     - **Test**: `SessionReplayPlayer.unit.spec.tsx`; e2e `apps/web/e2e/flow-fleet-sessions-replay.spec.ts`.
-- [ ] **T-45**. Write `apps/web/e2e/flow-fleet-sessions-a11y.spec.ts` — keyboard-only operation of tab, dialog, detail and player; an axe pass; `Esc Esc` releases the keyboard.
+- [ ] **T-45**. Write `apps/web/e2e/flow-fleet-sessions-a11y.spec.ts` — keyboard-only operation of tab, dialog, detail and player; an axe pass; `Esc Esc` releases the keyboard. _(P3: open — needs an e2e computer with a recorded session)_
     - **Test**: green; the sweep is clean.
 
 ---
 
 # PHASE 4 — Docs and rollout
 
-- [ ] **T-46**. Write the user doc `docs/features/fleet-sessions.md` (what a session is, owner vs Agent, consents, limits, recording, cost sentence) and list it in `apps/docs/sidebarsPlatform.ts` beside `features/fleet` (`:183`); cross-link from `docs/features/fleet.md` and `docs/features/agent-terminals.md` (the "Terminal sessions are dispatched onto the configured job runtime" paragraph gains the pointer to node sessions).
+- [x] **T-46**. Write the user doc `docs/features/fleet-sessions.md` (what a session is, owner vs Agent, consents, limits, recording, cost sentence) and list it in `apps/docs/sidebarsPlatform.ts` beside `features/fleet` (`:183`); cross-link from `docs/features/fleet.md` and `docs/features/agent-terminals.md` (the "Terminal sessions are dispatched onto the configured job runtime" paragraph gains the pointer to node sessions).
     - **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
-- [ ] **T-47**. Update trackers: `docs/specs/features/fleet/TRACKER.md` (FL-04 impl per phase) and `docs/specs/features/agent-workspace/TRACKER.md` (`:25`, AW-11 P3 terminal recording delivered by FL-04; `AW-11 tasks.md` T50–T55 note). No plugin doc change (no plugin).
+- [x] **T-47**. Update trackers: `docs/specs/features/fleet/TRACKER.md` (FL-04 impl per phase) and `docs/specs/features/agent-workspace/TRACKER.md` (`:25`, AW-11 P3 terminal recording delivered by FL-04; `AW-11 tasks.md` T50–T55 note). No plugin doc change (no plugin).
     - **Test**: both rows link to this folder.
 - [x] **T-48**. Flag and gate: `FLEET_SESSIONS_ENABLED` read in `apps/web/src/lib/fleet-flags.ts` and the API guard; default off in production; the existing `GET /api/health/ready` lists the flag state under `fleet`. _(P1b: web reads it through `readFleetFeatureFlags` (the registry list) for the tab, the header action and the session page; the API guard 404s; `GET /api/health/ready` answers `fleet: { sessions }`)_
     - **Test**: with the flag off every new route 404s and the tab is absent; with it on, everything above.

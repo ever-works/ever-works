@@ -633,7 +633,7 @@ expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale
 
 # PHASE 3 — Re-watch and the terminal channel
 
-- [ ] **T50. Add the recording segment entity and migration C.**
+- [ ] **T50. Add the recording segment entity and migration C.** _(Terminal recording and re-watch are delivered by Fleet FL-04 P3 (#2841): session-keyed transcript chunks, the recorder, `GET|POST /api/fleet/sessions/:id/recording`, `SessionReplayPlayer` — `../../fleet/FL-04-sessions-on-computers/`. The desktop recording segments stay FL-07's.)_
     - Create `packages/agent/src/entities/computer-recording-segment.entity.ts` per
       [`plan.md`](./plan.md) §3.1 (bytes live in storage; the row holds a `storageKey`, never
       bytes).
@@ -682,7 +682,7 @@ expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale
       `409` when the run has no stored steps, rendered as a disabled button with a reason.
     - **Done when**: the same synthesis path runs with no new demonstration.
 
-- [ ] **T55. Add the Node-hosted terminal channel.**
+- [ ] **T55. Add the Node-hosted terminal channel.** _(Delivered by Fleet FL-04: sessions in the node's session daemon over the `session` link family (P1, #2751), the browser viewer path (P1b, #2830) and Agent sessions (P2, #2837).)_
     - Extend the `computer-session` job payload with `channels` including `terminal`; in
       `apps/node/src/core/executors/computer-session.ts` spawn a local PTY and publish
       `TerminalFrame`s wrapped in the `ComputerTerminalFrame` envelope from T2 — **reusing** the

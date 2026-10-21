@@ -2,6 +2,8 @@
 
 import type {
     FleetSessionListResponse,
+    FleetSessionRecordingManifest,
+    FleetSessionRecordingPage,
     FleetSessionStartRequest,
     FleetSessionView,
 } from '@ever-works/contracts';
@@ -73,6 +75,23 @@ export const sessionsClient = {
         call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/end`, {
             method: 'POST',
             body: { confirm: true },
+        }),
+    /** P3: the recording's manifest. */
+    recording: (sessionId: string) =>
+        call<FleetSessionRecordingManifest>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/recording`, {
+            method: 'GET',
+        }),
+    /** P3: one page of the recording, `seq >= from`. */
+    recordingPage: (sessionId: string, from: number, limit = 200) =>
+        call<FleetSessionRecordingPage>(
+            `/api/fleet/sessions/${encodeURIComponent(sessionId)}/recording?from=${from}&limit=${limit}`,
+            { method: 'GET' },
+        ),
+    /** P3: start or stop recording a live session. */
+    setRecording: (sessionId: string, on: boolean) =>
+        call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/recording`, {
+            method: 'POST',
+            body: { on },
         }),
     restart: (sessionId: string, size: { cols?: number; rows?: number } = {}) =>
         call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/restart`, {

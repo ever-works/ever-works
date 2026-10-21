@@ -839,3 +839,68 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
         expect(h.runs.markCompleted).toHaveBeenCalledWith(RUN_ID, expect.any(String));
     });
 });
+
+describe('FleetSessionService — recording (FL-04 P3)', () => {
+    function recordedHarness(nodeOverrides: Record<string, unknown> = {}) {
+        const base = harness({ node: nodeOverrides as never });
+        const recorder = { ensure: jest.fn(), stop: jest.fn() };
+        const service = new FleetSessionService(
+            base.repo as never,
+            { findById: jest.fn(async () => base.node), findByUser: jest.fn(async () => [base.node]) } as never,
+            {
+                resolveForFamily: jest.fn(async () => ({ node: base.node, role: 'owner' })),
+                listSharedWith: jest.fn(async () => []),
+            } as never,
+            base.killSwitch as never,
+            base.audit as never,
+            base.port,
+            undefined,
+            undefined,
+            undefined,
+            recorder,
+        );
+        return { ...base, service, recorder };
+    }
+
+    it('records an owner session when the computer asks for watched sessions to be recorded', async () => {
+        const h = recordedHarness({ recordWatchSessions: true });
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, START);
+        expect(view.recordingState).toBe('recording');
+        expect(h.recorder.ensure).toHaveBeenCalledWith(expect.objectContaining({ id: view.id, nodeId: NODE_ID }));
+    });
+
+    it('does not record by default', async () => {
+        const h = recordedHarness();
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, START);
+        expect(view.recordingState).toBe('off');
+        expect(h.recorder.ensure).not.toHaveBeenCalled();
+    });
+
+    it('switches recording on and off with one audit row each', async () => {
+        const h = recordedHarness();
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, START);
+        const on = await h.service.setRecording(view.id, { userId: OWNER }, true);
+        expect(on.recordingState).toBe('recording');
+        expect(h.recorder.ensure).toHaveBeenCalled();
+        const off = await h.service.setRecording(view.id, { userId: OWNER }, false);
+        expect(off.recordingState).toBe('off');
+        expect(h.recorder.stop).toHaveBeenCalledWith(view.id);
+        const actions = h.audit.tryRecord.mock.calls.map((call) => (call[0] as { action: string }).action);
+        expect(actions).toEqual(expect.arrayContaining(['node.session.recording.start', 'node.session.recording.stop']));
+    });
+
+    it('stores the recording when the session ends, and stops the recorder', async () => {
+        const h = recordedHarness({ recordWatchSessions: true });
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, START);
+        await h.service.end(view.id, { userId: OWNER }, { confirm: true });
+        expect(h.repo.rows.get(view.id)?.recordingState).toBe('stored');
+        expect(h.recorder.stop).toHaveBeenCalledWith(view.id);
+    });
+
+    it('a storage failure stops recording with an audit row', async () => {
+        const h = recordedHarness({ recordWatchSessions: true });
+        const view = await h.service.start(NODE_ID, { userId: OWNER }, START);
+        await h.service.recordingFailed(view.id);
+        expect(h.repo.rows.get(view.id)?.recordingState).toBe('off');
+    });
+});

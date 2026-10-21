@@ -65,6 +65,7 @@ import {
 } from './fleet-session.repository';
 import { toFleetSessionView } from './fleet-session.view';
 import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
+import { FLEET_SESSION_RECORDER, type FleetSessionRecorderPort } from './fleet-session-recorder.port';
 
 /**
  * Sessions on computers (FL-04) — the platform's one writer of
@@ -197,6 +198,10 @@ export class FleetSessionService {
         @Optional()
         @Inject(AGENT_SESSION_DISPATCHER)
         private readonly agentDispatcher?: AgentSessionDispatcher,
+        // FL-04 P3 — recording (the API binds it; unbound, nothing is recorded).
+        @Optional()
+        @Inject(FLEET_SESSION_RECORDER)
+        private readonly recorder?: FleetSessionRecorderPort,
     ) {}
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -469,7 +474,9 @@ export class FleetSessionService {
                     endedAt: null,
                     endedReason: null,
                     exitCode: null,
-                    recordingState: 'off',
+                    // P3: an owner session is recorded when the computer's owner
+                    // asked for watched sessions to be (spec FR-54).
+                    recordingState: node.recordWatchSessions === true ? 'recording' : 'off',
                 }),
             };
         });
@@ -502,6 +509,7 @@ export class FleetSessionService {
             ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
         });
         const applied = await this.drainEarly(node.id, row.row);
+        if (applied.recordingState === 'recording' && isFleetSessionLive(applied.state)) this.ensureRecording(applied);
         return toFleetSessionView(applied);
     }
 
@@ -694,6 +702,71 @@ export class FleetSessionService {
         });
     }
 
+    // ─── Recording (FL-04 P3, spec FR-54 … FR-57) ──────────────────────────
+
+    /**
+     * Switch recording of a live session on or off (spec FR-54): the
+     * `sessions` audience, then the row, the recorder and one
+     * `node.session.recording.start|stop` audit row. Recording changes nothing
+     * on the machine (the recorder only watches), so the kill switch does not
+     * refuse it. An ended session's recording is what it is.
+     */
+    async setRecording(id: string, actor: FleetSessionActor, on: boolean): Promise<FleetSessionView> {
+        const { session, node } = await this.resolve(id, actor);
+        if (!isFleetSessionLive(session.state)) {
+            throw fleetSessionError('invalid', 'the session has ended; its recording is what it is', {
+                state: session.state,
+            });
+        }
+        const next = on ? 'recording' : 'off';
+        if (session.recordingState === next) return toFleetSessionView(session);
+        await this.sessions.update(session.id, { recordingState: next });
+        if (on) this.ensureRecording(session);
+        else this.recorder?.stop(session.id);
+        await this.record(
+            on ? 'node.session.recording.start' : 'node.session.recording.stop',
+            actor.userId,
+            node,
+            session.id,
+            { confirmationClass: 'plain', outcome: on ? 'recording' : 'stopped' },
+        );
+        return toFleetSessionView({ ...session, recordingState: next } as FleetSession);
+    }
+
+    /**
+     * The recorder could not store what the session printed (storage is down):
+     * recording stops — the state says `off`, one audit row says why — and the
+     * live view is never touched. Never throws.
+     */
+    async recordingFailed(id: string): Promise<void> {
+        try {
+            const row = await this.sessions.findById(id);
+            if (!row || row.recordingState !== 'recording') return;
+            await this.sessions.update(row.id, { recordingState: 'off' });
+            await this.recordSystem('node.session.recording.stop', row, {
+                confirmationClass: 'plain',
+                outcome: 'storage-failed',
+                requestedBy: 'system:recorder',
+            });
+        } catch (error) {
+            this.logger.warn(
+                `session ${id}: recording failure not recorded: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /** Live sessions being recorded on these nodes (the recorder's periodic re-check). */
+    async liveRecordingFor(nodeIds: readonly string[]): Promise<FleetSession[]> {
+        if (nodeIds.length === 0) return [];
+        const out: FleetSession[] = [];
+        for (const nodeId of nodeIds) {
+            for (const row of await this.sessions.findLiveForNode(nodeId)) {
+                if (row.recordingState === 'recording' && row.state !== 'starting') out.push(row);
+            }
+        }
+        return out;
+    }
+
     // ─── Attach (FL-04 P1b) ────────────────────────────────────────────────
 
     /**
@@ -819,6 +892,7 @@ export class FleetSessionService {
             if (message.daemon.state === 'running') {
                 for (const row of await this.sessions.findLiveForNode(nodeId)) {
                     const entry = held.get(row.daemonSessionId);
+                    if (entry && entry.alive && row.recordingState === 'recording') this.ensureRecording(row);
                     if (entry) {
                         if (row.state === 'starting' && entry.alive) {
                             await this.applyToRow(nodeId, row, {
@@ -1025,7 +1099,9 @@ export class FleetSessionService {
             endedAt: null,
             endedReason: null,
             exitCode: null,
-            recordingState: 'off',
+            // P3: an Agent session is recorded by default (spec FR-54); the
+            // recorder attaches once the daemon reports it started.
+            recordingState: 'recording',
         });
         let runId: string;
         try {
@@ -1220,6 +1296,7 @@ export class FleetSessionService {
                     requestedBy: `system:${patch.endedReason}`,
                 });
             }
+            await this.afterEnded({ ...row, ...written } as FleetSession);
             if (row.kind === 'agent') {
                 await this.settleAgentRun(
                     { ...row, ...written } as FleetSession,
@@ -1229,6 +1306,8 @@ export class FleetSessionService {
             }
         } else {
             await this.sessions.update(row.id, written);
+            // P3: the process runs — a session to be recorded gets its recorder now.
+            if (message.event === 'started' && row.recordingState === 'recording') this.ensureRecording(row);
         }
         if (
             (message.event === 'exited' || message.event === 'lost') &&
@@ -1263,8 +1342,45 @@ export class FleetSessionService {
         if (!patch) return row;
         const written = this.toColumns(patch);
         const won = await this.sessions.updateIfLive(row.id, written);
-        if (won) return { ...row, ...written } as FleetSession;
+        if (won) return this.afterEnded({ ...row, ...written } as FleetSession);
         return (await this.sessions.findById(row.id)) ?? row;
+    }
+
+    /**
+     * A session just ended (FL-04 P3): a recording in progress becomes
+     * `stored` (the manifest says whether anything was), and its recorder stops.
+     */
+    private async afterEnded(row: FleetSession): Promise<FleetSession> {
+        if (row.recordingState !== 'recording') {
+            this.recorder?.stop(row.id);
+            return row;
+        }
+        this.recorder?.stop(row.id);
+        try {
+            await this.sessions.update(row.id, { recordingState: 'stored' });
+        } catch (error) {
+            this.logger.debug(
+                `session ${row.id}: recording not marked stored: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return row;
+        }
+        return { ...row, recordingState: 'stored' } as FleetSession;
+    }
+
+    /** Ask the recorder (API) to record a live session; best effort. */
+    private ensureRecording(row: Pick<FleetSession, 'id' | 'nodeId' | 'daemonSessionId' | 'kind'>): void {
+        try {
+            this.recorder?.ensure({
+                id: row.id,
+                nodeId: row.nodeId,
+                daemonSessionId: row.daemonSessionId,
+                kind: row.kind,
+            });
+        } catch (error) {
+            this.logger.debug(
+                `session ${row.id}: recorder not asked: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
     }
 
     private holdEarly(nodeId: string, message: FleetSessionEventMessage): void {
