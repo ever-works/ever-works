@@ -1,7 +1,12 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import type { FleetCheckoutView, FleetTaskHandoffOptions } from '@ever-works/contracts';
+import type {
+    FleetCheckoutView,
+    FleetGitIdentity,
+    FleetGitIdentitySetResult,
+    FleetTaskHandoffOptions,
+} from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
@@ -66,6 +71,36 @@ export async function getHandoffCheckoutAction(id: string): Promise<HandoffActio
     await ensureAuth();
     try {
         return { success: true, data: await fleetCheckoutsAPI.get(id) };
+    } catch (error) {
+        return refusal(error);
+    }
+}
+
+/** FL-15 P2: a computer's git identity (the Settings card and the dialog's line). */
+export async function getGitIdentityAction(
+    nodeId: string,
+    fresh = false,
+): Promise<HandoffActionResult<FleetGitIdentity>> {
+    await ensureAuth();
+    try {
+        return { success: true, data: await fleetTaskHandoffAPI.gitIdentity(nodeId, fresh) };
+    } catch (error) {
+        return refusal(error);
+    }
+}
+
+/**
+ * FL-15 P2: **Use my Ever Works identity**. Without `confirm` the answer is
+ * `code: 'confirmation_required'` with `details` = `{ summary, name, email,
+ * emailSource }` — what the confirmation shows.
+ */
+export async function setGitIdentityAction(
+    nodeId: string,
+    confirm: boolean,
+): Promise<HandoffActionResult<FleetGitIdentitySetResult>> {
+    await ensureAuth();
+    try {
+        return { success: true, data: await fleetTaskHandoffAPI.setGitIdentity(nodeId, confirm) };
     } catch (error) {
         return refusal(error);
     }

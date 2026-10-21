@@ -1,6 +1,11 @@
 import 'server-only';
-import type { FleetSessionListResponse, FleetTaskHandoffOptions } from '@ever-works/contracts';
-import { serverFetch } from './server-api';
+import type {
+    FleetGitIdentity,
+    FleetGitIdentitySetResult,
+    FleetSessionListResponse,
+    FleetTaskHandoffOptions,
+} from '@ever-works/contracts';
+import { serverFetch, serverMutation } from './server-api';
 
 // NOTE: no leading `/api` here — `serverFetch` prepends `API_URL`, which
 // already ends in `/api` (see `lib/api/fleet.ts`).
@@ -21,6 +26,22 @@ export const fleetTaskHandoffAPI = {
             }`,
             { method: 'GET' },
         ),
+
+    /** FL-15 P2: a computer's global git identity (`?fresh=1` reads the machine again). */
+    gitIdentity: async (nodeId: string, fresh = false): Promise<FleetGitIdentity> =>
+        serverFetch<FleetGitIdentity>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/git/identity${fresh ? '?fresh=1' : ''}`,
+            { method: 'GET' },
+        ),
+
+    /** FL-15 P2: **Use my Ever Works identity** — `confirmation_required` until `confirm` is true. */
+    setGitIdentity: async (nodeId: string, confirm: boolean): Promise<FleetGitIdentitySetResult> =>
+        serverMutation<FleetGitIdentitySetResult>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}/git/identity`,
+            data: confirm ? { confirm: true } : {},
+            method: 'POST',
+            wrapInData: false,
+        }),
 
     /** The Task's sessions on computers, latest first (`GET /api/fleet/sessions?taskId=&limit=`). */
     sessionsForTask: async (taskId: string, limit = 1): Promise<FleetSessionListResponse> =>
