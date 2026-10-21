@@ -802,6 +802,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet operations get'
 	}),
 	read('fleet_operations_list', 'view', 'FL-19', 'FLEET_NODE_LINK_ENABLED', 'live', {
+		route: GET('/api/fleet/operations'),
 		cli: 'fleet operations list'
 	}),
 	act('fleet_operations_cancel', 'view', 'FL-02', 'FLEET_NODE_LINK_ENABLED', 'live', plain('machine.run'), {
