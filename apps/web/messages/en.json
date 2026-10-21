@@ -15140,6 +15140,24 @@
                 "close": "Close",
                 "failed": "The password could not be revealed."
             },
+            "resize": {
+                "button": "Resize…",
+                "title": "Resize {name}",
+                "description": "It uses the new size from its next start.",
+                "cpus": "CPUs",
+                "memory": "Memory",
+                "cancel": "Cancel",
+                "apply": "Resize",
+                "started": "Resizing {name}",
+                "failed": "It could not be resized."
+            },
+            "rebuild": {
+                "button": "Rebuild…",
+                "title": "Rebuild {name}?",
+                "body": "Re-creates the container from the current image. Its home folder and its Fleet registration are kept; sessions on it end.",
+                "confirm": "Rebuild",
+                "started": "Rebuilding {name}"
+            },
             "watch": {
                 "button": "Watch the install",
                 "opened": "The installer's screen opened on {host}",

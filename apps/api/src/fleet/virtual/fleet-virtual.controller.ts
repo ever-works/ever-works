@@ -7,6 +7,7 @@ import {
     HttpStatus,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
     Query,
     Req,
@@ -30,6 +31,7 @@ import {
     FleetVirtualDestroyDto,
     FleetVirtualOptionsQueryDto,
     FleetVirtualPowerDto,
+    FleetVirtualResizeDto,
     FleetVirtualRevealDto,
     virtualConfirmFields,
 } from './dto/fleet-virtual.dto';
@@ -167,6 +169,46 @@ export class FleetVirtualController {
     ): Promise<FleetVirtualOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'destroy a virtual computer', REFUSAL_WHY);
         return this.virtual.destroy({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+    }
+
+    @Patch('nodes/:id/virtual/:childId')
+    @ApiOperation({
+        summary:
+            'Resize a STOPPED virtual computer (CPUs 2 / 4 / 8, memory 4 / 8 / 16 GB). Refused `busy` while it runs. Send `confirm: true`. Answers 202.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async resize(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('childId', ParseUUIDPipe) childId: string,
+        @Body() body: FleetVirtualResizeDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetVirtualOperationResponse> {
+        refuseMachinePrincipalAction(auth, req, 'resize a virtual computer', REFUSAL_WHY);
+        return this.virtual.resize({ kind: 'user', userId: auth.userId }, id, childId, {
+            cpus: body.cpus,
+            memoryGiB: body.memoryGiB,
+            fields: virtualConfirmFields(body),
+        });
+    }
+
+    @Post('nodes/:id/virtual/:childId/rebuild')
+    @ApiOperation({
+        summary:
+            'Rebuild a Container from the current catalogue image, keeping its home folder and its Fleet registration. Send `confirm: true`. Answers 202.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 5, ttl: 60_000 } })
+    async rebuild(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('childId', ParseUUIDPipe) childId: string,
+        @Body() body: FleetVirtualRevealDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetVirtualOperationResponse> {
+        refuseMachinePrincipalAction(auth, req, 'rebuild a virtual computer', REFUSAL_WHY);
+        return this.virtual.rebuild({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
     }
 
     @Post('nodes/:id/virtual/:childId/password/reveal')
