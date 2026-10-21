@@ -80,6 +80,7 @@ import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module'
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
 import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
 import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
+import { FleetCloudApiModule } from './fleet/cloud/fleet-cloud-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
 import { FleetToolsApiModule } from './fleet/tools/fleet-tools-api.module';
@@ -344,6 +345,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // on a computer of the Fleet: the routes, the host-facing token mint and
         // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
         FleetVirtualApiModule,
+        // Cloud computers (FL-17) — machines created at a cloud provider through a
+        // machine-provider plugin: providers, options, create / power / destroy,
+        // and the reconcile + bootstrap-watch fallbacks. Dark unless FLEET_CLOUD_ENABLED.
+        FleetCloudApiModule,
         // Servers and ports (FL-10) — what a computer listens on, and Open on
         // the machine (its desktop or its preview browser), over the node link.
         // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.

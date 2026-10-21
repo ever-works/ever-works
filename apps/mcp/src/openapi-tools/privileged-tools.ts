@@ -64,7 +64,11 @@ export const MCP_PRIVILEGED_TOOLS: Readonly<Record<string, string>> = Object.fre
 	discard_task_branch: 'throws away pushed work the platform cannot get back',
 	delete_inbox_item: 'hides a notice from the owner',
 	delete_comparison: 'destructive',
-	remove_item: 'deletes an item from the Work data repository'
+	remove_item: 'deletes an item from the Work data repository',
+	// Cloud computers (FL-17) — real money on the owner's own provider account.
+	fleet_cloud_create: 'creates a machine billed to the owner’s cloud provider account until destroyed',
+	fleet_cloud_power: 'powers a billed cloud machine on or off',
+	fleet_cloud_destroy: 'destroys a cloud machine and its disk at the provider'
 });
 
 /**

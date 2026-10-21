@@ -816,6 +816,59 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Cloud computers (FL-17 P1) — machines created at a cloud provider through a machine-provider
+	// plugin, billed to the owner's own provider account. Each route 404s unless FLEET_CLOUD_ENABLED.
+	// Create needs the acknowledged monthly price and `confirm: true` (the 409 carries the price
+	// sentence); destroy needs `confirmName`.
+	{
+		method: 'GET',
+		path: '/api/fleet/cloud',
+		toolName: 'fleet_cloud_list',
+		description:
+			'List the cloud computers (machines created at a cloud provider) with provider, region, size, power state, hourly rate and cost so far, the usage totals (list-price estimates) and the connected providers. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/providers/{plugin}/options',
+		toolName: 'fleet_cloud_options',
+		description:
+			'Regions, sizes with current monthly and hourly list prices, software presets and the connected account for one machine provider ({plugin} from fleet_cloud_list). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/cloud/usage',
+		toolName: 'fleet_cloud_usage',
+		description:
+			'What the cloud computers cost: per hour now, this month so far and projected — estimates from list prices, never counted against model-spend budgets. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud',
+		toolName: 'fleet_cloud_create',
+		description:
+			'Create a cloud computer at a provider on the owner’s account (it bills until destroyed). Needs `acknowledgedPriceCents` = the size’s monthly price from fleet_cloud_options (a stale price is refused with the current one) and `confirm: true`; without it the answer is 409 with the price sentence.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud/{id}/power',
+		toolName: 'fleet_cloud_power',
+		description:
+			'Power a cloud computer on or off (`action: on | off`, `confirm: true`; the 409 says whether the provider still bills it while off). Power on is refused while the Fleet is stopped.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud/{id}/destroy',
+		toolName: 'fleet_cloud_destroy',
+		description:
+			'Destroy a cloud computer: the machine and its disk at the provider, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name (the 409 states the cost so far). Refused while a Run or a session is live on it.',
+		annotations: { destructiveHint: true }
+	},
+
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
 	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,
 	// processes and Docker (FL-09), long operations (FL-02). Same names as the Agent tools; each
