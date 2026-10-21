@@ -261,6 +261,28 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * FL-19 (`fleet_operations_list`, `GET /api/fleet/operations`) — the
+     * operations `userId` may see (asked for them, or owns the node), newest
+     * first, optionally one state or one node. Only this replica's records (and
+     * those the relay bus shared with it) — the same set `get` answers from.
+     */
+    listForUser(
+        userId: string,
+        query: { state?: FleetOperationView['state']; nodeId?: string; limit?: number } = {},
+    ): FleetOperationView[] {
+        const limit = Math.min(Math.max(Math.floor(query.limit ?? 20), 1), 100);
+        const out: FleetOperationRecord[] = [];
+        for (const record of this.records.values()) {
+            if (record.requesterUserId !== userId && record.ownerUserId !== userId) continue;
+            if (query.state && record.view.state !== query.state) continue;
+            if (query.nodeId && record.view.nodeId !== query.nodeId) continue;
+            out.push(record);
+        }
+        out.sort((a, b) => b.startedAtMs - a.startedAtMs);
+        return out.slice(0, limit).map((record) => ({ ...record.view }));
+    }
+
+    /**
      * Ask the node to cancel a running operation (spec FR-18). An operation
      * that already ended answers as it is with `sent: false`; one whose node
      * is not connected answers `unreachable`.

@@ -857,6 +857,113 @@ export class NotificationService {
         });
     }
 
+    /**
+     * Sessions on computers (FL-05, spec FR-37 … FR-40, §5.9) — the three
+     * session events, worded from the session's state and outcome:
+     *
+     *   needs-you — "<Who> needs you on <computer> — <prompt>"
+     *   finished  — "<Who> finished on <computer> — <title>"
+     *   failed    — "<Who> failed on <computer> — <reason>"
+     *
+     * One row per attention edge (the deduplication key IS the attention key,
+     * CONTRACTS §5.2), so a replayed report never rings twice; the caller keeps
+     * the 5 s per-subject window, the boundary rule and the silence of
+     * interrupted / cancelled / shell sessions (they never call). The prompt
+     * was redacted on the machine and is redacted again here; free text a
+     * person typed never reaches a notification. Action: Open session.
+     */
+    async notifyFleetSession(args: {
+        userId: string;
+        event: 'needs-you' | 'finished' | 'failed';
+        sessionId: string;
+        attentionKey: string;
+        who: string;
+        nodeName: string;
+        /** The prompt (needs-you), the title (finished) or the reason (failed). */
+        text: string;
+    }): Promise<void> {
+        const who = this.sanitizeLabel(args.who) || 'A session';
+        const node = this.sanitizeLabel(args.nodeName) || 'a computer';
+        const text = sanitizeDescription(redactSecrets(args.text).cleaned, 300);
+        const eventKey =
+            args.event === 'needs-you'
+                ? 'fleet_session_needs_you'
+                : args.event === 'finished'
+                  ? 'fleet_session_finished'
+                  : 'fleet_session_failed';
+        const title =
+            args.event === 'needs-you'
+                ? `${who} needs you on ${node}`
+                : args.event === 'finished'
+                  ? `${who} finished on ${node}`
+                  : `${who} failed on ${node}`;
+        const message = text ? `${title} — ${text}` : title;
+        const actionUrl = `/fleet/sessions/${encodeURIComponent(args.sessionId)}`;
+        const actionLabel = 'Open session';
+        const type =
+            args.event === 'failed'
+                ? NotificationType.ERROR
+                : args.event === 'finished'
+                  ? NotificationType.SUCCESS
+                  : NotificationType.WARNING;
+        let inApp: { created: boolean };
+        if (args.event === 'needs-you') {
+            inApp = await this.writeInApp({
+                eventKey: 'fleet_session_needs_you',
+                userId: args.userId,
+                type,
+                category: NotificationCategory.AGENT,
+                title,
+                message,
+                actionUrl,
+                actionLabel,
+                metadata: { sessionId: args.sessionId, attentionKey: args.attentionKey },
+                deduplicationKey: `fleet_session:${args.attentionKey}`,
+            });
+        } else if (args.event === 'finished') {
+            inApp = await this.writeInApp({
+                eventKey: 'fleet_session_finished',
+                userId: args.userId,
+                type,
+                category: NotificationCategory.AGENT,
+                title,
+                message,
+                actionUrl,
+                actionLabel,
+                metadata: { sessionId: args.sessionId, attentionKey: args.attentionKey },
+                deduplicationKey: `fleet_session:${args.attentionKey}`,
+            });
+        } else {
+            inApp = await this.writeInApp({
+                eventKey: 'fleet_session_failed',
+                userId: args.userId,
+                type,
+                category: NotificationCategory.AGENT,
+                title,
+                message,
+                actionUrl,
+                actionLabel,
+                metadata: { sessionId: args.sessionId, attentionKey: args.attentionKey },
+                deduplicationKey: `fleet_session:${args.attentionKey}`,
+            });
+        }
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey,
+            deduplicated: !inApp.created,
+            title,
+            message,
+            actionUrl,
+            actionLabel,
+            urgent: args.event === 'needs-you',
+        });
+    }
+
+    /** FL-05: the session's prompt was answered — its "needs you" notification is dismissed (S3). */
+    async dismissFleetSession(userId: string, attentionKey: string): Promise<void> {
+        await this.clearByDeduplicationKey(userId, `fleet_session:${attentionKey}`);
+    }
+
     async notifyGitAuthExpired(userId: string, provider: string): Promise<void> {
         const inApp = await this.writeInApp({
             eventKey: 'git_auth_expired',

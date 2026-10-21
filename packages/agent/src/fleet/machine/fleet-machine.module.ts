@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { FleetModule } from '../fleet.module';
+import { FleetSessionsModule } from '../sessions/fleet-sessions.module';
 import { FleetMachineActionsService } from './fleet-machine-actions.service';
 import { FleetMachineProposalListener } from './fleet-machine-proposal.listener';
 
@@ -13,7 +14,8 @@ import { FleetMachineProposalListener } from './fleet-machine-proposal.listener'
  * write is `fleet_audit`, through `FleetModule`'s `FleetAuditService`.
  */
 @Module({
-    imports: [FleetModule],
+    // FleetSessionsModule: Shell inside a container is an owner Session (FL-04, P3).
+    imports: [FleetModule, FleetSessionsModule],
     // The listener runs a held Agent act once a person approves it (FR-22).
     providers: [FleetMachineActionsService, FleetMachineProposalListener],
     exports: [FleetMachineActionsService],

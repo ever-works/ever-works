@@ -4,6 +4,8 @@ import type {
     FleetEnrollableNodeKind,
     FleetNodeLimitCeiling,
     FleetNodeView,
+    FleetStatusView,
+    FleetToolsGateView,
     NeedsALookItem,
 } from '@ever-works/contracts';
 import { NEEDS_A_LOOK_PARTIAL_HEADER } from '@ever-works/contracts';
@@ -594,6 +596,21 @@ export const fleetAPI = {
     wakeStatus: async (nodeId: string) => {
         return serverFetch<FleetNodeWakeStatus>(
             `${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`,
+        );
+    },
+
+    /** FL-19 — "how is my fleet?" in one read (`GET /api/fleet/status`). */
+    status: async () => {
+        return serverFetch<FleetStatusView>(`${BASE}/status`);
+    },
+
+    /**
+     * FL-19 — what one of my Agents may read and do in each fleet tool family
+     * (`GET /api/fleet/tools/gate?agentId=`), for its Capabilities "Fleet tools" block.
+     */
+    toolsGate: async (agentId: string) => {
+        return serverFetch<FleetToolsGateView>(
+            `${BASE}/tools/gate?agentId=${encodeURIComponent(agentId)}`,
         );
     },
 };

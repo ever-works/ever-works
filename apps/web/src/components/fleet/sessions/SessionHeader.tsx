@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { FLEET_TONE_DOT_CLASS } from '../fleet-hub.shared';
 import { providerKey, sessionElapsed, sessionStateGlyph } from './sessions.shared';
+import { notifyReplaced, sessionGlyph, sessionStateWords, statusSourceNote } from './sessions-status.shared';
+import { SessionStateGlyph } from './SessionStateGlyph';
 
 /**
  * Sessions on computers (FL-04 P1b, spec §5.4) — the session page's header:
@@ -61,6 +63,14 @@ export function SessionHeader({
           ? t('detail.startedByYou')
           : t('detail.startedByOther');
     const KindIcon = session.kind === 'agent' ? Bot : TerminalSquare;
+    // FL-05: the state in words with its reason or outcome, and where the status comes from (FR-11, §5.10).
+    const words = sessionStateWords(session);
+    const stateText = words.qualifier
+        ? t('states.withQualifier', { state: t(`states.${words.key}`), qualifier: t(`states.${words.qualifier}`) })
+        : t(`states.${glyph.key}`);
+    const statusGlyph = sessionGlyph(session);
+    const sourceNote = statusSourceNote(session, { detail: true });
+    const providerName = t(`providers.${providerKey(session.provider)}`);
 
     return (
         <header className="space-y-3" data-testid="fleet-session-header">
@@ -80,11 +90,15 @@ export function SessionHeader({
                             {session.title}
                         </span>
                         <span className="inline-flex items-center gap-1.5 text-sm font-normal text-text-muted dark:text-text-muted-dark">
-                            <span
-                                className={cn('h-2 w-2 rounded-full', FLEET_TONE_DOT_CLASS[glyph.tone])}
-                                aria-hidden="true"
-                            />
-                            <span data-testid="fleet-session-state">{t(`states.${glyph.key}`)}</span>
+                            {statusGlyph === 'none' ? (
+                                <span
+                                    className={cn('h-2 w-2 rounded-full', FLEET_TONE_DOT_CLASS[glyph.tone])}
+                                    aria-hidden="true"
+                                />
+                            ) : (
+                                <SessionStateGlyph glyph={statusGlyph} />
+                            )}
+                            <span data-testid="fleet-session-state">{stateText}</span>
                         </span>
                     </h1>
                     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted dark:text-text-muted-dark">
@@ -104,6 +118,17 @@ export function SessionHeader({
                             </span>
                         )}
                     </p>
+                    {sourceNote && (
+                        <p
+                            className="text-xs text-text-muted dark:text-text-muted-dark"
+                            data-testid="fleet-session-status-source"
+                            data-source={sourceNote}
+                        >
+                            {t(`statusSource.${sourceNote}`, { provider: providerName, node: nodeName })}
+                            {notifyReplaced(session) && <> · {t('statusSource.notifyReplaced')}</>}
+                            {session.provider !== 'shell' && <> · {t('statusSource.noTokens')}</>}
+                        </p>
+                    )}
                     <div data-slot="fl-06-git-line">{gitSlot}</div>
                     <div data-slot="fl-05-attention">{attentionSlot}</div>
                 </div>

@@ -6,7 +6,7 @@
 
 **Feature ID**: `FL-08-logs`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `In progress` — P1 merged (#2839), P2 built (lane L3; specs written, not run — Fast-build rule)
+**Status**: `Built` — P1 #2839, P2 #2851 merged, P3 built (lane L3; specs written, not run — T-25's gates run at the cascade)
 **Last updated**: 2026-10-21
 
 ---
@@ -156,14 +156,14 @@
 
 ## P3 — Deep links and snapshots
 
-- [ ] **T-21**. **Open the log** at the failure time from the Services tab's failed rows (deep link
+- [x] **T-21**. **Open the log** at the failure time from the Services tab's failed rows (deep link
       `/fleet/computers/:id?tab=logs&source=service:<unit>&at=<iso>`), and honour `at=` in
       `LogsTab.tsx` (position the viewer, highlight the first line at/after `at`). No "needs a look"
       producer is added: CONTRACTS §4.6 has no kind for a failed service (spec §8b (c)); when one is
       added, the same route becomes that item's `action`.
     - **Test**: `LogsTab.unit.spec.tsx` `at=` positioning; deep-link parsing in
       `logs-tab.registry.unit.spec.ts`.
-- [ ] **T-22**. Add **Download shown lines** to `LogViewerToolbar.tsx` (browser-side Blob of the
+- [x] **T-22**. Add **Download shown lines** to `LogViewerToolbar.tsx` (browser-side Blob of the
       filtered held lines, `<computer>-<source>-<time>.log`).
     - **Test**: `LogViewerToolbar.unit.spec.tsx` — file content equals the filtered lines only.
 

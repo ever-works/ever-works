@@ -36,6 +36,7 @@ import {
     stateGlyph,
     visibleServices,
 } from './services.shared';
+import { openLogsForSource } from '../logs/logs-tab.registry';
 
 /** The list refreshes every 30 s while the tab is visible (FR-6). */
 const REFRESH_MS = 30_000;
@@ -284,7 +285,12 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                                                         ) : null}
                                                         <DropdownMenuItem asChild>
                                                             <Link
-                                                                href={`${ROUTES.DASHBOARD_FLEET_COMPUTER(node.id, 'logs')}&source=service&unit=${encodeURIComponent(service.name)}`}
+                                                                href={
+                                                                    // FL-08 P3 (FR-39): a failed service opens its log at the failure time.
+                                                                    service.state === 'failed'
+                                                                        ? openLogsForSource(node.id, `service:${service.name}`, { at: service.since })
+                                                                        : `${ROUTES.DASHBOARD_FLEET_COMPUTER(node.id, 'logs')}&source=service&unit=${encodeURIComponent(service.name)}`
+                                                                }
                                                             >
                                                                 {t('log')}
                                                             </Link>

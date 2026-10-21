@@ -33,6 +33,7 @@ import {
 } from '@/lib/tasks-view';
 import { TasksFilterSelects } from '@/components/tasks/TasksFilterSelects';
 import { TasksList } from '@/components/tasks/TasksList';
+import { FleetTaskHandoffGate } from '@/components/fleet/tasks/FleetTaskHandoffGate';
 import { TasksTabsNav } from '@/components/tasks/TasksTabsNav';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Link } from '@/i18n/navigation';
@@ -281,21 +282,24 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                     </Button>
                 </div>
             </form>
-            <TasksList
-                tasks={listResult?.data ?? []}
-                enableStatusFilter={!query.status}
-                view={view}
-                board={
-                    view === 'board'
-                        ? {
-                              result: boardResult,
-                              query: boardQuery,
-                              filtersActive,
-                              tableHref: buildTasksHref({ ...baseHrefInput, view: 'table' }),
-                          }
-                        : undefined
-                }
-            />
+            {/* FL-15 P1: the board's cards offer "Fix with an agent on this computer" when allowed. */}
+            <FleetTaskHandoffGate>
+                <TasksList
+                    tasks={listResult?.data ?? []}
+                    enableStatusFilter={!query.status}
+                    view={view}
+                    board={
+                        view === 'board'
+                            ? {
+                                  result: boardResult,
+                                  query: boardQuery,
+                                  filtersActive,
+                                  tableHref: buildTasksHref({ ...baseHrefInput, view: 'table' }),
+                              }
+                            : undefined
+                    }
+                />
+            </FleetTaskHandoffGate>
             {listResult && listResult.meta.total > listResult.meta.limit && (
                 <nav className="mt-5 flex items-center justify-between gap-3 text-xs text-text-muted dark:text-text-muted-dark">
                     <span>

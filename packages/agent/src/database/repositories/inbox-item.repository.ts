@@ -245,6 +245,22 @@ export class InboxItemRepository {
     }
 
     /**
+     * FL-05 producer dedup: the item already filed for this session
+     * attention key, if any (open or not — one edge, one item). The key lives
+     * in `sourceMeta` (text JSON), so the user's `fleet-session` items are
+     * read — newest first, bounded — and matched here; a session asks a
+     * handful of things a day, never thousands.
+     */
+    async findByFleetSessionAttentionKey(userId: string, attentionKey: string): Promise<InboxItem | null> {
+        const rows = await this.repository.find({
+            where: { userId, sourceType: 'fleet-session' as InboxItemSourceType },
+            order: { createdAt: 'DESC' },
+            take: 200,
+        });
+        return rows.find((row) => row.sourceMeta?.attentionKey === attentionKey) ?? null;
+    }
+
+    /**
      * One user's inbox, newest first. No `status` = the ACTIVE view
      * (everything not archived) — that is what the message list renders;
      * `archived` is its own tab.

@@ -2,6 +2,7 @@ import type { ComputerLegBroker } from '../computer-leg';
 import { controlModule } from './control';
 import { createDesktopModule, type DesktopFamilySources } from './desktop';
 import { createDockerModule, type DockerModuleDeps } from './docker';
+import { createGitModule } from './git';
 import { createMachineModule, type MachineModuleOptions } from './machine';
 import { createProcessesModule, type ProcessesModuleDeps } from './processes';
 import { composeNodeModules, type ComposedNodeModules, type NodeModule } from './registry';
@@ -15,7 +16,10 @@ import { createServicesModule, type ServicesModuleDeps } from './services';
  * Nothing else in the link changes. The `control` and `machine` modules are
  * the link's own and are always first.
  */
-export const NODE_LINK_MODULES: readonly NodeModule[] = [];
+export const NODE_LINK_MODULES: readonly NodeModule[] = [
+	// Tasks on computers (FL-15 P2): `git.identity` / `git.setIdentity` over the global git config (`--manage`).
+	createGitModule()
+];
 
 /**
  * Services, Docker, Compose and processes (FL-09) — the machine-facts modules
@@ -127,6 +131,7 @@ export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from 
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
 export { createDockerModule, type DockerModuleDeps } from './docker';
+export { createGitModule, type GitModuleOptions } from './git';
 export { createProcessesModule, type ProcessesModuleDeps } from './processes';
 export { createServicesModule, type ServicesModuleDeps } from './services';
 export { createHealthLinkModule, type HealthLinkModuleOptions, type WakeSender } from './health';

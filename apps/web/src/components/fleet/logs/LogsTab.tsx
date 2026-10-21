@@ -14,7 +14,15 @@ import type { FleetComputerTabProps } from '../registry';
 import { readSessionError } from '../sessions/sessions.shared';
 import { LogSourceTree } from './LogSourceTree';
 import { LogViewer } from './LogViewer';
-import { logsDeepLinkSources, logsTabCard, toggleMergedSource, type LogsError, type LogsTabCard } from './logs.shared';
+import {
+    composeDeepLinkProject,
+    composeProjectSources,
+    logsDeepLinkSources,
+    logsTabCard,
+    toggleMergedSource,
+    type LogsError,
+    type LogsTabCard,
+} from './logs.shared';
 
 /**
  * Logs on computers (FL-08, spec §5, T-13) — the computer page's Logs tab:
@@ -38,7 +46,12 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
               (name) => search.get(name),
           )
         : [];
-    const linkedTitle = search?.get('title')?.slice(0, 80) ?? null;
+    // FL-09's Compose **Logs** (`?source=compose&project=<name>`): the project's containers, merged.
+    const linkedProject = search ? composeDeepLinkProject((name) => search.get(name)) : null;
+    const linkedTitle = search?.get('title')?.slice(0, 80) ?? linkedProject;
+    // P3 (FR-39): `?at=<iso>` positions the first-opened view at that time (a failed service).
+    const linkedAtRaw = search?.get('at') ?? null;
+    const linkedAt = linkedAtRaw && !Number.isNaN(Date.parse(linkedAtRaw)) ? new Date(Date.parse(linkedAtRaw)).toISOString() : null;
     const [list, setList] = useState<FleetLogSourcesResponse | null>(null);
     const [error, setError] = useState<LogsError | null>(null);
     const [loading, setLoading] = useState(true);
@@ -76,6 +89,15 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
         }, FLEET_LOGS_SOURCES_REFRESH_MS);
         return () => clearInterval(timer);
     }, [reload]);
+
+    // A Compose link resolves once the list (with each container's project) is in.
+    const [composeResolved, setComposeResolved] = useState(false);
+    useEffect(() => {
+        if (!linkedProject || composeResolved || !list) return;
+        setComposeResolved(true);
+        const ids = composeProjectSources(list.sources, linkedProject);
+        if (ids.length > 0) setSelected((current) => (current.length === 0 ? ids : current));
+    }, [linkedProject, composeResolved, list]);
 
     const card = logsTabCard(node, error);
     const sources = list?.sources ?? [];
@@ -141,6 +163,7 @@ export default function LogsTab({ node }: FleetComputerTabProps) {
                         sources={selected}
                         listed={sources}
                         title={selected.length > 1 ? linkedTitle : null}
+                        at={linkedAt && selected.join('|') === linked.join('|') ? linkedAt : null}
                     />
                 ) : list && sources.length === 0 ? (
                     <LogsEmpty nodeName={node.name} />

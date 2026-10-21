@@ -411,3 +411,99 @@ export function fleetRunPreview(request: FleetRunRequest): string {
 	parts.push(request.image, ...(request.command ?? []));
 	return parts.map((part, index) => (index < 3 || part.endsWith('=…') ? part : shown(part))).join(' ');
 }
+
+// ─── Compose (P3, spec §4.5) ────────────────────────────────────────────────
+
+/** A Compose project name as Compose itself allows it (lowercase letters, digits, `_`, `-`). */
+export const FLEET_COMPOSE_PROJECT_PATTERN = /^[a-z0-9][a-z0-9_-]{0,127}$/;
+
+/** A Compose service name. */
+export const FLEET_COMPOSE_SERVICE_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
+
+export function isFleetComposeProject(value: unknown): value is string {
+	return typeof value === 'string' && FLEET_COMPOSE_PROJECT_PATTERN.test(value);
+}
+
+export function isFleetComposeService(value: unknown): value is string {
+	return typeof value === 'string' && FLEET_COMPOSE_SERVICE_PATTERN.test(value);
+}
+
+/** The four project acts, each an operation (FR-32). `down` never removes named volumes (FR-34). */
+export const FLEET_COMPOSE_ACTIONS = ['up', 'down', 'restart', 'pull'] as const;
+
+export type FleetComposeAction = (typeof FLEET_COMPOSE_ACTIONS)[number];
+
+export function isFleetComposeAction(value: unknown): value is FleetComposeAction {
+	return typeof value === 'string' && (FLEET_COMPOSE_ACTIONS as readonly string[]).includes(value);
+}
+
+/** One project Docker knows (spec §5.7). */
+export interface FleetComposeProjectView {
+	name: string;
+	/** Compose's own status (`running(3)`, `exited(1)`). */
+	status: string;
+	serviceCount: number;
+	runningCount: number;
+	configFiles: string[];
+	/** True when a config file is gone: only Down is offered (U14). */
+	filesMissing: boolean;
+	/** The acts its files allow. */
+	actions: FleetComposeAction[];
+}
+
+/** `compose.list` reply / `GET …/docker/compose` body. */
+export interface FleetComposeListResult {
+	docker: FleetDockerStatus;
+	projects: FleetComposeProjectView[];
+	sampledAt: string;
+}
+
+export type FleetComposeHealth = 'healthy' | 'unhealthy' | 'starting' | null;
+
+/** One service of a project, as the picture and the list show it (FR-33). */
+export interface FleetComposeServiceView {
+	name: string;
+	image: string | null;
+	/** The state of its (first) container, or `absent` when none exists. */
+	state: FleetContainerState | 'absent';
+	health: FleetComposeHealth;
+	/** Its container (first one), for Start / Stop / Shell / Logs. */
+	containerId: string | null;
+	containerName: string | null;
+	cpuPercent: number | null;
+	memBytes: number | null;
+	ports: FleetContainerPort[];
+	networks: string[];
+	/** Named volumes it mounts. */
+	volumes: string[];
+	/** Host files and folders it mounts (bind sources). */
+	mounts: string[];
+	dependsOn: { service: string; condition: 'service_started' | 'service_healthy' | 'service_completed_successfully' }[];
+}
+
+/** `compose.describe` reply / `GET …/docker/compose?project=` body. */
+export interface FleetComposeDescription {
+	project: FleetComposeProjectView;
+	services: FleetComposeServiceView[];
+	networks: string[];
+	volumes: string[];
+}
+
+/** The shells "Shell inside" offers (FR-35). */
+export const FLEET_CONTAINER_SHELLS = ['bash', 'sh'] as const;
+
+export type FleetContainerShell = (typeof FLEET_CONTAINER_SHELLS)[number];
+
+export function isFleetContainerShell(value: unknown): value is FleetContainerShell {
+	return typeof value === 'string' && (FLEET_CONTAINER_SHELLS as readonly string[]).includes(value);
+}
+
+/** `docker.container.shells` reply: which of the shells the container has. */
+export interface FleetContainerShellsResult {
+	shells: FleetContainerShell[];
+}
+
+/** `POST …/docker/containers/:cid/exec` result: the owner Session that runs the shell (FL-04). */
+export interface FleetContainerExecResult {
+	sessionId: string;
+}

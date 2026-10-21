@@ -106,6 +106,24 @@ export function tunnelFor(list: FleetPortsListResponse | null, port: number): Fl
     return list?.tunnel?.open.find((tunnel) => tunnel.port === port && tunnel.state === 'open') ?? null;
 }
 
+/**
+ * Phase 3 (FR-33) — which WATCHED ports stopped between two lists: a watched
+ * port that was listening (a live row) and now is not (stopped, waiting, or
+ * gone). `wasLive` is the set the caller keeps between lists.
+ */
+export function watchedStopped(
+    list: Pick<FleetPortsListResponse, 'ports'>,
+    watched: readonly number[],
+    wasLive: ReadonlySet<number>,
+): { stopped: number[]; live: Set<number> } {
+    const live = new Set<number>();
+    for (const port of list.ports) {
+        if (watched.includes(port.port) && port.kind !== 'waiting' && !port.stopped) live.add(port.port);
+    }
+    const stopped = [...wasLive].filter((port) => watched.includes(port) && !live.has(port));
+    return { stopped, live };
+}
+
 /** The target Open uses for a row (the response's default), or null when nothing is available. */
 export function defaultOpenTarget(list: FleetPortsListResponse | null): FleetPortOpenTarget | null {
     return list?.defaultTarget ?? null;
@@ -138,6 +156,17 @@ export const portsClient = {
     list(nodeId: string, watch: readonly number[]): Promise<PortsResult<FleetPortsListResponse>> {
         const query = watch.length > 0 ? `?watch=${watch.join(',')}` : '';
         return call(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports${query}`);
+    },
+    /** Phase 3 — a watched server stopped: file the Inbox item (best-effort). */
+    async watchStopped(nodeId: string, port: number): Promise<void> {
+        try {
+            await fetch(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/watch-stopped`, {
+                method: 'POST',
+                cache: 'no-store',
+            });
+        } catch {
+            // the inline notice is shown either way
+        }
     },
     /** Phase 2 — open (or re-open) the person's preview tunnel; the answer carries a one-time `openUrl`. */
     openPreview(nodeId: string, port: number): Promise<PortsResult<FleetPortTunnelOpenResponse>> {

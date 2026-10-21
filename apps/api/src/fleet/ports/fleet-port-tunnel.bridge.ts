@@ -65,6 +65,22 @@ export interface TunnelForwardRequest {
 interface Pending extends TunnelForwardCallbacks {
     timer: ReturnType<typeof setTimeout>;
     responded: boolean;
+    /** Phase 3: a WebSocket passthrough — accepted, then raw bytes both ways until END. */
+    upgrade?: TunnelUpgradeCallbacks;
+}
+
+/** Phase 3 (FR-32) — what the preview host hears about one WebSocket upgrade. */
+export interface TunnelUpgradeCallbacks {
+    /** The loopback server switched protocols: write the 101 with these headers to the browser. */
+    onAccept(status: number, headers: Record<string, string | string[]>): void;
+    /** The loopback server answered without switching protocols. */
+    onRefused(status: number): void;
+}
+
+/** A live WebSocket passthrough: bytes toward the machine, and its end. */
+export interface TunnelUpgradeHandle {
+    send(bytes: Uint8Array): boolean;
+    end(): void;
 }
 
 interface OpenTunnel {
@@ -191,6 +207,80 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
         }
     }
 
+    /**
+     * Phase 3 (FR-32) — pass one WebSocket upgrade through: `tunnel.ws-open`
+     * with the browser's handshake headers; once the node says the loopback
+     * server switched protocols (`onAccept`), raw bytes flow both ways (`onData`
+     * toward the browser, the handle's `send` toward the machine) until either
+     * side ends. Counts toward the 32 in flight; no 60 s cap once accepted (the
+     * tunnel's own idle / hard caps close it).
+     */
+    async upgrade(
+        request: Omit<TunnelForwardRequest, 'method' | 'body'>,
+        callbacks: TunnelForwardCallbacks & TunnelUpgradeCallbacks,
+    ): Promise<TunnelUpgradeHandle | null> {
+        let open: OpenTunnel;
+        try {
+            open = await this.ensure(request.tunnel.id, request.tunnel.nodeId, request.tunnel.port, {
+                kind: 'user',
+                userId: request.tunnel.ownerUserId,
+            });
+        } catch (error) {
+            callbacks.onError(
+                'unreachable',
+                error instanceof FleetPortsException
+                    ? error.portsError.hint
+                    : error instanceof Error
+                      ? error.message
+                      : 'the computer could not be reached',
+            );
+            return null;
+        }
+        if (open.pending.size >= FLEET_PORT_TUNNEL_MAX_INFLIGHT) {
+            callbacks.onError('busy', 'too many requests are in flight on this preview — try again');
+            return null;
+        }
+        const requestId = open.nextRequest;
+        open.nextRequest = (open.nextRequest + 1) >>> 0;
+        open.lastUsed = Date.now();
+        const pending: Pending = {
+            ...callbacks,
+            upgrade: { onAccept: callbacks.onAccept, onRefused: callbacks.onRefused },
+            responded: false,
+            timer: setTimeout(() => {
+                const entry = open.pending.get(requestId);
+                if (!entry || entry.responded) return;
+                open.pending.delete(requestId);
+                entry.onError('timeout', 'the computer did not accept the WebSocket within 60 s');
+            }, FLEET_PORT_TUNNEL_REQUEST_TIMEOUT_MS),
+        };
+        open.pending.set(requestId, pending);
+        if (
+            !open.channel.sendJson({
+                type: 'tunnel.ws-open',
+                requestId: String(requestId),
+                path: request.path,
+                query: request.query,
+                headers: request.headers,
+            })
+        ) {
+            this.settle(open, requestId, () => callbacks.onError('unreachable', 'the request could not be sent'));
+            return null;
+        }
+        return {
+            send: (bytes) => {
+                if (!open.pending.has(requestId)) return false;
+                open.lastUsed = Date.now();
+                return open.channel.sendBinary(FLEET_LINK_FRAME_KINDS.DATA, encodeFleetPortTunnelChunk(requestId, bytes));
+            },
+            end: () => {
+                if (!open.pending.has(requestId)) return;
+                open.channel.sendBinary(FLEET_LINK_FRAME_KINDS.END, encodeFleetPortTunnelChunk(requestId));
+                this.settle(open, requestId, () => undefined);
+            },
+        };
+    }
+
     // ─── Internals ─────────────────────────────────────────────────────────
 
     private async ensure(tunnelId: string, nodeId: string, port: number, caller: FleetPortsCaller): Promise<OpenTunnel> {
@@ -248,6 +338,18 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
                     : {};
             entry.responded = true;
             entry.onResponse(status >= 100 && status <= 599 ? status : 502, headers);
+        } else if (message.type === 'tunnel.ws-accept' && entry.upgrade) {
+            const headers =
+                typeof message.headers === 'object' && message.headers !== null
+                    ? (message.headers as Record<string, string | string[]>)
+                    : {};
+            entry.responded = true;
+            clearTimeout(entry.timer);
+            entry.upgrade.onAccept(typeof message.status === 'number' ? message.status : 101, headers);
+        } else if (message.type === 'tunnel.ws-refused' && entry.upgrade) {
+            const upgrade = entry.upgrade;
+            const status = typeof message.status === 'number' ? message.status : 502;
+            this.settle(open, requestId, () => upgrade.onRefused(status));
         } else if (message.type === 'tunnel.error') {
             const code = message.code === 'timeout' || message.code === 'invalid' ? message.code : 'unreachable';
             const hint = typeof message.hint === 'string' ? message.hint.slice(0, 300) : 'the request failed';

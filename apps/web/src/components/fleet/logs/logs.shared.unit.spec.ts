@@ -4,6 +4,7 @@ import {
     appendHeld,
     EMPTY_WINDOW,
     filterHeld,
+    firstHeldAtOrAfter,
     groupLogSources,
     isAtBottom,
     logFooterParts,
@@ -166,5 +167,20 @@ describe('typedPathSourceId (S8)', () => {
         expect(typedPathSourceId('C:\\logs\\app.log')).toBe('file:C:\\logs\\app.log');
         expect(typedPathSourceId('var/log/x')).toBeNull();
         expect(typedPathSourceId('')).toBeNull();
+    });
+});
+
+describe('firstHeldAtOrAfter (P3, FR-39)', () => {
+    it('finds the first line at or after the failure time', () => {
+        const window = appendHeld(EMPTY_WINDOW, [
+            line('a', { ts: '2026-10-21T09:40:00.000Z' }),
+            line('no stamp'),
+            line('b', { ts: '2026-10-21T09:41:02.000Z' }),
+            line('c', { ts: '2026-10-21T09:42:00.000Z' }),
+        ]);
+        expect(firstHeldAtOrAfter(window.lines, '2026-10-21T09:41:00.000Z')).toBe(2);
+        expect(firstHeldAtOrAfter(window.lines, '2026-10-21T09:39:00.000Z')).toBe(0);
+        expect(firstHeldAtOrAfter(window.lines, '2026-10-21T10:00:00.000Z')).toBe(-1);
+        expect(firstHeldAtOrAfter(window.lines, 'later')).toBe(-1);
     });
 });

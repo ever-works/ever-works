@@ -1,12 +1,15 @@
 import { Global, Module } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { DatabaseModule } from '@ever-works/agent/database';
 import {
     AGENT_SESSION_DISPATCHER,
     FLEET_SESSION_NODE_PORT,
     FLEET_SESSION_RECORDER,
+    FleetSessionService,
     FleetSessionsModule,
 } from '@ever-works/agent/fleet';
+import { FLEET_SESSION_ANSWER_ROUTER, type FleetSessionAnswerRouter } from '@ever-works/agent/inbox';
 import { TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { FleetSessionRecorderService } from './fleet-session-recorder.service';
 import { FleetSessionRecordingService } from './fleet-session-recording.service';
@@ -71,10 +74,39 @@ import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
         { provide: FLEET_SESSION_RECORDER, useExisting: FleetSessionRecorderService },
         FleetSessionRecordingService,
         DistributedTaskLockService,
+        // FL-05: a `fleet-session` Decision answered in the Inbox / My Decisions is
+        // typed into the session. Resolved lazily: the session service reaches the
+        // Inbox (through the attention delivery), so a constructor dependency back
+        // would be a provider cycle.
+        {
+            provide: FLEET_SESSION_ANSWER_ROUTER,
+            useFactory: (moduleRef: ModuleRef): FleetSessionAnswerRouter => ({
+                answer: async (input) => {
+                    const sessions = moduleRef.get(FleetSessionService, { strict: false });
+                    await sessions.answer(
+                        input.sessionId,
+                        { userId: input.userId },
+                        {
+                            key: input.key,
+                            ...(input.optionId ? { optionId: input.optionId } : {}),
+                            ...(input.text ? { text: input.text } : {}),
+                        },
+                        input.source,
+                    );
+                },
+            }),
+            inject: [ModuleRef],
+        },
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetSessionsEnabledGuard,
     ],
-    exports: [FLEET_SESSION_NODE_PORT, AGENT_SESSION_DISPATCHER, FLEET_SESSION_RECORDER, FleetSessionsModule],
+    exports: [
+        FLEET_SESSION_NODE_PORT,
+        AGENT_SESSION_DISPATCHER,
+        FLEET_SESSION_RECORDER,
+        FLEET_SESSION_ANSWER_ROUTER,
+        FleetSessionsModule,
+    ],
 })
 export class FleetSessionsApiModule {}

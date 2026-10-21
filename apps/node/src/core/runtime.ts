@@ -85,6 +85,9 @@ import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
 import type { SessionDaemonPaths } from './sessions/daemon/daemon-paths';
 import { NO_HOOK_OVERLAY, type HookOverlayPort } from './sessions/hook-overlay.port';
+import { resolveHookPaths } from './sessions/hook-client';
+import { SessionHookOverlay } from './sessions/hook-overlay';
+import { SessionStatusPipeline } from './sessions/session-status';
 import { spawn as spawnProcess } from 'node:child_process';
 import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
 import {
@@ -461,7 +464,16 @@ export interface NodeRuntime {
 	 * The shell starts the supervisor and stops it at shutdown; stopping
 	 * never ends a session (the daemon outlives this process).
 	 */
-	sessions?: { supervisor: SessionDaemonSupervisor; module: SessionModule };
+	sessions?: {
+		supervisor: SessionDaemonSupervisor;
+		module: SessionModule;
+		/**
+		 * FL-05 — the status pipeline (hook endpoint, overlay, evidence merger).
+		 * The shell starts it with the supervisor and stops it at shutdown; the
+		 * endpoint FILE stays, so hooks spool while the node is down.
+		 */
+		status?: SessionStatusPipeline;
+	};
 	/** The consents this process was started with (CONTRACTS §1.1). */
 	consents: FleetConsents;
 	attended?: {
@@ -832,6 +844,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// sessions need `--manage`, Agent sessions `--work`) and whose shell said
 	// how to run the daemon. Started by the shell; the daemon outlives us.
 	let sessions: NodeRuntime['sessions'];
+	// The overlay launches use (FL-05's when the daemon runs; a test's own, or none).
+	let sessionHookOverlay: HookOverlayPort = options.sessionHookOverlay ?? NO_HOOK_OVERLAY;
 	if (options.sessionDaemon && (consents.manage || consents.work)) {
 		const daemon = options.sessionDaemon;
 		const supervisor = new SessionDaemonSupervisor({
@@ -872,6 +886,37 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			logger: io.logger,
 			...(io.scheduler ? { scheduler: io.scheduler } : {})
 		});
+		// Session status (FL-05): the per-session hook overlay (R-6 — never the
+		// person's own configuration) and the pipeline that turns hooks, output,
+		// Ctrl-C and silence into a state. Its hook client runs on the same Node
+		// binary as the daemon.
+		const hookPaths = resolveHookPaths(daemon.paths.stateDir, io.environment.platform);
+		const hookOverlay = new SessionHookOverlay({
+			paths: hookPaths,
+			nodePath: daemon.command,
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			env: process.env,
+			cliVersion: async (provider) => {
+				const executable = pinnedModelCli[provider];
+				if (typeof executable !== 'string' || !executable.trim()) return null;
+				return (await cliCompat.probe(provider, executable)).version;
+			},
+			...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+			logger: io.logger
+		});
+		const statusPipeline = new SessionStatusPipeline({
+			daemon: supervisor,
+			paths: hookPaths,
+			overlay: hookOverlay,
+			homedir: osHomedir(),
+			platform: io.environment.platform,
+			...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		sessionHookOverlay = options.sessionHookOverlay ?? hookOverlay;
 		const sessionModule = createSessionModule({
 			supervisor,
 			consents,
@@ -882,12 +927,16 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				homedir: osHomedir(),
 				modelCli: pinnedModelCli,
 				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
-				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+				overlay: sessionHookOverlay
 			},
-			logger: io.logger
+			logger: io.logger,
+			onInput: (sessionId, data) => statusPipeline.observeInput(sessionId, data),
+			// FL-05 P2: `session.answer` — the pipeline types what the CLI expects.
+			answer: (sessionId, params) => statusPipeline.answer(sessionId, params)
 		});
-		sessions = { supervisor, module: sessionModule };
-		telemetry.sessionDaemon = () => supervisor.report();
+		sessions = { supervisor, module: sessionModule, status: statusPipeline };
+		// The daemon block carries the hook counters (CONTRACTS §1.1, FL-05 FR-6).
+		telemetry.sessionDaemon = () => ({ ...supervisor.report(), hooks: statusPipeline.hooksReport() });
 	}
 	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
 	// preview source, for a process started with `--manage`. The preview
@@ -982,7 +1031,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			io.logs ??
 			createNodeLogIo({
 				platform,
-				runner: io.runner,
+				// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+				// `docker ps --format` carries braces, quotes and tabs `cmd.exe` would mangle.
+				runner: createMachineCommandRunner(),
 				homedir,
 				user,
 				...(typeof process.getuid === 'function' ? { uid: process.getuid() } : {})
@@ -1231,6 +1282,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		runtime.link = link;
 		// Sessions (FL-04): channel-0 facts, the kill switch and drain ride this link.
 		sessions?.module.bindLink(link);
+		// Session status (FL-05): `session.status` / `session.attention` ride this link too.
+		sessions?.status?.bindLink(link);
 		// Schedules (FL-13): the kill switch and drain reach the machine's own loop.
 		scheduleModule?.bindLink(link);
 		computerLegs?.bindLink(link);
@@ -1626,7 +1679,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
 				...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {}),
 				platform: io.environment.platform as NodeJS.Platform,
-				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+				overlay: sessionHookOverlay
 			})
 		);
 		// `browser-check` is registered ONLY when this machine actually

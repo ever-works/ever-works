@@ -12,11 +12,13 @@ import {
 	isFleetSessionLinkVerb,
 	makeFleetLinkError,
 	parseFleetSessionAck,
+	parseFleetSessionAnswerParams,
 	parseFleetSessionChannelParams,
 	parseFleetSessionNotice,
 	parseFleetSessionStartParams,
 	type FleetConsents,
 	type FleetLinkError,
+	type FleetSessionAnswerParams,
 	type FleetLinkExtensionMessage,
 	type FleetSessionChannelParams,
 	type FleetSessionEventMessage,
@@ -76,6 +78,21 @@ export interface SessionModuleOptions {
 	typeAfterStartMs?: number;
 	setTimer?: (callback: () => void, ms: number) => unknown;
 	clearTimer?: (handle: unknown) => void;
+	/**
+	 * FL-05: told what a DRIVER typed into a session (the status pipeline reads
+	 * a Ctrl-C in a running turn as `interrupted`, U15). Facts only — the bytes
+	 * are not kept. Never able to fail the input.
+	 */
+	onInput?: (sessionId: string, data: string | Uint8Array) => void;
+	/**
+	 * FL-05 P2: answer what a session asks (`session.answer`) — the status
+	 * pipeline checks the key is current and types what the CLI expects.
+	 * Absent: the verb answers `unsupported_on_node`.
+	 */
+	answer?: (
+		sessionId: string,
+		params: FleetSessionAnswerParams
+	) => Promise<{ ok: true } | { ok: false; error: FleetLinkError }>;
 }
 
 /** What the runtime binds once the link exists. */
@@ -256,6 +273,13 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 		let attaching = false;
 		let closed = false;
 		const isDriver = params.mode === 'driver';
+		const observeInput = (data: string | Uint8Array) => {
+			try {
+				options.onInput?.(params.sessionId, data);
+			} catch {
+				// An observer never fails the input.
+			}
+		};
 
 		const reply = (requestId: unknown, outcome: Reply) => {
 			if (typeof requestId !== 'string') return;
@@ -348,11 +372,25 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 				return;
 			}
 			try {
+				// Shell inside a container (FL-09 P3, FR-35): the same owner shell session,
+				// running `docker exec -it` (the Docker CLI, never its socket) instead of the
+				// login shell. The container and shell were validated by the params parser.
+				const command = parsed.container
+					? [
+							'docker',
+							'exec',
+							'-it',
+							'-e',
+							'TERM=xterm-256color',
+							parsed.container.container,
+							parsed.container.shell
+						]
+					: composed.launch.command;
 				const started = await supervisor.request<{ pid: number | null }>('start', {
 					sessionId: params.sessionId,
 					kind: parsed.kind,
 					provider: parsed.provider,
-					command: composed.launch.command,
+					command,
 					cwd: composed.launch.cwd,
 					env: composed.launch.env,
 					cols: parsed.cols,
@@ -361,7 +399,7 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 					startedBy: parsed.startedBy
 				});
 				reply(requestId, { result: { daemonSessionId: params.sessionId, pid: started?.pid ?? null } });
-				const typed = composed.launch.typeAfterStart;
+				const typed = parsed.container ? undefined : composed.launch.typeAfterStart;
 				if (typed) {
 					setTimer(() => {
 						void supervisor
@@ -427,6 +465,7 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 							reply(requestId, { error: makeFleetLinkError('invalid', 'data') });
 							return;
 						}
+						observeInput(request.data);
 						void control(requestId, 'input', { data: request.data }, 'could not send the input');
 						return;
 					}
@@ -469,13 +508,41 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 							'could not read the screen'
 						);
 						return;
-					case 'session.answer':
+					case 'session.answer': {
+						// FL-05 P2: answer what the session asks — a driver's request (the
+						// platform's answer route), never a watcher's.
+						if (!isDriver) {
+							reply(requestId, {
+								error: makeFleetLinkError('permission_denied', 'viewers cannot answer a session')
+							});
+							return;
+						}
+						const answerParams = parseFleetSessionAnswerParams(request);
+						if (!answerParams) {
+							reply(requestId, { error: makeFleetLinkError('invalid', 'answer') });
+							return;
+						}
+						if (!options.answer) {
+							reply(requestId, {
+								error: makeFleetLinkError('unsupported_on_node', 'this node cannot answer session prompts yet')
+							});
+							return;
+						}
+						void options
+							.answer(params.sessionId, answerParams)
+							.then((outcome) =>
+								reply(requestId, outcome.ok ? { result: { answered: true } } : { error: outcome.error })
+							)
+							.catch(() =>
+								reply(requestId, {
+									error: makeFleetLinkError('operation_failed', 'the answer could not be typed')
+								})
+							);
+						return;
+					}
 					default:
 						reply(requestId, {
-							error: makeFleetLinkError(
-								'unsupported_on_node',
-								'answering prompts arrives with session status'
-							)
+							error: makeFleetLinkError('unsupported_on_node', 'unknown session request')
 						});
 						return;
 				}
@@ -484,7 +551,10 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 				// Only a driver's channel carries keystrokes and sizes; a viewer's are dropped here.
 				if (!isDriver || !stream) return;
 				if (kind === FLEET_LINK_FRAME_KINDS.DATA) {
-					if (!context.control.paused) stream.sendInput(payload);
+					if (!context.control.paused) {
+						stream.sendInput(payload);
+						observeInput(payload);
+					}
 					return;
 				}
 				if (kind === FLEET_LINK_FRAME_KINDS.RESIZE && payload.byteLength === 4) {

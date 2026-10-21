@@ -736,6 +736,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// The daemon starts with the node, before the first beat, so that beat can
 	// already report it (and advertise `sessions`).
 	runtime.sessions?.supervisor.start();
+	// Session status (FL-05): the hook endpoint, its file and client — before the
+	// first session starts, so its hooks have somewhere to go.
+	void runtime.sessions?.status?.start();
 	if (workerEnabled) {
 		// Node lifecycle (slice AR): say at startup what each pinned CLI is
 		// and whether this node can drive it — the first place an operator
@@ -928,6 +931,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// Sessions (FL-04): let go of the daemon — never stop it. Every session
 	// keeps running and the next node process finds them all.
 	runtime.sessions?.module.dispose();
+	await runtime.sessions?.status?.stop().catch(() => undefined);
 	runtime.sessions?.supervisor.stop();
 	loop.stop();
 	await loop.settled();

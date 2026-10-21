@@ -22,6 +22,7 @@ import { config } from '@ever-works/agent/config';
 import { ComputerAttachService } from './computer-attach.service';
 import { ComputerRelayRegistry } from './computer-relay.registry';
 import type { TerminalClientRole } from '../terminal/terminal-relay.registry';
+import { isFleetPreviewHostRequest } from '../fleet/ports/preview-host.match';
 
 /**
  * Agent computers — the live-view WebSocket gateway.
@@ -138,6 +139,9 @@ export class ComputerWsService implements OnApplicationBootstrap, OnApplicationS
 
     /** Exposed for the spec: decide what to do with one upgrade request. */
     handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
+        // Servers and ports (FL-10 P3): an upgrade on the dedicated preview host is a
+        // tunnelled page's own socket (hot reload) — the preview host handler's, never ours.
+        if (isFleetPreviewHostRequest(req)) return;
         const rawUrl = req.url ?? '';
         if (!rawUrl.startsWith(COMPUTER_WS_PATH_PREFIX)) {
             // Not ours — the terminal gateway on the same server owns it.

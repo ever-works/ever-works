@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDown, ArrowUpToLine, Copy, Pause, Play, RotateCw } from 'lucide-react';
+import { ArrowDown, ArrowUpToLine, Copy, Download, Pause, Play, RotateCw } from 'lucide-react';
 import type { FleetLogSource } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { CopyCommand } from '../link/CopyCommand';
@@ -12,8 +12,10 @@ import {
     isAtBottom,
     logChipClass,
     logChipLabel,
+    firstHeldAtOrAfter,
     logFooterParts,
     logsCopyText,
+    logsDownloadName,
     shouldStopFollowing,
     type HeldLine,
 } from './logs.shared';
@@ -39,6 +41,7 @@ export function LogViewer({
     sources,
     listed = [],
     title = null,
+    at = null,
 }: {
     nodeId: string;
     nodeName: string;
@@ -50,6 +53,8 @@ export function LogViewer({
     listed?: readonly FleetLogSource[];
     /** P2: a merged view's name (a Compose project). */
     title?: string | null;
+    /** P3 (FR-39): open positioned at this time — the first line at or after it, highlighted. */
+    at?: string | null;
 }) {
     const t = useTranslations('fleet.logs');
     const { state, pause, resume, reopen, startFollowing, loadEarlier } = useLogFollow({ nodeId, sources });
@@ -64,6 +69,9 @@ export function LogViewer({
     const listRef = useRef<HTMLDivElement | null>(null);
     const filterRef = useRef<HTMLInputElement | null>(null);
     const lastAppended = useRef(0);
+    const [highlightSeq, setHighlightSeq] = useState<number | null>(null);
+    const positioned = useRef(at === null);
+    const earlierTries = useRef(0);
     const lastFirstSeq = useRef<number | null>(null);
 
     const shown = useMemo(() => filterHeld(state.window.lines, filter), [state.window.lines, filter]);
@@ -137,6 +145,51 @@ export function LogViewer({
         },
         [shown],
     );
+
+    // P3 (FR-39): position at `at` once the batch is in — paging back (≤ 4 pages)
+    // while the oldest line held is still later than the failure.
+    useLayoutEffect(() => {
+        if (positioned.current || !at || !state.loaded) return;
+        const lines = state.window.lines;
+        const oldest = lines[0]?.line.ts ?? null;
+        const pageable = !merged && (source ? source.supportsEarlier : kind === 'file');
+        if (
+            oldest &&
+            oldest > at &&
+            pageable &&
+            !state.earlierExhausted &&
+            !state.earlierUnsupported &&
+            earlierTries.current < 4
+        ) {
+            if (!state.loadingEarlier) {
+                earlierTries.current += 1;
+                loadEarlier(0);
+            }
+            return;
+        }
+        if (state.loadingEarlier) return;
+        positioned.current = true;
+        const index = firstHeldAtOrAfter(shown, at);
+        if (index < 0) return;
+        setPinned(false);
+        setHighlightSeq(shown[index]!.seq);
+        const list = listRef.current;
+        if (list) list.scrollTop = Math.max(0, index * ROW_HEIGHT - ROW_HEIGHT * 2);
+    }, [at, state.loaded, state.window.lines, state.loadingEarlier, state.earlierExhausted, state.earlierUnsupported, shown, merged, source, kind, loadEarlier]);
+
+    const download = useCallback(() => {
+        // P3 (FR-40): the filtered lines on screen, already scanned on the machine; nothing is stored.
+        if (typeof window === 'undefined' || shown.length === 0) return;
+        const blob = new Blob([`${logsCopyText(shown)}\n`], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = logsDownloadName(nodeName, merged ? (title ?? 'merged') : (sources[0] ?? 'log'), new Date());
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    }, [shown, nodeName, merged, title, sources]);
 
     // Keyboard (spec §5.12): `/` filter · Space pause/resume · End latest · Esc clear · C copy.
     useEffect(() => {
@@ -275,6 +328,16 @@ export function LogViewer({
                 <Button size="sm" variant="ghost" onClick={() => void copy('all')} data-testid="fleet-logs-copy-all">
                     {copied === 'all' ? t('viewer.copied') : t('viewer.copyAllShown')}
                 </Button>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={download}
+                    disabled={shown.length === 0}
+                    data-testid="fleet-logs-download"
+                >
+                    <Download className="w-3 h-3 mr-1" aria-hidden="true" />
+                    {t('viewer.download')}
+                </Button>
             </div>
 
             {state.groupHint && (
@@ -310,6 +373,7 @@ export function LogViewer({
                                     held={held}
                                     top={(start + index) * ROW_HEIGHT}
                                     chip={merged ? (chips[held.line.src] ?? '?') : null}
+                                    highlight={held.seq === highlightSeq}
                                 />
                             ))}
                         </div>
@@ -403,7 +467,17 @@ function EarlierControl({
     );
 }
 
-function LogRow({ held, top, chip }: { held: HeldLine; top: number; chip: string | null }) {
+function LogRow({
+    held,
+    top,
+    chip,
+    highlight,
+}: {
+    held: HeldLine;
+    top: number;
+    chip: string | null;
+    highlight: boolean;
+}) {
     const t = useTranslations('fleet.logs');
     const { line } = held;
     const tone =
@@ -414,9 +488,12 @@ function LogRow({ held, top, chip }: { held: HeldLine; top: number; chip: string
               : 'text-text dark:text-text-dark';
     return (
         <div
-            className={`absolute left-0 right-0 flex gap-3 px-3 whitespace-pre ${tone}`}
+            className={`absolute left-0 right-0 flex gap-3 px-3 whitespace-pre ${tone} ${
+                highlight ? 'bg-warning/15 ring-1 ring-warning/40' : ''
+            }`}
             style={{ top, height: ROW_HEIGHT, lineHeight: `${ROW_HEIGHT}px` }}
             data-level={line.level}
+            data-highlight={highlight ? 'true' : undefined}
         >
             <span className="shrink-0 text-text-muted dark:text-text-muted-dark select-none w-16">{formatLogTime(line.ts)}</span>
             {chip !== null && (

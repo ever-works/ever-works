@@ -9,6 +9,20 @@ import {
     FLEET_AGENT_SESSION_LEASE_TTL_SEC,
     FLEET_AGENT_SESSION_QUEUED_TIMEOUT_MS,
     FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH,
+    FLEET_SESSION_IDLE_AFTER_MS,
+    FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
+    FLEET_SESSION_BOARD_COLUMNS,
+    FLEET_SESSION_BOARD_MAX,
+    fleetSessionBoardColumn,
+    type FleetSessionBoardResponse,
+    type FleetSessionKind,
+    isFleetSessionAttentionUnread,
+    isFleetSessionDecisionReason,
+    parseFleetSessionAttention,
+    type FleetSessionAnswerRequest,
+    type FleetSessionAnswerResponse,
+    type FleetSessionAnswerSource,
+    type FleetSessionQuestionView,
     isFleetAgentSessionProvider,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_END_GRACE_MS,
@@ -20,6 +34,7 @@ import {
     isFleetSessionKind,
     isFleetSessionLive,
     isFleetSessionStartableProvider,
+    parseFleetSessionContainerShell,
     type FleetAgentSessionResult,
     type FleetAuditAction,
     type FleetSessionEndedReason,
@@ -31,6 +46,7 @@ import {
     type FleetSessionStartableProvider,
     type FleetSessionView,
 } from '@ever-works/contracts';
+import type { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import type { FleetSession } from '../../entities/fleet-session.entity';
 import { AgentRepository } from '../../database/repositories/agent.repository';
@@ -40,7 +56,9 @@ import { FleetAccessService } from '../fleet-access.service';
 import { FleetAuditService } from '../fleet-audit.service';
 import { FleetKillSwitchService } from '../fleet-kill-switch.service';
 import { FleetNodeRepository } from '../fleet-node.repository';
+import { FleetCheckoutRepository } from '../checkouts/fleet-checkout.repository';
 import { fleetSessionError, readFleetSessionError } from './fleet-session.errors';
+import { FleetSessionTaskService, type FleetSessionTaskAdmission } from './fleet-session-task.service';
 import {
     FLEET_SESSION_NODE_PORT,
     type FleetSessionNodePort,
@@ -66,6 +84,7 @@ import {
 import { toFleetSessionView } from './fleet-session.view';
 import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
 import { FLEET_SESSION_RECORDER, type FleetSessionRecorderPort } from './fleet-session-recorder.port';
+import { FleetSessionStateService } from './fleet-session-state.service';
 
 /**
  * Sessions on computers (FL-04) — the platform's one writer of
@@ -202,6 +221,13 @@ export class FleetSessionService {
         @Optional()
         @Inject(FLEET_SESSION_RECORDER)
         private readonly recorder?: FleetSessionRecorderPort,
+        // FL-15 P1 — a start for a Task (its rules and the Task a Run carries)
+        // and a start in a checkout (FL-14's rows). `@Optional()`: without
+        // them a start naming a Task or a checkout is refused, as before.
+        @Optional() private readonly taskRules?: FleetSessionTaskService,
+        @Optional() private readonly checkouts?: FleetCheckoutRepository,
+        // FL-05 — attention delivery when a session ends or is answered.
+        @Optional() private readonly status?: FleetSessionStateService,
     ) {}
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -209,7 +235,8 @@ export class FleetSessionService {
     /** One session, with its last screen (the detail page). */
     async get(id: string, actor: FleetSessionActor): Promise<FleetSessionView> {
         const { session } = await this.resolve(id, actor);
-        return toFleetSessionView(session, { includeScreen: true });
+        const [view] = await this.withTasks([session], { includeScreen: true });
+        return view;
     }
 
     /** A node's sessions, most recently active first (the computer page's Sessions tab). */
@@ -220,7 +247,7 @@ export class FleetSessionService {
     ): Promise<FleetSessionView[]> {
         const { node } = await this.nodeFor(nodeId, actor);
         const rows = await this.sessions.listForNodes([node.id], query);
-        return rows.map((row) => toFleetSessionView(row));
+        return this.withTasks(rows);
     }
 
     /** Sessions on every node the person may see sessions on. */
@@ -231,7 +258,7 @@ export class FleetSessionService {
         if (query.nodeId) return this.listForNode(query.nodeId, actor, query);
         const nodeIds = await this.visibleNodeIds(actor);
         const rows = await this.sessions.listForNodes(nodeIds, query);
-        return rows.map((row) => toFleetSessionView(row));
+        return this.withTasks(rows);
     }
 
     /**
@@ -254,9 +281,112 @@ export class FleetSessionService {
         const rows = await this.sessions.listForNodes(nodeIds, { ...query, limit });
         const last = rows.length === limit ? rows[rows.length - 1] : undefined;
         return {
-            sessions: rows.map((row) => toFleetSessionView(row)),
+            sessions: await this.withTasks(rows),
             nextCursor: last ? fleetSessionCursor(last) : null,
         };
+    }
+
+    /**
+     * The views of these rows, each carrying the Task its Run works on (FL-15
+     * spec FR-10: the session card's Task chip). One batched read; a failed
+     * one leaves the chips off, never the list.
+     */
+    private async withTasks(
+        rows: readonly FleetSession[],
+        options: { includeScreen?: boolean } = {},
+    ): Promise<FleetSessionView[]> {
+        const views = rows.map((row) => toFleetSessionView(row, options));
+        const runIds = rows.map((row) => row.agentRunId).filter((id): id is string => !!id);
+        if (runIds.length === 0 || !this.taskRules) return views;
+        const refs = await this.taskRules.refsForRuns(runIds);
+        for (const view of views) {
+            const ref = view.agentRunId ? refs.get(view.agentRunId) : undefined;
+            if (ref) view.task = ref;
+        }
+        return views;
+    }
+
+    /**
+     * The checkout a start names (FL-15 P1, the FL-14 follow-up): on this
+     * computer, `ready`, host-isolated — a session in a container checkout
+     * waits for FL-04 to spawn through `containerArgvFor`. `newWorktreeOf` is
+     * still refused: the worktree is created through Checkouts first, then
+     * the session starts in it by `checkoutId` (one create path).
+     */
+    private async checkoutFor(
+        node: FleetNode,
+        request: FleetSessionStartRequest,
+    ): Promise<FleetCheckout | null> {
+        if (request.newWorktreeOf) {
+            throw fleetSessionError(
+                'invalid',
+                'create the worktree under Checkouts first, then start the session in it',
+                { field: 'newWorktreeOf' },
+            );
+        }
+        if (!request.checkoutId) return null;
+        if (!this.checkouts) {
+            throw fleetSessionError('invalid', 'Checkouts are not available in this deployment', {
+                field: 'checkoutId',
+            });
+        }
+        const checkout = await this.checkouts.findById(request.checkoutId);
+        if (!checkout || checkout.nodeId !== node.id) {
+            throw fleetSessionError('invalid', `that checkout is not on ${node.name}`, {
+                field: 'checkoutId',
+            });
+        }
+        if (checkout.state !== 'ready') {
+            throw fleetSessionError(
+                'invalid',
+                `the checkout is ${checkout.state}; start the session once it is ready`,
+                { field: 'checkoutId', state: checkout.state },
+            );
+        }
+        if (checkout.isolation === 'container') {
+            throw fleetSessionError(
+                'unsupported_on_node',
+                'sessions in container checkouts arrive later; choose a checkout on the computer itself',
+                { field: 'checkoutId', isolation: 'container' },
+            );
+        }
+        return checkout;
+    }
+
+    /**
+     * FL-05 P3 — the Sessions board (spec FR-41 … FR-44, FR-48): every live
+     * session on the computers the person may see sessions on (or one, after
+     * its audience check), in the four columns, most recently moved first;
+     * `done` only for 24 h after it finished; ended sessions are list-only.
+     */
+    async board(
+        actor: FleetSessionActor,
+        query: { nodeId?: string; agentId?: string; kind?: FleetSessionKind } = {},
+    ): Promise<FleetSessionBoardResponse> {
+        const nodeIds = query.nodeId
+            ? [(await this.nodeFor(query.nodeId, actor)).node.id]
+            : await this.visibleNodeIds(actor);
+        const rows = await this.sessions.listLiveForBoard(
+            nodeIds,
+            {
+                ...(query.agentId ? { agentId: query.agentId } : {}),
+                ...(query.kind ? { kind: query.kind } : {}),
+            },
+            FLEET_SESSION_BOARD_MAX,
+        );
+        const now = this.now();
+        const columns: FleetSessionBoardResponse['columns'] = { needs_you: [], working: [], done: [], idle: [] };
+        const movedAt = (view: FleetSessionView) =>
+            Date.parse(view.stateChangedAt ?? view.lastActivityAt ?? view.createdAt) || 0;
+        for (const row of rows) {
+            const view = toFleetSessionView(row);
+            const column = fleetSessionBoardColumn(view, now);
+            if (column) columns[column].push(view);
+        }
+        for (const column of FLEET_SESSION_BOARD_COLUMNS) {
+            columns[column].sort((a, b) => movedAt(b) - movedAt(a));
+        }
+        return { columns, generatedAt: new Date(now).toISOString() };
     }
 
     /** The start dialog's "Recent" folders for a node (spec FR-15). */
@@ -335,13 +465,27 @@ export class FleetSessionService {
         }
         if (!isFleetSessionStartableProvider(request.provider))
             throw fleetSessionError('invalid', 'provider');
-        const cwd = typeof request.cwd === 'string' ? request.cwd.trim() : '';
+        if (request.taskId) {
+            throw fleetSessionError('invalid', 'a Task is handed to an Agent session', {
+                field: 'taskId',
+            });
+        }
+        // FL-15 P1: a session may start in a checkout — its folder is the checkout's.
+        const checkout = await this.checkoutFor(node, request);
+        const cwd = checkout
+            ? checkout.path
+            : typeof request.cwd === 'string'
+              ? request.cwd.trim()
+              : '';
         if (cwd.length === 0 || cwd.length > FLEET_SESSION_CWD_MAX_LENGTH || cwd.includes('\0')) {
             throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
         }
-        if (request.newWorktreeOf || request.checkoutId) {
-            throw fleetSessionError('invalid', 'New worktrees arrive with Checkouts', {
-                field: 'checkout',
+        // Shell inside a container (FL-09 P3): an owner shell session only, its target validated.
+        const container =
+            request.container !== undefined ? parseFleetSessionContainerShell(request.container) : null;
+        if (request.container !== undefined && (!container || request.provider !== 'shell')) {
+            throw fleetSessionError('invalid', 'a shell inside a container needs a container and bash or sh', {
+                field: 'container',
             });
         }
         const firstMessage =
@@ -422,6 +566,7 @@ export class FleetSessionService {
                     rows: size.rows,
                     startedBy: requestedBy,
                     ...(firstMessage?.trim() ? { firstMessage } : {}),
+                    ...(container ? { container } : {}),
                     ...(options.restartOf ? { restartOf: options.restartOf.daemonSessionId } : {}),
                 },
                 caller,
@@ -458,7 +603,7 @@ export class FleetSessionService {
                     provider: request.provider,
                     agentId: null,
                     agentRunId: null,
-                    checkoutId: null,
+                    checkoutId: checkout?.id ?? null,
                     cwd,
                     title,
                     state: 'working',
@@ -470,6 +615,8 @@ export class FleetSessionService {
                     restartOfSessionId: options.restartOf?.id ?? null,
                     startedBy: requestedBy,
                     lastActivityAt: now,
+                    // FL-05: the board orders by when the state last moved.
+                    stateChangedAt: now,
                     startedAt: now,
                     endedAt: null,
                     endedReason: null,
@@ -506,6 +653,7 @@ export class FleetSessionService {
             provider: request.provider,
             confirmationClass: 'plain',
             outcome: 'started',
+            ...(checkout ? { checkoutId: checkout.id } : {}),
             ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
         });
         const applied = await this.drainEarly(node.id, row.row);
@@ -539,6 +687,11 @@ export class FleetSessionService {
                 'this kind of session cannot be restarted',
             );
         }
+        // FL-15 P1: an Agent session that worked a Task starts again on the same Task.
+        let restartTaskId: string | undefined;
+        if (session.kind === 'agent' && session.agentRunId && this.taskRules) {
+            restartTaskId = (await this.taskRules.refsForRuns([session.agentRunId])).get(session.agentRunId)?.id;
+        }
         return this.start(
             node.id,
             actor,
@@ -553,6 +706,7 @@ export class FleetSessionService {
                 ...(session.kind === 'agent' && session.firstMessage
                     ? { firstMessage: session.firstMessage }
                     : {}),
+                ...(restartTaskId ? { taskId: restartTaskId } : {}),
                 ...(size.cols !== undefined ? { cols: size.cols } : {}),
                 ...(size.rows !== undefined ? { rows: size.rows } : {}),
             },
@@ -678,6 +832,16 @@ export class FleetSessionService {
         if (!isFleetSessionLive(session.state)) {
             throw fleetSessionError('invalid', 'the session has ended', { state: session.state });
         }
+        // FL-05 (FR-30): an Agent never answers a permission prompt — not through
+        // `fleet_sessions_answer`, and not by typing into the session either.
+        if (actor.agentId && session.state === 'needs_you') {
+            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            if (attention?.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+        }
         if (await this.isStopped())
             throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
         await this.requireNode().request({
@@ -700,6 +864,182 @@ export class FleetSessionService {
             bytes: Buffer.byteLength(data, 'utf8'),
             ...(actor.agentId ? { requestedBy: `agent:${actor.agentId}` } : {}),
         });
+    }
+
+    // ─── Attention (FL-05 P2, CONTRACTS §5.2, R-12, R-32) ───────────────────
+
+    /** What a session asks right now (`fleet_sessions_question`, readOnly; spec S13). */
+    async question(id: string, actor: FleetSessionActor): Promise<FleetSessionQuestionView> {
+        const { session } = await this.resolve(id, actor);
+        const view = toFleetSessionView(session);
+        const attention = view.attention && view.attention.reason !== 'finished' ? view.attention : null;
+        return {
+            sessionId: session.id,
+            state: session.state,
+            attention,
+            source: view.lastEvidence?.source ?? null,
+        };
+    }
+
+    /**
+     * Opening the detail acknowledges (FR-26): the unread mark clears, the
+     * attention stays until it is answered; an edge acknowledged once never
+     * re-flags (the node keeps its key). A key that is no longer the current
+     * one answers `invalid`. Not audited (a read).
+     */
+    async acknowledge(id: string, actor: FleetSessionActor, key: string): Promise<FleetSessionView> {
+        const { session } = await this.resolve(id, actor);
+        const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+        if (!attention || attention.key !== key) {
+            throw fleetSessionError('invalid', 'that prompt is no longer current', { field: 'acknowledge' });
+        }
+        if (!isFleetSessionAttentionUnread(attention)) return toFleetSessionView(session);
+        const next = { ...attention, acknowledgedAt: new Date(this.now()).toISOString() };
+        await this.sessions.update(session.id, { attention: next });
+        return toFleetSessionView({ ...session, attention: next } as FleetSession);
+    }
+
+    /**
+     * Answer what a session asks (spec FR-28 … FR-31, FR-48 … FR-50) — from
+     * the card, the detail, the Inbox / My Decisions, a tool or the CLI.
+     * Refusals, in order: existence and the `sessions` audience (a stranger
+     * reads 404); the key must be the session's CURRENT question or
+     * permission (else `invalid` "Already answered"); an Agent never answers a
+     * permission prompt, and answers another session's question only when its
+     * owner switched on "may answer other sessions" (R-32); exactly one of an
+     * option the CLI showed or a free text the question takes; the kill switch
+     * (`kill_switch`); the link (`unreachable`, the prompt stays). Then the
+     * machine types it (`session.answer` — it refuses a key that is no longer
+     * current, e.g. answered in the terminal a moment ago), the attention
+     * clears everywhere, and ONE `node.session.answer` row records the key,
+     * the reason, the option and who — never the free text (FR-49).
+     */
+    async answer(
+        id: string,
+        actor: FleetSessionActor,
+        request: FleetSessionAnswerRequest,
+        source: FleetSessionAnswerSource,
+    ): Promise<FleetSessionAnswerResponse> {
+        const { session, node } = await this.resolve(id, actor);
+        const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+        if (
+            !attention ||
+            typeof request.key !== 'string' ||
+            attention.key !== request.key ||
+            !isFleetSessionDecisionReason(attention.reason) ||
+            session.state !== 'needs_you'
+        ) {
+            throw fleetSessionError('invalid', 'Already answered', { field: 'key' });
+        }
+        if (actor.agentId) {
+            if (attention.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+            if (session.agentId !== actor.agentId && !(await this.agentMayAnswerOthers(actor.agentId))) {
+                throw fleetSessionError(
+                    'permission_denied',
+                    'ask the Agent\u2019s owner to switch on "may answer other sessions" for this Agent',
+                    { setting: 'canAnswerOtherSessions' },
+                );
+            }
+        }
+        const optionId = typeof request.optionId === 'string' && request.optionId.length > 0 ? request.optionId : null;
+        const text = typeof request.text === 'string' && request.text.trim().length > 0 ? request.text : null;
+        if ((optionId === null) === (text === null)) {
+            throw fleetSessionError('invalid', 'an answer is one of the options or a text', { field: 'optionId' });
+        }
+        if (optionId !== null && !attention.options.some((option) => option.id === optionId)) {
+            throw fleetSessionError('invalid', `"${optionId}" is not one of the options`, { field: 'optionId' });
+        }
+        if (text !== null && !(attention.reason === 'question' && attention.allowsText)) {
+            throw fleetSessionError('invalid', 'this prompt takes one of its options, not a text', { field: 'text' });
+        }
+        if (text !== null && (text.length > FLEET_SESSION_ANSWER_TEXT_MAX_CHARS || text.includes('\u0000'))) {
+            throw fleetSessionError('invalid', 'an answer is at most 4 000 characters', { field: 'text' });
+        }
+        const requestedBy = actor.agentId ? `agent:${actor.agentId}` : `user:${actor.userId}`;
+        const auditBase = {
+            key: attention.key,
+            reason: attention.reason,
+            optionId,
+            answeredWith: optionId !== null ? 'option' : 'text',
+            source,
+            confirmationClass: 'plain',
+            requestedBy,
+        };
+        if (await this.isStopped()) {
+            await this.record('node.session.answer', actor.userId, node, session.id, {
+                ...auditBase,
+                outcome: 'refused',
+                code: 'kill_switch',
+            });
+            throw fleetSessionError('kill_switch', 'Paused by the fleet stop \u2014 answers are not sent');
+        }
+        if (!this.node?.isConnected(node.id)) {
+            throw fleetSessionError('unreachable', `${node.name} is unreachable \u2014 the answer will not be sent`);
+        }
+        try {
+            await this.requireNode().request({
+                nodeId: node.id,
+                sessionId: session.daemonSessionId,
+                kind: session.kind,
+                mode: 'driver',
+                verb: 'session.answer',
+                params: { key: attention.key, answer: optionId !== null ? { optionId } : { text } },
+                caller: { kind: 'user', userId: actor.userId },
+                stateChanging: true,
+            });
+        } catch (error) {
+            const typed = readFleetSessionError(error);
+            await this.record('node.session.answer', actor.userId, node, session.id, {
+                ...auditBase,
+                outcome: 'refused',
+                code: typed?.code ?? 'operation_failed',
+            });
+            if (typed?.code === 'invalid') {
+                throw fleetSessionError('invalid', 'Already answered in the terminal', typed.details);
+            }
+            if (typed) throw fleetSessionError(typed.code, typed.hint, typed.details);
+            throw error;
+        }
+        const now = new Date(this.now());
+        const won = await this.sessions.updateIfLive(session.id, {
+            attention: null,
+            state: 'working',
+            stateChangedAt: now,
+            outcome: null,
+            lastActivityAt: now,
+        });
+        if (won) {
+            await this.status?.attentionAnswered(
+                { ...session, attention: null, state: 'working' } as FleetSession,
+                attention,
+                { answeredBy: requestedBy, ...(optionId !== null ? { optionId } : {}) },
+            );
+        }
+        await this.record('node.session.answer', actor.userId, node, session.id, {
+            ...auditBase,
+            outcome: 'answered',
+        });
+        return { key: attention.key, answered: true };
+    }
+
+    /**
+     * R-32: may this Agent answer another session's question? Only when its
+     * owner switched it on (`permissions.canAnswerOtherSessions`, read here —
+     * absent = off). An Agent that cannot be read is refused.
+     */
+    private async agentMayAnswerOthers(agentId: string): Promise<boolean> {
+        if (!this.agents) return false;
+        try {
+            const agent = await this.agents.findById(agentId);
+            const permissions = agent?.permissions as unknown as Record<string, unknown> | undefined;
+            return permissions?.canAnswerOtherSessions === true;
+        } catch {
+            return false;
+        }
     }
 
     // ─── Recording (FL-04 P3, spec FR-54 … FR-57) ──────────────────────────
@@ -955,7 +1295,32 @@ export class FleetSessionService {
                 await this.settleAgentRun(next, 'unconfirmed', 'no computer slot became free within ten minutes');
             }
         }
+        await this.decayIdle();
         return { ended };
+    }
+
+    /**
+     * FL-05's platform floor for idle decay (spec FR-14, plan §10): a
+     * `working` / `done` session with no evidence for 30 minutes is `idle` —
+     * never `done`, never ended. Only on a machine whose link is up: a lost
+     * link never changes a state (the node's own clock decides, and reports
+     * when it is back). Never throws.
+     */
+    private async decayIdle(): Promise<number> {
+        let decayed = 0;
+        try {
+            const now = new Date(this.now());
+            const cutoff = new Date(this.now() - FLEET_SESSION_IDLE_AFTER_MS);
+            for (const row of await this.sessions.findIdleCandidates(cutoff)) {
+                if (!this.node?.isConnected(row.nodeId)) continue;
+                const patch: Partial<FleetSession> = { state: 'idle', stateChangedAt: now };
+                if (row.attention && row.attention.reason !== 'finished') patch.attention = null;
+                if (await this.sessions.updateIfState(row.id, [row.state], patch)) decayed += 1;
+            }
+        } catch (error) {
+            this.logger.warn(`idle decay failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        return decayed;
     }
 
     // ─── Agent sessions (FL-04 P2) ─────────────────────────────────────────
@@ -1006,14 +1371,15 @@ export class FleetSessionService {
                 { field: 'firstMessage' },
             );
         }
-        const cwd = typeof request.cwd === 'string' ? request.cwd.trim() : '';
+        // FL-15 P1: a session may start in a checkout — its folder is the checkout's.
+        const checkout = await this.checkoutFor(node, request);
+        const cwd = checkout
+            ? checkout.path
+            : typeof request.cwd === 'string'
+              ? request.cwd.trim()
+              : '';
         if (cwd.length === 0 || cwd.length > FLEET_SESSION_CWD_MAX_LENGTH || cwd.includes('\0')) {
             throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
-        }
-        if (request.newWorktreeOf || request.checkoutId) {
-            throw fleetSessionError('invalid', 'New worktrees arrive with Checkouts', {
-                field: 'checkout',
-            });
         }
         if (!this.agents || !this.runs || !this.agentDispatcher) {
             throw fleetSessionError('unreachable', 'this deployment does not run Agent sessions yet');
@@ -1043,6 +1409,7 @@ export class FleetSessionService {
         const action: FleetAuditAction = options.restartOf
             ? 'node.session.restart'
             : 'node.session.start';
+        const requestedTaskId = typeof request.taskId === 'string' ? request.taskId : '';
         const refusal = canStartFleetSession({
             node: {
                 name: node.name,
@@ -1068,8 +1435,42 @@ export class FleetSessionService {
                 confirmationClass: 'plain',
                 outcome: 'refused',
                 code: refusal.code,
+                ...(requestedTaskId ? { taskId: requestedTaskId } : {}),
             });
             throw fleetSessionError(refusal.code, refusal.hint, refusal.details);
+        }
+
+        // FL-15 P1 (spec FR-6, U5, U13, FR-3): a start for a Task — the Task is
+        // visible, the Agent is not already on it, the pin is respected (never
+        // written) and the computer has a free agent slot. The Run then
+        // carries the Task, so its history, the board and chat follow it.
+        let handoff: FleetSessionTaskAdmission | null = null;
+        if (requestedTaskId) {
+            if (!this.taskRules) {
+                throw fleetSessionError('invalid', 'this deployment does not hand Tasks to sessions yet', {
+                    field: 'taskId',
+                });
+            }
+            try {
+                handoff = await this.taskRules.admit({
+                    userId: actor.userId,
+                    agent: { id: agent.id, name: agent.name, organizationId: agent.organizationId ?? null },
+                    node,
+                    taskId: requestedTaskId,
+                });
+            } catch (error) {
+                const typed = readFleetSessionError(error);
+                await this.record(action, actor.userId, node, null, {
+                    kind: 'agent',
+                    provider,
+                    agentId,
+                    taskId: requestedTaskId,
+                    confirmationClass: 'plain',
+                    outcome: 'refused',
+                    code: typed?.code ?? 'internal',
+                });
+                throw error;
+            }
         }
 
         const id = randomUUID();
@@ -1083,7 +1484,7 @@ export class FleetSessionService {
             provider,
             agentId,
             agentRunId: null,
-            checkoutId: null,
+            checkoutId: checkout?.id ?? null,
             cwd,
             title,
             state: 'starting',
@@ -1095,6 +1496,7 @@ export class FleetSessionService {
             restartOfSessionId: options.restartOf?.id ?? null,
             startedBy: `agent:${agentId}`,
             lastActivityAt: now,
+            stateChangedAt: now,
             startedAt: null,
             endedAt: null,
             endedReason: null,
@@ -1112,6 +1514,8 @@ export class FleetSessionService {
                 organizationId: node.organizationId ?? null,
                 runnerKind: 'fleet-session',
                 fleetSessionId: id,
+                // FL-15 P1: the Task this session works on (its Work denormalised, as assign-task does).
+                ...(handoff ? { taskId: handoff.taskId, workId: handoff.workId } : {}),
             });
             runId = run.id;
             await this.sessions.update(id, { agentRunId: run.id });
@@ -1155,6 +1559,7 @@ export class FleetSessionService {
                 confirmationClass: 'plain',
                 outcome: 'refused',
                 code: 'unreachable',
+                ...(handoff ? { taskId: handoff.taskId } : {}),
             });
             throw fleetSessionError('unreachable', `${node.name} could not be asked to start the session`);
         }
@@ -1165,9 +1570,14 @@ export class FleetSessionService {
             agentRunId: runId,
             confirmationClass: 'plain',
             outcome: 'queued',
+            // FL-15 FR-11: the session-start row names the Task (and the checkout), never the first message.
+            ...(handoff ? { taskId: handoff.taskId } : {}),
+            ...(checkout ? { checkoutId: checkout.id } : {}),
             ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
         });
-        return toFleetSessionView(row);
+        const view = toFleetSessionView(row);
+        if (handoff) view.task = { id: handoff.taskId, slug: handoff.slug, title: handoff.title };
+        return view;
     }
 
     /**
@@ -1278,7 +1688,7 @@ export class FleetSessionService {
             }
             return;
         }
-        const written = this.toColumns(patch);
+        const written = this.withStatusColumns(row, this.toColumns(patch));
         const wasLive = isFleetSessionLive(row.state);
         if (patch.state === 'ended' && wasLive) {
             const won = await this.sessions.updateIfLive(row.id, written);
@@ -1288,6 +1698,8 @@ export class FleetSessionService {
                 if (fresh) await this.applyToRow(nodeId, fresh, message);
                 return;
             }
+            // FL-05: an open prompt expires with the session; a failure raises its notice.
+            await this.status?.sessionEnded(row, { ...row, ...written } as FleetSession);
             if (patch.endedReason === 'drain' || patch.endedReason === 'kill-switch') {
                 await this.recordSystem('node.session.end', row, {
                     reason: patch.endedReason,
@@ -1333,6 +1745,27 @@ export class FleetSessionService {
         return out;
     }
 
+    /**
+     * FL-05: the status columns a state change carries — when the state moved
+     * (the board's order), a fresh turn's cleared outcome (`idle → working`),
+     * and, on `ended`, an open prompt closed (its Decision expires with the
+     * session, R-12; a `finished` / `failed` marker stays for unread).
+     */
+    private withStatusColumns(row: FleetSession, written: Partial<FleetSession>): Partial<FleetSession> {
+        if (written.state === undefined || written.state === row.state) return written;
+        const out: Partial<FleetSession> = { ...written, stateChangedAt: new Date(this.now()) };
+        if (written.state === 'working' && row.state === 'idle' && written.outcome === undefined) out.outcome = null;
+        if (
+            written.state === 'ended' &&
+            row.attention &&
+            row.attention.reason !== 'finished' &&
+            row.attention.reason !== 'failed'
+        ) {
+            out.attention = null;
+        }
+        return out;
+    }
+
     /** End a row (if still live) and answer the row as it now stands. */
     private async endRow(
         row: FleetSession,
@@ -1340,9 +1773,12 @@ export class FleetSessionService {
     ): Promise<FleetSession> {
         const patch = endFleetSessionPatch(rowFacts(row), reason, new Date(this.now()));
         if (!patch) return row;
-        const written = this.toColumns(patch);
+        const written = this.withStatusColumns(row, this.toColumns(patch));
         const won = await this.sessions.updateIfLive(row.id, written);
-        if (won) return this.afterEnded({ ...row, ...written } as FleetSession);
+        if (won) {
+            await this.status?.sessionEnded(row, { ...row, ...written } as FleetSession);
+            return this.afterEnded({ ...row, ...written } as FleetSession);
+        }
         return (await this.sessions.findById(row.id)) ?? row;
     }
 

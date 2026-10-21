@@ -136,9 +136,16 @@ import {
     FleetPortTunnelService,
     FleetService,
     FleetSessionService,
+    FleetNodeHealthService,
+    NeedsALookService,
+    FLEET_LOGS_READER,
+    FLEET_STATUS_READER,
+    type FleetLogsReaderPort,
+    type FleetStatusReaderPort,
 } from '@ever-works/agent/fleet';
 import { config } from '@ever-works/agent/config';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
+import { FleetOperationsService } from '../fleet-link/fleet-operations.service';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
     PolicyModule,
@@ -2142,6 +2149,17 @@ async function assertRealWriteTarget(
                 // Servers and ports, phase 2 — backs `fleet_ports_preview_open|close`.
                 // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
                 { token: FleetPortTunnelService, optional: true },
+                // FL-19 — the Agent, MCP & CLI surface. All APPENDED LAST (positional) and
+                // optional: unbound, the matching tools are simply not offered.
+                //  - `fleet_status` (the API's status service, FleetToolsApiModule);
+                { token: FLEET_STATUS_READER, optional: true },
+                //  - `fleet_operations_get|list` (FL-02's operations registry, FleetLinkApiModule);
+                { token: FleetOperationsService, optional: true },
+                //  - `fleet_logs_sources|read` (FL-08's reader, FleetLogsApiModule);
+                { token: FLEET_LOGS_READER, optional: true },
+                //  - `fleet_nodes_health|needs_a_look` (FL-03's history + the needs-a-look registry).
+                { token: FleetNodeHealthService, optional: true },
+                { token: NeedsALookService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2171,6 +2189,11 @@ async function assertRealWriteTarget(
                 checkouts?: FleetCheckoutService | null,
                 fleetCommands?: FleetCommandService | null,
                 fleetPortTunnels?: FleetPortTunnelService | null,
+                fleetStatus?: FleetStatusReaderPort | null,
+                fleetOperations?: FleetOperationsService | null,
+                fleetLogs?: FleetLogsReaderPort | null,
+                fleetHealth?: FleetNodeHealthService | null,
+                needsALook?: NeedsALookService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2197,6 +2220,24 @@ async function assertRealWriteTarget(
                     ...(fleetMachine ? { machine: fleetMachine } : {}),
                     ...(fleetPorts ? { ports: fleetPorts } : {}),
                     ...(fleetPortTunnels ? { portTunnels: fleetPortTunnels } : {}),
+                    // FL-19 — the catalogue's own reads and the families FL-03 / FL-08
+                    // left for FL-19 to bind. Each only while its flag is on.
+                    ...(fleetStatus ? { status: fleetStatus } : {}),
+                    ...(fleetOperations && config.fleet.isNodeLinkEnabled()
+                        ? { operations: fleetOperations }
+                        : {}),
+                    ...(fleetLogs && config.fleet.isMachineFactsEnabled()
+                        ? { logs: { reader: fleetLogs } }
+                        : {}),
+                    ...(fleetHealth
+                        ? {
+                              health: {
+                                  service: fleet,
+                                  history: fleetHealth,
+                                  ...(needsALook ? { needsALook } : {}),
+                              },
+                          }
+                        : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

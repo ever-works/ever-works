@@ -12,6 +12,7 @@ import {
 } from '@ever-works/contracts';
 import { TerminalAttachService } from './terminal-attach.service';
 import { TerminalRelayRegistry, type TerminalClientRole } from './terminal-relay.registry';
+import { isFleetPreviewHostRequest } from '../fleet/ports/preview-host.match';
 
 /**
  * Terminal WebSocket gateway (streaming-terminal M3).
@@ -107,6 +108,9 @@ export class TerminalWsService implements OnApplicationBootstrap, OnApplicationS
     }
 
     private handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
+        // Servers and ports (FL-10 P3): an upgrade on the dedicated preview host is a
+        // tunnelled page's own socket (hot reload) — the preview host handler's, never ours.
+        if (isFleetPreviewHostRequest(req)) return;
         const rawUrl = req.url ?? '';
         if (rawUrl.includes('?')) {
             // Attach tokens ride the FIRST FRAME, never the URL — a query
