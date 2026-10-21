@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import {
     inboundTriggersAPI,
     type CreateInboundTriggerInput,
+    type GithubForMePresetInput,
     type FireNowInboundTriggerResult,
     type InboundTriggerFireView,
     type InboundTriggerView,
@@ -62,6 +63,20 @@ export async function createInboundTriggerAction(
         return { success: true, data };
     } catch (error) {
         return toError(error, 'Failed to create trigger');
+    }
+}
+
+/** FL-15 P3: **GitHub: things for me** — refused without a linked GitHub account (the API says so). */
+export async function createGithubForMeTriggerAction(
+    input: GithubForMePresetInput = {},
+): Promise<ActionResult<InboundTriggerWithSecret>> {
+    await requireAuth();
+    try {
+        const data = await inboundTriggersAPI.createGithubForMe(input);
+        revalidateTriggerSurfaces();
+        return { success: true, data };
+    } catch (error) {
+        return toError(error, 'Failed to create the GitHub trigger');
     }
 }
 

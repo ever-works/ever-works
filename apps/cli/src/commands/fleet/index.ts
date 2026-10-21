@@ -13,6 +13,7 @@ import { statusCommand } from './status';
 import { toolsCommand } from './tools';
 import { answerCommand } from './session/answer';
 import { questionCommand } from './session/question';
+import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -29,7 +30,12 @@ export const fleetSessionCommand = new Command('session')
     .addCommand(attachCommand)
     // FL-05 P2: what a session waits for, and answering it.
     .addCommand(questionCommand)
-    .addCommand(answerCommand);
+    .addCommand(answerCommand)
+    // FL-15 P3: hand a Task to an Agent session on a computer.
+    .addCommand(sessionStartCommand);
+
+// FL-15 P3 — `fleet nodes git-identity <nodeId> [--set [--confirm]]` on FL-19's `fleet nodes`.
+nodesCommand.addCommand(gitIdentityCommand);
 
 // FL-19 T-10 — the reads beside FL-12's `fleet commands run`.
 commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand);
@@ -69,4 +75,6 @@ export const fleetCommand = new Command('fleet')
     .addCommand(operationsCommand)
     .addCommand(toolsCommand)
     // Schedules on computers (FL-13): `fleet schedules create|list|get|update|run|pause|resume|runs|delete` (alias `fleet schedule`).
-    .addCommand(schedulesCommand);
+    .addCommand(schedulesCommand)
+    // Tasks on computers (FL-15 P3): `fleet tasks handoff-options <taskId>`.
+    .addCommand(fleetTasksCommand);

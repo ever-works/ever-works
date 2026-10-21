@@ -1,4 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { InboundTriggerFire, IngestedEvent } from '@ever-works/agent/entities';
 import {
     AgentRepository,
     AgentRunRepository,
@@ -25,6 +28,7 @@ import {
     FLEET_AGENT_SESSION_PROVIDERS,
     FLEET_SESSION_PROVIDER_CAPABILITY,
     fleetHandoffAgentCli,
+    fleetHandoffPullRequestFrom,
     fleetHandoffRepositoryOf,
     fleetRemotesMatch,
     judgeFleetHandoffComputer,
@@ -35,6 +39,7 @@ import {
     type FleetHandoffCheckoutRef,
     type FleetHandoffComputer,
     type FleetHandoffNodeCheckouts,
+    type FleetHandoffPullRequest,
     type FleetTaskHandoffOptions,
 } from '@ever-works/contracts';
 
@@ -132,7 +137,38 @@ export class FleetTaskHandoffService {
         private readonly sessionTasks: FleetSessionTaskService,
         private readonly checkouts: FleetCheckoutRepository,
         @Optional() @Inject(FLEET_SESSION_NODE_PORT) private readonly link?: FleetSessionNodePort,
+        // P3 (spec FR-20): a Trigger-made Task's fire and the event behind it — where a
+        // pull-request Task's head branch is read. @Optional(): without them a Task
+        // falls back to its own branch.
+        @Optional() @InjectRepository(InboundTriggerFire) private readonly fires?: Repository<InboundTriggerFire>,
+        @Optional() @InjectRepository(IngestedEvent) private readonly events?: Repository<IngestedEvent>,
     ) {}
+
+    /**
+     * The pull request a Task was made from (spec FR-20, plan §4): the
+     * Trigger fire that created the Task (`inbound_trigger_fires.taskId`), its
+     * claim key (the ingested event's id), and that event's `github.pr`
+     * payload — head branch, head repository, fork, maintainer edits. Null
+     * for a Task no `github.pr` event made; never throws.
+     */
+    private async pullRequestOf(taskId: string): Promise<FleetHandoffPullRequest | null> {
+        if (!this.fires || !this.events) return null;
+        try {
+            const fires = await this.fires.find({ where: { taskId }, order: { firedAt: 'ASC' }, take: 5 });
+            for (const fire of fires) {
+                if (!/^[0-9a-f-]{36}$/i.test(fire.dedupeKey ?? '')) continue;
+                const event = await this.events.findOne({ where: { id: fire.dedupeKey } });
+                if (event?.kind !== 'github.pr') continue;
+                const pullRequest = fleetHandoffPullRequestFrom(event.payload);
+                if (pullRequest) return pullRequest;
+            }
+        } catch (error) {
+            this.logger.debug(
+                `Pull request of task ${taskId} not read: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+        return null;
+    }
 
     async options(
         userId: string,
@@ -143,14 +179,23 @@ export class FleetTaskHandoffService {
         const task = await this.tasks.getOne(userId, taskId, scope);
         const work = task.workId ? await this.works.findById(task.workId).catch(() => null) : null;
         const target = work ? resolveTaskRepository(work) : null;
-        const repoUrl = target ? cloneUrlFor(work?.gitProvider, target.owner, target.repo) : null;
+        const pullRequest = await this.pullRequestOf(task.id);
+        // P3 (FR-20, S4, U8): a pull-request Task works on the pull request's head —
+        // its branch, in the repository that branch lives in (a fork's, when it is one).
+        const headRepository = pullRequest?.headRef ? (pullRequest.headRepo ?? pullRequest.repository) : null;
+        const repoUrl = headRepository
+            ? `https://github.com/${headRepository}.git`
+            : target
+              ? cloneUrlFor(work?.gitProvider, target.owner, target.repo)
+              : null;
         const repository = repoUrl ? fleetHandoffRepositoryOf(repoUrl) : null;
-        const branch =
-            typeof task.branchRef === 'string' && task.branchRef.trim()
-                ? task.branchRef.trim()
-                : task.workId
-                  ? taskBranchName(task)
-                  : null;
+        const branch = pullRequest?.headRef
+            ? pullRequest.headRef
+            : typeof task.branchRef === 'string' && task.branchRef.trim()
+              ? task.branchRef.trim()
+              : task.workId
+                ? taskBranchName(task)
+                : null;
         const source = parseFleetTaskSourceLink(task.description ?? '');
 
         // ── Agents (FR-4): the Run-with-agent resolver, then each Agent's facts.
@@ -214,7 +259,11 @@ export class FleetTaskHandoffService {
         // ── Checkouts (FR-5, U7).
         const checkouts: FleetHandoffNodeCheckouts[] = [];
         for (const node of ownNodes) {
-            checkouts.push(await this.checkoutsOn(node, task.workId ?? null, repoUrl));
+            const step = await this.checkoutsOn(node, task.workId ?? null, repoUrl);
+            // P3: FL-14's new worktree always cuts a NEW branch, so a pull request's existing head
+            // branch is checked out by a fresh clone of it (or an existing checkout already on it).
+            if (pullRequest?.headRef && step.defaultMode === 'worktree') step.defaultMode = 'clone';
+            checkouts.push(step);
         }
 
         // ── First message (FR-7) and the session already working it (U13).
@@ -227,9 +276,19 @@ export class FleetTaskHandoffService {
             title: task.title,
             description: task.description ?? null,
             checks,
-            source,
+            source: pullRequest
+                ? {
+                      provider: 'github',
+                      kind: 'pull',
+                      url: `https://github.com/${pullRequest.repository}/pull/${pullRequest.number}`,
+                      repository: pullRequest.repository,
+                      number: pullRequest.number,
+                  }
+                : source,
             branch,
             hasRepository: repository !== null,
+            // S4: a pull-request Task reviews and addresses its comments.
+            review: pullRequest !== null,
         });
         let activeSessionId: string | null = null;
         if (selected) {
@@ -248,6 +307,7 @@ export class FleetTaskHandoffService {
                 repository,
                 repoUrl,
                 source,
+                pullRequest,
             },
             agents,
             agentId: selected?.id ?? null,

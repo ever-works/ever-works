@@ -197,6 +197,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-session-status',
 				// Git clones and worktrees on those computers (FL-14).
 				'features/fleet-checkouts',
+				// Tasks on computers (FL-15) — the hand-off, the Computer block, GitHub things for me, git identity.
+				'features/fleet-tasks-and-github',
 				// Reading a computer's logs through that link.
 				'features/fleet-logs',
 				// What runs on each computer — services, Docker, processes (FL-09).

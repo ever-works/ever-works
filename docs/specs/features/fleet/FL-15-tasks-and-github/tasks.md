@@ -107,31 +107,31 @@
 
 ## P3 — Trigger source, PR checkout, tools
 
-- [ ] **T-12**. `eventMatcher` on `packages/agent/src/entities/inbound-trigger.entity.ts` is
+- [x] **T-12**. `eventMatcher` on `packages/agent/src/entities/inbound-trigger.entity.ts` is
       `simple-json` (L151-152); add optional `audience?: { me: FleetGithubAudience[] }` to
       `InboundTriggerEventMatcher`; extend `packages/agent/src/triggers/trigger-event-matcher.ts` to
       take the owner's GitHub login and evaluate the audience; pass the login from
       `packages/agent/src/triggers/inbound-triggers.service.ts` (`github_app_user_links.githubLogin`).
       **Test**: `packages/agent/src/triggers/__tests__/trigger-event-matcher.spec.ts` extended —
       audience × login matrix, missing key = today's behaviour, case-insensitive login.
-- [ ] **T-13**. Create `apps/api/src/ingest/github/github-pr-intake.service.ts` beside the issue
+- [x] **T-13**. Create `apps/api/src/ingest/github/github-pr-intake.service.ts` beside the issue
       intake: `pull_request` actions `review_requested · review_request_removed · assigned · unassigned · opened · ready_for_review · reopened · closed` → `github.pr` envelopes with
       `requestedReviewer`, `assignees`, `author`, `headRef`, `headRepo`, `maintainerCanModify`;
       register in `github-webhook-dispatcher.service.ts`.
       **Test**: `apps/api/src/ingest/github/github-pr-intake.service.spec.ts` — each action, subject
       coalescing id, bridge-owned actions untouched.
-- [ ] **T-14**. Add the preset `POST /api/inbound-triggers/presets/github-for-me` to the Triggers
+- [x] **T-14**. Add the preset `POST /api/inbound-triggers/presets/github-for-me` to the Triggers
       controller (refuse without a GitHub link → `invalid` with hint); Task builder in
       `packages/agent/src/triggers/trigger-prompt.ts` adds the `github` label and the source link to
       the description (`tasks` has no `metadata` column; the structured source is resolved at
       hand-off time, T-16).
       **Test**: `inbound-triggers.service.spec.ts` extended — preset shape, refusal, second event on
       the same PR updates the Task.
-- [ ] **T-15**. Triggers UI: **About me** group and `GithubForMePreset.tsx` in
+- [x] **T-15**. Triggers UI: **About me** group and `GithubForMePreset.tsx` in
       `apps/web/src/components/tasks/TaskTriggersClient.tsx`; `for me` badge; i18n `fleet.githubTrigger.*`;
       `apps/web/e2e/flow-fleet-github-for-me-trigger.spec.ts`.
       **Test**: `TaskTriggersClient.unit.spec.tsx` extended; e2e green.
-- [ ] **T-16**. PR-branch checkout: `task-handoff.rules.ts` resolves the PR source from the Trigger
+- [x] **T-16**. PR-branch checkout: `task-handoff.rules.ts` resolves the PR source from the Trigger
       fire that created the Task (`inbound_trigger_fires.taskId` → its delivery `dedupeKey` → the
       ingested event's `github.pr` envelope; else the description's link via the GitHub App) → checkout
       choice on `headRef` (fork → read-only unless `maintainerCanModify`); first message
@@ -139,7 +139,7 @@
       **Test**: extend `task-handoff.rules.spec.ts` and `fleet-task-handoff.service.spec.ts` — same-repo
       vs fork; read-only flag surfaces in the dialog copy; a Task without a fire falls back to the
       link.
-- [ ] **T-17**. Tools `fleet_tasks_handoff_options` (read-only), `fleet_nodes_git_identity_get` /
+- [x] **T-17**. Tools `fleet_tasks_handoff_options` (read-only), `fleet_nodes_git_identity_get` /
       `fleet_nodes_git_identity_set` (CONTRACTS §11.3 names) and the `taskId` parameter on
       FL-04/FL-19's `fleet_sessions_start` in `packages/agent/src/fleet/agent-fleet-tools.ts`; MCP
       whitelist entries with the same names in `apps/mcp/src/openapi-tools/whitelist.ts`; CLI verbs
@@ -150,7 +150,7 @@
 
 ## P4 — Docs and rollout
 
-- [ ] **T-18**. Write `docs/features/fleet-tasks-and-github.md` (fix on this computer, Computer
+- [x] **T-18**. Write `docs/features/fleet-tasks-and-github.md` (fix on this computer, Computer
       block, "for me" Trigger, git identity); add to `apps/docs/sidebarsPlatform.ts` beside
       `'features/fleet'` (`:183`); cross-link from `docs/features/tasks.md` (§"Run with agent") and
       `docs/features/inbound-triggers.md`.

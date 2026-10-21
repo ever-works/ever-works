@@ -12836,6 +12836,21 @@
         }
     },
     "fleet": {
+        "githubTrigger": {
+            "preset": {
+                "button": "GitHub: things for me",
+                "created": "Trigger created: review requests, assignments and your pull requests now become Tasks in the Backlog.",
+                "failed": "The GitHub trigger could not be created."
+            },
+            "aboutMe": {
+                "title": "About me",
+                "reviewRequested": "Review requested from me",
+                "assigned": "Assigned to me",
+                "authored": "My pull requests",
+                "hint": "Matched against the GitHub account linked to you. Leave all unchecked to match every event."
+            },
+            "badge": "for me"
+        },
         "tools": {
             "capabilities": {
                 "title": "Fleet tools",
@@ -13011,6 +13026,10 @@
             },
             "chip": {
                 "title": "Task {slug}: {title}"
+            },
+            "pr": {
+                "head": "Pull request #{number} · checks out its branch {branch}",
+                "forkReadOnly": "From a fork — {agent} can review and comment but not push"
             }
         },
         "checkouts": {

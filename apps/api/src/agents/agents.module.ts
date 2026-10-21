@@ -134,6 +134,7 @@ import {
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
+    FleetGitIdentityService,
     FleetPortTunnelService,
     FleetService,
     FleetSessionService,
@@ -145,6 +146,9 @@ import {
     type FleetStatusReaderPort,
 } from '@ever-works/agent/fleet';
 import { config } from '@ever-works/agent/config';
+// Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
+// (global through FleetTasksApiModule; optional below).
+import { FleetTaskHandoffService } from '../fleet/tasks/fleet-task-handoff.service';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { FleetOperationsService } from '../fleet-link/fleet-operations.service';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
@@ -2165,6 +2169,11 @@ async function assertRealWriteTarget(
                 // (positional), optional: unbound (or FLEET_VIRTUAL_ENABLED off) the
                 // five tools are not offered; create / stop / destroy only ever file an approval.
                 { token: FleetVirtualService, optional: true },
+                // Tasks on computers (FL-15 P3) — backs `fleet_tasks_handoff_options` and
+                // `fleet_nodes_git_identity_*`. APPENDED LAST (positional), optional:
+                // unbound (or FLEET_CHECKOUTS_ENABLED off) the tools are not offered.
+                { token: FleetTaskHandoffService, optional: true },
+                { token: FleetGitIdentityService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2200,6 +2209,8 @@ async function assertRealWriteTarget(
                 fleetHealth?: FleetNodeHealthService | null,
                 needsALook?: NeedsALookService | null,
                 fleetVirtual?: FleetVirtualService | null,
+                fleetTaskHandoff?: FleetTaskHandoffService | null,
+                fleetGitIdentity?: FleetGitIdentityService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2251,6 +2262,19 @@ async function assertRealWriteTarget(
                     : {}),
                 ...(fleetCommands && config.fleet.isCommandsEnabled()
                     ? { fleetCommands: { service: fleetCommands } }
+                    : {}),
+                ...((fleetTaskHandoff || fleetGitIdentity) && config.fleet.isCheckoutsEnabled()
+                    ? {
+                          fleetTasks: {
+                              handoff: fleetTaskHandoff
+                                  ? {
+                                        options: (userId: string, taskId: string, agentId: string | null) =>
+                                            fleetTaskHandoff.options(userId, taskId, agentId),
+                                    }
+                                  : null,
+                              identity: fleetGitIdentity ?? null,
+                          },
+                      }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.

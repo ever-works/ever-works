@@ -324,6 +324,19 @@ export function FixOnComputerDialog({
                                 <h3 className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('dialog.checkout')}
                                 </h3>
+                                {options.task.pullRequest && (
+                                    <p
+                                        className={options.task.pullRequest.readOnly ? 'text-xs text-warning' : 'text-xs text-text-muted'}
+                                        data-testid="fleet-handoff-pr"
+                                    >
+                                        {options.task.pullRequest.readOnly
+                                            ? t('pr.forkReadOnly', { agent: agent?.name ?? '' })
+                                            : t('pr.head', {
+                                                  number: options.task.pullRequest.number,
+                                                  branch: options.task.pullRequest.headRef ?? '',
+                                              })}
+                                    </p>
+                                )}
                                 <CheckoutChoice
                                     step={step}
                                     task={options.task}
