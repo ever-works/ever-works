@@ -13,6 +13,9 @@ import {
 import { FixAction, type ClearModelThrottle } from './FixAction';
 import { useNow } from './use-now';
 
+/** States whose sentence only restates what FL-01's word beside the dot already says. */
+const SENTENCE_REPEATS_WORD: readonly string[] = ['online', 'busy', 'offline', 'paused', 'disabled'];
+
 export interface ComputerStateLineProps {
     node: FleetNodeView;
     /** "Now", injectable for tests and for a ticking parent. */
@@ -30,6 +33,15 @@ export interface ComputerStateLineProps {
     withAction?: boolean;
     onActionDone?: () => void;
     clearModelThrottle?: ClearModelThrottle;
+    /**
+     * FL-03 second phase — `sentence` renders only the sentence (no dot, no
+     * word, no action) for a surface that already shows the word beside its own
+     * dot (FL-01's cards and table), and nothing when the sentence would only
+     * repeat the word. Default `line`.
+     */
+    variant?: 'line' | 'sentence';
+    /** FL-03 second phase — the sibling an offline computer can be woken through ("can be woken from build-01"). */
+    wakeVia?: string | null;
 }
 
 /**
@@ -51,6 +63,8 @@ export function ComputerStateLine({
     onActionDone,
     clearModelThrottle,
     resolution,
+    variant = 'line',
+    wakeVia = null,
 }: ComputerStateLineProps) {
     const t = useTranslations('fleet');
     const locale = useLocale();
@@ -76,6 +90,27 @@ export function ComputerStateLine({
 
     const word = t(`states.${copy.wordKey}`);
     const sentence = t(`stateSentences.${copy.sentenceKey}`, values);
+
+    if (variant === 'sentence') {
+        const wakeNote = copy.state === 'offline' && wakeVia ? t('wake.cardCanWake', { via: wakeVia }) : null;
+        // The surface's own word already says these; the sentence adds the why
+        // (a limit's reset time, the node's own reason, the floor it is under).
+        const saysMore = !SENTENCE_REPEATS_WORD.includes(copy.state) && sentence !== word;
+        const parts = [saysMore ? sentence : null, wakeNote].filter(
+            (part): part is string => Boolean(part),
+        );
+        if (parts.length === 0) return null;
+        return (
+            <span
+                className="text-xs text-text-muted dark:text-text-muted-dark"
+                title={tooltip}
+                data-testid="fleet-computer-state-sentence"
+                data-state={copy.state}
+            >
+                {parts.join(' · ')}
+            </span>
+        );
+    }
 
     return (
         <div className="space-y-1" data-testid="fleet-computer-state" data-state={copy.state}>

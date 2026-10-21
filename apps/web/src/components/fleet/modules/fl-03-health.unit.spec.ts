@@ -8,6 +8,11 @@ vi.mock('../health/overview/HealthMetricsBlock', () => ({
         return null;
     },
 }));
+vi.mock('../health/overview/HealthHistoryBlock', () => ({
+    default: function HealthHistoryBlockStub() {
+        return null;
+    },
+}));
 // The server action behind "Clear limit now" (the existing, audited route).
 const clearThrottle = vi.fn();
 vi.mock('@/app/actions/settings/fleet', () => ({
@@ -37,6 +42,14 @@ describe('FL-03 registration (components/fleet/modules/fl-03-health.ts)', () => 
         }
         // Not on the hub's own Overview: the hub lists computers, not one machine's metrics.
         expect(registry.getOverviewBlocks('hub', {})).toEqual([]);
+    });
+
+    it('puts the history chart right under the metrics, unflagged so a switched-off history says so (U10)', async () => {
+        const registry = await import('../registry');
+        const { HEALTH_HISTORY_BLOCK_ID } = await import('./fl-03-health');
+        const blocks = registry.getOverviewBlocks('computer', {});
+        expect(blocks[1]).toMatchObject({ id: HEALTH_HISTORY_BLOCK_ID, surface: 'computer', order: 20 });
+        expect(blocks[1].flag).toBeUndefined();
     });
 
     it('is reachable from the one registrations barrel the pages import', async () => {
