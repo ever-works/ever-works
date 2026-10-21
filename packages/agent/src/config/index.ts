@@ -748,6 +748,20 @@ export const config = {
             );
         },
         /**
+         * Commands on computers (FL-12, CONTRACTS §9) — `FLEET_COMMANDS_ENABLED`
+         * (shared with FL-13's Schedules). Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every `/api/fleet/commands**`
+         * route answers 404 (the surface is not even confirmed). A Command needs
+         * the node link, so the link flag gates the machine calls on its own.
+         * Read per call: flipping it needs no restart.
+         */
+        isCommandsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_COMMANDS_ENABLED === 'true'
+            );
+        },
+        /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
          * makes a missing relay bus (`REDIS_URL`) a boot-time configuration
          * error. Every multi-replica deployment sets it; without it a single
