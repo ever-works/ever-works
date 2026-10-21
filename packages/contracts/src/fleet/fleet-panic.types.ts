@@ -228,7 +228,23 @@ export type FleetAuditAction =
 	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
 	| 'node.port.preview.open'
 	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
-	| 'node.port.preview.close';
+	| 'node.port.preview.close'
+	/**
+	 * Virtual computers (FL-16, CONTRACTS §7) — every row carries
+	 * `family: 'machines'`, the child as `target`, `requestedBy`,
+	 * `confirmationClass` and `outcome`, plus the system, CPUs, memory, disk
+	 * and image digest; never the guest password or an enrolment token.
+	 */
+	| 'node.vm.create'
+	| 'node.vm.start'
+	| 'node.vm.stop'
+	| 'node.vm.destroy'
+	/** A stopped virtual computer's CPUs / memory changed (P3). */
+	| 'node.vm.resize'
+	/** A Container recreated from the current catalogue image, keeping its home (P3). */
+	| 'node.vm.rebuild'
+	/** The one-time reveal of a Windows VM's generated password — `revealed: true`, never the value (P2). */
+	| 'node.vm.password.reveal';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -308,7 +324,14 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.checkout.restore',
 	'node.port.open',
 	'node.port.preview.open',
-	'node.port.preview.close'
+	'node.port.preview.close',
+	'node.vm.create',
+	'node.vm.start',
+	'node.vm.stop',
+	'node.vm.destroy',
+	'node.vm.resize',
+	'node.vm.rebuild',
+	'node.vm.password.reveal'
 ];
 
 /**

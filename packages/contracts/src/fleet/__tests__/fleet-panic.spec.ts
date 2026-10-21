@@ -107,7 +107,14 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	// Servers and ports (FL-10, CONTRACTS §7).
 	'node.port.open',
 	'node.port.preview.open',
-	'node.port.preview.close'
+	'node.port.preview.close',
+	'node.vm.create',
+	'node.vm.start',
+	'node.vm.stop',
+	'node.vm.destroy',
+	'node.vm.resize',
+	'node.vm.rebuild',
+	'node.vm.password.reveal'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */
