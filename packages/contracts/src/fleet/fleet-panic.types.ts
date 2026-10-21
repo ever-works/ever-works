@@ -228,7 +228,13 @@ export type FleetAuditAction =
 	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
 	| 'node.port.preview.open'
 	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
-	| 'node.port.preview.close';
+	| 'node.port.preview.close'
+	/**
+	 * Tasks on computers (FL-15 P2, CONTRACTS §7) — **Use my Ever Works
+	 * identity** set a computer's global git `user.name` / `user.email`.
+	 * `details.fields` names what was set; never the email value (spec FR-15).
+	 */
+	| 'node.git.identity.set';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -308,7 +314,8 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.checkout.restore',
 	'node.port.open',
 	'node.port.preview.open',
-	'node.port.preview.close'
+	'node.port.preview.close',
+	'node.git.identity.set'
 ];
 
 /**
