@@ -9,6 +9,8 @@ import {
 import { agentsAPI } from '@/lib/api/agents';
 import { inboxAPI } from '@/lib/api/inbox';
 import { TaskDetailClient } from '@/components/tasks/TaskDetailClient';
+import { FixOnComputerSlot } from '@/components/fleet/tasks/FixOnComputerSlot';
+import { TaskFleetSection } from '@/components/fleet/tasks/TaskFleetSection';
 
 function errorMessage(err: unknown, fallback: string): string {
     return err instanceof Error ? err.message : fallback;
@@ -104,6 +106,9 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     return (
         <TaskDetailClient
             task={task}
+            // Tasks on computers (FL-15 P1): flag- and node-gated server pieces.
+            fleetAction={<FixOnComputerSlot taskId={task.id} taskSlug={task.slug} />}
+            fleetSection={<TaskFleetSection task={task} />}
             initialChat={chat.data ?? []}
             initialAttachments={attachments}
             initialGateRun={gateRun}

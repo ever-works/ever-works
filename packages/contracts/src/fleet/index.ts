@@ -30,3 +30,4 @@ export * from './fleet-session-status.types.js';
 export * from './fleet-session-rules.types.js';
 export * from './fleet-commands.types.js';
 export * from './fleet-task-workspace.types.js';
+export * from './fleet-task-handoff.types.js';

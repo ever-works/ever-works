@@ -20,6 +20,7 @@ import {
 } from './sessions-status.shared';
 import { SessionStateGlyph } from './SessionStateGlyph';
 import { SessionAttentionBox } from './SessionAttentionBox';
+import { SessionTaskChip } from '../tasks/SessionTaskChip';
 
 /**
  * The footer slots other epics fill (CONTRACTS §4.8, R-22), in their order:
@@ -195,7 +196,12 @@ export function SessionCard({
                 <span data-slot="computer">{nodeName}</span>
                 {slots?.gitLine && <span data-slot="gitLine">{slots.gitLine}</span>}
                 {slots?.prPill && <span data-slot="prPill">{slots.prPill}</span>}
-                {slots?.taskChip && <span data-slot="taskChip">{slots.taskChip}</span>}
+                {/* FL-15 P1 (spec FR-10): the Task this session's Run works on fills the taskChip slot. */}
+                {(slots?.taskChip || session.task) && (
+                    <span data-slot="taskChip">
+                        {slots?.taskChip ?? (session.task ? <SessionTaskChip task={session.task} /> : null)}
+                    </span>
+                )}
                 {elapsed && (
                     <span data-slot="elapsed" className="tabular-nums">
                         {t(`card.${elapsed.key}`, { span: elapsed.span })}

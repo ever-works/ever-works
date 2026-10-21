@@ -62,6 +62,7 @@ function listQuery(query: ListFleetSessionsQueryDto): FleetSessionListQuery {
     if (query.state) out.state = query.state;
     if (query.kind) out.kind = query.kind;
     if (query.agentId) out.agentId = query.agentId;
+    if (query.taskId) out.taskId = query.taskId;
     if (query.limit !== undefined) out.limit = query.limit;
     if (query.cursor) out.cursor = query.cursor;
     if (query.since) {
@@ -158,6 +159,7 @@ export class FleetSessionsController {
             ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
             ...(body.checkoutId !== undefined ? { checkoutId: body.checkoutId } : {}),
             ...(body.newWorktreeOf !== undefined ? { newWorktreeOf: body.newWorktreeOf } : {}),
+            ...(body.taskId !== undefined ? { taskId: body.taskId } : {}),
             ...(body.cols !== undefined ? { cols: body.cols } : {}),
             ...(body.rows !== undefined ? { rows: body.rows } : {}),
         }));

@@ -2,9 +2,12 @@ import { Injectable, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Agent } from '../../entities/agent.entity';
 import { AgentRun } from '../../entities/agent-run.entity';
+import { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import { FleetSession } from '../../entities/fleet-session.entity';
+import { Task } from '../../entities/task.entity';
 import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentRunRepository } from '../../database/repositories/agent-run.repository';
+import { FleetCheckoutRepository } from '../checkouts/fleet-checkout.repository';
 import { FleetModule } from '../fleet.module';
 import { FleetSessionRepository } from './fleet-session.repository';
 import { FleetSessionService } from './fleet-session.service';
@@ -13,6 +16,7 @@ import { FleetSessionAttentionDelivery } from './fleet-session-attention.deliver
 import { FLEET_SESSION_ATTENTION_SINK } from './fleet-session-attention.port';
 import { SessionNeedsYouProducer } from './session-needs-you.producer';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { FleetSessionTaskService } from './fleet-session-task.service';
 
 /**
  * Sessions on computers (FL-04) — the sweeper's one-member facade.
@@ -45,7 +49,14 @@ export class FleetSessionSweepService {
     // as FleetModule provides `ApiKeyRepository` — stateless, so a second
     // instance is harmless and this module needs no DatabaseModule).
     // FL-05: the session notifications (`NotificationService`).
-    imports: [FleetModule, NotificationsModule, TypeOrmModule.forFeature([FleetSession, Agent, AgentRun])],
+    // FL-15 P1: the Task a session works on and the checkout it starts in —
+    // their repositories provided here the same stateless way (FleetCheckoutsModule
+    // imports this module, so this one cannot import it back).
+    imports: [
+        FleetModule,
+        NotificationsModule,
+        TypeOrmModule.forFeature([FleetSession, Agent, AgentRun, Task, FleetCheckout]),
+    ],
     providers: [
         FleetSessionRepository,
         FleetSessionService,
@@ -59,6 +70,8 @@ export class FleetSessionSweepService {
         SessionNeedsYouProducer,
         AgentRepository,
         AgentRunRepository,
+        FleetSessionTaskService,
+        FleetCheckoutRepository,
     ],
     exports: [
         FleetSessionRepository,
@@ -66,6 +79,7 @@ export class FleetSessionSweepService {
         FleetSessionSweepService,
         FleetSessionStateService,
         FleetSessionAttentionDelivery,
+        FleetSessionTaskService,
     ],
 })
 export class FleetSessionsModule {}

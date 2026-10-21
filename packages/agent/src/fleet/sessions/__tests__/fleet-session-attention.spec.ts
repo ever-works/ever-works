@@ -109,6 +109,8 @@ function harness(options: { row?: FleetSession; stopped?: boolean; connected?: b
         undefined,
         undefined,
         undefined,
+        undefined,
+        undefined,
         state,
     );
     return { service, state, repo, port, audit, sink, current: () => current };
