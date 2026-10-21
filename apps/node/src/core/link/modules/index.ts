@@ -25,6 +25,12 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 */
 	session?: NodeModule;
 	/**
+	 * Commands on computers (FL-12) — the `command` family, built by the
+	 * runtime for a process started with `--manage` (`createCommandModule`).
+	 * Absent, every command channel is refused `unsupported_on_node`.
+	 */
+	command?: NodeModule;
+	/**
 	 * Fleet node link (FL-02 T-22) — the runtime's live-view leg broker. With
 	 * it, the `desktop` family module (`./desktop`) is composed, carrying a
 	 * view's leg over the link; without it the family stays unclaimed.
@@ -34,7 +40,7 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 
 /** Compose the link's own modules, every registered module, and any extras. */
 export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = {}): ComposedNodeModules {
-	const { extra = [], session, computerLegs, ...machineOptions } = options;
+	const { extra = [], session, command, computerLegs, ...machineOptions } = options;
 	let composed: ComposedNodeModules | null = null;
 	const machine = createMachineModule({
 		...machineOptions,
@@ -45,6 +51,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		machine,
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
+		...(command ? [command] : []),
 		...(computerLegs ? [createDesktopModule(computerLegs)] : []),
 		...extra
 	]);
@@ -55,6 +62,8 @@ export { controlModule, createLinkControlState, FLEET_MANAGED_CAPABILITY } from 
 export type { LinkControlStateHolder } from './control';
 export { createMachineModule, MACHINE_CHANNEL_MAX_IN_FLIGHT } from './machine';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
+export { createCommandModule, type CommandModuleOptions } from './command';
+export { CommandOutputStore } from './command/command-output-store';
 export {
 	composeNodeModules,
 	MachineVerbError,

@@ -619,6 +619,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 				}
 			: {}),
 		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {}),
+		// Commands on computers (FL-12): the last 30 runs' full output, beside the config.
+		commandOutputDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'commands'
+		),
 		// Fleet node link (FL-02 T-25): the self-update's report rides every
 		// beat, and every accepted beat's version verdict reaches it.
 		selfUpdateReport: () => selfUpdate?.report() ?? null,
