@@ -151,25 +151,25 @@
 
 ## P2.A — Docker module
 
-- [ ] **T-20**. Add `packages/contracts/src/fleet/fleet-docker.types.ts` (containers, images, run
+- [x] **T-20**. Add `packages/contracts/src/fleet/fleet-docker.types.ts` (containers, images, run
       request, compose shapes, name/ref patterns); export.
     - **Test**: `fleet-docker.spec.ts`.
-- [ ] **T-21**. Write `apps/node/src/core/link/modules/docker/docker-cli.ts` (argv builders, JSON-line
+- [x] **T-21**. Write `apps/node/src/core/link/modules/docker/docker-cli.ts` (argv builders, JSON-line (`modules/docker.ts` + `machine-facts/docker-cli.ts`)
       parsers, PATH lookup only), `containers.ts`, `images.ts`.
     - **Test**: `docker-cli.spec.ts`, `containers.spec.ts`, `images.spec.ts` (Engine + Desktop fixtures).
-- [ ] **T-22**. Write `run-request.ts` (allow-listed flags; mounts under FL-08's allowed roots or
+- [x] **T-22**. Write `run-request.ts` (allow-listed flags; mounts under FL-08's allowed roots or (`machine-facts/docker-ops.ts`, `stream.ts`; the run refusals live in the contracts validator; operations are FL-02's — decision 17)
       named volumes; refuse privileged / host namespaces / cap-add / socket; env names on argv,
       values through the child's environment) and `operations.ts` (FL-02 runner adapter, pull
       percent parser, last-20 records ≤ 1 MiB).
     - **Test**: `run-request.spec.ts` (every refusal; argv never contains a value), `operations.spec.ts`.
-- [ ] **T-23**. Write `apps/node/src/core/link/modules/docker/index.ts` (`docker.containers|images`,
+- [x] **T-23**. Write `apps/node/src/core/link/modules/docker/index.ts` (`docker.containers|images`,
       `docker.container.action` start/stop/restart/remove, `docker.run`, `docker.image.pull|remove|prune`);
       register when `docker` is detected.
     - **Test**: `index.spec.ts` — daemon down → `operation_failed` hint; remove in-use image → `busy`.
 
 ## P2.B — Docker API and service
 
-- [ ] **T-24**. Write `packages/agent/src/fleet/docker/fleet-docker.service.ts` and
+- [x] **T-24**. Write `packages/agent/src/fleet/docker/fleet-docker.service.ts` and (methods on `FleetMachineActionsService`, `FleetDockerController`)
       `apps/api/src/fleet/docker/fleet-docker.controller.ts` + `dto/` (routes per plan §5 — pull is
       `POST /nodes/:id/docker/images`, remove `POST …/images/:iid/remove`, prune
       `DELETE …/images?unused=true`, all §11.2 paths; container `remove` requires `confirmName`;
@@ -179,7 +179,7 @@
 
 ## P2.C — Docker web and Runs here
 
-- [ ] **T-25**. Write `apps/web/src/components/fleet/docker/` — `DockerTab.tsx`, `ContainersList.tsx`,
+- [x] **T-25**. Write `apps/web/src/components/fleet/docker/` — `DockerTab.tsx`, `ContainersList.tsx`, (`components/fleet/docker/`; `OperationCard` in `components/fleet/machine/`)
       `ImagesList.tsx`, `RunContainerDialog.tsx` (masked values, root-limited volume picker, command
       preview, disk-free line, cloud billing line via FL-17 `providerMeta`), `docker.shared.ts`,
       `docker-tab.registry.ts` (tab through `registerComputerTab`, palette through FL-01's
@@ -190,7 +190,7 @@
 
 ## P2.D — Docker tools, i18n, e2e
 
-- [ ] **T-26**. Write `packages/agent/src/fleet/docker/agent-fleet-docker-tools.ts`
+- [x] **T-26**. Write `packages/agent/src/fleet/docker/agent-fleet-docker-tools.ts` (tools + held Approvals; MCP entries deferred with P1's — owner question 2; Playwright: follow-up)
       (`fleet_docker_containers_list`, `fleet_docker_container_action`, `fleet_docker_run`,
       `fleet_docker_images_list`, `fleet_docker_image_action`; annotations per plan §9; Approvals for
       `remove`/`prune` below trust); MCP whitelist entries; `fleet.docker.*` i18n;

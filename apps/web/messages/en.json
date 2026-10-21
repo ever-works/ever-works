@@ -14093,6 +14093,120 @@
                 "saved": "Saved.",
                 "failed": "Could not switch the preview browser."
             }
+        },
+        "operations": {
+            "cancelled": "{title} — stopped",
+            "interrupted": "{title} — the computer went away before it finished",
+            "failed": "{title} — failed: {hint}",
+            "reconnecting": "Reconnecting…",
+            "stop": "Stop",
+            "retry": "Retry",
+            "dismiss": "Dismiss"
+        },
+        "docker": {
+            "title": "Docker",
+            "family": "Docker",
+            "tabs": {
+                "containers": "Containers ({count})",
+                "images": "Images ({count})",
+                "compose": "Compose"
+            },
+            "runContainer": "Run a container",
+            "run": "Run",
+            "pull": "Pull",
+            "pullLabel": "Image to pull",
+            "removeUnused": "Remove unused",
+            "removeUnusedCount": "Remove unused ({count} · {size})",
+            "logs": "Logs",
+            "working": "working…",
+            "ownerOnly": "Only the owner of {name} can change its containers and images.",
+            "notInstalled": "Docker is not installed on {name}.",
+            "installLink": "How to install Docker",
+            "daemonDown": "Docker is installed but not running on {name}.",
+            "startDocker": "Start Docker from the Services tab",
+            "noContainers": "No containers on {name} yet.",
+            "done": "{action}: {name}.",
+            "actionFailed": "That did not work on the computer.",
+            "actionFailedWith": "That did not work: {hint}",
+            "running": "Running {image} on {name}",
+            "ran": "Ran {image}",
+            "pulling": "Pulling {ref} on {name}",
+            "pulled": "Pulled {ref}",
+            "pruning": "Removing unused images on {name}",
+            "pruned": "Removed unused images",
+            "nothingToRemove": "Nothing to remove — every image on {name} is in use.",
+            "imageRemoved": "Removed {name}.",
+            "act": {
+                "start": "Start",
+                "stop": "Stop",
+                "restart": "Restart",
+                "remove": "Remove"
+            },
+            "columns": {
+                "name": "Name",
+                "image": "Image",
+                "state": "State",
+                "ports": "Ports",
+                "cpu": "CPU",
+                "memory": "Memory",
+                "project": "Compose",
+                "actions": "Actions"
+            },
+            "images": {
+                "empty": "No images on {name}.",
+                "usedBy": "used by {count}",
+                "unused": "unused",
+                "inUseHint": "A container uses this image; remove the container first.",
+                "columns": {
+                    "tag": "Image",
+                    "id": "Id",
+                    "size": "Size",
+                    "age": "Age",
+                    "used": "In use"
+                }
+            },
+            "dialog": {
+                "title": "{action} {name} on {machine}?",
+                "removeBody": "The container is removed. Its anonymous volumes are kept; named volumes are never removed from here.",
+                "pullTitle": "Pull {ref} on {machine}?",
+                "removeImageTitle": "Remove {name} from {machine}?",
+                "pruneTitle": "Remove every unused image from {machine}?",
+                "pruneBody": "{count} images that no container uses ({size}) are removed."
+            },
+            "runDialog": {
+                "title": "Run a container on {name}",
+                "pullsNote": "Pulls the image if it is not on {name} yet.",
+                "image": "Image",
+                "name": "Name",
+                "ports": "Ports (host → container)",
+                "hostPort": "Host port",
+                "containerPort": "Container port",
+                "addPort": "Add a port",
+                "env": "Environment",
+                "envNote": "Values are never stored or shown again.",
+                "envName": "Name",
+                "envValue": "Value",
+                "addEnv": "Add a variable",
+                "volumes": "Volumes",
+                "volumesNote": "A named volume, or a folder under the shared folders of {name}.",
+                "volumeSource": "Volume or folder",
+                "volumeTarget": "Path in the container",
+                "readOnly": "read-only",
+                "addVolume": "Add a volume",
+                "restart": "Restart policy",
+                "command": "Command",
+                "preview": "It runs",
+                "removeRow": "Remove this row",
+                "cancel": "Cancel",
+                "run": "Run"
+            },
+            "compose": {
+                "arrives": "Compose projects arrive with the next update."
+            },
+            "runsHere": {
+                "title": "Runs here",
+                "open": "Docker"
+            }
         }
     }
 }
