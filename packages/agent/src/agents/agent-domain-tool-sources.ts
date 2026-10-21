@@ -18,6 +18,7 @@ import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.ser
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
+import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
@@ -171,6 +172,16 @@ export interface AgentFleetCommandToolSource {
     service: Pick<FleetCommandService, 'listRecent' | 'get' | 'cancel'>;
 }
 
+/**
+ * FL-15 P3 — Tasks on computers (`fleet/agent-fleet-task-tools.ts`): the
+ * hand-off options and the git identity check. Each half is optional; the
+ * builder offers nothing while FLEET_CHECKOUTS_ENABLED is off.
+ */
+export interface AgentFleetTaskToolSource {
+    handoff?: FleetTaskHandoffToolPort | null;
+    identity?: FleetGitIdentityToolPort | null;
+}
+
 /** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
 export interface AgentFleetSessionToolSource {
     service: FleetSessionsToolService['service'];
@@ -304,6 +315,8 @@ export interface AgentDomainToolSources {
     fleetSessions?: AgentFleetSessionToolSource;
     /** FL-12 P2 — bound only while FLEET_COMMANDS_ENABLED is on. */
     fleetCommands?: AgentFleetCommandToolSource;
+    /** FL-15 P3 — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_*`. */
+    fleetTasks?: AgentFleetTaskToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

@@ -67,6 +67,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
@@ -680,6 +681,20 @@ export class AgentToolService {
                             : null,
                     service: fleetCommands.service,
                     proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-15 P3 — Tasks on computers: the hand-off options (the start is
+        // `fleet_sessions_start` with `taskId`) and the git identity check.
+        if (sources.fleetTasks) {
+            const fleetTasks = sources.fleetTasks;
+            add('fleet-tasks', () =>
+                buildFleetTaskTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    handoff: fleetTasks.handoff ?? null,
+                    identity: fleetTasks.identity ?? null,
                 }),
             );
         }

@@ -56,4 +56,6 @@ export * from './machine';
 export * from './checkouts';
 // Tasks on computers (FL-15 P2) — a computer's global git identity.
 export * from './git';
+// Tasks on computers (FL-15 P3) — the hand-off and identity Agent tools.
+export * from './agent-fleet-task-tools';
 export * from './ports';

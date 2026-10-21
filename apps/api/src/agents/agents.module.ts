@@ -133,11 +133,15 @@ import {
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
+    FleetGitIdentityService,
     FleetPortTunnelService,
     FleetService,
     FleetSessionService,
 } from '@ever-works/agent/fleet';
 import { config } from '@ever-works/agent/config';
+// Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
+// (global through FleetTasksApiModule; optional below).
+import { FleetTaskHandoffService } from '../fleet/tasks/fleet-task-handoff.service';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
@@ -2142,6 +2146,11 @@ async function assertRealWriteTarget(
                 // Servers and ports, phase 2 — backs `fleet_ports_preview_open|close`.
                 // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
                 { token: FleetPortTunnelService, optional: true },
+                // Tasks on computers (FL-15 P3) — backs `fleet_tasks_handoff_options` and
+                // `fleet_nodes_git_identity_*`. APPENDED LAST (positional), optional:
+                // unbound (or FLEET_CHECKOUTS_ENABLED off) the tools are not offered.
+                { token: FleetTaskHandoffService, optional: true },
+                { token: FleetGitIdentityService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2171,6 +2180,8 @@ async function assertRealWriteTarget(
                 checkouts?: FleetCheckoutService | null,
                 fleetCommands?: FleetCommandService | null,
                 fleetPortTunnels?: FleetPortTunnelService | null,
+                fleetTaskHandoff?: FleetTaskHandoffService | null,
+                fleetGitIdentity?: FleetGitIdentityService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2203,6 +2214,19 @@ async function assertRealWriteTarget(
                     : {}),
                 ...(fleetCommands && config.fleet.isCommandsEnabled()
                     ? { fleetCommands: { service: fleetCommands } }
+                    : {}),
+                ...((fleetTaskHandoff || fleetGitIdentity) && config.fleet.isCheckoutsEnabled()
+                    ? {
+                          fleetTasks: {
+                              handoff: fleetTaskHandoff
+                                  ? {
+                                        options: (userId: string, taskId: string, agentId: string | null) =>
+                                            fleetTaskHandoff.options(userId, taskId, agentId),
+                                    }
+                                  : null,
+                              identity: fleetGitIdentity ?? null,
+                          },
+                      }
                     : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
