@@ -920,6 +920,16 @@ export class FleetSessionService {
         if (!isFleetSessionLive(session.state)) {
             throw fleetSessionError('invalid', 'the session has ended; restart it first', { state: session.state });
         }
+        // FL-05 (FR-30): an Agent never answers a permission prompt — and an action typed while
+        // one is open WOULD be read as the answer (spec U7), so an Agent's action waits for a person.
+        if (actor.agentId && session.state === 'needs_you') {
+            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            if (attention?.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+        }
         if (await this.isStopped()) throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
         if (!this.node?.isConnected(session.nodeId)) {
             throw fleetSessionError('unreachable', 'the computer is not connected', { nodeId: session.nodeId });

@@ -137,6 +137,11 @@ export class FleetPullRequestService {
 
         // FR-18, U11: an Agent opens pull requests only with its owner's permission.
         const agentId = caller.run?.agentId ?? (caller.run ? session?.agentId : null) ?? null;
+        if (caller.run && !agentId) {
+            throw fleetSessionError('permission_denied', 'only an Agent session may open a pull request this way', {
+                permission: 'canOpenPullRequests',
+            });
+        }
         let agentName: string | null = null;
         if (agentId) {
             const agent = this.agents ? await this.agents.findById(agentId).catch(() => null) : null;
