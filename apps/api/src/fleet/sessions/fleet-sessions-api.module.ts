@@ -4,8 +4,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import {
     AGENT_SESSION_DISPATCHER,
     FLEET_SESSION_NODE_PORT,
+    FLEET_SESSION_RECORDER,
     FleetSessionsModule,
 } from '@ever-works/agent/fleet';
+import { TerminalTranscriptModule } from '@ever-works/agent/agents';
+import { FleetSessionRecorderService } from './fleet-session-recorder.service';
+import { FleetSessionRecordingService } from './fleet-session-recording.service';
 import { FleetApiModule } from '../fleet.module';
 import { agentSessionDispatcherProvider } from './agent-session.dispatcher.provider';
 import { AgentSessionJobListener } from './agent-session-job.listener';
@@ -47,7 +51,8 @@ import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
 @Module({
     // P2: FleetApiModule for the node job runtime's dispatcher factory (the
     // `agent-session` job); it does not import this module, so no cycle.
-    imports: [FleetSessionsModule, DatabaseModule, FleetApiModule],
+    // P3: TerminalTranscriptModule for the recordings (persist, page, stats).
+    imports: [FleetSessionsModule, DatabaseModule, FleetApiModule, TerminalTranscriptModule],
     controllers: [FleetSessionsController],
     providers: [
         FleetSessionLinkAdapter,
@@ -60,11 +65,16 @@ import { FleetSessionsEnabledGuard } from './fleet-sessions-enabled.guard';
         // P2: Agent sessions — the job dispatch port and its lifecycle listener.
         agentSessionDispatcherProvider,
         AgentSessionJobListener,
+        // P3: recording — the recorder (bound to the session service's port)
+        // and the manifest / page reader.
+        FleetSessionRecorderService,
+        { provide: FLEET_SESSION_RECORDER, useExisting: FleetSessionRecorderService },
+        FleetSessionRecordingService,
         DistributedTaskLockService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetSessionsEnabledGuard,
     ],
-    exports: [FLEET_SESSION_NODE_PORT, AGENT_SESSION_DISPATCHER, FleetSessionsModule],
+    exports: [FLEET_SESSION_NODE_PORT, AGENT_SESSION_DISPATCHER, FLEET_SESSION_RECORDER, FleetSessionsModule],
 })
 export class FleetSessionsApiModule {}

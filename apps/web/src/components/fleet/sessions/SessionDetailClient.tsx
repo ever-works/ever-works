@@ -11,6 +11,7 @@ import {
     type FleetSessionAttachRole,
     type FleetSessionView,
 } from '@ever-works/contracts';
+import { useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
@@ -24,6 +25,7 @@ import { SessionEndDialog } from './SessionEndDialog';
 import { SessionFooter } from './SessionFooter';
 import { SessionHeader } from './SessionHeader';
 import { SessionRenameDialog } from './SessionRenameDialog';
+import { SessionReplayPlayer } from './SessionReplayPlayer';
 import { SessionShortcutSheet } from './SessionShortcutSheet';
 import { SessionStartDialog } from './SessionStartDialog';
 import { SessionTerminal } from './SessionTerminal';
@@ -87,6 +89,17 @@ export function SessionDetailClient({
     const [sheet, setSheet] = useState(false);
     const [starting, setStarting] = useState(false);
     const rendererRef = useRef<TerminalRenderer | null>(null);
+    // P3: `?rewatch=1` (the Run receipt's link) opens the player straight away.
+    const searchParams = useSearchParams();
+    const [rewatch, setRewatch] = useState(searchParams?.get('rewatch') === '1');
+    const [recordingBusy, setRecordingBusy] = useState(false);
+    const toggleRecording = async () => {
+        setRecordingBusy(true);
+        const result = await sessionsClient.setRecording(session.id, session.recordingState !== 'recording');
+        setRecordingBusy(false);
+        if (result.ok) setSession(result.data);
+        else toast.error(result.error.hint ? t('actions.failed', { hint: result.error.hint }) : t('actions.failedGeneric'));
+    };
     const takeKeyboardRef = useRef<HTMLDivElement | null>(null);
 
     const refresh = useCallback(async () => {
@@ -274,6 +287,11 @@ export function SessionDetailClient({
                     ) : (
                         <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('detail.noLastScreen')}</p>
                     )}
+                    {!rewatch && (
+                        <Button size="sm" variant="secondary" onClick={() => setRewatch(true)} data-testid="fleet-session-rewatch">
+                            {t('detail.rewatch')}
+                        </Button>
+                    )}
                     {ended && (
                         <p className="text-sm text-text dark:text-text-dark" data-testid="fleet-session-ended-line" data-reason={session.endedReason ?? ''}>
                             {t(`detail.${ended.key}`, {
@@ -285,6 +303,8 @@ export function SessionDetailClient({
                     )}
                 </section>
             )}
+
+            {rewatch && <SessionReplayPlayer sessionId={session.id} title={session.title} nodeName={nodeName} />}
 
             {live && agentCli && attach.role === 'driver' && (
                 <SessionComposer providerName={providerName} disabled={attach.state !== 'attached' || attach.paused !== null} onSend={attach.sendInput} />
@@ -299,6 +319,24 @@ export function SessionDetailClient({
                 bytesPerSecond={attach.bytesPerSecond}
                 nodeName={nodeName}
                 isolatedAgentName={session.kind === 'agent' ? (agentName ?? t('kinds.agent')) : null}
+                recordingSlot={
+                    live ? (
+                        <span className="inline-flex items-center gap-2" data-testid="fleet-session-recording">
+                            <span>
+                                {session.recordingState === 'recording' ? `● ${t('detail.recording')}` : t('detail.notRecordingNow')}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => void toggleRecording()}
+                                disabled={recordingBusy}
+                                className="underline hover:no-underline disabled:opacity-50"
+                                data-testid="fleet-session-recording-toggle"
+                            >
+                                {session.recordingState === 'recording' ? t('detail.recordOff') : t('detail.recordOn')}
+                            </button>
+                        </span>
+                    ) : null
+                }
             />
 
             <SessionEndDialog
