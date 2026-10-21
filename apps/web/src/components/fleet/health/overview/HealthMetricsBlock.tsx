@@ -112,6 +112,9 @@ export default function HealthMetricsBlock({ nodes, flags }: FleetOverviewBlockP
         setRefresh(null);
         setAttempt((value) => value + 1);
     };
+    // After a wake answered: read again, keeping what is on screen until the
+    // new answer lands, so "win-lab is back" stays readable.
+    const readAgain = () => setAttempt((value) => value + 1);
 
     return (
         <div className="space-y-3">
@@ -136,7 +139,7 @@ export default function HealthMetricsBlock({ nodes, flags }: FleetOverviewBlockP
                     availability={view.wake}
                     sendWake={sendWake}
                     readStatus={readWakeStatus}
-                    onBack={reload}
+                    onBack={readAgain}
                 />
             ) : null}
         </div>

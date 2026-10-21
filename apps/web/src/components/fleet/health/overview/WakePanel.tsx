@@ -34,6 +34,11 @@ export interface WakePanelProps {
     clearTimer?: (handle: unknown) => void;
 }
 
+// Module-level, so the defaults keep one identity across renders: the timer
+// cleanup below runs only on unmount, never because a parent re-rendered.
+const defaultSetTimer = (callback: () => void, ms: number): unknown => setTimeout(callback, ms);
+const defaultClearTimer = (handle: unknown): void => clearTimeout(handle as ReturnType<typeof setTimeout>);
+
 /**
  * Where a wake is:
  *  - `idle` — nothing sent (or a refusal to show);
@@ -72,8 +77,8 @@ export function WakePanel({
     sendWake,
     readStatus,
     onBack,
-    setTimer = (callback, ms) => setTimeout(callback, ms),
-    clearTimer = (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+    setTimer = defaultSetTimer,
+    clearTimer = defaultClearTimer,
 }: WakePanelProps) {
     const t = useTranslations('fleet.wake');
     const tHealth = useTranslations('fleet.health');
@@ -85,10 +90,16 @@ export function WakePanel({
     const timers = useRef<unknown[]>([]);
     const alive = useRef(true);
 
+    // The latest clear, read through a ref so neither the unmount cleanup nor
+    // the checkpoints depend on the caller passing a stable function.
+    const clearTimerRef = useRef(clearTimer);
+    useEffect(() => {
+        clearTimerRef.current = clearTimer;
+    });
     const clearAll = useCallback(() => {
-        for (const handle of timers.current) clearTimer(handle);
+        for (const handle of timers.current) clearTimerRef.current(handle);
         timers.current = [];
-    }, [clearTimer]);
+    }, []);
 
     useEffect(() => {
         alive.current = true;
