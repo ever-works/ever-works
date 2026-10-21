@@ -129,8 +129,8 @@ export function FilesOperationsStrip({
                                     : view.kind === 'copy'
                                       ? t('copy', {
                                             label: view.label,
-                                            from: nodeName,
-                                            to: view.peerNodeId ?? '',
+                                            from: view.nodeName ?? nodeName,
+                                            to: view.peerNodeName ?? view.peerNodeId ?? '',
                                         })
                                       : t('upload', { label: view.label, node: nodeName })}
                             </span>

@@ -38,6 +38,7 @@ import { FLEET_FILES_DOCS_URL } from '../fleet-links';
 import { CopyCommand } from '../link/CopyCommand';
 import type { FleetComputerTabProps } from '../registry';
 import { readSessionError } from '../sessions/sessions.shared';
+import { FilesCopyDialog, type FilesCopyTarget } from './FilesCopyDialog';
 import { FilesConflictDialog, FilesCredentialDialog, FilesDeleteDialog } from './FilesDialogs';
 import { FilesGrid } from './FilesGrid';
 import { FilesOperationsStrip, type LocalUpload } from './FilesOperationsStrip';
@@ -94,12 +95,17 @@ export default function FilesTab({ node }: FleetComputerTabProps) {
         names: string[];
         count: number;
         entries: string[];
+        /** P2: a credential-shaped file inside a copy asks the same way. */
+        copy?: { target: FilesCopyTarget; policy: FleetFilesWritePolicy };
     } | null>(null);
     const [conflicts, setConflicts] = useState<{
         items: FleetFileConflictView[];
         picks: UploadPick[];
         total: number;
+        /** P2: conflicts at a copy's destination (the picks are then empty). */
+        copy?: { target: FilesCopyTarget; names: string[] };
     } | null>(null);
+    const [copying, setCopying] = useState<string[] | null>(null);
     const [deleting, setDeleting] = useState<{ names: string[]; expected: string } | null>(null);
     const [deletePending, setDeletePending] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -485,6 +491,89 @@ export default function FilesTab({ node }: FleetComputerTabProps) {
         }
     };
 
+    // ─── Copy between computers (P2, FR-24…FR-29) ────────────────────────
+
+    /** The copy itself (202): the Operations strip of both computers follows it. */
+    const sendCopy = async (
+        names: string[],
+        target: FilesCopyTarget,
+        policy: FleetFilesWritePolicy,
+        confirm: boolean,
+    ) => {
+        if (!root) return;
+        try {
+            const response = await browserApiFetch(filesApiPath(node.id, 'copy'), {
+                method: 'POST',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    root: root.id,
+                    path,
+                    entries: names,
+                    to: { nodeId: target.nodeId, root: target.root, path: target.path },
+                    ...(policy.replaceAll ? { replaceAll: true } : {}),
+                    ...(policy.replace ? { replace: policy.replace } : {}),
+                    ...(confirm ? { confirm: true } : {}),
+                }),
+            });
+            const body = (await response.json().catch(() => null)) as unknown;
+            if (!response.ok) {
+                const read = readSessionError(response.status, body);
+                if (read.code === 'confirmation_required' && !confirm) {
+                    const named = Array.isArray(read.details.credentialShaped)
+                        ? (read.details.credentialShaped as string[])
+                        : [];
+                    const count =
+                        typeof read.details.count === 'number' ? read.details.count : named.length;
+                    setCredential({
+                        names: named,
+                        count,
+                        entries: names,
+                        copy: { target, policy },
+                    });
+                    return;
+                }
+                setAnnouncement(t('operations.failed', { hint: read.hint ?? read.code }));
+                return;
+            }
+            setAnnouncement(t('copy.started', { count: names.length, node: target.nodeName }));
+            void loadTransfers();
+        } catch {
+            setAnnouncement(t('states.unreachable', { node: node.name }));
+        }
+    };
+
+    /** Same-name entries at the destination are listed first (FR-26); nothing moves until the person chooses. */
+    const startCopy = async (names: string[], target: FilesCopyTarget) => {
+        try {
+            const response = await browserApiFetch(filesApiPath(target.nodeId, 'conflicts'), {
+                method: 'POST',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ root: target.root, path: target.path, names }),
+            });
+            const body = (await response.json().catch(() => null)) as unknown;
+            if (!response.ok) {
+                const read = readSessionError(response.status, body);
+                setAnnouncement(read.hint ?? t('errors.generic', { hint: read.code }));
+                return;
+            }
+            const found = (body as FleetFileConflictView[]) ?? [];
+            if (found.length > 0) {
+                setConflicts({
+                    items: found,
+                    picks: [],
+                    total: names.length,
+                    copy: { target, names },
+                });
+                return;
+            }
+            await sendCopy(names, target, {}, false);
+        } catch {
+            setAnnouncement(t('states.unreachable', { node: target.nodeName }));
+        }
+    };
+
     const cancelTransfer = async (view: FleetFilesOperationView) => {
         const query = view.operationId
             ? `?operationId=${encodeURIComponent(view.operationId)}`
@@ -700,7 +789,13 @@ export default function FilesTab({ node }: FleetComputerTabProps) {
                         <FolderUp className="w-4 h-4" aria-hidden="true" />
                         {t('actions.uploadFolder')}
                     </Button>
-                    <Button size="sm" variant="secondary" disabled title={t('actions.copySoon')}>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={selection.length === 0 || tooMany}
+                        onClick={() => setCopying(selection.map((entry) => entry.name))}
+                        data-testid="fleet-files-copy-open"
+                    >
                         <ArrowLeftRight className="w-4 h-4" aria-hidden="true" />
                         {t('actions.copy')}
                     </Button>
@@ -781,11 +876,14 @@ export default function FilesTab({ node }: FleetComputerTabProps) {
                     open
                     names={credential.names}
                     count={credential.count}
+                    copy={Boolean(credential.copy)}
                     onCancel={() => setCredential(null)}
                     onConfirm={() => {
                         const names = credential.entries;
+                        const copy = credential.copy;
                         setCredential(null);
-                        startDownload(names, true);
+                        if (copy) void sendCopy(names, copy.target, copy.policy, true);
+                        else startDownload(names, true);
                     }}
                 />
             )}
@@ -794,13 +892,36 @@ export default function FilesTab({ node }: FleetComputerTabProps) {
                     open
                     conflicts={conflicts.items}
                     total={conflicts.total}
-                    folder={folderLabel}
-                    nodeName={node.name}
+                    folder={
+                        conflicts.copy
+                            ? conflicts.copy.target.rootLabel +
+                              (conflicts.copy.target.path ? ' / ' + conflicts.copy.target.path : '')
+                            : folderLabel
+                    }
+                    nodeName={conflicts.copy ? conflicts.copy.target.nodeName : node.name}
                     onCancel={() => setConflicts(null)}
                     onConfirm={(policy) => {
                         const picks = conflicts.picks;
+                        const copy = conflicts.copy;
                         setConflicts(null);
-                        sendUpload(picks, policy);
+                        if (copy) void sendCopy(copy.names, copy.target, policy, false);
+                        else sendUpload(picks, policy);
+                    }}
+                />
+            )}
+            {copying && (
+                <FilesCopyDialog
+                    open
+                    source={{ id: node.id, name: node.name }}
+                    names={copying}
+                    bytes={entries
+                        .filter((entry) => copying.includes(entry.name))
+                        .reduce((sum, entry) => sum + (entry.kind === 'file' ? entry.size : 0), 0)}
+                    onCancel={() => setCopying(null)}
+                    onSubmit={(target) => {
+                        const names = copying;
+                        setCopying(null);
+                        void startCopy(names, target);
                     }}
                 />
             )}
