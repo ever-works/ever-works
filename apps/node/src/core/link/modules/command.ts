@@ -2,6 +2,7 @@ import {
 	encodeFleetLinkExit,
 	FleetCommandEdgeBuffer,
 	FLEET_COMMAND_CANCEL_EXIT_CODE,
+	FLEET_COMMAND_DATA_CHUNK_BYTES,
 	FLEET_COMMAND_STOPPED_EXIT_CODE,
 	FLEET_COMMAND_TIMEOUT_EXIT_CODE,
 	FLEET_LINK_FRAME_KINDS,
@@ -40,6 +41,8 @@ import type { NodeChannelContext, NodeChannelHandler, NodeModule } from './regis
  *    10 MiB — then `command.truncated`), `command.timeout` when the timeout
  *    fired, `command.output` (the head and tail this machine kept, how it
  *    ended), `EXIT [code]` and `channel.close`.
+ *  - `command.read { runId }` (P2, "Open full output") — the run's kept
+ *    output from this machine's store, as `DATA` then `END` on its own channel.
  *  - `command.cancel { runId }` — on ANY command channel (the platform opens a
  *    short-lived one, so a cancel works from whichever API replica took it):
  *    the run is found by its id and its tree ended; its own channel reports
@@ -237,6 +240,45 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 			deliverEnd();
 		}
 
+		/** Stream one run's kept output: the reply (its size), `DATA` chunks, `END`, then close. */
+		async function read(requestId: unknown, runId: string): Promise<void> {
+			if (!options.store) {
+				reply(requestId, {
+					error: makeFleetLinkError('not_found', `${options.nodeName} keeps no full output of commands`)
+				});
+				return;
+			}
+			const stream = await options.store.read(runId);
+			if (!stream) {
+				reply(requestId, {
+					error: makeFleetLinkError('not_found', `the full output of this run is no longer on ${options.nodeName}`)
+				});
+				return;
+			}
+			reply(requestId, { result: { bytes: await options.store.size(runId) } });
+			for await (const raw of stream as AsyncIterable<Buffer>) {
+				if (closed) {
+					stream.destroy();
+					return;
+				}
+				for (let offset = 0; offset < raw.byteLength; offset += FLEET_COMMAND_DATA_CHUNK_BYTES) {
+					const piece = raw.subarray(offset, Math.min(raw.byteLength, offset + FLEET_COMMAND_DATA_CHUNK_BYTES));
+					if (!context.sendBinary(FLEET_LINK_FRAME_KINDS.DATA, new Uint8Array(piece))) {
+						stream.destroy();
+						if (!closed) {
+							closed = true;
+							context.close('unreachable', 'the link went away while the output was sent');
+						}
+						return;
+					}
+				}
+			}
+			if (closed) return;
+			context.sendBinary(FLEET_LINK_FRAME_KINDS.END, new Uint8Array(0));
+			closed = true;
+			context.close('normal');
+		}
+
 		return {
 			resumeKey: `command-${params.runId}-${context.channel}`,
 			onJson(message) {
@@ -268,6 +310,18 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 					void run(requestId, parsed).catch((error: unknown) => {
 						options.logger?.warn(`Commands: a run failed unexpectedly: ${describe(error)}`);
 						reply(requestId, { error: makeFleetLinkError('operation_failed', 'the command could not run') });
+					});
+					return;
+				}
+				if (verb === 'command.read') {
+					// "Open full output" (P2): the kept file of one run, streamed on this channel.
+					const runId = typeof request.runId === 'string' ? request.runId : params.runId;
+					void read(requestId, runId).catch((error: unknown) => {
+						options.logger?.warn(`Commands: reading a run's output failed: ${describe(error)}`);
+						if (!closed) {
+							closed = true;
+							context.close('operation_failed', 'the output could not be read');
+						}
 					});
 					return;
 				}

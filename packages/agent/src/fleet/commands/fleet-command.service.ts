@@ -340,7 +340,7 @@ export class FleetCommandService implements OnModuleDestroy {
     async lastRunForNode(
         nodeId: string,
         actor: FleetCommandActor,
-    ): Promise<{ command: string; run: FleetCommandRunView } | null> {
+    ): Promise<{ commandId: string; command: string; run: FleetCommandRunView } | null> {
         try {
             await this.access.resolveForFamily(nodeId, actor.userId, 'commands');
         } catch (error) {
@@ -355,6 +355,7 @@ export class FleetCommandService implements OnModuleDestroy {
         if (!command || command.userId !== actor.userId) return null;
         const names = await this.namesFor([nodeId]);
         return {
+            commandId: command.id,
             command: command.command,
             run: toFleetCommandRunView(run, names.get(nodeId) ?? null, this.now(), (id) =>
                 this.isConnected(id),

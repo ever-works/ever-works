@@ -13585,7 +13585,10 @@
                 "copied": "Copied",
                 "fullOutput": "Open full output",
                 "fullOutputSoon": "The full output is kept on the computer; opening it arrives soon",
-                "fullOutputOffline": "The full output is on {name}, which is offline"
+                "fullOutputOffline": "The full output is on {name}, which is offline",
+                "fullOutputNone": "The computer did not keep the full output of this run",
+                "fullOutputLoading": "Reading…",
+                "fullOutputFailed": "The full output could not be read."
             },
             "summary": {
                 "running": "{running} of {total} running",
@@ -13605,6 +13608,15 @@
                 "generic": "The command could not be sent.",
                 "withHint": "{hint}",
                 "network": "Ever Works could not be reached. Try again."
+            },
+            "menu": {
+                "runCommand": "Run a command…",
+                "notAllowed": "The owner of {name} has not allowed you to run commands on it"
+            },
+            "last": {
+                "label": "Last command:",
+                "ago": "{time} ago",
+                "open": "Commands"
             }
         },
         "sessions": {

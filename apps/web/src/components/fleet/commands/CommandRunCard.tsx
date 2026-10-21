@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { FleetCommandRunView } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
+import { commandsClient } from './commands.client';
 import { commandCardEnd, commandCardText } from './commands.shared';
 
 const TONE_CLASS: Record<'neutral' | 'success' | 'danger' | 'warning', string> = {
@@ -18,12 +19,16 @@ const TONE_CLASS: Record<'neutral' | 'success' | 'danger' | 'warning', string> =
  * card: its name, how it ended (✓ and the duration, `Exit N`, timed out,
  * stopped by the kill switch, connection lost, the refusal's hint), the
  * stored head and tail with the truncation marker, and Expand · Copy · Open
- * full output (the last arrives with P2; until then it is disabled with why).
+ * full output (P2: read from the computer and saved as a file; disabled with
+ * why while it runs or when the computer kept none, and the refusal — "the
+ * full output is on build-02, which is offline" — shown under the card).
  */
 export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunView; focused?: boolean }) {
     const t = useTranslations('fleet.commands.card');
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [fetching, setFetching] = useState(false);
+    const [fullError, setFullError] = useState<string | null>(null);
     const end = commandCardEnd(run);
     const text = commandCardText(run);
     const name = run.nodeName ?? t('removed');
@@ -39,6 +44,27 @@ export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunV
             setCopied(false);
         }
     };
+
+    /** "Open full output" (P2): read from the computer, saved as a file. */
+    const onFullOutput = async () => {
+        setFetching(true);
+        setFullError(null);
+        const result = await commandsClient.fullOutput(run.commandId, run.id);
+        setFetching(false);
+        if (!result.ok) {
+            setFullError(result.error.hint ?? t('fullOutputFailed'));
+            return;
+        }
+        const url = URL.createObjectURL(result.blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = result.filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    };
+    const fullOutputReady = run.hasFullOutput && run.status !== 'running';
 
     return (
         <article
@@ -89,13 +115,25 @@ export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunV
                 <Button
                     variant="ghost"
                     size="sm"
-                    disabled
-                    title={run.linkDown ? t('fullOutputOffline', { name }) : t('fullOutputSoon')}
+                    disabled={!fullOutputReady || fetching}
+                    title={
+                        run.linkDown
+                            ? t('fullOutputOffline', { name })
+                            : fullOutputReady
+                              ? undefined
+                              : t('fullOutputNone')
+                    }
+                    onClick={() => void onFullOutput()}
                     data-testid="fleet-command-card-full-output"
                 >
-                    {t('fullOutput')}
+                    {fetching ? t('fullOutputLoading') : t('fullOutput')}
                 </Button>
             </footer>
+            {fullError && (
+                <p role="alert" className="mt-1 text-xs text-danger" data-testid="fleet-command-card-full-output-error">
+                    {fullError}
+                </p>
+            )}
         </article>
     );
 }

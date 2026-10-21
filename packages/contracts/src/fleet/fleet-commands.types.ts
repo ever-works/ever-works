@@ -307,6 +307,15 @@ export interface FleetCommandListResponse {
 }
 
 /**
+ * `GET /api/fleet/nodes/:id/commands/last` (P2, spec §5.3): the latest run of
+ * the person's own Commands on one computer — "Last command: `uptime` · ✓ ·
+ * 3 min ago" on its Overview — or `{ last: null }`.
+ */
+export interface FleetCommandLastRunResponse {
+	last: { commandId: string; command: string; run: FleetCommandRunView } | null;
+}
+
+/**
  * The run summary every surface prints: "All done · 0.9 s", "1 of 2 failed ·
  * 1.2 s", "2 running". Counts only; the words are the surface's own.
  */
@@ -524,13 +533,18 @@ export function boundFleetCommandEdge(value: unknown): string {
 
 // ─── Link messages (CONTRACTS §3.3 `command` family) ────────────────────────
 
-/** Requests the platform sends on a `command` channel. */
-export const FLEET_COMMAND_LINK_VERBS = ['command.run', 'command.cancel'] as const;
+/**
+ * Requests the platform sends on a `command` channel. `command.read { runId }`
+ * (P2, "Open full output") streams the run's kept output from the machine's
+ * store on a channel of its own: the reply carries `{ bytes }`, then `DATA`
+ * chunks of at most 64 KiB, then `END` and the close.
+ */
+export const FLEET_COMMAND_LINK_VERBS = ['command.run', 'command.cancel', 'command.read'] as const;
 
 export type FleetCommandLinkVerb = (typeof FLEET_COMMAND_LINK_VERBS)[number];
 
 export function isFleetCommandLinkVerb(value: unknown): value is FleetCommandLinkVerb {
-	return value === 'command.run' || value === 'command.cancel';
+	return typeof value === 'string' && (FLEET_COMMAND_LINK_VERBS as readonly string[]).includes(value);
 }
 
 /** A run id / command id on the wire: a platform uuid. */
