@@ -222,7 +222,10 @@ engine than the one an operator chose is how a check passes for the wrong reason
   operator defined; the node proves a worktree's `.git` still points at its own gitdir before its own
   Git touches it; the MCP bridge has a local switch (`policy --allow-mcp-bridge`); and the Windows
   health / capability probes start `powershell`, `where`, `icacls` and `nvidia-smi` from absolute
-  paths without `cmd.exe`, never searching the current directory. Trust model controls 20–23.
+  paths without `cmd.exe`, never searching the current directory. A Codex run also reports, in
+  its containment block, a repository-local `.codex/config.toml` / `.codex/hooks.json` in the
+  checkout (`codex-repository-config`) and native Windows without your `[windows] sandbox` setting
+  (`codex-windows-sandbox`) — disclosures only, no run is refused. Trust model controls 20–24.
 
 ## Commands (development)
 
