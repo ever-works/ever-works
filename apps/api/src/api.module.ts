@@ -75,6 +75,7 @@ import { ComputerApiModule } from './computer/computer.module';
 import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
 import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.module';
 import { FleetCommandsApiModule } from './fleet/commands/fleet-commands-api.module';
+import { FleetSchedulesApiModule } from './fleet/schedules/fleet-schedules-api.module';
 import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
 import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
@@ -322,6 +323,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         FleetSessionsApiModule,
         // Commands on computers (FL-12) — one command line, N computers (FLEET_COMMANDS_ENABLED).
         FleetCommandsApiModule,
+        // Schedules on computers (FL-13): the schedule link adapter, the node_schedule source, the reconcile pass.
+        FleetSchedulesApiModule,
         // Services, Docker, Compose and processes on computers (FL-09) — the
         // machine-action routes and the node-link adapter. Dark unless
         // FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
