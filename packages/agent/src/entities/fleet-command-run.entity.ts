@@ -29,7 +29,10 @@ import { PortableDateColumn } from './_types';
  * No foreign key on `nodeId`: the history outlives the computer, as
  * `fleet_audit.nodeId` does. `commandId` → `fleet_commands` CASCADE lives in
  * the migration (`1796120100000-CreateFleetCommandRuns`). Written ONLY by
- * `FleetCommandService`. FL-13 adds `scheduledFor` in its slot.
+ * `FleetCommandService`, and — for a schedule's runs — by `FleetScheduleService`
+ * (FL-13, which adds `scheduledFor` in its slot; a run the machine made on its
+ * own clock keeps the machine's run id as its primary key, so reconciling it
+ * twice is one row).
  */
 @Entity({ name: 'fleet_command_runs' })
 @Index('uq_fleet_command_runs_command_node_started', ['commandId', 'nodeId', 'startedAt'], {
@@ -37,6 +40,7 @@ import { PortableDateColumn } from './_types';
 })
 @Index('idx_fleet_command_runs_node_started', ['nodeId', 'startedAt'])
 @Index('idx_fleet_command_runs_status', ['status'])
+@Index('idx_fleet_command_runs_scheduled', ['commandId', 'scheduledFor'])
 export class FleetCommandRun {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -100,6 +104,14 @@ export class FleetCommandRun {
     /** The node's key for the full output it keeps (the run id), or null when it kept none. */
     @Column({ type: 'text', nullable: true })
     outputRef?: string | null;
+
+    /**
+     * Schedules on computers (FL-13, CONTRACTS §4.4) — the fire a schedule's
+     * run belongs to; null for a Run now and for one-off Commands.
+     * Migration: `1796130000000-AddFleetCommandCadence`.
+     */
+    @PortableDateColumn({ nullable: true })
+    scheduledFor?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;
