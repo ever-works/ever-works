@@ -12,6 +12,7 @@ import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
+import type { FleetCloudService } from '../fleet/cloud/fleet-cloud.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
@@ -121,6 +122,11 @@ export interface AgentFleetToolSource {
      * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
      */
     virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
+    /**
+     * Cloud computers (FL-17) — backs `fleet_cloud_*`. Optional: unbound (or
+     * `FLEET_CLOUD_ENABLED` off), those tools are simply not offered.
+     */
+    cloud?: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'
