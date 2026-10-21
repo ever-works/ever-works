@@ -36,7 +36,9 @@ import {
 import { abortableSleep, createVirtualExecutors } from './executors/virtual';
 import { createVirtualModule } from './link/modules/virtual';
 import { defaultStdinRunner } from './link/modules/virtual/host';
-import { VirtualState } from './link/modules/virtual/state';
+import { defaultVirtualStateFs, VirtualState } from './link/modules/virtual/state';
+import type { SecretStore } from './secret-store';
+import { kvmUsable, WindowsPasswordStore } from './link/modules/virtual/windows';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -665,6 +667,12 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	virtualDataDir?: string;
 	/**
+	 * Virtual computers, phase 2 — where Windows VM passwords are kept: the
+	 * node's OS keychain. Null / absent: the documented owner-only file
+	 * fallback under the virtual data folder (announced once).
+	 */
+	virtualSecrets?: SecretStore | null;
+	/**
 	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
 	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
 	 * embedder without self-update leaves it unset and the field is absent.
@@ -1114,7 +1122,26 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		(io.environment.platform === 'linux' || io.environment.platform === 'darwin')
 			? new VirtualState(options.virtualDataDir)
 			: null;
-	const virtualModule = virtualState ? createVirtualModule({ state: virtualState }) : null;
+	// Windows VMs (P2): the KVM probe (re-read every beat — a group change needs no
+	// restart) and the generated passwords (this host's keychain, or the owner-only
+	// file fallback the store announces).
+	const virtualKvm = (): boolean => kvmUsable({ platform: io.environment.platform, arch: io.environment.arch });
+	const virtualPasswords = virtualState
+		? new WindowsPasswordStore(
+				virtualState.root,
+				defaultVirtualStateFs,
+				options.virtualSecrets ?? null,
+				(message) => io.logger.warn(message)
+			)
+		: null;
+	const virtualModule = virtualState
+		? createVirtualModule({
+				state: virtualState,
+				kvm: virtualKvm,
+				env: options.env ?? process.env,
+				passwords: virtualPasswords
+			})
+		: null;
 	const linkModules = composeNodeLinkModules({
 		extra: [
 			healthLinkModule,
@@ -1203,7 +1230,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				env: options.env ?? process.env,
 				sleep: abortableSleep,
 				now: io.now ?? Date.now,
-				logger: io.logger
+				logger: io.logger,
+				nodeName: config.name?.trim() || 'this computer',
+				platform: io.environment.platform,
+				arch: io.environment.arch,
+				kvm: virtualKvm,
+				passwords: virtualPasswords
 			})
 		: [];
 	const managementPlan = planManagementLane(

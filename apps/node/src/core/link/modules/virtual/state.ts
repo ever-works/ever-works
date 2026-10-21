@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, rm, writeFile, chmod } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile, chmod, unlink } from 'node:fs/promises';
 import { posix } from 'node:path';
 import {
 	isFleetVirtualSystemId,
@@ -42,6 +42,10 @@ export interface VirtualStateFs {
 	/** Remove a folder and everything in it; missing is success. */
 	removeDir(path: string): Promise<void>;
 	listDir(path: string): Promise<string[]>;
+	/** Remove one file; missing is success. */
+	removeFile(path: string): Promise<void>;
+	/** Whether a file exists (the Windows markers in the shared folder). */
+	exists(path: string): Promise<boolean>;
 }
 
 export const defaultVirtualStateFs: VirtualStateFs = {
@@ -69,6 +73,20 @@ export const defaultVirtualStateFs: VirtualStateFs = {
 		} catch {
 			return [];
 		}
+	},
+	removeFile: async (path) => {
+		await unlink(path).catch((error: NodeJS.ErrnoException) => {
+			if (error?.code !== 'ENOENT') throw error;
+		});
+	},
+	exists: async (path) => {
+		try {
+			await readFile(path);
+			return true;
+		} catch (error) {
+			// A file the guest's share wrote as another user may be unreadable but present.
+			return (error as NodeJS.ErrnoException)?.code === 'EACCES';
+		}
 	}
 };
 
@@ -88,6 +106,40 @@ export class VirtualState {
 
 	runDir(childNodeId: string): string {
 		return posix.join(this.childDir(childNodeId), 'run');
+	}
+
+	/** Windows VMs: the first-boot step, mounted read-only as the installer's `/oem`. */
+	oemDir(childNodeId: string): string {
+		return posix.join(this.childDir(childNodeId), 'oem');
+	}
+
+	/** Windows VMs: the folder shared with the guest (its markers, the one-time token file). */
+	sharedDir(childNodeId: string): string {
+		return posix.join(this.childDir(childNodeId), 'shared');
+	}
+
+	/** Windows VMs: create `run/`, `oem/` (with the first-boot files) and `shared/`. */
+	async prepareWindows(childNodeId: string, files: { installBat: string; firstBoot: string }): Promise<void> {
+		await this.fs.mkdir(this.runDir(childNodeId));
+		await this.fs.mkdir(this.oemDir(childNodeId));
+		await this.fs.mkdir(this.sharedDir(childNodeId));
+		await this.fs.writeFile(posix.join(this.oemDir(childNodeId), 'install.bat'), files.installBat, 0o644);
+		await this.fs.writeFile(posix.join(this.oemDir(childNodeId), 'ever-works-first-boot.ps1'), files.firstBoot, 0o644);
+	}
+
+	/** Write a private (0600) file in the child's folder; answers its path. */
+	async writePrivate(childNodeId: string, relative: string, content: string): Promise<string> {
+		const path = posix.join(this.childDir(childNodeId), relative);
+		await this.fs.writeFile(path, content, 0o600);
+		return path;
+	}
+
+	async removeFile(path: string): Promise<void> {
+		await this.fs.removeFile(path);
+	}
+
+	async exists(path: string): Promise<boolean> {
+		return this.fs.exists(path);
 	}
 
 	/** Create the child's folders (0700) and write its bootstrap (0644 — read by the guest's root). */
