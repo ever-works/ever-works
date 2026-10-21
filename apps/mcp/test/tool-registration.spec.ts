@@ -165,11 +165,37 @@ describe('ToolRegistrationService', () => {
 		});
 
 		it('never forwards an omitted argument upstream, even when handed raw arguments', async () => {
-			const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'abc', status: 'done' });
-			service.registerTools();
-			const { handler } = registered('transition_task');
-			await handler({ id: 'abc', to: 'done', force: true });
-			expect(requestSpy).toHaveBeenCalledWith('POST', '/tasks/abc/transition', { to: 'done' });
+			// Works-security (2026-10-21): `→ done` is a held-back value while
+			// MCP_PRIVILEGED_TOOLS is off (see privileged-tools.spec.ts). This case
+			// pins the `force` omission WHEN the operator turned the switch on,
+			// where the move itself is forwarded.
+			const previousSwitch = process.env.MCP_PRIVILEGED_TOOLS;
+			process.env.MCP_PRIVILEGED_TOOLS = 'true';
+			try {
+				const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'abc', status: 'done' });
+				service.registerTools();
+				const { handler } = registered('transition_task');
+				await handler({ id: 'abc', to: 'done', force: true });
+				expect(requestSpy).toHaveBeenCalledWith('POST', '/tasks/abc/transition', { to: 'done' });
+			} finally {
+				if (previousSwitch === undefined) delete process.env.MCP_PRIVILEGED_TOOLS;
+				else process.env.MCP_PRIVILEGED_TOOLS = previousSwitch;
+			}
+		});
+
+		it('off: refuses the same `→ done` move and sends nothing (held-back value)', async () => {
+			const previousSwitch = process.env.MCP_PRIVILEGED_TOOLS;
+			delete process.env.MCP_PRIVILEGED_TOOLS;
+			try {
+				const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'abc', status: 'done' });
+				service.registerTools();
+				const { handler } = registered('transition_task');
+				const result = (await handler({ id: 'abc', to: 'done', force: true })) as { isError?: boolean };
+				expect(result.isError).toBe(true);
+				expect(requestSpy).not.toHaveBeenCalled();
+			} finally {
+				if (previousSwitch !== undefined) process.env.MCP_PRIVILEGED_TOOLS = previousSwitch;
+			}
 		});
 
 		// `requireAllApprovers` is the approver POLICY, not the override: with it

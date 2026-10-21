@@ -1,6 +1,7 @@
 import 'server-only';
 import type { UIMessage } from 'ai';
 import { serverFetch } from '@/lib/api/server-api';
+import { scrubSecretOnceFromParts } from './tools/generated/secret-guard';
 
 export interface MessageUsage {
     promptTokens?: number;
@@ -38,7 +39,9 @@ export async function saveConversationMessages({
         id: msg.id,
         role: msg.role,
         content: extractTextContent(msg),
-        parts: msg.parts,
+        // Works-security: a one-time secret (a freshly minted API key) was
+        // shown to the user live; the stored conversation never keeps it.
+        parts: scrubSecretOnceFromParts(msg.parts),
         // Attach model/usage to assistant messages only
         ...(msg.role === 'assistant' && model ? { model } : {}),
         ...(msg.role === 'assistant' && usage ? { usage } : {}),

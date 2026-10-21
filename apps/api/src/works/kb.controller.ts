@@ -43,6 +43,7 @@ import {
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import {
     fleetRunBindingOf,
+    isHumanSession,
     machinePrincipalKind,
     refuseMachinePrincipalAction,
     refuseMachinePrincipalFields,
@@ -84,6 +85,57 @@ function machineAuthoredKbFields(
         };
     }
     return { reviewState: 'proposed' as KbReviewState };
+}
+
+/**
+ * Works-security (2026-10-18) — `KB_NON_SESSION_WRITES_PROPOSED` (default on):
+ * a KB write made with anything but a person's interactive session — a
+ * personal API key (`ew_live_…`, what an MCP client or the CLI holds) — lands
+ * `proposed`, so the M7 review gate keeps it out of agent context until a
+ * person accepts it. The API cannot tell an MCP client holding the owner's
+ * key from the owner, and that client is a model that may be reading hostile
+ * content. `false` restores the previous behaviour (accepted on write).
+ * Read per request so an operator can flip it without a rebuild.
+ */
+export function kbNonSessionWritesProposed(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.KB_NON_SESSION_WRITES_PROPOSED?.trim().toLowerCase() !== 'false';
+}
+
+/**
+ * `{ reviewState: 'proposed' }` for a non-session write while
+ * `KB_NON_SESSION_WRITES_PROPOSED` is on, else `{}` — for the routes that
+ * create a document from something other than a request body (uploads).
+ */
+function nonSessionKbReviewState(auth: AuthenticatedUser): { reviewState?: KbReviewState } {
+    return !isHumanSession(auth) && kbNonSessionWritesProposed()
+        ? { reviewState: 'proposed' as KbReviewState }
+        : {};
+}
+
+/**
+ * What a KB create carries beyond its content: the machine-principal rule
+ * above, the non-session rule, and the downgrade a client may ask for itself
+ * (`reviewState: 'proposed'`, `source: 'agent'` — the DTO accepts nothing
+ * else). A person's session asking for nothing keeps landing `accepted`.
+ */
+function authoredKbFields(
+    auth: AuthenticatedUser,
+    req: MachinePrincipalRequest | undefined,
+    requested: { reviewState?: string; source?: string },
+): { source?: KbDocumentSource; reviewState?: KbReviewState; metadata?: Record<string, unknown> } {
+    const fields: {
+        source?: KbDocumentSource;
+        reviewState?: KbReviewState;
+        metadata?: Record<string, unknown>;
+    } = {};
+    if (requested.source === 'agent') fields.source = 'agent' as KbDocumentSource;
+    if (
+        requested.reviewState === 'proposed' ||
+        (!isHumanSession(auth) && kbNonSessionWritesProposed())
+    ) {
+        fields.reviewState = 'proposed' as KbReviewState;
+    }
+    return { ...fields, ...machineAuthoredKbFields(auth, req) };
 }
 
 /** Whether an update touches what a model reads (title, body, description, class). */
@@ -229,7 +281,7 @@ export class KbController {
             categories: body.categories,
             language: body.language,
             status: body.status as KbDocumentStatus | undefined,
-            ...machineAuthoredKbFields(auth, req),
+            ...authoredKbFields(auth, req, { reviewState: body.reviewState, source: body.source }),
         });
     }
 
@@ -270,15 +322,23 @@ export class KbController {
             'a knowledge-base document',
             'archiving and restoring documents is done by a person in the app.',
         );
+        // The body's own `reviewState` (DTO: `proposed` only) is never
+        // spread into the patch; the decision below is the only writer.
+        const { reviewState: requestedReviewState, ...patch } = body;
+        // Works-security lane 3a — a machine principal's content edit
+        // re-enters the review gate (see `machineAuthoredKbFields`); since
+        // 2026-10-18 so does any non-session content edit
+        // (`KB_NON_SESSION_WRITES_PROPOSED`), and a client may ask for it.
+        const reenterReview =
+            requestedReviewState === 'proposed' ||
+            (changesKbContent(patch) &&
+                (machinePrincipalKind(auth, req) !== null ||
+                    (!isHumanSession(auth) && kbNonSessionWritesProposed())));
         return this.kb.updateDocument(workId, docId, auth.userId, {
-            ...body,
-            status: body.status as KbDocumentStatus | undefined,
-            class: body.class as KbDocumentClass | undefined,
-            // Works-security lane 3a — a machine principal's content edit
-            // re-enters the review gate (see `machineAuthoredKbFields`).
-            ...(machinePrincipalKind(auth, req) && changesKbContent(body)
-                ? { reviewState: 'proposed' as KbReviewState }
-                : {}),
+            ...patch,
+            status: patch.status as KbDocumentStatus | undefined,
+            class: patch.class as KbDocumentClass | undefined,
+            ...(reenterReview ? { reviewState: 'proposed' as KbReviewState } : {}),
         });
     }
 
@@ -629,6 +689,9 @@ export class KbController {
             // When set, the service derives the class from the extracted
             // text and `targetClass` becomes the fallback.
             autoClassify: body.autoClassify,
+            // Works-security (#2804 review): an upload is a KB write too — a
+            // non-session one lands `proposed` (`KB_NON_SESSION_WRITES_PROPOSED`).
+            ...nonSessionKbReviewState(auth),
         });
     }
 
@@ -745,6 +808,13 @@ export class KbController {
         @Param('id', new ParseUUIDPipe()) workId: string,
         @Param('uploadId', new ParseUUIDPipe()) uploadId: string,
     ) {
-        return this.kb.retryUploadExtraction(workId, uploadId, auth.userId);
+        // Works-security (#2804 review): the re-created document follows the
+        // same non-session review rule as a fresh upload.
+        return this.kb.retryUploadExtraction(
+            workId,
+            uploadId,
+            auth.userId,
+            nonSessionKbReviewState(auth),
+        );
     }
 }
