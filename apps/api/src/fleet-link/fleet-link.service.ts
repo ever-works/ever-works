@@ -137,6 +137,29 @@ export class FleetLinkService {
         return { result: reply.result as T };
     }
 
+    /**
+     * The gate of {@link request} WITHOUT contacting the machine (machine
+     * actions, FL-09): the link flag, existence, the kill switch, the verb's
+     * consent and its action family's audience — throws the first refusal,
+     * else answers the node row. An act asks for its confirmation only after
+     * this passed, so a caller who may not act learns nothing about it.
+     */
+    async authorizeRequest(
+        input: Pick<FleetLinkRequestInput, 'nodeId' | 'verb' | 'caller' | 'requirement'>,
+    ): Promise<FleetNode> {
+        if (!isFleetLinkVerb(input.verb))
+            throw fleetLinkError('invalid', 'verb', { verb: input.verb });
+        const node = await this.prepare(input.nodeId);
+        await this.authorizer.authorize({
+            node: nodeFacts(node),
+            caller: input.caller,
+            family: 'machine',
+            verb: input.verb,
+            requirement: input.requirement,
+        });
+        return node;
+    }
+
     /** A channel of `family` on the node's link, opened for this caller, on whichever replica holds it. */
     async openChannel(input: FleetLinkOpenChannelInput): Promise<FleetLinkChannel> {
         if (!isFleetLinkFamily(input.family))

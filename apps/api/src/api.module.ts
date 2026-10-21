@@ -74,6 +74,7 @@ import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
 import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.module';
+import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
@@ -315,6 +316,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // adapter and listener, and the sweeper fallback. Dark unless
         // FLEET_SESSIONS_ENABLED (and the link) are on.
         FleetSessionsApiModule,
+        // Services, Docker, Compose and processes on computers (FL-09) — the
+        // machine-action routes and the node-link adapter. Dark unless
+        // FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
+        FleetMachineApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,
