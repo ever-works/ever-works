@@ -13568,6 +13568,108 @@
                 "state": "State: {state}",
                 "card": "{title} on {node}, {state}"
             }
+        },
+        "logs": {
+            "palette": "Logs on {name}",
+            "groups": {
+                "system": "System",
+                "files": "Files",
+                "containers": "Containers",
+                "services": "Services",
+                "withCount": "{group} ({count})"
+            },
+            "kinds": {
+                "system": "system log",
+                "file": "file",
+                "container": "container",
+                "service": "service"
+            },
+            "sources": {
+                "title": "Sources",
+                "refresh": "Refresh the list of logs",
+                "every": "{seconds} s",
+                "loading": "Asking {node} for its logs…",
+                "rootOnly": "root only",
+                "needsAdmin": "needs administrator",
+                "gone": "gone",
+                "failed": "failed",
+                "openFile": "Open a file…",
+                "openFilePlaceholder": "Open a file… e.g. /var/log/nginx/error.log",
+                "openFileNotAbsolute": "Type a full path, starting with / or a drive letter.",
+                "outsideRoots": "That path is outside the folders this computer shares"
+            },
+            "viewer": {
+                "title": "{source} · {kind} · {node}",
+                "pick": "Pick a log on the left to read it.",
+                "live": "● LIVE",
+                "reconnecting": "○ RECONNECTING",
+                "pause": "Pause",
+                "resume": "Resume",
+                "follow": "Follow",
+                "following": "Following",
+                "notFollowing": "Not following — scroll to the bottom to follow again.",
+                "filterPlaceholder": "filter…",
+                "copySelection": "Copy selection",
+                "copyAllShown": "Copy all shown",
+                "copied": "Copied",
+                "download": "Download shown lines",
+                "jumpToLatest": "↓ {count} new lines — jump to latest",
+                "reopen": "Reopen",
+                "loadEarlier": "Load 500 earlier",
+                "loadingEarlier": "Loading earlier lines…",
+                "noEarlier": "No earlier lines",
+                "noEarlierContainer": "Container logs keep no earlier lines here — the Docker log driver bounds them",
+                "levelError": "✖ error",
+                "levelWarning": "⚠ warn",
+                "footerFollowing": "Following",
+                "footerPaused": "Paused · {count} new lines",
+                "footerFiltered": "showing {shown} of {held} lines · filter: {filter}",
+                "footerHeld": "{count} lines held",
+                "footerBytes": "{bytes} read",
+                "footerRedactions": "{count, plural, one {# redaction} other {# redactions}}",
+                "footerDropped": "Skipped {count} lines — the log is faster than the link",
+                "footerDiscarded": "{count} older lines discarded (5 000 held at most)"
+            },
+            "notices": {
+                "groupMembership": "Only this user's entries. To see the whole system log, run on {node}:",
+                "groupMembershipAfter": "and sign in again.",
+                "gone": "{source} is gone",
+                "stopped": "{source} stopped",
+                "fastLog": "Skipped {count} lines — the log is faster than the link"
+            },
+            "states": {
+                "loading": "Asking {node} for the last 500 lines…",
+                "loadingSlow": "{node} has not answered yet. It may be busy.",
+                "loadingAbandoned": "{node} did not answer",
+                "error": "Could not read {source} on {node}",
+                "listError": "Could not list the logs on {node}.",
+                "tryAgain": "Try again",
+                "empty": "Nothing to read on {node} yet",
+                "emptyBody": "No log files under this computer's shared folders, no containers, and the system log is not readable by the node's user. Share a folder with --files-root, or install Docker, and come back.",
+                "offline": "{node} is offline — last seen {relative}.",
+                "offlineNever": "{node} is offline.",
+                "unreachable": "{node} is not connected right now.",
+                "consentMissing": "Logs need machine management switched on for this computer.",
+                "consentCommand": "Run this on {node}:",
+                "permissionDenied": "Only the owner of {node} can read its logs.",
+                "desktopNode": "Not available on this kind of node yet.",
+                "killSwitch": "Following stopped — all computers are stopped.",
+                "killSwitchTab": "All computers are stopped. Logs open again once the stop is cleared.",
+                "lost": "Lost the live feed — reopen to continue."
+            },
+            "a11y": {
+                "sources": "Log sources",
+                "region": "Log: {source}",
+                "following": "Following",
+                "paused": "Paused, {count} new lines"
+            },
+            "shortcuts": {
+                "filter": "Focus the filter",
+                "pause": "Pause or resume",
+                "latest": "Jump to latest",
+                "clear": "Clear the filter",
+                "copy": "Copy the selection"
+            }
         }
     }
 }

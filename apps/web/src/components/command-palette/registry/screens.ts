@@ -380,7 +380,7 @@ export function fleetComputerScreens(
         for (const computer of computers) {
             screens.push({
                 id: `fleet.computer.${computer.id}.logs`,
-                href: `${ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id)}?tab=logs`,
+                href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'logs'),
                 icon: ScrollText,
                 title: (t: PaletteTranslator) => t('fleet.logs.palette', { name: computer.name }),
                 breadcrumb: fleet,

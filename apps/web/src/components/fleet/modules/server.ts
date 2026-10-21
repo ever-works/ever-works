@@ -2,6 +2,7 @@ import 'server-only';
 import './index';
 import './fl-01-hub';
 import './fl-04-sessions.server';
+import './fl-08-logs.server';
 
 /**
  * Fleet hub (FL-01, README D9) — where Fleet modules register what renders ON
@@ -12,6 +13,7 @@ import './fl-04-sessions.server';
  * line above. Imported by the hub pages and the computer page only.
  *
  * Registered today: FL-01's own computer tabs (`./fl-01-hub`); FL-04's
- * Sessions tab and session page (`./fl-04-sessions.server`).
+ * Sessions tab and session page (`./fl-04-sessions.server`); FL-08's Logs tab
+ * (`./fl-08-logs.server`).
  */
 export {};
