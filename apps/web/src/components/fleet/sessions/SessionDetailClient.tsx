@@ -23,6 +23,7 @@ import { relativeTime } from '../fleet-hub.shared';
 import { SessionComposer } from './SessionComposer';
 import { SessionEndDialog } from './SessionEndDialog';
 import { SessionFooter } from './SessionFooter';
+import { SessionGitPanel } from './SessionGitPanel';
 import { SessionHeader } from './SessionHeader';
 import { SessionRenameDialog } from './SessionRenameDialog';
 import { SessionReplayPlayer } from './SessionReplayPlayer';
@@ -73,6 +74,7 @@ export function SessionDetailClient({
     agentName?: string | null;
 }) {
     const t = useTranslations('fleet.sessions');
+    const tGit = useTranslations('fleet.sessionGit');
     const locale = useLocale();
     const router = useRouter();
     const nowMs = useNow(1_000);
@@ -219,6 +221,25 @@ export function SessionDetailClient({
                 onRestart={() => void restart()}
                 onCopyLink={() => void copyLink()}
                 onShortcuts={() => setSheet(true)}
+                gitSlot={
+                    // FL-06 (spec FR-6 … FR-10): the git line, Changes, refresh.
+                    <SessionGitPanel
+                        session={session}
+                        now={now}
+                        offline={
+                            node && node.status !== 'online'
+                                ? {
+                                      hint: tGit('detail.offline', {
+                                          node: nodeName,
+                                          age: relativeTime(node.lastHeartbeatAt, now, locale) ?? '—',
+                                      }),
+                                  }
+                                : null
+                        }
+                        agentName={agentName}
+                        onRefreshed={() => void refresh()}
+                    />
+                }
             />
 
             <div ref={takeKeyboardRef} tabIndex={-1} className="sr-only">

@@ -13004,6 +13004,96 @@
                 "title": "Task {slug}: {title}"
             }
         },
+        "sessionGit": {
+            "gitLine": {
+                "noCheckout": "Not in a checkout",
+                "worktreeOf": "Worktree of {folder}",
+                "folderGone": "the folder is gone"
+            },
+            "prPill": {
+                "label": "PR #{number} {state}",
+                "states": {
+                    "open": "open",
+                    "draft": "draft",
+                    "merged": "merged",
+                    "closed": "closed"
+                },
+                "checks": {
+                    "passing": "checks passing",
+                    "failing": "checks failing",
+                    "pending": "checks running",
+                    "none": "no checks reported"
+                },
+                "unknown": "PR: unknown (GitHub unreachable {minutes} min)",
+                "stale": "GitHub unreachable {minutes} min"
+            },
+            "detail": {
+                "changes": "Changes",
+                "refreshTitle": "Recompute the git line on the computer now",
+                "offline": "{node} is offline (last seen {age})"
+            },
+            "changes": {
+                "title": "Changes",
+                "refresh": "Refresh",
+                "close": "Close",
+                "loading": "Reading the changes on the computer…",
+                "clean": "Nothing uncommitted.",
+                "summary": "{files, plural, one {# changed file} other {# changed files}}, not committed yet",
+                "binary": "binary",
+                "noPatch": "No patch shown for this file.",
+                "fileCut": "… cut at 64 KiB",
+                "refreshesWhile": "Refreshes every 10 s while {who} works",
+                "refreshesWhileSession": "Refreshes every 10 s while the session works",
+                "refreshOnDemand": "Refresh it with ↻",
+                "omitted": "{files, plural, one {# file} other {# files}} omitted ({size})",
+                "seePullRequest": "see the pull request",
+                "status": {
+                    "modified": "modified",
+                    "added": "added",
+                    "deleted": "deleted",
+                    "renamed": "renamed",
+                    "copied": "copied",
+                    "untracked": "new",
+                    "conflicted": "conflict",
+                    "typeChanged": "type changed"
+                }
+            },
+            "where": {
+                "checkoutLabel": "Checkout on {node}",
+                "noCheckout": "None — use the folder below",
+                "modeLabel": "Where the session works",
+                "existing": "Existing checkout",
+                "worktree": "New worktree",
+                "clone": "Fresh clone",
+                "existingNote": "The session works in this checkout as it is.",
+                "existingAgentNote": "The Agent works in this checkout as it is — another agent there would overwrite its changes.",
+                "worktreeNote": "A new worktree of this checkout, on its own branch: ready in seconds, shares history with it.",
+                "cloneNote": "A fresh clone of the same repository, on its own branch, in its own folder."
+            },
+            "branch": {
+                "label": "Branch",
+                "checking": "Checking the branch…",
+                "neverUsed": "never used before on {repository}",
+                "suffixed": "{base} exists — using {branch}",
+                "taskBranch": "the Task’s own branch",
+                "edited": "your branch — it is checked again when the worktree is made",
+                "invalid": "git does not accept this branch name",
+                "remoteUnchecked": "the remote could not be asked",
+                "failed": "The branch could not be proposed"
+            },
+            "errorTitles": {
+                "notFound": "Not found",
+                "invalid": "Not possible",
+                "unreachable": "Not connected",
+                "consentMissing": "Not allowed on this computer",
+                "permissionDenied": "Not allowed",
+                "killSwitch": "All computers are stopped",
+                "limitExceeded": "Too many at once",
+                "busy": "Busy",
+                "operationFailed": "It did not finish",
+                "internal": "Something went wrong"
+            }
+        },
         "checkouts": {
             "hub": {
                 "title": "Checkouts on every computer",
@@ -13932,6 +14022,8 @@
                 "inFolder": "in this folder",
                 "newWorktree": "in a new worktree of {checkout}",
                 "worktreeLater": "New worktrees arrive with Checkouts",
+                "checkoutNotReady": "The new checkout is {state}; it did not become ready",
+                "creatingCheckout": "Creating the checkout on {node}…",
                 "notInstalled": "not installed on {node}",
                 "firstMessage": "First message",
                 "firstMessageHint": "Typed into {provider} when it starts. Optional for your own sessions.",
