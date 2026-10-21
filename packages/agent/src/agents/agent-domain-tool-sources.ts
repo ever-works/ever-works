@@ -12,6 +12,7 @@ import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
+import type { FleetUsageViewService } from '../fleet/usage/fleet-usage-view.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
@@ -123,6 +124,11 @@ export interface AgentFleetToolSource {
      * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
      */
     virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
+    /**
+     * Usage & cost on the fleet (FL-20) — backs the read-only `fleet_usage_get`.
+     * Optional: unbound (or `FLEET_USAGE_SCAN_ENABLED` off), it is not offered.
+     */
+    usage?: Pick<FleetUsageViewService, 'view'>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'

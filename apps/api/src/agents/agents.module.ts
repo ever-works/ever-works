@@ -132,6 +132,7 @@ import {
     FleetKillSwitchService,
     FleetMachineActionsService,
     FleetVirtualService,
+    FleetUsageViewService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2184,6 +2185,10 @@ async function assertRealWriteTarget(
                 // LAST (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the
                 // tools are not offered; create/update/delete/run only ever file an approval.
                 { token: FleetScheduleService, optional: true },
+                // Usage & cost on the fleet (FL-20) — backs the read-only `fleet_usage_get`.
+                // APPENDED LAST (positional), optional: unbound (or FLEET_USAGE_SCAN_ENABLED
+                // off) the tool is not offered.
+                { token: FleetUsageViewService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2223,6 +2228,7 @@ async function assertRealWriteTarget(
                 fleetGitIdentity?: FleetGitIdentityService | null,
                 fleetWake?: FleetWakeToolPort | null,
                 fleetSchedules?: FleetScheduleService | null,
+                fleetUsage?: FleetUsageViewService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2268,6 +2274,7 @@ async function assertRealWriteTarget(
                           }
                         : {}),
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
+                    ...(fleetUsage && config.fleet.isUsageScanEnabled() ? { usage: fleetUsage } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()

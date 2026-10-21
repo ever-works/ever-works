@@ -74,3 +74,5 @@ export * from './agent-fleet-task-tools';
 export * from './ports';
 // Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
 export * from './virtual';
+// Usage & cost on the fleet (FL-20) — the transcript scan's reconciler, dispatcher, view and Agent tool.
+export * from './usage';
