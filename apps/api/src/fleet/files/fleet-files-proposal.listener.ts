@@ -5,6 +5,7 @@ import {
     FLEET_FILES_COPY_PROPOSAL_KIND,
     FLEET_FILES_DELETE_PROPOSAL_KIND,
 } from '@ever-works/agent/fleet';
+import { FleetLinkException } from '../../fleet-link/fleet-link.errors';
 import { FleetFilesTransferService } from './fleet-files-transfer.service';
 import { FleetFilesService } from './fleet-files.service';
 
@@ -76,9 +77,9 @@ export class FleetFilesProposalListener {
                 `Approved copy ${event.proposalId} started as transfer ${started.transferId}`,
             );
         } catch (error) {
-            this.logger.warn(
-                `Approved file act ${event.proposalId} did not run: ${error instanceof Error ? error.message.split('\n', 1)[0] : String(error)}`,
-            );
+            // The code only: a refusal's hint can name a file.
+            const code = error instanceof FleetLinkException ? error.code : 'internal';
+            this.logger.warn(`Approved file act ${event.proposalId} did not run (${code})`);
         }
     }
 }
