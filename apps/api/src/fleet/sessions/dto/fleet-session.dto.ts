@@ -118,6 +118,16 @@ export class StartFleetSessionDto extends FleetSessionSizeDto {
     @IsOptional()
     @IsUUID()
     restartOf?: string;
+
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description:
+            'FL-15: the Task this Agent session works on. Its Run carries the Task (history, board, chat follow it); refused `busy` while the same Agent already works the Task, `invalid` on a computer other than the Agent’s pinned one, `limit_exceeded` when the computer has no free agent slot.',
+    })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string;
 }
 
 /** Body for `PATCH /api/fleet/sessions/:id`. */
@@ -170,6 +180,15 @@ export class ListFleetSessionsQueryDto {
     @IsOptional()
     @IsUUID()
     agentId?: string;
+
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'FL-15: only sessions whose Run works on this Task (the Task page’s Computer block).',
+    })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string;
 
     @ApiProperty({ required: false, description: 'ISO 8601: sessions active since then.' })
     @IsOptional()
