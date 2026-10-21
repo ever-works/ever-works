@@ -161,7 +161,10 @@ function stubDomainSources(): AgentDomainToolSources {
             checkouts: { service: stub() },
             logs: { reader: stub() },
             status: stub(),
-            operations: stub(),
+            // `requestCancel` present so `fleet_operations_cancel` is listed (P2).
+            operations: { requestCancel: async () => stub() } as never,
+            wake: stub(),
+            gitIdentity: stub(),
         },
         fleetSessions: { service: stub() },
         fleetCommands: { service: stub() },

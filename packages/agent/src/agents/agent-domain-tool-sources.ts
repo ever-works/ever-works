@@ -19,7 +19,12 @@ import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.servi
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
-import type { FleetOperationsToolPort, FleetStatusReaderPort } from '../fleet/fleet-status';
+import type {
+    FleetGitIdentityToolPort,
+    FleetOperationsToolPort,
+    FleetStatusReaderPort,
+    FleetWakeToolPort,
+} from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -171,6 +176,10 @@ export interface AgentFleetToolSource {
      * (FL-02). Unbound (no link in this context), the tools are not offered.
      */
     operations?: FleetOperationsToolPort;
+    /** FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the owner). Unbound, not offered. */
+    wake?: FleetWakeToolPort;
+    /** FL-19 P2 — `fleet_nodes_git_identity_get|set` (FL-15). Unbound (checkouts off), not offered. */
+    gitIdentity?: FleetGitIdentityToolPort;
 }
 
 /**

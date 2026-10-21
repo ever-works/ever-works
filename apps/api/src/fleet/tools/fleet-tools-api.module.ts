@@ -4,6 +4,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import {
     FLEET_HELD_CALL_FILER,
     FLEET_STATUS_READER,
+    FLEET_WAKE_TOOL_PORT,
+    FleetGitModule,
     FleetModule as AgentFleetModule,
 } from '@ever-works/agent/fleet';
 import { PolicyModule } from '@ever-works/agent/policy';
@@ -11,6 +13,7 @@ import { SafetyModule } from '@ever-works/agent/safety';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetConfirmationInterceptor } from './fleet-confirmation.interceptor';
 import { FleetHeldCallService } from './fleet-held-call.service';
+import { FleetWakeToolAdapter } from './fleet-wake-tool.adapter';
 import { FleetStatusService } from './fleet-status.service';
 import { FleetToolsController } from './fleet-tools.controller';
 import { FleetToolsGateService } from './fleet-tools-gate.service';
@@ -34,7 +37,9 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
  */
 @Global()
 @Module({
-    imports: [AgentFleetModule, DatabaseModule, SafetyModule, PolicyModule, AgentApprovalsModule],
+    // FleetGitModule (FL-15) is imported AND re-exported so `FleetGitIdentityService` reaches the
+    // api-side AgentsModule's tool sources through this global module (the Agent's git-identity tools).
+    imports: [AgentFleetModule, DatabaseModule, SafetyModule, PolicyModule, AgentApprovalsModule, FleetGitModule],
     controllers: [FleetToolsController],
     providers: [
         FleetStatusService,
@@ -45,6 +50,9 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
         // P2 — a held fleet act becomes a Decision (the run loop asks under FLEET_HELD_CALL_FILER).
         FleetHeldCallService,
         { provide: FLEET_HELD_CALL_FILER, useExisting: FleetHeldCallService },
+        // P2 — `fleet_nodes_wake` runs FL-03's wake route as the Agent's owner.
+        FleetWakeToolAdapter,
+        { provide: FLEET_WAKE_TOOL_PORT, useExisting: FleetWakeToolAdapter },
         FleetEnabledGuard,
     ],
     exports: [
@@ -54,6 +62,8 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
         FleetConfirmationInterceptor,
         FleetHeldCallService,
         FLEET_HELD_CALL_FILER,
+        FLEET_WAKE_TOOL_PORT,
+        FleetGitModule,
     ],
 })
 export class FleetToolsApiModule {}

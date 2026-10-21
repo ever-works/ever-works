@@ -72,7 +72,7 @@ import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
-import { buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
+import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -651,6 +651,16 @@ export class AgentToolService {
                     service: fleet.service,
                     status: fleet.status ?? null,
                     operations: fleet.operations ?? null,
+                }),
+            );
+            // FL-19 P2 — wake, cancel an operation, the FL-15 git identity (each when bound).
+            add('fleet-acts', () =>
+                buildFleetActTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    wake: fleet.wake ?? null,
+                    operations: fleet.operations ?? null,
+                    gitIdentity: fleet.gitIdentity ?? null,
                 }),
             );
             // Logs on computers (FL-08): the read-only log tools, when bound.

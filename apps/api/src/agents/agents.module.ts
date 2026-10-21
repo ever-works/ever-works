@@ -140,8 +140,11 @@ import {
     NeedsALookService,
     FLEET_LOGS_READER,
     FLEET_STATUS_READER,
+    FLEET_WAKE_TOOL_PORT,
+    FleetGitIdentityService,
     type FleetLogsReaderPort,
     type FleetStatusReaderPort,
+    type FleetWakeToolPort,
 } from '@ever-works/agent/fleet';
 import { config } from '@ever-works/agent/config';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
@@ -2160,6 +2163,10 @@ async function assertRealWriteTarget(
                 //  - `fleet_nodes_health|needs_a_look` (FL-03's history + the needs-a-look registry).
                 { token: FleetNodeHealthService, optional: true },
                 { token: NeedsALookService, optional: true },
+                // FL-19 P2 — `fleet_nodes_wake` (FL-03's route as the owner) and the FL-15 git
+                // identity tools. APPENDED LAST (positional), optional.
+                { token: FLEET_WAKE_TOOL_PORT, optional: true },
+                { token: FleetGitIdentityService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2194,6 +2201,8 @@ async function assertRealWriteTarget(
                 fleetLogs?: FleetLogsReaderPort | null,
                 fleetHealth?: FleetNodeHealthService | null,
                 needsALook?: NeedsALookService | null,
+                fleetWake?: FleetWakeToolPort | null,
+                gitIdentity?: FleetGitIdentityService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2238,6 +2247,8 @@ async function assertRealWriteTarget(
                               },
                           }
                         : {}),
+                    ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
+                    ...(gitIdentity && config.fleet.isCheckoutsEnabled() ? { gitIdentity } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

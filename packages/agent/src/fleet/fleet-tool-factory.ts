@@ -12,7 +12,13 @@ import {
 } from '@ever-works/contracts';
 import type { TaskToolDescriptor } from '../tasks-domain/agent-task-tools';
 import type { FleetService } from './fleet.service';
-import type { FleetOperationsToolPort, FleetStatusReaderPort } from './fleet-status';
+import type {
+    FleetGitIdentityToolPort,
+    FleetOperationsToolPort,
+    FleetStatusReaderPort,
+    FleetWakeToolPort,
+} from './fleet-status';
+import { FLEET_NODES_WAKE_TOOL } from './agent-fleet-health-tools';
 
 /**
  * FL-19 (plan §9, T-04/T-05) — the Agent half of the fleet tool catalogue.
@@ -277,6 +283,126 @@ export function buildFleetCoreTools(args: BuildFleetCoreToolsArgs): TaskToolDesc
                     limit,
                 });
                 return { operations: list };
+            },
+        });
+    }
+
+    return out;
+}
+
+// ─── FL-19 P2 — the acts (and the FL-15 read) the catalogue binds itself ────
+
+export interface BuildFleetActToolsArgs {
+    userId: string;
+    agentId: string;
+    /** `fleet_nodes_wake` — unbound, not offered. */
+    wake?: FleetWakeToolPort | null;
+    /** `fleet_operations_cancel` — needs the registry's cancel; unbound, not offered. */
+    operations?: FleetOperationsToolPort | null;
+    /** `fleet_nodes_git_identity_get|set` — unbound (checkouts off), not offered. */
+    gitIdentity?: FleetGitIdentityToolPort | null;
+}
+
+/**
+ * State-changing tools whose rows no family epic assembled for the Agent:
+ *
+ *  - `fleet_nodes_wake` (FL-03, `machines`, plain) — FL-03's descriptor bound to
+ *    the wake route as the Agent's owner;
+ *  - `fleet_operations_cancel` (FL-02, plain) — ask the computer to stop an
+ *    operation the owner (or this Agent's calls) started;
+ *  - `fleet_nodes_git_identity_get` (read) and `_set` (FL-15, `commands`, class
+ *    `confirm`: without `confirm: true` it answers `confirmation_required` with
+ *    the sentence; the owner's own computers only).
+ *
+ * Each is held or refused by the AW-24 ladder in the run loop like every
+ * catalogued act (`ENTRY_POINT_CATEGORY` classifies it), and decorated at the
+ * assembly point like every other fleet tool.
+ */
+export function buildFleetActTools(args: BuildFleetActToolsArgs): TaskToolDescriptor[] {
+    const out: TaskToolDescriptor[] = [];
+    const agentCaller = { kind: 'agent' as const, agentId: args.agentId, ownerUserId: args.userId };
+
+    if (args.wake) {
+        const wake = args.wake;
+        out.push({
+            name: FLEET_NODES_WAKE_TOOL.name,
+            description: FLEET_NODES_WAKE_TOOL.description,
+            parameters: {
+                type: 'object',
+                properties: { nodeId: { type: 'string', description: 'The computer to wake (its id).' } },
+                required: ['nodeId'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { nodeId?: unknown };
+                if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId)) {
+                    return invalid('nodeId', 'nodeId must be a computer id');
+                }
+                return wake.wake(args.userId, a.nodeId);
+            },
+        });
+    }
+
+    const cancel = args.operations?.requestCancel?.bind(args.operations);
+    if (cancel) {
+        out.push({
+            name: 'fleet_operations_cancel',
+            description:
+                'Ask the computer to stop a long operation that is still running (an operationId a tool answered with). It then reads cancelled; one that already ended is returned as it is. Plain: no confirmation.',
+            parameters: {
+                type: 'object',
+                properties: { operationId: { type: 'string', description: 'The operation to stop.' } },
+                required: ['operationId'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { operationId?: unknown };
+                if (typeof a.operationId !== 'string' || a.operationId.length === 0 || a.operationId.length > 100) {
+                    return invalid('operationId', 'operationId is the id a tool answered with');
+                }
+                return cancel(a.operationId, args.userId);
+            },
+        });
+    }
+
+    if (args.gitIdentity) {
+        const identity = args.gitIdentity;
+        out.push({
+            name: 'fleet_nodes_git_identity_get',
+            description:
+                "Which git identity (name and email) one of the user's computers commits as, whether a credential helper is set there, and whether Ever Works can push for agents on it. Read on the machine (needs --manage). Read-only.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    nodeId: { type: 'string', description: 'The computer (its id).' },
+                    fresh: { type: 'boolean', description: 'Read it again on the machine instead of the last answer.' },
+                },
+                required: ['nodeId'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { nodeId?: unknown; fresh?: unknown };
+                if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId)) {
+                    return invalid('nodeId', 'nodeId must be a computer id');
+                }
+                return identity.read(a.nodeId, agentCaller, { fresh: a.fresh === true });
+            },
+        });
+        out.push({
+            name: 'fleet_nodes_git_identity_set',
+            description:
+                "Set the user's own computer's global git identity to their Ever Works identity (display name and GitHub no-reply email). Only on a computer the user owns; nothing else is written; audited. Without confirm: true it answers confirmation_required with the sentence to show; call again with confirm: true once the user agreed.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    nodeId: { type: 'string', description: 'The computer (its id).' },
+                    confirm: { type: 'boolean', description: 'true once the user agreed to the sentence.' },
+                },
+                required: ['nodeId'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { nodeId?: unknown; confirm?: unknown };
+                if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId)) {
+                    return invalid('nodeId', 'nodeId must be a computer id');
+                }
+                return identity.set(a.nodeId, agentCaller, { confirm: a.confirm === true });
             },
         });
     }

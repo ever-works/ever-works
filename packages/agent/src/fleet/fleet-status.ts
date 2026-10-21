@@ -1,5 +1,8 @@
 import type {
+    FleetGitIdentity,
+    FleetGitIdentitySetResult,
     FleetKillSwitchState,
+    FleetNodeWakeResult,
     FleetNodeView,
     FleetOperationCancelResult,
     FleetOperationState,
@@ -88,4 +91,34 @@ export interface FleetOperationsToolPort {
         query?: { state?: FleetOperationState; nodeId?: string; limit?: number },
     ): FleetOperationView[];
     requestCancel?(operationId: string, userId: string): Promise<FleetOperationCancelResult>;
+}
+
+/**
+ * FL-19 P2 — `fleet_nodes_wake` (FL-03's row): the API's wake route as the
+ * Agent's owner (visibility, the target's `machines` audience, the stop
+ * switch, 3 tries in 5 minutes, the audit row — all the route's own). Bound by
+ * the API under {@link FLEET_WAKE_TOOL_PORT}.
+ */
+export interface FleetWakeToolPort {
+    wake(userId: string, nodeId: string): Promise<FleetNodeWakeResult>;
+}
+
+export const FLEET_WAKE_TOOL_PORT = 'FLEET_WAKE_TOOL_PORT' as const;
+
+/**
+ * FL-19 P2 — `fleet_nodes_git_identity_get|set` (FL-15's rows): the agent-side
+ * `FleetGitIdentityService`, called with the Agent as the caller (the owner's
+ * own computers only for a set, class `confirm`).
+ */
+export interface FleetGitIdentityToolPort {
+    read(
+        nodeId: string,
+        caller: { kind: 'agent'; agentId: string; ownerUserId: string },
+        options?: { fresh?: boolean },
+    ): Promise<FleetGitIdentity>;
+    set(
+        nodeId: string,
+        caller: { kind: 'agent'; agentId: string; ownerUserId: string },
+        request?: { confirm?: boolean },
+    ): Promise<FleetGitIdentitySetResult>;
 }
