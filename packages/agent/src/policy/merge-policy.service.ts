@@ -129,6 +129,7 @@ export class MergePolicyService implements MergePolicyEnforcer {
         return evaluateAgentMerge({
             policy: resolved.policy,
             source: resolved.source,
+            humanScopeWaivesApproval: resolved.humanScopeWaivesApproval === true,
             gateStatus: input.gateStatus ?? null,
             humanApproved: input.humanApproved ?? false,
             targetBranch: input.targetBranch ?? null,

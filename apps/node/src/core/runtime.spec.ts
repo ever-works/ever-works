@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CapabilityEnvironment, CommandRunner } from './capabilities';
 import type { FetchLike } from './fleet-client';
+import type { HealthProbeIo } from './health-probe';
 import { createLogger, type LogEntry } from './logger';
 import {
 	buildSelfDescriptionTelemetry,
@@ -537,7 +538,10 @@ describe('createNodeRuntime', () => {
 			kind: 'node',
 			capabilities: ['os:linux'],
 			heartbeatIntervalMs: 30_000,
-			enrolledAt: '2026-07-25T10:00:00.000Z'
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			// This job carries a command step; control 18 refuses those unless the
+			// machine owner allowed node-run shell commands locally.
+			executionPolicy: { allowSkipPermissions: false, allowShellCommands: true, restrictedMode: true }
 		};
 
 		const runtime = createNodeRuntime(
@@ -1038,7 +1042,30 @@ describe('createNodeRuntime — the attended live-view lane (Agent computers)', 
 		expect(beat?.body.capabilities).toContain('attended');
 		const leases = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).map((call) => call.body);
 		expect(leases).toContainEqual(expect.objectContaining({ kinds: ['computer-session'] }));
-		expect(leases).toContainEqual(expect.objectContaining({ excludeKinds: ['computer-session'] }));
+		// Control 18: with the default local policy (no node-run shell commands)
+		// the work lane also never leases `acceptance-checks` jobs.
+		expect(leases).toContainEqual(
+			expect.objectContaining({ excludeKinds: ['computer-session', 'acceptance-checks'] })
+		);
+	});
+
+	it('control 18: a node whose owner allowed shell commands leases acceptance-checks again', async () => {
+		const { calls, fetchFn } = recording();
+		const { io: deps } = io(fetchFn);
+		const runtime = createNodeRuntime(
+			{
+				...config(),
+				executionPolicy: { allowSkipPermissions: false, allowShellCommands: true, restrictedMode: true }
+			},
+			deps,
+			{ workerEnabled: true, terminalHost: null }
+		);
+		await runtime.worker?.start();
+		await runtime.worker?.stop();
+		const leases = calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).map((call) => call.body);
+		expect(leases.length).toBeGreaterThan(0);
+		for (const lease of leases)
+			expect((lease.excludeKinds as string[] | undefined) ?? []).not.toContain('acceptance-checks');
 	});
 
 	it('serves live views on a machine started with --attend but without --work', () => {
@@ -1102,5 +1129,131 @@ describe('createNodeRuntime — the attended live-view lane (Agent computers)', 
 			expect(calls.filter((call) => call.url.endsWith('/api/fleet/jobs/lease')).length).toBeGreaterThan(before)
 		);
 		await runtime.attended?.worker.stop();
+	});
+});
+
+describe('computer health wiring (FL-03)', () => {
+	const healthIo: HealthProbeIo = {
+		platform: 'linux',
+		runner,
+		resourceProbe: { sample: () => ({ cpuPercent: 12, usedMemoryMb: 4096, totalMemoryMb: 8192 }) },
+		host: { loadAvg1: () => 0.5, uptimeSec: () => 3600, cores: () => 2 },
+		pathExists: async () => false
+	};
+
+	function recordingFetch(bodies: Array<{ url: string; body: Record<string, unknown> }>): FetchLike {
+		return async (url, init) => {
+			bodies.push({ url, body: JSON.parse(init.body || '{}') as Record<string, unknown> });
+			const payload = url.endsWith('/api/fleet/enroll')
+				? { nodeId: NODE_ID, secret: SECRET, node: nodeFromApi }
+				: { ok: true, node: nodeFromApi };
+			return {
+				ok: true,
+				status: url.endsWith('/api/fleet/enroll') ? 201 : 200,
+				text: async () => JSON.stringify(payload)
+			};
+		};
+	}
+
+	it('the heartbeat carries the snapshot when the IO has a health probe', async () => {
+		const bodies: Array<{ url: string; body: Record<string, unknown> }> = [];
+		const deps = { ...io(recordingFetch(bodies)).io, health: healthIo };
+		const runtime = createNodeRuntime(
+			{
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-10-18T09:00:00.000Z'
+			},
+			deps,
+			{ env: {} }
+		);
+		await runtime.loop.start();
+		runtime.loop.stop();
+
+		const beat = bodies.find((entry) => entry.url.endsWith('/api/fleet/heartbeat'));
+		expect(beat?.body.health).toMatchObject({ cpuPercent: 12, memPercent: 50, cpuCores: 2, uptimeSec: 3600 });
+	});
+
+	it('enrolment never carries it — enrolment has no strip-and-retry fallback', async () => {
+		const bodies: Array<{ url: string; body: Record<string, unknown> }> = [];
+		await enrollNode({
+			...io(recordingFetch(bodies)).io,
+			health: healthIo,
+			apiUrl: 'https://api.ever.works',
+			token: TOKEN,
+			kind: 'node'
+		});
+		expect(bodies).toHaveLength(1);
+		expect(bodies[0].body).not.toHaveProperty('health');
+	});
+
+	it('stops running the probe — and spawning its tools — once the platform rejects health', async () => {
+		const bodies: Array<{ url: string; body: Record<string, unknown> }> = [];
+		let samples = 0;
+		const counting: HealthProbeIo = {
+			...healthIo,
+			resourceProbe: {
+				sample: () => {
+					samples += 1;
+					return { cpuPercent: 12, usedMemoryMb: 4096, totalMemoryMb: 8192 };
+				}
+			}
+		};
+		// An API older than `health`: a beat carrying it is a 400.
+		const olderPlatform: FetchLike = async (url, init) => {
+			const body = JSON.parse(init.body || '{}') as Record<string, unknown>;
+			bodies.push({ url, body });
+			if (url.endsWith('/api/fleet/heartbeat') && 'health' in body) {
+				return { ok: false, status: 400, text: async () => '{"message":"property health should not exist"}' };
+			}
+			return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: nodeFromApi }) };
+		};
+		const runtime = createNodeRuntime(
+			{
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-10-18T09:00:00.000Z'
+			},
+			{ ...io(olderPlatform).io, health: counting },
+			{ env: {} }
+		);
+		await runtime.loop.start();
+		const afterFirstBeat = samples;
+		expect(afterFirstBeat).toBeGreaterThan(0);
+		expect(runtime.loop.acceptsField('health')).toBe(false);
+		await runtime.loop.tick();
+		runtime.loop.stop();
+		// The second beat went out without health, and nothing was probed for it.
+		const beats = bodies.filter((entry) => entry.url.endsWith('/api/fleet/heartbeat'));
+		expect(beats[beats.length - 1].body).not.toHaveProperty('health');
+		expect(samples).toBe(afterFirstBeat);
+	});
+
+	it('a node without a health probe beats exactly as before', async () => {
+		const bodies: Array<{ url: string; body: Record<string, unknown> }> = [];
+		const runtime = createNodeRuntime(
+			{
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-10-18T09:00:00.000Z'
+			},
+			io(recordingFetch(bodies)).io,
+			{ env: {} }
+		);
+		await runtime.loop.start();
+		runtime.loop.stop();
+		expect(bodies.find((entry) => entry.url.endsWith('/api/fleet/heartbeat'))?.body).not.toHaveProperty('health');
 	});
 });

@@ -19,7 +19,8 @@ vi.mock('@/i18n/navigation', () => ({
 import { EverIdButton } from './ever-id-button';
 
 /**
- * APW-12 T24 — "Sign in with Ever ID" / "Sign up with Ever ID" (spec §6.1).
+ * APW-12 T24 — "Sign in with Ever ID" / "Sign up with Ever ID" (spec §6.1), the Ever brand kit
+ * button (the same as in Ever Teams and Gauzy).
  *
  * The visibility rule itself (administrator switch AND flag) lives in
  * `isEverIdOffered` and the pages; this pins what the button does once a page
@@ -34,6 +35,35 @@ describe('EverIdButton', () => {
     it('reads "Sign in with Ever ID" on the sign-in page', () => {
         render(<EverIdButton mode="signIn" />);
         expect(screen.getByRole('button', { name: 'Sign in with Ever ID' })).toBeEnabled();
+    });
+
+    it('is the brand kit button: full width, at least 40 px, black in light and #EDEDED in dark', () => {
+        render(<EverIdButton mode="signIn" />);
+        const button = screen.getByRole('button', { name: 'Sign in with Ever ID' });
+        expect(button.className.split(' ')).toEqual(
+            expect.arrayContaining([
+                'w-full',
+                'min-h-10',
+                'rounded-lg',
+                'bg-[#0a0a0a]',
+                'text-white',
+                'dark:bg-[#ededed]',
+            ]),
+        );
+    });
+
+    it('draws the spinning Ever star (still with reduced motion) and the "Ever ID" wordmark, both decorative', () => {
+        render(<EverIdButton mode="signIn" />);
+        const button = screen.getByRole('button', { name: 'Sign in with Ever ID' });
+        const [star, wordmark] = Array.from(button.querySelectorAll('svg'));
+        expect(star.getAttribute('viewBox')).toBe('0 0 40 42');
+        expect(star.getAttribute('class')).toContain(
+            'motion-safe:animate-[spin_9s_linear_infinite]',
+        );
+        expect(wordmark.getAttribute('viewBox')).toBe('0 0 92 17');
+        expect(star.getAttribute('aria-hidden')).toBe('true');
+        expect(wordmark.getAttribute('aria-hidden')).toBe('true');
+        expect(button.textContent).toBe('Sign in with Ever ID');
     });
 
     it('reads "Sign up with Ever ID" on the registration page', () => {

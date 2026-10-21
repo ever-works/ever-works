@@ -309,6 +309,39 @@ describe('AgentApprovalsService', () => {
         });
     });
 
+    describe('approveAll — agent identity edits and escalation closures (prompt-injection hardening)', () => {
+        it.each(['agent-file-edit', 'agent-escalation-resolution'])(
+            'never bulk-approves an agent %s proposal, and counts it as EXCLUDED',
+            async (kind) => {
+                proposals.find.mockResolvedValue([
+                    makeProposal({ id: 'p1', actionType: 'spawn_agent', status: 'pending' }),
+                    makeProposal({
+                        id: 'p2',
+                        actionType: 'other',
+                        status: 'pending',
+                        payload: { kind },
+                    }),
+                ]);
+
+                const result = await svc.approveAll('u1');
+
+                expect(result).toEqual({ approved: 1, skipped: 0, excluded: 1 });
+                expect(decidedRows(proposals).map((r) => r.id)).toEqual(['p1']);
+            },
+        );
+
+        it('still bulk-approves an ordinary `other` proposal', async () => {
+            proposals.find.mockResolvedValue([
+                makeProposal({ id: 'p1', actionType: 'other', status: 'pending', payload: {} }),
+            ]);
+            await expect(svc.approveAll('u1')).resolves.toEqual({
+                approved: 1,
+                skipped: 0,
+                excluded: 0,
+            });
+        });
+    });
+
     describe('approveAll — merge approval carve-out (slice AE)', () => {
         // CONTRACT REVERSAL (AE review). These two used to assert
         // `{ approved: 1, skipped: 1 }` — counting a still-PENDING merge
@@ -383,6 +416,25 @@ describe('AgentApprovalsService', () => {
                 skipped: 1,
                 excluded: 0,
             });
+        });
+    });
+
+    describe('findBySubjectKey', () => {
+        it("finds the caller's proposal about one subject in any status", async () => {
+            proposals.findOne.mockResolvedValueOnce(
+                makeProposal({ actionType: 'other', status: 'rejected' }),
+            );
+            const found = await svc.findBySubjectKey('u1', 'other', 'escalation:e1');
+            expect(found).toMatchObject({ id: 'p1', status: 'rejected' });
+            // Owner-scoped, no status filter, no page limit.
+            expect(proposals.findOne).toHaveBeenCalledWith({
+                where: { userId: 'u1', actionType: 'other', subjectKey: 'escalation:e1' },
+            });
+        });
+
+        it('answers null when there is none', async () => {
+            proposals.findOne.mockResolvedValueOnce(null);
+            await expect(svc.findBySubjectKey('u1', 'other', 'x')).resolves.toBeNull();
         });
     });
 

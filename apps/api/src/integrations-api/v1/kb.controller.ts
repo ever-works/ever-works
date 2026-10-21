@@ -32,7 +32,10 @@ import {
     ValidateIf,
     ValidateNested,
 } from 'class-validator';
-import { runWithClaimedAggregateVersion } from '@ever-works/agent/domain-events';
+import {
+    claimedAggregateVersionTaken,
+    runWithClaimedAggregateVersion,
+} from '@ever-works/agent/domain-events';
 import {
     KnowledgeBaseService,
     KnowledgeLibraryService,
@@ -80,6 +83,7 @@ import {
     principalOf,
     rethrowCursor,
     validationFailed,
+    IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
 
@@ -196,13 +200,13 @@ export class IntegrationCreateKbDocumentDto {
 /** `UpdateKbDocument` (contract v1 requests.schema.json): at least one field. */
 export class IntegrationUpdateKbDocumentDto {
     @ApiProperty({ required: false, maxLength: 255 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, 255)
     title?: string;
 
     @ApiProperty({ required: false, maxLength: KB_BODY_MAX_CHARS })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @MaxLength(KB_BODY_MAX_CHARS)
     body?: string;
@@ -214,12 +218,12 @@ export class IntegrationUpdateKbDocumentDto {
     description?: string | null;
 
     @ApiProperty({ required: false, enum: [...KB_DOCUMENT_CLASSES] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsIn(KB_DOCUMENT_CLASSES as unknown as string[])
     class?: string;
 
     @ApiProperty({ required: false, type: [String] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(50)
     @IsString({ each: true })
@@ -227,7 +231,7 @@ export class IntegrationUpdateKbDocumentDto {
     tags?: string[];
 
     @ApiProperty({ required: false, type: [String] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(50)
     @IsString({ each: true })
@@ -235,13 +239,13 @@ export class IntegrationUpdateKbDocumentDto {
     categories?: string[];
 
     @ApiProperty({ required: false, maxLength: 8 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(2, 8)
     language?: string;
 
     @ApiProperty({ required: false, enum: WRITABLE_STATUSES })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsIn(WRITABLE_STATUSES as unknown as string[])
     status?: 'draft' | 'active';
 }
@@ -276,7 +280,7 @@ export class IntegrationCreateKbFolderDto {
 /** `UpdateKbFolder`: rename and / or move (`parentId: null` = top level). */
 export class IntegrationUpdateKbFolderDto {
     @ApiProperty({ required: false, maxLength: 120 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, 120)
     name?: string;
@@ -451,8 +455,17 @@ export class IntegrationKbController {
                 language: dto.language,
                 status: dto.status as never,
                 // A person writing through the integration authors it; the key
-                // itself imports it. Both land `accepted` (never review-gated).
+                // itself imports it.
                 source: (principal.actAsUserId ? 'user' : 'imported') as never,
+                // Works-security lane 3a — a document with NO person behind it
+                // (the key writing as itself) lands `proposed`: an `accepted`
+                // document feeds every later agent prompt, so the M7 review
+                // gate applies until a person accepts it (in Ever Works, or in
+                // the integration's own review queue, relayed through
+                // `POST /kb/documents/:id/accept`). A person's write relayed
+                // with X-Act-As-User stays `accepted`, as their own edit in Ever
+                // Works would be.
+                ...(principal.actAsUserId ? {} : { reviewState: 'proposed' as never }),
             };
             // Before the create: filing afterwards would leave the document
             // behind (one more per retry) when the folder is not one of this
@@ -556,6 +569,20 @@ export class IntegrationKbController {
         if (Object.keys(patch).length === 0) {
             throw validationFailed('body', 'must change at least one field');
         }
+        // Works-security lane 3a — a content edit with NO person behind it (the
+        // key writing as itself) puts the document back to `proposed`, exactly
+        // like a key-only create: otherwise a key could rewrite an accepted
+        // document straight into every later prompt. A person's edit relayed
+        // with X-Act-As-User leaves the review state alone.
+        if (
+            !principalOf(user).actAsUserId &&
+            (patch.title !== undefined ||
+                patch.body !== undefined ||
+                patch.description !== undefined ||
+                patch.class !== undefined)
+        ) {
+            patch.reviewState = 'proposed' as KbDocumentPatch['reviewState'];
+        }
         const organizationId = this.organizationId();
         const current = await this.kb.getDocument(organizationId, id);
         // Malformed or stale If-Match first (400 / 412), before any other rule.
@@ -623,6 +650,11 @@ export class IntegrationKbController {
         @Param('id', ParseUUIDPipe) id: string,
         @Res({ passthrough: true }) res: Response,
     ): Promise<IntegrationKbDocumentDto> {
+        // Works-security lane 3a — kept open to integration keys on purpose:
+        // this is how an integration RELAYS a person's review decision (Ever
+        // Gauzy calls it when a reviewer approves the page in Gauzy's own
+        // review queue). A document an integration creates lands `proposed`,
+        // so the review happens there and this route records its outcome.
         const organizationId = this.organizationId();
         const current = await this.kb.getDocument(organizationId, id);
         await asDomainRule(async () => {
@@ -923,10 +955,27 @@ export class IntegrationKbController {
                     : await this.kb.getFolder(organizationId, id);
             throw new VersionMismatchError(expected, now.dto.version);
         }
-        return runWithClaimedAggregateVersion(
-            { aggregateType: kind, id, version: expected + 1 },
-            write,
-        );
+        // Review 2026-10-17 F53: the claim committed on its own. A write that is refused
+        // (no edit access, a locked document) or changes nothing records no event, so its
+        // claimed version is released; otherwise the row kept a version no event carries
+        // and the integration's next If-Match on the old one answered 412.
+        let taken = false;
+        try {
+            return await runWithClaimedAggregateVersion(
+                { aggregateType: kind, id, version: expected + 1 },
+                async () => {
+                    try {
+                        return await write();
+                    } finally {
+                        taken = claimedAggregateVersionTaken() === true;
+                    }
+                },
+            );
+        } finally {
+            if (!taken) {
+                await this.kb.releaseClaimedVersion(kind, id, expected).catch(() => undefined);
+            }
+        }
     }
 
     private sendDocument(res: Response, doc: IntegrationKbDocument): IntegrationKbDocumentDto {

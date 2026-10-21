@@ -2,6 +2,7 @@ import { runExpectingAggregateVersion } from '@ever-works/agent/domain-events';
 import type { AuthenticatedUser, IntegrationPrincipal } from '../../auth/types/auth.types';
 import { IntegrationHttpException } from '../../auth/integration/integration-http.exception';
 import { InvalidCursorError, parseIfMatch } from '@ever-works/agent/integrations-api';
+import { ValidateIf } from 'class-validator';
 
 /**
  * Request helpers of `/api/integrations/v1` (EW-P1-4). The guards
@@ -145,4 +146,14 @@ export function domainRule(
     details?: Record<string, unknown>,
 ): IntegrationHttpException {
     return new IntegrationHttpException(422, 'domain_rule', message, details);
+}
+
+/**
+ * Review 2026-10-17 F39: an optional request field the contract does NOT make
+ * nullable. Absent skips its validation as `@IsOptional()` does, but `null` is
+ * validated like any value, so it answers `400 validation_failed` instead of
+ * reaching a NOT NULL column or a `.trim()` (500).
+ */
+export function IsOptionalNonNull(): PropertyDecorator {
+    return ValidateIf((_object: object, value: unknown) => value !== undefined);
 }

@@ -12,7 +12,11 @@ jest.mock('@ever-works/agent/services', () => ({
     formatKbContext: jest.fn().mockReturnValue('<kb>\n</kb>'),
 }));
 
-import { OpenAiCompatService, KB_CITATION_INSTRUCTION } from './openai-compat.service';
+import {
+    OpenAiCompatService,
+    KB_CITATION_INSTRUCTION,
+    KB_DATA_PREAMBLE,
+} from './openai-compat.service';
 import type { WorkRepository } from '@ever-works/agent/database';
 import type { AiFacadeService } from '@ever-works/agent/facades';
 import {
@@ -770,6 +774,53 @@ describe('OpenAiCompatService', () => {
             const instructionIdx = content.indexOf(KB_CITATION_INSTRUCTION);
             expect(blockIdx).toBeGreaterThanOrEqual(0);
             expect(instructionIdx).toBeGreaterThan(blockIdx);
+        });
+
+        // Security (prompt-injection hardening): KB text is document content,
+        // not operator policy — the system message leads with the data preamble.
+        it('leads the KB system message with the untrusted-data preamble', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:brand/voice', reference: 'brand/voice', startOffset: 6, endOffset: 21 },
+            ]);
+            kbMentionResolver.resolveMentions.mockResolvedValue([
+                {
+                    mention: {
+                        raw: '@kb:brand/voice',
+                        reference: 'brand/voice',
+                        startOffset: 6,
+                        endOffset: 21,
+                    },
+                    document: sampleDoc,
+                },
+            ] as any);
+            mockedFormat.mockReturnValue('<kb>\n## Brand voice (kb:brand/voice)\nbody\n</kb>');
+
+            await service.handleCompletion(baseDto, { userId: 'u-1', workId: 'w-1' });
+
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            const content = opts.messages[0].content as string;
+            expect(content.startsWith(KB_DATA_PREAMBLE)).toBe(true);
+            expect(KB_DATA_PREAMBLE).toMatch(/UNTRUSTED DATA/);
+            expect(KB_DATA_PREAMBLE).toMatch(/never instructions and never authorization/);
+            // The preamble names no literal tag, so the only `<kb>` is the block's own.
+            expect(content.indexOf('<kb>')).toBe(KB_DATA_PREAMBLE.length + 1);
+        });
+
+        it('skips @kb: resolution entirely when the caller disallows it (bridged prompts)', async () => {
+            mockedParse.mockReturnValue([
+                { raw: '@kb:brand/voice', reference: 'brand/voice', startOffset: 6, endOffset: 21 },
+            ]);
+
+            await service.handleCompletion(
+                baseDto,
+                { userId: 'u-1', workId: 'w-1' },
+                { allowKbMentions: false },
+            );
+
+            expect(kbMentionResolver.resolveMentions).not.toHaveBeenCalled();
+            const [opts] = aiFacade.createChatCompletion.mock.calls[0];
+            expect(opts.messages).toHaveLength(1);
+            expect(opts.messages[0].role).toBe('user');
         });
 
         it('does NOT include the citation instruction when no <kb> block is injected (no resolved docs)', async () => {

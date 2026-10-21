@@ -42,6 +42,7 @@ import {
 	REPO_DECLARED_COMMAND_ID_PREFIX
 } from '@ever-works/contracts';
 import { FleetClientError } from '../fleet-client';
+import { enforceAgentTaskExecutionPolicy } from '../execution-policy';
 import {
 	buildNodeCheckEnv,
 	fitNodeOutcomeToResultBudget,
@@ -73,6 +74,7 @@ import {
 } from './agent-task-question';
 import {
 	assertMcpIsolationInCommand,
+	assertSettingsIsolationInCommand,
 	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	unsupportedOptionalModelCliFlags,
@@ -88,6 +90,7 @@ import {
 	redactCommandResult,
 	type ModelCliPaths,
 	MODEL_CLI_EMPTY_MCP_CONFIG,
+	MODEL_CLI_FLEET_SETTINGS,
 	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
 import {
@@ -591,6 +594,13 @@ export async function runAgentTaskJob(
 	// an install needs, and it is the one command in the run that cannot
 	// work without one.
 	const setup = withRunEnvGrants(normalizeAgentTaskSetup(payload.setup), runEnvGrants);
+	// Control 18 — the machine owner's local execution policy, BEFORE anything
+	// is provisioned or spawned: skip-permissions and node-run shell commands
+	// are this machine's decision, not the platform's.
+	enforceAgentTaskExecutionPolicy(
+		{ execution, setupCount: setup.length, stepCount: grantedSteps.length, checkCount: checks.length },
+		io.executionPolicy
+	);
 
 	let workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
 	try {
@@ -1346,6 +1356,9 @@ async function runModelStep(
 	// changed-file count — by construction rather than by an exclude rule,
 	// which is why `.ever-works/` needed one and this does not.
 	const mcpConfigPath = join(scratchDir, 'mcp.json');
+	// Control 17: the node-owned Claude Code settings file, in scratch for the
+	// same reason as the MCP config — never in the worktree, never committed.
+	const settingsPath = join(scratchDir, 'claude-settings.json');
 	// Slice AK: built BEFORE the bridge, because the overlay has to exist
 	// before anything is spawned with it.
 	//
@@ -1401,10 +1414,23 @@ async function runModelStep(
 			await scratchFs.writeFile(mcpConfigPath, MODEL_CLI_EMPTY_MCP_CONFIG);
 			emptyMcpConfigPath = mcpConfigPath;
 		}
+		// ── Control 17: the repository's settings never load, no hook runs ─
+		//
+		// Same posture as the MCP config above: written inside the `try`, and
+		// NOT degraded on failure — a Claude Code run that would load the
+		// worktree's own `.claude/settings.json` (its hooks run shell commands
+		// as the machine owner whatever the permission mode) does not run.
+		let claudeSettingsPath: string | undefined;
+		if (execution.provider === 'claude-code') {
+			await scratchFs.writeFile(settingsPath, MODEL_CLI_FLEET_SETTINGS);
+			claudeSettingsPath = settingsPath;
+		}
 		// Node lifecycle (slice AR): ask the pinned binary what it supports
-		// BEFORE building its command line. A probe that cannot answer drops
-		// nothing — the command is then exactly what it always was.
-		const droppedFlags = await optionalFlagsToDrop(jobId, execution, executable, io);
+		// BEFORE building its command line — ONE probe answers both questions.
+		// A probe that cannot answer drops nothing and adds nothing (control
+		// 17's `--restricted` needs a positive answer): the command is then
+		// exactly what it always was.
+		const { dropped: droppedFlags, restricted } = await probeModelCliFlags(jobId, execution, executable, io);
 		// Control 16: every Codex run starts with `--ignore-user-config`, and
 		// only the owner's sandbox mode and model defaults are kept (see
 		// CodexUserSettings). Read once per job; a config that cannot be read
@@ -1438,6 +1464,8 @@ async function runModelStep(
 					...(mounts && mounts.length > 0 ? { mounts } : {}),
 					...(bridge.cli ? { mcp: bridge.cli } : {}),
 					...(emptyMcpConfigPath ? { emptyMcpConfigPath } : {}),
+					...(claudeSettingsPath ? { settingsPath: claudeSettingsPath } : {}),
+					...(restricted ? { restricted: true } : {}),
 					...(codexUserSettings ? { codexUserSettings } : {}),
 					...(resumeSessionId ? { resumeSessionId } : {}),
 					...(io.platform ? { platform: io.platform } : {}),
@@ -1447,6 +1475,9 @@ async function runModelStep(
 				// Same gate, for MCP: a Claude Code command that would load the
 				// owner's own MCP servers is refused, not spawned.
 				assertMcpIsolationInCommand({ command, execution });
+				// Control 17, same gate: a Claude Code command that would load the
+				// repository's own settings (and run its hooks) is refused.
+				assertSettingsIsolationInCommand({ command, execution });
 				// Last gate before the spawn: the grant has to be in the string
 				// that is actually run, not merely computed. Nothing downstream
 				// can tell a discarded cross-repository edit from a model that
@@ -1603,19 +1634,31 @@ async function refuseUnderClaudeManagedMcpConfig(
  * blocks the run: any failure to ask reads as "could not tell", which drops
  * nothing.
  */
-async function optionalFlagsToDrop(
+async function probeModelCliFlags(
 	jobId: string,
 	execution: FleetAgentModelExecution,
 	executable: string,
 	io: AgentTaskIo
-): Promise<string[]> {
-	if (!io.modelCliCompat) return [];
+): Promise<{ dropped: string[]; restricted: boolean }> {
+	if (!io.modelCliCompat) return { dropped: [], restricted: false };
 	let compat: { version: string | null; supportedFlags: ReadonlySet<string> | null } | null = null;
 	try {
 		compat = await io.modelCliCompat(execution.provider, executable);
 	} catch {
-		return [];
+		return { dropped: [], restricted: false };
 	}
+	return {
+		dropped: optionalFlagsToDrop(jobId, execution, compat, io),
+		restricted: supportsRestrictedMode(jobId, execution, compat, io)
+	};
+}
+
+function optionalFlagsToDrop(
+	jobId: string,
+	execution: FleetAgentModelExecution,
+	compat: { version: string | null; supportedFlags: ReadonlySet<string> | null } | null,
+	io: AgentTaskIo
+): string[] {
 	const dropped = unsupportedOptionalModelCliFlags(execution, compat?.supportedFlags ?? null);
 	if (dropped.length > 0) {
 		io.logger?.warn(
@@ -1625,6 +1668,36 @@ async function optionalFlagsToDrop(
 		);
 	}
 	return dropped;
+}
+
+/**
+ * Control 17 — whether the pinned Claude Code advertises `--restricted`.
+ *
+ * Only a POSITIVE answer turns it on: a probe that could not read the help,
+ * or a help text it did not recognise, keeps the run exactly as it was
+ * (the baseline isolation of `--setting-sources user` + the hook-free
+ * settings file still applies) rather than passing an option the binary may
+ * reject. Never with skip-permissions, which `--restricted` refuses.
+ */
+function supportsRestrictedMode(
+	jobId: string,
+	execution: FleetAgentModelExecution,
+	compat: { version: string | null; supportedFlags: ReadonlySet<string> | null } | null,
+	io: AgentTaskIo
+): boolean {
+	if (execution.provider !== 'claude-code' || execution.skipPermissions === true) return false;
+	// The machine owner can switch restricted mode off locally (control 18);
+	// an embedder that passes no policy keeps the default (on when supported).
+	if (io.executionPolicy?.restrictedMode === false) return false;
+	const supported = compat?.supportedFlags?.has('--restricted') === true;
+	if (!supported && compat?.supportedFlags) {
+		io.logger?.info(
+			`[fleet-node] job ${jobId}: the pinned claude-code CLI (${compat.version ?? 'version unknown'}) does not ` +
+				'advertise --restricted — running with the baseline settings isolation only. Upgrade Claude Code on ' +
+				'this machine for the stricter mode.'
+		);
+	}
+	return supported;
 }
 
 /**

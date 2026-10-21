@@ -517,6 +517,15 @@ export interface GitPullRequestCheck {
 	readonly status: GitCheckStatus;
 	readonly conclusion?: GitCheckConclusion | null;
 	readonly detailsUrl?: string;
+	/**
+	 * The app that REPORTED the result — GitHub's `check_run.app.slug`
+	 * (`github-actions` for Actions). `null` when the provider reports no app,
+	 * which includes every legacy commit STATUS (any token with status write
+	 * access can post one); absent when the read did not say. Consumers that
+	 * act on a result (the CI fix loop) must treat `null` / absent as an
+	 * unknown reporter, never as a trusted one.
+	 */
+	readonly appSlug?: string | null;
 }
 
 /**

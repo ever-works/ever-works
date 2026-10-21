@@ -118,7 +118,7 @@ describe('dependencies on the managed tier', () => {
 		expect(plugin.capabilities).toContain('app-dependency');
 		expect(plugin.getManifest().capabilities).toContain('app-dependency');
 		const kinds = plugin.dependencyProviders.map((descriptor) => descriptor.kind).sort();
-		expect(kinds).toEqual(['objectStorage', 'postgres', 'redis']);
+		expect(kinds).toEqual(['objectStorage', 'postgres', 'redis', 'smtp']);
 		for (const descriptor of plugin.dependencyProviders) {
 			expect(descriptor.targets).toEqual(['ever-works-apps']);
 			expect(descriptor.label).toMatch(/^On Ever Works · /);
@@ -137,6 +137,11 @@ describe('dependencies on the managed tier', () => {
 		await expect(plugin.supports('redis', 'ever-works-apps', ctx)).resolves.toMatchObject({ supported: true });
 		await expect(plugin.supports('objectStorage', 'ever-works-apps', ctx)).resolves.toMatchObject({
 			supported: true
+		});
+		// Lane aw-env-smtp (GAP-22): the `smtp` mail sink is served on the managed tier too.
+		await expect(plugin.supports('smtp', 'ever-works-apps', ctx)).resolves.toEqual({
+			supported: true,
+			providerId: 'k8s-inline-mailpit'
 		});
 		await expect(plugin.supports('postgres', 'your-cluster', ctx)).resolves.toMatchObject({ supported: false });
 		await expect(new KubernetesPlugin().supports('postgres', 'ever-works-apps', ctx)).resolves.toMatchObject({

@@ -287,6 +287,8 @@
             "signIn": "Masuk dengan Ever ID",
             "signUp": "Daftar dengan Ever ID",
             "redirecting": "Membuka Ever ID…",
+            "signInWith": "Masuk dengan <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Daftar dengan <wordmark>Ever ID</wordmark>",
             "consentRequired": "Setujui ketentuan di atas untuk melanjutkan.",
             "createAccount": {
                 "title": "Buat akun Ever Works Anda",
@@ -7354,6 +7356,95 @@
                         "resume": "Pelanjutan diminta.",
                         "remove": "Penghapusan diminta.",
                         "cancelDeploy": "Pembatalan diminta."
+                    }
+                },
+                "environment": {
+                    "title": "Lingkungan",
+                    "description": "Nilai yang digunakan aplikasi ini saat berjalan. Nilai rahasia tidak pernah ditampilkan — hanya apakah sudah diatur.",
+                    "summary": "{set} dari {total} diatur",
+                    "missingRequired": "{count, plural, other {# nilai wajib belum diisi}}",
+                    "loading": "Membaca lingkungan…",
+                    "unavailable": "Nilai lingkungan belum dapat diedit di instans ini.",
+                    "error": "Tidak dapat membaca lingkungan. Muat ulang halaman untuk mencoba lagi.",
+                    "empty": "Spesifikasi aplikasi ini tidak mendeklarasikan nilai lingkungan.",
+                    "secureStorageOff": "Penyimpanan aman belum dikonfigurasi di instalasi ini, jadi nilai tidak dapat disimpan.",
+                    "edit": "Edit",
+                    "setValue": "Atur nilai",
+                    "editAria": "Edit {name}",
+                    "saved": "{name} disimpan",
+                    "removed": "{name} dihapus",
+                    "states": {
+                        "set": "Diatur",
+                        "unset": "Belum diatur",
+                        "missing": "Wajib — belum diatur",
+                        "fromSpec": "Dari spesifikasi aplikasi",
+                        "fromDependency": "Disuntikkan oleh {kind}",
+                        "generated": "Dibuat otomatis"
+                    },
+                    "badges": {
+                        "secret": "Rahasia",
+                        "required": "Wajib"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Runtime",
+                        "both": "Build + runtime"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Penyimpanan objek",
+                        "smtp": "Email SMTP"
+                    },
+                    "dialog": {
+                        "title": "Edit {name}",
+                        "valueLabel": "Nilai",
+                        "secretHint": "Nilai ini rahasia. Disimpan terenkripsi dan tidak pernah ditampilkan lagi.",
+                        "secretStored": "Ada nilai yang tersimpan. Ketik nilai baru untuk menggantinya.",
+                        "dependencyHint": "Biasanya disuntikkan oleh {kind}. Nilai yang Anda atur di sini menggantikannya — misalnya server SMTP Anda sendiri.",
+                        "redeployHint": "Di bagian aplikasi yang memakai nilai ini, aplikasi dibuild ulang atau dideploy ulang dengan nilai baru.",
+                        "empty": "Masukkan nilai, atau hapus nilai yang tersimpan.",
+                        "save": "Simpan",
+                        "saving": "Menyimpan…",
+                        "remove": "Hapus nilai",
+                        "cancel": "Batal"
+                    },
+                    "errors": {
+                        "undeclaredName": "Spesifikasi aplikasi tidak mendeklarasikan nama ini.",
+                        "specUnavailable": "Aplikasi ini belum memiliki spesifikasi yang dapat digunakan.",
+                        "failed": "Nilai tidak dapat disimpan. Coba lagi."
+                    }
+                },
+                "dependencies": {
+                    "title": "Dependensi",
+                    "description": "Database, cache, penyimpanan, dan email yang dibutuhkan aplikasi ini. Semuanya disiapkan di target penerapannya sebelum aplikasi dimulai.",
+                    "loading": "Membaca dependensi…",
+                    "unavailable": "Dependensi belum dapat dikelola di instans ini.",
+                    "error": "Tidak dapat membaca dependensi. Muat ulang halaman untuk mencoba lagi.",
+                    "empty": "Spesifikasi aplikasi ini tidak mendeklarasikan dependensi.",
+                    "provider": "Penyedia: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, other {# percobaan}}",
+                    "noReason": "Tidak ada alasan yang tercatat.",
+                    "deployRetries": "Menerapkan ulang akan mencobanya lagi secara otomatis — atau tekan Coba lagi sekarang.",
+                    "retry": "Coba lagi",
+                    "retryAria": "Coba lagi {kind}",
+                    "retried": "{kind}: percobaan baru telah dijadwalkan.",
+                    "retryQueued": "{kind}: percobaan baru akan dimulai begitu worker tersedia.",
+                    "leaseHeld": "{kind} sedang disiapkan saat ini. Coba lagi sebentar lagi.",
+                    "retryFailed": "Tidak dapat mencoba lagi {kind}. Coba lagi.",
+                    "deleteData": "Hapus data",
+                    "deleteDataAria": "Hapus data {kind}",
+                    "deleteDialog": {
+                        "title": "Hapus data {kind}?",
+                        "description": "Tindakan ini menghancurkan volume, database, dan bucket milik dependensi ini. Tindakan ini tidak dapat dibatalkan.",
+                        "resources": "Akan dihapus:",
+                        "noResources": "Tidak ada sumber daya yang tercatat untuk dependensi ini.",
+                        "confirmLabel": "Ketik {slug} untuk mengonfirmasi",
+                        "cancel": "Batal",
+                        "confirm": "Hapus data",
+                        "requested": "Menghapus data {kind}.",
+                        "failed": "Data tidak dapat dihapus. {reason}"
                     }
                 }
             },

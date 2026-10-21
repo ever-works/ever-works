@@ -76,4 +76,44 @@ describe('ApprovalsQueue — bulk approval never sends a held email (AW-05)', ()
         );
         expect(toastSuccess).toHaveBeenCalledWith(expect.stringContaining('"excluded":1'));
     });
+
+    it('leaves agent identity edits and escalation closures out of "approve all"', async () => {
+        approveAllMock.mockResolvedValue({ approved: 1, skipped: 0, excluded: 0 });
+        render(
+            <ApprovalsQueue
+                initialApprovals={[
+                    proposal({ id: 'p-spawn' }),
+                    proposal({
+                        id: 'p-file',
+                        actionType: 'other',
+                        title: 'Edit SOUL.md of agent ceo',
+                        payload: {
+                            kind: 'agent-file-edit',
+                            fileName: 'SOUL.md',
+                            body: '# New soul <b>x</b>',
+                        },
+                    }),
+                    proposal({
+                        id: 'p-esc',
+                        actionType: 'other',
+                        payload: {
+                            kind: 'agent-escalation-resolution',
+                            escalationId: 'e1',
+                            note: 'done',
+                        },
+                    }),
+                ]}
+            />,
+        );
+
+        // The full proposed body is on the card, as text.
+        expect(screen.getByTestId('approval-body-p-file').textContent).toBe('# New soul <b>x</b>');
+        expect(screen.getByTestId('approval-body-p-esc').textContent).toBe('done');
+
+        fireEvent.click(screen.getByTestId('approval-approve-all'));
+
+        await waitFor(() => expect(approveAllMock).toHaveBeenCalledWith(['p-spawn']));
+        expect(screen.getByTestId('approval-row-p-file')).toBeInTheDocument();
+        expect(screen.getByTestId('approval-row-p-esc')).toBeInTheDocument();
+    });
 });

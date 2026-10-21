@@ -47,6 +47,14 @@ export type IntegrationKind = (typeof INTEGRATION_KINDS)[number];
  * Scope vocabulary v1 (plan doc 02 §3). `goals:activate`, `missions:activate`
  * and `ideas:build` are deliberately absent: they are never grantable to an
  * integration key (spend safety, decision D9).
+ *
+ * `merges:decide` (works-security lane 3a, 2026-10-18) is the one scope that
+ * lets an integration RELAY a person's answer to a MERGE approval (a
+ * `merge_pull_request` proposal: an agent's pull request landing on a real
+ * branch, a release promotion, a release revert). Every other approval and
+ * escalation is relayed with `inbox:write` alone. It is opt-in (never in a
+ * preset): without it the reply answers `403 scope_missing` and the approval
+ * stays pending for a decision in Ever Works.
  */
 export const INTEGRATION_SCOPES = [
 	'org:read',
@@ -74,12 +82,23 @@ export const INTEGRATION_SCOPES = [
 	'email:write',
 	'events:read',
 	'webhooks:manage',
-	'links:write'
+	'links:write',
+	'merges:decide'
 ] as const;
 export type IntegrationScope = (typeof INTEGRATION_SCOPES)[number];
 
+/**
+ * The scope an integration key needs to relay a decision on a MERGE approval
+ * (works-security lane 3a). See {@link INTEGRATION_SCOPES}.
+ */
+export const INTEGRATION_MERGE_DECISION_SCOPE = 'merges:decide' satisfies IntegrationScope;
+
 /** Scopes that are opt-in even under the "Ever Gauzy" preset. */
-export const INTEGRATION_OPT_IN_SCOPES: readonly IntegrationScope[] = ['org:write', 'email:write'];
+export const INTEGRATION_OPT_IN_SCOPES: readonly IntegrationScope[] = [
+	'org:write',
+	'email:write',
+	INTEGRATION_MERGE_DECISION_SCOPE
+];
 
 /** The "Ever Gauzy" preset: every v1 scope except the opt-in ones. */
 export const EVER_GAUZY_PRESET_SCOPES: readonly IntegrationScope[] = INTEGRATION_SCOPES.filter(

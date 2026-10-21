@@ -49,12 +49,25 @@ import {
 } from './inbound-trigger.types';
 import { matchesEvent, normalizeEventMatcher } from './trigger-event-matcher';
 import {
+    PLATFORM_EVENT_TEMPLATE_PATHS,
     findInvalidTemplatePlaceholders,
     renderTriggerTemplate,
     type TriggerTemplateEvent,
 } from './trigger-template';
 import { InboundTriggerFireRepository } from './inbound-trigger-fire.repository';
-import { MAX_AGENT_PROMPT_LENGTH, buildSingleTaskPrompt } from './trigger-prompt';
+import {
+    MAX_AGENT_PROMPT_LENGTH,
+    MAX_PROMPT_PAYLOAD_CHARS,
+    buildSingleTaskPrompt,
+    serializePayloadForPrompt,
+} from './trigger-prompt';
+import {
+    createFenceNonce,
+    fenceUntrusted,
+    fenceUntrustedInline,
+    neutralizeUntrustedLine,
+    untrustedInlinePreamble,
+} from '../utils/untrusted-content';
 import {
     TriggerVariablesError,
     describeMissingVariables,
@@ -69,6 +82,80 @@ import {
 
 /** Task titles are capped at 200 by TasksService.assertTitle — clamp rendered templates. */
 const MAX_TASK_TITLE_LENGTH = 200;
+
+/** Cap on ONE event value substituted into a Task title. */
+const MAX_TITLE_EVENT_VALUE_LENGTH = 120;
+
+/** Cap on ONE event value substituted into a Task description. */
+const MAX_DESCRIPTION_EVENT_VALUE_LENGTH = 4_000;
+
+/**
+ * Event kinds whose author can be ANYONE on GitHub (an issue, a pull
+ * request, or an @mention on a public repository) — the kinds the GitHub
+ * intake emits. For these, `payload.authorAssociation` (GitHub's
+ * `author_association`, camelCased by the intake) decides whether the fire
+ * may dispatch an agent on its own.
+ */
+const GITHUB_OUTSIDER_GATED_KINDS: ReadonlySet<string> = new Set([
+    'github.issue',
+    'github.pr',
+    'github.mention',
+]);
+
+/** GitHub associations trusted to start an agent run without a human in the loop. */
+const TRUSTED_GITHUB_AUTHOR_ASSOCIATIONS: ReadonlySet<string> = new Set([
+    'OWNER',
+    'MEMBER',
+    'COLLABORATOR',
+]);
+
+/**
+ * Dedupe-key namespace for the webhook path's SIGNATURE marker: a second
+ * ledger row taken next to the fire's own claim (the delivery id when the
+ * sender supplies one, else the signature) so the exact signed request can
+ * never fire twice inside the window, whatever delivery id it carries.
+ * Marker rows are bookkeeping, not fires — `listFires` hides them.
+ */
+const WEBHOOK_SIGNATURE_MARKER_PREFIX = 'wh:sigmark:';
+
+/** Fire-log reason for a signed request replayed under a different delivery id. */
+export const WEBHOOK_REPLAY_REASON =
+    'Duplicate: this exact signed request was already delivered (under another delivery id) inside the replay window';
+
+/**
+ * Why a fire must NOT auto-start its agent even though the trigger says
+ * `autoStart: 'always'` — or null when nothing blocks it.
+ *
+ * Today: a GitHub issue, pull request or @mention whose author is not an
+ * OWNER, MEMBER or COLLABORATOR of the repository. Anyone can open an issue
+ * or a PR on a public repository, so its text reaching an agent with tools
+ * must wait for a human. FAILS CLOSED: an event of these kinds that carries
+ * no association (an older intake build) is treated as unverified and is
+ * not started either.
+ */
+export function outsiderAutoStartBlockReason(event: TriggerTemplateEvent | null): string | null {
+    if (!event?.kind || !GITHUB_OUTSIDER_GATED_KINDS.has(event.kind)) return null;
+    const payload = event.payload;
+    const raw =
+        payload && typeof payload === 'object'
+            ? (payload as Record<string, unknown>).authorAssociation
+            : undefined;
+    if (typeof raw !== 'string' || raw.trim().length === 0) {
+        return (
+            'Not started automatically: this GitHub event does not say how its author relates to the repository, so the author could not be verified as an OWNER, MEMBER or COLLABORATOR. ' +
+            'Review the request, then start the Task by hand.'
+        );
+    }
+    const association = raw.trim().toUpperCase();
+    if (TRUSTED_GITHUB_AUTHOR_ASSOCIATIONS.has(association)) return null;
+    // GitHub's values are an enum (CONTRIBUTOR, FIRST_TIMER, NONE …); keep
+    // only that alphabet so a forged payload cannot write prose here.
+    const shown = association.replace(/[^A-Z_]/g, '').slice(0, 40);
+    return (
+        `Not started automatically: the GitHub author's association with the repository is ${shown || 'unknown'}, ` +
+        'not OWNER, MEMBER or COLLABORATOR. Review the request, then start the Task by hand.'
+    );
+}
 
 /**
  * A fire the trigger's OWN contract rejected (a required payload
@@ -230,7 +317,13 @@ export class InboundTriggersService {
                 agentPrompt: input.agentPrompt ?? null,
                 showOnBoard: input.showOnBoard ?? false,
                 replayWindowSec: this.clampReplayWindow(input.replayWindowSec),
-                autoStart: input.autoStart ?? 'always',
+                // Security: an EVENT-sourced trigger fires on text the
+                // outside world writes (GitHub issues, Sentry messages,
+                // Slack, Jira), so a NEW one parks its Task for a human
+                // unless the owner explicitly asks for 'always'. Webhook
+                // triggers are signed by the owner's own sender and keep
+                // the old default. Stored rows are never rewritten.
+                autoStart: input.autoStart ?? (sourceType === 'event' ? 'manual' : 'always'),
                 defaultVariables,
                 lastFiredAt: null,
                 fireCount: 0,
@@ -415,19 +508,51 @@ export class InboundTriggersService {
         };
         // Replay/duplicate suppression: a retry of the SAME delivery
         // inside the trigger's window returns the original fire's Task
-        // instead of creating a second one. The sender's delivery id is
-        // preferred; without one the signature stands in — a byte-identical
-        // replay signs identically, distinct deliveries do not.
-        const dedupeKey = this.webhookDedupeKey(input.deliveryHeader, providedHex);
+        // instead of creating a second one. The fire's own claim is the
+        // sender's delivery id when supplied (a sender retry that re-signs
+        // with a new timestamp re-uses the same ledger row), else the
+        // signature — a byte-identical replay signs identically.
+        //
+        // Security (replay amplification): the delivery id is NOT covered by
+        // the HMAC (only `${timestamp}.${rawBody}` is), so keyed on the id
+        // alone one captured request re-sent with a fresh
+        // `x-everworks-delivery` per attempt fired again every time inside
+        // the window (a Task, and an agent run, per replay). Every fire
+        // therefore ALSO claims a hidden signature marker; losing it means
+        // these exact signed bytes already fired, so the request is a
+        // duplicate whatever id it carries. The signing protocol is unchanged.
         const claim = this.fires
-            ? await this.fires.claim(row.id, dedupeKey, 'webhook', replayWindowMs)
+            ? await this.fires.claim(
+                  row.id,
+                  this.webhookDedupeKey(input.deliveryHeader, providedHex),
+                  'webhook',
+                  replayWindowMs,
+              )
             : null;
         if (claim && !claim.won) {
             return { ok: true, taskId: claim.fire.taskId, taskSlug: null, duplicate: true };
         }
+        let signatureMarker: InboundTriggerFire | null = null;
+        if (claim && this.fires) {
+            const marker = await this.fires.claim(
+                row.id,
+                `${WEBHOOK_SIGNATURE_MARKER_PREFIX}${providedHex.slice(0, 64)}`,
+                'webhook',
+                replayWindowMs,
+            );
+            if (!marker.won) {
+                // A new identity for already-delivered signed bytes: a replay.
+                // Settle the fresh claim as refused (it produced nothing, so
+                // it stays re-claimable) with a reason the fire log shows.
+                await this.closeFire(claim.fire, 'refused', { reason: WEBHOOK_REPLAY_REASON });
+                return { ok: true, taskId: marker.fire.taskId, taskSlug: null, duplicate: true };
+            }
+            signatureMarker = marker.fire;
+        }
 
         const task = await this.executeFire(row, {
             fire: claim?.fire ?? null,
+            linkedFires: signatureMarker ? [signatureMarker] : [],
             event: webhookEvent,
             fallbackDescription: () => this.buildTaskDescription(row, input.rawBody),
         });
@@ -464,8 +589,14 @@ export class InboundTriggersService {
     async listFires(scope: InboundTriggerScope, id: string): Promise<InboundTriggerFireView[]> {
         const row = await this.findOwn(scope, id);
         if (!this.fires) return [];
-        const rows = await this.fires.listRecent(row.id, RECENT_FIRES_LIMIT);
-        return rows.map((fire) => this.toFireView(fire));
+        // Webhook signature markers are dedupe bookkeeping that ride next
+        // to a real fire row — over-fetch so hiding them never shortens the
+        // log the owner sees.
+        const rows = await this.fires.listRecent(row.id, RECENT_FIRES_LIMIT * 2);
+        return rows
+            .filter((fire) => !(fire.dedupeKey ?? '').startsWith(WEBHOOK_SIGNATURE_MARKER_PREFIX))
+            .slice(0, RECENT_FIRES_LIMIT)
+            .map((fire) => this.toFireView(fire));
     }
 
     /**
@@ -689,29 +820,55 @@ export class InboundTriggersService {
         ctx: {
             /** Ledger row to close out; null when no ledger is bound. */
             fire: InboundTriggerFire | null;
+            /**
+             * Dedupe marker rows taken for this same delivery (webhook
+             * delivery-id marker). Settled with exactly the fire's outcome
+             * so a failed fire leaves them re-claimable and a done fire
+             * leaves them carrying its Task id.
+             */
+            linkedFires?: InboundTriggerFire[];
             event: TriggerTemplateEvent;
             /** Description when neither a template nor a prompt applies. */
             fallbackDescription: () => string;
             workId?: string | null;
         },
     ): Promise<{ id: string; slug: string; title: string }> {
+        const settle = async (
+            status: 'running' | 'done' | 'failed' | 'refused',
+            patch: { taskId?: string | null; reason?: string | null },
+        ): Promise<void> => {
+            await this.closeFire(ctx.fire, status, patch);
+            for (const linked of ctx.linkedFires ?? []) {
+                await this.closeFire(linked, status, patch);
+            }
+        };
         const payload = ctx.event.payload ?? {};
         const missing = findMissingRequiredVariables(row.defaultVariables, payload);
         if (missing.length > 0) {
             const reason = describeMissingVariables(missing);
-            await this.closeFire(ctx.fire, 'refused', { reason });
+            await settle('refused', { reason });
             throw new FireRefusedError(reason);
         }
 
         const resolved = await this.resolveTemplateSlug(row);
         const title = this.renderTaskTitle(row, ctx.event, resolved);
-        const description = this.buildFireDescription(
+        const builtDescription = this.buildFireDescription(
             row,
             ctx.event,
             resolved,
             payload,
             ctx.fallbackDescription,
         );
+        // Security: an outsider's GitHub issue must not reach an agent with
+        // tools on its own — the Task is still created (nothing is lost),
+        // parked for a human, and says why at the top.
+        const autoStartBlocked =
+            row.targetAgentId && row.autoStart !== 'manual'
+                ? outsiderAutoStartBlockReason(ctx.event)
+                : null;
+        const description = autoStartBlocked
+            ? `${autoStartBlocked}\n\n${builtDescription}`
+            : builtDescription;
 
         let task: { id: string; slug: string; title: string };
         try {
@@ -734,14 +891,14 @@ export class InboundTriggersService {
             );
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            await this.closeFire(ctx.fire, 'failed', { reason: message });
+            await settle('failed', { reason: message });
             throw error;
         }
 
         await this.tryAssignAgent(row, task.id);
 
         let dispatched = false;
-        if (row.targetAgentId && row.autoStart !== 'manual') {
+        if (row.targetAgentId && row.autoStart !== 'manual' && !autoStartBlocked) {
             try {
                 await this.tasks.runTask(row.userId, task.id, { agentId: row.targetAgentId });
                 dispatched = true;
@@ -760,7 +917,15 @@ export class InboundTriggersService {
             fireCount: () => '"fireCount" + 1',
             lastFiredAt: new Date(),
         });
-        await this.closeFire(ctx.fire, dispatched ? 'running' : 'done', { taskId: task.id });
+        if (autoStartBlocked) {
+            this.logger.log(
+                `Trigger ${row.id}: task ${task.id} left for a human — outsider GitHub author (auto-start skipped).`,
+            );
+        }
+        await settle(dispatched ? 'running' : 'done', {
+            taskId: task.id,
+            ...(autoStartBlocked ? { reason: autoStartBlocked } : {}),
+        });
         return task;
     }
 
@@ -848,26 +1013,49 @@ export class InboundTriggersService {
         };
     }
 
-    /** Default description for event-sourced fires with no template — provenance-first. */
+    /**
+     * Default description for event-sourced fires with no template —
+     * provenance-first.
+     *
+     * Security (prompt-injection hardening): everything the outside world
+     * wrote — the event title, actor, URL and the whole payload — goes
+     * inside ONE nonce'd untrusted-data fence. It used to be `Event: <raw
+     * title>` plus the payload in a ```json code fence that a payload
+     * string containing ``` could simply close. The payload is serialized
+     * with the single-task path's `serializePayloadForPrompt` (every `<`
+     * escaped, capped), so both modes agree on how a payload is embedded.
+     */
     private buildEventTaskDescription(row: InboundTrigger, event: TriggerTemplateEvent): string {
         const occurredAt =
             event.occurredAt instanceof Date
                 ? event.occurredAt.toISOString()
                 : (event.occurredAt ?? new Date().toISOString());
-        const lines = [
-            `Fired by event trigger "${row.name}" (${row.id}) for ${event.source}/${event.kind}.`,
-            '',
-            ...(event.title ? [`Event: ${event.title}`] : []),
-            ...(event.actorName ? [`Actor: ${event.actorName}`] : []),
-            ...(event.sourceUrl ? [`Source: ${event.sourceUrl}`] : []),
-            `Occurred at: ${occurredAt}`,
-            '',
-            'Payload:',
-            '```json',
-            JSON.stringify(event.payload ?? {}, null, 2),
-            '```',
+        const source = neutralizeUntrustedLine(event.source ?? 'unknown', { maxChars: 60 });
+        const kind = neutralizeUntrustedLine(event.kind ?? 'unknown', { maxChars: 80 });
+        const header = [
+            `Fired by event trigger "${row.name}" (${row.id}) for ${source}/${kind}.`,
+            `Occurred at: ${neutralizeUntrustedLine(String(occurredAt), { maxChars: 40 })}`,
         ];
-        return lines.join('\n');
+        const body = [
+            ...(event.title
+                ? [`Event: ${neutralizeUntrustedLine(event.title, { maxChars: 300 })}`]
+                : []),
+            ...(event.actorName
+                ? [`Actor: ${neutralizeUntrustedLine(event.actorName, { maxChars: 120 })}`]
+                : []),
+            ...(event.sourceUrl
+                ? [`Source: ${neutralizeUntrustedLine(event.sourceUrl, { maxChars: 500 })}`]
+                : []),
+            'Payload:',
+            serializePayloadForPrompt(event.payload ?? {}),
+        ];
+        return [
+            ...header,
+            '',
+            fenceUntrusted('event', body.join('\n'), {
+                source: `the ${source} event that fired this trigger`,
+            }),
+        ].join('\n');
     }
 
     /**
@@ -957,10 +1145,19 @@ export class InboundTriggersService {
                 : null;
         const template = fromSlug ?? own ?? DEFAULT_TASK_TITLE_TEMPLATE;
         const withName = template.split('{name}').join(row.name);
-        const title = renderTriggerTemplate(withName, {
-            trigger: { name: row.name },
-            event,
-        }).trim();
+        // Security: a title is one line of plain text (the board renders
+        // it, and the run's brief carries it inside the fenced
+        // `<task_brief>` block), so each EVENT value is flattened to one
+        // line, stripped of chat-template markers and marker look-alikes,
+        // and capped — one issue title cannot fill the whole Task title.
+        const title = renderTriggerTemplate(
+            withName,
+            { trigger: { name: row.name }, event },
+            {
+                transformEventValue: (value) =>
+                    neutralizeUntrustedLine(value, { maxChars: MAX_TITLE_EVENT_VALUE_LENGTH }),
+            },
+        ).trim();
         const fallback = `Trigger: ${row.name}`.slice(0, MAX_TASK_TITLE_LENGTH);
         if (title.length < 1) return fallback;
         return title.slice(0, MAX_TASK_TITLE_LENGTH);
@@ -982,7 +1179,37 @@ export class InboundTriggersService {
                 : null;
         const template = fromSlug ?? own;
         if (!template) return null;
-        return renderTriggerTemplate(template, { trigger: { name: row.name }, event });
+        // Security (prompt-injection hardening): the template is the
+        // owner's instructions; the substituted EVENT values are not. They
+        // used to be spliced in raw, so an issue body could carry its own
+        // "ignore the above" straight into the agent's brief. Each
+        // outside-written value is now wrapped in a nonce'd inline fence
+        // (one nonce per description) and a one-line preamble says what the
+        // markers mean. Platform-set fields (ids, source/kind, timestamps)
+        // are only flattened, which keeps templates like
+        // "{{event.kind}} at {{event.occurredAt}}" readable.
+        const nonce = createFenceNonce();
+        let fencedAny = false;
+        const rendered = renderTriggerTemplate(
+            template,
+            { trigger: { name: row.name }, event },
+            {
+                transformEventValue: (value, path) => {
+                    if (PLATFORM_EVENT_TEMPLATE_PATHS.has(path)) {
+                        return neutralizeUntrustedLine(value, { maxChars: 200 });
+                    }
+                    fencedAny = true;
+                    return fenceUntrustedInline(value, nonce, {
+                        maxChars: MAX_DESCRIPTION_EVENT_VALUE_LENGTH,
+                    });
+                },
+            },
+        );
+        if (!fencedAny) return rendered;
+        const source = event?.source
+            ? `the ${neutralizeUntrustedLine(event.source, { maxChars: 60 })} event that fired this trigger`
+            : 'the event that fired this trigger';
+        return `${untrustedInlinePreamble(nonce, { source })}\n\n${rendered}`;
     }
 
     /**
@@ -1095,10 +1322,11 @@ export class InboundTriggersService {
     }
 
     /**
-     * Delivery identity for the webhook path: the sender's own delivery
-     * id when supplied, else the request signature — which is a hash
-     * over `${timestamp}.${body}`, so a byte-identical replay collides
-     * and two genuinely different deliveries never do.
+     * The fire's own delivery identity for the webhook path: the sender's
+     * delivery id when supplied, else the request signature — a hash over
+     * `${timestamp}.${body}`, so a byte-identical replay collides and two
+     * genuinely different deliveries never do. (The signature is ALSO
+     * claimed as a hidden marker on every fire — see `fire()`.)
      */
     private webhookDedupeKey(deliveryHeader: string | undefined, signatureHex: string): string {
         const supplied = (deliveryHeader ?? '').trim();
@@ -1141,17 +1369,37 @@ export class InboundTriggersService {
         }
     }
 
+    /**
+     * Default description for webhook fires with no template or prompt.
+     *
+     * Security (prompt-injection hardening): the body is the sender's —
+     * for a non-JSON delivery it is free text — and used to sit inside a
+     * ```json code fence it could close itself. It now goes inside a
+     * nonce'd untrusted-data fence: a parseable JSON body is re-serialized
+     * the way the single-task mode does it (every `<` escaped, capped);
+     * anything else is capped and defused as plain text.
+     */
     private buildTaskDescription(row: InboundTrigger, rawBody: string): string {
         const firedAt = new Date().toISOString();
-        const lines = [
+        const trimmed = rawBody.trim();
+        let payloadText: string;
+        if (trimmed.length === 0) {
+            payloadText = '{}';
+        } else {
+            try {
+                payloadText = serializePayloadForPrompt(JSON.parse(trimmed));
+            } catch {
+                payloadText = trimmed;
+            }
+        }
+        return [
             `Fired by inbound trigger "${row.name}" (${row.id}) at ${firedAt}.`,
             '',
-            'Payload:',
-            '```json',
-            rawBody.trim().length > 0 ? rawBody : '{}',
-            '```',
-        ];
-        return lines.join('\n');
+            fenceUntrusted('webhook_body', `Payload:\n${payloadText}`, {
+                source: 'the webhook delivery that fired this trigger',
+                maxChars: MAX_PROMPT_PAYLOAD_CHARS,
+            }),
+        ].join('\n');
     }
 
     private toView(row: InboundTrigger): InboundTriggerView {

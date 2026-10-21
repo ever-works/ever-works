@@ -80,6 +80,7 @@ import {
     rethrowCursor,
     validationFailed,
     withExpectedVersion,
+    IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
 
@@ -306,7 +307,7 @@ export class IntegrationCreateGoalDto {
  */
 export class IntegrationUpdateGoalDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: 200 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, 200)
     title?: string;
@@ -318,23 +319,23 @@ export class IntegrationUpdateGoalDto {
     description?: string | null;
 
     @ApiProperty({ required: false, enum: ['gte', 'lte'] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsIn(COMPARATORS)
     comparator?: GoalComparator;
 
     @ApiProperty({ required: false, type: Number })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsNumber()
     targetValue?: number;
 
     @ApiProperty({ required: false, minLength: 1, maxLength: 32 })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, 32)
     unit?: string;
 
     @ApiProperty({ required: false, enum: ['day', 'week', 'month', 'total', 'point'] })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsIn(WINDOWS)
     window?: GoalWindow;
 
@@ -358,7 +359,7 @@ export class IntegrationUpdateGoalDto {
         description:
             'The Teams of the pinned organization (team_resources rows). Non-empty means visibility `team` unless visibility was set by hand (D11).',
     })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(50)
     @IsUUID('all', { each: true })
@@ -370,7 +371,7 @@ export class IntegrationUpdateGoalDto {
         description:
             'Integrations may set team or organization only; `private` answers 422 domain_rule. Setting it marks visibilityExplicit=true.',
     })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     visibility?: string;
 }

@@ -59,11 +59,11 @@ it off after N hours, but never destroys anything by itself.
 
 Three phases, each independently shippable:
 
-| Phase  | Ships                                                                                                                                                                                                   |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase  | Ships                                                                                                                                                                                                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **P1** | The `machine-provider` plugin category + capability, the facade, the first plugin (DigitalOcean, API token), the create dialog with the price statement, self-enrolment, the machine block, power on/off, destroy with cost so far, the Remove guard (R-36), audit, Agent tools |
-| **P2** | Cost: hourly / month-to-date / since-created / projected on the page and in the hub **Usage** tab; the idle policy (nothing · tell me · power off after N hours) evaluated by a platform job; the `cloud-idle` producer; `fleet_cloud_usage`                   |
-| **P3** | Sign-in with the provider (OAuth) where supported; software presets incl. the overlay-VPN client with a one-time auth key; reconciliation of machines changed outside Ever Works; contract review for a second provider                                          |
+| **P2** | Cost: hourly / month-to-date / since-created / projected on the page and in the hub **Usage** tab; the idle policy (nothing · tell me · power off after N hours) evaluated by a platform job; the `cloud-idle` producer; `fleet_cloud_usage`                                    |
+| **P3** | Sign-in with the provider (OAuth) where supported; software presets incl. the overlay-VPN client with a one-time auth key; reconciliation of machines changed outside Ever Works; contract review for a second provider                                                         |
 
 ---
 
@@ -105,12 +105,12 @@ show logs and services, and honour the kill switch.
 
 ### 2.2 What they do today, and what breaks
 
-| To get…                                   | Today they must…                                                                                                  | What breaks                                                                                                                                                                                                                                                                                 |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| To get…                                    | Today they must…                                                                                               | What breaks                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | A machine at a cloud provider in the Fleet | Create it in the provider's console, SSH in, install Node and the runtime, come back for a token, run `enroll` | No plugin category or capability for machine providers exists (`packages/plugin/src/contracts/plugin-manifest.types.ts:5-128`; `packages/plugin/src/contracts/facade-capabilities.ts:1-159`); no DigitalOcean plugin exists under `packages/plugins/` (the `vercel` deployment plugin is the closest shape). |
-| To know what it costs                     | Open the provider's billing page                                                                                  | A Node has no provider, region, size or rate (`packages/agent/src/entities/fleet-node.entity.ts:96-115`); Budgets and the fleet cost ceiling track **model** spend only (`packages/agent/src/budgets/budget.service.ts`; `packages/agent/src/fleet/fleet-cost-ceiling.service.ts`).           |
-| To avoid an orphaned bill                 | Remember                                                                                                          | **Remove** deletes the registration and nothing else (`apps/web/src/components/settings/FleetSettings.tsx:257-271`; `apps/api/src/fleet/fleet.controller.ts:562-571`), so a cloud machine would keep billing with no trace in Ever Works.                                                     |
-| To be told about an idle box              | Nothing                                                                                                           | Health samples exist from FL-03 but nothing evaluates idleness against money.                                                                                                                                                                                                               |
+| To know what it costs                      | Open the provider's billing page                                                                               | A Node has no provider, region, size or rate (`packages/agent/src/entities/fleet-node.entity.ts:96-115`); Budgets and the fleet cost ceiling track **model** spend only (`packages/agent/src/budgets/budget.service.ts`; `packages/agent/src/fleet/fleet-cost-ceiling.service.ts`).                          |
+| To avoid an orphaned bill                  | Remember                                                                                                       | **Remove** deletes the registration and nothing else (`apps/web/src/components/settings/FleetSettings.tsx:257-271`; `apps/api/src/fleet/fleet.controller.ts:562-571`), so a cloud machine would keep billing with no trace in Ever Works.                                                                    |
+| To be told about an idle box               | Nothing                                                                                                        | Health samples exist from FL-03 but nothing evaluates idleness against money.                                                                                                                                                                                                                                |
 
 Three existing mechanics make this cheap: plugins already declare a category and capabilities in
 `package.json` and are consumed through facades that resolve by capability and scope
@@ -136,16 +136,16 @@ R-36).
 - **S1 — Create (owner).**
   **Given** the DigitalOcean plugin is enabled and the owner has saved an API token for it,
   **when** they choose **New cloud computer…**, pick `DigitalOcean`, name `nyc-ops`, region `New
-  York 3`, the `$24/mo` size, keep Docker · Node.js · Claude Code · Codex, read the price sentence and
+York 3`, the `$24/mo` size, keep Docker · Node.js · Claude Code · Codex, read the price sentence and
   press **Create · $24/mo**, **then** within 500 ms a row `nyc-ops · creating · Cloud computer ·
-  DigitalOcean · nyc3 · $24/mo` appears, progress reads _"asking DigitalOcean → booting → installing
+DigitalOcean · nyc3 · $24/mo` appears, progress reads _"asking DigitalOcean → booting → installing
   → enrolling"_, and within 5 minutes the row is `● online`; an audit row `node.cloud.create` names
   the owner, the plugin, the region, the size and the hourly rate.
 
 - **S2 — The page answers "what did it cost?".**
   **Given** `nyc-ops` has existed for 3 days 7 hours, **when** the owner opens its page, **then**
   the Cloud block reads `DigitalOcean · nyc3 · 2 CPU · 4 GB · running · $0.036/h · this month $2.84
-  · since created $2.84 · projected month $24.00 (provider list price; your bill may differ)`.
+· since created $2.84 · projected month $24.00 (provider list price; your bill may differ)`.
 
 - **S3 — Power off and on.**
   **Given** `nyc-ops` is running, **when** the owner presses **Power off** and confirms, **then**
@@ -188,7 +188,7 @@ R-36).
   tool's categories (`spend.metered`, `machine.admin`) at **Ask** (CONTRACTS §2.1), **when** it calls
   `fleet_cloud_create` with `providerPluginId`, `regionId`, `sizeId` and `acknowledgedPriceCents`,
   **then** the call is held as an `agent_action_proposals` row (CONTRACTS R-33) and returns `{ held:
-  true, decisionId }`; the Decision states _"Creates a 2 CPU · 4 GB cloud computer at DigitalOcean
+true, decisionId }`; the Decision states _"Creates a 2 CPU · 4 GB cloud computer at DigitalOcean
   (nyc3) for about $24/month ($0.036/hour), billed to your DigitalOcean account until destroyed."_;
   at **Auto** the call answers 409 `confirmation_required` with that summary until repeated with
   `confirm: true` (CONTRACTS §2.2); a call whose `acknowledgedPriceCents` differs from the current
@@ -240,13 +240,13 @@ Values marked **(C)** come from [CONTRACTS.md](../CONTRACTS.md).
 
 ### 4.1 Action families (program rule 12)
 
-| Family action        | Consent on the machine | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                                   | Audit (C §7)             | Agent tool (C §11.3)                                 |
-| -------------------- | ---------------------- | --------------------------------------------- | ------------------------------------------------------- | ------------------------ | ---------------------------------------------------- |
-| Create               | — (platform → provider) | `machines` / owner                            | `confirm` — the price sentence; Agents: held at Ask (R-33) | `node.cloud.create`   | `fleet_cloud_create` — destructive                   |
-| Power on / off       | —                      | `machines` / owner                            | `confirm` — "still bills while off" when applicable     | `node.cloud.power`       | `fleet_cloud_power` — destructive                    |
-| Destroy              | —                      | `machines` / owner                            | `confirm-destructive` — type the name; shows cost so far | `node.cloud.destroy`     | `fleet_cloud_destroy` — destructive                  |
-| Idle policy change   | —                      | `machines` / owner                            | `plain`                                                 | `node.policy.change` (C §7) for the change; `node.cloud.power` with `requestedBy: system:idle-policy` when the policy acts | `fleet_cloud_idle_policy` — destructive: false |
-| Options / usage      | —                      | `view`                                        | `plain`                                                 | —                        | `fleet_cloud_options`, `fleet_cloud_usage`, `fleet_cloud_list` — readOnly |
+| Family action      | Consent on the machine  | Permission family / default audience (C §2.1) | Confirmation (C §2.2)                                      | Audit (C §7)                                                                                                               | Agent tool (C §11.3)                                                      |
+| ------------------ | ----------------------- | --------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Create             | — (platform → provider) | `machines` / owner                            | `confirm` — the price sentence; Agents: held at Ask (R-33) | `node.cloud.create`                                                                                                        | `fleet_cloud_create` — destructive                                        |
+| Power on / off     | —                       | `machines` / owner                            | `confirm` — "still bills while off" when applicable        | `node.cloud.power`                                                                                                         | `fleet_cloud_power` — destructive                                         |
+| Destroy            | —                       | `machines` / owner                            | `confirm-destructive` — type the name; shows cost so far   | `node.cloud.destroy`                                                                                                       | `fleet_cloud_destroy` — destructive                                       |
+| Idle policy change | —                       | `machines` / owner                            | `plain`                                                    | `node.policy.change` (C §7) for the change; `node.cloud.power` with `requestedBy: system:idle-policy` when the policy acts | `fleet_cloud_idle_policy` — destructive: false                            |
+| Options / usage    | —                       | `view`                                        | `plain`                                                    | —                                                                                                                          | `fleet_cloud_options`, `fleet_cloud_usage`, `fleet_cloud_list` — readOnly |
 
 Every caller satisfies a class with the same request fields (`confirm: true`, `confirmName`); a call
 without them answers 409 `confirmation_required` with the summary — the price sentence for Create
@@ -488,16 +488,16 @@ Dialog keyboard-operable; sizes are a radio group with price read by assistive t
 
 ## 7. Key entities & concepts
 
-| Concept                     | New?          | Description                                                                                                                                 |
-| --------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Node** (Computer)         | Existing      | Gains `origin: cloud`, `providerPluginId`, `providerMachineRef`, `providerMeta` (region, size, rate, created at, power state, idle policy, cost snapshot — no secrets) — C §4.1 |
-| **Machine provider plugin** | New category/capability | A plugin that can list options, create, power, destroy and report usage of machines at a provider — C R-15                           |
-| **Provider options**        | New (read model) | Regions, sizes with prices, software presets for one provider+account                                                                     |
-| **Bootstrap script**        | New (generated) | Platform-generated first-boot script that installs the runtime and enrols; carries the one-time token                                     |
-| **Idle policy**             | New (per Node) | nothing · tell me after N h · power off after N h                                                                                          |
-| **Needs a look `cloud-idle`** | Existing kind (C §4.6) | Produced by the idle job; the same kind carries the "never came online", "powered off by policy" and "unclaimed machine" variants in its title, detail and action |
-| **Operation**               | Existing (FL-02) | Progress of create/power/destroy                                                                                                           |
-| **Fleet audit**             | Existing      | `node.cloud.create|power|destroy`                                                                                                           |
+| Concept                       | New?                    | Description                                                                                                                                                                     |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Node** (Computer)           | Existing                | Gains `origin: cloud`, `providerPluginId`, `providerMachineRef`, `providerMeta` (region, size, rate, created at, power state, idle policy, cost snapshot — no secrets) — C §4.1 |
+| **Machine provider plugin**   | New category/capability | A plugin that can list options, create, power, destroy and report usage of machines at a provider — C R-15                                                                      |
+| **Provider options**          | New (read model)        | Regions, sizes with prices, software presets for one provider+account                                                                                                           |
+| **Bootstrap script**          | New (generated)         | Platform-generated first-boot script that installs the runtime and enrols; carries the one-time token                                                                           |
+| **Idle policy**               | New (per Node)          | nothing · tell me after N h · power off after N h                                                                                                                               |
+| **Needs a look `cloud-idle`** | Existing kind (C §4.6)  | Produced by the idle job; the same kind carries the "never came online", "powered off by policy" and "unclaimed machine" variants in its title, detail and action               |
+| **Operation**                 | Existing (FL-02)        | Progress of create/power/destroy                                                                                                                                                |
+| **Fleet audit**               | Existing                | `node.cloud.create\|power\|destroy`                                                                                                                                             |
 
 ---
 

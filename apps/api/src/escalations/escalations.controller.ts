@@ -16,6 +16,7 @@ import { AgentEscalationService } from '@ever-works/agent/agents';
 import type { AgentEscalationDto } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { requireHumanSession } from '../auth/machine-principal';
 import { ListEscalationsQueryDto, ResolveEscalationBodyDto } from './dto/escalations.dto';
 
 /**
@@ -94,6 +95,8 @@ export class EscalationsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: ResolveEscalationBodyDto,
     ): Promise<{ resolved: true; escalationId: string }> {
+        // Works-security lane 3a — resolving an escalation is a human gate.
+        requireHumanSession(auth, 'resolve an escalation');
         const resolved = await this.escalations.resolve(id, auth.userId, body.note ?? null);
         if (!resolved) {
             throw new NotFoundException(`Escalation ${id} not found or already resolved.`);

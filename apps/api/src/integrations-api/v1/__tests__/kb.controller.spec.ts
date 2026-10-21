@@ -14,7 +14,13 @@ import {
     ResourceNotFoundError,
     VersionMismatchError,
 } from '@ever-works/agent/integrations-api';
-import { IntegrationKbController } from '../kb.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import {
+    IntegrationKbController,
+    IntegrationUpdateKbDocumentDto,
+    IntegrationUpdateKbFolderDto,
+} from '../kb.controller';
 
 /**
  * The Knowledge Base of `/api/integrations/v1` (EW-P3-2) over doubles of the
@@ -75,6 +81,7 @@ describe('IntegrationKbController', () => {
                 .mockResolvedValue({ data: [], nextCursor: null, hasMore: false }),
             getFolder: jest.fn(async () => ({ dto: { id: FOLDER, version: 1 }, etag: '"1"' })),
             claimVersion: jest.fn().mockResolvedValue(true),
+            releaseClaimedVersion: jest.fn().mockResolvedValue(undefined),
         };
         // As the Knowledge Base: `withinCreate` runs in the create's transaction.
         const createWith =
@@ -164,7 +171,13 @@ describe('IntegrationKbController', () => {
         expect(knowledgeBase.createOrgDocument).toHaveBeenCalledWith(
             ORG,
             'owner-1',
-            expect.objectContaining({ class: 'freeform', source: 'imported' }),
+            // Works-security lane 3a — the key writing as itself (no person
+            // behind it) lands the document `proposed` (M7 review gate).
+            expect.objectContaining({
+                class: 'freeform',
+                source: 'imported',
+                reviewState: 'proposed',
+            }),
             { withinCreate: expect.any(Function) },
         );
         expect(library.fileDocuments).toHaveBeenCalledWith(
@@ -192,7 +205,11 @@ describe('IntegrationKbController', () => {
         );
         expect(kb.assertWorkOfOrganization).toHaveBeenCalledWith(ORG, WORK);
         expect(knowledgeBase.createDocument).toHaveBeenCalledWith(
-            expect.objectContaining({ workId: WORK, userId: 'user-7', source: 'user' }),
+            expect.objectContaining({
+                workId: WORK,
+                userId: 'user-7',
+                source: 'user',
+            }),
             { withinCreate: undefined },
         );
     });
@@ -260,6 +277,25 @@ describe('IntegrationKbController', () => {
         expect(kb.claimVersion).not.toHaveBeenCalled();
     });
 
+    // Review 2026-10-17 F53: a claim no recorded change took is given back, so the row never
+    // keeps a version no event carries (the next If-Match on the old one would 412).
+    it('releases an If-Match claim that the write did not use (refused, or nothing changed)', async () => {
+        const { controller, kb, knowledgeBase } = setup();
+        // These doubles record nothing, so the claim is never taken: released.
+        await controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"1"', res());
+        expect(kb.releaseClaimedVersion).toHaveBeenCalledWith('kb_document', 'doc-1', 1);
+        kb.releaseClaimedVersion.mockClear();
+        knowledgeBase.updateOrgDocument.mockRejectedValueOnce(new Error('locked'));
+        await expect(
+            controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"1"', res()),
+        ).rejects.toThrow('locked');
+        expect(kb.releaseClaimedVersion).toHaveBeenCalledWith('kb_document', 'doc-1', 1);
+        kb.releaseClaimedVersion.mockClear();
+        // No If-Match: nothing was claimed, nothing is released.
+        await controller.updateDocument(user(), 'doc-1', { title: 'T' }, undefined, res());
+        expect(kb.releaseClaimedVersion).not.toHaveBeenCalled();
+    });
+
     it('a refused write claims nothing: a non-admin is refused before the If-Match claim', async () => {
         const { controller, kb } = setup({ admin: false });
         await expect(
@@ -316,14 +352,44 @@ describe('IntegrationKbController', () => {
     it('edits a Work document through updateDocument and an organization one through updateOrgDocument; a stale If-Match is 412', async () => {
         const work = setup({ workId: WORK });
         await work.controller.updateDocument(user(), 'doc-1', { body: 'New' }, undefined, res());
+        // Works-security lane 3a — a content edit with no person behind it (the
+        // key writing as itself) re-proposes the document.
         expect(work.knowledgeBase.updateDocument).toHaveBeenCalledWith(WORK, 'doc-1', 'owner-1', {
             body: 'New',
+            reviewState: 'proposed',
         });
         const org = setup();
         await org.controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"1"', res());
         expect(org.knowledgeBase.updateOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1', {
             title: 'T',
+            reviewState: 'proposed',
         });
+        // A metadata-only edit leaves the review state alone…
+        await org.controller.updateDocument(user(), 'doc-1', { tags: ['a'] }, undefined, res());
+        expect(org.knowledgeBase.updateOrgDocument).toHaveBeenLastCalledWith(
+            ORG,
+            'doc-1',
+            'owner-1',
+            {
+                tags: ['a'],
+            },
+        );
+        // …and so does a person's edit relayed with X-Act-As-User.
+        await org.controller.updateDocument(
+            user('user-7'),
+            'doc-1',
+            { body: 'Mine' },
+            undefined,
+            res(),
+        );
+        expect(org.knowledgeBase.updateOrgDocument).toHaveBeenLastCalledWith(
+            ORG,
+            'doc-1',
+            'user-7',
+            {
+                body: 'Mine',
+            },
+        );
         await expect(
             org.controller.updateDocument(user(), 'doc-1', { title: 'T' }, '"9"', res()),
         ).rejects.toBeInstanceOf(VersionMismatchError);
@@ -345,6 +411,8 @@ describe('IntegrationKbController', () => {
     });
 
     it('accepts, archives, restores and files through the Knowledge Base and the library', async () => {
+        // `/accept` stays open to an integration (works-security lane 3a): it
+        // relays a person's review decision made in the integration's own queue.
         const { controller, knowledgeBase, library } = setup();
         await controller.acceptDocument(user(), 'doc-1', res());
         expect(knowledgeBase.acceptOrgDocument).toHaveBeenCalledWith(ORG, 'doc-1', 'owner-1');
@@ -414,5 +482,57 @@ describe('IntegrationKbController', () => {
         await expect(
             controller.updateFolder(user(), FOLDER, {}, undefined, res()),
         ).rejects.toMatchObject({ code: 'validation_failed' });
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateKbDocumentDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateKbDocumentDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of [
+            'title',
+            'body',
+            'class',
+            'tags',
+            'categories',
+            'language',
+            'status',
+        ]) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of ['description']) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateKbFolderDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateKbFolderDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of ['name']) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of ['parentId']) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
     });
 });

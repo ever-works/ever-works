@@ -1,10 +1,13 @@
+import { createHash } from 'crypto';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     TenantEmailAddressRepository,
     AgentEmailAssignmentRepository,
     EmailMessageRepository,
     EmailConversationRepository,
+    UserRepository,
 } from '@src/database';
+import { isTrustedSender } from './inbound-email-trust';
 import type {
     EmailMessage,
     EmailMessageAttachmentRecord,
@@ -150,6 +153,54 @@ function threadLookupIds(payload: AgentInboundEmailDispatchPayload): string[] {
 }
 
 /**
+ * The bare, lower-cased mailbox of an address as a header writes it:
+ * `"Ada" <Ada@Example.com>` and `ada@example.com` are the same participant.
+ * `''` when nothing address-like is there.
+ */
+export function normalizeEmailAddress(raw: unknown): string {
+    if (typeof raw !== 'string') return '';
+    const text = raw.trim();
+    const open = text.lastIndexOf('<');
+    const close = text.lastIndexOf('>');
+    const bare = open >= 0 && close > open ? text.slice(open + 1, close) : text;
+    return bare.trim().toLowerCase();
+}
+
+/**
+ * Prompt-injection hardening — everyone a set of stored messages was from or
+ * addressed to (from / to / cc / bcc), normalized. A reply may only JOIN a
+ * thread whose participants include its sender: `In-Reply-To` and
+ * `References` are the sender's to write, and any internet sender who learned
+ * one Message-ID could otherwise post into the owner's Task.
+ */
+export function threadParticipants(messages: readonly EmailMessage[]): Set<string> {
+    const out = new Set<string>();
+    const add = (value: unknown): void => {
+        const address = normalizeEmailAddress(value);
+        if (address) out.add(address);
+    };
+    for (const message of messages) {
+        add(message.from);
+        for (const list of [message.toAddresses, message.ccAddresses, message.bccAddresses]) {
+            for (const address of list ?? []) add(address);
+        }
+    }
+    return out;
+}
+
+/**
+ * Prompt-injection hardening — the conversation key for a subject-only match
+ * from a sender who is not a participant of the conversation that subject
+ * already names. Scoped to the sender (by a short hash, so it fits the
+ * 200-character column), so two different senders using the same subject
+ * never land in one conversation.
+ */
+export function senderScopedThreadKey(threadKey: string, sender: string): string {
+    const suffix = ` #${createHash('sha256').update(sender).digest('hex').slice(0, 16)}`;
+    return `${threadKey.slice(0, 200 - suffix.length)}${suffix}`;
+}
+
+/**
  * Why `address` may not receive a webhook verified as `userId` on `pluginId`,
  * or `null` when it may.
  */
@@ -172,8 +223,9 @@ function whyNotDeliverable(
  * (`payload.recipient`) → its inbound agent assignment, persists the
  * inbound `email_messages` row, and branches on the assignment's
  * `dispatchMode`:
- *  - `task-spawn` (default): delegate Task creation + agent-task-execute
- *    enqueue to the optional {@link INBOUND_EMAIL_TASK_SPAWNER} adapter.
+ *  - `task-spawn` (default): delegate Task creation (and assignment to the
+ *    receiving agent — which by itself starts no run) to the optional
+ *    {@link INBOUND_EMAIL_TASK_SPAWNER} adapter.
  *  - `conversation`: find/create the per-agent `email_conversations`
  *    thread, link the message, and bump `lastMessageAt` (the agent's
  *    chat-reply path consumes the thread).
@@ -207,7 +259,103 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
         @Optional()
         @Inject(INBOUND_EMAIL_ATTACHMENT_STORE)
         private readonly attachmentStore?: InboundEmailAttachmentStore,
+        // Prompt-injection hardening — the owner's verified account email, one
+        // of the addresses the trusted-sender rule accepts. @Optional() and
+        // appended LAST; unbound, only their own mailboxes and the configured
+        // list are trusted (more mail waits for the owner, never less).
+        @Optional() private readonly users?: UserRepository,
     ) {}
+
+    /**
+     * Prompt-injection hardening — whether this email's sender is trusted
+     * (`inbound-email-trust.ts`). Never throws: a lookup that fails trusts
+     * less, never more.
+     *
+     * The owner's SENDING addresses only: their verified account email and
+     * verified outbound / two-way addresses — never the address this mail was
+     * received on, never an inbound-only address (anyone can write either into
+     * `From`). Mail one of the owner's agents sent another is recognised from
+     * the platform's own outbound record instead: the inbound `Message-ID` is
+     * the id of a message the owner's account SENT, from the same address, to
+     * this very address.
+     */
+    private async senderTrusted(
+        payload: AgentInboundEmailDispatchPayload,
+        address: TenantEmailAddress,
+        /** The row this very delivery was stored as (excluded from the replay check). */
+        currentMessageId?: string,
+    ): Promise<boolean> {
+        const ownerAddresses: string[] = [];
+        try {
+            const user = await this.users?.findById(address.userId);
+            if (user?.email && user.emailVerified) ownerAddresses.push(user.email);
+        } catch {
+            // Fall through: the configured list still applies.
+        }
+        try {
+            for (const own of await this.addresses.findAllByUser(address.userId)) {
+                if (!own.verified || own.disabledAt) continue;
+                if (own.id === address.id) continue;
+                if (own.direction !== 'outbound' && own.direction !== 'both') continue;
+                ownerAddresses.push(own.address);
+            }
+        } catch {
+            // Same.
+        }
+        return isTrustedSender({
+            from: payload.from,
+            ownerAddresses,
+            metadata: payload.metadata,
+            platformSent: await this.sentByPlatform(payload, address, currentMessageId),
+        });
+    }
+
+    /**
+     * Whether this inbound message is one the owner's account itself sent to
+     * the receiving address (agent-to-agent mail): its `Message-ID` matches an
+     * OUTBOUND row of the owner that went out (`sentAt` set), from the same
+     * address as this message's `From`, addressed to the receiving address.
+     *
+     * Once per receiving address: a platform message the address already
+     * RECEIVED (an earlier inbound row with this `Message-ID`, other than this
+     * delivery's own) is a replay — a captured copy re-sent under a new provider
+     * message id — and earns no trust (CodeRabbit on #2769).
+     */
+    private async sentByPlatform(
+        payload: AgentInboundEmailDispatchPayload,
+        address: TenantEmailAddress,
+        currentMessageId?: string,
+    ): Promise<boolean> {
+        const id = typeof payload.messageIdHeader === 'string' ? payload.messageIdHeader : '';
+        if (!id) return false;
+        const sender = normalizeEmailAddress(payload.from);
+        const receiving = normalizeEmailAddress(address.address);
+        try {
+            const rows = await this.messages.findByMessageIdHeaders(address.userId, [id]);
+            const replayed = rows.some(
+                (row) =>
+                    row.direction === 'inbound' &&
+                    row.id !== currentMessageId &&
+                    row.emailAddressId === address.id,
+            );
+            if (replayed) return false;
+            return rows.some(
+                (row) =>
+                    row.direction === 'outbound' &&
+                    !!row.sentAt &&
+                    normalizeEmailAddress(row.from) === sender &&
+                    [
+                        ...(row.toAddresses ?? []),
+                        ...(row.ccAddresses ?? []),
+                        ...(row.bccAddresses ?? []),
+                    ]
+                        .map(normalizeEmailAddress)
+                        .includes(receiving),
+            );
+        } catch {
+            return false;
+        }
+    }
 
     async dispatch(
         payload: AgentInboundEmailDispatchPayload,
@@ -234,6 +382,29 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
         }
         const agentId = assignment.agentId;
         const mode = assignment.dispatchMode === 'conversation' ? 'conversation' : 'task-spawn';
+
+        // Review 2026-10-17 U2 (F113): a provider retries a webhook with the same message
+        // id when its first try timed out or failed after the row was written. That
+        // message is handled already: answer so (the route acknowledges, the provider
+        // stops) before storing its attachments again, instead of uploading them once more
+        // and failing on the unique `(pluginId, providerMessageId)` row with a 500.
+        if (payload.providerMessageId) {
+            const delivered = await this.messages.findByProviderMessageId(
+                payload.pluginId,
+                payload.providerMessageId,
+            );
+            if (delivered) {
+                return {
+                    handled: true,
+                    agentId: delivered.agentId ?? agentId,
+                    mode,
+                    emailMessageId: delivered.id,
+                    taskId: delivered.taskId ?? undefined,
+                    conversationId: delivered.conversationId ?? undefined,
+                    reason: 'duplicate',
+                };
+            }
+        }
 
         // EW-P4-3 — attachments are stored (for the address owner, in the
         // address's scope) before the row is written, so the row lists them.
@@ -292,6 +463,8 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
                 subject: payload.subject,
                 bodyText: payload.bodyText,
                 from: payload.from,
+                // One trusted-sender rule for new emails and replies alike.
+                senderTrusted: await this.senderTrusted(payload, address, message.id),
                 // EW-P4-3 — the Task lives where the receiving address does.
                 tenantId: address.tenantId ?? null,
                 organizationId: address.organizationId ?? null,
@@ -363,9 +536,23 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
             }
         }
         const threaded = !!conversation;
-        const threadKey = deriveThreadKey(payload.subject);
+        let threadKey = deriveThreadKey(payload.subject);
         if (!conversation) {
             conversation = await this.conversations.findByThreadKey(agentId, threadKey);
+            // Prompt-injection hardening: a subject is not an identity. A
+            // conversation found by subject alone is joined only by one of its
+            // participants; anyone else gets their own, sender-scoped thread.
+            const sender = normalizeEmailAddress(payload.from);
+            const isParticipant =
+                !!conversation &&
+                !!sender &&
+                (conversation.participants ?? []).some(
+                    (participant) => normalizeEmailAddress(participant?.address) === sender,
+                );
+            if (conversation && !isParticipant) {
+                threadKey = senderScopedThreadKey(threadKey, sender || '(no sender)');
+                conversation = await this.conversations.findByThreadKey(agentId, threadKey);
+            }
         }
         if (!conversation) {
             conversation = await this.conversations.save({
@@ -418,13 +605,39 @@ export class DefaultInboundEmailDispatcher implements AgentInboundEmailDispatche
         const ids = threadLookupIds(payload);
         if (ids.length === 0) return null;
         try {
-            const candidates = (await this.messages.findByMessageIdHeaders(userId, ids)).filter(
-                (candidate) => candidate.agentId === agentId && accept(candidate),
+            const referenced = (await this.messages.findByMessageIdHeaders(userId, ids)).filter(
+                (candidate) => candidate.agentId === agentId,
             );
+            if (referenced.length === 0) return null;
+            const candidates = referenced.filter((candidate) => accept(candidate));
+            let parent: EmailMessage | null = null;
             for (const id of ids) {
-                const match = candidates.find((candidate) => candidate.messageIdHeader === id);
-                if (match) return match;
+                parent = candidates.find((candidate) => candidate.messageIdHeader === id) ?? null;
+                if (parent) break;
             }
+            if (!parent) return null;
+            // Prompt-injection hardening: only a PARTICIPANT of the thread the
+            // reply would JOIN may join it — judged on the selected parent's own
+            // Task / conversation, never on the union of every message the
+            // headers name (a sender of one thread must not reach another by
+            // also quoting its Message-ID; CodeRabbit on #2769). A sender who
+            // merely quotes a Message-ID gets a fresh Task / conversation.
+            const chosen = parent;
+            const sameThread = referenced.filter((message) =>
+                chosen.taskId
+                    ? message.taskId === chosen.taskId
+                    : chosen.conversationId
+                      ? message.conversationId === chosen.conversationId
+                      : message.id === chosen.id,
+            );
+            const sender = normalizeEmailAddress(payload.from);
+            if (!sender || !threadParticipants(sameThread).has(sender)) {
+                this.logger.warn(
+                    `Inbound ${payload.pluginId} message names a thread of agent ${agentId} but its sender is not a participant; not joining it.`,
+                );
+                return null;
+            }
+            return parent;
         } catch (error) {
             this.logger.warn(
                 `Thread lookup failed for inbound ${payload.pluginId} message; falling back to the subject — ${

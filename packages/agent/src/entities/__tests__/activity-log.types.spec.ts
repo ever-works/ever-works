@@ -169,6 +169,11 @@ describe('activity-log.types', () => {
             ['APP_DEPLOY', 'app_deploy'],
             ['APP_JOB', 'app_job'],
             ['APP_SMOKE', 'app_smoke'],
+            // APW-07 — the Environment table's rows (`app.env.changed`, lane
+            // aw-env-smtp) and the Dependencies card's (`app.dependency.retried`, …,
+            // lane aw-deps-api).
+            ['APP_ENV', 'app_env'],
+            ['APP_DEPENDENCY', 'app_dependency'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -500,7 +505,14 @@ describe('activity-log.types', () => {
             //    app_smoke (one row per relayed §9.4 runtime event, written by
             //    `AppRuntimeActivityListener`), each with its `feed-kind.ts` row
             //    in the same change -> 218. Nothing existing moves.
-            expect(literals).toHaveLength(218);
+            // +1 app_env (APW-07 T26, lane aw-env-smtp — the Environment table's
+            //    family, `AppEnvActivityService`) -> 219. Landed without this count,
+            //    so develop read 219 against 218; recounted here.
+            // +1 app_dependency (APW-07, lane aw-deps-api — the Dependencies card's
+            //    Configure / Retry / Delete data rows and the Deploy-triggered
+            //    transient retry), with its `feed-kind.ts` row in the same change
+            //    -> 220. Nothing existing moves.
+            expect(literals).toHaveLength(220);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {
@@ -531,9 +543,10 @@ describe('activity-log.types', () => {
     /**
      * Resolution R-2 has two halves: the snake_case family is the
      * `actionType` (pinned above) and the dotted CONTRACTS §6 event is the
-     * `action`. APW-02's three families own exactly the eight events below —
-     * the six CONTRACTS §6 already listed plus the two APW-02 added
-     * (`app.fork.missing`, `app.upstream.unavailable`). A seventh event is
+     * `action`. APW-02's three families own exactly the nine events below —
+     * the six CONTRACTS §6 already listed plus the three APW-02 added
+     * (`app.fork.missing`, `app.upstream.unavailable`, and FR-60's
+     * `app.upstream.held`). A further event is
      * added to CONTRACTS §6 and to this list together, never to one alone, so
      * a family cannot quietly start writing an event nobody specified.
      */
@@ -561,6 +574,8 @@ describe('activity-log.types', () => {
                     'app.upstream.behind',
                     'app.upstream.conflict',
                     'app.upstream.unavailable',
+                    // FR-60 (T46): the sync held a range that touches the workflow files.
+                    'app.upstream.held',
                 ],
             },
         ];
@@ -578,7 +593,7 @@ describe('activity-log.types', () => {
             },
         );
 
-        it('pins the whole APW-02 event set — six from CONTRACTS §6 plus the two APW-02 adds', () => {
+        it('pins the whole APW-02 event set — six from CONTRACTS §6 plus the three APW-02 adds', () => {
             expect(FAMILIES.flatMap((family) => [...family.events])).toEqual([
                 'app.fork.ready',
                 'app.fork.timeout',
@@ -588,6 +603,7 @@ describe('activity-log.types', () => {
                 'app.upstream.behind',
                 'app.upstream.conflict',
                 'app.upstream.unavailable',
+                'app.upstream.held',
             ]);
         });
     });

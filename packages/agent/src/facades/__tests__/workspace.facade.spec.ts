@@ -159,6 +159,38 @@ describe('WorkspaceFacadeService', () => {
         ).rejects.toBeInstanceOf(WorkspaceFacadeError);
     });
 
+    // Review of #2769 — a judge-before-push caller asks this BEFORE committing:
+    // it needs `branchChanges` AND the promise that `publishSha` is honoured.
+    describe('supportsJudgedPublish', () => {
+        const opts = { userId: 'u1', providerOverride: 'local-workspace' };
+        type Capable = IWorkspacePlugin & {
+            branchChanges?: jest.Mock;
+            publishesJudgedCommit?: true;
+        };
+
+        it('is true only with branchChanges AND publishesJudgedCommit', async () => {
+            const plugin = createMockWorkspacePlugin('local-workspace') as Capable;
+            plugin.branchChanges = jest.fn();
+            plugin.publishesJudgedCommit = true;
+            arm(plugin);
+            await expect(service.supportsJudgedPublish(opts)).resolves.toBe(true);
+        });
+
+        it('is false for a provider that reports changes but does not promise publishSha', async () => {
+            const plugin = createMockWorkspacePlugin('local-workspace') as Capable;
+            plugin.branchChanges = jest.fn();
+            arm(plugin);
+            await expect(service.supportsJudgedPublish(opts)).resolves.toBe(false);
+        });
+
+        it('is false for a provider without branchChanges, even with the flag', async () => {
+            const plugin = createMockWorkspacePlugin('local-workspace') as Capable;
+            plugin.publishesJudgedCommit = true;
+            arm(plugin);
+            await expect(service.supportsJudgedPublish(opts)).resolves.toBe(false);
+        });
+    });
+
     // APW-08 T17 — judge-before-push reads the branch's changes through here.
     describe('branchChanges', () => {
         it('refuses, naming the provider, when the plugin cannot report a branch before it is pushed', async () => {

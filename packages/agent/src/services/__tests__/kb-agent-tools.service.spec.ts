@@ -209,7 +209,12 @@ describe('KbAgentToolsService', () => {
                 WORK_ID,
                 'd1',
                 USER_ID,
-                expect.objectContaining({ title: 'Brand voice v2', body: 'new body' }),
+                // Works-security lane 3a — an agent's edit re-enters review.
+                expect.objectContaining({
+                    title: 'Brand voice v2',
+                    body: 'new body',
+                    reviewState: 'proposed',
+                }),
             );
             expect(kb.createDocument).not.toHaveBeenCalled();
         });
@@ -303,23 +308,13 @@ describe('KbAgentToolsService', () => {
     });
 
     describe('kbUnlock', () => {
-        it('returns the unlocked doc on happy path', async () => {
-            const unlocked = makeBody({ id: 'd1', locked: false, lockMode: null });
-            kb.unlockDocument.mockResolvedValueOnce(unlocked);
-
+        // Works-security lane 3a — every caller of this service is an agent
+        // run, and a lock is how the owner keeps agents off a document: an
+        // agent never lifts one. A person unlocks through the app / API.
+        it('refuses every unlock and never reaches the Knowledge Base', async () => {
             const result = await service.kbUnlock(WORK_ID, USER_ID, 'd1');
-            const data = expectOk(result);
-            expect(data.locked).toBe(false);
-            expect(kb.unlockDocument).toHaveBeenCalledWith(WORK_ID, 'd1', USER_ID);
-        });
-
-        it('returns { ok: false, error } on role-gate denial', async () => {
-            kb.unlockDocument.mockRejectedValueOnce(
-                new ForbiddenException('Unlocking a KB document requires manager+ role'),
-            );
-
-            const result = await service.kbUnlock(WORK_ID, USER_ID, 'd1');
-            expect(expectErr(result)).toMatch(/manager\+/);
+            expect(expectErr(result)).toMatch(/person/);
+            expect(kb.unlockDocument).not.toHaveBeenCalled();
         });
     });
 });

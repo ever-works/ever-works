@@ -388,6 +388,14 @@ describe('AppEnvRuntimeSource (T14, plan §4.6.1:424-449)', () => {
 
     it('emits ew-dep:// placeholders on the managed tier and never an output value', async () => {
         await seedReadyWorld();
+        // A zone row: the full managed tier's Postgres (lane aw-env-smtp — an in-namespace
+        // `k8s-inline-*` row is the lite tier's, whose real outputs the platform holds).
+        await dependencyRows.update(
+            { workId: WORK, kind: 'postgres' },
+            {
+                providerId: 'managed-postgres',
+            },
+        );
 
         const result = await makeSource().resolve(WORK, 'commit-1', {
             ...RUNTIME_CTX,

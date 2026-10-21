@@ -35,6 +35,9 @@ export function isSafeWebhookUrl(rawUrl: string): boolean {
 	if (host.startsWith('[') && host.endsWith(']')) {
 		host = host.slice(1, -1);
 	}
+	// A fully-qualified spelling (`metadata.google.internal.`) names the same
+	// host — the trailing dot must not walk past the alias list.
+	host = host.replace(/\.+$/, '');
 
 	if (CLOUD_METADATA_HOSTNAMES.has(host)) {
 		return false;
@@ -68,8 +71,10 @@ const CLOUD_METADATA_HOSTNAMES = new Set([
  * True for any IPv4 address that must never be reachable from server-side
  * webhook / SSRF-sensitive code: RFC1918 private ranges, loopback (127/8),
  * link-local (169.254/16 — includes AWS / GCP / Azure IMDS 169.254.169.254),
- * CGNAT (100.64/10), multicast/reserved (>=224), 0.0.0.0/8, and the
- * IETF-protocol-assignment range 192.0.0/24.
+ * CGNAT (100.64/10), multicast/reserved (>=224), 0.0.0.0/8, the
+ * IETF-protocol-assignment range 192.0.0/24, the benchmarking range
+ * 198.18/15 (RFC 2544), and the documentation ranges 192.0.2/24,
+ * 198.51.100/24 and 203.0.113/24 (RFC 5737) — none is a public destination.
  *
  * Exported so {@link safeFetchWithDnsPin} can reuse the same predicate
  * against DNS-resolved addresses without duplicating the rules.
@@ -85,37 +90,114 @@ export function isPrivateIPv4(ip: string): boolean {
 	if (a === 172 && b >= 16 && b <= 31) return true;
 	if (a === 192 && b === 168) return true;
 	if (a === 192 && b === 0 && parts[2] === 0) return true;
+	if (a === 198 && (b === 18 || b === 19)) return true;
+	if (a === 192 && b === 0 && parts[2] === 2) return true;
+	if (a === 198 && b === 51 && parts[2] === 100) return true;
+	if (a === 203 && b === 0 && parts[2] === 113) return true;
 	if (a === 100 && b >= 64 && b <= 127) return true;
 	if (a >= 224) return true;
 	return false;
 }
 
 /**
+ * The eight 16-bit groups of an IPv6 literal, or `null` when `ip` is not one.
+ *
+ * Handles `::` compression, a trailing dotted IPv4 quad (`::ffff:1.2.3.4`)
+ * and a zone index (`fe80::1%eth0`). The WHATWG URL parser rewrites an
+ * embedded dotted quad to hex (`[::ffff:169.254.169.254]` becomes
+ * `[::ffff:a9fe:a9fe]`), so every check below works on the groups, never on
+ * the spelling.
+ */
+function parseIPv6Groups(ip: string): number[] | null {
+	let text = ip.trim().toLowerCase();
+	const zone = text.indexOf('%');
+	if (zone >= 0) text = text.slice(0, zone);
+	if (isIP(text) !== 6) return null;
+	const lastColon = text.lastIndexOf(':');
+	const tail = text.slice(lastColon + 1);
+	if (tail.includes('.')) {
+		if (isIP(tail) !== 4) return null;
+		const [a, b, c, d] = tail.split('.').map((part) => Number(part));
+		text = `${text.slice(0, lastColon + 1)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+	}
+	const halves = text.split('::');
+	if (halves.length > 2) return null;
+	const head = halves[0] ? halves[0].split(':') : [];
+	const rest = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+	const fill = halves.length === 2 ? 8 - head.length - rest.length : 0;
+	if (fill < 0) return null;
+	const groups = [...head, ...new Array<string>(fill).fill('0'), ...rest].map((group) => parseInt(group, 16));
+	if (groups.length !== 8 || groups.some((group) => Number.isNaN(group) || group < 0 || group > 0xffff)) {
+		return null;
+	}
+	return groups;
+}
+
+/** Dotted IPv4 from two 16-bit groups. */
+function ipv4FromGroups(high: number, low: number): string {
+	return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+}
+
+/**
+ * The IPv4 address an IPv6 address carries inside it, when it carries one in
+ * a form a host or a gateway will actually route to that IPv4 address:
+ *
+ *  - IPv4-mapped        `::ffff:a.b.c.d`      (`::ffff:hhhh:hhhh`)
+ *  - IPv4-translated    `::ffff:0:a.b.c.d`    (RFC 2765)
+ *  - IPv4-compatible    `::a.b.c.d`           (`::hhhh:hhhh`, deprecated but parsed)
+ *  - NAT64 well-known   `64:ff9b::a.b.c.d`    (RFC 6052, /96)
+ *  - 6to4               `2002:hhhh:hhhh::/48` (RFC 3056)
+ *  - Teredo             `2001:0::/32`, client address = last 32 bits XOR 0xffffffff
+ *
+ * `null` when there is none. Exported for tests.
+ */
+export function embeddedIPv4(ip: string): string | null {
+	const g = parseIPv6Groups(ip);
+	if (!g) return null;
+	const zeros = (from: number, to: number) => g.slice(from, to).every((group) => group === 0);
+	if (zeros(0, 5) && g[5] === 0xffff) return ipv4FromGroups(g[6], g[7]);
+	if (zeros(0, 4) && g[4] === 0xffff && g[5] === 0) return ipv4FromGroups(g[6], g[7]);
+	if (zeros(0, 6) && (g[6] !== 0 || g[7] > 1)) return ipv4FromGroups(g[6], g[7]);
+	if (g[0] === 0x64 && g[1] === 0xff9b && zeros(2, 6)) return ipv4FromGroups(g[6], g[7]);
+	if (g[0] === 0x2002) return ipv4FromGroups(g[1], g[2]);
+	if (g[0] === 0x2001 && g[1] === 0) return ipv4FromGroups(g[6] ^ 0xffff, g[7] ^ 0xffff);
+	return null;
+}
+
+/**
  * True for any IPv6 address that must never be reachable from server-side
- * webhook / SSRF-sensitive code: loopback (::1), unspecified (::), unique
- * local (fc00::/7 — fc.. / fd..), link-local (fe80::/10), and IPv4-mapped
- * addresses (::ffff:a.b.c.d) where the embedded IPv4 is private.
+ * webhook / SSRF-sensitive code: unspecified (::), loopback (::1), unique
+ * local (fc00::/7), link-local (fe80::/10), the deprecated site-local block
+ * (fec0::/10), multicast (ff00::/8), documentation (2001:db8::/32), NAT64
+ * local-use (64:ff9b:1::/48), and every address that EMBEDS an IPv4 address
+ * which is itself private, loopback, link-local or cloud-metadata — mapped,
+ * translated, compatible, NAT64, 6to4 and Teredo forms alike (see
+ * {@link embeddedIPv4}). The check works on the parsed groups, so
+ * `::ffff:169.254.169.254` and its URL-normalized spelling `::ffff:a9fe:a9fe`
+ * are the same address here.
  *
  * Exported so {@link safeFetchWithDnsPin} can reuse the same predicate
  * against DNS-resolved addresses without duplicating the rules.
  */
 export function isPrivateIPv6(ip: string): boolean {
-	const lower = ip.toLowerCase();
-	if (lower === '::1' || lower === '::') return true;
-	if (lower.startsWith('fc') || lower.startsWith('fd')) return true;
+	const g = parseIPv6Groups(ip);
+	if (!g) {
+		// Not a parseable IPv6 literal: keep the old prefix checks as a floor.
+		const lower = ip.toLowerCase();
+		return lower === '::1' || lower === '::' || lower.startsWith('fc') || lower.startsWith('fd');
+	}
+	if (g.every((group) => group === 0)) return true;
+	if (g.slice(0, 7).every((group) => group === 0) && g[7] === 1) return true;
+	if ((g[0] & 0xfe00) === 0xfc00) return true;
 	// Security: link-local is the full fe80::/10 block (fe80:: – febf::), not
-	// just the fe80 prefix. `startsWith('fe80')` missed fe81–febf, letting
-	// e.g. http://[fe82::1]/ through. Mask the first hextet with 0xffc0 and
-	// compare to 0xfe80 so the whole /10 range is blocked.
-	const firstHextet = lower.split(':', 1)[0];
-	if (/^[0-9a-f]{1,4}$/.test(firstHextet)) {
-		const group0 = parseInt(firstHextet, 16);
-		if ((group0 & 0xffc0) === 0xfe80) return true;
-	}
-	if (lower.startsWith('::ffff:')) {
-		const v4 = lower.slice('::ffff:'.length);
-		if (isIP(v4) === 4) return isPrivateIPv4(v4);
-	}
+	// just the fe80 prefix — masked so fe81–febf are blocked too.
+	if ((g[0] & 0xffc0) === 0xfe80) return true;
+	if ((g[0] & 0xffc0) === 0xfec0) return true;
+	if ((g[0] & 0xff00) === 0xff00) return true;
+	if (g[0] === 0x2001 && g[1] === 0x0db8) return true;
+	if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 1) return true;
+	const v4 = embeddedIPv4(ip);
+	if (v4 && isPrivateIPv4(v4)) return true;
 	return false;
 }
 

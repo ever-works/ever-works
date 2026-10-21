@@ -207,6 +207,39 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             expect(usernameAllocator.allocateUsername).toHaveBeenCalledTimes(2);
         });
 
+        // Review 2026-10-17 F52: an admin's integration key creating an Organization makes
+        // its creator an admin of it in the SAME transaction as the create.
+        it('writes the initial admin roster row inside the create transaction', async () => {
+            const { service, manager } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+            });
+            const saved: unknown[] = [];
+            const original = manager.getRepository.getMockImplementation()!;
+            manager.getRepository.mockImplementation((target: string) =>
+                target === 'organization_members'
+                    ? ({
+                          create: jest.fn((data) => data),
+                          save: jest.fn(async (row) => {
+                              saved.push(row);
+                              return { ...row, updatedAt: new Date() };
+                          }),
+                      } as never)
+                    : original(target),
+            );
+            await service.createOrganization('u-1', 'Acme EU', undefined, {
+                initialAdmin: { userId: 'admin-1', invitedById: 'u-1' },
+            });
+            expect(saved).toEqual([
+                expect.objectContaining({
+                    organizationId: 'o-new',
+                    tenantId: 't-1',
+                    userId: 'admin-1',
+                    role: 'admin',
+                    invitedById: 'u-1',
+                }),
+            ]);
+        });
+
         it('gives up after repeated slug races rather than retrying forever', async () => {
             const { service, usernameAllocator } = makeService({
                 user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },

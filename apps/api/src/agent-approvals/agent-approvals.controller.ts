@@ -17,6 +17,7 @@ import {
 } from '@ever-works/agent/agent-approvals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { requireHumanSession } from '../auth/machine-principal';
 import { ApproveAllAgentApprovalsDto, ListAgentApprovalsQueryDto } from './dto/agent-approval.dto';
 
 /**
@@ -86,6 +87,10 @@ export class AgentApprovalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: ApproveAllAgentApprovalsDto,
     ): Promise<{ approved: number; skipped: number; excluded: number }> {
+        // Works-security lane 3a — every approve / reject here is a human
+        // decision: a person's interactive session only (never a personal API
+        // key, an integration key or a fleet run).
+        requireHumanSession(auth, 'approve agent proposals');
         // `skipped` and `excluded` are deliberately separate counters:
         // skipped means "somebody already decided this", excluded means
         // "bulk approve refused to decide it and it is STILL PENDING"
@@ -104,6 +109,7 @@ export class AgentApprovalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentActionProposalDto> {
+        requireHumanSession(auth, 'approve an agent proposal');
         return this.service.decide(auth.userId, id, 'approved');
     }
 
@@ -117,6 +123,7 @@ export class AgentApprovalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentActionProposalDto> {
+        requireHumanSession(auth, 'reject an agent proposal');
         return this.service.decide(auth.userId, id, 'rejected');
     }
 }

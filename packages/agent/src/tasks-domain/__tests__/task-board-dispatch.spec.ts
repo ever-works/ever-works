@@ -272,6 +272,22 @@ describe('TasksService.runTask — board dispatch', () => {
         expect(result).toMatchObject({ taskId: 't1', agentId: 'agent-x', dispatched: true });
     });
 
+    it("pressing Run is the owner starting the Task: it clears a binding 'awaiting-owner' label", async () => {
+        taskRepo.findByIdAndUser.mockResolvedValue(
+            makeTask({ labels: ['inbound-email', 'awaiting-owner'] } as any),
+        );
+        taskRepo.updateById = jest.fn().mockResolvedValue(undefined);
+
+        await build().runTask('u1', 't1', { agentId: 'agent-x' });
+
+        expect(taskRepo.updateById).toHaveBeenCalledWith('t1', { labels: ['inbound-email'] });
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
+            expect.objectContaining({ labels: ['inbound-email'] }),
+            'agent-x',
+            expect.anything(),
+        );
+    });
+
     it('opaque-404s a same-user known Task UUID from Yo in the active Ever scope', async () => {
         taskRepo.findByIdAndUser.mockResolvedValueOnce(makeTask({ ...yoScope }));
 

@@ -31,6 +31,7 @@ import {
     buildIdeaSnapshot,
     buildMissionSnapshot,
     buildTaskSnapshot,
+    buildTeamSnapshot,
 } from '../domain-events/domain-event-snapshots';
 import { VISIBILITY_AGGREGATE_SHAPES } from './record-access.types';
 import { serializeOnSingleConnection } from '../database/repositories/single-connection-write-queue';
@@ -60,6 +61,18 @@ interface VisibilityRecord {
     teamId?: string | null;
     /** Tasks only: the sub-task hierarchy `setTeams` must keep consistent. */
     parentTaskId?: string | null;
+}
+
+/** The `team_resources` rows a {@link RecordVisibilityService.setTeamsIn} call added and removed. */
+export interface TeamSideChange {
+    readonly resourceType: TeamResource['resourceType'];
+    readonly resourceId: string;
+    /** Teams that gained the record. */
+    readonly added: readonly string[];
+    /** Teams that lost it. */
+    readonly removed: readonly string[];
+    /** A private record: its Teams' events stay off the feed. */
+    readonly isPrivate: boolean;
 }
 
 export interface VisibilityState {
@@ -334,6 +347,7 @@ export class RecordVisibilityService {
             if (!moved && result.changed) {
                 await this.recordTeamsChanged(manager, aggregate, id, result.previousTeamIds);
             }
+            await this.recordTeamSideIn(manager, result.teamSide);
             return result;
         });
         if (!state) return null;
@@ -341,9 +355,10 @@ export class RecordVisibilityService {
     }
 
     /**
-     * {@link setTeams} inside the caller's transaction, without D11 or any event (a create
-     * path applies both after: `recomputeAutomaticIn` then its `<aggregate>.created`).
-     * Answers the Teams before and after, `null` when the record is missing.
+     * {@link setTeams} inside the caller's transaction, without D11 or any event of the
+     * record (a create path applies both after: `recomputeAutomaticIn` then its
+     * `<aggregate>.created`, then {@link recordTeamSideIn} with `teamSide`, F34). Answers
+     * the Teams before and after, `null` when the record is missing.
      */
     async setTeamsIn(
         manager: EntityManager,
@@ -351,7 +366,12 @@ export class RecordVisibilityService {
         id: string,
         teamIds: readonly string[],
         addedById: string | null,
-    ): Promise<{ previousTeamIds: string[]; teamIds: string[]; changed: boolean } | null> {
+    ): Promise<{
+        previousTeamIds: string[];
+        teamIds: string[];
+        changed: boolean;
+        teamSide: TeamSideChange;
+    } | null> {
         const unique = [...new Set(teamIds)];
         const row = await this.load(manager, aggregate, id);
         if (!row) return null;
@@ -397,6 +417,7 @@ export class RecordVisibilityService {
             await resources.delete({ id: In(stale.map((resource) => resource.id)) });
         }
         const present = new Set(existing.map((resource) => resource.teamId));
+        const added: string[] = [];
         for (const teamId of resourceTeamIds) {
             if (present.has(teamId)) continue;
             await resources.save(
@@ -410,11 +431,49 @@ export class RecordVisibilityService {
                     createdAt: new Date(),
                 }),
             );
+            added.push(teamId);
         }
         const next = await this.teamIdsOf(manager, aggregate, row);
         const before = new Set(previousTeamIds);
         const changed = next.length !== before.size || next.some((teamId) => !before.has(teamId));
-        return { previousTeamIds, teamIds: next, changed };
+        const teamSide: TeamSideChange = {
+            resourceType: shape.teamResourceType as TeamResource['resourceType'],
+            resourceId: id,
+            added,
+            removed: stale.map((resource) => resource.teamId),
+            isPrivate: row.visibility === 'private',
+        };
+        return { previousTeamIds, teamIds: next, changed, teamSide };
+    }
+
+    /**
+     * Review 2026-10-17 F34: the Teams' side of a {@link setTeamsIn} change, as
+     * `TeamResourcesService.attach` / `detach` record it: each Team whose resources moved
+     * gets `team.resource.added` / `removed` and a version bump, so its integration copy
+     * (and ETag) follows. {@link setTeams} calls it after the record's own event; a create
+     * path calls it after its `<aggregate>.created`, so a consumer never meets a Team
+     * resource before the record. A private record's link stays off the feed (F4).
+     */
+    async recordTeamSideIn(manager: EntityManager, change: TeamSideChange): Promise<void> {
+        const ref = { resourceType: change.resourceType, resourceId: change.resourceId };
+        for (const teamId of change.removed) {
+            await this.recordTeamResourceChange(
+                manager,
+                teamId,
+                'team.resource.removed',
+                { teamId, ...ref, deleted: true },
+                change.isPrivate,
+            );
+        }
+        for (const teamId of change.added) {
+            await this.recordTeamResourceChange(
+                manager,
+                teamId,
+                'team.resource.added',
+                { teamId, ...ref },
+                change.isPrivate,
+            );
+        }
     }
 
     // ── internals ─────────────────────────────────────────────────────
@@ -519,8 +578,66 @@ export class RecordVisibilityService {
         if (automatic && result.affected === 0) return false;
         if (recordEvent && next.visibility !== row.visibility) {
             await this.recordChange(manager, aggregate, row, next, teamIds);
+        } else if (recordEvent) {
+            // Review 2026-10-17 F35: only `visibilityExplicit` moved (a value picked by hand
+            // that equals the automatic one, or back to automatic). The DTO carries the flag,
+            // so the version moves and the change is on the feed too.
+            await this.recordExplicitChanged(manager, aggregate, row, next);
         }
         return true;
+    }
+
+    /** `<aggregate>.updated` with `changedFields: ['visibilityExplicit']` (F35). */
+    private async recordExplicitChanged(
+        manager: EntityManager,
+        aggregate: VisibilityAggregate,
+        row: VisibilityRecord,
+        next: { visibility: RecordVisibility; visibilityExplicit: boolean },
+    ): Promise<void> {
+        const build = SNAPSHOT_OF[aggregate];
+        if (!this.recorder || !build || !row.organizationId) return;
+        const version = await this.recorder.bumpAggregateVersion(manager, aggregate, row.id);
+        assertExpectedAggregateVersion(aggregate, row.id, version);
+        const snapshot = await build(manager, row.id);
+        if (!snapshot?.organizationId) return;
+        await this.recorder.record(manager, {
+            type: `${aggregate}.updated`,
+            tenantId: snapshot.tenantId,
+            organizationId: snapshot.organizationId,
+            aggregate: { type: aggregate, id: row.id, version },
+            data: snapshot.dto as Record<string, unknown>,
+            changedFields: ['visibilityExplicit'],
+            previous: { visibilityExplicit: row.visibilityExplicit === true },
+            visibility: next.visibility,
+        });
+    }
+
+    /**
+     * A Team's `team.resource.added` / `removed` for a record whose Teams moved here
+     * (F34): bumps the Team's version, as `DomainEventPublisher.child` does. A private
+     * record's link stays off the feed (F4).
+     */
+    private async recordTeamResourceChange(
+        manager: EntityManager,
+        teamId: string,
+        type: 'team.resource.added' | 'team.resource.removed',
+        data: Record<string, unknown>,
+        isPrivate: boolean,
+    ): Promise<void> {
+        if (!this.recorder) return;
+        const version = await this.recorder.bumpAggregateVersion(manager, 'team', teamId);
+        assertExpectedAggregateVersion('team', teamId, version);
+        const snapshot = await buildTeamSnapshot(manager, teamId);
+        if (!snapshot?.organizationId) return;
+        await this.recorder.record(manager, {
+            type,
+            tenantId: snapshot.tenantId,
+            organizationId: snapshot.organizationId,
+            aggregate: { type: 'team', id: teamId, version },
+            data,
+            changedFields: ['resources'],
+            visibility: isPrivate ? 'private' : snapshot.dto.visibility,
+        });
     }
 
     /**

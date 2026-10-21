@@ -174,6 +174,69 @@ describe('IntegrationKeysSection', () => {
             ),
         );
     });
+
+    // Review 2026-10-17 U5: Escape (or a click outside) never drops the only copy of a secret.
+    it('keeps a shown secret on screen through Escape; Done closes it', async () => {
+        rotateApiKey.mockResolvedValue({
+            success: true,
+            data: {
+                id: 'k-1',
+                name: KEY.name,
+                key: 'ew_int_' + 'b'.repeat(64),
+                prefix: 'ew_int_bbbb',
+                rotatedAt: '2026-10-16T00:00:00.000Z',
+                previousKeyGraceUntil: '2099-01-01T00:00:00.000Z',
+            },
+            error: null,
+        });
+        render(<IntegrationKeysSection initialKeys={[KEY]} organizations={ORGS} />);
+        fireEvent.click(screen.getByLabelText(`rotate.action ${KEY.name}`));
+        fireEvent.click(screen.getByText('rotate.confirm'));
+        await waitFor(() => expect(screen.getByTestId('integration-key-secret')).toBeTruthy());
+        fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(screen.getByTestId('integration-key-secret').textContent).toBe(
+            'ew_int_' + 'b'.repeat(64),
+        );
+        // Done ignores clicks until the rotation's transition has settled (`isPending`); on a
+        // loaded CI runner that outlasted the secret's first render, so the click was dropped
+        // (stage runs 39245383947 #1 and #2). Click once it is enabled.
+        const done = screen.getByRole('button', { name: 'dialog.done' }) as HTMLButtonElement;
+        await waitFor(() => expect(done.disabled).toBe(false), { timeout: 5_000 });
+        fireEvent.click(done);
+        await waitFor(
+            () => {
+                expect(screen.queryByTestId('integration-key-secret')).toBeNull();
+                expect(screen.queryByRole('dialog')).toBeNull();
+            },
+            { timeout: 5_000 },
+        );
+    });
+
+    // Review 2026-10-17 U10: "None" stops the old secret at once, so no grace line.
+    it('says the previous secret still works only while a grace period runs', async () => {
+        rotateApiKey.mockResolvedValue({
+            success: true,
+            data: {
+                id: 'k-1',
+                name: KEY.name,
+                key: 'ew_int_' + 'c'.repeat(64),
+                prefix: 'ew_int_cccc',
+                rotatedAt: new Date().toISOString(),
+                previousKeyGraceUntil: new Date(Date.now() + 1000).toISOString(),
+            },
+            error: null,
+        });
+        render(<IntegrationKeysSection initialKeys={[KEY]} organizations={ORGS} />);
+        fireEvent.click(screen.getByLabelText(`rotate.action ${KEY.name}`));
+        // The custom Select: open it on its current value, pick "None".
+        fireEvent.click(screen.getByText('rotate.grace.24'));
+        fireEvent.click(screen.getByText('rotate.grace.0'));
+        fireEvent.click(screen.getByText('rotate.confirm'));
+        await waitFor(() => expect(rotateApiKey).toHaveBeenCalledWith('k-1', 0));
+        await waitFor(() => expect(screen.getByTestId('integration-key-secret')).toBeTruthy());
+        expect(screen.queryByText(/^graceUntil/)).toBeNull();
+    });
 });
 
 describe('EverGauzyIntegrationCard', () => {

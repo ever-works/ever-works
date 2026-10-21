@@ -18,6 +18,7 @@ import {
 	OBJECT_STORAGE_PROVIDER_DESCRIPTOR,
 	POSTGRES_PROVIDER_DESCRIPTOR,
 	REDIS_PROVIDER_DESCRIPTOR,
+	SMTP_PROVIDER_DESCRIPTOR,
 	assertSupportedKubeconfig,
 	renderNamespace
 } from '@ever-works/k8s-plugin';
@@ -70,8 +71,8 @@ export const MANAGED_NAMESPACE_GRANT_NAME = 'ever-works-apps-controller';
  * 5. **Least privilege, per namespace.** Before the first write into a managed namespace the plugin
  *    applies the Namespace and a RoleBinding granting the controller ServiceAccount the operator's
  *    namespaced-admin ClusterRole IN that namespace only (see {@link managedNamespaceGrant}).
- * 6. **Dependencies in the App's namespace.** The same in-cluster Postgres / Redis / object-storage providers,
- *    published for `ever-works-apps` only (see {@link dependencyProviders}).
+ * 6. **Dependencies in the App's namespace.** The same in-cluster Postgres / Redis / object-storage / smtp
+ *    providers, published for `ever-works-apps` only (see {@link dependencyProviders}).
  */
 export class KubernetesAppsTierPlugin extends KubernetesPlugin {
 	private readonly tierApi: KubernetesApiService;
@@ -89,15 +90,16 @@ export class KubernetesAppsTierPlugin extends KubernetesPlugin {
 	override readonly capabilities: readonly string[] = ['deployment', 'apps-tier', 'app-dependency'];
 
 	/**
-	 * Point 6: the k8s plugin's in-cluster providers (Postgres, Redis, S3-compatible object storage), published
-	 * for `ever-works-apps` ONLY. They provision inside the App's own `ewapp-*` namespace — so every byte
+	 * Point 6: the k8s plugin's in-cluster providers (Postgres, Redis, S3-compatible object storage and — lane
+	 * aw-env-smtp, GAP-22 — the `smtp` mail sink / bring-your-own server), published for `ever-works-apps` ONLY. They provision inside the App's own `ewapp-*` namespace — so every byte
 	 * counts against its ResourceQuota and goes when the namespace goes — dialled with the platform credential
 	 * the dependency job assembles through the runtime facade (`prepareDependencyTarget`).
 	 */
 	override readonly dependencyProviders: readonly AppDependencyProviderDescriptor[] = [
 		POSTGRES_PROVIDER_DESCRIPTOR,
 		REDIS_PROVIDER_DESCRIPTOR,
-		OBJECT_STORAGE_PROVIDER_DESCRIPTOR
+		OBJECT_STORAGE_PROVIDER_DESCRIPTOR,
+		SMTP_PROVIDER_DESCRIPTOR
 	].map((descriptor) => ({
 		...descriptor,
 		targets: ['ever-works-apps'],

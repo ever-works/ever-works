@@ -115,3 +115,38 @@ describe('findInvalidTemplatePlaceholders', () => {
         expect(findInvalidTemplatePlaceholders('Trigger: {name} fired!')).toEqual([]);
     });
 });
+
+describe('renderTriggerTemplate — transformEventValue (prompt-injection hardening)', () => {
+    it('passes every non-empty EVENT value through the transform, never trigger.name', () => {
+        const seen: string[] = [];
+        const out = renderTriggerTemplate(
+            '{{trigger.name}}: {{event.title}} / {{event.payload.missing}}',
+            CONTEXT,
+            {
+                transformEventValue: (value, path) => {
+                    seen.push(path);
+                    return `[${value}]`;
+                },
+            },
+        );
+        expect(seen).toEqual(['event.title']);
+        expect(out.startsWith('Deploy watcher: [')).toBe(true);
+        expect(out.endsWith('] / ')).toBe(true);
+    });
+
+    it('does not re-expand placeholder text produced by the transform', () => {
+        const out = renderTriggerTemplate('{{event.title}}', CONTEXT, {
+            transformEventValue: () => '{{trigger.name}}',
+        });
+        expect(out).toBe('{{trigger.name}}');
+    });
+});
+
+describe('renderTriggerTemplate — placeholder scan stays linear', () => {
+    it('handles long whitespace runs inside braces quickly and still trims', () => {
+        const started = Date.now();
+        renderTriggerTemplate(`{{${' '.repeat(200_000)}`, CONTEXT);
+        expect(Date.now() - started).toBeLessThan(500);
+        expect(renderTriggerTemplate('{{   trigger.name   }}', CONTEXT)).toBe('Deploy watcher');
+    });
+});

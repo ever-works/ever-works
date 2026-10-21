@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { fenceReviewFeedback, neutralizeFenceText } from './review-feedback-fence';
 
 /**
  * CI feedback and the autonomous fix loop (self-build slice AC, EW-806) —
@@ -55,6 +56,42 @@ export function clampAutoResumeAttempts(raw: unknown): number {
         MAX_CI_AUTO_RESUME_ATTEMPTS,
         Math.max(MIN_CI_AUTO_RESUME_ATTEMPTS, Math.trunc(raw)),
     );
+}
+
+// ── who may report CI (security finding F8) ─────────────────────────
+
+/**
+ * The GitHub Apps whose check results may drive the fix loop when nothing
+ * else is configured. Operators ADD to this with `GITHUB_TRUSTED_CHECK_APPS`.
+ */
+export const DEFAULT_TRUSTED_CHECK_APPS: readonly string[] = ['github-actions'];
+
+/**
+ * `github-actions` plus every slug in a comma-separated list (trimmed,
+ * lower-cased, de-duplicated). There is no way to remove the default: it is
+ * what this repository's own CI runs as.
+ */
+export function parseTrustedCheckApps(raw: string | null | undefined): string[] {
+    const extra = (raw ?? '')
+        .split(',')
+        .map((value) => value.trim().toLowerCase())
+        .filter((value) => value.length > 0);
+    return Array.from(new Set([...DEFAULT_TRUSTED_CHECK_APPS, ...extra]));
+}
+
+/**
+ * May a check reported by `appSlug` drive the fix loop? Any GitHub App
+ * installed on a repository can post a check run, and a red one's name,
+ * title and summary become what the resumed agent is told to fix — so only
+ * an allow-listed reporter counts, and an unknown one (`null`, absent, a
+ * commit status) never does.
+ */
+export function isTrustedCheckApp(
+    appSlug: string | null | undefined,
+    trusted: readonly string[],
+): boolean {
+    const slug = (appSlug ?? '').trim().toLowerCase();
+    return slug.length > 0 && trusted.includes(slug);
 }
 
 // ── reading a provider check result ─────────────────────────────────
@@ -189,6 +226,16 @@ export interface CiHeadEvidence {
      * look like a fresh push.
      */
     reportedAt?: Date | null;
+    /**
+     * The delivery reached the Task through its BRANCH NAME alone — it named
+     * no pull request at all. A branch name is chosen by whoever pushed
+     * it (a fork can be named exactly like a Task branch), so such a
+     * delivery can confirm a head the platform already holds but is never
+     * evidence that the head has MOVED: with this set, a commit that differs
+     * from the recorded head is `stale`, never `advanced`, and the clock is
+     * not consulted.
+     */
+    branchOnly?: boolean;
 }
 
 /**
@@ -238,6 +285,9 @@ export function decideCiHead(
     const eventSha = sha(event.headSha);
     if (!storedSha) return 'first-seen';
     if (storedSha === eventSha) return 'current';
+
+    // (0) Branch-only evidence never moves the head (see `branchOnly`).
+    if (event.branchOnly === true) return 'stale';
 
     // (1) The provider's own pointer to the pull request head. Decisive
     //     in both directions, and available on every same-repo delivery.
@@ -308,6 +358,20 @@ export type AutoResumeOutcomeReason =
     | 'halted'
     /** The repo/branch/PR resolved to no Task this owner holds. */
     | 'no-task'
+    /**
+     * The result was reported by a GitHub App that is not on the trusted
+     * list (`github-actions` + `GITHUB_TRUSTED_CHECK_APPS`), or by nothing
+     * the provider could name. Nothing recorded, nothing resumed (F8).
+     */
+    | 'untrusted-check-app'
+    /**
+     * The delivery matched a Task by BRANCH NAME only — it named no pull
+     * request at all, as every fork pull request's deliveries do — and its
+     * commit is not one the platform already knows for that Task
+     * (`ciHeadSha` / `prHeadSha`). A fork can name a branch anything, so
+     * nothing is recorded and nothing is resumed (F1).
+     */
+    | 'unverified-branch'
     /** A review delivery arrived but the Task has no unconsumed rejection. */
     | 'no-feedback'
     /** The Task is `done` or `cancelled`. */
@@ -386,9 +450,24 @@ export const CI_FAILURE_FEEDBACK_MAX_CHARS = 4000;
  * observed for this commit, not necessarily the only one, and the run
  * that reads this has a git provider it can ask.
  *
- * Every interpolated value is provider-reported and therefore untrusted;
- * `RunSteeringService` neutralizes chat-template markers when it splices
- * the stored row into a prompt, and the caller caps the length.
+ * ## Platform words vs provider words (security finding F5, 2026-10-18)
+ *
+ * The check NAME, output TITLE and output SUMMARY are whatever the CI
+ * provider reported — text a workflow (or any GitHub App) chose — so each
+ * sits in its own `<review_feedback source="ci">` fence with `<` neutralized
+ * ({@link fenceReviewFeedback}). Everything else is the PLATFORM speaking
+ * and stays outside the fence, where the agent reads it as instructions:
+ * the repository / commit / PR coordinates, the conclusion (one of
+ * {@link FAILING_CHECK_CONCLUSIONS} for any row this is written for), the
+ * provider's https run link, and the "fix the cause, push to the same
+ * branch, do not weaken a check" guidance. `RunSteeringService` recognises
+ * a row composed here ({@link isComposedCiFeedback}) and replays it as-is
+ * under the strict data notice.
+ *
+ * The length cap is spent on the OUTPUT, never on the fences or the
+ * guidance: the summary is cut to whatever room the rest leaves, so a long
+ * CI dump can neither push the closing tag off the end nor squeeze out the
+ * instruction not to disable a check.
  */
 export function composeCiFailureFeedback(input: {
     repoFullName: string;
@@ -400,21 +479,82 @@ export function composeCiFailureFeedback(input: {
     outputTitle?: string | null;
     outputSummary?: string | null;
 }): string {
-    const lines: string[] = [
-        `Continuous integration is RED for ${input.repoFullName} at commit ${input.headSha}.`,
+    // NFKC-fold and neutralize FIRST, cap LAST: folding can multiply a
+    // string's length (U+FDFA alone becomes 18 characters) and `<` becomes
+    // `&lt;`, so a cap applied before either would not bound what is
+    // written. The result holds no `<`, so fencing it again is a no-op; the
+    // truncation marker is ASCII so a later fold cannot grow it either.
+    const oneLine = (value: string, max: number) => {
+        const flat = neutralizeFenceText(value).replace(/\s+/g, ' ').trim();
+        return flat.length > max ? `${flat.slice(0, max - 3)}...` : flat;
+    };
+    const head: string[] = [
+        `Continuous integration is RED for ${oneLine(input.repoFullName, 200)} at commit ${oneLine(input.headSha, 64)}.`,
         '',
-        `Failing check: ${input.checkName} (${input.conclusion}).`,
+        `Failing check (${oneLine(input.conclusion, 40)}) — its name as the CI provider reported it:`,
+        fenceReviewFeedback(oneLine(input.checkName, CI_FEEDBACK_NAME_MAX_CHARS), 'ci'),
     ];
-    if (input.prNumber) lines.push(`Pull request: #${input.prNumber}.`);
-    if (input.url) lines.push(`Details: ${input.url}`);
-    if (input.outputTitle) lines.push('', `Reported title: ${input.outputTitle}`);
-    if (input.outputSummary) lines.push('', 'Reported output:', input.outputSummary);
-    lines.push(
+    if (input.prNumber) head.push(`Pull request: #${input.prNumber}.`);
+    // The run link sits OUTSIDE the fence, so it must be a real https URL —
+    // the webhook already validates its own; the poll hands over the raw
+    // `detailsUrl` a check reported. Anything else is dropped, not quoted.
+    const details = httpsLink(input.url);
+    if (details) head.push(`Details: ${details}`);
+    if (input.outputTitle) {
+        head.push(
+            '',
+            'Reported title:',
+            fenceReviewFeedback(oneLine(input.outputTitle, CI_FEEDBACK_TITLE_MAX_CHARS), 'ci'),
+        );
+    }
+    const tail = [
         '',
         'Other checks on this commit may also be failing — this is the first red result reported for it, not a full list. Read the pull request checks, fix the cause, and push to the same branch. Do not disable, skip or weaken a check to make it pass.',
-    );
-    return lines.join('\n').slice(0, CI_FAILURE_FEEDBACK_MAX_CHARS);
+    ];
+    if (input.outputSummary) {
+        const outputLabel = ['', 'Reported output:'];
+        const fixed = [...head, ...outputLabel, fenceReviewFeedback('', 'ci'), ...tail].join(
+            '\n',
+        ).length;
+        const room = CI_FAILURE_FEEDBACK_MAX_CHARS - fixed;
+        // Neutralizing can lengthen the text (`<` → `&lt;`), so the cut is made
+        // on the ESCAPED form — which holds no `<`, so fencing it again is a
+        // no-op and a cut can never leave half a tag behind.
+        let escaped = neutralizeFenceText(input.outputSummary.trim());
+        // ASCII `...`, not `…`: the fence NFKC-folds its content, and U+2026
+        // would grow back to three characters past the cap.
+        if (escaped.length > room) escaped = room > 3 ? `${escaped.slice(0, room - 3)}...` : '';
+        if (escaped.length > 0) head.push(...outputLabel, fenceReviewFeedback(escaped, 'ci'));
+    }
+    return [...head, ...tail].join('\n');
 }
+
+/**
+ * `value` as an https URL with no credentials, normalized and capped, or
+ * `null`. `URL` percent-encodes anything that could break the line or open
+ * a tag (`<`, spaces, newlines).
+ */
+function httpsLink(value: string | null | undefined): string | null {
+    if (typeof value !== 'string' || value.trim().length === 0) return null;
+    let url: URL;
+    try {
+        url = new URL(value.trim());
+    } catch {
+        return null;
+    }
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    const text = url.toString();
+    return text.length <= CI_FEEDBACK_URL_MAX_CHARS ? text : null;
+}
+
+/** Longest run link quoted into the CI feedback; a longer one is dropped. */
+export const CI_FEEDBACK_URL_MAX_CHARS = 500;
+
+/** Longest check name quoted into the CI feedback (one line). */
+export const CI_FEEDBACK_NAME_MAX_CHARS = 200;
+
+/** Longest output title quoted into the CI feedback (one line). */
+export const CI_FEEDBACK_TITLE_MAX_CHARS = 300;
 
 /**
  * Title + body of the ONE Inbox notice filed when the loop gives up.

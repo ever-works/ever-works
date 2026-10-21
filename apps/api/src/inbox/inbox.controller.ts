@@ -23,6 +23,7 @@ import {
 } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { isHumanSession, requireHumanSession } from '../auth/machine-principal';
 import {
     ListInboxDecisionsQueryDto,
     ListInboxQueryDto,
@@ -189,6 +190,21 @@ export class InboxController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: ReplyInboxItemDto,
     ): Promise<InboxReplyOutcome> {
+        // Works-security lane 3a — answering an APPROVAL decides the proposal
+        // (`decidedVia: 'user'`, which the merge verifier accepts as the human
+        // merge approval) and answering an ESCALATION resolves it: both are
+        // human gates, so they need a person's interactive session. A
+        // question's answer steers the asking run and stays open to a personal
+        // API key (the CLI), exactly as before.
+        if (!isHumanSession(auth)) {
+            const item = await this.inbox.getForUser(id, auth.userId);
+            if (item && (item.kind === 'approval' || item.kind === 'escalation')) {
+                requireHumanSession(
+                    auth,
+                    item.kind === 'approval' ? 'answer an approval' : 'resolve an escalation',
+                );
+            }
+        }
         return this.inbox.reply(auth.userId, id, {
             text: body.text ?? null,
             optionId: body.optionId ?? null,

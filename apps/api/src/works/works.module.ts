@@ -39,6 +39,14 @@ import { AppWorksModule as AgentAppWorksModule } from '@ever-works/agent/app-wor
 // the evaluation job all read and write ONE state row through ONE service.
 import { AppSpecModule as AgentAppSpecModule } from '@ever-works/agent/app-spec';
 import { AppDeployRequestModule } from '@ever-works/agent/app-runtime';
+// Lane aw-env-smtp (APW-07 T24) — `AppEnvEditorService` for `GET`/`PUT /api/works/:id/app-env`. The
+// same static module `AppDeployRequestModule` reaches through `AppRuntimeEnvModule`, so the routes, the
+// deploy preconditions and the resolver read and write ONE `AppEnvService`.
+import { AppEnvModule } from '@ever-works/agent/app-env';
+// Lane aw-deps-api (APW-07 T25) — `AppDependenciesService` for `/api/works/:id/app-dependencies[/:kind]`.
+// The same static module `TriggerInternalModule` and `AppDeployRequestModule` import, so the routes, the
+// Deploy preflight and the worker relays share ONE service and one row store.
+import { AppDependenciesModule } from '@ever-works/agent/app-dependencies';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -53,6 +61,8 @@ import { WorkAppRuntimeController } from './work-app-runtime.controller';
 import { WorkEvolveController } from './work-evolve.controller';
 import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requests';
 import { WorkAppSpecController } from './work-app-spec.controller';
+import { WorkAppEnvController } from './work-app-env.controller';
+import { WorkAppDependenciesController } from './work-app-dependencies.controller';
 // Lane aw-web-2 — the attestation dialog's read and the create form's catalog tab.
 import { WorkAppLicenseController } from './work-app-license.controller';
 import { AppsCatalogBlueprintsController } from './apps-catalog-blueprints.controller';
@@ -147,6 +157,8 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // keeps "your spec is invalid" on the Deploy tab and the App spec tab
         // from ever disagreeing.
         AppDeployRequestModule,
+        AppEnvModule,
+        AppDependenciesModule,
         // APW-09 (lane aw-ai) — `UpstreamPullRequestOpenService` for
         // `POST /api/works/:id/upstream-pr`. The same module instance `ApiModule` imports.
         UpstreamPullRequestsModule,
@@ -211,6 +223,11 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkAppDeployController,
         WorkAppRuntimeController,
         WorkAppSpecController,
+        // Lane aw-env-smtp (APW-07 T24) — `GET`/`PUT /api/works/:id/app-env`.
+        WorkAppEnvController,
+        // Lane aw-deps-api (APW-07 T25) — `GET /api/works/:id/app-dependencies`, `PUT`/`DELETE …/:kind`
+        // and `POST …/:kind/provision` (the card's Retry).
+        WorkAppDependenciesController,
         // `GET /api/works/:id/app-license` — the attestation dialog's read.
         WorkAppLicenseController,
         // `GET /api/apps-catalog/blueprints` — the create form's "Browse the Apps catalog".

@@ -174,7 +174,7 @@ docker run --rm --net container:ever-works-api nicolaka/netshoot tcpdump -n '(tc
 
 With statistics off you will see no query for an Ever host and no connection to one. With them on, you will see the connections §2 lists — one a day to the statistics endpoint, a second one on days 1–3 of a month, retries after a failed delivery and those of each _Send now_ — and nothing else from this module.
 
-The repository runs the same check in CI on every push to `develop`, `stage` and `main`: an egress audit boots the API image on a Docker network with no route out and records every DNS query and connection attempt, with statistics off by default (nothing configured), off through the environment and through `.env`, and on against a mock receiver (where the only call allowed is the report itself).
+The repository runs the same check in CI on every push to `develop`, `stage` and `main`: an egress audit boots the API and web images on a Docker network with no route out and records every DNS query and connection attempt of both, with statistics off by default (nothing configured), off through the environment and through `.env`, switched off in Settings, and on against a mock receiver (where the only call allowed is the report itself). In the environment, Settings and mock runs, a real browser also signs in to the web app and opens every page, and the run fails if it looks up or requests an Ever host or shows a new link to one ([`tools/egress-audit/README.md`](../../tools/egress-audit/README.md)).
 
 You can also run the stack on a Docker network created with `docker network create --internal`, which has no route out at all: the installation keeps working, and the settings page shows the daily report as not delivered.
 

@@ -45,16 +45,14 @@
 
 ## P1.B — Node files module
 
-- [ ] **T-02**. `apps/node/src/core/link/modules/files/path-guard.ts`: `resolveInsideRoot(root,
-      rel, io)` over the shared resolver's `isUnderAllowedRoot` (T-03), `lstat` walk per component,
+- [ ] **T-02**. `apps/node/src/core/link/modules/files/path-guard.ts`: `resolveInsideRoot(root, rel, io)` over the shared resolver's `isUnderAllowedRoot` (T-03), `lstat` walk per component,
       link-target check, UNC refusal; typed refusals `escape | link-escape | not-found`. Never a
       second canonicalisation rule.
       **Test**: `apps/node/src/core/link/modules/files/path-guard.spec.ts` — `..`, absolute, `C:\`,
       `\\server\share`, link out of root, link inside root, case-insensitive match on `win32` via
       injected platform.
 - [ ] **T-03** (parallel). Import the shared resolver `apps/node/src/core/link/allowed-roots.ts`
-      (CONTRACTS R-39; create it with FL-08's API `resolveAllowedRoots({ checkouts, workspaceRoot,
-      extraRoots })` / `isUnderAllowedRoot(path)` only if neither FL-08 nor FL-14 has landed it):
+      (CONTRACTS R-39; create it with FL-08's API `resolveAllowedRoots({ checkouts, workspaceRoot, extraRoots })` / `isUnderAllowedRoot(path)` only if neither FL-08 nor FL-14 has landed it):
       roots from the checkout registry (FL-14; fallback: worktree pool entries under the workspace
       root from `apps/node/src/core/workspaces/fleet-task-workspace.ts`), the workspace root, and
       `--files-root` entries; home never implied; missing roots refused with a log line. Add
@@ -195,8 +193,7 @@
       flag), `fleet_files_delete` (`destructive`, `confirm-destructive` → held as an
       `agent_action_proposals` row carrying the entries, CONTRACTS R-33; executes on the owner's
       approval), `fleet_desktop_paste` (`destructive`, denied unless granted, FL-07 grant required);
-      MCP entries with the same names; CLI `apps/cli/src/commands/fleet/files.ts` and `fleet desktop
-      paste` _(with FL-19)_.
+      MCP entries with the same names; CLI `apps/cli/src/commands/fleet/files.ts` and `fleet desktop paste` _(with FL-19)_.
       **Test**: extend `agent-fleet-files-tools.spec.ts` — delete creates a held proposal and writes
       nothing; paste default denied; copy without `replace` skips conflicts.
 - [ ] **T-23**. Accessibility: `apps/web/e2e/flow-fleet-files-a11y.spec.ts` — keyboard-only grid

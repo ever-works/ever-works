@@ -63,6 +63,7 @@ import {
     rethrowCursor,
     validationFailed,
     withExpectedVersion,
+    IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
 
@@ -128,13 +129,13 @@ export class IntegrationCreateIdeaDto {
 /** Contract v1 `requests.schema.json#/$defs/UpdateIdea` (no `status`: dismiss / restore). */
 export class IntegrationUpdateIdeaDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: IDEA_TITLE_MAX })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, IDEA_TITLE_MAX)
     title?: string;
 
     @ApiProperty({ required: false, minLength: 1, maxLength: IDEA_DESCRIPTION_MAX })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     @Length(1, IDEA_DESCRIPTION_MAX)
     description?: string;
@@ -147,7 +148,7 @@ export class IntegrationUpdateIdeaDto {
         description:
             'The Teams of the pinned organization (team_resources rows). Non-empty means visibility `team` unless visibility was set by hand (D11).',
     })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsArray()
     @ArrayMaxSize(50)
     @IsUUID('all', { each: true })
@@ -159,7 +160,7 @@ export class IntegrationUpdateIdeaDto {
         description:
             'Integrations may set team or organization only; `private` answers 422 domain_rule. Setting it marks visibilityExplicit=true.',
     })
-    @IsOptional()
+    @IsOptionalNonNull()
     @IsString()
     visibility?: string;
 }

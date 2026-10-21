@@ -103,6 +103,10 @@ describe('IntegrationOrganizationsWriteController', () => {
             undefined,
             expect.anything(),
         );
+        // Review 2026-10-17 F52: the roster row is part of the create's transaction.
+        expect(organizations.createOrganization.mock.calls[0][3]).toMatchObject({
+            initialAdmin: { userId: 'admin-1', invitedById: 'owner-1' },
+        });
         expect(members.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 organizationId: 'org-new',

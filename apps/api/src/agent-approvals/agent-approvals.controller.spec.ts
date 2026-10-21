@@ -12,7 +12,8 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
  * prefix, owner-only call shapes, the approve / reject mapping, and that
  * the service's 404 and 409 reach the caller untouched.
  */
-const auth = { userId: 'u1' } as AuthenticatedUser;
+// A person in an interactive session: deciding is a human gate (works-security lane 3a).
+const auth = { userId: 'u1', authMethod: 'session' } as AuthenticatedUser;
 
 function makeService() {
     return {
@@ -118,6 +119,35 @@ describe('AgentApprovalsController', () => {
 
             await controller.approveAll(auth, {});
             expect(service.approveAll).toHaveBeenLastCalledWith('u1', undefined);
+        });
+    });
+
+    // Works-security lane 3a — every decision here is a human gate. The merge
+    // verifier accepts any `decidedVia: 'user'` approval, so a personal API key
+    // held by an MCP client, an integration key or a fleet-run token deciding
+    // as the owner would be an approval nobody gave.
+    describe('only a person in a session decides', () => {
+        it.each([
+            ['a personal API key', { userId: 'u1', authMethod: 'api-key' }],
+            [
+                'an integration key',
+                { userId: 'u1', authMethod: 'integration', integration: { keyId: 'k' } },
+            ],
+            ['an unstamped credential', { userId: 'u1' }],
+        ])('refuses approve, reject and approve-all from %s', async (_label, who) => {
+            const caller = who as unknown as AuthenticatedUser;
+            await expect(controller.approve(caller, 'p1')).rejects.toMatchObject({
+                status: expect.any(Number),
+            });
+            await expect(controller.reject(caller, 'p1')).rejects.toBeDefined();
+            await expect(controller.approveAll(caller, {})).rejects.toBeDefined();
+            expect(service.decide).not.toHaveBeenCalled();
+            expect(service.approveAll).not.toHaveBeenCalled();
+        });
+
+        it('still lets any credential READ proposals', async () => {
+            await controller.list({ userId: 'u1', authMethod: 'api-key' } as AuthenticatedUser, {});
+            expect(service.list).toHaveBeenCalled();
         });
     });
 });

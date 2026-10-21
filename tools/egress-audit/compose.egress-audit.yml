@@ -1,9 +1,9 @@
 # Egress audit only (see README.md) — layered after docker-compose.yml by the audit config.
 #
-# - Runs the API image built from this checkout (EVER_WORKS_API_IMAGE) instead of the published
-#   one, and never pulls it.
-# - The production image refuses to start without a 32+ character AUTH_SECRET and a
-#   PLATFORM_ENCRYPTION_KEY; these are fake, test-only values (the e2e workflow uses the same
+# - Runs the API and web images built from this checkout (EVER_WORKS_API_IMAGE,
+#   EVER_WORKS_WEB_IMAGE) instead of the published ones, and never pulls them.
+# - The production images refuse to start without a 32+ character AUTH_SECRET (and the API without
+#   a PLATFORM_ENCRYPTION_KEY); these are fake, test-only values (the e2e workflow uses the same
 #   kind), never used outside this run.
 # - Mounts the API's `.env` file at its working directory (/app): the file the workflow writes for
 #   the mode — empty, or `EVER_STATS_ENABLED=false` for `off_env_file`.
@@ -15,8 +15,31 @@ services:
         environment:
             AUTH_SECRET: ever-works-egress-audit-secret-padding-to-32min-fake
             PLATFORM_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+            # The web app as the sealed network knows it (the API builds links and redirects from it).
+            WEB_URL: http://ever-works-web:3000
+            # The audit's person signs in right after registering, with no mailbox to verify from
+            # (the e2e workflow sets the same switch).
+            REQUIRE_EMAIL_VERIFICATION: 'false'
+            # Plain log lines: the audit reads the host out of a resolver error, and a colour code
+            # after it would hide which host it was.
+            NO_COLOR: '1'
         volumes:
             - ${EVER_WORKS_AUDIT_DOTENV:?set EVER_WORKS_AUDIT_DOTENV to the API .env file of this run}:/app/.env:ro
+
+    ever-works-web:
+        image: ${EVER_WORKS_WEB_IMAGE:-ever-works-web:egress-audit}
+        pull_policy: never
+        environment:
+            AUTH_SECRET: ever-works-egress-audit-secret-padding-to-32min-fake
+            # The browser reaches the web app by its service name over plain http, so the session
+            # cookie must not be `Secure` (the web app takes that from the scheme of WEB_URL).
+            WEB_URL: http://ever-works-web:3000
+            NEXT_PUBLIC_WEB_URL: http://ever-works-web:3000
+            # Next.js' standalone server listens on $HOSTNAME. In the audit the web app shares the
+            # network namespace of a holder that sits on two networks, so its host name may resolve
+            # to the address on the other one: listen on every address instead.
+            HOSTNAME: 0.0.0.0
+            NO_COLOR: '1'
 
     ever-works-db:
         ports: !reset []

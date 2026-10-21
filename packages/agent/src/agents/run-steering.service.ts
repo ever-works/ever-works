@@ -34,6 +34,14 @@ import { TaskReviewRejectionRepository } from '../database/repositories/task-rev
 import type { OwnershipScope } from '../database/ownership-scope';
 // Pure leaf (type-only imports of its own) — no runtime graph, no cycle.
 import { isAgentReviewRunScope } from '../tasks-domain/task-agent-review';
+// Pure leaf, no imports at all.
+import {
+    REVIEW_FEEDBACK_DATA_NOTICE,
+    TRUSTED_REVIEWER_NOTICE,
+    fenceReviewFeedback,
+    isComposedCiFeedback,
+    safeReviewerLabel,
+} from '../tasks-domain/review-feedback-fence';
 
 type ScopedRunSteerInput = RunSteerInput & { ownershipScope?: OwnershipScope };
 
@@ -84,6 +92,33 @@ export function neutralizeRejectionText(value: string): string {
  * Machine-generated in the same shape as the red-gate iterate message, so
  * an agent that has learned to read one reads the other. Exported for the
  * spec: the exact wording is the contract with the model.
+ *
+ * ## Whose words are whose (security finding F5, 2026-10-18)
+ *
+ * The preamble tells the model to act on these rows "before doing anything
+ * else", and they are not all written by somebody it should obey:
+ *
+ *  - a TRUSTED HUMAN's row (an OWNER / MEMBER / COLLABORATOR's review — the
+ *    bridge records no one else's — or a platform user's Task-review
+ *    rejection) is marked "trusted reviewer" and framed by
+ *    {@link TRUSTED_REVIEWER_NOTICE}: follow it, within the limits no
+ *    reviewer can lift;
+ *  - a reviewer BOT's row is somebody else's text the bot repeated (it can
+ *    quote whoever asked it), so its body is fenced as data
+ *    (`<review_feedback source="bot">`, `<` neutralized);
+ *  - a CI row composed by the fix loop is the platform's own guidance with
+ *    the provider's check name / output already fenced inside it
+ *    (`composeCiFailureFeedback`, recognised by {@link isComposedCiFeedback})
+ *    and is replayed as-is; one that is not (written before that, or by
+ *    anything else) is fenced whole — fail closed;
+ *  - the platform's own quality-gate row is left as the gate wrote it.
+ *
+ * {@link REVIEW_FEEDBACK_DATA_NOTICE} — data, not instructions; no commands,
+ * no URLs, no authority — is printed only when a fenced block follows, and
+ * describes exactly those blocks. Header fields (reviewer label, severity)
+ * are flattened and capped wherever they appear: a login or a check name is
+ * still somebody else's string. The fix loop itself is unchanged: the agent
+ * is still told to fix what the feedback describes.
  */
 export function composeRejectionFeedbackMessage(
     rejections: Array<{
@@ -101,22 +136,39 @@ export function composeRejectionFeedbackMessage(
         severity?: string | null;
     }>,
 ): string {
+    const rows = rejections.map((rejection) => ({ rejection, kind: rowKindOf(rejection) }));
     const lines: string[] = [
         'Your previous work on this task was REJECTED by a reviewer. Address the feedback below before doing anything else, then finish.',
         '',
     ];
-    // Only when at least one row is bot-authored, so a human-only message
-    // stays byte-identical to what the model has already learned to read.
-    if (rejections.some((rejection) => rejection.reviewerKind === 'bot')) {
+    if (rows.some((row) => row.kind === 'human')) {
+        lines.push(TRUSTED_REVIEWER_NOTICE, '');
+    }
+    // F5 — what a fenced block is, said BEFORE the first one, and only when
+    // there is one.
+    if (rows.some((row) => row.kind === 'bot' || row.kind === 'ci' || row.kind === 'ci-composed')) {
+        lines.push(REVIEW_FEEDBACK_DATA_NOTICE, '');
+    }
+    if (rows.some((row) => row.rejection.reviewerKind === 'bot')) {
         lines.push(
             'Some of it comes from automated reviewers. Fix every finding marked critical or major, and every one with no stated severity (treat it as major); a minor one may be left as-is only if you say why.',
             '',
         );
     }
-    for (const rejection of rejections) {
-        const who = rejection.reviewerLabel
-            ? neutralizeRejectionText(String(rejection.reviewerLabel))
-            : 'reviewer';
+    for (const { rejection, kind } of rows) {
+        // A CI row's label is the provider's CHECK NAME — provider text, so it
+        // never sits outside a fence: the header says "CI", and the name is in
+        // the row's own fenced body (composed rows carry it there; a legacy row
+        // is fenced whole).
+        const who =
+            kind === 'ci' || kind === 'ci-composed'
+                ? 'CI'
+                : safeReviewerLabel(
+                      rejection.reviewerLabel
+                          ? neutralizeRejectionText(String(rejection.reviewerLabel))
+                          : '',
+                      'reviewer',
+                  );
         const where =
             rejection.source === 'pull-request'
                 ? `pull request${rejection.prNumber ? ` #${rejection.prNumber}` : ''}`
@@ -124,18 +176,51 @@ export function composeRejectionFeedbackMessage(
                   ? 'quality gate'
                   : 'task review';
         const qualifiers: string[] = [];
+        if (kind === 'human') qualifiers.push('trusted reviewer');
         if (rejection.reviewerKind === 'bot') qualifiers.push('automated review');
         if (rejection.severity) {
-            qualifiers.push(`severity: ${neutralizeRejectionText(String(rejection.severity))}`);
+            qualifiers.push(
+                `severity: ${safeReviewerLabel(neutralizeRejectionText(String(rejection.severity)), 'unknown')}`,
+            );
         }
         const context = qualifiers.length > 0 ? `${where}, ${qualifiers.join(', ')}` : where;
         lines.push(`Rejection from ${who} (${context}):`);
-        for (const feedbackLine of neutralizeRejectionText(rejection.feedback).split('\n')) {
-            lines.push(`  ${feedbackLine}`);
+        const feedback = neutralizeRejectionText(rejection.feedback);
+        if (kind === 'bot' || kind === 'ci') {
+            lines.push(fenceReviewFeedback(feedback, kind));
+        } else if (kind === 'ci-composed') {
+            lines.push(feedback);
+        } else {
+            for (const feedbackLine of feedback.split('\n')) {
+                lines.push(`  ${feedbackLine}`);
+            }
         }
         lines.push('');
     }
     return lines.join('\n').trimEnd();
+}
+
+/**
+ * How one row is rendered (see {@link composeRejectionFeedbackMessage}):
+ *
+ *  - `ci-composed` — the fix loop's own CI row, provider fields already
+ *    fenced inside it: replayed as-is;
+ *  - `ci`          — a CI row that is NOT so composed: fenced whole;
+ *  - `gate`        — the platform's quality gate (machine-authored, no
+ *    reviewer kind): as written;
+ *  - `bot`         — a reviewer bot's comment body: fenced;
+ *  - `human`       — everything else: a trusted person's review.
+ */
+function rowKindOf(rejection: {
+    source: string;
+    feedback: string;
+    reviewerKind?: string | null;
+}): 'ci-composed' | 'ci' | 'gate' | 'bot' | 'human' {
+    if (rejection.source === 'gate') {
+        if (rejection.reviewerKind !== 'bot') return 'gate';
+        return isComposedCiFeedback(rejection.feedback) ? 'ci-composed' : 'ci';
+    }
+    return rejection.reviewerKind === 'bot' ? 'bot' : 'human';
 }
 
 /**

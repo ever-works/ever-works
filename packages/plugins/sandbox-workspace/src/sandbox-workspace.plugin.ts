@@ -177,6 +177,8 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	readonly category: PluginCategory = 'utility';
 	readonly capabilities: readonly string[] = ['workspace'];
 	readonly providerName = 'Sandbox (ephemeral clone)';
+	/** `finalize` with `publishSha` pushes exactly that verified commit, never HEAD. */
+	readonly publishesJudgedCommit = true as const;
 
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',

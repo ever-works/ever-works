@@ -167,7 +167,11 @@ describe('FleetLinkGatewayService', () => {
             }),
         );
         socket.close();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        // The close travels the loopback socket: wait for it, bounded (a fixed
+        // 50 ms flaked under parallel load).
+        for (let waited = 0; waited < 5_000 && h.registry.isConnected(NODE_ID); waited += 10) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
         expect(h.registry.isConnected(NODE_ID)).toBe(false);
         expect(h.audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({ action: 'node.link.disconnect' }),
@@ -353,7 +357,9 @@ describe('FleetLinkGatewayService', () => {
         await h.gateway.tick();
         h.killSwitch.isStopped.mockResolvedValue(false);
         await h.gateway.tick();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        for (let waited = 0; waited < 5_000 && seen.length < 2; waited += 10) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+        }
         expect(messages[0].type).toBe('link.ready');
         expect(seen).toEqual(['link.pause', 'link.resume']);
         expect(h.registry.isConnected(NODE_ID)).toBe(true);

@@ -185,6 +185,27 @@ export class DomainEventRecorder {
         return Number.isFinite(version) && version >= 1 ? version : 1;
     }
 
+    /**
+     * The highest `aggregateVersion` any recorded event of this aggregate carries (0 when
+     * none). A tombstone recorded after a racing edit uses it to stay above that edit's
+     * event (review 2026-10-17 F30).
+     */
+    async latestRecordedAggregateVersion(
+        manager: EntityManager,
+        aggregateType: DomainEventAggregateType,
+        id: string,
+    ): Promise<number> {
+        const row = (await manager
+            .getRepository(DomainEvent)
+            .createQueryBuilder('event')
+            .select('MAX(event.aggregateVersion)', 'version')
+            .where('event.aggregateType = :aggregateType', { aggregateType })
+            .andWhere('event.aggregateId = :id', { id })
+            .getRawOne()) as { version?: number | string | null } | undefined;
+        const version = Number(row?.version ?? 0);
+        return Number.isFinite(version) && version > 0 ? version : 0;
+    }
+
     private versionedTarget(aggregateType: DomainEventAggregateType): EntityTarget<ObjectLiteral> {
         const target = VERSIONED_AGGREGATES[aggregateType];
         if (!target) throw new Error(`Aggregate type "${aggregateType}" has no version column yet`);

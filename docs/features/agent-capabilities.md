@@ -149,6 +149,16 @@ The Capabilities tab shows all eight flags read-only, with an **Edit in Settings
 
 Turning a flag off removes the tool from the run entirely — it is never assembled, so the model does not see it. That is a stronger statement than a deny in the matrix, which withholds an assembled tool and reports the refusal.
 
+:::caution Agents never change GitHub workflow or action files
+Whatever the Work kind, an Agent's changes may not touch `.github/workflows/**` or `.github/actions/**` — files that run a repository's checks and deploys with its secrets. `commitToRepo` refuses to write them, `openPullRequest` refuses a branch whose diff touches them, a cloud run's commit is checked **before** it is pushed (and is not pushed if it touches them), and no pull request is opened for a fleet-pushed branch that does. An operator can lift this for specific Works only, with a comma-separated list of Work ids:
+
+```bash
+AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS=11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222
+```
+
+An App Work's own change gate still applies its rules to a listed Work.
+:::
+
 ## Skills
 
 The **Skills** section binds [Skills](./skills-catalog.md) directly to this Agent. The **Attach a skill…** picker offers every Skill you already have installed; catalog entries you have not installed yet appear with an **install & attach** hint and are installed in one step when picked.
@@ -277,6 +287,26 @@ Other behaviour worth knowing:
 - Arguments with no credential reference take a fast path and never touch the resolver at all, and other mustache-style templates are not mistaken for credential references.
 - Credentials always resolve for the **Agent's owner**, never for a model-supplied identity in the arguments.
 - The default, self-hosting-friendly resolver reads the operator environment: `{{cred.stripe_key}}` reads `EVERWORKS_CRED_STRIPE_KEY`. The prefix is mandatory — without it a tool argument could name `DATABASE_URL` or a platform key. Multi-tenant deployments bind a store-backed resolver instead.
+
+### Where a credential may be substituted
+
+Substituting a secret into an arbitrary argument would hand it to wherever that argument goes — a URL an injected instruction chose, an email body, a Task comment. So a `{{cred.<key>}}` reference is substituted **only where someone other than the model declared it may go**; anywhere else the call is **refused before the credential is even resolved**, and the refusal names the variable an operator would set:
+
+1. **A declared credential slot** — an argument a built-in tool marks as a credential field in its own schema (`'x-credential': true`). A schema that came from an MCP server can never declare one.
+2. **An operator allowance, per credential** — in the environment:
+
+    ```bash
+    # any argument of these tools may reference {{cred.billing_token}}
+    EVERWORKS_CRED_BILLING_TOKEN_ALLOW=mcp__billing__create_invoice,mcp__billing__refund
+    # only when the call's `url` argument is https on exactly this host (default port)
+    EVERWORKS_CRED_DOCS_TOKEN_ALLOW=extractContent@api.docs.example.com
+    # ... or on this host and port
+    EVERWORKS_CRED_DOCS_TOKEN_ALLOW=extractContent@api.docs.example.com:8443
+    ```
+
+    Entries are comma-separated `tool`, `tool@host` or `tool@host:port`. The tool name is the exact name the Agent calls (case-insensitive). A `tool@host` entry matches only when the call's `url` argument is an `https:` URL on exactly that host (no wildcards) and the default port; `tool@host:port` names another port. A tool with no `url` argument never matches a host-bound entry, and neither does a URL carrying userinfo (`user@` before the host), a backslash, whitespace or a control character (spellings URL parsers disagree on). No entry means no substitution outside declared slots. (Avoid naming a credential `<other>_allow` — its variable would collide with `<other>`'s allow list.)
+
+Credentials stored in an **MCP connection's auth headers** (`Authorization: Bearer {{cred.docs_token}}`) resolve on their own path when the connection is opened and need no allow entry.
 
 :::note The credential catalog is empty today
 No built-in tool requires a credential, so the catalog of known keys ships empty on purpose. What ships is the **mechanism** plus a CI check: a tool that starts needing a secret declares its key, and the check fails the build if a requirement names a tool that does not exist, a key no catalog entry defines, or an environment variable that does not match what the resolver actually reads.

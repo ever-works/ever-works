@@ -26,11 +26,34 @@ export interface IdempotentResponse {
     readonly replayed: boolean;
 }
 
-/** sha256 hex of `METHOD path\nbody` — the "same request" test of a repeated key. */
-export function idempotencyRequestHash(method: string, path: string, body: unknown): string {
+/**
+ * Where and as whom a request acts, besides its method, path and body: the
+ * organization it is scoped to (`X-Scope-Slug`) and the person it acts as
+ * (`X-Act-As-User`, resolved). Review 2026-10-17 F32 / F37: the same key reused
+ * for another organization or another person is another request (`409
+ * request_mismatch`), never a replay of the first one's result.
+ */
+export interface IdempotencyRequestContext {
+    readonly scope?: string | null;
+    readonly actAsUserId?: string | null;
+}
+
+/**
+ * sha256 hex of `METHOD path\nbody` — the "same request" test of a repeated key —
+ * plus, when given, the request's {@link IdempotencyRequestContext}.
+ */
+export function idempotencyRequestHash(
+    method: string,
+    path: string,
+    body: unknown,
+    context: IdempotencyRequestContext = {},
+): string {
     const canonical = body === undefined || body === null ? '' : JSON.stringify(body);
+    const scope = context.scope?.trim() || '';
+    const actAs = context.actAsUserId?.trim() || '';
+    const where = scope || actAs ? `scope:${scope}\nact-as:${actAs}\n` : '';
     return createHash('sha256')
-        .update(`${method.toUpperCase()} ${path}\n${canonical}`, 'utf8')
+        .update(`${method.toUpperCase()} ${path}\n${where}${canonical}`, 'utf8')
         .digest('hex');
 }
 

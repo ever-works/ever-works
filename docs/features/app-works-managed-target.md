@@ -65,6 +65,15 @@ credential, through the same runtime facade as deploys. As a result:
 The quota defaults below are sized for an App plus all three dependencies at their default sizes:
 Postgres 10Gi, Redis 1Gi, object storage 20Gi.
 
+**Cluster prerequisite — a StorageClass that can actually provision.** The Postgres, Redis and
+object-storage volumes are PVCs on the cluster's default StorageClass. With `local-path`
+(`rancher.io/local-path`) the provisioner creates each volume by running a `hostPath` helper pod
+in **its own** namespace (`local-path-storage`), so that namespace must allow it: label it
+`pod-security.kubernetes.io/enforce=privileged`. Under `baseline` or `restricted` every new PVC
+stays `Pending` (`ProvisioningFailed … violates PodSecurity "baseline:latest": hostPath volumes`)
+and the dependency ends `deadlineExceeded`. The `ewapp-*` namespaces themselves stay
+`restricted` — the provider's pods run under it unchanged.
+
 ## Environment
 
 All of the following are read per call. Set them on **both** the API and the App runtime worker,

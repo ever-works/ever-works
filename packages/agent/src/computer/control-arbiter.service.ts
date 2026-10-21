@@ -10,6 +10,8 @@ import {
 } from '@ever-works/contracts';
 import type { ComputerSession } from '../entities/computer-session.entity';
 import { FleetAuditService } from '../fleet/fleet-audit.service';
+import { FleetAccessService } from '../fleet/fleet-access.service';
+import { effectiveControlPolicy, type ComputerViewerRole } from '@ever-works/contracts';
 import { computerAuditDetails } from './computer-audit';
 import {
     ComputerControlRepository,
@@ -118,7 +120,45 @@ export class ComputerControlArbiter {
         private readonly sessions: ComputerSessionRepository,
         @Optional() private readonly audit?: FleetAuditService,
         @Optional() private readonly events?: EventEmitter2,
+        // Fleet hub (FL-01, T-21) — the caller's Organization role on the
+        // machine. APPENDED and @Optional(): unbound, the role stays the
+        // owner-or-stranger answer `viewerRoleForNode` has always given.
+        @Optional() private readonly access?: FleetAccessService,
     ) {}
+
+    /**
+     * The caller's role on the machine (`owner · org-admin · org-member ·
+     * stranger`), from the Organization the machine is bound to. Without the
+     * access service: owner or stranger, exactly as before.
+     */
+    private async roleOf(
+        lock: ComputerControlLockRow,
+        actor: { userId: string },
+    ): Promise<ComputerViewerRole> {
+        if (!this.access) return viewerRoleForNode(lock, actor);
+        return this.access.roleFor(
+            {
+                id: lock.id,
+                userId: lock.userId,
+                name: lock.name ?? '',
+                organizationId: lock.organizationId ?? null,
+            },
+            actor.userId,
+        );
+    }
+
+    /**
+     * Who may take control: the `desktop` family of the machine's policy
+     * (CONTRACTS §2.1, R-25) — the family map's entry, or the legacy
+     * single value when the map has none. The two are kept equal by every
+     * writer, so this reads exactly what AW-11 read before the map existed.
+     */
+    private desktopPolicy(lock: ComputerControlLockRow | null) {
+        return effectiveControlPolicy({
+            controlPolicy: lock?.controlPolicy ?? 'owner',
+            controlPolicyFamilies: lock?.controlPolicyFamilies ?? null,
+        }).desktop;
+    }
 
     /** Limits are read per call so an operator change needs no restart. */
     limits(): ComputerControlLimits {
@@ -163,7 +203,7 @@ export class ComputerControlArbiter {
         };
 
         if (session.status === 'ended') return refuse('session-ended');
-        if (!canControl(lock.controlPolicy ?? 'owner', viewerRoleForNode(lock, actor))) {
+        if (!canControl(this.desktopPolicy(lock), await this.roleOf(lock, actor))) {
             return refuse('policy');
         }
         if (lock.controlHolderSessionId === session.id) {
@@ -221,7 +261,7 @@ export class ComputerControlArbiter {
         });
 
         if (session.status === 'ended') return refuse('session-ended');
-        if (!canControl(lock.controlPolicy ?? 'owner', viewerRoleForNode(lock, actor))) {
+        if (!canControl(this.desktopPolicy(lock), await this.roleOf(lock, actor))) {
             await this.recordRefusal(session, actor.userId, lock);
             return refuse('policy');
         }
@@ -605,7 +645,7 @@ export class ComputerControlArbiter {
             nodeId: lock.id,
             details: computerAuditDetails('computer.control-refused', {
                 sessionId: session.id,
-                policy: lock.controlPolicy ?? 'owner',
+                policy: this.desktopPolicy(lock),
                 holderPresent: Boolean(lock.controlHolderSessionId),
             }),
         });
@@ -646,7 +686,7 @@ export class ComputerControlArbiter {
     ): Promise<ComputerControlStateView> {
         const limits = this.limits();
         const session = await this.sessions.findById(sessionId);
-        const policy = lock?.controlPolicy ?? 'owner';
+        const policy = this.desktopPolicy(lock);
         const holder = lock?.controlHolderSessionId && lock.controlHolderUserId ? lock : null;
         const pending = lock && isControlRequestPending(lock, now, limits) ? lock : null;
         const last = lastClosedSpan(session?.controlSpans);
@@ -654,7 +694,7 @@ export class ComputerControlArbiter {
             nodeId: lock?.id ?? session?.nodeId ?? '',
             sessionId,
             policy,
-            canControl: lock ? canControl(policy, viewerRoleForNode(lock, { userId })) : false,
+            canControl: lock ? canControl(policy, await this.roleOf(lock, { userId })) : false,
             mode: holder?.controlHolderSessionId === sessionId ? 'controlling' : 'watching',
             holder: holder
                 ? {

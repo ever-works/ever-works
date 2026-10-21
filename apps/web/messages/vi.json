@@ -287,6 +287,8 @@
             "signIn": "Đăng nhập bằng Ever ID",
             "signUp": "Đăng ký bằng Ever ID",
             "redirecting": "Đang mở Ever ID…",
+            "signInWith": "Đăng nhập bằng <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Đăng ký bằng <wordmark>Ever ID</wordmark>",
             "consentRequired": "Hãy chấp nhận các điều khoản ở trên để tiếp tục.",
             "createAccount": {
                 "title": "Tạo tài khoản Ever Works của bạn",
@@ -7354,6 +7356,95 @@
                         "resume": "Đã yêu cầu tiếp tục.",
                         "remove": "Đã yêu cầu gỡ.",
                         "cancelDeploy": "Đã yêu cầu hủy."
+                    }
+                },
+                "environment": {
+                    "title": "Môi trường",
+                    "description": "Các giá trị mà ứng dụng này dùng khi chạy. Giá trị bí mật không bao giờ được hiển thị — chỉ cho biết đã được đặt hay chưa.",
+                    "summary": "Đã đặt {set} trên {total}",
+                    "missingRequired": "{count, plural, other {Thiếu # giá trị bắt buộc}}",
+                    "loading": "Đang đọc môi trường…",
+                    "unavailable": "Chưa thể chỉnh sửa giá trị môi trường trên phiên bản này.",
+                    "error": "Không thể đọc môi trường. Hãy tải lại trang để thử lại.",
+                    "empty": "Đặc tả ứng dụng này không khai báo giá trị môi trường nào.",
+                    "secureStorageOff": "Bộ lưu trữ an toàn chưa được cấu hình trên bản cài đặt này nên không thể lưu giá trị.",
+                    "edit": "Sửa",
+                    "setValue": "Đặt giá trị",
+                    "editAria": "Sửa {name}",
+                    "saved": "Đã lưu {name}",
+                    "removed": "Đã xóa {name}",
+                    "states": {
+                        "set": "Đã đặt",
+                        "unset": "Chưa đặt",
+                        "missing": "Bắt buộc — chưa đặt",
+                        "fromSpec": "Từ đặc tả ứng dụng",
+                        "fromDependency": "Được cung cấp bởi {kind}",
+                        "generated": "Tự động tạo"
+                    },
+                    "badges": {
+                        "secret": "Bí mật",
+                        "required": "Bắt buộc"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Runtime",
+                        "both": "Build + runtime"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Lưu trữ đối tượng",
+                        "smtp": "Thư SMTP"
+                    },
+                    "dialog": {
+                        "title": "Sửa {name}",
+                        "valueLabel": "Giá trị",
+                        "secretHint": "Giá trị này là bí mật. Nó được lưu ở dạng mã hóa và không bao giờ hiển thị lại.",
+                        "secretStored": "Đã có giá trị được lưu. Nhập giá trị mới để thay thế.",
+                        "dependencyHint": "Thường được cung cấp bởi {kind}. Giá trị bạn đặt ở đây sẽ được ưu tiên — ví dụ máy chủ SMTP của riêng bạn.",
+                        "redeployHint": "Ở nơi ứng dụng dùng giá trị này, ứng dụng sẽ được build lại hoặc triển khai lại với giá trị mới.",
+                        "empty": "Nhập một giá trị, hoặc xóa giá trị đã lưu.",
+                        "save": "Lưu",
+                        "saving": "Đang lưu…",
+                        "remove": "Xóa giá trị",
+                        "cancel": "Hủy"
+                    },
+                    "errors": {
+                        "undeclaredName": "Đặc tả ứng dụng không khai báo tên này.",
+                        "specUnavailable": "Ứng dụng này chưa có đặc tả dùng được.",
+                        "failed": "Không thể lưu giá trị. Hãy thử lại."
+                    }
+                },
+                "dependencies": {
+                    "title": "Phụ thuộc",
+                    "description": "Các cơ sở dữ liệu, bộ nhớ đệm, lưu trữ và thư điện tử mà ứng dụng này cần. Chúng được cấp phát trên đích triển khai trước khi ứng dụng khởi động.",
+                    "loading": "Đang đọc các phụ thuộc…",
+                    "unavailable": "Chưa thể quản lý phụ thuộc trên phiên bản này.",
+                    "error": "Không thể đọc các phụ thuộc. Hãy tải lại trang để thử lại.",
+                    "empty": "Đặc tả của ứng dụng này không khai báo phụ thuộc nào.",
+                    "provider": "Nhà cung cấp: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, other {# lần thử}}",
+                    "noReason": "Không có lý do nào được ghi lại.",
+                    "deployRetries": "Triển khai lại sẽ tự động thử lại — hoặc nhấn Thử lại ngay bây giờ.",
+                    "retry": "Thử lại",
+                    "retryAria": "Thử lại {kind}",
+                    "retried": "{kind}: đã lên lịch một lần thử mới.",
+                    "retryQueued": "{kind}: lần thử mới sẽ bắt đầu ngay khi worker sẵn sàng.",
+                    "leaseHeld": "{kind} đang được cấp phát. Hãy thử lại sau giây lát.",
+                    "retryFailed": "Không thể thử lại {kind}. Hãy thử lại.",
+                    "deleteData": "Xóa dữ liệu",
+                    "deleteDataAria": "Xóa dữ liệu của {kind}",
+                    "deleteDialog": {
+                        "title": "Xóa dữ liệu của {kind}?",
+                        "description": "Thao tác này phá hủy các volume, cơ sở dữ liệu và bucket của phụ thuộc này. Không thể hoàn tác.",
+                        "resources": "Sẽ bị xóa:",
+                        "noResources": "Không có tài nguyên nào được ghi lại cho phụ thuộc này.",
+                        "confirmLabel": "Nhập {slug} để xác nhận",
+                        "cancel": "Hủy",
+                        "confirm": "Xóa dữ liệu",
+                        "requested": "Đang xóa dữ liệu của {kind}.",
+                        "failed": "Không thể xóa dữ liệu. {reason}"
                     }
                 }
             },

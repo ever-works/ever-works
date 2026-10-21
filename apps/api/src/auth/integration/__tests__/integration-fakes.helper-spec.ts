@@ -69,6 +69,12 @@ export class FakeApiKeyRepository {
         return this.rows.find((r) => r.id === id && r.userId === userId) ?? null;
     }
 
+    // `IntegrationKeyService.rotationOwnerOf` (F117, 3936031e7) reads the row by id alone,
+    // whoever created it — without this every rotation through the fake was a 500.
+    async findById(id: string) {
+        return this.rows.find((r) => r.id === id) ?? null;
+    }
+
     async findIntegrationKeysByTenant(tenantId: string) {
         return this.rows.filter(
             (r) => r.tenantId === tenantId && r.kind === 'integration' && r.isActive,

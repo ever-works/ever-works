@@ -347,9 +347,8 @@ The [MCP server](../features/mcp-server.md) exposes six `kb.*` tools. Every one 
 | `kb.create` | Create a document at a path, in a class, with a body                        |
 | `kb.update` | Patch title, description, body, tags, categories, language or status        |
 | `kb.lock`   | Lock with `lockMode: "full"` or `"additions-only"`                          |
-| `kb.unlock` | Clear the lock                                                              |
 
-There is no `kb.search` and no `kb.upload` tool — `kb.list` with `q` covers search, and multipart uploads go through the REST endpoint or the CLI. Setup for an external session is in [Use Ever Works from an MCP Client](./mcp-server-setup.md).
+There is no `kb.unlock` tool (unlocking is a person's decision (works-security lane 3a, 2026-10-18); unlock in the app, the API or the CLI). There is no `kb.search` and no `kb.upload` tool — `kb.list` with `q` covers search, and multipart uploads go through the REST endpoint or the CLI. Setup for an external session is in [Use Ever Works from an MCP Client](./mcp-server-setup.md).
 
 ### CLI
 
@@ -392,7 +391,7 @@ Being straight about the edges:
 - **There is no `/orgs/:id/kb` screen.** Organization-level documents come from a Memory upload or from the API.
 - **External memory and RAG plugins are contracts only.** The plugin manifest carries `memory` and `rag` categories with capability interfaces, and nothing ships under either yet. Built-in retrieval is unchanged and remains the default; the `vector-store` and `content-extractor` seams beside them are real and populated today.
 - **Agent definition files are database-inline for every scope.** The read endpoint reports `storage: "db"` for Tenant, Mission, Idea and Work-scoped agents alike; Git-backed storage in the scope's repository is designed but not wired. Editing, the 64 KB cap and the `expectedHash` concurrency check all work today and do not change when it lands.
-- **`getKbDocument`, the placeholder agent tool, always errors.** The working agent-side KB tools are `kb_search`, `kb_read`, `kb_write`, `kb_lock` and `kb_unlock`, registered by the agent pipeline.
+- **`getKbDocument`, the placeholder agent tool, always errors.** The working agent-side KB tools are `kb_search`, `kb_read`, `kb_write`, `kb_lock` and `kb_unlock`, registered by the agent pipeline. `kb_unlock` always refuses (unlocking is a person's decision (works-security lane 3a, 2026-10-18)), and a `kb_write` that edits an existing document puts it back to `proposed` for review.
 
 ## Related
 

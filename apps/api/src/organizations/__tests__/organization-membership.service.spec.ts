@@ -10,7 +10,7 @@ jest.mock('@ever-works/agent/database', () => ({
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { OrganizationMembershipService } from '../organization-membership.service';
 
 /**
@@ -27,18 +27,38 @@ describe('OrganizationMembershipService', () => {
     type Org = { id: string; tenantId: string };
     type Usr = { id: string; tenantId?: string | null };
 
-    function makeService(opts: { user?: Usr | null; org?: Org | null }) {
+    function makeService(opts: {
+        user?: Usr | null;
+        org?: Org | null;
+        tenantOwner?: string | null;
+        role?: string | null;
+        withRoleRepos?: boolean;
+    }) {
         const userRepository = {
             findById: jest.fn().mockResolvedValue(opts.user ?? null),
         };
         const organizationRepository = {
             findById: jest.fn().mockResolvedValue(opts.org ?? null),
         };
-        const service = new OrganizationMembershipService(
-            organizationRepository as never,
-            userRepository as never,
-        );
-        return { service, userRepository, organizationRepository };
+        const tenantRepository = {
+            findById: jest.fn().mockResolvedValue({ ownerUserId: opts.tenantOwner ?? null }),
+        };
+        const memberRepository = {
+            findByOrgAndUser: jest.fn().mockResolvedValue(opts.role ? { role: opts.role } : null),
+        };
+        const service =
+            opts.withRoleRepos === false
+                ? new OrganizationMembershipService(
+                      organizationRepository as never,
+                      userRepository as never,
+                  )
+                : new OrganizationMembershipService(
+                      organizationRepository as never,
+                      userRepository as never,
+                      tenantRepository as never,
+                      memberRepository as never,
+                  );
+        return { service, userRepository, organizationRepository, memberRepository };
     }
 
     describe('ensureMember', () => {
@@ -116,6 +136,70 @@ describe('OrganizationMembershipService', () => {
             await expect(service.ensureAdmin('victim-org', 'attacker')).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+
+        describe('with ORG_ADMIN_ROLE_ENFORCED=true (opt-in)', () => {
+            const org = { id: 'o-1', tenantId: 't-1' };
+            beforeEach(() => {
+                process.env.ORG_ADMIN_ROLE_ENFORCED = 'true';
+            });
+            afterEach(() => {
+                delete process.env.ORG_ADMIN_ROLE_ENFORCED;
+            });
+
+            it('allows the Tenant owner', async () => {
+                const { service } = makeService({
+                    user: { id: 'u-1', tenantId: 't-1' },
+                    org,
+                    tenantOwner: 'u-1',
+                });
+                await expect(service.ensureAdmin('o-1', 'u-1')).resolves.toBe(org);
+            });
+
+            it('allows a roster admin', async () => {
+                const { service } = makeService({
+                    user: { id: 'u-2', tenantId: 't-1' },
+                    org,
+                    tenantOwner: 'u-1',
+                    role: 'admin',
+                });
+                await expect(service.ensureAdmin('o-1', 'u-2')).resolves.toBe(org);
+            });
+
+            it('refuses a plain member (403) while ensureMember still lets them read', async () => {
+                const { service } = makeService({
+                    user: { id: 'u-3', tenantId: 't-1' },
+                    org,
+                    tenantOwner: 'u-1',
+                    role: 'member',
+                });
+                await expect(service.ensureAdmin('o-1', 'u-3')).rejects.toBeInstanceOf(
+                    ForbiddenException,
+                );
+                await expect(service.ensureMember('o-1', 'u-3')).resolves.toBe(org);
+            });
+
+            it('fails closed when the role repositories are not bound', async () => {
+                const { service } = makeService({
+                    user: { id: 'u-1', tenantId: 't-1' },
+                    org,
+                    withRoleRepos: false,
+                });
+                await expect(service.ensureAdmin('o-1', 'u-1')).rejects.toBeInstanceOf(
+                    ForbiddenException,
+                );
+            });
+        });
+
+        it('stays membership-only by default (the switch is off)', async () => {
+            const org = { id: 'o-1', tenantId: 't-1' };
+            const { service, memberRepository } = makeService({
+                user: { id: 'u-3', tenantId: 't-1' },
+                org,
+                role: 'member',
+            });
+            await expect(service.ensureAdmin('o-1', 'u-3')).resolves.toBe(org);
+            expect(memberRepository.findByOrgAndUser).not.toHaveBeenCalled();
         });
     });
 });

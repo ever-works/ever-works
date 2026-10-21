@@ -211,7 +211,44 @@ describe('redactConfig', () => {
 			paused: false,
 			secretStorage: 'file',
 			limits: clampResourceLimits(undefined),
-			hasSecret: true
+			hasSecret: true,
+			// Control 18: switches, not values — OFF/OFF for a config that never set them.
+			executionPolicy: { allowSkipPermissions: false, allowShellCommands: false, restrictedMode: true }
+		});
+	});
+
+	it('control 18: round-trips the local execution policy, and anything but a literal true reads as OFF', () => {
+		const stored = JSON.stringify(
+			config({ executionPolicy: { allowSkipPermissions: true, allowShellCommands: false, restrictedMode: true } })
+		);
+		expect(parseConfig(stored)?.executionPolicy).toEqual({
+			allowSkipPermissions: true,
+			allowShellCommands: false,
+			restrictedMode: true
+		});
+		const tampered = JSON.stringify({
+			...JSON.parse(JSON.stringify(config())),
+			executionPolicy: { allowSkipPermissions: 'yes', allowShellCommands: 1 }
+		});
+		expect(parseConfig(tampered)?.executionPolicy).toEqual({
+			allowSkipPermissions: false,
+			allowShellCommands: false,
+			restrictedMode: true
+		});
+		// Restricted mode resolves toward ON: only a literal false turns it off.
+		const offRestricted = JSON.stringify(config({ executionPolicy: { restrictedMode: false } }));
+		expect(parseConfig(offRestricted)?.executionPolicy?.restrictedMode).toBe(false);
+		const junkRestricted = JSON.stringify({
+			...JSON.parse(JSON.stringify(config())),
+			executionPolicy: { restrictedMode: 'no' }
+		});
+		expect(parseConfig(junkRestricted)?.executionPolicy?.restrictedMode).toBe(true);
+		// A config that never set it carries no key and reads as the default.
+		expect(parseConfig(JSON.stringify(config()))?.executionPolicy).toBeUndefined();
+		expect(redactConfig(config()).executionPolicy).toEqual({
+			allowSkipPermissions: false,
+			allowShellCommands: false,
+			restrictedMode: true
 		});
 	});
 

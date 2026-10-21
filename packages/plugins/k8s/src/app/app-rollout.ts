@@ -35,6 +35,11 @@
  * `image_user_unverifiable`. Both are reported once the container has been stuck for the 180 s
  * window of §5.4 — which is what ACC-06-08's "rollout fails ≤ 180 s" measures.
  *
+ * A Job's pods (pre-deploy, first-deploy, post-deploy) go through the same classifier, restricted to
+ * the "never started" signals: {@link classifyJobPodFailures}. The deployer passes
+ * `userMessageSeconds: 0` there, because a Job that cannot start otherwise waits out its own
+ * `activeDeadlineSeconds`.
+ *
  * ## Reported gaps (parameters, not inventions)
  *
  * - **When the wait started.** A `V1ContainerStatus` carries no timestamp for
@@ -196,6 +201,14 @@ export interface AppRolloutOptions {
 	podStuckSeconds?: Record<string, number> | null;
 	/** A measured wait for every container under observation. */
 	stuckSeconds?: number | null;
+	/**
+	 * How long a container must hold one of §4.4's two kubelet user messages before it is reported;
+	 * default the stuck window ({@link APP_ROLLOUT_STUCK_POD_S}, ACC-06-08). Both messages are
+	 * deterministic — the kubelet checks the same image config against the same pod spec on every
+	 * sync and never changes its answer — so a caller with nothing to gain from waiting (a Job, whose
+	 * only other way out is its own timeout) passes `0`.
+	 */
+	userMessageSeconds?: number | null;
 }
 
 /** What the classifier proves, and everything a caller needs to report it. */
@@ -252,6 +265,10 @@ function count(value: unknown): number {
 
 function positive(value: unknown, fallback: number): number {
 	return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function nonNegative(value: unknown, fallback: number): number {
+	return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 /* ------------------------------------------------------------------------- *
@@ -613,6 +630,65 @@ export function hasProgressDeadlineExceeded(deployment: AppRolloutDeployment | n
 	return (deployment?.status?.conditions ?? []).some((condition) => condition?.reason === 'ProgressDeadlineExceeded');
 }
 
+/** Pods in name order, so the same observation always yields the same first verdict. */
+function byPodName(pods: readonly AppRolloutPod[]): AppRolloutPod[] {
+	return [...(pods ?? [])].sort((left, right) =>
+		String(left?.metadata?.name ?? '').localeCompare(String(right?.metadata?.name ?? ''))
+	);
+}
+
+/** What the classifier reads off one container: its waiting state, how long it held it, and the shared fields. */
+interface ContainerFacts {
+	fields: { pod: string; container?: string; reason?: string; seconds: number | null };
+	reason: string;
+	message: string;
+	seconds: number | null;
+}
+
+function containerFacts(
+	pod: AppRolloutPod,
+	container: AppRolloutContainerStatus,
+	options: AppRolloutOptions
+): ContainerFacts {
+	const containerName = container?.name;
+	const waiting = container?.state?.waiting ?? null;
+	const seconds = containerStuckSeconds(pod, container, options);
+	return {
+		fields: {
+			pod: String(pod?.metadata?.name ?? ''),
+			...(containerName ? { container: containerName } : {}),
+			...(waiting?.reason ? { reason: waiting.reason } : {}),
+			seconds
+		},
+		reason: waiting?.reason ?? '',
+		message: typeof waiting?.message === 'string' ? waiting.message : '',
+		seconds
+	};
+}
+
+/** §4.4's two kubelet messages, once they have held for `threshold` seconds. */
+function userMessageFailure(facts: ContainerFacts, threshold: number): AppPodFailure | null {
+	if (facts.seconds === null || facts.seconds < threshold) {
+		return null;
+	}
+	if (ROOT_USER_MESSAGE.test(facts.message)) {
+		return { code: 'managed_root_forbidden', signal: 'root_user', ...facts.fields, message: facts.message };
+	}
+	if (NON_NUMERIC_USER_MESSAGE.test(facts.message)) {
+		return { code: 'image_user_unverifiable', signal: 'non_numeric_user', ...facts.fields, message: facts.message };
+	}
+	return null;
+}
+
+/** §5.4: a waiting reason it names, held for the whole stuck window. */
+function stuckWaitingFailure(facts: ContainerFacts, threshold: number, restarts: number): AppPodFailure | null {
+	const code = STUCK_WAITING_CODES[facts.reason];
+	if (!code || facts.seconds === null || facts.seconds < threshold) {
+		return null;
+	}
+	return { code, signal: 'stuck_waiting', ...facts.fields, restarts };
+}
+
 /**
  * Every §5.4 failure this observation proves, **most specific first**.
  *
@@ -626,44 +702,20 @@ export function classifyPodFailures(
 	options: AppRolloutOptions = {}
 ): AppPodFailure[] {
 	const failures: AppPodFailure[] = [];
-	const current = currentRolloutPods(deployment, replicaSets, pods, options)
-		.slice()
-		.sort((left, right) => String(left?.metadata?.name ?? '').localeCompare(String(right?.metadata?.name ?? '')));
+	const current = byPodName(currentRolloutPods(deployment, replicaSets, pods, options));
 	const restartsToFail = positive(options?.restartsToFail, APP_ROLLOUT_RESTARTS_FAIL);
 	const stuckThreshold = positive(options?.stuckPodSeconds, APP_ROLLOUT_STUCK_POD_S);
+	const userThreshold = nonNegative(options?.userMessageSeconds, stuckThreshold);
 
 	for (const pod of current) {
-		const podName = String(pod?.metadata?.name ?? '');
 		for (const container of containersOf(pod)) {
-			const containerName = container?.name;
-			const waiting = container?.state?.waiting ?? null;
-			const message = typeof waiting?.message === 'string' ? waiting.message : '';
-			const seconds = containerStuckSeconds(pod, container, options);
-			const stuck = seconds !== null && seconds >= stuckThreshold;
-			const stuckFields = {
-				pod: podName,
-				...(containerName ? { container: containerName } : {}),
-				...(waiting?.reason ? { reason: waiting.reason } : {}),
-				seconds
-			};
+			const facts = containerFacts(pod, container, options);
+			const stuckFields = facts.fields;
 
 			// 1. §4.4's two kubelet messages — the most specific verdict there is.
-			if (stuck && ROOT_USER_MESSAGE.test(message)) {
-				failures.push({
-					code: 'managed_root_forbidden',
-					signal: 'root_user',
-					...stuckFields,
-					message
-				});
-				continue;
-			}
-			if (stuck && NON_NUMERIC_USER_MESSAGE.test(message)) {
-				failures.push({
-					code: 'image_user_unverifiable',
-					signal: 'non_numeric_user',
-					...stuckFields,
-					message
-				});
+			const user = userMessageFailure(facts, userThreshold);
+			if (user) {
+				failures.push(user);
 				continue;
 			}
 
@@ -698,10 +750,9 @@ export function classifyPodFailures(
 			}
 
 			// 4. §5.4: a waiting reason held for the whole window.
-			const reason = waiting?.reason ?? '';
-			const code = STUCK_WAITING_CODES[reason];
-			if (stuck && code) {
-				failures.push({ code, signal: 'stuck_waiting', ...stuckFields, restarts });
+			const waited = stuckWaitingFailure(facts, stuckThreshold, restarts);
+			if (waited) {
+				failures.push(waited);
 			}
 		}
 	}
@@ -730,4 +781,71 @@ export function classifyPodFailure(
 	options: AppRolloutOptions = {}
 ): AppPodFailure | null {
 	return classifyPodFailures(deployment, replicaSets, pods, options)[0] ?? null;
+}
+
+/* ------------------------------------------------------------------------- *
+ * Job pods (plan §4.8, §5.5 phases 2, 4 and 8)
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The §5.4 verdicts that apply to a **Job's** pods: the container could not *start*. Same regexes,
+ * same codes and same precedence as {@link classifyPodFailures} — §4.4's two kubelet user messages
+ * first, then a waiting reason §5.4 names held for the stuck window.
+ *
+ * The restart and OOM signals are left out on purpose: an App Job runs `restartPolicy: Never`, and
+ * its own `backoffLimit` (the spec's `retries`) is what judges a container that started and exited.
+ * What a Job cannot judge is a container that never starts — kubelet leaves the pod Pending in
+ * `CreateContainerConfigError` and the Job active until `activeDeadlineSeconds` (up to 1800 s on
+ * prod Deployment `cal-e2e`, 2026-10-18). This is the verdict that ends that wait early.
+ *
+ * `pods` are the Job's own pods (the caller selects them); `options.now` is required, as for every
+ * time-based verdict, and `options.userMessageSeconds` is honoured exactly as in the rollout.
+ */
+export function classifyJobPodFailures(
+	pods: readonly AppRolloutPod[] = [],
+	options: AppRolloutOptions = {}
+): AppPodFailure[] {
+	const failures: AppPodFailure[] = [];
+	const stuckThreshold = positive(options?.stuckPodSeconds, APP_ROLLOUT_STUCK_POD_S);
+	const userThreshold = nonNegative(options?.userMessageSeconds, stuckThreshold);
+
+	for (const pod of byPodName(pods)) {
+		for (const container of containersOf(pod)) {
+			const facts = containerFacts(pod, container, options);
+			const failure =
+				userMessageFailure(facts, userThreshold) ??
+				stuckWaitingFailure(facts, stuckThreshold, count(container?.restartCount));
+			if (failure) {
+				failures.push(failure);
+			}
+		}
+	}
+
+	return failures;
+}
+
+/** {@link classifyJobPodFailures}' most specific verdict, or `null`. */
+export function classifyJobPodFailure(
+	pods: readonly AppRolloutPod[] = [],
+	options: AppRolloutOptions = {}
+): AppPodFailure | null {
+	return classifyJobPodFailures(pods, options)[0] ?? null;
+}
+
+/**
+ * The fix a person can make for a verdict, in one or two sentences — `null` when the code names
+ * nothing the App's own repository can change. Appended to the failure message of a rollout or a
+ * Job, so the Deployment's `lastError` says what to do and not only what the kubelet saw.
+ */
+export function podFailureAdvice(code: AppFailureCode): string | null {
+	switch (code) {
+		case 'managed_root_forbidden':
+			return 'The image runs as root, which this target refuses. Fix: set a numeric non-root `USER` in the Dockerfile (for example `USER 1001`, after a `chown` of the paths the app writes), or a non-zero `components[].runAsUser` in works.yml.';
+		case 'image_user_unverifiable':
+			return "The image's `USER` is a name, so Kubernetes cannot verify that it is not root. Fix: use the numeric uid in the Dockerfile (for example `USER 1001` instead of `USER nextjs`), or set `components[].runAsUser` to that uid in works.yml.";
+		case 'image_pull':
+			return 'The image could not be pulled: check the image reference and that the registry credential can read it.';
+		default:
+			return null;
+	}
 }

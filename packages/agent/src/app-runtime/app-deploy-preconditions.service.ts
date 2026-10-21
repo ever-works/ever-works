@@ -1086,8 +1086,8 @@ export class AppDeployPreconditionsService {
             unmet.push({
                 code: 'no_green_build',
                 message:
-                    'No green Build exists for this App Work yet. Wait for a Build to succeed, then ' +
-                    'Deploy.',
+                    'No green Build exists for this App Work yet. Start a Build on the Builds tab, ' +
+                    'wait for it to succeed, then Deploy.',
             });
             return null;
         }
@@ -1425,8 +1425,7 @@ export class AppDeployPreconditionsService {
             names: names.length > 0 ? names : declared.length > 0 ? declared : undefined,
             message:
                 names.length > 0
-                    ? `These dependencies are not ready yet: ${names.join(', ')}. Provisioning was ` +
-                      'requested; Deploy again when they are ready.'
+                    ? dependencyNotReadyMessage(readiness?.notReady ?? [])
                     : 'The dependencies of this App Work are not ready' +
                       (readiness?.reason ? ` (${String(readiness.reason)})` : '') +
                       '.',
@@ -1596,6 +1595,64 @@ function declaredDependencyKinds(spec: AppSpec | null | undefined): string[] {
     return (['postgres', 'redis', 'objectStorage', 'smtp'] as const).filter(
         (kind) => dependencies[kind] !== undefined && dependencies[kind] !== null,
     );
+}
+
+/**
+ * The `dependency_not_ready` message for the kinds `ensureReadyForDeploy` reported, each named
+ * with its state — and a `failed` one with its reason.
+ *
+ * It used to say "Provisioning was requested; Deploy again when they are ready" for every kind,
+ * which was false for a `failed` row: a definite failure (`providerNotSupported`,
+ * `noDefaultStorageClass`, …) is final (FR-43) and nothing re-dispatches it, so "Deploy again"
+ * could never succeed and the reason the owner needed was nowhere in the refusal.
+ */
+export function dependencyNotReadyMessage(
+    notReady: AppDeployDependencyReadiness['notReady'],
+): string {
+    const entries = notReady.filter((entry) => String(entry?.kind ?? '').length > 0);
+    const failed = entries.filter((entry) => entry.status === 'failed');
+    const awaitingConfig = entries.filter((entry) => entry.status === 'awaiting_config');
+    const inProgress = entries.filter(
+        (entry) => entry.status !== 'failed' && entry.status !== 'awaiting_config',
+    );
+
+    const sentences: string[] = [];
+    if (failed.length > 0) {
+        sentences.push(
+            `${failed.length === 1 ? 'This dependency' : 'These dependencies'} failed to provision: ` +
+                `${failed
+                    .map(
+                        (entry) =>
+                            `${entry.kind} (${entry.reason ? String(entry.reason) : 'no reason recorded'})`,
+                    )
+                    .join(', ')}. ` +
+                `${failed.length === 1 ? 'It is' : 'They are'} not retried on ${failed.length === 1 ? 'its' : 'their'} own: ` +
+                'fix the cause or retry from the Dependencies card, then Deploy again.',
+        );
+    }
+    if (awaitingConfig.length > 0) {
+        sentences.push(
+            `${awaitingConfig.map((entry) => entry.kind).join(', ')} ${
+                awaitingConfig.length === 1 ? 'needs' : 'need'
+            } configuration on the Dependencies card before ${
+                awaitingConfig.length === 1 ? 'it' : 'they'
+            } can be provisioned.`,
+        );
+    }
+    if (inProgress.length > 0) {
+        sentences.push(
+            `${failed.length + awaitingConfig.length > 0 ? 'Not ready yet' : 'These dependencies are not ready yet'}: ` +
+                `${inProgress
+                    .map((entry) => {
+                        const state = entry.status ? String(entry.status) : 'pending';
+                        return entry.reason
+                            ? `${entry.kind} (${state}: ${String(entry.reason)})`
+                            : `${entry.kind} (${state})`;
+                    })
+                    .join(', ')}. Provisioning was requested; Deploy again when they are ready.`,
+        );
+    }
+    return sentences.join(' ');
 }
 
 /**

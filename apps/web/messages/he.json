@@ -287,6 +287,8 @@
             "signIn": "התחברות עם Ever ID",
             "signUp": "הרשמה עם Ever ID",
             "redirecting": "פותח את Ever ID…",
+            "signInWith": "התחברות עם <wordmark>Ever ID</wordmark>",
+            "signUpWith": "הרשמה עם <wordmark>Ever ID</wordmark>",
             "consentRequired": "אשר את התנאים שלמעלה כדי להמשיך.",
             "createAccount": {
                 "title": "צור את חשבון ה-Ever Works שלך",
@@ -7422,6 +7424,95 @@
                         "resume": "התבקש המשך.",
                         "remove": "התבקשה הסרה.",
                         "cancelDeploy": "התבקש ביטול."
+                    }
+                },
+                "environment": {
+                    "title": "סביבה",
+                    "description": "הערכים שאיתם האפליקציה הזו רצה. ערכים סודיים לעולם אינם מוצגים — רק האם הם מוגדרים.",
+                    "summary": "{set} מתוך {total} מוגדרים",
+                    "missingRequired": "{count, plural, one {חסר ערך חובה אחד} other {חסרים # ערכי חובה}}",
+                    "loading": "קורא את הסביבה…",
+                    "unavailable": "עדיין לא ניתן לערוך ערכי סביבה במופע הזה.",
+                    "error": "לא ניתן היה לקרוא את הסביבה. טען מחדש את הדף כדי לנסות שוב.",
+                    "empty": "מפרט האפליקציה הזו אינו מצהיר על ערכי סביבה.",
+                    "secureStorageOff": "אחסון מאובטח אינו מוגדר בהתקנה הזו, ולכן לא ניתן לשמור ערכים.",
+                    "edit": "עריכה",
+                    "setValue": "הגדרת ערך",
+                    "editAria": "עריכת {name}",
+                    "saved": "{name} נשמר",
+                    "removed": "{name} הוסר",
+                    "states": {
+                        "set": "מוגדר",
+                        "unset": "לא מוגדר",
+                        "missing": "חובה — לא מוגדר",
+                        "fromSpec": "ממפרט האפליקציה",
+                        "fromDependency": "מוזרק על ידי {kind}",
+                        "generated": "נוצר אוטומטית"
+                    },
+                    "badges": {
+                        "secret": "סודי",
+                        "required": "חובה"
+                    },
+                    "phases": {
+                        "build": "בנייה",
+                        "runtime": "זמן ריצה",
+                        "both": "בנייה + זמן ריצה"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "אחסון אובייקטים",
+                        "smtp": "דואר SMTP"
+                    },
+                    "dialog": {
+                        "title": "עריכת {name}",
+                        "valueLabel": "ערך",
+                        "secretHint": "הערך הזה סודי. הוא נשמר מוצפן ולעולם אינו מוצג שוב.",
+                        "secretStored": "קיים ערך שמור. הקלד ערך חדש כדי להחליף אותו.",
+                        "dependencyHint": "בדרך כלל מוזרק על ידי {kind}. ערך שתגדיר כאן גובר עליו — למשל שרת SMTP משלך.",
+                        "redeployHint": "היכן שהאפליקציה משתמשת בערך הזה, היא נבנית או נפרסת מחדש עם הערך החדש.",
+                        "empty": "הזן ערך, או הסר את הערך השמור.",
+                        "save": "שמירה",
+                        "saving": "שומר…",
+                        "remove": "הסרת הערך",
+                        "cancel": "ביטול"
+                    },
+                    "errors": {
+                        "undeclaredName": "מפרט האפליקציה אינו מצהיר על השם הזה.",
+                        "specUnavailable": "לאפליקציה הזו עדיין אין מפרט שמיש.",
+                        "failed": "לא ניתן היה לשמור את הערך. נסה שוב."
+                    }
+                },
+                "dependencies": {
+                    "title": "תלויות",
+                    "description": "מסדי הנתונים, המטמונים, האחסון והדואר שהאפליקציה הזו צריכה. הם מוקצים ביעד הפריסה שלה לפני שהיא מופעלת.",
+                    "loading": "קורא את התלויות…",
+                    "unavailable": "עדיין לא ניתן לנהל תלויות במופע הזה.",
+                    "error": "לא ניתן היה לקרוא את התלויות. טענו מחדש את הדף כדי לנסות שוב.",
+                    "empty": "מפרט האפליקציה הזו אינו מצהיר על תלויות.",
+                    "provider": "ספק: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {ניסיון אחד} other {# ניסיונות}}",
+                    "noReason": "לא נרשמה סיבה.",
+                    "deployRetries": "פריסה חוזרת מנסה שוב באופן אוטומטי — או לחצו עכשיו על ״נסה שוב״.",
+                    "retry": "נסה שוב",
+                    "retryAria": "נסה שוב את {kind}",
+                    "retried": "{kind}: נקבע ניסיון חדש.",
+                    "retryQueued": "{kind}: ניסיון חדש יתחיל ברגע שה-worker יהיה זמין.",
+                    "leaseHeld": "{kind} מוקצה ממש עכשיו. נסו שוב בעוד רגע.",
+                    "retryFailed": "לא ניתן היה לנסות שוב את {kind}. נסו שוב.",
+                    "deleteData": "מחק נתונים",
+                    "deleteDataAria": "מחק את הנתונים של {kind}",
+                    "deleteDialog": {
+                        "title": "למחוק את הנתונים של {kind}?",
+                        "description": "פעולה זו משמידה את האחסון, מסדי הנתונים וה-buckets של התלות הזו. לא ניתן לבטל אותה.",
+                        "resources": "יימחקו:",
+                        "noResources": "לא נרשמו משאבים עבור התלות הזו.",
+                        "confirmLabel": "הקלידו {slug} לאישור",
+                        "cancel": "ביטול",
+                        "confirm": "מחק נתונים",
+                        "requested": "הנתונים של {kind} נמחקים.",
+                        "failed": "לא ניתן היה למחוק את הנתונים. {reason}"
                     }
                 }
             },

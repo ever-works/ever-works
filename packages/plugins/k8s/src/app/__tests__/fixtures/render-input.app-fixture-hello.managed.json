@@ -1,0 +1,150 @@
+{
+	"_comment": "The render input of ever-works/app-fixture-hello (.works/works.yml, blueprint 0.1.0) on the managed target, as AppRenderInputBuilder composes it for ever-works-apps (podSecurity restricted, the tier's runtimeClassName, quota and limit range, edge TLS). web is read-only with an `uploads` volume, worker is read-only with none; `migrate` (pre-deploy) and `bootstrap` (first-deploy) are command jobs on web; `tick` is an http cron. Added 2026-10-18 after prod Deployment e4b65cbd's migrate Job was refused with 422 `volumeMounts[0].name: Not found: \"tmp\"`. Hosts are RFC 2606 / the tier's apex; the digest and every value are synthetic.",
+	"ref": {
+		"workId": "5a07fa3f-367a-444e-9d1e-311d03cc1327",
+		"namespace": "ewapp-5a07fa3f",
+		"target": "ever-works-apps"
+	},
+	"purpose": "deploy",
+	"workSlug": "app-fixture-hello",
+	"deploymentId": "e4b65cbd-0000-4000-8000-000000000001",
+	"deploymentShort": "e4b65cbd",
+	"specCommitSha": "78bbc9c35ab5cf089da609c3255edb74b653fa57",
+	"isFirstDeploymentOnCluster": true,
+	"skipPreDeployJobs": false,
+	"image": {
+		"reference": "ghcr.io/example-org/app-fixture-hello@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	},
+	"components": [
+		{
+			"name": "web",
+			"role": "web",
+			"command": ["node", "src/server.mjs"],
+			"port": 8080,
+			"replicas": 1,
+			"writableRootFilesystem": false,
+			"probes": {
+				"startup": {
+					"http": "/healthz",
+					"periodSeconds": 2,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 30
+				},
+				"readiness": {
+					"http": "/readyz",
+					"periodSeconds": 10,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 3
+				},
+				"liveness": {
+					"http": "/healthz",
+					"periodSeconds": 20,
+					"timeoutSeconds": 5,
+					"initialDelaySeconds": 0,
+					"failureThreshold": 3
+				}
+			},
+			"resources": { "cpu": "50m", "memory": "64Mi", "memoryLimit": "128Mi" },
+			"volumes": [{ "name": "uploads", "path": "/data", "size": "1Gi", "backup": false }],
+			"primary": true,
+			"deadlineSeconds": 300,
+			"internalUrl": "http://web.ewapp-5a07fa3f.svc.cluster.local:8080"
+		},
+		{
+			"name": "worker",
+			"role": "worker",
+			"command": ["node", "src/worker.mjs"],
+			"replicas": 1,
+			"writableRootFilesystem": false,
+			"probes": {},
+			"resources": { "cpu": "25m", "memory": "64Mi", "memoryLimit": "128Mi" },
+			"volumes": [],
+			"primary": false,
+			"deadlineSeconds": 300,
+			"internalUrl": "http://worker.ewapp-5a07fa3f.svc.cluster.local"
+		}
+	],
+	"jobs": [
+		{
+			"name": "migrate",
+			"when": "pre-deploy",
+			"component": "web",
+			"command": ["node", "src/migrate.mjs"],
+			"timeoutSeconds": 120
+		},
+		{
+			"name": "bootstrap",
+			"when": "first-deploy",
+			"component": "web",
+			"command": ["node", "src/bootstrap.mjs"],
+			"timeoutSeconds": 120
+		}
+	],
+	"cron": [
+		{
+			"name": "tick",
+			"schedule": "*/2 * * * *",
+			"component": "web",
+			"http": { "method": "POST", "path": "/cron/tick", "authEnv": "FIXTURE_CRON_TOKEN", "authScheme": "bearer" }
+		}
+	],
+	"smoke": [],
+	"env": {
+		"values": {
+			"DATABASE_URL": "postgres://app:fixture-placeholder@dep-postgres.ewapp-5a07fa3f.svc.cluster.local:5432/app",
+			"SMTP_HOST": "dep-smtp.ewapp-5a07fa3f.svc.cluster.local",
+			"SMTP_PORT": "1025",
+			"FIXTURE_MARKER": "fixture",
+			"FIXTURE_SESSION_SECRET": "fixture-placeholder-session-secret",
+			"FIXTURE_CRON_TOKEN": "fixture-placeholder-cron-token"
+		},
+		"checksum": "a1b2c3d4e5f60718",
+		"secretNames": ["DATABASE_URL", "FIXTURE_SESSION_SECRET", "FIXTURE_CRON_TOKEN"]
+	},
+	"hosts": {
+		"primary": "app-fixture-hello.example.com",
+		"extra": [],
+		"previous": []
+	},
+	"ingress": {
+		"className": "nginx",
+		"controllerNamespace": "ingress-nginx",
+		"tls": "edge",
+		"issuer": null
+	},
+	"network": {
+		"isolation": true,
+		"extraEgress": [],
+		"needsHairpin": false
+	},
+	"policy": {
+		"podSecurity": "restricted",
+		"allowRoot": false,
+		"runtimeClassName": "ever-works-apps",
+		"quota": {
+			"requests.cpu": "2",
+			"limits.cpu": "4",
+			"requests.memory": "4Gi",
+			"limits.memory": "6Gi",
+			"pods": 20,
+			"persistentvolumeclaims": 5,
+			"requests.storage": "20Gi",
+			"services.loadbalancers": 0,
+			"services.nodeports": 0,
+			"count/jobs.batch": 20,
+			"count/cronjobs.batch": 20,
+			"secrets": 30,
+			"configmaps": 30
+		},
+		"limitRange": {
+			"defaultRequest": { "cpu": "100m", "memory": "128Mi" },
+			"defaultLimit": { "cpu": "1", "memory": "512Mi", "ephemeralStorage": "1Gi" },
+			"max": { "cpu": "2", "memory": "4Gi" }
+		},
+		"cronMinIntervalMinutes": 5,
+		"scaleFailedFirstDeployToZero": true,
+		"requireIsolationEnforced": true
+	}
+}

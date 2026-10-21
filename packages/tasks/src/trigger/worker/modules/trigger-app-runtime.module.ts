@@ -1,4 +1,11 @@
-import { Injectable, Module, OnModuleInit } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    Module,
+    OnApplicationBootstrap,
+    OnModuleInit,
+    Optional,
+} from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
 import {
     APP_DEPLOY_BUILD_SOURCE,
@@ -54,6 +61,10 @@ import {
     workerAppDeployDispatcher,
 } from '@ever-works/agent/app-runtime';
 import { APP_DEPLOY_HOST_SOURCE } from '@ever-works/agent/app-runtime';
+import {
+    APP_LICENSE_SERVICE,
+    type AppLicenseService as AppLicenseGateReader,
+} from '@ever-works/agent/app-runtime';
 import { APP_DEPENDENCIES_SERVICE } from '@ever-works/agent/app-runtime';
 // Lane aw-deploy-3 (2026-10-17) — APW-07's service, composed HERE so the worker's preconditions
 // enforce dependency readiness and the orchestrator's `remove` can order the dependency deletion.
@@ -86,6 +97,7 @@ import { TriggerRemoteCacheModule } from './trigger-remote-cache.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerInternalModule } from './trigger-internal.module';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
+import { TriggerPluginHydratorService } from '../services/trigger-plugin-hydrator.service';
 import { createRemoteProxy } from '../remote-proxy';
 
 /**
@@ -145,6 +157,12 @@ import { createRemoteProxy } from '../remote-proxy';
  * `AppRuntimeFacadeService`'s every method throws `APP_CLUSTER_IO_IN_API` — which is exactly what
  * keeps a cluster dial out of the API process.
  *
+ * ## The plugin registry's bootstrap
+ *
+ * {@link AppRuntimePluginRegistryBootstrap} fills the registry (`onApplicationBootstrap`) that the
+ * facade resolves every App target's plugin from. Without it the registry is empty and every
+ * target is `target_unavailable` — see that class.
+ *
  * ## What is local, and what is proxied
  *
  * | Local (this module) | Proxied over the internal API |
@@ -195,8 +213,9 @@ import { createRemoteProxy } from '../remote-proxy';
  * - `AppImageReferenceResolver` — APW-06 **T72** (`packages/agent/src/app-runtime/app-image-reference.resolver.ts`).
  * - `AppRuntimeEventRelayService` (the `APP_RUNTIME_EVENT_SINK` proxy) — APW-06 **T28**
  *   (`apps/api/src/app-runtime/app-runtime-event-relay.service.ts`).
- * - APW-03's `AppLicenseService` (T29/T30's `APP_LICENSE_SERVICE`). (APW-05's `WorkBuild` reads were
- *   on this list until 2026-09-25; they are proxied above.)
+ * - (APW-03's `AppLicenseService` — T29/T30's `APP_LICENSE_SERVICE` — was on this list until
+ *   2026-10-18; it has landed and is proxied by name below, see `workerAppLicenseService`. APW-05's
+ *   `WorkBuild` reads were on it until 2026-09-25; they are proxied above.)
  *
  * (`WORK_APP_RUNTIME_STATES` was on this list, blamed on APW-06 T17. That was stale: T17's
  * `WorkAppRuntimeStateRepository` has landed and the API binds the token to it. It moved to the
@@ -265,6 +284,54 @@ export class AppClusterWorkerContextBootstrap implements OnModuleInit {
     }
 }
 
+/**
+ * **The plugin registry, filled** — once per context, before any task code runs.
+ *
+ * `TriggerPluginsModule` binds `PluginRegistryService`, but a registry is only populated by
+ * `PluginBootstrapService.bootstrap()` (the loader's disk discovery). The KB / workflow / terminal
+ * tasks call `TriggerPluginHydratorService.initialize()` themselves; none of the `app-cluster-io`
+ * tasks did, so every context this module built had an EMPTY registry: the runtime facade found
+ * no `k8s` plugin for `your-cluster` and no `apps-tier` plugin for `ever-works-apps`
+ * (`No enabled deployment plugin declares the 'apps-tier' capability …`, prod run
+ * `run_cmvdl1xd81sut2y47j7sqnvo5`, worker 20261018.4), so `prepareDependencyTarget` answered
+ * `target_unavailable` and every dependency row read `clusterUnreachable` without a cluster ever
+ * being dialled.
+ *
+ * Here rather than in each task because the registry is this module's dependency: every task that
+ * boots it (`app-deploy`, `app-cluster-op`, `app-smoke`, `app-health-poll`,
+ * `app-dependency-provision`, the local worker) resolves plugins through `AppRuntimeFacadeService`.
+ * `onApplicationBootstrap`, so the internal client and every module above it are initialised first.
+ *
+ * Lazy mode (the default) registers manifests only — no plugin module is imported until first
+ * use. A failed bootstrap does not fail the context: the facade then answers its own named
+ * refusal (`target_unavailable`), which is logged with the reason below.
+ */
+@Injectable()
+export class AppRuntimePluginRegistryBootstrap implements OnApplicationBootstrap {
+    private readonly logger = new Logger(AppRuntimePluginRegistryBootstrap.name);
+
+    constructor(@Optional() private readonly hydrator?: TriggerPluginHydratorService) {}
+
+    async onApplicationBootstrap(): Promise<void> {
+        if (!this.hydrator || typeof this.hydrator.initialize !== 'function') {
+            this.logger.warn(
+                'No plugin hydrator is bound: the App runtime plugin registry stays empty, so no ' +
+                    'App target can be resolved in this context.',
+            );
+            return;
+        }
+        try {
+            await this.hydrator.initialize();
+        } catch (error) {
+            this.logger.warn(
+                `The App runtime plugin registry could not be bootstrapped: ${
+                    error instanceof Error ? `${error.name}: ${error.message}` : typeof error
+                }`,
+            );
+        }
+    }
+}
+
 /** The remote name each proxied provider dials on `TriggerInternalController.remoteMap`. */
 export const APP_RUNTIME_REMOTE_PROXIES = [
     'WorkRepository',
@@ -292,6 +359,9 @@ export const APP_RUNTIME_REMOTE_PROXIES = [
     'AppDependencyProvisionDispatchRelay',
     'AppDeployRequestService',
     'WorkUpstreamStateRepository',
+    // APW-03 T42 — the license gate's one read (`getHostingEligibility`), see
+    // `workerAppLicenseService`.
+    'AppLicenseService',
 ] as const;
 
 /**
@@ -313,6 +383,32 @@ export function hydratingWorkRepositoryProxy(apiClient: TriggerInternalApiClient
 function hydrateWork<T>(row: T): T {
     if (!row || typeof row !== 'object' || row instanceof Work) return row;
     return Object.assign(Object.create(Work.prototype), row) as T;
+}
+
+/**
+ * The worker's `APP_LICENSE_SERVICE`: the ONE read `AppLicenseGate` makes —
+ * `getHostingEligibility(workId, opts?)` — over the internal channel to the API's three-member
+ * `AppLicenseService` facade (`TriggerInternalController.remoteMap`, APW-03 T42).
+ *
+ * Unbound, the gate had no verdict to read, so every `ever-works-apps` Deployment failed closed
+ * with `license_blocks_target` / `license_eligibility_unavailable` even for a green App (prod
+ * Deployment d08b60ab, run `run_cmvdxu7np1zwj2y4722nqpd7c`, 2026-10-18).
+ *
+ * - **Narrow**: an object with that one method, never the raw proxy — the raw proxy answers a
+ *   forwarding function for ANY property, so a typo or a later caller could dial another member.
+ * - **Fail-closed**: a failed RPC (the API down, the facade unbound — the controller's loud
+ *   `Unknown remote target`) throws, and the gate turns a throw into "no verdict"
+ *   (`readEligibility` → `null`): `license_blocks_target` on the managed tier, a warning on
+ *   `your-cluster`. An absent answer is `null`, the gate's own "unreadable", never a guess.
+ */
+export function workerAppLicenseService(apiClient: TriggerInternalApiClient): AppLicenseGateReader {
+    const remote = createRemoteProxy(apiClient, 'AppLicenseService');
+    return {
+        async getHostingEligibility(workId: string, opts?: { commitSha?: string }) {
+            const answer = await remote.getHostingEligibility(workId, opts);
+            return answer ?? null;
+        },
+    };
 }
 
 /**
@@ -371,6 +467,8 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
     providers: [
         // ---- the flag, armed by this module's own bootstrap and by nothing else --------
         AppClusterWorkerContextBootstrap,
+        // ---- the plugin registry, populated before any task resolves a plugin ------------
+        AppRuntimePluginRegistryBootstrap,
 
         // ---- proxied: the worker owns no `DataSource` -----------------------------------
         {
@@ -430,6 +528,13 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
             provide: WORK_APP_RUNTIME_STATES,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'WorkAppRuntimeStateRepository'),
+            inject: [TriggerInternalApiClient],
+        },
+        // APW-03 T42: the license gate's verdict, read in the API (the classification and its
+        // evidence live there). Narrow and fail-closed — see `workerAppLicenseService`.
+        {
+            provide: APP_LICENSE_SERVICE,
+            useFactory: (apiClient: TriggerInternalApiClient) => workerAppLicenseService(apiClient),
             inject: [TriggerInternalApiClient],
         },
         // §6.4 "proxied by name" (T73): APW-07's env source reads the stored env and decrypts it in

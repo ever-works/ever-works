@@ -43,9 +43,13 @@ import type {
     FleetExecutionScopeType,
     FleetRotateAllResult,
     FleetRunnerStatusView,
+    // Computer health (FL-03).
+    FleetNodeHealthView,
 } from '@ever-works/contracts';
 
 export type {
+    // Computer health (FL-03).
+    FleetNodeHealthView,
     FleetAgentNodeAffinityView,
     FleetCostCeilingView,
     FleetAuditView,
@@ -245,24 +249,29 @@ export const fleetAPI = {
 
     updateNode: async (nodeId: string, payload: UpdateFleetNodePayload) => {
         return serverMutation<FleetNodeView>({
-            endpoint: `${BASE}/nodes/${nodeId}`,
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
             data: payload,
             method: 'PATCH',
             wrapInData: false,
         });
     },
 
-    deleteNode: async (nodeId: string) => {
+    /**
+     * Remove a node. `confirmName` (Fleet hub, CONTRACTS §2.2) is the typed
+     * name the API checks when it is sent; without it the call is exactly
+     * what it always was.
+     */
+    deleteNode: async (nodeId: string, confirmation?: { confirmName: string }) => {
         return serverMutation<void>({
-            endpoint: `${BASE}/nodes/${nodeId}`,
-            data: {},
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
+            data: confirmation ?? {},
             method: 'DELETE',
             wrapInData: false,
         });
     },
 
     nodeDetail: async (nodeId: string) => {
-        return serverFetch<FleetNodeDetailView>(`${BASE}/nodes/${nodeId}`);
+        return serverFetch<FleetNodeDetailView>(`${BASE}/nodes/${encodeURIComponent(nodeId)}`);
     },
 
     listOutstandingTokens: async () => {
@@ -518,5 +527,15 @@ export const fleetAPI = {
             method: 'DELETE',
             wrapInData: false,
         });
+    },
+
+    /**
+     * Computer health (FL-03) — one computer's latest snapshot, whether it is
+     * stale, and its plain-language state with its one fix.
+     */
+    health: async (nodeId: string) => {
+        return serverFetch<FleetNodeHealthView>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/health`,
+        );
     },
 };

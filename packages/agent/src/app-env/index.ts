@@ -59,6 +59,21 @@ export {
 } from './app-env.service';
 
 export { AppEnvModule } from './app-env.module';
+// Lane aw-env-smtp (2026-10-18) — the Environment routes' service, the Activity writer behind
+// `APP_ENV_ACTIVITY` (T26) and the App env → `smtp` dependency bridge (GAP-22).
+export {
+    AppEnvEditorRefusal,
+    AppEnvEditorService,
+    isAppEnvEditorRefusal,
+    toVariableView,
+    type AppEnvEditorViewer,
+} from './app-env-editor.service';
+export { AppEnvActivityService } from './app-env.activity';
+export {
+    APP_ENV_SMTP_BRIDGE_OUTPUTS,
+    AppEnvSmtpBridgeListener,
+    smtpBoundNames,
+} from './app-env-smtp-bridge.listener';
 // The composition root that binds `APP_RUNTIME_ENV_SOURCE` and
 // `APP_ENV_DEPLOY_READINESS` — see its own docstring for why the two swaps
 // cannot both live in `AppEnvModule`.

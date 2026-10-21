@@ -287,6 +287,8 @@
             "signIn": "Inloggen met Ever ID",
             "signUp": "Registreren met Ever ID",
             "redirecting": "Ever ID wordt geopend…",
+            "signInWith": "Inloggen met <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Registreren met <wordmark>Ever ID</wordmark>",
             "consentRequired": "Accepteer de voorwaarden hierboven om door te gaan.",
             "createAccount": {
                 "title": "Maak uw Ever Works-account aan",
@@ -7354,6 +7356,95 @@
                         "resume": "Hervatten aangevraagd.",
                         "remove": "Verwijderen aangevraagd.",
                         "cancelDeploy": "Annuleren aangevraagd."
+                    }
+                },
+                "environment": {
+                    "title": "Omgeving",
+                    "description": "De waarden waarmee deze app draait. Geheime waarden worden nooit getoond — alleen of ze zijn ingesteld.",
+                    "summary": "{set} van {total} ingesteld",
+                    "missingRequired": "{count, plural, one {# verplichte waarde ontbreekt} other {# verplichte waarden ontbreken}}",
+                    "loading": "Omgeving wordt gelezen…",
+                    "unavailable": "Omgevingswaarden kunnen op deze instantie nog niet worden bewerkt.",
+                    "error": "De omgeving kon niet worden gelezen. Laad de pagina opnieuw om het nog eens te proberen.",
+                    "empty": "De app-specificatie van deze app declareert geen omgevingswaarden.",
+                    "secureStorageOff": "Beveiligde opslag is op deze installatie niet ingesteld, dus waarden kunnen niet worden opgeslagen.",
+                    "edit": "Bewerken",
+                    "setValue": "Waarde instellen",
+                    "editAria": "{name} bewerken",
+                    "saved": "{name} opgeslagen",
+                    "removed": "{name} verwijderd",
+                    "states": {
+                        "set": "Ingesteld",
+                        "unset": "Niet ingesteld",
+                        "missing": "Verplicht — niet ingesteld",
+                        "fromSpec": "Uit de app-specificatie",
+                        "fromDependency": "Aangeleverd door {kind}",
+                        "generated": "Gegenereerd"
+                    },
+                    "badges": {
+                        "secret": "Geheim",
+                        "required": "Verplicht"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Runtime",
+                        "both": "Build + runtime"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Objectopslag",
+                        "smtp": "SMTP-mail"
+                    },
+                    "dialog": {
+                        "title": "{name} bewerken",
+                        "valueLabel": "Waarde",
+                        "secretHint": "Deze waarde is geheim. Ze wordt versleuteld opgeslagen en nooit meer getoond.",
+                        "secretStored": "Er is een waarde opgeslagen. Typ een nieuwe om die te vervangen.",
+                        "dependencyHint": "Normaal aangeleverd door {kind}. Een waarde die je hier instelt gaat voor — bijvoorbeeld je eigen SMTP-server.",
+                        "redeployHint": "Waar de app deze waarde gebruikt, wordt hij opnieuw gebouwd of uitgerold met de nieuwe.",
+                        "empty": "Voer een waarde in, of verwijder de opgeslagen waarde.",
+                        "save": "Opslaan",
+                        "saving": "Opslaan…",
+                        "remove": "Waarde verwijderen",
+                        "cancel": "Annuleren"
+                    },
+                    "errors": {
+                        "undeclaredName": "De app-specificatie declareert deze naam niet.",
+                        "specUnavailable": "Deze app heeft nog geen bruikbare app-specificatie.",
+                        "failed": "De waarde kon niet worden opgeslagen. Probeer het opnieuw."
+                    }
+                },
+                "dependencies": {
+                    "title": "Afhankelijkheden",
+                    "description": "De databases, caches, opslag en e-mail die deze app nodig heeft. Ze worden op het deploydoel ingericht voordat de app start.",
+                    "loading": "Afhankelijkheden worden gelezen…",
+                    "unavailable": "Afhankelijkheden kunnen op deze instantie nog niet worden beheerd.",
+                    "error": "Kon de afhankelijkheden niet lezen. Laad de pagina opnieuw om het nog eens te proberen.",
+                    "empty": "De App-spec van deze app declareert geen afhankelijkheden.",
+                    "provider": "Provider: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# poging} other {# pogingen}}",
+                    "noReason": "Er is geen reden vastgelegd.",
+                    "deployRetries": "Opnieuw deployen probeert het automatisch opnieuw — of klik nu op Opnieuw proberen.",
+                    "retry": "Opnieuw proberen",
+                    "retryAria": "{kind} opnieuw proberen",
+                    "retried": "{kind}: er is een nieuwe poging gepland.",
+                    "retryQueued": "{kind}: een nieuwe poging start zodra de worker beschikbaar is.",
+                    "leaseHeld": "{kind} wordt nu ingericht. Probeer het zo meteen opnieuw.",
+                    "retryFailed": "Kon {kind} niet opnieuw proberen. Probeer het nog eens.",
+                    "deleteData": "Gegevens verwijderen",
+                    "deleteDataAria": "Gegevens van {kind} verwijderen",
+                    "deleteDialog": {
+                        "title": "Gegevens van {kind} verwijderen?",
+                        "description": "Hiermee worden de volumes, databases en buckets van deze afhankelijkheid vernietigd. Dit kan niet ongedaan worden gemaakt.",
+                        "resources": "Wordt verwijderd:",
+                        "noResources": "Voor deze afhankelijkheid zijn geen resources vastgelegd.",
+                        "confirmLabel": "Typ {slug} om te bevestigen",
+                        "cancel": "Annuleren",
+                        "confirm": "Gegevens verwijderen",
+                        "requested": "De gegevens van {kind} worden verwijderd.",
+                        "failed": "De gegevens konden niet worden verwijderd. {reason}"
                     }
                 }
             },

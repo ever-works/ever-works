@@ -38,7 +38,8 @@ import { TasksController } from './tasks.controller';
 
 describe('TasksController — board-run active scope', () => {
     const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-    const auth = { userId } as never;
+    // A person in an interactive session (resolving an escalation needs one).
+    const auth = { userId, authMethod: 'session' } as never;
     const taskId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
     const agentId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
     const everScope = {

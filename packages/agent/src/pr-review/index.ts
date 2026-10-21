@@ -3,5 +3,6 @@
 // and the `review_pull_request` chat tool factory.
 export * from './pr-review.module';
 export * from './pr-review.service';
+export * from './pr-review-comment';
 export * from './pr-review.types';
 export * from './agent-pr-review-tools';

@@ -135,9 +135,14 @@ change-feed head (`DomainEventFeedService.head()`, EW-P1-1, `'0'` while no event
 `org:read`, `org:write`, `members:read`, `members:write`, `agents:read`, `teams:read`, `teams:write`, `works:read`,
 `works:write`, `missions:read`, `missions:write`, `goals:read`, `goals:write`, `ideas:read`, `ideas:write`,
 `tasks:read`, `tasks:write`, `inbox:read`, `inbox:write`, `kb:read`, `kb:write`, `email:read`, `email:write`,
-`events:read`, `webhooks:manage`, `links:write`.
+`events:read`, `webhooks:manage`, `links:write`, `merges:decide`.
 
-- The **"Ever Gauzy" preset** is every scope except `org:write` and `email:write` (opt-in).
+- The **"Ever Gauzy" preset** is every scope except `org:write`, `email:write` and `merges:decide` (opt-in).
+- **`merges:decide`** (works-security lane 3a, 2026-10-18) is the only scope that lets an integration relay a person's
+  answer to a **merge approval** (a `merge_pull_request` proposal: an agent's pull request landing on a real branch, a
+  release promotion or revert). Every other approval and escalation is relayed with `inbox:write` alone. Without it the
+  reply answers `403 scope_missing` (`details.missing: ['merges:decide']`) and the approval stays pending for a decision
+  in Ever Works. Granted like any scope, by ticking it when the key is created.
 - **Never grantable:** `goals:activate`, `missions:activate`, `ideas:build` — they are not in the vocabulary (spend
   safety, decision D9).
 - Source of truth: `INTEGRATION_SCOPES` in `packages/contracts/src/integrations/integration-keys.types.ts`, mirrored by

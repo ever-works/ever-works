@@ -17,6 +17,8 @@ const ENV_KEYS = [
     'EMAIL_SEND_CAPS_ENFORCEMENT',
     'EMAIL_SEND_CAP_INBOX_DAILY',
     'EMAIL_DEFAULT_AGENT_SEND_MODE',
+    'EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE',
+    'EMAIL_AGENT_AUTO_SEND_ALLOWLIST',
     // Ceilings are opt-in: every operator switch starts unset in each test.
     'EMAIL_SEND_CAP_INBOX_PER_MINUTE',
     'EMAIL_SEND_CAP_INBOX_RECIPIENTS_PER_5_MINUTES',
@@ -35,6 +37,13 @@ function makeHarness() {
         listOutboundSentAtSince: jest.fn().mockResolvedValue([]),
         listOutboundRecipientsSince: jest.fn().mockResolvedValue([]),
         findByIdAndUserId: jest.fn().mockResolvedValue(null),
+        // `ada@example.com` (the default recipient below) is a known
+        // correspondent, so the suites that predate the unknown-recipient
+        // rule keep testing what they tested.
+        listCorrespondentAddresses: jest.fn().mockResolvedValue(['Ada <ada@example.com>']),
+    };
+    const addresses = {
+        findAllByUser: jest.fn().mockResolvedValue([{ address: 'nova@agents.example.com' }]),
     };
     const agents = {
         findOne: jest
@@ -71,9 +80,10 @@ function makeHarness() {
         agents as never,
         organizations as never,
         proposals as never,
+        addresses as never,
     );
     jest.spyOn(service as unknown as { now: () => Date }, 'now').mockReturnValue(NOW);
-    return { service, inboxes, messages, agents, organizations, proposals };
+    return { service, inboxes, messages, agents, organizations, proposals, addresses };
 }
 
 function attempt(overrides: Partial<EmailSendAttempt> = {}): EmailSendAttempt {
@@ -103,6 +113,91 @@ describe('EmailSendPolicyService', () => {
             else process.env[key] = saved[key];
         }
         jest.restoreAllMocks();
+    });
+
+    describe('unknown recipients on the platform default (prompt-injection hardening)', () => {
+        it('holds an agent send to someone the agent never corresponded with', async () => {
+            const { service } = makeHarness();
+            const error = await service
+                .assertSendAllowed(attempt({ to: ['attacker@evil.test'] }))
+                .catch((e) => e);
+            expect(error).toBeInstanceOf(EmailApprovalRequiredException);
+            expect(error.getResponse()).toMatchObject({
+                details: { code: 'awaiting-approval', agentId: 'agent-1' },
+            });
+        });
+
+        it('holds the whole message when ANY recipient (cc / bcc included) is unknown', async () => {
+            const { service } = makeHarness();
+            await expect(
+                service.assertSendAllowed(attempt({ bcc: ['exfil@evil.test'] })),
+            ).rejects.toBeInstanceOf(EmailApprovalRequiredException);
+        });
+
+        it("lets mail to the owner's own addresses through (agent-to-agent messages)", async () => {
+            const { service } = makeHarness();
+            await expect(
+                service.assertSendAllowed(attempt({ to: ['NOVA@agents.example.com'] })),
+            ).resolves.toBeUndefined();
+        });
+
+        it('honours the operator allowlist (address or @domain)', async () => {
+            process.env.EMAIL_AGENT_AUTO_SEND_ALLOWLIST = 'ops@partner.test, @acme.test';
+            const { service } = makeHarness();
+            await expect(
+                service.assertSendAllowed(attempt({ to: ['ops@partner.test', 'bo@acme.test'] })),
+            ).resolves.toBeUndefined();
+        });
+
+        it('keeps auto-send when the operator restores it explicitly', async () => {
+            process.env.EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE = 'auto-send';
+            const first = makeHarness();
+            await expect(
+                first.service.assertSendAllowed(attempt({ to: ['anyone@else.test'] })),
+            ).resolves.toBeUndefined();
+
+            delete process.env.EMAIL_AGENT_UNKNOWN_RECIPIENT_MODE;
+            process.env.EMAIL_DEFAULT_AGENT_SEND_MODE = 'auto-send';
+            const second = makeHarness();
+            await expect(
+                second.service.assertSendAllowed(attempt({ to: ['anyone@else.test'] })),
+            ).resolves.toBeUndefined();
+        });
+
+        it("keeps auto-send when the agent's inbox explicitly chose it", async () => {
+            const { service, inboxes } = makeHarness();
+            inboxes.findByAgentForUser.mockResolvedValue({ id: 'inbox-1', mode: 'auto-send' });
+            await expect(
+                service.assertSendAllowed(attempt({ to: ['anyone@else.test'] })),
+            ).resolves.toBeUndefined();
+        });
+
+        it('fails toward review when the correspondent lookup fails', async () => {
+            const { service, messages } = makeHarness();
+            messages.listCorrespondentAddresses.mockRejectedValue(new Error('db down'));
+            await expect(service.assertSendAllowed(attempt())).rejects.toBeInstanceOf(
+                EmailApprovalRequiredException,
+            );
+        });
+
+        it('a person composing is never held by this rule', async () => {
+            const { service } = makeHarness();
+            await expect(
+                service.assertSendAllowed(attempt({ origin: 'human', to: ['anyone@else.test'] })),
+            ).resolves.toBeUndefined();
+        });
+
+        it('resolveAgentSendMode says which recipients need review', async () => {
+            const { service } = makeHarness();
+            await expect(
+                service.resolveAgentSendMode('user-1', 'agent-1', {
+                    to: ['ada@example.com', 'mallory@evil.test'],
+                }),
+            ).resolves.toEqual({ mode: 'draft-review', unknownRecipients: ['mallory@evil.test'] });
+            await expect(
+                service.resolveAgentSendMode('user-1', 'agent-1', { to: ['ada@example.com'] }),
+            ).resolves.toEqual({ mode: 'auto-send' });
+        });
     });
 
     describe('approval gate', () => {
@@ -394,6 +489,8 @@ describe('EmailSendPolicyService', () => {
             const { service, messages } = makeHarness();
             messages.countOutboundSentSince.mockResolvedValue(1_000_000);
             const to = Array.from({ length: 500 }, (_, i) => `r${i}@example.com`);
+            // Known correspondents: this case is about ceilings, not review.
+            messages.listCorrespondentAddresses.mockResolvedValue(to);
 
             await expect(service.assertSendAllowed(attempt({ to }))).resolves.toBeUndefined();
             await expect(
@@ -666,6 +763,8 @@ describe('EmailSendPolicyService', () => {
             });
             const { lock } = withLock(harness);
             const to = ['a@x.io', 'b@x.io', 'c@x.io', 'd@x.io'];
+            // Known correspondents: this case is about ceilings, not review.
+            harness.messages.listCorrespondentAddresses.mockResolvedValue(to);
             await expect(
                 harness.service.admitSend(attempt({ to }), { kind: 'message', row: ROW }),
             ).rejects.toMatchObject({ details: { limitKind: 'recipientsPerMessage', cap: 3 } });

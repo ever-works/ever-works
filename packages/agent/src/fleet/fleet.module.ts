@@ -24,6 +24,11 @@ import { FleetAuditService } from './fleet-audit.service';
 import { FleetRunCredentialService } from './fleet-run-credential.service';
 import { ApiKey } from '../entities/api-key.entity';
 import { ApiKeyRepository } from '../database/repositories/api-key.repository';
+import { FleetNodeHealthSample } from '../entities/fleet-node-health-sample.entity';
+import { FleetNodeHealthSampleRepository } from './fleet-node-health-sample.repository';
+import { FleetNodeHealthService } from './fleet-node-health.service';
+import { NEEDS_A_LOOK_PRODUCERS } from './needs-a-look/needs-a-look.producer';
+import { FL03_NEEDS_A_LOOK_PRODUCERS } from './needs-a-look/producers';
 import { FleetAccessService } from './fleet-access.service';
 import { FleetOrganizationDirectory } from './fleet-organization-directory';
 import { NeedsALookService } from './needs-a-look/needs-a-look.service';
@@ -98,6 +103,8 @@ import { NeedsALookService } from './needs-a-look/needs-a-look.service';
             // reuses the ONE hash/expiry/revoke implementation the
             // platform already has instead of growing a second one.
             ApiKey,
+            // Computer health (FL-03) — the raw and hourly health history.
+            FleetNodeHealthSample,
         ]),
     ],
     providers: [
@@ -120,6 +127,16 @@ import { NeedsALookService } from './needs-a-look/needs-a-look.service';
         // exactly as the fleet repositories are.
         ApiKeyRepository,
         FleetRunCredentialService,
+        // Computer health (FL-03) — the history writer and its roll-up.
+        FleetNodeHealthSampleRepository,
+        FleetNodeHealthService,
+        // Fleet "needs a look" (seam owned by FL-01) and FL-03's producers.
+        ...FL03_NEEDS_A_LOOK_PRODUCERS,
+        {
+            provide: NEEDS_A_LOOK_PRODUCERS,
+            useFactory: (...producers: unknown[]) => producers,
+            inject: [...FL03_NEEDS_A_LOOK_PRODUCERS],
+        },
         // Fleet hub (FL-01).
         FleetOrganizationDirectory,
         FleetAccessService,
@@ -142,6 +159,10 @@ import { NeedsALookService } from './needs-a-look/needs-a-look.service';
         // Exported so the api-side `FleetJobsController` can mint on the
         // node channel and the completion listener can revoke.
         FleetRunCredentialService,
+        // Computer health (FL-03): the API reads snapshots and runs the
+        // roll-up fallback; "needs a look" is read by the hub endpoints.
+        FleetNodeHealthSampleRepository,
+        FleetNodeHealthService,
         // Fleet hub (FL-01) — the family check (FL-02's link authoriser and
         // every family-gated route) and the needs-a-look registry (producers
         // register into it; the hub reads it).

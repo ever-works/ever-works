@@ -1,4 +1,5 @@
 import type { HttpMethod } from './api-call';
+import { mentionsSomeone, touchesAgentPrivileges } from './privileged';
 
 /**
  * Manifest-driven chat-tool registry.
@@ -61,6 +62,22 @@ export interface OperationSpec {
     bodyHint?: string;
     /** Destructive / irreversible / spend-incurring — gated behind confirmation. */
     requiresConfirmation?: boolean;
+    /**
+     * Per-call confirmation: gate only the calls this predicate flags (e.g. a
+     * task-chat post that @mentions someone, an agent update that touches
+     * permissions). A throwing predicate fails closed. Ignored when
+     * `requiresConfirmation` is already true.
+     */
+    confirmWhen?: (args: Record<string, unknown>) => boolean;
+    /**
+     * Security: `privileged` marks an op that is reversible but changes what
+     * agents can do, know or are told (permissions, agent files, skills,
+     * memory, advanced prompts, org documents). Such writes must be the
+     * user's own call, because an injected tool result (an email, an event,
+     * a KB doc read earlier in the same turn) can otherwise steer the model
+     * into making them. Defaults to `destructive` wording.
+     */
+    confirmationKind?: 'destructive' | 'privileged';
     /** Optional canvas artifact this result renders nicely as (documentation only). */
     canvas?: string;
 }
@@ -117,6 +134,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/agents',
         summary: 'Create a new agent.',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint: 'name, title, scope, scopeId, aiProvider, model, capabilities[].',
     },
@@ -135,6 +154,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         summary:
             'Create an agent for the current user from a prebuilt template (draft status, review-before-act guardrails).',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [
             {
                 name: 'slug',
@@ -153,6 +174,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/agents/{id}',
         summary: 'Update an agent’s fields.',
         kind: 'update',
+        confirmWhen: touchesAgentPrivileges,
+        confirmationKind: 'privileged',
         params: [id('Agent id')],
         body: true,
         bodyHint:
@@ -465,6 +488,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/tasks/{id}/chat',
         summary: 'Post a message to a task’s chat.',
         kind: 'create',
+        confirmWhen: mentionsSomeone,
+        confirmationKind: 'privileged',
         params: [id('Task id')],
         body: true,
         bodyHint: 'content.',
@@ -501,6 +526,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/skills',
         summary: 'Create a new skill.',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint: 'name, description, definition.',
     },
@@ -510,6 +537,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/skills/{id}',
         summary: 'Update a skill.',
         kind: 'update',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [id('Skill id')],
         body: true,
         bodyHint: 'Any of: name, description, definition.',
@@ -537,6 +566,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/skills/install',
         summary: 'Install a skill from the catalog.',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint: 'slug.',
     },
@@ -554,6 +585,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/skills/{id}/bindings',
         summary: 'Bind a skill to an agent.',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [id('Skill id')],
         body: true,
         bodyHint: 'agentId, priority.',
@@ -939,6 +972,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/works/{id}/kb/documents',
         summary: 'Create a knowledge-base document.',
         kind: 'create',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [id('Work id')],
         body: true,
         bodyHint: 'path, title, content.',
@@ -949,6 +984,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         path: '/api/works/{id}/kb/documents/{docId}',
         summary: 'Update a knowledge-base document.',
         kind: 'update',
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         params: [id('Work id'), { name: 'docId', in: 'path', required: true, type: 'string' }],
         body: true,
         bodyHint: 'Any of: title, content.',

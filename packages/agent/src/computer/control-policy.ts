@@ -37,9 +37,15 @@ export function canControl(policy: ComputerControlPolicy, role: ComputerViewerRo
 }
 
 /**
- * The role of a person relative to a machine. Live views are opened on the
- * owner's own machines only, so today this is `owner` or `stranger`; the
- * Organization roles are resolved here once views are shared.
+ * The role of a person relative to a machine, WITHOUT the Organization:
+ * `owner` or `stranger`. Kept for callers that have no Organization facts
+ * at hand; the control arbiter now asks `FleetAccessService.roleFor`
+ * (Fleet hub, FL-01), which also derives `org-admin` and `org-member` from
+ * the Organization the machine is bound to, and falls back to this when that
+ * service is not bound.
+ *
+ * @deprecated Ask `FleetAccessService.roleFor` wherever the Organization can
+ * be known; this answer can never be `org-admin` or `org-member`.
  */
 export function viewerRoleForNode(
     node: { userId: string },

@@ -892,7 +892,10 @@ describe('AppEnvResolver (T14, plan §2.2:110-150, §4.6:422-464)', () => {
 
     describe('the deploy target decides the placeholder (plan §4.6.1:436-437, §4.11:694-696)', () => {
         it('emits ew-dep:// tokens and reads no output on the managed tier', async () => {
+            // A zone row (`managed-*`): the platform holds no outputs for it — even an envelope that is
+            // somehow present is never read into a value.
             await storeDependency('postgres', {
+                providerId: 'managed-postgres',
                 outputs: outputsFor('postgres'),
                 outputsVersion: 3,
             });
@@ -914,6 +917,7 @@ describe('AppEnvResolver (T14, plan §2.2:110-150, §4.6:422-464)', () => {
 
         it('decides from ctx.target, never from the stored row (APW06-G08)', async () => {
             await storeDependency('postgres', {
+                providerId: 'managed-postgres',
                 outputs: outputsFor('postgres'),
                 deployTarget: 'ever-works-apps',
             });
@@ -930,6 +934,47 @@ describe('AppEnvResolver (T14, plan §2.2:110-150, §4.6:422-464)', () => {
                 target: 'ever-works-apps',
             });
             expect(value(managed, 'DATABASE_URL').value).toBe('ew-dep://postgres/url');
+        });
+
+        // Lane aw-env-smtp (2026-10-18) — APW-10 lite has no zone: `k8s-apps-tier` provisions the
+        // in-namespace providers itself and stores their outputs, so nothing would ever replace a token.
+        it('resolves the lite tier’s in-namespace rows to their real outputs on ever-works-apps', async () => {
+            await storeDependency('postgres', {
+                outputs: outputsFor('postgres'),
+                outputsVersion: 4,
+                deployTarget: 'ever-works-apps',
+            });
+            await storeDependency('smtp', {
+                providerId: 'k8s-inline-mailpit',
+                outputs: outputsFor('smtp'),
+                deployTarget: 'ever-works-apps',
+            });
+
+            const result = await makeResolver().resolveRuntime(WORK, { target: 'ever-works-apps' });
+
+            expect(value(result, 'DATABASE_URL').value).toContain('pg.internal');
+            expect(value(result, 'DATABASE_URL').fingerprint).toBe('d4');
+            expect(value(result, 'DATABASE_HOST').value).toBe('pg.internal:5432');
+            expect(value(result, 'MAIL_HOST').value).toBe('smtp.mail.test');
+            expect(JSON.stringify(result.values)).not.toContain('ew-dep://postgres');
+            // `platform.smtp.*` is the relay's, still the zone token; and the managed tier opens no egress.
+            expect(value(result, 'RELAY_HOST').value).toBe('ew-dep://smtp/host');
+            expect(result.egress).toEqual([]);
+        });
+
+        it('fails a lite-tier reference closed while its row is not ready', async () => {
+            await storeDependency('postgres', {
+                status: 'provisioning',
+                deployTarget: 'ever-works-apps',
+            });
+
+            const result = await makeResolver().resolveRuntime(WORK, { target: 'ever-works-apps' });
+
+            expect(result.unresolved).toContainEqual({
+                name: 'DATABASE_URL',
+                reason: 'dependencyNotReady',
+                ref: 'deps.postgres.url',
+            });
         });
     });
 

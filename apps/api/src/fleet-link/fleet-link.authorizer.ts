@@ -1,19 +1,15 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { FleetKillSwitchService } from '@ever-works/agent/fleet';
 import {
     effectiveConsents,
     fleetConsentMissingHint,
     fleetConsentSatisfies,
-    fleetLinkMachineVerbActionFamily,
-    fleetLinkVerbConsent,
-    FLEET_LINK_FAMILY_ACTION_FAMILY,
-    FLEET_LINK_FAMILY_CONSENT,
-    isFleetLinkStateChangingFamily,
-    type FleetLinkConsentRequirement,
     type FleetLinkFamily,
 } from '@ever-works/contracts';
 import { fleetLinkError } from './fleet-link.errors';
+import { resolveFleetLinkRequirement } from './fleet-link-requirement';
 import { FleetLinkRegistry } from './fleet-link.registry';
+import { FleetLinkRemote } from './fleet-link-remote.service';
 import {
     FLEET_LINK_AUDIENCE,
     type FleetLinkAudience,
@@ -35,7 +31,8 @@ import {
  *  1. **Kill switch** — read fail-closed: on, or unreadable, refuses
  *     `kill_switch`.
  *  2. **Consent** — the consent the family (or the `machine` verb) needs,
- *     against what the node's live link presented, else what its last
+ *     against what the node's live link presented (on this API replica or
+ *     the one holding it), else what its last
  *     heartbeat stored (`effectiveConsents`, which never infers `manage`):
  *     `consent_missing` with the command to run on the machine.
  *  3. **Family audience** — the node's control policy for the action family
@@ -46,42 +43,10 @@ import {
  * refusal is never a reason to wake a machine.
  */
 
-/** How strict each consent requirement is, for "a caller may narrow, never widen". */
-function atLeastAsStrict(
-    candidate: FleetLinkConsentRequirement,
-    base: FleetLinkConsentRequirement,
-): boolean {
-    if (candidate === base || base === 'link') return true;
-    return base === 'work-or-manage' && (candidate === 'work' || candidate === 'manage');
-}
-
-/** The requirement of a family (or one `machine` verb), narrowed by the caller where it asked to be. */
-export function resolveFleetLinkRequirement(
-    family: FleetLinkFamily,
-    verb: string | null,
-    narrow: Partial<FleetLinkRequirement> = {},
-): FleetLinkRequirement {
-    const machineVerb = family === 'machine' && verb !== null;
-    const baseConsent = machineVerb
-        ? fleetLinkVerbConsent(verb)
-        : FLEET_LINK_FAMILY_CONSENT[family];
-    const consent =
-        narrow.consent !== undefined && atLeastAsStrict(narrow.consent, baseConsent)
-            ? narrow.consent
-            : baseConsent;
-    const actionFamily =
-        narrow.actionFamily ??
-        (machineVerb
-            ? fleetLinkMachineVerbActionFamily(verb)
-            : FLEET_LINK_FAMILY_ACTION_FAMILY[family]);
-    // A `machine` verb changes the machine unless it is a `view` read; a
-    // family by the CONTRACTS list. Fail-safe both ways: when in doubt it is
-    // treated as state-changing (audited, refused while stopped).
-    const stateChanging =
-        narrow.stateChanging ??
-        (machineVerb ? actionFamily !== 'view' : isFleetLinkStateChangingFamily(family));
-    return { consent, actionFamily, stateChanging, target: narrow.target ?? null };
-}
+// The requirement resolver lives in its own module so `FleetLinkRemote` (which
+// the authoriser injects) can rebuild a forwarded requirement with it without
+// an import cycle; re-exported here, where callers have always found it.
+export { resolveFleetLinkRequirement } from './fleet-link-requirement';
 
 @Injectable()
 export class FleetLinkAuthorizer {
@@ -91,6 +56,8 @@ export class FleetLinkAuthorizer {
         private readonly killSwitch: FleetKillSwitchService,
         private readonly registry: FleetLinkRegistry,
         @Inject(FLEET_LINK_AUDIENCE) private readonly audience: FleetLinkAudience,
+        // A link another API replica holds presents its consents there (FL-02 P1b).
+        @Optional() private readonly remote?: FleetLinkRemote,
     ) {}
 
     /** Resolve and check the requirement; throws the first refusal. */
@@ -132,6 +99,7 @@ export class FleetLinkAuthorizer {
         // 2. Consent.
         const consents =
             this.registry.liveConsents(node.id) ??
+            this.remote?.liveConsents(node.id) ??
             effectiveConsents({
                 consents: node.storedConsents,
                 capabilities: node.capabilities,

@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Inject,
     Injectable,
     Logger,
@@ -61,6 +62,7 @@ import {
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 import { randomUUID } from 'node:crypto';
+import { AWAITING_OWNER_LABEL, isAwaitingOwner, withoutAwaitingOwner } from './awaiting-owner';
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -171,6 +173,24 @@ export interface TransitionOptions {
      * auto-unblock of dependents still run.
      */
     suppressAgentDispatch?: boolean;
+    /**
+     * Works-security lane 3a — suppress ONLY the `→ in_progress` agent
+     * fan-out, and nothing else. Set for a fleet-run token (the model on a
+     * fleet node, reached through the MCP bridge): moving a Task into
+     * `in_progress` must not start another Agent's run on text an injected
+     * run may have written. Unlike {@link suppressAgentDispatch} it leaves the
+     * `→ in_review` reviewer stage (a review still has to happen before a
+     * merge) and the dispatch-on-done cascade of dependents exactly as they
+     * are.
+     */
+    suppressAgentFanOut?: boolean;
+    /**
+     * Set by the auto-unblock cascade on the move that restores a Task's
+     * pre-block status: the PLATFORM moved it, not a person. Today it only
+     * keeps a binding `awaiting-owner` label (see `awaiting-owner.ts`) — a
+     * restore never counts as the owner starting the Task.
+     */
+    automaticRestore?: boolean;
 }
 
 /** Result of a sync walk: the Task after the last hop and the hops taken. */
@@ -180,6 +200,26 @@ export interface SyncTransitionResult {
     from: TaskStatus;
     /** Statuses moved through after `from`; `[]` when the Task was already there. */
     path: TaskStatus[];
+}
+
+/**
+ * Prompt-injection hardening — `force` is a PERSON's override and never an
+ * agent's. It skips the quality gate on `→ in_review` and the approver gate on
+ * `→ done`, the two checks that exist to judge an agent's work; an agent-driven
+ * move (the `transitionTask` tool, the run finisher, the workspace finalize
+ * step, the merge completion) runs every gate, whatever its caller passed.
+ * Human and API moves keep `force` exactly as before.
+ */
+export function withoutAgentForce(
+    opts: TransitionOptions,
+    logger?: { warn(message: string): void },
+    taskId?: string,
+): TransitionOptions {
+    if (opts.actorType !== 'agent' || opts.force !== true) return opts;
+    logger?.warn(
+        `Task ${taskId ?? '?'}: an agent-driven transition asked for force=true; ignored (agents run every gate).`,
+    );
+    return { ...opts, force: false };
 }
 
 @Injectable()
@@ -250,6 +290,15 @@ export class TaskTransitionService {
      * side-effect columns).
      */
     async transition(task: Task, to: TaskStatus, opts: TransitionOptions = {}): Promise<Task> {
+        opts = withoutAgentForce(opts, this.logger, task.id);
+        // Prompt-injection hardening — a Task filed from an untrusted email
+        // waits for its owner: no agent moves it (see `awaiting-owner.ts`).
+        const awaitingOwner = isAwaitingOwner(task);
+        if (awaitingOwner && opts.actorType === 'agent') {
+            throw new ForbiddenException(
+                `Task ${task.id} is waiting for its owner (label '${AWAITING_OWNER_LABEL}'): an agent cannot move it. The owner starts it.`,
+            );
+        }
         const from = task.status;
         if (!ALLOWED[from]?.includes(to)) {
             throw new BadRequestException(`Cannot transition Task from ${from} to ${to}.`);
@@ -292,7 +341,7 @@ export class TaskTransitionService {
             const refusingGate = await this.findRefusingGateStatus(task);
             if (refusingGate) {
                 throw new ConflictException(
-                    `Task cannot transition to in_review — the latest agent run's quality gate is '${refusingGate}' and this Work requires passing acceptance checks. Fix the failing checks (or pass force=true to override).`,
+                    `Task cannot transition to in_review — the latest agent run's quality gate is '${refusingGate}' and this Work requires passing acceptance checks. Fix the failing checks (only a person can override this, with force=true from the Task).`,
                 );
             }
         }
@@ -326,6 +375,22 @@ export class TaskTransitionService {
         }
 
         const patch: Partial<Task> = { status: to };
+        // A PERSON's own move into todo / in_progress starts the Task and
+        // clears the binding label in the same write. A machine's move never
+        // does — a sync (mirror) walk, a fleet run's move (refused above as an
+        // agent anyway), the auto-unblock restore — and while the label stays,
+        // the move starts no agent run on the Task either.
+        const ownerStarts =
+            awaitingOwner &&
+            (to === TaskStatus.TODO || to === TaskStatus.IN_PROGRESS) &&
+            opts.actorType !== 'agent' &&
+            opts.suppressAgentDispatch !== true &&
+            opts.suppressAgentFanOut !== true &&
+            opts.automaticRestore !== true;
+        const holdForOwner = awaitingOwner && !ownerStarts;
+        if (ownerStarts) {
+            patch.labels = withoutAwaitingOwner(task.labels);
+        }
         if (to === TaskStatus.IN_PROGRESS && !task.startedAt) {
             patch.startedAt = new Date();
         }
@@ -418,7 +483,9 @@ export class TaskTransitionService {
             to === TaskStatus.IN_PROGRESS &&
             this.dispatcher &&
             this.assignees &&
-            !opts.suppressAgentDispatch
+            !opts.suppressAgentDispatch &&
+            !opts.suppressAgentFanOut &&
+            !holdForOwner
         ) {
             void this.fanOutAgentExecutions(refreshed).catch((err) =>
                 this.logger.warn(`Agent fan-out failed for task ${refreshed.id}: ${err}`),
@@ -461,9 +528,13 @@ export class TaskTransitionService {
         // down the cascade (review of EW-P1-6): a dependent restored to
         // `in_progress` because a mirrored blocker resolved must not start a
         // paid run either (D9). The status restore and notifications still run.
+        // A fleet run's move (`suppressAgentFanOut`, works-security lane 3a)
+        // carries its no-fan-out choice down the same cascade: otherwise a
+        // run could block B on A, complete A, and have B's agents start.
         if (to === TaskStatus.DONE || to === TaskStatus.CANCELLED) {
             void this.autoUnblockResolvedTasks(refreshed.id, {
                 suppressAgentDispatch: opts.suppressAgentDispatch === true,
+                suppressAgentFanOut: opts.suppressAgentFanOut === true,
             }).catch((err) =>
                 this.logger.warn(`autoUnblock cascade failed for task ${refreshed.id}: ${err}`),
             );
@@ -544,6 +615,7 @@ export class TaskTransitionService {
         /** Called after EVERY hop that landed, before the next one is tried. */
         onHop?: (hop: { from: TaskStatus; to: TaskStatus }) => Promise<void>,
     ): Promise<SyncTransitionResult> {
+        opts = withoutAgentForce(opts, this.logger, task.id);
         const from = task.status;
         const path = shortestTransitionPath(from, to, ALLOWED);
         if (path === null) {
@@ -557,10 +629,17 @@ export class TaskTransitionService {
         const walked: TaskStatus[] = [];
         for (const hop of path) {
             try {
-                current = await this.transition(current, hop, {
-                    ...opts,
-                    suppressAgentDispatch: true,
-                });
+                // A sync hop starts no agent work (D9) — except that a caller
+                // which asked only for `suppressAgentFanOut` (a fleet run,
+                // works-security lane 3a) keeps exactly that: no fan-out, but
+                // the reviewer stage and its plan memory are left alone.
+                current = await this.transition(
+                    current,
+                    hop,
+                    opts.suppressAgentFanOut
+                        ? { ...opts, suppressAgentFanOut: true }
+                        : { ...opts, suppressAgentDispatch: true },
+                );
             } catch (err) {
                 if (
                     err instanceof ConflictException &&
@@ -1557,8 +1636,10 @@ export class TaskTransitionService {
     async autoUnblockResolvedTasks(
         blockerTaskId: string,
         // EW-P1-6 — set when the resolving move was a sync (mirrored) one: the
-        // restores it causes then start no agent work either.
-        cascade: { suppressAgentDispatch?: boolean } = {},
+        // restores it causes then start no agent work either. Works-security
+        // lane 3a — `suppressAgentFanOut` when it was a fleet run's move: the
+        // restores start no `→ in_progress` fan-out.
+        cascade: { suppressAgentDispatch?: boolean; suppressAgentFanOut?: boolean } = {},
     ): Promise<{ unblocked: string[] }> {
         // Find every Task that was blocked BY this Task and is still in `blocked` status.
         const blockedTaskIds = await this.blocks.findTasksBlockedBy(blockerTaskId).catch(() => []);
@@ -1599,7 +1680,7 @@ export class TaskTransitionService {
      */
     private async tryUnblockSingleTask(
         taskId: string,
-        cascade: { suppressAgentDispatch?: boolean } = {},
+        cascade: { suppressAgentDispatch?: boolean; suppressAgentFanOut?: boolean } = {},
     ): Promise<boolean> {
         const blocked = await this.tasks.findById(taskId).catch(() => null);
         if (!blocked || blocked.status !== TaskStatus.BLOCKED) return false;
@@ -1613,6 +1694,8 @@ export class TaskTransitionService {
             await this.transition(blocked, restoreTo, {
                 force: false,
                 suppressAgentDispatch: cascade.suppressAgentDispatch === true,
+                suppressAgentFanOut: cascade.suppressAgentFanOut === true,
+                automaticRestore: true,
             });
             return true;
         } catch (err) {

@@ -115,7 +115,8 @@
 				"email:write",
 				"events:read",
 				"webhooks:manage",
-				"links:write"
+				"links:write",
+				"merges:decide"
 			]
 		}
 	}

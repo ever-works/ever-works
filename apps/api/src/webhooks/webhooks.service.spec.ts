@@ -1,15 +1,22 @@
 jest.mock('@ever-works/agent/database', () => ({
     WebhookSubscriptionRepository: class {},
 }));
-jest.mock('@ever-works/agent/entities', () => ({}));
+jest.mock('@ever-works/agent/entities', () => ({ ApiKey: class ApiKey {} }));
 // Security (EW-711 #14): the service now injects WorkOwnershipService to
 // authorize work-scoped subscriptions; a class shell keeps the spec from
-// pulling the real services barrel (TypeORM repos/entities).
+// pulling the real services barrel (TypeORM repos/entities). The key-pin rule
+// (F46) is the real one, from its own file.
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class {},
+    effectiveIntegrationKeyPins: jest.requireActual(
+        '../../../../packages/agent/src/services/integration-key-pins',
+    ).effectiveIntegrationKeyPins,
 }));
 
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ApiKey } from '@ever-works/agent/entities';
+import { Tenant } from '../../../../packages/agent/src/entities/tenant.entity';
+import { User } from '../../../../packages/agent/src/entities/user.entity';
 import { WebhooksService } from './webhooks.service';
 import { WebhookSecretService } from './webhook-secret.service';
 
@@ -504,6 +511,65 @@ describe('WebhooksService', () => {
                 excludeOriginTags: ['gauzy:conn-2'],
                 description: null,
             });
+        });
+
+        // Review 2026-10-17 F46: a key-owned subscription names only the key's pins, from
+        // Settings too (contract: a subset of the key's pinned organizations).
+        it('PATCH from Settings keeps a key-owned subscription inside the key pins', async () => {
+            const OTHER = '22222222-3333-4444-5555-666666666666';
+            organizations.findById.mockImplementation(async (id: string) =>
+                id === ORG || id === OTHER ? { id, tenantId: TENANT_ID } : null,
+            );
+            const key = {
+                id: 'key-1',
+                userId: ACCOUNT,
+                tenantId: TENANT_ID,
+                organizationIds: [ORG],
+            };
+            const byEntity = new Map<unknown, unknown>([
+                [ApiKey, { findOne: jest.fn().mockResolvedValue(key) }],
+                [
+                    Tenant,
+                    {
+                        findOne: jest
+                            .fn()
+                            .mockResolvedValue({ id: TENANT_ID, ownerUserId: ACCOUNT }),
+                    },
+                ],
+                [
+                    User,
+                    {
+                        findOne: jest.fn().mockResolvedValue({
+                            id: ACCOUNT,
+                            tenantId: TENANT_ID,
+                            isActive: true,
+                        }),
+                    },
+                ],
+            ]);
+            const manager = { getRepository: (entity: unknown) => byEntity.get(entity) };
+            const keyed = new WebhooksService(
+                repo as any,
+                secrets,
+                workOwnership as any,
+                users as any,
+                organizations as any,
+                undefined,
+                { ...manager, manager } as any,
+            );
+            repo.findById.mockResolvedValue(
+                v2Row({ ownerType: 'integration_key', ownerId: 'key-1' }),
+            );
+            await expect(
+                keyed.update(ACCOUNT, 'wh-2', { organizationIds: [ORG, OTHER] }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(repo.updateV2).not.toHaveBeenCalled();
+
+            await keyed.update(ACCOUNT, 'wh-2', { organizationIds: [ORG] });
+            expect(repo.updateV2).toHaveBeenCalledWith(
+                'wh-2',
+                expect.objectContaining({ organizationIds: [ORG] }),
+            );
         });
 
         it('rotating a v2 secret keeps the previous one signing for the grace window', async () => {

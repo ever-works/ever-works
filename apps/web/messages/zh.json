@@ -287,6 +287,8 @@
             "signIn": "使用 Ever ID 登录",
             "signUp": "使用 Ever ID 注册",
             "redirecting": "正在打开 Ever ID…",
+            "signInWith": "使用 <wordmark>Ever ID</wordmark> 登录",
+            "signUpWith": "使用 <wordmark>Ever ID</wordmark> 注册",
             "consentRequired": "请接受上方的条款以继续。",
             "createAccount": {
                 "title": "创建您的 Ever Works 帐户",
@@ -7354,6 +7356,95 @@
                         "resume": "已请求恢复。",
                         "remove": "已请求移除。",
                         "cancelDeploy": "已请求取消。"
+                    }
+                },
+                "environment": {
+                    "title": "环境",
+                    "description": "此应用运行时使用的值。机密值从不显示——只显示是否已设置。",
+                    "summary": "已设置 {set} / {total}",
+                    "missingRequired": "{count, plural, other {缺少 # 个必填值}}",
+                    "loading": "正在读取环境…",
+                    "unavailable": "此实例暂时无法编辑环境值。",
+                    "error": "无法读取环境。请重新加载页面后重试。",
+                    "empty": "此应用的 App spec 未声明任何环境值。",
+                    "secureStorageOff": "此安装未配置安全存储，因此无法保存值。",
+                    "edit": "编辑",
+                    "setValue": "设置值",
+                    "editAria": "编辑 {name}",
+                    "saved": "已保存 {name}",
+                    "removed": "已移除 {name}",
+                    "states": {
+                        "set": "已设置",
+                        "unset": "未设置",
+                        "missing": "必填——未设置",
+                        "fromSpec": "来自 App spec",
+                        "fromDependency": "由 {kind} 注入",
+                        "generated": "自动生成"
+                    },
+                    "badges": {
+                        "secret": "机密",
+                        "required": "必填"
+                    },
+                    "phases": {
+                        "build": "构建",
+                        "runtime": "运行时",
+                        "both": "构建 + 运行时"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "对象存储",
+                        "smtp": "SMTP 邮件"
+                    },
+                    "dialog": {
+                        "title": "编辑 {name}",
+                        "valueLabel": "值",
+                        "secretHint": "此值为机密。它以加密形式存储，且不会再次显示。",
+                        "secretStored": "已存储一个值。输入新值即可替换。",
+                        "dependencyHint": "通常由 {kind} 注入。在此设置的值会覆盖它——例如你自己的 SMTP 服务器。",
+                        "redeployHint": "应用中使用此值的地方会用新值重新构建或重新部署。",
+                        "empty": "请输入一个值，或移除已存储的值。",
+                        "save": "保存",
+                        "saving": "正在保存…",
+                        "remove": "移除值",
+                        "cancel": "取消"
+                    },
+                    "errors": {
+                        "undeclaredName": "App spec 未声明此名称。",
+                        "specUnavailable": "此应用还没有可用的 App spec。",
+                        "failed": "无法保存该值。请重试。"
+                    }
+                },
+                "dependencies": {
+                    "title": "依赖项",
+                    "description": "此应用所需的数据库、缓存、存储和邮件服务。它们会在应用启动前在其部署目标上完成预配。",
+                    "loading": "正在读取依赖项…",
+                    "unavailable": "此实例暂不支持管理依赖项。",
+                    "error": "无法读取依赖项。请重新加载页面后重试。",
+                    "empty": "此应用的 App 规范未声明任何依赖项。",
+                    "provider": "提供方：{label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, other {已尝试 # 次}}",
+                    "noReason": "未记录原因。",
+                    "deployRetries": "再次部署会自动重试，也可以现在点击“重试”。",
+                    "retry": "重试",
+                    "retryAria": "重试 {kind}",
+                    "retried": "{kind}：已安排新的尝试。",
+                    "retryQueued": "{kind}：工作进程可用后将立即开始新的尝试。",
+                    "leaseHeld": "{kind} 正在预配中。请稍后重试。",
+                    "retryFailed": "无法重试 {kind}。请再试一次。",
+                    "deleteData": "删除数据",
+                    "deleteDataAria": "删除 {kind} 的数据",
+                    "deleteDialog": {
+                        "title": "删除 {kind} 的数据？",
+                        "description": "此操作会销毁该依赖项的卷、数据库和存储桶，且无法撤销。",
+                        "resources": "将被删除：",
+                        "noResources": "此依赖项没有记录任何资源。",
+                        "confirmLabel": "输入 {slug} 以确认",
+                        "cancel": "取消",
+                        "confirm": "删除数据",
+                        "requested": "正在删除 {kind} 的数据。",
+                        "failed": "无法删除数据。{reason}"
                     }
                 }
             },

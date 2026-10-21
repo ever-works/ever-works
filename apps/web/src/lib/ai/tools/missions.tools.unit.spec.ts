@@ -253,13 +253,26 @@ describe('missions chat tools — Lifecycle', () => {
         expect(result).toMatchObject({ completed: true });
     });
 
-    it('deleteMission returns a tombstone envelope (no entity fields)', async () => {
+    it('deleteMission returns a tombstone envelope (no entity fields) once confirmed', async () => {
         deleteMissionMock.mockResolvedValueOnce({ deleted: true });
         const result = await run<{ deleted: boolean; missionId: string }>(deleteMission, {
             missionId: 'm-1',
+            confirmed: true,
         });
         expect(deleteMissionMock).toHaveBeenCalledWith('m-1');
         expect(result).toEqual({ deleted: true, missionId: 'm-1' });
+    });
+
+    // Security: deleteMission had no server-side confirmation at all.
+    it('deleteMission without confirmed returns the confirmation card and deletes nothing', async () => {
+        deleteMissionMock.mockClear();
+        const result = await run<{ __confirmationRequired?: boolean; toolName?: string }>(
+            deleteMission,
+            { missionId: 'm-1' },
+        );
+        expect(result.__confirmationRequired).toBe(true);
+        expect(result.toolName).toBe('deleteMission');
+        expect(deleteMissionMock).not.toHaveBeenCalled();
     });
 
     it('runMissionNow passes through the spawn-status envelope', async () => {

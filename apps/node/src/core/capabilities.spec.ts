@@ -406,6 +406,42 @@ describe('describeSelf', () => {
 			expect('workspaceBytes' in description).toBe(false);
 		});
 	});
+
+	/**
+	 * Computer health (FL-03) — the snapshot rides the same optional-probe
+	 * seam and is re-sanitised at this, the wire boundary: whatever a probe
+	 * returns, only known fields within their bounds go out.
+	 */
+	describe('health snapshot', () => {
+		it('carries the snapshot the probe returns', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				health: () => ({ cpuPercent: 31.2, cpuCores: 4, gpu: null })
+			});
+			expect(description.health).toEqual({ cpuPercent: 31.2, cpuCores: 4, gpu: null });
+		});
+
+		it('strips what the wire must never carry: unknown keys and out-of-range values', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				health: () => ({ cpuPercent: 140, memPercent: 50, hostname: 'build-01' }) as never
+			});
+			expect(description.health).toEqual({ memPercent: 50 });
+		});
+
+		it('omits the field when the probe answers nothing, throws or rejects — never fails the description', async () => {
+			for (const health of [
+				() => null,
+				() => ({}),
+				() => {
+					throw new Error('probe bug');
+				},
+				() => Promise.reject(new Error('probe bug'))
+			]) {
+				const description = await describeSelf(runnerWith(['git']), environment(), '0.1.0', null, { health });
+				expect('health' in description).toBe(false);
+				expect(description.capabilities).toContain('git');
+			}
+		});
+	});
 });
 
 /**

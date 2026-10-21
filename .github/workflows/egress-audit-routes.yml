@@ -1,0 +1,75 @@
+name: Egress audit route list
+
+# The egress audit's browser leg opens every page of tools/egress-audit/ui-routes.json, which is
+# generated from the Next.js app router. This check fails a pull request that adds, moves or removes
+# a page without regenerating that list, so no page escapes the walk (see
+# tools/egress-audit/README.md, "The route list"). It runs in a minute; the full audit
+# (.github/workflows/egress-audit.yml) runs on every push to develop, stage and main.
+on:
+  pull_request:
+    branches: [develop, stage, main]
+    paths:
+      - 'apps/web/src/app/**'
+      - 'tools/egress-audit/ui-routes.json'
+      - 'tools/egress-audit/package.json'
+      - '.github/workflows/egress-audit-routes.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The `ever-egress-audit` bin of @ever-co/connect-tools (Apache-2.0), installed below.
+  AUDIT_BIN: tools/egress-audit/node_modules/.bin/ever-egress-audit
+
+jobs:
+  route-list:
+    name: route list in step with the app router
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 26
+
+      - name: Install the audit tools (pinned @ever-co/connect-tools, from the lockfile)
+        run: pnpm install --frozen-lockfile --filter @ever-works/egress-audit
+
+      - name: The route list is in step with the Next.js app router
+        run: |
+          if ! $AUDIT_BIN ui-routes --framework next-app --entry apps/web/src/app --out tools/egress-audit/ui-routes.json --check; then
+            echo "::error::regenerate the route list: $AUDIT_BIN ui-routes --framework next-app --entry apps/web/src/app --out tools/egress-audit/ui-routes.json"
+            exit 1
+          fi
+
+      - name: 'Control: a page missing from the route list must fail the check'
+        run: |
+          node -e '
+            const fs = require("fs");
+            const list = JSON.parse(fs.readFileSync("tools/egress-audit/ui-routes.json", "utf8"));
+            list.routes.splice(list.routes.findIndex((route) => route.source === "router"), 1);
+            fs.writeFileSync(process.env.RUNNER_TEMP + "/ui-routes.missing.json", JSON.stringify(list, null, 2));
+          '
+          set +e
+          $AUDIT_BIN ui-routes --framework next-app --entry apps/web/src/app --out "$RUNNER_TEMP/ui-routes.missing.json" --check
+          code=$?
+          set -e
+          if [ "$code" -ne 1 ]; then
+            echo "::error::a route list missing a page must fail the check (exit 1); it exited $code"
+            exit 1
+          fi
+          echo "The control failed as it must (exit 1)."

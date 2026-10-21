@@ -377,9 +377,11 @@ export class GitHubWebhookDispatcherService {
      *      who installed the App, written by the App-install flow;
      *   2. that installation's `createdByGithubUserId` resolved through
      *      `github_app_user_links`;
-     *   3. only then an existing `ingest_install_bindings` row for the
-     *      delivery's installation / owner key — the same single binding
-     *      table the per-install path uses.
+     *   3. only then an `ingest_install_bindings` row for the delivery's
+     *      INSTALLATION key that the App-install path itself wrote
+     *      (`pluginId` = `GITHUB_APP_BINDING_PLUGIN_ID`) — never an
+     *      `owner:` key, never a row the per-install path recorded from an
+     *      unverified body (security finding F4).
      *
      * The order matters and used to be the other way round. Binding rows
      * on the `install-secret` path are written from an UNVERIFIED body
@@ -433,8 +435,16 @@ export class GitHubWebhookDispatcherService {
             }
         }
 
-        for (const key of workspace?.keys ?? []) {
-            const bound = await this.bridge.installBindingFor(key);
+        // 3. F4 — ONLY a binding the App-install path itself wrote for THIS
+        //    installation. Never an `owner:<login>` row and never a row the
+        //    per-install path recorded: both are written from an UNVERIFIED
+        //    body key, and the platform App is public — anyone can install it
+        //    on anything — so with those consulted, a squatter tenant who
+        //    pre-recorded `owner:<victim-org>` (or `installation:<id>`)
+        //    received the App-signed deliveries of every installation of that
+        //    org the platform had no owner for.
+        if (installationKey) {
+            const bound = await this.bridge.appInstallBindingFor(installationKey);
             if (bound) {
                 return { ...asBinding(bound.userId), matchedBy: 'binding' };
             }

@@ -320,3 +320,41 @@ describe('EmailFacadeService.send — verified sender (EW-P4-3)', () => {
         expect(lax.plugin.sendEmail).toHaveBeenCalled();
     });
 });
+
+// Review 2026-10-17 U1 (F112): an outbound row lives where its sending address does, not in
+// whatever scope the caller ran in (an agent run outside a request has none).
+describe('EmailFacadeService.send — the row carries the sending address scope', () => {
+    function facadeWithAddress(address: unknown) {
+        const { facade, emailMessages } = makeFacade();
+        (facade as unknown as { emailAddresses: unknown }).emailAddresses = {
+            findById: jest.fn().mockResolvedValue(address),
+        };
+        return { facade, emailMessages };
+    }
+
+    it("stamps the address's Tenant and Organization on the sent row", async () => {
+        const { facade, emailMessages } = facadeWithAddress({
+            id: 'addr-1',
+            verified: true,
+            tenantId: 'tenant-1',
+            organizationId: 'org-1',
+        });
+        await facade.send(INPUT, { userId: 'user-1', addressId: 'addr-1', agentId: 'agent-1' });
+        expect(emailMessages.save).toHaveBeenCalledWith(
+            expect.objectContaining({ tenantId: 'tenant-1', organizationId: 'org-1' }),
+        );
+    });
+
+    it('leaves a personal address to the request scope, as before', async () => {
+        const { facade, emailMessages } = facadeWithAddress({
+            id: 'addr-1',
+            verified: true,
+            tenantId: null,
+            organizationId: null,
+        });
+        await facade.send(INPUT, { userId: 'user-1', addressId: 'addr-1' });
+        const row = emailMessages.save.mock.calls[0][0];
+        expect(row).not.toHaveProperty('organizationId');
+        expect(row).not.toHaveProperty('tenantId');
+    });
+});

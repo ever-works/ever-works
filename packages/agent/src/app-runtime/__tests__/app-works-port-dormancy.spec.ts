@@ -210,6 +210,10 @@ const BOUND: readonly string[] = [
     //                                  dependency output answered
     //                                  `secureStorageUnavailable` on an
     //                                  installation that had a key
+    //   APP_ENV_ACTIVITY               (2026-10-18, lane aw-env-smtp — APW-07 T26)
+    //                                  `AppEnvActivityService`: until then every
+    //                                  env change answered `activityRecorded:
+    //                                  false` and wrote no Activity row (FR-8)
     //   APP_ENV_DEPLOY_READINESS       `AppEnvRuntimeSource.resolve` reported no
     //                                  not-ready dependencies AND dispatched no
     //                                  provisioning at all (GAP-05)
@@ -265,6 +269,7 @@ const BOUND: readonly string[] = [
     // its spec actually said.
     'APP_DEPLOY_HOST_SOURCE',
     'APP_DEPLOY_SPEC_SOURCE',
+    'APP_ENV_ACTIVITY',
     'APP_ENV_DEPLOY_READINESS',
     'APP_ENV_ENSURE_GENERATED',
     'APP_ENV_RESOLVER_FINGERPRINTS',
@@ -324,6 +329,10 @@ const BOUND: readonly string[] = [
     // register like any other port — a new token in NEITHER list fails the
     // "classifies every token …" case below.
     'BUILD_REPOSITORY_FACTS_SOURCE',
+    // 2026-10-18 (#2783) — GitHub's own answer on repository visibility when the
+    // facts source can only give its `private` fail-safe; provided by
+    // `AppBuildsModule` (`createGitHubRepositoryVisibilityProbe`).
+    'BUILD_REPOSITORY_VISIBILITY_PROBE',
     // 2026-10-17 (A0.4) — the build plugin's resolved Work settings, lazily over
     // `PluginSettingsService`; provided by `AppBuildsModule` beside the two above.
     'BUILD_SETTINGS_SOURCE',
@@ -418,7 +427,6 @@ const UNBOUND: readonly string[] = [
     'APP_COMMIT_ANCESTRY',
     'APP_DEPENDENCY_CLUSTER_ACCESS',
     'APP_DEPLOY_TARGET_RESOLVER',
-    'APP_ENV_ACTIVITY',
     'APP_ENV_ACTOR_NAMES',
     'APP_ENV_BUILD_FINGERPRINTS',
     'APP_ENV_DEPLOY_FINGERPRINTS',
@@ -572,8 +580,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         // 31/43 → 30/44 on 2026-10-17: `APP_SPEC_DISPLAY_NAMES` is bound by `AppLauncherModule`.
         // 30/44 → 29/45 on 2026-10-18 (lane aw-live-fix): `APP_PROMPTED_VALUES_PORT` is
         // bound by `AppWorksModule`.
-        expect(UNBOUND).toHaveLength(29);
-        expect(BOUND).toHaveLength(45);
+        // 29/45 → 28/46 the same day (lane aw-env-smtp): `APP_ENV_ACTIVITY` is bound by
+        // `AppEnvModule` to `AppEnvActivityService` (APW-07 T26).
+        // 28/46 → 28/47 the same day (#2783): `BUILD_REPOSITORY_VISIBILITY_PROBE` is a new
+        // port, born bound by `AppBuildsModule` — nothing moved from UNBOUND.
+        expect(UNBOUND).toHaveLength(28);
+        expect(BOUND).toHaveLength(47);
     });
 
     it('names where the worker binds what this package does not', () => {

@@ -118,6 +118,17 @@ export function runWithClaimedAggregateVersion<T>(
 }
 
 /** The claimed version of this aggregate, once (`null` when there is none). */
+/**
+ * Review 2026-10-17 F53: whether the version claimed by the enclosing
+ * {@link runWithClaimedAggregateVersion} was taken by a recorded change (`null`
+ * outside one). A claim nothing took (the write refused, or changed nothing) must be
+ * released, or the row keeps a version no event carries.
+ */
+export function claimedAggregateVersionTaken(): boolean | null {
+    const claim = claimedVersions.getStore();
+    return claim ? claim.taken : null;
+}
+
 export function takeClaimedAggregateVersion(aggregateType: string, id: string): number | null {
     const claim = claimedVersions.getStore();
     if (!claim || claim.taken || claim.aggregateType !== aggregateType || claim.id !== id) {

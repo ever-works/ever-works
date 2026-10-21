@@ -449,7 +449,14 @@ export class TeamsService {
                             memberId: member.memberId,
                             role: member.role,
                         },
-                        { changedFields: ['members'] },
+                        {
+                            changedFields: ['members'],
+                            ...(await this.privateAgentEvent(
+                                manager,
+                                member.memberType,
+                                member.memberId,
+                            )),
+                        },
                     );
                     // An agent's team scope is its team memberships (`teamIds`).
                     if (member.memberType === 'agent') {
@@ -517,7 +524,10 @@ export class TeamsService {
                         role: existing?.role ?? 'member',
                         deleted: true,
                     },
-                    { changedFields: ['members'] },
+                    {
+                        changedFields: ['members'],
+                        ...(await this.privateAgentEvent(manager, memberType, memberId)),
+                    },
                 );
                 if (memberType === 'agent') {
                     await this.visibility?.recomputeAutomaticIn(manager, 'agent', memberId, {
@@ -535,6 +545,22 @@ export class TeamsService {
         if (memberType === 'agent') {
             await this.visibility?.recomputeAutomatic('agent', memberId);
         }
+    }
+
+    /**
+     * Review 2026-10-17 F38: a private agent's team membership stays off the feed, as a
+     * private record's team resource does (F4): the team DTO leaves it out too.
+     */
+    private async privateAgentEvent(
+        manager: EntityManager,
+        memberType: string,
+        memberId: string,
+    ): Promise<{ visibility?: 'private' }> {
+        if (memberType !== 'agent') return {};
+        const agent = await manager
+            .getRepository(Agent)
+            .findOne({ where: { id: memberId }, select: { id: true, visibility: true } });
+        return agent?.visibility === 'private' ? { visibility: 'private' } : {};
     }
 
     async childTeamIds(teamId: string): Promise<string[]> {

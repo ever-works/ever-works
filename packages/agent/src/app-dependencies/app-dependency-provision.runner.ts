@@ -101,6 +101,7 @@ import {
     AppDependencyRefusalError,
     type AppDependencyAttemptResult,
 } from './app-dependencies.service';
+import { describeDependencyError } from './describe-dependency-error';
 
 /* -------------------------------------------------------------------------- *
  * Limits and shapes the callers read
@@ -312,10 +313,13 @@ export class AppDependencyProvisionRunner {
             if (error instanceof AppDependencyRefusalError) {
                 return { kind, status: 'failed', reason: error.code };
             }
+            // The row's reason stays the contract's `clusterUnreachable`; the LOG says what
+            // actually failed (message + cause chain, credential material redacted) — `error.name`
+            // alone read `Error` for every cause there is.
             this.logger.warn(
-                `app-dependency-provision: ${kind} of work ${payload.workId} threw: ${
-                    error instanceof Error ? error.name : typeof error
-                }`,
+                `app-dependency-provision: ${kind} of work ${payload.workId} threw: ${describeDependencyError(
+                    error,
+                )}`,
             );
             return { kind, status: 'failed', reason: 'clusterUnreachable' };
         } finally {

@@ -11,6 +11,8 @@ import { AppTargetCard, APP_TARGET_LEAF } from './AppTargetCard';
 import { ConnectClusterDialog } from './ConnectClusterDialog';
 import { AppDeployNowButton } from './AppDeployNowButton';
 import { AppLicenseCard } from './AppLicenseCard';
+import { AppEnvironmentCard } from './AppEnvironmentCard';
+import { AppDependenciesCard } from './AppDependenciesCard';
 import { AppLifecycleActions } from './AppLifecycleActions';
 
 const STATE_LEAF = {
@@ -124,6 +126,14 @@ export function AppDeployPage({ work, initialTarget, status, canEdit }: AppDeplo
             {/* APW-03 T44 / APW-06 T37 (R-3) — the licence and, when it still
                 needs one, the owner's confirmation before a your-cluster deploy. */}
             <AppLicenseCard workId={work.id} />
+
+            {/* Lane aw-env-smtp (APW-07 T24) — the App env: which values are set, and the way to set
+                a missing required one (`env_required_unset`) or your own SMTP server. */}
+            <AppEnvironmentCard workId={work.id} />
+
+            {/* Lane aw-deps-api (APW-07 T25) — the dependencies (Postgres, Redis, storage, mail): their
+                status and reason, Retry for a failed one, and Delete data behind the typed slug. */}
+            <AppDependenciesCard work={{ id: work.id, slug: work.slug }} />
 
             {target.target !== 'none' && canEdit && <AppDeployNowButton workId={work.id} />}
 

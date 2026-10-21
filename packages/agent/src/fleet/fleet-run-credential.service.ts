@@ -294,6 +294,7 @@ export class FleetRunCredentialService {
             tenantId: record.tenantId ?? null,
             organizationId: record.organizationId ?? null,
             expiresAt: new Date(record.expiresAt),
+            agentId: this.agentIdOf(job),
         };
     }
 
@@ -313,6 +314,18 @@ export class FleetRunCredentialService {
     private bridgeRequested(job: FleetJob): boolean {
         const payload = job.payload as { mcp?: { enabled?: unknown } } | null | undefined;
         return payload?.mcp?.enabled === true;
+    }
+
+    /**
+     * The Agent the job was dispatched for, from the platform-written payload
+     * (works-security lane 3a). The API uses it to keep a run token from
+     * handing a Task to an Agent with wider permissions than its own, and to
+     * stamp what the run creates as that Agent's work. `null` when the payload
+     * carries none — callers then refuse every agent assignment.
+     */
+    private agentIdOf(job: FleetJob): string | null {
+        const payload = job.payload as { agentId?: unknown } | null | undefined;
+        return typeof payload?.agentId === 'string' && payload.agentId ? payload.agentId : null;
     }
 
     private runIdOf(job: FleetJob): string | null {
@@ -356,6 +369,11 @@ export interface FleetRunCredentialBinding {
     /** Organization the token is pinned to; null = the owner's personal scope. */
     organizationId: string | null;
     expiresAt: Date;
+    /**
+     * Agent the bound job was dispatched for (`payload.agentId`), or `null`.
+     * Optional so existing constructions (specs, doubles) keep compiling.
+     */
+    agentId?: string | null;
 }
 
 /** Re-exported so the API guard can type a partial `ApiKey` row without the entity. */

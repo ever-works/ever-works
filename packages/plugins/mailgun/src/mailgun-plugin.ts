@@ -52,6 +52,18 @@ function resolveSigningKey(options: EmailOptions): string | undefined {
  */
 const EMAIL_INBOUND_ALLOW_UNSIGNED_ENV = 'EMAIL_INBOUND_ALLOW_UNSIGNED';
 
+/**
+ * Review 2026-10-17 F56: Mailgun's signature covers only `timestamp + token`, never the
+ * body, so a captured genuine one could be replayed with any recipient and content. As
+ * Mailgun documents, a signature is accepted only while its timestamp is fresh, and each
+ * token only once (remembered for that window, in this process).
+ */
+const MAILGUN_SIGNATURE_MAX_AGE_SECONDS = 15 * 60;
+/** A sender clock slightly ahead of ours is tolerated. */
+const MAILGUN_SIGNATURE_MAX_SKEW_SECONDS = 5 * 60;
+/** Tokens remembered at most (oldest dropped first). */
+const MAILGUN_USED_TOKENS_MAX = 10_000;
+
 function unsignedInboundAllowed(): boolean {
 	return process.env[EMAIL_INBOUND_ALLOW_UNSIGNED_ENV] === 'true';
 }
@@ -197,6 +209,8 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 	}
 
 	private readonly idempotencyCache = new Map<string, EmailSendResult>();
+	/** F56: inbound signature tokens already accepted → when they may be forgotten (ms). */
+	private readonly usedInboundTokens = new Map<string, number>();
 
 	async sendEmail(input: EmailSendInput, options: EmailOptions): Promise<EmailSendResult> {
 		// Security (tenant isolation): scope the local idempotency cache key by
@@ -297,6 +311,32 @@ export class MailgunPlugin implements IEmailOutboundPlugin, IEmailInboundPlugin 
 		const b = Buffer.from(sig.signature);
 		if (a.length !== b.length || !timingSafeEqual(a, b)) {
 			throw new Error('Mailgun inbound: signature mismatch.');
+		}
+		// F56: only a fresh signature, and each token once.
+		const nowMs = Date.now();
+		const signedAt = Number(sig.timestamp);
+		if (
+			!Number.isFinite(signedAt) ||
+			signedAt < nowMs / 1000 - MAILGUN_SIGNATURE_MAX_AGE_SECONDS ||
+			signedAt > nowMs / 1000 + MAILGUN_SIGNATURE_MAX_SKEW_SECONDS
+		) {
+			throw new Error('Mailgun inbound: signature timestamp is outside the accepted window.');
+		}
+		for (const [token, forgetAt] of this.usedInboundTokens) {
+			if (forgetAt > nowMs) break;
+			this.usedInboundTokens.delete(token);
+		}
+		if (this.usedInboundTokens.has(sig.token)) {
+			throw new Error('Mailgun inbound: signature token already used.');
+		}
+		this.usedInboundTokens.set(
+			sig.token,
+			nowMs + (MAILGUN_SIGNATURE_MAX_AGE_SECONDS + MAILGUN_SIGNATURE_MAX_SKEW_SECONDS) * 1000
+		);
+		while (this.usedInboundTokens.size > MAILGUN_USED_TOKENS_MAX) {
+			const oldest = this.usedInboundTokens.keys().next().value;
+			if (oldest === undefined) break;
+			this.usedInboundTokens.delete(oldest);
 		}
 	}
 

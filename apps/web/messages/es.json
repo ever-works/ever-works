@@ -287,6 +287,8 @@
             "signIn": "Iniciar sesión con Ever ID",
             "signUp": "Registrarse con Ever ID",
             "redirecting": "Abriendo Ever ID…",
+            "signInWith": "Iniciar sesión con <wordmark>Ever ID</wordmark>",
+            "signUpWith": "Registrarse con <wordmark>Ever ID</wordmark>",
             "consentRequired": "Acepta los términos de arriba para continuar.",
             "createAccount": {
                 "title": "Crea tu cuenta de Ever Works",
@@ -7422,6 +7424,95 @@
                         "resume": "Reanudación solicitada.",
                         "remove": "Eliminación solicitada.",
                         "cancelDeploy": "Cancelación solicitada."
+                    }
+                },
+                "environment": {
+                    "title": "Entorno",
+                    "description": "Los valores con los que se ejecuta esta app. Los valores secretos nunca se muestran, solo si están definidos.",
+                    "summary": "{set} de {total} definidos",
+                    "missingRequired": "{count, plural, one {Falta # valor obligatorio} other {Faltan # valores obligatorios}}",
+                    "loading": "Leyendo el entorno…",
+                    "unavailable": "Los valores del entorno aún no se pueden editar en esta instancia.",
+                    "error": "No se pudo leer el entorno. Recarga la página para intentarlo de nuevo.",
+                    "empty": "La especificación de esta app no declara valores de entorno.",
+                    "secureStorageOff": "El almacenamiento seguro no está configurado en esta instalación, así que no se pueden guardar valores.",
+                    "edit": "Editar",
+                    "setValue": "Definir valor",
+                    "editAria": "Editar {name}",
+                    "saved": "{name} guardado",
+                    "removed": "{name} eliminado",
+                    "states": {
+                        "set": "Definido",
+                        "unset": "Sin definir",
+                        "missing": "Obligatorio — sin definir",
+                        "fromSpec": "De la especificación de la app",
+                        "fromDependency": "Inyectado por {kind}",
+                        "generated": "Generado"
+                    },
+                    "badges": {
+                        "secret": "Secreto",
+                        "required": "Obligatorio"
+                    },
+                    "phases": {
+                        "build": "Compilación",
+                        "runtime": "Ejecución",
+                        "both": "Compilación + ejecución"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Almacenamiento de objetos",
+                        "smtp": "Correo SMTP"
+                    },
+                    "dialog": {
+                        "title": "Editar {name}",
+                        "valueLabel": "Valor",
+                        "secretHint": "Este valor es secreto. Se guarda cifrado y no se vuelve a mostrar.",
+                        "secretStored": "Hay un valor guardado. Escribe uno nuevo para reemplazarlo.",
+                        "dependencyHint": "Normalmente lo inyecta {kind}. Un valor definido aquí tiene prioridad; por ejemplo, tu propio servidor SMTP.",
+                        "redeployHint": "Donde la app usa este valor, se vuelve a compilar o desplegar con el nuevo.",
+                        "empty": "Introduce un valor o elimina el guardado.",
+                        "save": "Guardar",
+                        "saving": "Guardando…",
+                        "remove": "Eliminar valor",
+                        "cancel": "Cancelar"
+                    },
+                    "errors": {
+                        "undeclaredName": "La especificación de la app no declara este nombre.",
+                        "specUnavailable": "Esta app aún no tiene una especificación utilizable.",
+                        "failed": "No se pudo guardar el valor. Inténtalo de nuevo."
+                    }
+                },
+                "dependencies": {
+                    "title": "Dependencias",
+                    "description": "Las bases de datos, cachés, almacenamiento y correo que necesita esta app. Se aprovisionan en su destino de despliegue antes de que se inicie.",
+                    "loading": "Leyendo las dependencias…",
+                    "unavailable": "Las dependencias aún no se pueden gestionar en esta instancia.",
+                    "error": "No se pudieron leer las dependencias. Recarga la página para volver a intentarlo.",
+                    "empty": "La especificación de esta app no declara dependencias.",
+                    "provider": "Proveedor: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# intento} other {# intentos}}",
+                    "noReason": "No se registró ningún motivo.",
+                    "deployRetries": "Al desplegar de nuevo se reintenta automáticamente, o pulsa Reintentar ahora.",
+                    "retry": "Reintentar",
+                    "retryAria": "Reintentar {kind}",
+                    "retried": "{kind}: se programó un nuevo intento.",
+                    "retryQueued": "{kind}: un nuevo intento comenzará en cuanto el worker esté disponible.",
+                    "leaseHeld": "{kind} se está aprovisionando ahora mismo. Vuelve a intentarlo en un momento.",
+                    "retryFailed": "No se pudo reintentar {kind}. Vuelve a intentarlo.",
+                    "deleteData": "Eliminar datos",
+                    "deleteDataAria": "Eliminar los datos de {kind}",
+                    "deleteDialog": {
+                        "title": "¿Eliminar los datos de {kind}?",
+                        "description": "Esto destruye los volúmenes, bases de datos y buckets de esta dependencia. No se puede deshacer.",
+                        "resources": "Se eliminará:",
+                        "noResources": "No hay recursos registrados para esta dependencia.",
+                        "confirmLabel": "Escribe {slug} para confirmar",
+                        "cancel": "Cancelar",
+                        "confirm": "Eliminar datos",
+                        "requested": "Eliminando los datos de {kind}.",
+                        "failed": "No se pudieron eliminar los datos. {reason}"
                     }
                 }
             },

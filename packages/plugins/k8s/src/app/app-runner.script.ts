@@ -429,8 +429,12 @@ function readCapped(response, maxBytes) {
 }
 
 function runIsolationProbe(probe) {
-	var host = probe.host || process.env.KUBERNETES_SERVICE_HOST;
-	var port = finiteNumber(probe.port, finiteNumber(process.env.KUBERNETES_SERVICE_PORT, 0));
+	// The renderer sends port: null when it has no target, and Number(null) is 0, so a plain
+	// finiteNumber() turned "no port given" into port 0 and the probe never ran (prod 2026-10-18,
+	// cal-e2e: "no host or port to connect to" on every deploy). A non-positive port is "not given".
+	// Last resort for the host: the API server by its in-cluster name, then its HTTPS port.
+	var host = probe.host || process.env.KUBERNETES_SERVICE_HOST || 'kubernetes.default.svc';
+	var port = tcpPort(probe.port) || tcpPort(process.env.KUBERNETES_SERVICE_PORT) || 443;
 	var timeoutMs = finiteNumber(probe.timeoutMs, DEFAULT_PROBE_TIMEOUT_MS);
 
 	if (!host || !port) {
@@ -617,6 +621,14 @@ function messageOf(error) {
 		return String(error.code);
 	}
 	return String(error.message || error);
+}
+
+function tcpPort(value) {
+	if (value === null || value === undefined || value === '') {
+		return 0;
+	}
+	var number = Number(value);
+	return isFinite(number) && number > 0 && number < 65536 ? Math.floor(number) : 0;
 }
 
 function finiteNumber(value, fallback) {

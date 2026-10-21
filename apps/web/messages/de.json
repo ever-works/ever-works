@@ -287,6 +287,8 @@
             "signIn": "Mit Ever ID anmelden",
             "signUp": "Mit Ever ID registrieren",
             "redirecting": "Ever ID wird geöffnet…",
+            "signInWith": "Mit <wordmark>Ever ID</wordmark> anmelden",
+            "signUpWith": "Mit <wordmark>Ever ID</wordmark> registrieren",
             "consentRequired": "Akzeptieren Sie oben die Bedingungen, um fortzufahren.",
             "createAccount": {
                 "title": "Erstellen Sie Ihr Ever Works-Konto",
@@ -7422,6 +7424,95 @@
                         "resume": "Fortsetzen angefordert.",
                         "remove": "Entfernen angefordert.",
                         "cancelDeploy": "Abbruch angefordert."
+                    }
+                },
+                "environment": {
+                    "title": "Umgebung",
+                    "description": "Die Werte, mit denen diese App läuft. Geheime Werte werden nie angezeigt — nur, ob sie gesetzt sind.",
+                    "summary": "{set} von {total} gesetzt",
+                    "missingRequired": "{count, plural, one {# erforderlicher Wert fehlt} other {# erforderliche Werte fehlen}}",
+                    "loading": "Umgebung wird gelesen…",
+                    "unavailable": "Umgebungswerte können auf dieser Instanz noch nicht bearbeitet werden.",
+                    "error": "Die Umgebung konnte nicht gelesen werden. Lade die Seite neu, um es erneut zu versuchen.",
+                    "empty": "Die App-Spezifikation dieser App deklariert keine Umgebungswerte.",
+                    "secureStorageOff": "Sicherer Speicher ist auf dieser Installation nicht eingerichtet, daher können keine Werte gespeichert werden.",
+                    "edit": "Bearbeiten",
+                    "setValue": "Wert setzen",
+                    "editAria": "{name} bearbeiten",
+                    "saved": "{name} gespeichert",
+                    "removed": "{name} entfernt",
+                    "states": {
+                        "set": "Gesetzt",
+                        "unset": "Nicht gesetzt",
+                        "missing": "Erforderlich — nicht gesetzt",
+                        "fromSpec": "Aus der App-Spezifikation",
+                        "fromDependency": "Bereitgestellt von {kind}",
+                        "generated": "Generiert"
+                    },
+                    "badges": {
+                        "secret": "Geheim",
+                        "required": "Erforderlich"
+                    },
+                    "phases": {
+                        "build": "Build",
+                        "runtime": "Laufzeit",
+                        "both": "Build + Laufzeit"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Objektspeicher",
+                        "smtp": "SMTP-Mail"
+                    },
+                    "dialog": {
+                        "title": "{name} bearbeiten",
+                        "valueLabel": "Wert",
+                        "secretHint": "Dieser Wert ist geheim. Er wird verschlüsselt gespeichert und nie wieder angezeigt.",
+                        "secretStored": "Ein Wert ist gespeichert. Gib einen neuen ein, um ihn zu ersetzen.",
+                        "dependencyHint": "Wird normalerweise von {kind} bereitgestellt. Ein hier gesetzter Wert hat Vorrang — zum Beispiel dein eigener SMTP-Server.",
+                        "redeployHint": "Wo die App diesen Wert verwendet, wird sie mit dem neuen Wert neu gebaut oder neu bereitgestellt.",
+                        "empty": "Gib einen Wert ein oder entferne den gespeicherten.",
+                        "save": "Speichern",
+                        "saving": "Wird gespeichert…",
+                        "remove": "Wert entfernen",
+                        "cancel": "Abbrechen"
+                    },
+                    "errors": {
+                        "undeclaredName": "Die App-Spezifikation deklariert diesen Namen nicht.",
+                        "specUnavailable": "Diese App hat noch keine verwendbare App-Spezifikation.",
+                        "failed": "Der Wert konnte nicht gespeichert werden. Versuche es erneut."
+                    }
+                },
+                "dependencies": {
+                    "title": "Abhängigkeiten",
+                    "description": "Die Datenbanken, Caches, Speicher und E-Mail-Dienste, die diese App braucht. Sie werden vor dem Start auf ihrem Bereitstellungsziel eingerichtet.",
+                    "loading": "Abhängigkeiten werden gelesen…",
+                    "unavailable": "Abhängigkeiten können auf dieser Instanz noch nicht verwaltet werden.",
+                    "error": "Die Abhängigkeiten konnten nicht gelesen werden. Lade die Seite neu, um es erneut zu versuchen.",
+                    "empty": "Die App-Spezifikation dieser App deklariert keine Abhängigkeiten.",
+                    "provider": "Anbieter: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# Versuch} other {# Versuche}}",
+                    "noReason": "Es wurde kein Grund erfasst.",
+                    "deployRetries": "Eine erneute Bereitstellung versucht es automatisch noch einmal – oder klicke jetzt auf „Erneut versuchen“.",
+                    "retry": "Erneut versuchen",
+                    "retryAria": "{kind} erneut versuchen",
+                    "retried": "{kind}: Ein neuer Versuch ist geplant.",
+                    "retryQueued": "{kind}: Ein neuer Versuch startet, sobald der Worker verfügbar ist.",
+                    "leaseHeld": "{kind} wird gerade eingerichtet. Versuche es gleich noch einmal.",
+                    "retryFailed": "{kind} konnte nicht erneut versucht werden. Versuche es noch einmal.",
+                    "deleteData": "Daten löschen",
+                    "deleteDataAria": "Daten von {kind} löschen",
+                    "deleteDialog": {
+                        "title": "Daten von {kind} löschen?",
+                        "description": "Dadurch werden die Volumes, Datenbanken und Buckets dieser Abhängigkeit vernichtet. Dies kann nicht rückgängig gemacht werden.",
+                        "resources": "Wird gelöscht:",
+                        "noResources": "Für diese Abhängigkeit sind keine Ressourcen erfasst.",
+                        "confirmLabel": "Gib {slug} zur Bestätigung ein",
+                        "cancel": "Abbrechen",
+                        "confirm": "Daten löschen",
+                        "requested": "Die Daten von {kind} werden gelöscht.",
+                        "failed": "Die Daten konnten nicht gelöscht werden. {reason}"
                     }
                 }
             },

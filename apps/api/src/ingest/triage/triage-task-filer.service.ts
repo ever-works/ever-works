@@ -15,6 +15,8 @@ import {
     type Task,
 } from '@ever-works/agent/tasks-domain';
 import { redactSecrets } from '@ever-works/agent/utils';
+import { config } from '../../config/constants';
+import { STEERING_AUTHOR_ASSOCIATIONS } from '../github/github-review-bots';
 import {
     TRIAGE_EVENT_KINDS,
     TRIAGE_LABEL,
@@ -63,8 +65,56 @@ export type TriageOutcome =
     | { readonly outcome: 'noop'; readonly taskId: string }
     | {
           readonly outcome: 'skipped';
-          readonly reason: 'no-external-id' | 'no-work' | 'work-unavailable' | 'rejected';
+          readonly reason:
+              | 'no-external-id'
+              | 'no-work'
+              | 'work-unavailable'
+              | 'rejected'
+              /**
+               * F6 — a GitHub issue whose author is not an OWNER, MEMBER or
+               * COLLABORATOR of the repository, with
+               * `GITHUB_ISSUE_INTAKE_OUTSIDERS` off. The event stays
+               * ingested (Activity, triggers); no Task is filed for it.
+               */
+              | 'outsider-author';
       };
+
+/** Label on a Task filed from an outsider's issue under the F6 opt-in. */
+export const TRIAGE_OUTSIDE_AUTHOR_LABEL = 'outside-author';
+
+/**
+ * Is this intake event a GitHub issue opened by somebody with no write
+ * relationship to the repository (security finding F6)?
+ *
+ * Only `github.issue` is judged — Jira issues, Sentry and Dependabot
+ * incidents come from systems the owner configured, not from the public.
+ * The association is the issue AUTHOR's (`authorAssociation`, stamped by
+ * the GitHub issue intake from `issue.author_association`), and a missing
+ * value — an event ingested before the field existed, or a payload
+ * without it — is an outsider: fail closed.
+ */
+export function isOutsiderGithubIssue(
+    event: Pick<IngestedEvent, 'kind' | 'payload'>,
+    trustedBots: readonly string[] = [],
+): boolean {
+    if (event.kind !== 'github.issue') return false;
+    const payload = (event.payload ?? {}) as Record<string, unknown>;
+    const association = payload.authorAssociation;
+    if (
+        typeof association === 'string' &&
+        STEERING_AUTHOR_ASSOCIATIONS.has(association.trim().toUpperCase())
+    ) {
+        return false;
+    }
+    // A GitHub App the operator trusts to open issues (Dependabot, Renovate
+    // by default — `GITHUB_ISSUE_INTAKE_TRUSTED_BOTS`): matched on the login
+    // AND `type: Bot`. GitHub reserves the `[bot]` suffix for Apps, so no
+    // person can take one of these names.
+    const author = typeof payload.author === 'string' ? payload.author.trim().toLowerCase() : '';
+    const isBot =
+        typeof payload.authorType === 'string' && payload.authorType.toLowerCase() === 'bot';
+    return !(isBot && author.length > 0 && trustedBots.includes(author));
+}
 
 /** `file()`'s internal result — carries the Task so a caller can name it. */
 type FileResult =
@@ -468,6 +518,19 @@ export class TriageTaskFilerService implements OnModuleInit {
         context: TriageFileContext = {},
         mode: LinkWriteMode = { repoint: false },
     ): Promise<FileResult> {
+        // F6 — on a public repository anyone can open an issue, and every one
+        // used to become a Task in the owner's Work, filed AS the owner, with
+        // no rate limit. A stranger's issue is still ingested (Activity, the
+        // trigger matcher) — it just files nothing, here and on a re-file,
+        // unless the operator opted back in. Checked first: nothing below
+        // (not even the Work lookup) is spent on it.
+        const outsider = isOutsiderGithubIssue(event, config.githubIssueIntake.trustedBots());
+        if (outsider && !config.githubIssueIntake.fileOutsiderIssues()) {
+            this.logger.debug(
+                `Triage: ${event.source}/${externalIssueId} was opened by an author who is not an OWNER, MEMBER or COLLABORATOR; nothing filed (GITHUB_ISSUE_INTAKE_OUTSIDERS is off)`,
+            );
+            return { outcome: 'skipped', reason: 'outsider-author' };
+        }
         if (!event.workId) {
             this.logger.debug(
                 `Triage: ${event.source}/${externalIssueId} routed to no Work; nothing filed`,
@@ -503,6 +566,9 @@ export class TriageTaskFilerService implements OnModuleInit {
                         TRIAGE_LABEL,
                         `source:${event.source}`,
                         ...(regressed ? [TRIAGE_REGRESSION_LABEL] : []),
+                        // Provenance on the board: filed under the F6 opt-in
+                        // from somebody outside the repository.
+                        ...(outsider ? [TRIAGE_OUTSIDE_AUTHOR_LABEL] : []),
                     ],
                     priority: PRIORITY[triagePriorityOf(facts.level)],
                     workId: work.id,

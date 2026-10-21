@@ -697,6 +697,117 @@ describe('WebhookDomainEventFanoutService', () => {
         });
     });
 
+    // Review 2026-10-17 F43: a subscription created while a pass runs is not in that
+    // pass's list, so the pass must not move the cursor past events it cannot match.
+    it('a subscription created while a pass runs still gets the events after it (F43)', async () => {
+        await fanout.catchUp(); // cursor at the (empty) head
+        const first = await subscribe();
+        const list = subscriptions.listActiveV2.bind(subscriptions);
+        let late: { id: string } | null = null;
+        const spy = jest.spyOn(subscriptions, 'listActiveV2').mockImplementationOnce(async () => {
+            const listed = await list();
+            // Right after the list was read: a new subscription, then an event for it.
+            late = await subscribe();
+            await record();
+            await dispatch();
+            return listed;
+        });
+        await fanout.catchUp();
+        await fanout.catchUp();
+        spy.mockRestore();
+        const rows = await deliveries();
+        expect(rows.filter((row) => row.subscriptionId === late!.id)).toHaveLength(1);
+        expect(rows.filter((row) => row.subscriptionId === first.id)).toHaveLength(1);
+    });
+
+    // Review 2026-10-17 F44: the relay never waits for a fan-out pass.
+    it('the relay consumer starts a pass and does not wait for it (F44)', async () => {
+        let consumer: { consume: (batch: unknown[]) => Promise<void> } | null = null;
+        const relay = {
+            registerConsumer: (registered: typeof consumer) => {
+                consumer = registered;
+            },
+            isLeader: () => false,
+        };
+        const relayed = new WebhookDomainEventFanoutService(
+            dataSource,
+            subscriptions,
+            new WebhookDeliveryRepository(dataSource.getRepository(WebhookDelivery)),
+            new DomainEventFeedService(dataSource),
+            new WebhookOwnerAccessService(dataSource),
+            enqueuer,
+            relay as never,
+        );
+        relayed.onApplicationBootstrap();
+        const pass = jest.spyOn(relayed, 'catchUp').mockReturnValue(new Promise(() => undefined));
+        const settled = await Promise.race([
+            consumer!.consume([]).then(() => 'returned'),
+            new Promise((resolve) => setTimeout(() => resolve('waited'), 1000)),
+        ]);
+        expect(settled).toBe('returned');
+        expect(pass).toHaveBeenCalledTimes(1);
+        relayed.onModuleDestroy();
+    });
+
+    // Review 2026-10-17 F45: without Trigger.dev nothing re-ran a failed delivery.
+    it('re-enqueues an in-process delivery left retrying once its ladder step passed (F45)', async () => {
+        await fanout.catchUp();
+        await subscribe();
+        await record();
+        await dispatch();
+        await fanout.catchUp();
+        const [row] = await deliveries();
+        expect(enqueued).toHaveLength(1);
+        const repo = dataSource.getRepository(WebhookDelivery);
+        // The in-process attempt failed (5xx): one attempt, no Trigger run.
+        await repo.update(
+            { id: row.id },
+            { status: 'retrying', attempts: 1, lastAttemptAt: new Date(Date.now() - 10_000) },
+        );
+        await fanout.catchUp();
+        expect(enqueued).toHaveLength(1); // 10 s ago: the 30 s step has not passed
+        await repo.update({ id: row.id }, { lastAttemptAt: new Date(Date.now() - 31_000) });
+        await fanout.catchUp();
+        expect(enqueued).toHaveLength(2);
+        expect(enqueued[1]).toMatchObject({ deliveryId: row.id });
+        await fanout.catchUp();
+        expect(enqueued).toHaveLength(2); // claimed: never twice for one step
+        // A Trigger.dev run retries on its own; the budget caps the in-process ladder.
+        await repo.update(
+            { id: row.id },
+            { lastAttemptAt: new Date(Date.now() - 48 * 3600_000), triggerRunId: 'run_1' },
+        );
+        await fanout.catchUp();
+        await repo.update({ id: row.id }, { triggerRunId: null, attempts: 10 });
+        await fanout.catchUp();
+        expect(enqueued).toHaveLength(2);
+    });
+
+    it('a delivery waiting on a long ladder step never holds back a due one (F45)', async () => {
+        await fanout.catchUp();
+        await subscribe();
+        await record();
+        await record();
+        await dispatch();
+        await fanout.catchUp();
+        const [waiting, due] = await deliveries();
+        const repo = dataSource.getRepository(WebhookDelivery);
+        // 4 attempts: next step 1.8 h; tried 10 min ago (older than the due one).
+        await repo.update(
+            { id: waiting.id },
+            { status: 'retrying', attempts: 4, lastAttemptAt: new Date(Date.now() - 600_000) },
+        );
+        await repo.update(
+            { id: due.id },
+            { status: 'retrying', attempts: 1, lastAttemptAt: new Date(Date.now() - 31_000) },
+        );
+        enqueued.length = 0;
+        await fanout.catchUp();
+        expect(enqueued.map((item) => (item as { deliveryId?: string }).deliveryId)).toEqual([
+            due.id,
+        ]);
+    });
+
     it('ignores v1 subscriptions and paused v2 ones', async () => {
         await fanout.catchUp();
         await subscriptions.createForAccount({

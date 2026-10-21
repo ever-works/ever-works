@@ -952,13 +952,15 @@ describe('T21 — the declared block, read defensively', () => {
  * ------------------------------------------------------------------------- */
 
 describe('T21 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.md:319)', () => {
-	it('publishes all three descriptors, each with the plan’s preference and target', () => {
+	it('publishes all four descriptors, each with the plan’s preference and target', () => {
 		const plugin = new KubernetesPlugin();
 
+		// Lane aw-env-smtp (GAP-22) appended the fourth, the `smtp` mail sink.
 		expect(plugin.dependencyProviders.map((entry) => entry.id)).toEqual([
 			'k8s-inline-postgres',
 			'k8s-inline-redis',
-			'k8s-inline-minio'
+			'k8s-inline-minio',
+			'k8s-inline-mailpit'
 		]);
 		expect(plugin.dependencyProviders).toContainEqual(OBJECT_STORAGE_PROVIDER_DESCRIPTOR);
 		expect(OBJECT_STORAGE_PROVIDER_DESCRIPTOR).toEqual({
@@ -969,13 +971,19 @@ describe('T21 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 			preference: 10,
 			backupPolicy: 'none'
 		});
-		// All three are `your-cluster` only (R-5) and all three beat `s3-external`'s 20. Postgres is the one
-		// with a backup policy that is not `none` — its operator path takes backups (plan §4.9:615).
+		// All four are `your-cluster` only (R-5); the three data stores beat `s3-external`'s 20, and the mail
+		// sink (30) sits behind every provider that really delivers mail. Postgres is the one with a backup
+		// policy that is not `none` — its operator path takes backups (plan §4.9:615).
 		for (const descriptor of plugin.dependencyProviders) {
 			expect(descriptor.targets).toEqual(['your-cluster']);
-			expect(descriptor.preference).toBe(10);
+			expect(descriptor.preference).toBe(descriptor.kind === 'smtp' ? 30 : 10);
 		}
-		expect(plugin.dependencyProviders.map((entry) => entry.backupPolicy)).toEqual(['operator', 'none', 'none']);
+		expect(plugin.dependencyProviders.map((entry) => entry.backupPolicy)).toEqual([
+			'operator',
+			'none',
+			'none',
+			'none'
+		]);
 	});
 
 	it('answers supports for objectStorage on your-cluster and never on the managed tier', async () => {
@@ -990,9 +998,10 @@ describe('T21 — the k8s plugin publishes and delegates (plan §4.9:570, tasks.
 			supported: false,
 			reason: 'providerNotSupported'
 		});
+		// Lane aw-env-smtp (GAP-22): `smtp` is this plugin's too now — the mail sink answers it.
 		expect(await plugin.supports('smtp', 'your-cluster', context())).toEqual({
-			supported: false,
-			reason: 'providerNotSupported'
+			supported: true,
+			providerId: 'k8s-inline-mailpit'
 		});
 	});
 

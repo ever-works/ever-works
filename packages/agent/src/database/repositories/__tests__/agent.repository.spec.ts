@@ -239,6 +239,67 @@ describe('AgentRepository', () => {
         });
     });
 
+    describe('updateByIdIfContentHash (compare-and-set on the file hash)', () => {
+        it('applies the write only while the row holds the expected hash', async () => {
+            inner.update.mockResolvedValueOnce({ affected: 1 });
+
+            const ok = await repo.updateByIdIfContentHash('a1', 'h1', { contentHash: 'h2' });
+
+            expect(ok).toBe(true);
+            expect(inner.update).toHaveBeenCalledWith(
+                { id: 'a1', contentHash: 'h1' },
+                { contentHash: 'h2' },
+            );
+            expect(inner.findOne).not.toHaveBeenCalled();
+        });
+
+        it('reports a mismatch when another writer moved the hash first', async () => {
+            inner.update.mockResolvedValueOnce({ affected: 0 });
+
+            const ok = await repo.updateByIdIfContentHash('a1', 'h1', { contentHash: 'h2' });
+
+            expect(ok).toBe(false);
+            expect(inner.findOne).not.toHaveBeenCalled();
+        });
+
+        // Review of #2769: MySQL reports 0 affected rows for an UPDATE that
+        // changes nothing, so re-saving identical content read as a lost race.
+        it('a no-op rewrite (new hash === expected) succeeds while the row still holds it', async () => {
+            inner.update.mockResolvedValueOnce({ affected: 0 });
+            inner.findOne.mockResolvedValueOnce({ id: 'a1', contentHash: 'h1' });
+
+            const ok = await repo.updateByIdIfContentHash('a1', 'h1', { contentHash: 'h1' });
+
+            expect(ok).toBe(true);
+            expect(inner.findOne).toHaveBeenCalledWith({ where: { id: 'a1' } });
+        });
+
+        it('a no-op rewrite still fails when the row moved on', async () => {
+            inner.update.mockResolvedValueOnce({ affected: 0 });
+            inner.findOne.mockResolvedValueOnce({ id: 'a1', contentHash: 'h9' });
+
+            expect(await repo.updateByIdIfContentHash('a1', 'h1', { contentHash: 'h1' })).toBe(
+                false,
+            );
+        });
+
+        it('the empty expected hash matches an unset hash, and a no-op rewrite of it', async () => {
+            inner.update.mockResolvedValueOnce({ affected: 0 }).mockResolvedValueOnce({
+                affected: 1,
+            });
+            expect(await repo.updateByIdIfContentHash('a1', '', { contentHash: 'h2' })).toBe(true);
+            expect(inner.update).toHaveBeenNthCalledWith(
+                2,
+                { id: 'a1', contentHash: '' },
+                { contentHash: 'h2' },
+            );
+
+            inner.update.mockResolvedValue({ affected: 0 });
+            inner.findOne.mockResolvedValueOnce({ id: 'a1', contentHash: null });
+            expect(await repo.updateByIdIfContentHash('a1', '', { contentHash: '' })).toBe(true);
+        });
+    });
+
     describe('transitionStatus', () => {
         it('returns false when the row is not in the `from` set', async () => {
             qb.execute.mockResolvedValueOnce({ affected: 0 });

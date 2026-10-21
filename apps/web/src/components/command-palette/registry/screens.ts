@@ -15,6 +15,7 @@ import {
     Lightbulb,
     ListChecks,
     Plug,
+    Server,
     Settings,
     Sparkles,
     Target,
@@ -294,6 +295,81 @@ export const DASHBOARD_SCREENS: readonly PaletteScreen[] = [
     },
 ];
 
+/**
+ * Fleet hub (FL-01, FR-13) — "Fleet" and its six hub tabs, offered only while
+ * the hub is on (`FLEET_ENABLED` + `FLEET_HUB_ENABLED`); with it off the
+ * palette lists exactly what it listed before (FR-15). They sit right after
+ * Teams, the way the sidebar entry does.
+ */
+const fleet = (t: PaletteTranslator) => [t('fleet.nav.label')];
+
+export const FLEET_HUB_SCREENS: readonly PaletteScreen[] = [
+    {
+        id: 'fleet',
+        href: ROUTES.DASHBOARD_FLEET,
+        icon: Server,
+        title: (t) => t('fleet.nav.label'),
+    },
+    {
+        id: 'fleet.overview',
+        href: ROUTES.DASHBOARD_FLEET,
+        icon: Server,
+        title: (t) => t('fleet.hub.tabs.overview'),
+        breadcrumb: fleet,
+    },
+    {
+        id: 'fleet.computers',
+        href: ROUTES.DASHBOARD_FLEET_COMPUTERS,
+        icon: Server,
+        title: (t) => t('fleet.hub.tabs.computers'),
+        breadcrumb: fleet,
+    },
+    {
+        id: 'fleet.sessions',
+        href: ROUTES.DASHBOARD_FLEET_SESSIONS,
+        icon: Server,
+        title: (t) => t('fleet.hub.tabs.sessions'),
+        breadcrumb: fleet,
+    },
+    {
+        id: 'fleet.checkouts',
+        href: ROUTES.DASHBOARD_FLEET_CHECKOUTS,
+        icon: Server,
+        title: (t) => t('fleet.hub.tabs.checkouts'),
+        breadcrumb: fleet,
+    },
+    {
+        id: 'fleet.commands',
+        href: ROUTES.DASHBOARD_FLEET_COMMANDS,
+        icon: Server,
+        title: (t) => t('fleet.hub.tabs.commands'),
+        breadcrumb: fleet,
+    },
+    {
+        id: 'fleet.usage',
+        href: ROUTES.DASHBOARD_FLEET_USAGE,
+        icon: Server,
+        title: (t) => t('fleet.hub.tabs.usage'),
+        breadcrumb: fleet,
+    },
+];
+
+/** What decides which screens exist beyond the fixed list. */
+export interface ScreensForOptions {
+    /** Fleet hub (FL-01): add the hub's screens after Teams. */
+    fleetHubEnabled?: boolean;
+}
+
+function dashboardScreens(options: ScreensForOptions): PaletteScreen[] {
+    if (!options.fleetHubEnabled) return [...DASHBOARD_SCREENS];
+    const at = DASHBOARD_SCREENS.findIndex((screen) => screen.id === 'teams') + 1;
+    return [
+        ...DASHBOARD_SCREENS.slice(0, at),
+        ...FLEET_HUB_SCREENS,
+        ...DASHBOARD_SCREENS.slice(at),
+    ];
+}
+
 type WorkScreenBuilder = {
     id: string;
     href: (workId: string) => string;
@@ -374,11 +450,12 @@ const WORK_SUBPAGES: readonly WorkScreenBuilder[] = [
  * The screens available from `pathname`: every dashboard screen, plus the
  * sub-pages of the Work being viewed when the operator is inside one.
  */
-export function screensFor(pathname: string): PaletteScreen[] {
+export function screensFor(pathname: string, options: ScreensForOptions = {}): PaletteScreen[] {
     const workId = getWorkIdFromPath(pathname);
-    if (!workId) return [...DASHBOARD_SCREENS];
+    const screens = dashboardScreens(options);
+    if (!workId) return screens;
     return [
-        ...DASHBOARD_SCREENS,
+        ...screens,
         ...WORK_SUBPAGES.map((screen) => ({
             id: `work.${screen.id}`,
             href: screen.href(workId),

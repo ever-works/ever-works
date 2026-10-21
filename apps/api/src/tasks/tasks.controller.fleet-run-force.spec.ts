@@ -71,11 +71,12 @@ describe('TasksController.transition — force is not available to a fleet-run c
     it('still lets a fleet-run credential transition WITHOUT force — the gate then applies', async () => {
         const { controller, service } = build();
         await controller.transition(auth, taskId, { to: 'done' } as never, runTokenRequest);
+        // Works-security lane 3a — and it moves as an agent, starting nothing.
         expect(service.transition).toHaveBeenCalledWith(
             'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
             taskId,
             'done',
-            { force: false },
+            { force: false, suppressAgentFanOut: true, actorType: 'agent' },
             scope,
         );
     });

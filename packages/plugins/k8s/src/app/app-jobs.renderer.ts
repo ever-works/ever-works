@@ -78,6 +78,7 @@ import {
 import { APP_ISOLATION_PROBE_LABEL } from './app-network-policy.renderer.js';
 import {
 	APP_RUNNER_RUN_AS_USER,
+	APP_TMP_VOLUME_NAME,
 	containerSecurityContext,
 	podSecurityContext,
 	tmpVolume,
@@ -372,11 +373,33 @@ function jobPodSpec(
 		podSpec.runtimeClassName = runtimeClassName;
 	}
 
-	if (options.volumes && options.volumes.length > 0) {
-		podSpec.volumes = options.volumes;
+	const volumes = withMountedTmpVolume(options.volumes ?? [], container, input, component);
+	if (volumes.length > 0) {
+		podSpec.volumes = volumes;
 	}
 
 	return podSpec;
+}
+
+/**
+ * `volumes`, plus the §4.4 `/tmp` emptyDir when the container mounts `tmp` and no volume of that
+ * name is declared — the second lock behind every caller passing `tmpVolumes(...)`: a pod template
+ * whose container mounts a volume the pod does not declare is refused by the API server (422), so
+ * this renderer never emits one.
+ */
+function withMountedTmpVolume(
+	volumes: Record<string, unknown>[],
+	container: Record<string, unknown>,
+	input: AppRenderInput,
+	component: AppComponentInput | null
+): Record<string, unknown>[] {
+	const mounts = Array.isArray(container?.volumeMounts) ? (container.volumeMounts as Array<{ name?: unknown }>) : [];
+	const mountsTmp = mounts.some((mount) => mount?.name === APP_TMP_VOLUME_NAME);
+	const declaresTmp = volumes.some((volume) => volume?.name === APP_TMP_VOLUME_NAME);
+	if (!mountsTmp || declaresTmp) {
+		return volumes;
+	}
+	return [...volumes, ...tmpVolumes(input, component)];
 }
 
 /* ------------------------------------------------------------------------- *
@@ -414,7 +437,12 @@ export function renderCommandJob(
 			ttlSecondsAfterFinished: APP_JOB_TTL_SECONDS,
 			template: {
 				metadata: { labels },
-				spec: jobPodSpec(input, component, commandContainer(input, component, job?.command, options))
+				// The container mounts the §4.4 `/tmp` emptyDir when its root filesystem is read-only,
+				// so the pod must declare it: without it the API server refused the Job with 422
+				// `volumeMounts[0].name: Not found: "tmp"` (prod Deployment e4b65cbd, 2026-10-18).
+				spec: jobPodSpec(input, component, commandContainer(input, component, job?.command, options), {
+					volumes: tmpVolumes(input, component)
+				})
 			}
 		}
 	};

@@ -73,11 +73,19 @@ export interface HeartbeatCapableClient {
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
 	// NEWEST first. Sessions on computers (FL-04): the session daemon's health.
 	// A platform that predates it answers 400; the node strips this tier first
-	// and keeps beating — losing only the daemon line, never its consents.
+	// and keeps beating — losing only the daemon line, never its health or
+	// consents. Newer than the health snapshot: FL-03 reached `develop` first.
 	['daemon'],
-	// Fleet node link (FL-02): the consents. A platform that
-	// predates them answers 400; the node strips this tier, keeps beating with
-	// everything else, and does not open the link (spec U11).
+	// Computer health (FL-03): the health snapshot. Its own
+	// tier, so a platform that predates it costs exactly this one field —
+	// the consents, pinned CLI versions and enforced limits below keep
+	// flowing (FR-3, U9). Newer than the consents: FL-02 reached `develop`
+	// first, so a platform that knows the consents but not the snapshot
+	// exists, and the reverse never will.
+	['health'],
+	// Fleet node link (FL-02): the consents. A platform that predates them
+	// answers 400; the node strips this tier, keeps beating with everything
+	// else, and does not open the link (spec U11).
 	['consents'],
 	// Then Node lifecycle + remote node limits (self-build slices
 	// AR, AS). Tiered (review): `cliVersions` goes out on EVERY beat of a
@@ -449,7 +457,10 @@ function describeStrippedTiers(tiers: number): string {
 		return 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.';
 	}
 	if (dropped.has('consents')) {
-		return 'Platform rejected the consents field; it predates the node link. Still reporting everything else; the node link stays closed until this node restarts.';
+		return 'Platform rejected the consents field; it predates the node link. Still reporting pinned CLI versions, enforced limits, worker state and housekeeping; the node link stays closed and the health snapshot off until this node restarts.';
+	}
+	if (dropped.has('health')) {
+		return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
 	}
 	return 'Platform rejected the session daemon field; it predates sessions on computers. Still reporting everything else; the daemon line stays off until this node restarts.';
 }

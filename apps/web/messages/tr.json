@@ -287,6 +287,8 @@
             "signIn": "Ever ID ile oturum aç",
             "signUp": "Ever ID ile kaydol",
             "redirecting": "Ever ID açılıyor…",
+            "signInWith": "<wordmark>Ever ID</wordmark> ile oturum aç",
+            "signUpWith": "<wordmark>Ever ID</wordmark> ile kaydol",
             "consentRequired": "Devam etmek için yukarıdaki şartları kabul edin.",
             "createAccount": {
                 "title": "Ever Works hesabınızı oluşturun",
@@ -7354,6 +7356,95 @@
                         "resume": "Sürdürme istendi.",
                         "remove": "Kaldırma istendi.",
                         "cancelDeploy": "İptal istendi."
+                    }
+                },
+                "environment": {
+                    "title": "Ortam",
+                    "description": "Bu uygulamanın çalışırken kullandığı değerler. Gizli değerler asla gösterilmez — yalnızca ayarlanıp ayarlanmadıkları.",
+                    "summary": "{total} değerden {set} tanesi ayarlı",
+                    "missingRequired": "{count, plural, one {# zorunlu değer eksik} other {# zorunlu değer eksik}}",
+                    "loading": "Ortam okunuyor…",
+                    "unavailable": "Ortam değerleri bu kurulumda henüz düzenlenemiyor.",
+                    "error": "Ortam okunamadı. Tekrar denemek için sayfayı yenileyin.",
+                    "empty": "Bu uygulamanın uygulama belirtimi hiçbir ortam değeri bildirmiyor.",
+                    "secureStorageOff": "Bu kurulumda güvenli depolama yapılandırılmamış; bu yüzden değerler kaydedilemiyor.",
+                    "edit": "Düzenle",
+                    "setValue": "Değer ayarla",
+                    "editAria": "{name} düzenle",
+                    "saved": "{name} kaydedildi",
+                    "removed": "{name} kaldırıldı",
+                    "states": {
+                        "set": "Ayarlı",
+                        "unset": "Ayarlı değil",
+                        "missing": "Zorunlu — ayarlı değil",
+                        "fromSpec": "Uygulama belirtiminden",
+                        "fromDependency": "{kind} tarafından sağlanır",
+                        "generated": "Oluşturuldu"
+                    },
+                    "badges": {
+                        "secret": "Gizli",
+                        "required": "Zorunlu"
+                    },
+                    "phases": {
+                        "build": "Derleme",
+                        "runtime": "Çalışma zamanı",
+                        "both": "Derleme + çalışma zamanı"
+                    },
+                    "kinds": {
+                        "postgres": "Postgres",
+                        "redis": "Redis",
+                        "objectStorage": "Nesne depolama",
+                        "smtp": "SMTP e-postası"
+                    },
+                    "dialog": {
+                        "title": "{name} düzenle",
+                        "valueLabel": "Değer",
+                        "secretHint": "Bu değer gizlidir. Şifrelenmiş olarak saklanır ve bir daha asla gösterilmez.",
+                        "secretStored": "Kayıtlı bir değer var. Değiştirmek için yenisini yazın.",
+                        "dependencyHint": "Normalde {kind} tarafından sağlanır. Burada ayarladığınız değer önceliklidir — örneğin kendi SMTP sunucunuz.",
+                        "redeployHint": "Uygulamanın bu değeri kullandığı yerlerde, yeni değerle yeniden derlenir veya yeniden dağıtılır.",
+                        "empty": "Bir değer girin veya kayıtlı olanı kaldırın.",
+                        "save": "Kaydet",
+                        "saving": "Kaydediliyor…",
+                        "remove": "Değeri kaldır",
+                        "cancel": "İptal"
+                    },
+                    "errors": {
+                        "undeclaredName": "Uygulama belirtimi bu adı bildirmiyor.",
+                        "specUnavailable": "Bu uygulamanın henüz kullanılabilir bir uygulama belirtimi yok.",
+                        "failed": "Değer kaydedilemedi. Tekrar deneyin."
+                    }
+                },
+                "dependencies": {
+                    "title": "Bağımlılıklar",
+                    "description": "Bu uygulamanın ihtiyaç duyduğu veritabanları, önbellekler, depolama ve e-posta. Uygulama başlamadan önce dağıtım hedefinde hazırlanırlar.",
+                    "loading": "Bağımlılıklar okunuyor…",
+                    "unavailable": "Bağımlılıklar bu kurulumda henüz yönetilemiyor.",
+                    "error": "Bağımlılıklar okunamadı. Tekrar denemek için sayfayı yenileyin.",
+                    "empty": "Bu uygulamanın uygulama belirtimi hiçbir bağımlılık bildirmiyor.",
+                    "provider": "Sağlayıcı: {label}",
+                    "size": "{size} GiB",
+                    "attempts": "{count, plural, one {# deneme} other {# deneme}}",
+                    "noReason": "Herhangi bir neden kaydedilmedi.",
+                    "deployRetries": "Yeniden dağıtmak otomatik olarak tekrar dener — ya da şimdi Yeniden dene'ye basın.",
+                    "retry": "Yeniden dene",
+                    "retryAria": "{kind} için yeniden dene",
+                    "retried": "{kind}: yeni bir deneme planlandı.",
+                    "retryQueued": "{kind}: çalışan (worker) hazır olur olmaz yeni bir deneme başlayacak.",
+                    "leaseHeld": "{kind} şu anda hazırlanıyor. Birazdan tekrar deneyin.",
+                    "retryFailed": "{kind} yeniden denenemedi. Tekrar deneyin.",
+                    "deleteData": "Verileri sil",
+                    "deleteDataAria": "{kind} verilerini sil",
+                    "deleteDialog": {
+                        "title": "{kind} verileri silinsin mi?",
+                        "description": "Bu işlem, bu bağımlılığın birimlerini, veritabanlarını ve bucket'larını yok eder. Geri alınamaz.",
+                        "resources": "Silinecekler:",
+                        "noResources": "Bu bağımlılık için kayıtlı kaynak yok.",
+                        "confirmLabel": "Onaylamak için {slug} yazın",
+                        "cancel": "İptal",
+                        "confirm": "Verileri sil",
+                        "requested": "{kind} verileri siliniyor.",
+                        "failed": "Veriler silinemedi. {reason}"
                     }
                 }
             },

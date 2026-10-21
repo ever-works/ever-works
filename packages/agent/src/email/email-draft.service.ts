@@ -98,7 +98,14 @@ export class EmailDraftService {
     ) {}
 
     async submit(input: SubmitAgentEmailInput): Promise<SubmitAgentEmailResult> {
-        const { mode } = await this.policy.resolvePolicy(input.userId, input.agentId);
+        // Prompt-injection hardening: the mode for THIS message, given who it
+        // goes to — on the platform default, mail to someone the agent has
+        // never corresponded with is held for review rather than sent.
+        const { mode } = await this.policy.resolveAgentSendMode(input.userId, input.agentId, {
+            to: input.to,
+            cc: input.cc,
+            bcc: input.bcc,
+        });
         if (mode === 'auto-send') {
             const result = await this.facade.send(
                 {
@@ -129,7 +136,10 @@ export class EmailDraftService {
         // it is released (the send that actually goes out).
         const replyThreading = input.headers ? threadingFieldsOf(input.headers) : null;
 
+        // Review 2026-10-17 U1 (F112): the held draft lives where its address does.
+        const ownership = (await this.facade.ownershipOfAddress?.(input.emailAddressId)) ?? {};
         const draft = await this.messages.save({
+            ...ownership,
             userId: input.userId,
             agentId: input.agentId,
             taskId: input.taskId ?? null,

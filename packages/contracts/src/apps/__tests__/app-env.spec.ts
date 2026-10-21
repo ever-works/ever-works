@@ -679,3 +679,33 @@ const FIXTURE_SHAPE: AppEnvEntryView = {
 	updatedAt: null,
 	updatedBy: null
 };
+
+/* ------------------------------------------------------------------------- *
+ * The Environment routes (lane aw-env-smtp, 2026-10-18)
+ * ------------------------------------------------------------------------- */
+
+describe('app-env.ts — the Environment routes', () => {
+	it('reads a dependency reference back out of an entry’s reference text', async () => {
+		const { appEnvDependencyRefOf } = await import('../app-env.js');
+		expect(appEnvDependencyRefOf('deps.smtp.host')).toEqual({ kind: 'smtp', output: 'host' });
+		expect(appEnvDependencyRefOf(' deps.objectStorage.bucket.uploads ')).toEqual({
+			kind: 'objectStorage',
+			output: 'bucket.uploads'
+		});
+		for (const text of ['domains.primary.url', 'platform.smtp.host', 'deps.smtp', '{{deps.smtp.host}}', '', null]) {
+			expect(appEnvDependencyRefOf(text as string | null)).toBeNull();
+		}
+	});
+
+	it('pins the whole-request refusals and the per-request ceiling', async () => {
+		const { APP_ENV_PATCH_REFUSAL_CODES, APP_ENV_PATCH_MAX_NAMES } = await import('../app-env.js');
+		expect([...APP_ENV_PATCH_REFUSAL_CODES]).toEqual([
+			'invalidBody',
+			'undeclaredName',
+			'tooManyNames',
+			'specUnavailable',
+			'storeUnavailable'
+		]);
+		expect(APP_ENV_PATCH_MAX_NAMES).toBe(100);
+	});
+});
