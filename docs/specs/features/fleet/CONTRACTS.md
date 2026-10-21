@@ -88,6 +88,19 @@ parentPath }, branch, baseRef, createdBy }` with the platform naming the exact p
 `containerImage` (the deployment default `FLEET_CHECKOUT_CONTAINER_IMAGE`) and `sharedFolders` (worktrees only, linked
 when git ignores them); the bin purge is the daily scheduled task `fleet-checkout-bin-purge` (`23 3 * * *`).
 
+**Revision 14 (2026-10-21)** — FL-13 P1 (lane log `docs/internal/fleet/lanes/FL-13.md`): the `schedule` family's
+messages are written down in `packages/contracts/src/fleet/fleet-schedules.types.ts` — `schedule.sync { generation,
+definitions[] }` answered `{ generation, held, refused, next, timeZone }`, `schedule.runs { since }` answered `{ runs,
+more, timeZone }` (each run `{ runId, scheduleId, scheduledFor, startedAt, endedAt, status, failedReason, exitCode,
+head, tail, truncated, capped, bytes, kept, trigger }`), `schedule.runNow { id, runId }` answered `{ runId, startedAt }`;
+one short-lived channel per request. A schedule's ONE computer is `nodeIds[0]`. A schedule's run keeps the machine's run
+id as its `fleet_command_runs` id (reconciliation is an upsert by it). Schedule routes are FL-12's paths (`POST
+/commands` with `cadence` + `name` → 201, `PATCH` / `DELETE /commands/:id`, `/commands/:id/runs?limit≤30`); Run now /
+Pause / Resume ride `/api/schedules/node_schedule:<id>/…` and `run-now` takes `{ confirm }` (other sources ignore it).
+`ScheduleOwnerType` gains `node`; the heartbeat's newest strip tier is `timeZone`; the node advertises `schedules`
+under `--manage`; `HomeScheduleKind` gains `node_schedule`. A command line that trips the secret scanner is refused
+`invalid` (a schedule's line is stored to be re-synced, and the platform stores no secret).
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

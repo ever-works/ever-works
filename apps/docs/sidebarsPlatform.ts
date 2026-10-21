@@ -189,6 +189,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-node-link',
 				// One command on several computers, from the hub or the CLI.
 				'features/fleet-commands',
+				// Commands on a computer's own clock (FL-13).
+				'features/fleet-schedules',
 				// Terminals that keep running on those computers (FL-04).
 				'features/fleet-sessions',
 				// Git clones and worktrees on those computers (FL-14).
