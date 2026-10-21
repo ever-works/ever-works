@@ -11,7 +11,7 @@ import {
     type FleetSessionAttachRole,
     type FleetSessionView,
 } from '@ever-works/contracts';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
 import { useShortcut } from '@/lib/hooks/use-shortcut';
@@ -60,10 +60,13 @@ export function SessionDetailClient({
     initial,
     node,
     viewerUserId,
+    agentName = null,
 }: {
     initial: FleetSessionView;
     node: FleetNodeView | null;
     viewerUserId: string | null;
+    /** The Agent of an Agent session (P2), for the isolation sentence and the end dialog. */
+    agentName?: string | null;
 }) {
     const t = useTranslations('fleet.sessions');
     const locale = useLocale();
@@ -73,6 +76,9 @@ export function SessionDetailClient({
     const [session, setSession] = useState<FleetSessionView>(initial);
     const nodeName = node?.name ?? '…';
     const live = isFleetSessionLive(session.state);
+    // An Agent session waits (its job queued) until the computer has a free slot:
+    // there is nothing to attach to until the daemon runs it.
+    const waiting = session.kind === 'agent' && session.state === 'starting';
     const startedByMe = session.kind === 'owner' && session.userId === viewerUserId;
     const [role, setRole] = useState<FleetSessionAttachRole>(startedByMe ? 'driver' : 'viewer');
     const [size, setSize] = useState<{ cols: number; rows: number } | null>(null);
@@ -92,7 +98,7 @@ export function SessionDetailClient({
         {
             sessionId: session.id,
             role,
-            enabled: live,
+            enabled: live && !waiting,
             size: () => size ?? { cols: 120, rows: 32 },
         },
         {
@@ -191,7 +197,21 @@ export function SessionDetailClient({
                 {t('detail.releaseKeyboard')}
             </div>
 
-            {live && attach.state === 'starting' && (
+            {waiting && (
+                <Strip icon={<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />} testId="fleet-session-waiting">
+                    {t('detail.waiting', { node: nodeName })}
+                </Strip>
+            )}
+            {session.agentRunId && (
+                <Link
+                    href={ROUTES.DASHBOARD_AGENT_SESSION(session.agentRunId)}
+                    className="inline-block text-xs text-primary hover:underline"
+                    data-testid="fleet-session-run-link"
+                >
+                    {t('detail.openRun')}
+                </Link>
+            )}
+            {live && !waiting && attach.state === 'starting' && (
                 <Strip icon={<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}>
                     {t('detail.starting', { node: nodeName })}
                 </Strip>
@@ -278,6 +298,7 @@ export function SessionDetailClient({
                 recordingState={session.recordingState}
                 bytesPerSecond={attach.bytesPerSecond}
                 nodeName={nodeName}
+                isolatedAgentName={session.kind === 'agent' ? (agentName ?? t('kinds.agent')) : null}
             />
 
             <SessionEndDialog
@@ -285,6 +306,7 @@ export function SessionDetailClient({
                 onOpenChange={setEnding}
                 session={session}
                 nodeName={nodeName}
+                agentName={agentName}
                 onEnded={(view) => setSession(view)}
             />
             <SessionRenameDialog open={renaming} onOpenChange={setRenaming} session={session} onRenamed={(view) => setSession((current) => ({ ...current, title: view.title }))} />
