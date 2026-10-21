@@ -71,7 +71,27 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.session.restart',
 	'node.session.end',
 	'node.session.recording.start',
-	'node.session.recording.stop'
+	'node.session.recording.stop',
+	// Services, Docker, Compose and processes (FL-09, CONTRACTS §7).
+	'node.service.start',
+	'node.service.stop',
+	'node.service.restart',
+	'node.service.enable',
+	'node.service.disable',
+	'node.docker.container.start',
+	'node.docker.container.stop',
+	'node.docker.container.restart',
+	'node.docker.container.remove',
+	'node.docker.container.run',
+	'node.docker.container.exec',
+	'node.docker.image.pull',
+	'node.docker.image.remove',
+	'node.docker.image.prune',
+	'node.compose.up',
+	'node.compose.down',
+	'node.compose.restart',
+	'node.compose.pull',
+	'node.process.signal'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */
