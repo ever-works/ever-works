@@ -130,6 +130,16 @@ Pause / Resume ride `/api/schedules/node_schedule:<id>/…` and `run-now` takes 
 under `--manage`; `HomeScheduleKind` gains `node_schedule`. A command line that trips the secret scanner is refused
 `invalid` (a schedule's line is stored to be re-synced, and the platform stores no secret).
 
+**Revision 18 (2026-10-21)** — FL-13 P2 (lane log decisions 18–24): §11.2 gains `/schedules`, `/schedules/:id`
+(GET, PATCH, DELETE), `/schedules/:id/runs`, `/schedules/:id/run|pause|resume` (the routes FL-19's catalogue names; the
+`fleet_schedules_*` rows are `live`), `/nodes/:id/schedules/pause-all` + `/resume-all { breakerAt }` (the breaker scope
+"this computer": one `pausedAt` instant per Pause all, 15-minute Undo, cap 500) and `/nodes/:id/schedules/agents`
+beside `/nodes/:id/schedules/agent-session`. An Agent-session schedule is a recurring Task (R-29) whose labels carry
+`fleet:session-schedule`, `fleet:provider:<claude-code|codex>` and optionally `fleet:checkout:<uuid>`; each fire is
+started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDULE_DISPATCHER` as an FL-04 Agent session
+on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
+'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

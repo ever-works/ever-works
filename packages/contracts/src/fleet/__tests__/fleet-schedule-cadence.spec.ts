@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	describeFleetScheduleCadence,
+	fleetScheduleCadenceToCron,
+	fleetScheduleUnattendedCredentialSentence,
 	fleetScheduleCadenceFromForm,
 	fleetScheduleCatchUp,
 	fleetScheduleFailureStreak,
@@ -310,5 +312,23 @@ describe('fleetScheduleFailureStreak (FR-23)', () => {
 		).toBe(3);
 		expect(fleetScheduleFailureStreak([{ status: 'done' }, { status: 'failed' }])).toBe(0);
 		expect(fleetScheduleFailureStreak([{ status: 'skipped-offline' }, { status: 'failed' }])).toBe(0);
+	});
+});
+
+describe('Agent-session schedules (FL-13 P2)', () => {
+	it('stores every cadence form as the cron a recurring Task carries', () => {
+		expect(fleetScheduleCadenceToCron(every(30))).toBe('*/30 * * * *');
+		expect(fleetScheduleCadenceToCron(every(60))).toBe('0 * * * *');
+		expect(fleetScheduleCadenceToCron(every(1))).toBe('* * * * *');
+		expect(fleetScheduleCadenceToCron(daily('08:30'))).toBe('30 8 * * *');
+		expect(fleetScheduleCadenceToCron(weekdays('02:00'))).toBe('0 2 * * 1-5');
+		expect(fleetScheduleCadenceToCron(cron('0 9 * * 1,3'))).toBe('0 9 * * 1,3');
+		expect(fleetScheduleCadenceToCron(cron('nope'))).toBeNull();
+	});
+
+	it('carries the unattended-credential sentence verbatim (FR-26)', () => {
+		expect(fleetScheduleUnattendedCredentialSentence('build-01')).toBe(
+			'Runs happen on build-01 using the Claude Code or Codex sign-in — or the API key — that is set up on that computer. Ever Works keeps no copy of it. If that sign-in expires, the next run fails and this schedule appears under Needs a look until someone signs in on build-01 again.'
+		);
 	});
 });

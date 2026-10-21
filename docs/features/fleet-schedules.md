@@ -26,8 +26,8 @@ they printed.
 
 Schedules ride Commands' flag: `FLEET_COMMANDS_ENABLED=true` on the deployment (default off), and the
 [node link](./fleet-node-link.md) (`FLEET_NODE_LINK_ENABLED=true`) to send definitions to the computer and read its runs
-back. The computer must run the node with `--manage`. Schedules that start an Agent session on a computer arrive in
-the next phase.
+back. The computer must run the node with `--manage` for command schedules, and with `--work` for Agent-session
+schedules.
 
 :::
 
@@ -76,6 +76,28 @@ So that a closed laptop lid still runs them, run the node as a service (the syst
 `apps/node/packaging/systemd/` on Linux, `apps/node/packaging/windows/` on Windows): the timer
 lives inside the node, not in cron, launchd or Task Scheduler.
 
+## An Agent, every morning
+
+Choose **An Agent session** in the dialog to schedule an Agent instead of a command: the Agent (only Agents **pinned**
+to this computer are offered — pin one on its Capabilities tab; the dialog never pins one for you), what it should do
+(the prompt), the agent CLI (Claude Code or Codex) and, optionally, a checkout on the computer. It is stored as a
+recurring Task of that Agent; at each time the platform starts it as an **Agent session on that computer**, visible on
+its Sessions tab while it runs, and each run appears in Runs with its cost like any other run.
+
+> Runs happen on build-01 using the Claude Code or Codex sign-in — or the API key — that is set up on that computer.
+> Ever Works keeps no copy of it. If that sign-in expires, the next run fails and this schedule appears under Needs a
+> look until someone signs in on build-01 again.
+
+Agent-session schedules tick on the platform (each fire creates a Run), so they need the platform reachable; command
+schedules tick on the computer. In **Activity → Schedules** an Agent's recurring Task keeps its own source and shows the
+computer it is pinned to.
+
+## Pause all
+
+**Pause all** on a computer's Schedules tab pauses every command schedule on it (the computer's owner pauses all of
+them; anyone else their own), says how many and how many runs are in flight (they finish; nothing new starts), and
+offers **Undo** for 15 minutes. Nothing is deleted.
+
 ## Told only when it fails
 
 Two failures in a row put the schedule under **Needs a look** in the Fleet hub ("Nightly tests failed twice on
@@ -103,6 +125,13 @@ when it is fixed. A passing run clears it.
 - Every change writes a Fleet audit row (`node.schedule.create|update|delete|run|pause|resume`); every run the computer
   made is audited as `node.command.run` with `requestedBy: schedule:<id>`.
 - A command schedule spends **no model tokens or credits**.
+
+## Agents and MCP
+
+An Agent has `fleet_schedules_list`, `_get`, `_runs` (read-only), `_pause`, `_resume` (applied at once) and
+`fleet_schedules_create`, `_update`, `_delete`, `_run` — which never act by themselves: each is held for your approval in
+My Decisions and applied, as that Agent, when you approve it. The MCP server exposes the same nine names over the
+`/api/fleet/schedules` routes below (writes need `confirm: true`). An Agent sees only the schedules Agents asked for.
 
 ## CLI
 
@@ -132,3 +161,8 @@ Every verb takes `--json` (the web's shapes). Exit codes: `0` ok, `1` refused or
 | GET    | `/api/schedules/page?sourceType=node_schedule&node=<id>` | the schedules on one computer                                 |
 | POST   | `/api/schedules/node_schedule:<id>/run-now`      | Run now (`confirm: true`)                                             |
 | POST   | `/api/schedules/node_schedule:<id>/pause` · `/resume` | pause, resume                                                    |
+| GET · POST | `/api/fleet/schedules` · GET · PATCH · DELETE `/api/fleet/schedules/:id` | the same schedules as a resource (Agent, MCP, CLI) |
+| GET    | `/api/fleet/schedules/:id/runs` · POST `/:id/run` · `/:id/pause` · `/:id/resume` | runs, Run now (`confirm`), pause, resume       |
+| POST   | `/api/fleet/nodes/:id/schedules/pause-all` · `/resume-all` | Pause all (`confirm`) and its 15-minute Undo (`breakerAt`)  |
+| GET    | `/api/fleet/nodes/:id/schedules/agents`          | the Agents an Agent-session schedule here may use                     |
+| POST   | `/api/fleet/nodes/:id/schedules/agent-session`   | create an Agent-session schedule (`confirm`)                          |
