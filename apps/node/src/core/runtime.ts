@@ -922,7 +922,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				overlay: sessionHookOverlay
 			},
 			logger: io.logger,
-			onInput: (sessionId, data) => statusPipeline.observeInput(sessionId, data)
+			onInput: (sessionId, data) => statusPipeline.observeInput(sessionId, data),
+			// FL-05 P2: `session.answer` — the pipeline types what the CLI expects.
+			answer: (sessionId, params) => statusPipeline.answer(sessionId, params)
 		});
 		sessions = { supervisor, module: sessionModule, status: statusPipeline };
 		// The daemon block carries the hook counters (CONTRACTS §1.1, FL-05 FR-6).

@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
+    fleetSessionAttentionKey,
     isFleetSessionLive,
     parseFleetSessionAttention,
     parseFleetSessionLastEvidence,
@@ -12,6 +13,7 @@ import type { FleetSession } from '../../entities/fleet-session.entity';
 import { FleetSessionRepository } from './fleet-session.repository';
 import {
     FLEET_SESSION_ATTENTION_SINK,
+    type FleetSessionAttentionAnswer,
     type FleetSessionAttentionSink,
 } from './fleet-session-attention.port';
 
@@ -122,6 +124,58 @@ export class FleetSessionStateService {
                 `session.attention for ${message.sessionId} on node ${nodeId} failed: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
+            );
+        }
+    }
+
+    /**
+     * Somebody answered through the platform (the card, the detail, the
+     * Inbox, a tool, the CLI): the session service already cleared the row;
+     * every other door closes now (FR-28: within 2 s everywhere).
+     */
+    async attentionAnswered(
+        row: FleetSession,
+        attention: FleetSessionAttention,
+        answer: FleetSessionAttentionAnswer,
+    ): Promise<void> {
+        if (!this.sink) return;
+        try {
+            await this.sink.attentionCleared(row, attention, answer);
+        } catch (error) {
+            this.logger.warn(
+                `session ${row.id}: answered attention not delivered: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /**
+     * A session just ended (FL-04's end paths call this with the row before
+     * and after): an open prompt expires with it (R-12 — never answered
+     * automatically), and a session that ended with a failure raises the
+     * `failed` notice (U14) — never for a shell, never for a person's or the
+     * platform's own end (those are `cancelled`, not news). Never throws.
+     */
+    async sessionEnded(before: FleetSession, after: FleetSession): Promise<void> {
+        try {
+            const previous = before.attention ? parseFleetSessionAttention(before.attention) : null;
+            if (previous && previous.reason !== 'finished' && previous.reason !== 'failed' && this.sink) {
+                await this.sink.attentionCleared({ ...after, attention: null }, previous, null);
+            }
+            if (after.provider === 'shell' || after.outcome !== 'failure') return;
+            const code = typeof after.exitCode === 'number' ? after.exitCode : null;
+            const failed: FleetSessionAttention = {
+                key: fleetSessionAttentionKey(after.id, 'failed', 'exit'),
+                reason: 'failed',
+                prompt: code !== null ? `exit code ${code}` : 'the session failed',
+                options: [],
+                raisedAt: new Date(this.now()).toISOString(),
+                acknowledgedAt: null,
+            };
+            await this.sessions.update(after.id, { attention: failed });
+            if (this.sink) await this.sink.attentionRaised({ ...after, attention: failed }, failed, { finished: false });
+        } catch (error) {
+            this.logger.warn(
+                `session ${after.id}: end not delivered: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
     }

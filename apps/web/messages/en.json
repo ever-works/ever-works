@@ -1051,7 +1051,8 @@
                 "rejected": "Rejected.",
                 "escalationResolved": "Escalation resolved.",
                 "alreadyDecided": "This was already decided elsewhere.",
-                "recorded": "Reply recorded."
+                "recorded": "Reply recorded.",
+                "sessionAnswered": "Answer sent to the session."
             },
             "toast": {
                 "archived": "Message archived.",
@@ -1137,6 +1138,10 @@
                 },
                 "loadMore": "Load {count} more",
                 "loadMoreError": "Could not load more decisions."
+            },
+            "sessionSource": {
+                "badge": "From a session",
+                "open": "Open session"
             }
         },
         "connectGithub": {
@@ -14013,6 +14018,20 @@
             "hookHealth": {
                 "badToken": "Something on {node} is posting to the hook endpoint with a bad token ({count} in the last minute)",
                 "spooled": "{count} hook events are spooled on {node} and will be applied when the node is up"
+            },
+            "attention": {
+                "asks": "Asks: {prompt}",
+                "fallbackLabel": "Waiting for your answer",
+                "escDeny": "Esc = Deny",
+                "escKeep": "Esc keeps the prompt",
+                "orType": "or type an answer",
+                "send": "Send",
+                "killSwitch": "Paused by the fleet stop — answers are not sent",
+                "alreadyAnswered": "Already answered in the terminal",
+                "unreachable": "{node} is unreachable — the answer will not be sent",
+                "failed": "The answer was not sent",
+                "retry": "Retry",
+                "peopleOnly": "Permission prompts are answered by people"
             }
         },
         "actions": {

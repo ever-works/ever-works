@@ -10,6 +10,14 @@ import {
     FLEET_AGENT_SESSION_QUEUED_TIMEOUT_MS,
     FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH,
     FLEET_SESSION_IDLE_AFTER_MS,
+    FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
+    isFleetSessionAttentionUnread,
+    isFleetSessionDecisionReason,
+    parseFleetSessionAttention,
+    type FleetSessionAnswerRequest,
+    type FleetSessionAnswerResponse,
+    type FleetSessionAnswerSource,
+    type FleetSessionQuestionView,
     isFleetAgentSessionProvider,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_END_GRACE_MS,
@@ -71,6 +79,7 @@ import {
 import { toFleetSessionView } from './fleet-session.view';
 import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
 import { FLEET_SESSION_RECORDER, type FleetSessionRecorderPort } from './fleet-session-recorder.port';
+import { FleetSessionStateService } from './fleet-session-state.service';
 
 /**
  * Sessions on computers (FL-04) — the platform's one writer of
@@ -212,6 +221,8 @@ export class FleetSessionService {
         // them a start naming a Task or a checkout is refused, as before.
         @Optional() private readonly taskRules?: FleetSessionTaskService,
         @Optional() private readonly checkouts?: FleetCheckoutRepository,
+        // FL-05 — attention delivery when a session ends or is answered.
+        @Optional() private readonly status?: FleetSessionStateService,
     ) {}
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -780,6 +791,16 @@ export class FleetSessionService {
         if (!isFleetSessionLive(session.state)) {
             throw fleetSessionError('invalid', 'the session has ended', { state: session.state });
         }
+        // FL-05 (FR-30): an Agent never answers a permission prompt — not through
+        // `fleet_sessions_answer`, and not by typing into the session either.
+        if (actor.agentId && session.state === 'needs_you') {
+            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            if (attention?.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+        }
         if (await this.isStopped())
             throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
         await this.requireNode().request({
@@ -802,6 +823,182 @@ export class FleetSessionService {
             bytes: Buffer.byteLength(data, 'utf8'),
             ...(actor.agentId ? { requestedBy: `agent:${actor.agentId}` } : {}),
         });
+    }
+
+    // ─── Attention (FL-05 P2, CONTRACTS §5.2, R-12, R-32) ───────────────────
+
+    /** What a session asks right now (`fleet_sessions_question`, readOnly; spec S13). */
+    async question(id: string, actor: FleetSessionActor): Promise<FleetSessionQuestionView> {
+        const { session } = await this.resolve(id, actor);
+        const view = toFleetSessionView(session);
+        const attention = view.attention && view.attention.reason !== 'finished' ? view.attention : null;
+        return {
+            sessionId: session.id,
+            state: session.state,
+            attention,
+            source: view.lastEvidence?.source ?? null,
+        };
+    }
+
+    /**
+     * Opening the detail acknowledges (FR-26): the unread mark clears, the
+     * attention stays until it is answered; an edge acknowledged once never
+     * re-flags (the node keeps its key). A key that is no longer the current
+     * one answers `invalid`. Not audited (a read).
+     */
+    async acknowledge(id: string, actor: FleetSessionActor, key: string): Promise<FleetSessionView> {
+        const { session } = await this.resolve(id, actor);
+        const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+        if (!attention || attention.key !== key) {
+            throw fleetSessionError('invalid', 'that prompt is no longer current', { field: 'acknowledge' });
+        }
+        if (!isFleetSessionAttentionUnread(attention)) return toFleetSessionView(session);
+        const next = { ...attention, acknowledgedAt: new Date(this.now()).toISOString() };
+        await this.sessions.update(session.id, { attention: next });
+        return toFleetSessionView({ ...session, attention: next } as FleetSession);
+    }
+
+    /**
+     * Answer what a session asks (spec FR-28 … FR-31, FR-48 … FR-50) — from
+     * the card, the detail, the Inbox / My Decisions, a tool or the CLI.
+     * Refusals, in order: existence and the `sessions` audience (a stranger
+     * reads 404); the key must be the session's CURRENT question or
+     * permission (else `invalid` "Already answered"); an Agent never answers a
+     * permission prompt, and answers another session's question only when its
+     * owner switched on "may answer other sessions" (R-32); exactly one of an
+     * option the CLI showed or a free text the question takes; the kill switch
+     * (`kill_switch`); the link (`unreachable`, the prompt stays). Then the
+     * machine types it (`session.answer` — it refuses a key that is no longer
+     * current, e.g. answered in the terminal a moment ago), the attention
+     * clears everywhere, and ONE `node.session.answer` row records the key,
+     * the reason, the option and who — never the free text (FR-49).
+     */
+    async answer(
+        id: string,
+        actor: FleetSessionActor,
+        request: FleetSessionAnswerRequest,
+        source: FleetSessionAnswerSource,
+    ): Promise<FleetSessionAnswerResponse> {
+        const { session, node } = await this.resolve(id, actor);
+        const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+        if (
+            !attention ||
+            typeof request.key !== 'string' ||
+            attention.key !== request.key ||
+            !isFleetSessionDecisionReason(attention.reason) ||
+            session.state !== 'needs_you'
+        ) {
+            throw fleetSessionError('invalid', 'Already answered', { field: 'key' });
+        }
+        if (actor.agentId) {
+            if (attention.reason === 'permission') {
+                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
+                    reason: 'permission',
+                });
+            }
+            if (session.agentId !== actor.agentId && !(await this.agentMayAnswerOthers(actor.agentId))) {
+                throw fleetSessionError(
+                    'permission_denied',
+                    'ask the Agent\u2019s owner to switch on "may answer other sessions" for this Agent',
+                    { setting: 'canAnswerOtherSessions' },
+                );
+            }
+        }
+        const optionId = typeof request.optionId === 'string' && request.optionId.length > 0 ? request.optionId : null;
+        const text = typeof request.text === 'string' && request.text.trim().length > 0 ? request.text : null;
+        if ((optionId === null) === (text === null)) {
+            throw fleetSessionError('invalid', 'an answer is one of the options or a text', { field: 'optionId' });
+        }
+        if (optionId !== null && !attention.options.some((option) => option.id === optionId)) {
+            throw fleetSessionError('invalid', `"${optionId}" is not one of the options`, { field: 'optionId' });
+        }
+        if (text !== null && !(attention.reason === 'question' && attention.allowsText)) {
+            throw fleetSessionError('invalid', 'this prompt takes one of its options, not a text', { field: 'text' });
+        }
+        if (text !== null && (text.length > FLEET_SESSION_ANSWER_TEXT_MAX_CHARS || text.includes('\u0000'))) {
+            throw fleetSessionError('invalid', 'an answer is at most 4 000 characters', { field: 'text' });
+        }
+        const requestedBy = actor.agentId ? `agent:${actor.agentId}` : `user:${actor.userId}`;
+        const auditBase = {
+            key: attention.key,
+            reason: attention.reason,
+            optionId,
+            answeredWith: optionId !== null ? 'option' : 'text',
+            source,
+            confirmationClass: 'plain',
+            requestedBy,
+        };
+        if (await this.isStopped()) {
+            await this.record('node.session.answer', actor.userId, node, session.id, {
+                ...auditBase,
+                outcome: 'refused',
+                code: 'kill_switch',
+            });
+            throw fleetSessionError('kill_switch', 'Paused by the fleet stop \u2014 answers are not sent');
+        }
+        if (!this.node?.isConnected(node.id)) {
+            throw fleetSessionError('unreachable', `${node.name} is unreachable \u2014 the answer will not be sent`);
+        }
+        try {
+            await this.requireNode().request({
+                nodeId: node.id,
+                sessionId: session.daemonSessionId,
+                kind: session.kind,
+                mode: 'driver',
+                verb: 'session.answer',
+                params: { key: attention.key, answer: optionId !== null ? { optionId } : { text } },
+                caller: { kind: 'user', userId: actor.userId },
+                stateChanging: true,
+            });
+        } catch (error) {
+            const typed = readFleetSessionError(error);
+            await this.record('node.session.answer', actor.userId, node, session.id, {
+                ...auditBase,
+                outcome: 'refused',
+                code: typed?.code ?? 'operation_failed',
+            });
+            if (typed?.code === 'invalid') {
+                throw fleetSessionError('invalid', 'Already answered in the terminal', typed.details);
+            }
+            if (typed) throw fleetSessionError(typed.code, typed.hint, typed.details);
+            throw error;
+        }
+        const now = new Date(this.now());
+        const won = await this.sessions.updateIfLive(session.id, {
+            attention: null,
+            state: 'working',
+            stateChangedAt: now,
+            outcome: null,
+            lastActivityAt: now,
+        });
+        if (won) {
+            await this.status?.attentionAnswered(
+                { ...session, attention: null, state: 'working' } as FleetSession,
+                attention,
+                { answeredBy: requestedBy, ...(optionId !== null ? { optionId } : {}) },
+            );
+        }
+        await this.record('node.session.answer', actor.userId, node, session.id, {
+            ...auditBase,
+            outcome: 'answered',
+        });
+        return { key: attention.key, answered: true };
+    }
+
+    /**
+     * R-32: may this Agent answer another session's question? Only when its
+     * owner switched it on (`permissions.canAnswerOtherSessions`, read here —
+     * absent = off). An Agent that cannot be read is refused.
+     */
+    private async agentMayAnswerOthers(agentId: string): Promise<boolean> {
+        if (!this.agents) return false;
+        try {
+            const agent = await this.agents.findById(agentId);
+            const permissions = agent?.permissions as unknown as Record<string, unknown> | undefined;
+            return permissions?.canAnswerOtherSessions === true;
+        } catch {
+            return false;
+        }
     }
 
     // ─── Recording (FL-04 P3, spec FR-54 … FR-57) ──────────────────────────
@@ -1460,6 +1657,8 @@ export class FleetSessionService {
                 if (fresh) await this.applyToRow(nodeId, fresh, message);
                 return;
             }
+            // FL-05: an open prompt expires with the session; a failure raises its notice.
+            await this.status?.sessionEnded(row, { ...row, ...written } as FleetSession);
             if (patch.endedReason === 'drain' || patch.endedReason === 'kill-switch') {
                 await this.recordSystem('node.session.end', row, {
                     reason: patch.endedReason,
@@ -1535,7 +1734,10 @@ export class FleetSessionService {
         if (!patch) return row;
         const written = this.withStatusColumns(row, this.toColumns(patch));
         const won = await this.sessions.updateIfLive(row.id, written);
-        if (won) return this.afterEnded({ ...row, ...written } as FleetSession);
+        if (won) {
+            await this.status?.sessionEnded(row, { ...row, ...written } as FleetSession);
+            return this.afterEnded({ ...row, ...written } as FleetSession);
+        }
         return (await this.sessions.findById(row.id)) ?? row;
     }
 

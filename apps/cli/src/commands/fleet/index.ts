@@ -3,6 +3,8 @@ import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
 import { attachCommand } from './session/attach';
 import { listCommand } from './session/list';
+import { answerCommand } from './session/answer';
+import { questionCommand } from './session/question';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -10,9 +12,12 @@ import { listCommand } from './session/list';
  * the rest of `ever-works fleet session <verb>`.
  */
 export const fleetSessionCommand = new Command('session')
-    .description('Sessions on your computers (list, attach)')
+    .description('Sessions on your computers (list, attach, question, answer)')
     .addCommand(listCommand)
-    .addCommand(attachCommand);
+    .addCommand(attachCommand)
+    // FL-05 P2: what a session waits for, and answering it.
+    .addCommand(questionCommand)
+    .addCommand(answerCommand);
 
 /**
  * `ever-works fleet commands run` (FL-12, CONTRACTS §11.3) — one command on

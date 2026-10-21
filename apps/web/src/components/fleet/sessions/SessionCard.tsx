@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Bot, Folder, TerminalSquare } from 'lucide-react';
 import type { FleetSessionView } from '@ever-works/contracts';
@@ -14,10 +14,12 @@ import {
     sessionGlyph,
     sessionStateWords,
     sessionTint,
+    isAnswerable,
     isSessionUnread,
     statusSourceNote,
 } from './sessions-status.shared';
 import { SessionStateGlyph } from './SessionStateGlyph';
+import { SessionAttentionBox } from './SessionAttentionBox';
 import { SessionTaskChip } from '../tasks/SessionTaskChip';
 
 /**
@@ -67,6 +69,7 @@ export function SessionCard({
     slots,
     attentionSlot,
     agentName,
+    onAnswered,
 }: {
     session: FleetSessionView;
     nodeName: string;
@@ -80,6 +83,8 @@ export function SessionCard({
     attentionSlot?: ReactNode;
     /** The Agent's name for its lines ("Nina: …"); the CLI's name otherwise. */
     agentName?: string | null;
+    /** FL-05 P2: called once an answer from this card went through (the list re-reads). */
+    onAnswered?: () => void;
 }) {
     const t = useTranslations('fleet.sessions');
     const glyph = sessionGlyph(session);
@@ -100,6 +105,23 @@ export function SessionCard({
           ? t('tab.startedByYou')
           : t('tab.startedByOther');
     const KindIcon = session.kind === 'agent' ? Bot : TerminalSquare;
+    // FR-52: on a focused card, 1–9 answer a numbered option, A / D allow / deny.
+    const shortcutsRef = useRef<((key: string) => boolean) | null>(null);
+    const onCardKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+        if (event.target !== event.currentTarget || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (shortcutsRef.current?.(event.key)) event.preventDefault();
+    };
+    const answerBox =
+        attentionSlot ??
+        (body.kind === 'attention' && isAnswerable(body.attention) ? (
+            <SessionAttentionBox
+                session={session}
+                attention={body.attention}
+                nodeName={nodeName}
+                shortcutsRef={shortcutsRef}
+                {...(onAnswered ? { onAnswered } : {})}
+            />
+        ) : null);
 
     return (
         <article
@@ -110,6 +132,7 @@ export function SessionCard({
             data-tint={tint}
             data-unread={unread ? 'true' : undefined}
             tabIndex={0}
+            onKeyDown={onCardKeyDown}
             aria-label={t('a11y.cardFull', {
                 who,
                 title: session.title,
@@ -149,7 +172,7 @@ export function SessionCard({
                         data-testid="fleet-session-card-attention"
                     >
                         <p className="line-clamp-2 break-words">{body.attention.prompt || t('card.needsYouNoPrompt')}</p>
-                        {attentionSlot}
+                        {answerBox}
                         {source === 'fromScreen' && (
                             <p className="text-[11px] text-text-muted dark:text-text-muted-dark">{t('card.fromScreen')}</p>
                         )}

@@ -98,6 +98,18 @@ rule?, userLine?, agentLine? }` (the card's two lines, so no sixth column); `att
 `badTokenLastMinute · spooled · events · spoolApplied · unknownSession · malformed · unknownEvents · endpointUp`.
 Shapes in `packages/contracts/src/fleet/fleet-session-status.types.ts`.
 
+**Revision 15 (2026-10-21)** — FL-05 P2 (attention): Inbox source type `fleet-session` (appended after `fleet-run`) with
+`sourceMeta` gaining `sessionId · sessionTitle · provider · attentionKey`; a question / permission is ONE Inbox item of
+kind `question` / `approval` per attention key, blocked / failed a `notice`; a free-text answer is never stored (the
+Inbox records the option id only). `POST /api/fleet/sessions/:id/answer { key, optionId? | text?, source? }` answers
+`202 { key, answered }`; `PATCH /api/fleet/sessions/:id { acknowledge: <key> }` beside `{ title }`. Notification events
+`fleet_session_needs_you · fleet_session_finished · fleet_session_failed` (deduplication key = the attention key, plus
+the 5 s per-subject window). R-32's "may answer other sessions" is read from the Agent's `permissions.canAnswerOtherSessions`
+(absent = off; no editor yet). The node answers `session.answer` only on a `driver` channel, refuses a key that is not
+its current attention (`invalid`), and types the CLI's keys itself — the platform never sends keys. The rules file
+guard is `validateFleetSessionRulesFile` (`fleet-session-rules.types.ts`). Tools `fleet_sessions_question` (readOnly) /
+`fleet_sessions_answer` (`confirm`), MCP `fleet_sessions_answer`, CLI `fleet session question|answer`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)

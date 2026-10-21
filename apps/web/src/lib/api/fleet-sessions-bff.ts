@@ -1,4 +1,5 @@
 import {
+    FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
     FLEET_SESSION_KINDS,
@@ -80,6 +81,48 @@ export function sanitizeStartBody(raw: Record<string, unknown>): Partial<FleetSe
 export function sanitizeRenameBody(raw: Record<string, unknown>): { title?: string } {
     const title = text(raw.title, FLEET_SESSION_TITLE_MAX_LENGTH);
     return title === undefined ? {} : { title };
+}
+
+/**
+ * FL-05: the PATCH body — a rename (`title`) or an acknowledgement (`acknowledge`,
+ * an attention key the reader saw); a title wins when both are sent.
+ */
+export function sanitizePatchBody(raw: Record<string, unknown>): { title?: string } | { acknowledge: string } {
+    const renamed = sanitizeRenameBody(raw);
+    if (renamed.title !== undefined) return renamed;
+    const key = text(raw.acknowledge, 200);
+    return key === undefined ? {} : { acknowledge: key };
+}
+
+const ANSWER_SOURCES = ['card', 'detail', 'inbox', 'decisions'] as const;
+
+/**
+ * FL-05: the answer body — the attention key, then EXACTLY one of an option
+ * id or a free text, and where it was answered from. Null when it is not one
+ * (the route answers 400). The text is passed through as typed: it goes into
+ * the session and is never stored.
+ */
+export function sanitizeAnswerBody(
+    raw: Record<string, unknown>,
+): { key: string; optionId?: string; text?: string; source?: (typeof ANSWER_SOURCES)[number] } | null {
+    const key = text(raw.key, 200);
+    if (key === undefined) return null;
+    const optionId =
+        typeof raw.optionId === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(raw.optionId) ? raw.optionId : undefined;
+    const answerText =
+        typeof raw.text === 'string' && raw.text.trim().length > 0 && raw.text.length <= FLEET_SESSION_ANSWER_TEXT_MAX_CHARS
+            ? raw.text
+            : undefined;
+    if ((optionId === undefined) === (answerText === undefined)) return null;
+    const source = (ANSWER_SOURCES as readonly string[]).includes(raw.source as string)
+        ? (raw.source as (typeof ANSWER_SOURCES)[number])
+        : undefined;
+    return {
+        key,
+        ...(optionId !== undefined ? { optionId } : {}),
+        ...(answerText !== undefined ? { text: answerText } : {}),
+        ...(source ? { source } : {}),
+    };
 }
 
 /** The end body: only `confirm: true` survives (CONTRACTS §2.2 class `confirm`). */

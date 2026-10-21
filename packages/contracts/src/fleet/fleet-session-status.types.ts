@@ -982,6 +982,30 @@ export interface FleetSessionAnswerRequest {
 	text?: string;
 }
 
+/** Where an answer came from (the `node.session.answer` audit row's `source`, plan §11). */
+export const FLEET_SESSION_ANSWER_SOURCES = ['card', 'detail', 'inbox', 'decisions', 'tool', 'cli'] as const;
+
+export type FleetSessionAnswerSource = (typeof FLEET_SESSION_ANSWER_SOURCES)[number];
+
+export function isFleetSessionAnswerSource(value: unknown): value is FleetSessionAnswerSource {
+	return typeof value === 'string' && (FLEET_SESSION_ANSWER_SOURCES as readonly string[]).includes(value);
+}
+
+/** What `POST /sessions/:id/answer` answers (`202`): the key it cleared. */
+export interface FleetSessionAnswerResponse {
+	key: string;
+	answered: true;
+}
+
+/** `fleet_sessions_question` / `GET` read of what a session asks (FL-05 P2, readOnly). */
+export interface FleetSessionQuestionView {
+	sessionId: string;
+	state: FleetSessionState;
+	attention: FleetSessionAttention | null;
+	/** `hooks` · `rules` — where the prompt was read. */
+	source: FleetSessionEvidenceSource | null;
+}
+
 /** `PATCH /api/fleet/sessions/:id` acknowledgement body (plan §5), beside FL-04's `{ title }`. */
 export interface FleetSessionAcknowledgeRequest {
 	acknowledge: string;

@@ -108,7 +108,9 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_sessions_read: "a person's sessions on their computers (last screens)",
 	fleet_sessions_start: 'starts a process on a computer',
 	fleet_sessions_rename: "a person's sessions on their computers",
-	fleet_sessions_end: 'destructive: stops a process on a computer'
+	fleet_sessions_end: 'destructive: stops a process on a computer',
+	// FL-05 P2: typing an answer into a person's session prompt.
+	fleet_sessions_answer: "answers a prompt in a person's session"
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

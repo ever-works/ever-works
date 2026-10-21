@@ -12,6 +12,10 @@ import { FleetModule } from '../fleet.module';
 import { FleetSessionRepository } from './fleet-session.repository';
 import { FleetSessionService } from './fleet-session.service';
 import { FleetSessionStateService } from './fleet-session-state.service';
+import { FleetSessionAttentionDelivery } from './fleet-session-attention.delivery';
+import { FLEET_SESSION_ATTENTION_SINK } from './fleet-session-attention.port';
+import { SessionNeedsYouProducer } from './session-needs-you.producer';
+import { NotificationsModule } from '../../notifications/notifications.module';
 import { FleetSessionTaskService } from './fleet-session-task.service';
 
 /**
@@ -44,19 +48,26 @@ export class FleetSessionSweepService {
     // P2: the Agent and its Run, for Agent sessions (repositories provided here
     // as FleetModule provides `ApiKeyRepository` — stateless, so a second
     // instance is harmless and this module needs no DatabaseModule).
+    // FL-05: the session notifications (`NotificationService`).
     // FL-15 P1: the Task a session works on and the checkout it starts in —
     // their repositories provided here the same stateless way (FleetCheckoutsModule
     // imports this module, so this one cannot import it back).
     imports: [
         FleetModule,
+        NotificationsModule,
         TypeOrmModule.forFeature([FleetSession, Agent, AgentRun, Task, FleetCheckout]),
     ],
     providers: [
         FleetSessionRepository,
         FleetSessionService,
         FleetSessionSweepService,
-        // FL-05: the writer of what a machine reports about a session's status.
+        // FL-05: the writer of what a machine reports about a session's status,
+        // and where an attention edge is delivered (Inbox, notifications).
         FleetSessionStateService,
+        FleetSessionAttentionDelivery,
+        { provide: FLEET_SESSION_ATTENTION_SINK, useExisting: FleetSessionAttentionDelivery },
+        // FL-05: the hub's "needs a look" rows for sessions (registers itself at init).
+        SessionNeedsYouProducer,
         AgentRepository,
         AgentRunRepository,
         FleetSessionTaskService,
@@ -67,6 +78,7 @@ export class FleetSessionSweepService {
         FleetSessionService,
         FleetSessionSweepService,
         FleetSessionStateService,
+        FleetSessionAttentionDelivery,
         FleetSessionTaskService,
     ],
 })
