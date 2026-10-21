@@ -69,6 +69,12 @@ keys a checkout by its absolute path, so `checkouts.list` takes `paths` (not `ch
 `checkouts.sync` takes `{ path, op, checkoutId? }`; a person's rescan is audited as `node.checkout.sync` with
 `op: 'rescan'` (§7). Shapes in `packages/contracts/src/fleet/fleet-checkout.types.ts`.
 
+**Revision 11 (2026-10-21)** — FL-12 P1 (lane log `docs/internal/fleet/lanes/FL-12.md`, decisions 2–5): the
+`command` family opens with `{ commandId, nodeId, runId }` and its node→platform messages carry the fields of §3.3
+"Command family details"; `fleet_commands.commandRedacted` and `fleet_command_runs.errorCode`, `errorHint`,
+`outputBytes`, `capped` (§4.4, FL-12's own slots); the per-computer refusal lives on the run row, the `failedReason`
+enum is unchanged.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
@@ -281,7 +287,7 @@ state-changing requests, leave processes running), `link.resume`, and `link.drai
 | `logs`     | `{ source, path?, unit?, container?, lines, sources?[] }`                                    | `logs.read`, `logs.follow`, `logs.pause`, `logs.resume`, `logs.earlier`; node→platform `logs.initial-done`, `logs.earlier-done`, `logs.notice`. `logs.sources` is a `machine` verb (a list needs no open channel)                                                     | manage                       |
 | `machine`  | (one per link, lazily)                                                                       | `services.list\|action`, `docker.*`, `compose.*`, `processes.list\|signal`, `ports.list\|open\|preview`, `checkouts.list\|create\|delete\|sync\|changes`, `git.identity\|setIdentity`, `health.now`, `wake.send`, `vm.*`, `runner.*`                                  | manage (see §2.1 for family) |
 | `files`    | `{ root, path }`                                                                             | `files.list`, `files.stat`, `files.pack` (DATA out), `files.unpack` (DATA in), `files.delete`                                                                                                                                                                         | manage                       |
-| `command`  | `{ commandId, nodeId }`                                                                      | `command.run` → `DATA`/`EXIT`, `command.cancel`; node→platform `command.output` (head/tail on finish), `command.truncated`, `command.timeout`                                                                                                                         | manage                       |
+| `command`  | `{ commandId, nodeId, runId }`                                                               | `command.run` → `DATA`/`EXIT`, `command.cancel`; node→platform `command.output` (head/tail on finish), `command.truncated`, `command.timeout`                                                                                                                         | manage                       |
 | `schedule` | (one per link)                                                                               | `schedule.sync { generation, definitions[] }` (the reply carries the applied `generation`; pause/resume re-send the full set), `schedule.runs { since }`, `schedule.runNow`                                                                                           | manage                       |
 | `tunnel`   | `{ tunnelId, port }`                                                                         | HTTP request/response bodies as `DATA` with a `JSON` envelope per request                                                                                                                                                                                             | manage                       |
 | `clip`     | `{ viewId }`                                                                                 | `CLIP` frames                                                                                                                                                                                                                                                         | attend                       |
@@ -297,6 +303,17 @@ the node went away mid-operation; never reported as `done`).
 allowed on any open link (R-31). The link implementation keeps these exceptions in one table
 (`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code. FL-14 adds
 `checkouts.list: work-or-manage` (revision 9).
+
+**Command family details (FL-12, revision 11).** One channel per run, opened with `{ commandId, nodeId, runId }`.
+`command.run { runId, command, cwd?, timeoutSec }` answers `{ pid, startedAt, shell }` once the process exists (a
+shell that cannot start answers `operation_failed` with the first line of the error); `DATA` frames of at most 64 KiB
+follow until 10 MiB, then `command.truncated { runId, bytes }`; `command.timeout { runId, timeoutSec }` when the
+timeout fired; then, once, `command.output { runId, head, tail, truncated, capped, bytes, exitCode, reason?, detail?,
+kept }` — the machine's own 64 KiB head and tail (authoritative over the platform's live copy), `reason` ∈ `timeout ·
+kill-switch · drain · shell-failed · cancelled-by-user` when the node ended the run itself, `kept` when it holds the
+full output — then `EXIT [code]` (124 timeout, 130 cancel, 137 kill switch or drain) and `channel.close`.
+`command.cancel { runId }` is accepted on ANY `command` channel (the platform opens a short-lived one, so a cancel
+works from any API replica). A link drop does not end a command; the end is reported when the channel resumes.
 
 **Session family details (FL-04, revision 7).** `kind` on the open lets the node check the consent before
 the channel opens (`--manage` for owner sessions, `--work` for Agent sessions, R-5) and again against the
@@ -439,14 +456,19 @@ allowed values validated in code, as existing fleet columns are.
 | `deletedAt`                          | timestamptz null                                                                           | soft delete of a schedule (FL-13 slot 00)                       |
 
 FL-12's `CreateFleetCommands` creates every column above the `pausedAt` row (including `cadence`,
-`name`, `enabled`, `lastRunAt`, `nextRunAt`); FL-13's slot 00 (`AddFleetCommandCadence`) adds the
+`name`, `enabled`, `lastRunAt`, `nextRunAt`) plus `commandRedacted boolean` (revision 11: the stored command line
+was redacted by the secret scanner); FL-13's slot 00 (`AddFleetCommandCadence`) adds the
 last three rows and `fleet_command_runs.scheduledFor`.
 
 `fleet_command_runs`: `commandId`, `nodeId`, `startedAt`, `endedAt`, `exitCode`, `status`
 (`running · done · failed · timeout · skipped-overlap · skipped-offline`), `failedReason`
 (enum null `link-lost · node-restart · kill-switch · drain · shell-failed · cancelled-by-user`),
 `outputHead` / `outputTail` (first and last 64 KiB), `outputRef` (full output kept on the node for
-30 runs), `truncated boolean`, `scheduledFor` (timestamptz null; FL-13).
+30 runs), `truncated boolean`, `scheduledFor` (timestamptz null; FL-13). Revision 11 (FL-12's slot 01) adds
+`errorCode` (varchar null, a §8 code) and `errorHint` (text null) — a computer that refused BEFORE the command ran
+(`unreachable`, `consent_missing`, `permission_denied`, `unsupported_on_node`, `busy`, `kill_switch`) or a start
+that failed (`operation_failed`, with `failedReason: shell-failed`) — `outputBytes` (int) and `capped` (boolean,
+the node stopped keeping output at 10 MiB).
 
 ### 4.5 `FleetNodeHealthSample` (new, table `fleet_node_health_samples`, FL-03)
 

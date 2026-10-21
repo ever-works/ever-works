@@ -40,6 +40,12 @@ export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions
 	 */
 	session?: NodeModule;
 	/**
+	 * Commands on computers (FL-12) — the `command` family, built by the
+	 * runtime for a process started with `--manage` (`createCommandModule`).
+	 * Absent, every command channel is refused `unsupported_on_node`.
+	 */
+	command?: NodeModule;
+	/**
 	 * Servers and ports (FL-10) — the `ports` module (`ports.list`,
 	 * `ports.open`), built by the runtime around the machine's runner and its
 	 * preview browser (`createPortsModule`). Absent without `--manage`.
@@ -78,6 +84,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 	const {
 		extra = [],
 		session,
+		command,
 		computerLegs,
 		checkouts,
 		machineFacts = [],
@@ -96,6 +103,7 @@ export function composeNodeLinkModules(options: ComposeNodeLinkModulesOptions = 
 		machine,
 		...NODE_LINK_MODULES,
 		...(session ? [session] : []),
+		...(command ? [command] : []),
 		...(ports ? [ports] : []),
 		...(computerLegs || desktopSourcesGiven ? [createDesktopModule(computerLegs ?? null, desktopSources)] : []),
 		...(checkouts ? [checkouts] : []),
@@ -112,6 +120,8 @@ export { createProcessesModule, type ProcessesModuleDeps } from './processes';
 export { createServicesModule, type ServicesModuleDeps } from './services';
 export { createHealthLinkModule, type HealthLinkModuleOptions, type WakeSender } from './health';
 export { createSessionModule, type SessionModule, type SessionModuleLink, type SessionModuleOptions } from './session';
+export { createCommandModule, type CommandModuleOptions } from './command';
+export { CommandOutputStore } from './command/command-output-store';
 export { createCheckoutsModule, type CheckoutsModule, type CheckoutsModuleOptions } from './checkouts';
 export {
 	createDesktopFamilyModule,

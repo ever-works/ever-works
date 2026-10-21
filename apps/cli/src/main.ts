@@ -24,6 +24,7 @@ program
 program.addCommand(authCommand);
 program.addCommand(workCommand);
 program.addCommand(pluginsCommand);
+// `ever-works fleet …`: sessions (FL-04) and commands (FL-12, `fleet commands run --on a,b -- <cmd>`).
 program.addCommand(fleetCommand);
 registerKbCommands(program);
 

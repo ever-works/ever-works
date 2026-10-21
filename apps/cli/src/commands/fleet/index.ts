@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { commandsCommand } from './command';
 import { attachCommand } from './session/attach';
 import { listCommand } from './session/list';
 
@@ -12,4 +13,11 @@ export const fleetSessionCommand = new Command('session')
     .addCommand(listCommand)
     .addCommand(attachCommand);
 
-export const fleetCommand = new Command('fleet').description('Your computers').addCommand(fleetSessionCommand);
+/**
+ * `ever-works fleet commands run` (FL-12, CONTRACTS §11.3) — one command on
+ * several computers (alias `fleet command`).
+ */
+export const fleetCommand = new Command('fleet')
+    .description('Your computers')
+    .addCommand(fleetSessionCommand)
+    .addCommand(commandsCommand);

@@ -64,6 +64,8 @@ import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModule
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createCommandModule } from './link/modules/command';
+import { CommandOutputStore } from './link/modules/command/command-output-store';
 import { createPortsModule, type PortsModule } from './link/modules/ports';
 import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
 import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
@@ -653,8 +655,14 @@ export interface CreateNodeRuntimeOptions {
 	sessionDaemonConnect?: ConnectFn;
 	/** FL-05's per-session hook overlay; FL-04 ships none. */
 	sessionHookOverlay?: HookOverlayPort;
-	/** Folders besides home that owner sessions may start in. */
+	/** Folders besides home that owner sessions may start in (and Commands may run in, FL-12). */
 	sessionExtraRoots?: readonly string[];
+	/**
+	 * Commands on computers (FL-12) — where the last 30 runs' full output is
+	 * kept (`<configDir>/commands`). Absent: commands still run, no full
+	 * output is kept.
+	 */
+	commandOutputDir?: string;
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
 	/**
@@ -927,6 +935,21 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const linkModules = composeNodeLinkModules({
 		extra: [healthLinkModule, ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
+		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
+		...(consents.manage
+			? {
+					command: createCommandModule({
+						consents,
+						nodeName: config.name?.trim() || 'this computer',
+						platform: io.environment.platform,
+						homedir: osHomedir(),
+						env: process.env,
+						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						logger: io.logger
+					})
+				}
+			: {}),
 		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),

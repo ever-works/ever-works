@@ -24,4 +24,5 @@ export * from './fleet-run-credential.types.js';
 export * from './fleet-runner-status.types.js';
 export * from './fleet-services.types.js';
 export * from './fleet-sessions.types.js';
+export * from './fleet-commands.types.js';
 export * from './fleet-task-workspace.types.js';

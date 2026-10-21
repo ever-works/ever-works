@@ -35,6 +35,8 @@ Enrolled nodes go **offline** after five minutes without a heartbeat.
 
 > **Consents (FL-02).** Enrolling lets a computer report health and nothing else; running work (`--work`), live viewing (`--attend`) and managing the machine (`--manage`) are separate consents its owner gives when starting the node — or in the desktop app's wizard and tray. With any of them on, the node also keeps one outbound link to the platform. See [Fleet node link](./fleet-node-link.md).
 
+> **Commands (FL-12).** With `--manage` on, one command can run on several computers at once from the hub's **Commands** tab or `ever-works fleet commands run` — confirmed, audited, bounded by a timeout and stopped by the kill switch. See [Commands on computers](./fleet-commands.md).
+
 Enrollment is outbound-only: the node calls the platform, never the other way round. Nothing needs to be reachable from the internet.
 
 0. **Install the node app** — `npm install -g ever-works-node` (Node.js ≥ 22). It is a single-file bundle published from `apps/node`; the unattended-run scripts (systemd unit, Windows service/scheduled-task installer) ship inside the package under `packaging/`.
