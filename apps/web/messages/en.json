@@ -12942,6 +12942,10 @@
             },
             "chip": {
                 "title": "Task {slug}: {title}"
+            },
+            "pr": {
+                "head": "Pull request #{number} · checks out its branch {branch}",
+                "forkReadOnly": "From a fork — {agent} can review and comment but not push"
             }
         },
         "checkouts": {
