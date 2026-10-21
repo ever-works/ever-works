@@ -80,4 +80,19 @@ export class FleetPortsController {
             ...(body?.scheme ? { scheme: body.scheme } : {}),
         });
     }
+
+    @Post('nodes/:id/ports/:port/watch-stopped')
+    @ApiOperation({
+        summary:
+            'Phase 3 — a server the person was watching on this computer stopped: file one Inbox item ("The server on :5173 on build-01 stopped"), at most one per port per five minutes.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    watchStopped(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('port', ParseIntPipe) port: number,
+    ): Promise<{ filed: boolean }> {
+        return this.ports.watchStopped(id, port, actorOf(auth));
+    }
 }

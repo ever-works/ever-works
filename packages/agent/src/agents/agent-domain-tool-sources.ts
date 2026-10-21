@@ -17,6 +17,8 @@ import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service'
 import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
+import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
+import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -104,6 +106,8 @@ export interface AgentFleetToolSource {
      * are simply not offered.
      */
     ports?: Pick<FleetPortsService, 'list' | 'open'>;
+    /** Servers and ports, phase 2 — `fleet_ports_preview_open|close` (offered only while the tunnel flag is on). */
+    portTunnels?: Pick<FleetPortTunnelService, 'open' | 'closeForUser' | 'isEnabled'>;
     /**
      * Services, processes and Docker on computers (FL-09) — backs
      * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
@@ -119,6 +123,9 @@ export interface AgentFleetToolSource {
         | 'containerAction'
         | 'listImages'
         | 'pullImage'
+        | 'listComposeProjects'
+        | 'describeComposeProject'
+        | 'composeAction'
     >;
     /**
      * Computer health (FL-03 second phase) — when bound, the read-only
@@ -142,6 +149,16 @@ export interface AgentFleetToolSource {
             FleetCheckoutService,
             'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
         >;
+    };
+    /**
+     * Logs on computers (FL-08) — when bound, the read-only
+     * `fleet_logs_sources` / `fleet_logs_read` tools are offered
+     * (`buildFleetLogsTools`), reading through the API's node link. Optional
+     * and unbound by default: FL-19 owns the Agent catalogue and binds it
+     * (the API binds the port under `FLEET_LOGS_READER`).
+     */
+    logs?: {
+        reader: FleetLogsReaderPort;
     };
 }
 

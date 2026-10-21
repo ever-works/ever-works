@@ -1,7 +1,12 @@
 import 'server-only';
 import type {
     FleetActionConfirmFields,
+    FleetComposeAction,
+    FleetComposeDescription,
+    FleetComposeListResult,
     FleetContainerAction,
+    FleetContainerExecResult,
+    FleetContainerShellsResult,
     FleetContainersListResult,
     FleetImagesListResult,
     FleetOperationView,
@@ -121,6 +126,41 @@ export const fleetMachineAPI = {
             endpoint: `${BASE}/${encodeURIComponent(nodeId)}/docker/images?unused=true`,
             data: body,
             method: 'DELETE',
+            wrapInData: false,
+        }),
+
+    // ─── Compose and Shell inside (P3) ────────────────────────────────────
+    listCompose: async (nodeId: string) =>
+        serverFetch<FleetComposeListResult>(`${BASE}/${encodeURIComponent(nodeId)}/docker/compose`),
+
+    describeCompose: async (nodeId: string, project: string) =>
+        serverFetch<FleetComposeDescription>(
+            `${BASE}/${encodeURIComponent(nodeId)}/docker/compose?project=${encodeURIComponent(project)}`,
+        ),
+
+    composeAction: async (
+        nodeId: string,
+        project: string,
+        action: FleetComposeAction,
+        body: FleetActionConfirmFields & { service?: string },
+    ) =>
+        serverMutation<Record<string, unknown>>({
+            endpoint: `${BASE}/${encodeURIComponent(nodeId)}/docker/compose/${encodeURIComponent(project)}/${encodeURIComponent(action)}`,
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        }),
+
+    containerShells: async (nodeId: string, container: string) =>
+        serverFetch<FleetContainerShellsResult>(
+            `${BASE}/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(container)}/shells`,
+        ),
+
+    execInContainer: async (nodeId: string, container: string, shell: 'bash' | 'sh') =>
+        serverMutation<FleetContainerExecResult>({
+            endpoint: `${BASE}/${encodeURIComponent(nodeId)}/docker/containers/${encodeURIComponent(container)}/exec`,
+            data: { shell },
+            method: 'POST',
             wrapInData: false,
         }),
 

@@ -24,6 +24,11 @@
  */
 
 import type { FleetLinkConsentRequirement } from './fleet-link.types.js';
+import type {
+	FleetSessionAttention,
+	FleetSessionHooks,
+	FleetSessionLastEvidence
+} from './fleet-session-status.types.js';
 
 // ─── Kinds, providers, states (CONTRACTS §4.2, §5.1) ────────────────────────
 
@@ -320,6 +325,17 @@ export interface FleetSessionView {
 	lastScreen?: string | null;
 	/** Who is attached right now (detail only; FL-04 P1b). */
 	presence?: FleetSessionPresence;
+	// ─── FL-05 (CONTRACTS §4.2 — absent on a platform that predates it) ───
+	/** The open "needs you" edge, or the unread `finished` marker (§5.2). */
+	attention?: FleetSessionAttention | null;
+	/** When the state last changed (ISO) — the board orders by it. */
+	stateChangedAt?: string | null;
+	/** What the node injected (FR-11): every surface labels the status source from it. */
+	hooks?: FleetSessionHooks | null;
+	/** Why the state is what it is, with the card's last user and agent lines (FR-18, FR-20). */
+	lastEvidence?: FleetSessionLastEvidence | null;
+	/** End of the session-boundary window (ISO), or null (FR-39). */
+	boundaryUntil?: string | null;
 	/**
 	 * The Task this session's Run works on (FL-15 P1, spec FR-10): the session
 	 * card's Task chip. Absent when the Run carries no Task.
@@ -375,6 +391,8 @@ export interface FleetSessionStartRequest {
 	kind: FleetSessionKind;
 	provider: FleetSessionStartableProvider;
 	cwd: string;
+	/** Shell inside a container (FL-09 P3): an owner `shell` session only. */
+	container?: FleetSessionContainerShell;
 	title?: string;
 	firstMessage?: string;
 	agentId?: string;
@@ -553,6 +571,32 @@ export interface FleetSessionStartParams {
 	cols: number;
 	rows: number;
 	startedBy: FleetSessionStarter;
+	/**
+	 * Shell inside a container (FL-09 P3, FR-35): the owner `shell` session
+	 * runs `docker exec -it <container> <shell>` instead of the login shell.
+	 */
+	container?: FleetSessionContainerShell;
+}
+
+/** The container and shell of a "Shell inside" session (FL-09 P3). */
+export interface FleetSessionContainerShell {
+	/** A container id or name (`FLEET_DOCKER_NAME_PATTERN` / `FLEET_DOCKER_ID_PATTERN`). */
+	container: string;
+	shell: 'bash' | 'sh';
+}
+
+/** A "Shell inside" target off the wire, or null. */
+export function parseFleetSessionContainerShell(value: unknown): FleetSessionContainerShell | null {
+	if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+	const raw = value as Record<string, unknown>;
+	const container = raw.container;
+	if (
+		typeof container !== 'string' ||
+		!(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/.test(container) || /^(?:sha256:)?[a-f0-9]{12,64}$/.test(container))
+	)
+		return null;
+	if (raw.shell !== 'bash' && raw.shell !== 'sh') return null;
+	return { container, shell: raw.shell };
 }
 
 export function parseFleetSessionStartParams(value: unknown): FleetSessionStartParams | null {
@@ -579,6 +623,12 @@ export function parseFleetSessionStartParams(value: unknown): FleetSessionStartP
 		rows: size.rows,
 		startedBy: record.startedBy
 	};
+	if (record.container !== undefined && record.container !== null) {
+		// Only an owner shell may run inside a container (FL-09 P3).
+		const container = parseFleetSessionContainerShell(record.container);
+		if (!container || record.kind !== 'owner' || record.provider !== 'shell') return null;
+		params.container = container;
+	}
 	if (record.firstMessage !== undefined && record.firstMessage !== null) {
 		if (
 			typeof record.firstMessage !== 'string' ||

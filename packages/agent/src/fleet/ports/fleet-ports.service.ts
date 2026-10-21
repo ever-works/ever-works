@@ -23,6 +23,11 @@ import {
     type FleetPortsNodePort,
 } from './fleet-ports-node.port';
 import { fleetPortTargetRefusal, resolveFleetPortOpenTargets } from './fleet-ports.policy';
+import { FleetPortTunnelService } from './fleet-port-tunnel.service';
+import { INBOX_PRODUCER, type InboxProducer } from '../../inbox/inbox-producer.port';
+
+/** At most one watched-port Inbox item per person, computer and port in this long. */
+const WATCH_NOTICE_EVERY_MS = 5 * 60_000;
 
 /**
  * Servers and ports (FL-10, P1) — list what a computer is listening on, and
@@ -86,7 +91,51 @@ export class FleetPortsService {
         private readonly access: FleetAccessService,
         @Optional() private readonly audit?: FleetAuditService,
         @Optional() @Inject(FLEET_PORTS_NODE_PORT) private readonly node?: FleetPortsNodePort,
+        // Phase 2 — the person's open tunnels on this computer, for the rows.
+        // APPENDED LAST + @Optional(): absent, the list carries no tunnel state.
+        @Optional() private readonly tunnels?: FleetPortTunnelService,
+        // Phase 3 — the Inbox item when a watched server stops (FR-33).
+        // APPENDED LAST + @Optional(): absent, only the tab's inline notice shows.
+        @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
     ) {}
+
+    /** Watched-port notices already filed, per person, computer and port (one per 5 minutes). */
+    private readonly watchNotices = new Map<string, number>();
+
+    /**
+     * Phase 3 (FL-10, FR-33, spec §3.1) — a server the person was WATCHING
+     * (`Open a port…` or **Watch**) stopped: one Inbox item "The server on
+     * :5173 on build-01 stopped". The tab that watched it reports it (watching
+     * is a tab's state, not the machine's); the platform checks the person may
+     * see the computer, files at most one item per port per five minutes, and
+     * never says more than the sentence.
+     */
+    async watchStopped(nodeId: string, portNumber: number, actor: FleetPortsActor): Promise<{ filed: boolean }> {
+        if (!isFleetPortNumber(portNumber)) {
+            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', { field: 'port' });
+        }
+        const userId = actorUserId(actor);
+        const { node } = await this.access.resolveForFamily(nodeId, userId, 'view');
+        if (!this.inbox) return { filed: false };
+        const key = `${userId}:${node.id}:${portNumber}`;
+        const now = Date.now();
+        for (const [entry, at] of this.watchNotices) if (now - at > WATCH_NOTICE_EVERY_MS) this.watchNotices.delete(entry);
+        if (this.watchNotices.has(key)) return { filed: false };
+        this.watchNotices.set(key, now);
+        try {
+            await this.inbox.notice(userId, {
+                title: `The server on :${portNumber} on ${node.name} stopped`,
+                body: `Nothing listens on :${portNumber} on ${node.name} any more. Open the computer's Ports tab to see what is running there.`,
+                organizationId: node.organizationId ?? null,
+            });
+            return { filed: true };
+        } catch (error) {
+            this.logger.warn(
+                `watched-port notice for node ${node.id} not filed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return { filed: false };
+        }
+    }
 
     /** The computer's listening ports, web servers first, with what Open can do for this caller. */
     async list(
@@ -116,7 +165,7 @@ export class FleetPortsService {
             );
         }
         const decision = await this.decide(node, userId);
-        return {
+        const response: FleetPortsListResponse = {
             ...list,
             nodeId: node.id,
             nodeName: node.name,
@@ -124,6 +173,13 @@ export class FleetPortsService {
             targets: decision.targets,
             defaultTarget: decision.defaultTarget,
         };
+        if (this.tunnels?.isEnabled()) {
+            response.tunnel = {
+                available: decision.canPorts,
+                open: await this.tunnels.listOpenForNode(node.id, userId).catch(() => []),
+            };
+        }
+        return response;
     }
 
     /** Open `port` on the machine: on its desktop, or in its preview browser. */

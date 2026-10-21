@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react';
@@ -16,7 +16,14 @@ import { Button } from '@/components/ui/button';
 import { FLEET_CONSENT_START_COMMANDS, type FleetComputerTabProps } from '../registry';
 import { PortRow } from './PortRow';
 import { PreviewPane } from './PreviewPane';
-import { otherPortsLine, parsePortInput, portsClient, portsGroups, type PortsErrorRead } from './ports.shared';
+import {
+    otherPortsLine,
+    parsePortInput,
+    portsClient,
+    portsGroups,
+    watchedStopped,
+    type PortsErrorRead,
+} from './ports.shared';
 import { usePortsLive } from './use-ports-live';
 
 /**
@@ -54,6 +61,17 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
     } | null>(null);
     const fieldRef = useRef<HTMLInputElement | null>(null);
     const groups = useMemo(() => portsGroups(list), [list]);
+    // Phase 3 (FR-33): watched servers that stopped — an inline notice here, an Inbox item from the platform.
+    const [stoppedNotices, setStoppedNotices] = useState<number[]>([]);
+    const liveWatched = useRef<Set<number>>(new Set());
+    useEffect(() => {
+        if (!list) return;
+        const { stopped, live } = watchedStopped(list, watch, liveWatched.current);
+        liveWatched.current = live;
+        if (stopped.length === 0) return;
+        setStoppedNotices((current) => [...current.filter((port) => !stopped.includes(port)), ...stopped]);
+        for (const port of stopped) void portsClient.watchStopped(node.id, port);
+    }, [list, watch, node.id]);
 
     const open = async (port: FleetListeningPort, target: FleetPortOpenTarget) => {
         setOpening(port.port);
@@ -162,6 +180,25 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
             )}
             {!list.canOpen && <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('noOpen', { name: node.name })}</p>}
 
+            {stoppedNotices.map((port) => (
+                <div
+                    key={`stopped-${port}`}
+                    className="flex items-center gap-2 rounded-lg border border-border bg-warning/10 px-3 py-2 text-sm dark:border-border-dark"
+                    role="status"
+                    data-testid={`fleet-port-watch-stopped-${port}`}
+                >
+                    <span>{t('watchStopped', { port, name: node.name })}</span>
+                    <Button
+                        className="ml-auto"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setStoppedNotices((current) => current.filter((value) => value !== port))}
+                    >
+                        {t('dismiss')}
+                    </Button>
+                </div>
+            ))}
+
             {preview && (
                 <PreviewPane
                     nodeName={node.name}
@@ -191,6 +228,8 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
                             opening={opening === port.port}
                             selected={port.port === selectedPort}
                             onOpen={(row, target) => void open(row, target)}
+                            onTunnelChange={() => void reload()}
+                            onWatch={addWatch}
                         />
                     ))}
                     {groups.other.length > 0 && (

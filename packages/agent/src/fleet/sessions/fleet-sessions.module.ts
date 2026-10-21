@@ -11,6 +11,7 @@ import { FleetCheckoutRepository } from '../checkouts/fleet-checkout.repository'
 import { FleetModule } from '../fleet.module';
 import { FleetSessionRepository } from './fleet-session.repository';
 import { FleetSessionService } from './fleet-session.service';
+import { FleetSessionStateService } from './fleet-session-state.service';
 import { FleetSessionTaskService } from './fleet-session-task.service';
 
 /**
@@ -54,6 +55,8 @@ export class FleetSessionSweepService {
         FleetSessionRepository,
         FleetSessionService,
         FleetSessionSweepService,
+        // FL-05: the writer of what a machine reports about a session's status.
+        FleetSessionStateService,
         AgentRepository,
         AgentRunRepository,
         FleetSessionTaskService,
@@ -63,6 +66,7 @@ export class FleetSessionSweepService {
         FleetSessionRepository,
         FleetSessionService,
         FleetSessionSweepService,
+        FleetSessionStateService,
         FleetSessionTaskService,
     ],
 })

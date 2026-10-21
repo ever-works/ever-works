@@ -7,8 +7,11 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import type {
+    FleetSessionAttention,
     FleetSessionEndedReason,
+    FleetSessionHooks,
     FleetSessionKind,
+    FleetSessionLastEvidence,
     FleetSessionOutcome,
     FleetSessionProvider,
     FleetSessionRecordingState,
@@ -32,9 +35,11 @@ import { PortableDateColumn } from './_types';
  * 2 000 lines the daemon kept when the session ended (plain text, bounded).
  *
  * Written ONLY by `FleetSessionService` (start, node events, rename, end,
- * restart, reconciliation) and the session sweeper. FL-05 adds its five
- * attention columns in its own slot (`1796050000000`); FL-20 adds
- * `costCents` / `tokens` (`1796200000000`).
+ * restart, reconciliation) and the session sweeper; FL-05's
+ * `FleetSessionStateService` writes the status columns (state, outcome and
+ * the five attention columns of slot `1796050000000`) from the node's
+ * `session.status` / `session.attention`. FL-20 adds `costCents` / `tokens`
+ * (`1796200000000`).
  *
  * Scope columns are raw uuids (no `@ManyToOne`) per the entity-cycle rule;
  * foreign keys live in the migration (`1796040000000-CreateFleetSessions`).
@@ -49,6 +54,9 @@ import { PortableDateColumn } from './_types';
     where: '"agentRunId" IS NOT NULL',
 })
 @Index('uq_fleet_sessions_node_daemon', ['nodeId', 'daemonSessionId'], { unique: true })
+// FL-05 (`1796050000000-AddFleetSessionAttention`): the board's orderings.
+@Index('idx_fleet_sessions_user_state_changed', ['userId', 'state', 'stateChangedAt'])
+@Index('idx_fleet_sessions_org_state_changed', ['organizationId', 'state', 'stateChangedAt'])
 export class FleetSession {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -148,6 +156,42 @@ export class FleetSession {
     /** `off` | `recording` | `stored` (R-9). Written by the recording path (P3). */
     @Column({ type: 'varchar', length: 12, default: 'off' })
     recordingState: FleetSessionRecordingState;
+
+    // ─── FL-05 — status, attention (CONTRACTS §4.2, §5.2; slot `1796050000000`) ───
+
+    /**
+     * The open "needs you" edge (`question · permission · blocked · failed`) or
+     * the unread `finished` marker: `{ key, reason, prompt, options[],
+     * raisedAt, acknowledgedAt }`, prompt redacted on the node. Written by
+     * `FleetSessionStateService` from the node's `session.attention`, cleared
+     * by an answer or a new prompt; `acknowledgedAt` by opening the detail.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    attention?: FleetSessionAttention | null;
+
+    /**
+     * When `state` last changed (board ordering, FR-18). Written with every
+     * state change (start, node events, status reports, the sweeper);
+     * back-filled from `lastActivityAt` / `createdAt` by the migration.
+     */
+    @PortableDateColumn({ nullable: true })
+    stateChangedAt?: Date | null;
+
+    /** What the node injected for this session — `{ provider, injected, events[] }` (FR-11). */
+    @Column({ type: 'simple-json', nullable: true })
+    hooks?: FleetSessionHooks | null;
+
+    /**
+     * Why the state is what it is — `{ source, at, detail }`; `detail` carries the
+     * event, the report's sequence (newer-only, U5) and the card's last user
+     * and agent lines (redacted).
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    lastEvidence?: FleetSessionLastEvidence | null;
+
+    /** End of the session-boundary window (5 s after a start or resume): a `done` inside it is not news (FR-39). */
+    @PortableDateColumn({ nullable: true })
+    boundaryUntil?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

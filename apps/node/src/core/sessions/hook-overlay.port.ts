@@ -1,4 +1,4 @@
-import type { FleetSessionKind, FleetSessionStartableProvider } from '@ever-works/contracts';
+import type { FleetSessionHooks, FleetSessionKind, FleetSessionStartableProvider } from '@ever-works/contracts';
 
 /**
  * Sessions on computers (FL-04) — the per-session hook overlay seam that
@@ -19,6 +19,8 @@ export interface HookOverlay {
 	args: string[];
 	/** Variables added to the session's environment. */
 	env: Record<string, string>;
+	/** FL-05: what was injected (CONTRACTS §4.2 `hooks`), reported with the session's status. */
+	hooks?: FleetSessionHooks;
 }
 
 export interface HookOverlayPort {

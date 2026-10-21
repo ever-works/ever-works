@@ -71,6 +71,7 @@ import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-to
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
+import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -590,6 +591,7 @@ export class AgentToolService {
                     buildFleetPortsTools({
                         agent: { id: agent.id, userId: agent.userId, name: agent.name ?? null },
                         service: ports,
+                        tunnels: fleet.portTunnels ?? null,
                     }),
                 );
             }
@@ -632,6 +634,17 @@ export class AgentToolService {
                         userId: agent.userId,
                         agentId: agent.id,
                         service: checkouts.service,
+                    }),
+                );
+            }
+            // Logs on computers (FL-08): the read-only log tools, when bound.
+            if (fleet.logs) {
+                const logs = fleet.logs;
+                add('fleet-logs', () =>
+                    buildFleetLogsTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: logs.reader,
                     }),
                 );
             }

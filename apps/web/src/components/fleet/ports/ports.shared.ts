@@ -7,6 +7,8 @@ import {
     type FleetPortOpenUnavailableReason,
     type FleetPortsGroups,
     type FleetPortsListResponse,
+    type FleetPortTunnelOpenResponse,
+    type FleetPortTunnelView,
 } from '@ever-works/contracts';
 import { readSessionError, type SessionErrorRead } from '../sessions/sessions.shared';
 
@@ -86,6 +88,42 @@ export function portAddress(port: FleetListeningPort): string {
     return `${port.web?.scheme ?? 'http'}://127.0.0.1:${port.port}/`;
 }
 
+/** `1.2 MB` — a tunnel's bytes, for its row. */
+export function formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes < 1024) return `${Math.max(0, Math.round(bytes || 0))} B`;
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let value = bytes / 1024;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+        value /= 1024;
+        unit++;
+    }
+    return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
+/** The open tunnel of a port in a list response, if the viewer holds one. */
+export function tunnelFor(list: FleetPortsListResponse | null, port: number): FleetPortTunnelView | null {
+    return list?.tunnel?.open.find((tunnel) => tunnel.port === port && tunnel.state === 'open') ?? null;
+}
+
+/**
+ * Phase 3 (FR-33) — which WATCHED ports stopped between two lists: a watched
+ * port that was listening (a live row) and now is not (stopped, waiting, or
+ * gone). `wasLive` is the set the caller keeps between lists.
+ */
+export function watchedStopped(
+    list: Pick<FleetPortsListResponse, 'ports'>,
+    watched: readonly number[],
+    wasLive: ReadonlySet<number>,
+): { stopped: number[]; live: Set<number> } {
+    const live = new Set<number>();
+    for (const port of list.ports) {
+        if (watched.includes(port.port) && port.kind !== 'waiting' && !port.stopped) live.add(port.port);
+    }
+    const stopped = [...wasLive].filter((port) => watched.includes(port) && !live.has(port));
+    return { stopped, live };
+}
+
 /** The target Open uses for a row (the response's default), or null when nothing is available. */
 export function defaultOpenTarget(list: FleetPortsListResponse | null): FleetPortOpenTarget | null {
     return list?.defaultTarget ?? null;
@@ -118,6 +156,39 @@ export const portsClient = {
     list(nodeId: string, watch: readonly number[]): Promise<PortsResult<FleetPortsListResponse>> {
         const query = watch.length > 0 ? `?watch=${watch.join(',')}` : '';
         return call(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports${query}`);
+    },
+    /** Phase 3 — a watched server stopped: file the Inbox item (best-effort). */
+    async watchStopped(nodeId: string, port: number): Promise<void> {
+        try {
+            await fetch(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/watch-stopped`, {
+                method: 'POST',
+                cache: 'no-store',
+            });
+        } catch {
+            // the inline notice is shown either way
+        }
+    },
+    /** Phase 2 — open (or re-open) the person's preview tunnel; the answer carries a one-time `openUrl`. */
+    openPreview(nodeId: string, port: number): Promise<PortsResult<FleetPortTunnelOpenResponse>> {
+        return call(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`, { method: 'POST' });
+    },
+    /** Phase 2 — the open tunnel with a fresh one-time `openUrl`. */
+    readPreview(nodeId: string, port: number): Promise<PortsResult<FleetPortTunnelOpenResponse>> {
+        return call(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`);
+    },
+    /** Phase 2 — close the person's preview tunnel. */
+    async closePreview(nodeId: string, port: number): Promise<PortsResult<null>> {
+        try {
+            const response = await fetch(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`, {
+                method: 'DELETE',
+                cache: 'no-store',
+            });
+            if (response.ok) return { ok: true, data: null };
+            const body = (await response.json().catch(() => null)) as unknown;
+            return { ok: false, error: readPortsError(response.status, body) };
+        } catch {
+            return { ok: false, error: { code: 'network', hint: null, details: {}, status: 0 } as PortsErrorRead };
+        }
     },
     open(
         nodeId: string,

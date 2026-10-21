@@ -13751,6 +13751,12 @@
                 "label": "Last command:",
                 "ago": "{time} ago",
                 "open": "Commands"
+            },
+            "rerun": {
+                "action": "Run again",
+                "label": "Run {command} again",
+                "redacted": "The stored command was redacted — type it again to run it.",
+                "none": "None of these computers can take a command right now."
             }
         },
         "sessions": {
@@ -13781,7 +13787,17 @@
                 "offlineNever": "{node} is offline. Sessions it had are listed below with their last screens.",
                 "retry": "Retry",
                 "copy": "Copy",
-                "copied": "Copied"
+                "copied": "Copied",
+                "withQualifier": "{state} · {qualifier}",
+                "reasonPermission": "permission",
+                "reasonQuestion": "question",
+                "reasonBlocked": "blocked",
+                "reasonFailed": "failed",
+                "outcomeSuccess": "success",
+                "outcomeFailure": "failed",
+                "outcomeCancelled": "cancelled",
+                "outcomeInterrupted": "stopped",
+                "outcomeUnconfirmed": "no result"
             },
             "tab": {
                 "live": "Live",
@@ -13939,7 +13955,8 @@
                 "pane": "Terminal of {title} on {node}. {role}.",
                 "newSessionMenu": "New session on {node}",
                 "state": "State: {state}",
-                "card": "{title} on {node}, {state}"
+                "card": "{title} on {node}, {state}",
+                "cardFull": "{who}, {title}, {state}, on {node}"
             },
             "agentBlock": {
                 "title": "Sessions",
@@ -13966,6 +13983,36 @@
                 "position": "Position {at} of {total}",
                 "close": "Close",
                 "failed": "The recording could not be loaded."
+            },
+            "card": {
+                "you": "You: {text}",
+                "agent": "{who}: {text}",
+                "agentFallback": "Agent",
+                "exited": "exited with code {code}",
+                "unconfirmed": "{node} restarted before this finished",
+                "needsYouNoPrompt": "Waiting for you — open the session to see what it asks",
+                "waiting": "waiting {span}",
+                "doneAgo": "done {span} ago",
+                "workingFor": "working {span}",
+                "idleFor": "idle {span}",
+                "endedAgo": "ended {span} ago",
+                "startingFor": "starting {span}",
+                "fromScreen": "from the screen",
+                "openRun": "Open the Run"
+            },
+            "statusSource": {
+                "hooks": "Status from {provider}'s hooks",
+                "partial": "Status from the screen for permission prompts — update {provider} on {node} for exact status",
+                "codex": "Status from the screen — Codex reports only when a turn ends",
+                "screen": "Status from the screen",
+                "fromScreen": "from the screen",
+                "shell": "Shell — no agent status",
+                "notifyReplaced": "Your own Codex notify command is not run in this session",
+                "noTokens": "Status spends no model tokens"
+            },
+            "hookHealth": {
+                "badToken": "Something on {node} is posting to the hook endpoint with a bad token ({count} in the last minute)",
+                "spooled": "{count} hook events are spooled on {node} and will be applied when the node is up"
             }
         },
         "actions": {
@@ -14183,6 +14230,129 @@
                 "body": "Lets Open show a page in a browser profile on this computer that no agent uses.",
                 "saved": "Saved.",
                 "failed": "Could not switch the preview browser."
+            },
+            "tunnel": {
+                "button": "Preview in my browser",
+                "previewing": "previewing",
+                "timeLeft": "{time} left",
+                "requests": "{count, plural, one {# request} other {# requests}}",
+                "reopen": "Open",
+                "close": "Close preview",
+                "copyLink": "Copy link",
+                "copied": "Link copied — it opens in this browser only",
+                "limit": "You already have 4 previews open — close one.",
+                "limitRow": ":{port} ({left} left)",
+                "failed": "Could not open the preview",
+                "openedByAgent": "opened by an agent for you",
+                "egressBilled": "Egress on this cloud computer is billed by its provider."
+            },
+            "watch": "Watch",
+            "watchStopped": "The server on :{port} on {name} stopped",
+            "dismiss": "Dismiss"
+        },
+        "logs": {
+            "palette": "Logs on {name}",
+            "groups": {
+                "system": "System",
+                "files": "Files",
+                "containers": "Containers",
+                "services": "Services",
+                "withCount": "{group} ({count})"
+            },
+            "kinds": {
+                "system": "system log",
+                "file": "file",
+                "container": "container",
+                "service": "service"
+            },
+            "sources": {
+                "title": "Sources",
+                "refresh": "Refresh the list of logs",
+                "every": "{seconds} s",
+                "loading": "Asking {node} for its logs…",
+                "rootOnly": "root only",
+                "needsAdmin": "needs administrator",
+                "gone": "gone",
+                "failed": "failed",
+                "openFile": "Open a file…",
+                "openFilePlaceholder": "Open a file… e.g. /var/log/nginx/error.log",
+                "openFileNotAbsolute": "Type a full path, starting with / or a drive letter.",
+                "outsideRoots": "That path is outside the folders this computer shares"
+            },
+            "viewer": {
+                "title": "{source} · {kind} · {node}",
+                "pick": "Pick a log on the left to read it.",
+                "live": "● LIVE",
+                "reconnecting": "○ RECONNECTING",
+                "pause": "Pause",
+                "resume": "Resume",
+                "follow": "Follow",
+                "following": "Following",
+                "notFollowing": "Not following — scroll to the bottom to follow again.",
+                "filterPlaceholder": "filter…",
+                "copySelection": "Copy selection",
+                "copyAllShown": "Copy all shown",
+                "copied": "Copied",
+                "download": "Download shown lines",
+                "jumpToLatest": "↓ {count} new lines — jump to latest",
+                "reopen": "Reopen",
+                "loadEarlier": "Load 500 earlier",
+                "loadingEarlier": "Loading earlier lines…",
+                "noEarlier": "No earlier lines",
+                "noEarlierContainer": "Container logs keep no earlier lines here — the Docker log driver bounds them",
+                "levelError": "✖ error",
+                "levelWarning": "⚠ warn",
+                "footerFollowing": "Following",
+                "footerPaused": "Paused · {count} new lines",
+                "footerFiltered": "showing {shown} of {held} lines · filter: {filter}",
+                "footerHeld": "{count} lines held",
+                "footerBytes": "{bytes} read",
+                "footerRedactions": "{count, plural, one {# redaction} other {# redactions}}",
+                "footerDropped": "Skipped {count} lines — the log is faster than the link",
+                "footerDiscarded": "{count} older lines discarded (5 000 held at most)",
+                "mergedTitle": "{title} · {count} sources · {node}",
+                "mergedTitleNoName": "{count} logs merged · {node}",
+                "mergedHint": "Ctrl- or ⌘-click a source to add it to this view (up to 12)."
+            },
+            "notices": {
+                "groupMembership": "Only this user's entries. To see the whole system log, run on {node}:",
+                "groupMembershipAfter": "and sign in again.",
+                "gone": "{source} is gone",
+                "stopped": "{source} stopped",
+                "fastLog": "Skipped {count} lines — the log is faster than the link"
+            },
+            "states": {
+                "loading": "Asking {node} for the last 500 lines…",
+                "loadingSlow": "{node} has not answered yet. It may be busy.",
+                "loadingAbandoned": "{node} did not answer",
+                "error": "Could not read {source} on {node}",
+                "listError": "Could not list the logs on {node}.",
+                "tryAgain": "Try again",
+                "empty": "Nothing to read on {node} yet",
+                "emptyBody": "No log files under this computer's shared folders, no containers, and the system log is not readable by the node's user. Share a folder with --files-root, or install Docker, and come back.",
+                "offline": "{node} is offline — last seen {relative}.",
+                "offlineNever": "{node} is offline.",
+                "unreachable": "{node} is not connected right now.",
+                "consentMissing": "Logs need machine management switched on for this computer.",
+                "consentCommand": "Run this on {node}:",
+                "permissionDenied": "Only the owner of {node} can read its logs.",
+                "desktopNode": "Not available on this kind of node yet.",
+                "killSwitch": "Following stopped — all computers are stopped.",
+                "killSwitchTab": "All computers are stopped. Logs open again once the stop is cleared.",
+                "lost": "Lost the live feed — reopen to continue."
+            },
+            "a11y": {
+                "sources": "Log sources",
+                "region": "Log: {source}",
+                "following": "Following",
+                "paused": "Paused, {count} new lines"
+            },
+            "shortcuts": {
+                "filter": "Focus the filter",
+                "pause": "Pause or resume",
+                "latest": "Jump to latest",
+                "clear": "Clear the filter",
+                "copy": "Copy the selection"
             }
         },
         "operations": {
@@ -14292,11 +14462,70 @@
                 "run": "Run"
             },
             "compose": {
-                "arrives": "Compose projects arrive with the next update."
+                "arrives": "Compose projects arrive with the next update.",
+                "loading": "Reading the Compose projects…",
+                "empty": "No Compose projects on {name}.",
+                "projects": "Compose projects",
+                "pick": "Pick a project to see its services.",
+                "filesMissing": "files missing",
+                "filesMissingHint": "The Compose files of this project are gone; only Down is possible.",
+                "picture": "Picture",
+                "list": "List",
+                "logs": "Logs",
+                "pictureLabel": "A picture of {count} services and how they depend on each other",
+                "act": {
+                    "up": "Up",
+                    "down": "Down",
+                    "restart": "Restart",
+                    "pull": "Pull"
+                },
+                "dialog": {
+                    "up": "Bring {name} up on {machine}?",
+                    "down": "Bring {name} down on {machine}?",
+                    "restart": "Restart {name} on {machine}?",
+                    "pull": "Pull the images of {name} on {machine}?",
+                    "downKeeps": "Its {count} containers and network are removed. Named volumes ({volumes}) are kept.",
+                    "downKeepsNone": "Its {count} containers and network are removed. Named volumes are never removed from here."
+                },
+                "running": {
+                    "up": "Bringing {name} up on {machine}",
+                    "down": "Bringing {name} down on {machine}",
+                    "restart": "Restarting {name} on {machine}",
+                    "pull": "Pulling the images of {name} on {machine}"
+                },
+                "done": {
+                    "up": "{name} is up",
+                    "down": "{name} is down",
+                    "restart": "Restarted {name}",
+                    "pull": "Pulled the images of {name}"
+                },
+                "edge": {
+                    "grey": "{from} depends on {to}",
+                    "amber": "{from} waits for {to} to be healthy",
+                    "red": "{from} depends on {to}, which is down"
+                },
+                "state": {
+                    "absent": "not created",
+                    "stopped": "stopped"
+                },
+                "columns": {
+                    "service": "Service",
+                    "image": "Image",
+                    "state": "State",
+                    "health": "Health",
+                    "ports": "Ports",
+                    "volumes": "Volumes",
+                    "networks": "Networks"
+                }
             },
             "runsHere": {
                 "title": "Runs here",
                 "open": "Docker"
+            },
+            "shell": {
+                "label": "Shell inside",
+                "failed": "The shell could not start.",
+                "failedWith": "The shell could not start: {hint}"
             }
         }
     }

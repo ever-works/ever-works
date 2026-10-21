@@ -62,6 +62,8 @@ import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
 import { resolveAllowedRoots } from './link/allowed-roots';
 import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
+import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
@@ -82,8 +84,11 @@ import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
 import { ensureDaemonToken } from './sessions/daemon-token';
 import type { SessionDaemonPaths } from './sessions/daemon/daemon-paths';
 import { NO_HOOK_OVERLAY, type HookOverlayPort } from './sessions/hook-overlay.port';
+import { resolveHookPaths } from './sessions/hook-client';
+import { SessionHookOverlay } from './sessions/hook-overlay';
+import { SessionStatusPipeline } from './sessions/session-status';
 import { spawn as spawnProcess } from 'node:child_process';
-import { homedir as osHomedir } from 'node:os';
+import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -160,6 +165,12 @@ export interface NodeIo {
 	 * is not offered on the link.
 	 */
 	wakeSender?: WakeSender;
+	/**
+	 * Logs on computers (FL-08) — what the `logs` link module reads the machine
+	 * through. Optional: absent, the runtime binds the real one
+	 * (`createNodeLogIo`) for a `--manage` process.
+	 */
+	logs?: LogIo;
 }
 
 /**
@@ -452,7 +463,16 @@ export interface NodeRuntime {
 	 * The shell starts the supervisor and stops it at shutdown; stopping
 	 * never ends a session (the daemon outlives this process).
 	 */
-	sessions?: { supervisor: SessionDaemonSupervisor; module: SessionModule };
+	sessions?: {
+		supervisor: SessionDaemonSupervisor;
+		module: SessionModule;
+		/**
+		 * FL-05 — the status pipeline (hook endpoint, overlay, evidence merger).
+		 * The shell starts it with the supervisor and stops it at shutdown; the
+		 * endpoint FILE stays, so hooks spool while the node is down.
+		 */
+		status?: SessionStatusPipeline;
+	};
 	/** The consents this process was started with (CONTRACTS §1.1). */
 	consents: FleetConsents;
 	attended?: {
@@ -668,6 +688,13 @@ export interface CreateNodeRuntimeOptions {
 	 * output is kept.
 	 */
 	commandOutputDir?: string;
+	/**
+	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
+	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
+	 * tab lists log files under them (and FL-11's Files tab will browse them).
+	 * Process-scoped, like `--manage`; never the home directory as a whole.
+	 */
+	filesRoots?: readonly string[];
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
 	/**
@@ -809,6 +836,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// sessions need `--manage`, Agent sessions `--work`) and whose shell said
 	// how to run the daemon. Started by the shell; the daemon outlives us.
 	let sessions: NodeRuntime['sessions'];
+	// The overlay launches use (FL-05's when the daemon runs; a test's own, or none).
+	let sessionHookOverlay: HookOverlayPort = options.sessionHookOverlay ?? NO_HOOK_OVERLAY;
 	if (options.sessionDaemon && (consents.manage || consents.work)) {
 		const daemon = options.sessionDaemon;
 		const supervisor = new SessionDaemonSupervisor({
@@ -849,6 +878,37 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			logger: io.logger,
 			...(io.scheduler ? { scheduler: io.scheduler } : {})
 		});
+		// Session status (FL-05): the per-session hook overlay (R-6 — never the
+		// person's own configuration) and the pipeline that turns hooks, output,
+		// Ctrl-C and silence into a state. Its hook client runs on the same Node
+		// binary as the daemon.
+		const hookPaths = resolveHookPaths(daemon.paths.stateDir, io.environment.platform);
+		const hookOverlay = new SessionHookOverlay({
+			paths: hookPaths,
+			nodePath: daemon.command,
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			env: process.env,
+			cliVersion: async (provider) => {
+				const executable = pinnedModelCli[provider];
+				if (typeof executable !== 'string' || !executable.trim()) return null;
+				return (await cliCompat.probe(provider, executable)).version;
+			},
+			...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+			logger: io.logger
+		});
+		const statusPipeline = new SessionStatusPipeline({
+			daemon: supervisor,
+			paths: hookPaths,
+			overlay: hookOverlay,
+			homedir: osHomedir(),
+			platform: io.environment.platform,
+			...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		sessionHookOverlay = options.sessionHookOverlay ?? hookOverlay;
 		const sessionModule = createSessionModule({
 			supervisor,
 			consents,
@@ -859,12 +919,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				homedir: osHomedir(),
 				modelCli: pinnedModelCli,
 				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
-				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+				overlay: sessionHookOverlay
 			},
-			logger: io.logger
+			logger: io.logger,
+			onInput: (sessionId, data) => statusPipeline.observeInput(sessionId, data)
 		});
-		sessions = { supervisor, module: sessionModule };
-		telemetry.sessionDaemon = () => supervisor.report();
+		sessions = { supervisor, module: sessionModule, status: statusPipeline };
+		// The daemon block carries the hook counters (CONTRACTS §1.1, FL-05 FR-6).
+		telemetry.sessionDaemon = () => ({ ...supervisor.report(), hooks: statusPipeline.hooksReport() });
 	}
 	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
 	// preview source, for a process started with `--manage`. The preview
@@ -940,6 +1002,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					logger: io.logger
 				})
 			: undefined;
+	// Logs on computers (FL-08): the `logs` link module — the `logs` family,
+	// the `logs.sources` verb and the `logs` tag — for a `--manage` process
+	// only. The allowed roots (R-18, R-41) are re-resolved on every request:
+	// the standard log directories, ready checkouts (FL-14's registry), the
+	// workspace root and the `--files-root` folders, never the home directory.
+	let logsLinkModule: NodeModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		let user = 'this user';
+		try {
+			user = osUserInfo().username || user;
+		} catch {
+			// no passwd entry: the hint names no account
+		}
+		const logIo =
+			io.logs ??
+			createNodeLogIo({
+				platform,
+				// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+				// `docker ps --format` carries braces, quotes and tabs `cmd.exe` would mangle.
+				runner: createMachineCommandRunner(),
+				homedir,
+				user,
+				...(typeof process.getuid === 'function' ? { uid: process.getuid() } : {})
+			});
+		logsLinkModule = createLogsLinkModule({
+			io: logIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				const resolved = await resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'logs',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? [],
+						logDirs: standardLogDirs(platform, homedir)
+					},
+					logIo.fs
+				);
+				return resolved.roots;
+			}
+		});
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
 	// under `--manage`, `sessions` while the daemon answers, …) describe this
 	// process, not the socket — re-read on every beat, because `sessions`
@@ -949,7 +1058,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
 	const linkModules = composeNodeLinkModules({
-		extra: [healthLinkModule, ...(options.linkModules ?? [])],
+		extra: [healthLinkModule, ...(logsLinkModule ? [logsLinkModule] : []), ...(options.linkModules ?? [])],
 		...(sessions ? { session: sessions.module } : {}),
 		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
 		...(consents.manage
@@ -1133,6 +1242,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		runtime.link = link;
 		// Sessions (FL-04): channel-0 facts, the kill switch and drain ride this link.
 		sessions?.module.bindLink(link);
+		// Session status (FL-05): `session.status` / `session.attention` ride this link too.
+		sessions?.status?.bindLink(link);
 		computerLegs?.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {
@@ -1526,7 +1637,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
 				...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {}),
 				platform: io.environment.platform as NodeJS.Platform,
-				overlay: options.sessionHookOverlay ?? NO_HOOK_OVERLAY
+				overlay: sessionHookOverlay
 			})
 		);
 		// `browser-check` is registered ONLY when this machine actually
