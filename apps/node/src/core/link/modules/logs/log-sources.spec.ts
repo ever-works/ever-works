@@ -69,6 +69,12 @@ describe('readers parse their tools', () => {
 		expect(Buffer.from(args[5]!, 'base64').toString('utf16le')).toBe(script);
 	});
 
+	it('the event-log script pages back before the oldest event handed out (P2)', () => {
+		const script = eventLogScript({ logs: ['System'] }, 500, null, '2026-10-21T09:00:00.000Z');
+		expect(script).toContain("TimeCreated[@SystemTime<''2026-10-21T09:00:00.000Z'']");
+		expect(script).not.toContain('SystemTime>');
+	});
+
 	it('launchctl print log paths', () => {
 		expect(parseLaunchctlLogPaths('\tstdout path = /usr/local/var/log/nginx.log\n\tstderr path = /dev/null\n')).toEqual({
 			stdout: '/usr/local/var/log/nginx.log',

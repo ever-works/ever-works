@@ -14165,7 +14165,10 @@
                 "footerBytes": "{bytes} read",
                 "footerRedactions": "{count, plural, one {# redaction} other {# redactions}}",
                 "footerDropped": "Skipped {count} lines — the log is faster than the link",
-                "footerDiscarded": "{count} older lines discarded (5 000 held at most)"
+                "footerDiscarded": "{count} older lines discarded (5 000 held at most)",
+                "mergedTitle": "{title} · {count} sources · {node}",
+                "mergedTitleNoName": "{count} logs merged · {node}",
+                "mergedHint": "Ctrl- or ⌘-click a source to add it to this view (up to 12)."
             },
             "notices": {
                 "groupMembership": "Only this user's entries. To see the whole system log, run on {node}:",

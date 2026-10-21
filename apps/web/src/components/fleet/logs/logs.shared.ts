@@ -1,4 +1,5 @@
 import {
+    FLEET_LOGS_MAX_MERGED_SOURCES,
     FLEET_LOGS_VIEWER_MAX_LINES,
     fleetLogLineMatches,
     fleetLogSourceId,
@@ -114,6 +115,60 @@ export function logsDeepLinkSource(get: (name: string) => string | null): string
                 ? fleetLogSourceId('file', get('path')!)
                 : null;
     return candidate && isFleetLogSourceId(candidate) ? candidate : null;
+}
+
+/**
+ * Every source a deep link names (P2, FR-35/FR-36): repeated `?source=<id>`
+ * (`?tab=logs&source=container:acme-api&source=container:acme-db`), each a full
+ * id, at most {@link FLEET_LOGS_MAX_MERGED_SOURCES}, de-duplicated; else the one
+ * {@link logsDeepLinkSource} reads. Empty when nothing valid is named.
+ */
+export function logsDeepLinkSources(
+    getAll: (name: string) => string[],
+    get: (name: string) => string | null,
+): string[] {
+    const all = getAll('source').filter((value) => isFleetLogSourceId(value));
+    if (all.length > 1) return [...new Set(all)].slice(0, FLEET_LOGS_MAX_MERGED_SOURCES);
+    const one = logsDeepLinkSource(get);
+    return one ? [one] : [];
+}
+
+/** Add or remove a source from a merged view (ctrl/cmd-click), never past the bound, never empty. */
+export function toggleMergedSource(current: readonly string[], id: string): string[] {
+    if (current.includes(id)) {
+        const rest = current.filter((value) => value !== id);
+        return rest.length > 0 ? rest : [id];
+    }
+    if (current.length >= FLEET_LOGS_MAX_MERGED_SOURCES) return [...current];
+    return [...current, id];
+}
+
+/** One colour per merged source (spec §5.10 chips), by its index; the list wraps past twelve. */
+export const LOG_CHIP_CLASSES: readonly string[] = [
+    'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+    'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+    'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+    'bg-violet-500/15 text-violet-700 dark:text-violet-300',
+    'bg-rose-500/15 text-rose-700 dark:text-rose-300',
+    'bg-teal-500/15 text-teal-700 dark:text-teal-300',
+    'bg-orange-500/15 text-orange-700 dark:text-orange-300',
+    'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300',
+    'bg-lime-500/15 text-lime-700 dark:text-lime-300',
+    'bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300',
+    'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
+    'bg-stone-500/15 text-stone-700 dark:text-stone-300',
+];
+
+export function logChipClass(src: number): string {
+    return LOG_CHIP_CLASSES[((src % LOG_CHIP_CLASSES.length) + LOG_CHIP_CLASSES.length) % LOG_CHIP_CLASSES.length]!;
+}
+
+/** The short name a chip shows for a source id: the label when listed, else the id's key, last segment. */
+export function logChipLabel(id: string, listed: readonly FleetLogSource[]): string {
+    const source = listed.find((entry) => entry.id === id);
+    const raw = source?.label ?? id.slice(id.indexOf(':') + 1);
+    const last = raw.split(/[\\/]/).pop() ?? raw;
+    return last.length > 24 ? `${last.slice(0, 23)}…` : last;
 }
 
 /** A typed path → a file source id; null for a path that is not absolute (the field says so). */

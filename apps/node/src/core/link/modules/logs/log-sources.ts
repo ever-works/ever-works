@@ -98,7 +98,8 @@ async function systemSources(io: LogIo): Promise<FleetLogSource[]> {
 		label: SYSTEM_LABELS[key],
 		group: '',
 		readable: true,
-		supportsEarlier: key === 'journal' || key === 'kernel',
+		// The unified log cannot page back; the journal and the event logs can (P2).
+		supportsEarlier: key !== 'unified',
 		...extra
 	});
 	switch (io.platform) {
@@ -302,7 +303,7 @@ export function parseWindowsServices(stdout: string): FleetLogSource[] {
 		const [name, display] = line.split('\t');
 		const key = (name ?? '').trim();
 		if (!isFleetLogServiceKey(key)) continue;
-		out.push(service(key, (display ?? '').trim() || key, 'running', false, false));
+		out.push(service(key, (display ?? '').trim() || key, 'running', false, true));
 	}
 	return out;
 }
