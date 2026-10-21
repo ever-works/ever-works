@@ -30,12 +30,13 @@ import type {
 	AuthenticateOutcome,
 	AuthenticateRequest,
 	ConnectionStatusView,
+	DesktopConsentsView,
 	EnrollRequest,
 	EnrollOutcome,
 	NodeIdentityView,
 	WorkerStatusView
 } from '../shared/ipc-contract';
-import { API_HOST_OPTIONS, IDLE_WORKER_STATUS, IpcChannels } from '../shared/ipc-contract';
+import { API_HOST_OPTIONS, DEFAULT_DESKTOP_CONSENTS, IDLE_WORKER_STATUS, IpcChannels } from '../shared/ipc-contract';
 import {
 	IDLE_STATUS,
 	authenticateRequestValid,
@@ -49,6 +50,14 @@ import {
 } from './identity';
 import { startRuntimeInOrder } from './start-order';
 import { createTray } from './tray';
+import {
+	DESKTOP_CONSENTS_FILE,
+	describeDesktopConsents,
+	loadDesktopConsents,
+	normalizeDesktopConsents,
+	runtimeConsentOptions,
+	saveDesktopConsents
+} from './consents';
 
 /**
  * Ever Works Desktop Node — Electron main process.
@@ -86,6 +95,8 @@ if (!app.requestSingleInstanceLock()) {
 function bootstrap(): void {
 	const userData = app.getPath('userData');
 	const configPath = path.join(userData, 'node-config.json');
+	// Fleet node link (FL-02 T-26): the consents live beside the enrolment.
+	const consentsPath = path.join(userData, DESKTOP_CONSENTS_FILE);
 
 	// Buffered so the status window's log pane can back-fill on open; every
 	// entry is redacted by the core logger before it reaches any sink.
@@ -125,6 +136,10 @@ function bootstrap(): void {
 	// Survives disconnect/reconnect: an operator who paused the node expects it
 	// to still be paused after a reconnect, not quietly back at work.
 	let pausedByOperator = false;
+	// Fleet node link (FL-02 T-26): what this computer lets Ever Works do.
+	// Read before the first connect (below); the defaults are how the app
+	// always ran — work on, live viewing and management off.
+	let consents: DesktopConsentsView = { ...DEFAULT_DESKTOP_CONSENTS };
 
 	const publishStatus = (next: ConnectionStatusView): void => {
 		status = next;
@@ -143,7 +158,12 @@ function bootstrap(): void {
 		const created = createNodeRuntime(connectedConfig, io, {
 			// A desktop node exists to DO work; the ceilings the operator set
 			// in the wizard are what makes that safe to enable by default.
-			workerEnabled: true,
+			// Fleet node link (FL-02 T-26, spec S13): the work lane, live
+			// viewing and management now follow the owner's consents (work on
+			// by default, as before), and the node link opens on the first
+			// accepted heartbeat when any of them is on — exactly the CLI's
+			// `--work`, `--attend` and `--manage`.
+			...runtimeConsentOptions(consents),
 			limits: clampResourceLimits(connectedConfig.limits),
 			resourceProbe,
 			startPaused: pausedByOperator,
@@ -182,10 +202,22 @@ function bootstrap(): void {
 		}
 		const current = runtime;
 		runtime = null;
+		// Fleet node link (FL-02 T-26): the link first, so nothing reconnects
+		// while the lanes drain; live views end now (they are open-ended).
+		current.link?.close();
 		current.loop.stop();
+		const attended = current.attended?.worker;
+		for (const jobId of attended?.getState().activeJobIds ?? []) {
+			attended?.cancelJob(jobId, 'This machine is disconnecting');
+		}
 		// Drains: in-flight jobs report their verdicts instead of being
 		// abandoned to a lease expiry.
-		await Promise.all([current.loop.settled(), current.worker?.stop() ?? Promise.resolve()]);
+		await Promise.all([
+			current.loop.settled(),
+			current.worker?.stop() ?? Promise.resolve(),
+			attended?.stop() ?? Promise.resolve(),
+			current.management?.worker.stop() ?? Promise.resolve()
+		]);
 		workerStatus = { ...IDLE_WORKER_STATUS, paused: pausedByOperator };
 		publishStatus({ ...IDLE_STATUS, state: 'stopped', worker: workerStatus });
 	};
@@ -247,6 +279,26 @@ function bootstrap(): void {
 		}
 	};
 
+	/** Fleet node link (FL-02 T-26) — save new consents and restart the connection so the node reports them. */
+	const setConsents = async (next: DesktopConsentsView): Promise<DesktopConsentsView> => {
+		const normalized = normalizeDesktopConsents(next);
+		try {
+			await saveDesktopConsents(fs, consentsPath, normalized);
+		} catch (error) {
+			logger.warn(`Could not save the consents: ${(error as Error).message}`);
+			return consents;
+		}
+		consents = normalized;
+		tray?.updateConsents?.(consents);
+		logger.info(`Consents — ${describeDesktopConsents(consents)}`);
+		if (runtime) {
+			// Consents are process-scoped in the node core: reconnect with the new set.
+			await disconnect();
+			connect();
+		}
+		return consents;
+	};
+
 	const enroll = async (request: EnrollRequest): Promise<EnrollOutcome> => {
 		// The renderer is not a trust boundary: re-validate here.
 		if (!enrollRequestValid(request)) {
@@ -287,6 +339,14 @@ function bootstrap(): void {
 			await saveConfig(fs, configPath, enrolled, { platform: process.platform });
 			config = enrolled;
 			pausedByOperator = false;
+			// Fleet node link (FL-02 T-26): what the wizard chose, before the first connect.
+			if (request.consents) {
+				consents = normalizeDesktopConsents(request.consents);
+				await saveDesktopConsents(fs, consentsPath, consents).catch((error: unknown) =>
+					logger.warn(`Could not save the consents: ${(error as Error).message}`)
+				);
+				tray?.updateConsents?.(consents);
+			}
 			connect();
 			return { ok: true, identity: toIdentityView(config) };
 		} catch (error) {
@@ -338,6 +398,8 @@ function bootstrap(): void {
 	ipcMain.handle(IpcChannels.getStatus, () => status);
 	ipcMain.handle(IpcChannels.getLogs, () => logger.entries());
 	ipcMain.handle(IpcChannels.unenroll, () => unenroll());
+	ipcMain.handle(IpcChannels.getConsents, (): DesktopConsentsView => ({ ...consents }));
+	ipcMain.handle(IpcChannels.setConsents, (_event, next: DesktopConsentsView) => setConsents(next));
 
 	// -----------------------------------------------------------------------
 	// Window & tray
@@ -398,6 +460,7 @@ function bootstrap(): void {
 		onDisconnect: () => void disconnect(),
 		onPause: () => pause(),
 		onResume: () => resume(),
+		onToggleConsent: (key, enabled) => void setConsents({ ...consents, [key]: enabled }),
 		onQuit: () => {
 			quitting = true;
 			app.quit();
@@ -417,8 +480,10 @@ function bootstrap(): void {
 	// without waiting for the window to be opened.
 	// -----------------------------------------------------------------------
 
-	void loadConfig(fs, configPath)
-		.then((stored) => {
+	void Promise.all([loadConfig(fs, configPath), loadDesktopConsents(fs, consentsPath)])
+		.then(([stored, storedConsents]) => {
+			consents = storedConsents;
+			tray.updateConsents?.(consents);
 			config = stored;
 			if (stored) {
 				logger.info(`Resuming node ${stored.nodeId} → ${stored.apiUrl}`);

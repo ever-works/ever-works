@@ -4,6 +4,7 @@ import { normalizeFleetRunEnvGrants } from './fleet-run-secrets.types.js';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
 import type { FleetAgentTaskMcpBridge, FleetAgentTaskMcpResult } from './fleet-run-credential.types.js';
 import type { FleetJobFailureKind, FleetModelUsageLimit } from './fleet-model-usage-limit.types.js';
+import type { FleetConsentKey, FleetConsents } from './fleet-link.types.js';
 
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
@@ -130,6 +131,58 @@ export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
  * the detector cannot drift.
  */
 export const FLEET_BROWSER_CAPABILITY = 'browser';
+
+// ─── The management lane (FL-02, CONTRACTS R-34) ────────────────────────────
+
+/**
+ * Job kinds the node's MANAGEMENT lane leases — a third lease loop beside the
+ * work lane and the attended live-view lane, for machine jobs (`vm-create`,
+ * `vm-control` under `--manage`; `runner-install`, `runner-control` under
+ * `--work`; `usage-scan` under `--usage-scan`). They never compete with Agent
+ * work for `--concurrency`, and the work lane never leases them.
+ *
+ * EMPTY in FL-02, which ships the lane itself: FL-16, FL-18 and FL-20 each
+ * append their kinds here (and to {@link FleetJobKind}) together with the
+ * consent each needs in {@link FLEET_MANAGEMENT_LANE_CONSENT}. With an empty
+ * list no node starts the lane.
+ */
+export const FLEET_MANAGEMENT_LANE_KINDS: readonly FleetJobKind[] = [];
+
+/** The consent a management-lane kind needs on the node (CONTRACTS R-34). */
+export type FleetManagementLaneConsent = Extract<FleetConsentKey, 'manage' | 'work' | 'usageScan'>;
+
+/**
+ * Which consent each management-lane kind needs. A kind listed in
+ * {@link FLEET_MANAGEMENT_LANE_KINDS} without an entry here needs `manage`
+ * (the safest reading: machine jobs are management unless an epic says otherwise).
+ */
+export const FLEET_MANAGEMENT_LANE_CONSENT: Readonly<Partial<Record<FleetJobKind, FleetManagementLaneConsent>>> = {};
+
+/** The consent a management-lane kind needs (`manage` when the table names none). */
+export function fleetManagementLaneConsentFor(
+	kind: FleetJobKind,
+	table: Readonly<Partial<Record<FleetJobKind, FleetManagementLaneConsent>>> = FLEET_MANAGEMENT_LANE_CONSENT
+): FleetManagementLaneConsent {
+	return table[kind] ?? 'manage';
+}
+
+/**
+ * The management-lane kinds a node holding `consents` may lease, in list
+ * order, without duplicates. An empty answer means the lane is not started.
+ */
+export function fleetManagementLaneKindsFor(
+	consents: FleetConsents | null | undefined,
+	kinds: readonly FleetJobKind[] = FLEET_MANAGEMENT_LANE_KINDS,
+	table: Readonly<Partial<Record<FleetJobKind, FleetManagementLaneConsent>>> = FLEET_MANAGEMENT_LANE_CONSENT
+): FleetJobKind[] {
+	if (!consents) return [];
+	const out: FleetJobKind[] = [];
+	for (const kind of kinds) {
+		if (out.includes(kind)) continue;
+		if (consents[fleetManagementLaneConsentFor(kind, table)] === true) out.push(kind);
+	}
+	return out;
+}
 
 /** Capability tag advertised when a usable GPU was detected on the node. */
 export const FLEET_GPU_CAPABILITY = 'gpu';

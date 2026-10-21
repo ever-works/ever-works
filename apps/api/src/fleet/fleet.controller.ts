@@ -902,6 +902,8 @@ export class FleetController {
             consents: body.consents,
             // Sessions on computers (FL-04): the session daemon's health.
             daemon: body.daemon,
+            // Fleet node link (FL-02 T-25): the opt-in self-update report.
+            selfUpdate: body.selfUpdate,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

@@ -670,6 +670,23 @@ export class FleetNodeSelfDescriptionDto {
     @IsOptional()
     @IsFleetSessionDaemonShape()
     daemon?: Record<string, unknown>;
+
+    /**
+     * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update
+     * report: `{ enabled, failedAt, error, targetVersion, updatedAt,
+     * fromVersion }`. Only `@IsObject()`, for the reason `health` is: a value
+     * this build does not know must never fail the beat; the service keeps the
+     * known fields within their bounds and drops the rest.
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        description:
+            'Self-update (--auto-update): enabled, and the last attempt — failedAt, error (a short class of failure), targetVersion, updatedAt, fromVersion. Unknown or malformed values are dropped, never rejected.',
+    })
+    @IsOptional()
+    @IsObject()
+    selfUpdate?: Record<string, unknown>;
 }
 
 /**

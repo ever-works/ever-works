@@ -1,5 +1,5 @@
-import { Menu, Tray, nativeImage } from 'electron';
-import type { ConnectionStatusView } from '../shared/ipc-contract';
+import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from 'electron';
+import type { ConnectionStatusView, DesktopConsentsView } from '../shared/ipc-contract';
 import { describeStatus, isLive } from '../shared/status-label';
 
 // Tiny generated 16x16 indigo square — placeholder until branded icons land
@@ -15,6 +15,11 @@ export interface TrayHandlers {
 	onPause(): void;
 	/** Resume leasing after a pause (A18). */
 	onResume(): void;
+	/**
+	 * Fleet node link (FL-02 T-26, spec §5.5) — turn one consent on or off.
+	 * The main process saves it and restarts the connection.
+	 */
+	onToggleConsent?(key: keyof DesktopConsentsView, enabled: boolean): void;
 	onQuit(): void;
 }
 
@@ -22,13 +27,37 @@ export interface NodeTray {
 	tray: Tray;
 	/** Reflect the live connection state in the tooltip and menu. */
 	update(status: ConnectionStatusView): void;
+	/** Fleet node link (FL-02 T-26) — reflect the consents in force. */
+	updateConsents?(consents: DesktopConsentsView): void;
 }
 
 export function createTray(handlers: TrayHandlers): NodeTray {
 	const icon = nativeImage.createFromDataURL(TRAY_ICON_DATA_URL);
 	const tray = new Tray(icon);
 
+	let lastStatus: ConnectionStatusView | undefined;
+	let consents: DesktopConsentsView | null = null;
+	/** The three consent toggles (spec §5.5: "Each can be changed later from the tray"). */
+	const consentItems = (): MenuItemConstructorOptions[] => {
+		if (!consents || !handlers.onToggleConsent) return [];
+		const current = consents;
+		const toggle = (key: keyof DesktopConsentsView, label: string): MenuItemConstructorOptions => ({
+			label,
+			type: 'checkbox',
+			checked: current[key],
+			click: () => handlers.onToggleConsent?.(key, !current[key])
+		});
+		return [
+			{ label: 'What may this computer do?', enabled: false },
+			toggle('work', 'Run work for my agents'),
+			toggle('attend', 'Allow live viewing from the dashboard'),
+			toggle('manage', 'Allow managing this computer'),
+			{ type: 'separator' }
+		];
+	};
+
 	const render = (status?: ConnectionStatusView): void => {
+		lastStatus = status;
 		const summary = status ? describeStatus(status) : 'Not connected';
 		const connected = isLive(status);
 		const paused = status?.worker.paused === true;
@@ -57,6 +86,7 @@ export function createTray(handlers: TrayHandlers): NodeTray {
 				{ label: 'Pause work', enabled: !paused, click: () => handlers.onPause() },
 				{ label: 'Resume work', enabled: paused, click: () => handlers.onResume() },
 				{ type: 'separator' },
+				...consentItems(),
 				{ label: 'Quit', click: () => handlers.onQuit() }
 			])
 		);
@@ -65,5 +95,12 @@ export function createTray(handlers: TrayHandlers): NodeTray {
 	render();
 	tray.on('click', () => handlers.onShow());
 
-	return { tray, update: render };
+	return {
+		tray,
+		update: render,
+		updateConsents: (next) => {
+			consents = { ...next };
+			render(lastStatus);
+		}
+	};
 }

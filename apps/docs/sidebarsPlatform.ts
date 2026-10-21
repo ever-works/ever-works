@@ -183,6 +183,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet',
 				// The hub is the app's view of the same registry — read it right after.
 				'features/fleet-hub',
+				// What each computer lets the platform do, and the one link it keeps.
+				'features/fleet-node-link',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

@@ -71,8 +71,13 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Sessions on computers (FL-04): the session daemon's health.
-	// A platform that predates it answers 400; the node strips this tier first
+	// NEWEST first. Fleet node link (FL-02 T-25): the opt-in self-update's
+	// report. Its own tier, newest of all (it reached `develop` after FL-04's
+	// daemon line): a platform that knows the daemon line but not this field
+	// costs the node exactly this one field.
+	['selfUpdate'],
+	// Sessions on computers (FL-04): the session daemon's health.
+	// A platform that predates it answers 400; the node strips this tier
 	// and keeps beating — losing only the daemon line, never its health or
 	// consents. Newer than the health snapshot: FL-03 reached `develop` first.
 	['daemon'],
@@ -462,7 +467,10 @@ function describeStrippedTiers(tiers: number): string {
 	if (dropped.has('health')) {
 		return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
 	}
-	return 'Platform rejected the session daemon field; it predates sessions on computers. Still reporting everything else; the daemon line stays off until this node restarts.';
+	if (dropped.has('daemon')) {
+		return 'Platform rejected the session daemon field; it predates sessions on computers. Still reporting everything else; the daemon line stays off until this node restarts.';
+	}
+	return 'Platform rejected the self-update report; it predates it. Still reporting everything else; the report stays off until this node restarts.';
 }
 
 /** The same description with the newest `tiers` tiers of droppable fields removed (absent keys dropped too). */

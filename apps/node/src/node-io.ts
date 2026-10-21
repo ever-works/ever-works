@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process';
-import { accessSync, constants as fsConstants, existsSync, statSync } from 'node:fs';
+import { accessSync, constants as fsConstants, existsSync, realpathSync, statSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -572,3 +572,17 @@ export const systemFetch: FetchLike = (url, init) =>
 		...(init.method === 'GET' || init.method === 'HEAD' ? {} : { body: init.body }),
 		...(init.signal ? { signal: init.signal } : {})
 	});
+
+/**
+ * Fleet node link (FL-02 T-25) — the running binary's REAL path (symlinks
+ * resolved: a global npm install is reached through a `bin` link), or null.
+ * The opt-in self-update upgrades only an install it can identify from it.
+ */
+export function resolveEntryPath(argv1: string | undefined = process.argv[1]): string | null {
+	if (!argv1) return null;
+	try {
+		return realpathSync(argv1);
+	} catch {
+		return null;
+	}
+}

@@ -28,7 +28,7 @@ import { FleetNodeHealthSample } from '../entities/fleet-node-health-sample.enti
 import { FleetNodeHealthSampleRepository } from './fleet-node-health-sample.repository';
 import { FleetNodeHealthService } from './fleet-node-health.service';
 import { NEEDS_A_LOOK_PRODUCERS } from './needs-a-look/needs-a-look.producer';
-import { FL03_NEEDS_A_LOOK_PRODUCERS } from './needs-a-look/producers';
+import { FL02_NEEDS_A_LOOK_PRODUCERS, FL03_NEEDS_A_LOOK_PRODUCERS } from './needs-a-look/producers';
 import { FleetAccessService } from './fleet-access.service';
 import { FleetOrganizationDirectory } from './fleet-organization-directory';
 import { NeedsALookService } from './needs-a-look/needs-a-look.service';
@@ -132,10 +132,12 @@ import { NeedsALookService } from './needs-a-look/needs-a-look.service';
         FleetNodeHealthService,
         // Fleet "needs a look" (seam owned by FL-01) and FL-03's producers.
         ...FL03_NEEDS_A_LOOK_PRODUCERS,
+        // FL-02's producer (the version floor, `node-upgrade-required`).
+        ...FL02_NEEDS_A_LOOK_PRODUCERS,
         {
             provide: NEEDS_A_LOOK_PRODUCERS,
             useFactory: (...producers: unknown[]) => producers,
-            inject: [...FL03_NEEDS_A_LOOK_PRODUCERS],
+            inject: [...FL03_NEEDS_A_LOOK_PRODUCERS, ...FL02_NEEDS_A_LOOK_PRODUCERS],
         },
         // Fleet hub (FL-01).
         FleetOrganizationDirectory,

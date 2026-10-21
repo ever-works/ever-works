@@ -831,3 +831,29 @@ export interface FleetNodeLinkView {
 	bytesOut: number;
 	openChannels: number;
 }
+
+// ─── The computer-session leg over the link (FL-02 T-22, spec FR-34) ───────
+
+/**
+ * Channel-0 message a node sends when a live view (`computer-session`) it
+ * runs wants its inbound leg over the link: `{ type, sessionId }`. A node
+ * cannot open channels (CONTRACTS §3.2), so it asks, and the replica holding
+ * its link opens a `desktop` channel with `{ source:
+ * FLEET_LINK_COMPUTER_LEG_SOURCE, sessionId }` once it has checked the view
+ * is pinned to that node and live. The legacy WebSocket leg stays the
+ * fallback.
+ */
+export const FLEET_LINK_COMPUTER_LEG_REQUEST = 'computer.leg';
+
+/** `params.source` of a `desktop` channel that carries a live view's browser leg. */
+export const FLEET_LINK_COMPUTER_LEG_SOURCE = 'browser';
+
+/**
+ * JSON `type` on that channel: `{ type, data }`, `data` one computer frame as
+ * the relay encodes it (`encodeComputerFrame`: quality, refresh, mode, input)
+ * — the very frames the legacy leg carries, in the same encoding.
+ */
+export const FLEET_LINK_COMPUTER_LEG_FRAME = 'desktop.frame';
+
+/** How long a node waits for that channel before it opens the legacy leg. */
+export const FLEET_LINK_COMPUTER_LEG_WAIT_MS = 5_000;
