@@ -166,6 +166,21 @@ export type FleetAuditAction =
 	| 'node.logs.read'
 	| 'node.logs.follow'
 	/**
+	 * Files on computers (FL-11, CONTRACTS §7) — `list` (the first listing of
+	 * a root per person per visit), `read` (a download), `write` (an upload),
+	 * `copy` (P2, one row on each computer naming the other), `delete`.
+	 * Details carry `family: 'files'`, `root`, `path`, `entries`, `bytes`,
+	 * `requestedBy`, `confirmationClass`, `confirmed`, `peerNodeId` and
+	 * `outcome`; never a file's contents (spec FR-19).
+	 */
+	| 'node.files.list'
+	| 'node.files.read'
+	| 'node.files.write'
+	| 'node.files.copy'
+	| 'node.files.delete'
+	/** Paste into a desktop (FL-11 P2): the byte count only, never the text (FR-35). */
+	| 'node.clip.paste'
+	/**
 	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
 	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
 	 * (the Command id), `runId`, `requestedBy`, `confirmationClass: 'confirm'`,
@@ -280,6 +295,12 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.session.recording.stop',
 	'node.logs.read',
 	'node.logs.follow',
+	'node.files.list',
+	'node.files.read',
+	'node.files.write',
+	'node.files.copy',
+	'node.files.delete',
+	'node.clip.paste',
 	'node.command.run',
 	'node.command.cancel',
 	'node.service.start',
