@@ -60,6 +60,7 @@ import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport 
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
+import { resolveAllowedRoots } from './link/allowed-roots';
 import { composeNodeLinkModules, createHealthLinkModule, createMachineFactModules, type WakeSender } from './link/modules';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
@@ -867,7 +868,18 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
 		// FL-09 — services and processes (their verbs need --manage on this machine).
-		machineFacts: options.machineFactModules ?? createMachineFactModules(),
+		machineFacts:
+			options.machineFactModules ??
+			createMachineFactModules({
+				docker: {
+					// A bind mount may come only from this computer's shared folders (R-18, R-39).
+					allowedRoots: () =>
+						resolveAllowedRoots({
+							workspaceRoot,
+							...(checkoutsModule ? { readyCheckouts: () => checkoutsModule.readyPaths() } : {})
+						})
+				}
+			}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
