@@ -13149,6 +13149,83 @@
                 "busy": "Busy",
                 "operationFailed": "It did not finish",
                 "internal": "Something went wrong"
+            },
+            "actions": {
+                "button": "Actions",
+                "loading": "Reading what this session can do…",
+                "theAgent": "the agent",
+                "shellNote": "A shell session has no agent to prompt — use Changes and Clean up.",
+                "notInCheckout": "This session is not in a checkout",
+                "none": "Nothing to offer right now.",
+                "unresolved": "{count, plural, one {# unresolved} other {# unresolved}}",
+                "protectedShort": "pushes to a protected branch",
+                "hidden": "{action} is not available: {reason}",
+                "labels": {
+                    "commit": "Commit",
+                    "commitPush": "Commit and push",
+                    "pullRequest": "Open a pull request",
+                    "update": "Update the pull request #{number}",
+                    "review": "Review the changes",
+                    "fixComments": "Fix the review comments",
+                    "resolveConflicts": "Resolve conflicts",
+                    "recap": "Write a recap"
+                },
+                "reasons": {
+                    "shellSession": "a shell session has no agent to prompt",
+                    "ended": "the session has ended — restart it",
+                    "notInCheckout": "this session is not in a checkout",
+                    "noBranch": "the checkout is not on a branch",
+                    "defaultBranch": "not on {branch}",
+                    "protectedBranch": "{branch} is protected",
+                    "noOpenPullRequest": "there is no open pull request",
+                    "noUnresolvedComments": "no review comment is unresolved",
+                    "mergeable": "the pull request merges cleanly"
+                }
+            },
+            "sheet": {
+                "title": "{action} — {who} on {node}",
+                "yourSession": "your session",
+                "theAgent": "the agent",
+                "promptLabel": "The prompt typed into the session",
+                "ownTemplate": "{who}’s own template",
+                "defaultTemplate": "The Ever Works template",
+                "stillAsks": "{who} still asks before running anything you have not allowed.",
+                "stillAsksOwner": "The CLI still asks before running anything you have not allowed.",
+                "costAgent": "Uses {who}’s model; shown in Actions so far with its cost.",
+                "costOwner": "Runs on your own login; your session’s total cost is shown in Actions so far.",
+                "pushesProtected": "This pushes straight to {branch}.",
+                "readAsAnswer": "{who} is waiting for an answer — your action will be read as the answer.",
+                "cancel": "Cancel",
+                "send": "Send",
+                "sending": "Sending…",
+                "sent": "{action} sent",
+                "notDelivered": "Not delivered — {node} did not confirm it. Send it again from Actions so far."
+            },
+            "pullRequestDialog": {
+                "titleOpen": "Open a pull request",
+                "titleUpdate": "Update the pull request #{number}",
+                "branchLine": "{branch} into {base}",
+                "notPushed": "The branch is not pushed yet — push it first, or the pull request cannot be opened.",
+                "titleLabel": "Title",
+                "bodyLabel": "Description",
+                "draft": "Draft",
+                "byPlatform": "Opened by Ever Works through the GitHub App as you.",
+                "cancel": "Cancel",
+                "submitOpen": "Open the pull request",
+                "submitUpdate": "Update it",
+                "working": "Working…",
+                "opened": "Pull request #{number} opened",
+                "updated": "Pull request #{number} updated"
+            },
+            "ledger": {
+                "title": "Actions so far",
+                "costUnknown": "cost unknown",
+                "sessionTotalOnly": "session total only",
+                "cost": "≈ {tokens} tokens · {cost}",
+                "notDelivered": "not delivered",
+                "pending": "sending…",
+                "resend": "Send again",
+                "stillNotDelivered": "Still not delivered — the computer did not confirm it."
             }
         },
         "checkouts": {
