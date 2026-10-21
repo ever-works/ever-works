@@ -5,6 +5,11 @@ import {
     clampFleetSessionSize,
     effectiveConsents,
     fleetFamilyAllows,
+    FLEET_AGENT_SESSION_DEFAULT_PERMISSION_MODE,
+    FLEET_AGENT_SESSION_LEASE_TTL_SEC,
+    FLEET_AGENT_SESSION_QUEUED_TIMEOUT_MS,
+    FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH,
+    isFleetAgentSessionProvider,
     FLEET_SESSION_CWD_MAX_LENGTH,
     FLEET_SESSION_END_GRACE_MS,
     FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
@@ -15,8 +20,10 @@ import {
     isFleetSessionKind,
     isFleetSessionLive,
     isFleetSessionStartableProvider,
+    type FleetAgentSessionResult,
     type FleetAuditAction,
     type FleetSessionEndedReason,
+    type FleetSessionOutcome,
     type FleetSessionEventMessage,
     type FleetSessionListMessage,
     type FleetSessionListResponse,
@@ -26,6 +33,8 @@ import {
 } from '@ever-works/contracts';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import type { FleetSession } from '../../entities/fleet-session.entity';
+import { AgentRepository } from '../../database/repositories/agent.repository';
+import { AgentRunRepository } from '../../database/repositories/agent-run.repository';
 import { redactSecrets } from '../../utils/secret-scan';
 import { FleetAccessService } from '../fleet-access.service';
 import { FleetAuditService } from '../fleet-audit.service';
@@ -55,6 +64,7 @@ import {
     type FleetSessionListQuery,
 } from './fleet-session.repository';
 import { toFleetSessionView } from './fleet-session.view';
+import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
 
 /**
  * Sessions on computers (FL-04) — the platform's one writer of
@@ -78,6 +88,19 @@ import { toFleetSessionView } from './fleet-session.view';
 /** Who acts. P1: a person; P2 adds Agents (always Agent sessions, FR-51). */
 export interface FleetSessionActor {
     userId: string;
+    /**
+     * Set when an Agent acts through its tools (FL-04 P2, FR-51): every start is
+     * then an Agent session of THIS Agent, never an owner session, whatever the
+     * request says. `userId` is the Agent's owner.
+     */
+    agentId?: string;
+}
+
+/** How an `agent-session` job settled (the API's job listener reports it). */
+export interface FleetAgentSessionJobSettlement {
+    succeeded: boolean;
+    result: Partial<FleetAgentSessionResult> | null;
+    error: string | null;
 }
 
 export interface FleetSessionEndRequest {
@@ -165,6 +188,15 @@ export class FleetSessionService {
         private readonly killSwitch: FleetKillSwitchService,
         @Optional() private readonly audit?: FleetAuditService,
         @Optional() @Inject(FLEET_SESSION_NODE_PORT) private readonly node?: FleetSessionNodePort,
+        // FL-04 P2 — Agent sessions: the Agent (ownership), its Run, and the
+        // `agent-session` job. `@Optional()` so a context without them (a
+        // test, the worker) answers "this deployment does not run Agent
+        // sessions" instead of failing to boot.
+        @Optional() private readonly agents?: AgentRepository,
+        @Optional() private readonly runs?: AgentRunRepository,
+        @Optional()
+        @Inject(AGENT_SESSION_DISPATCHER)
+        private readonly agentDispatcher?: AgentSessionDispatcher,
     ) {}
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -285,15 +317,15 @@ export class FleetSessionService {
         options: { restartOf?: FleetSession } = {},
     ): Promise<FleetSessionView> {
         const { node } = await this.nodeFor(nodeId, actor);
-        const kind = request.kind;
+        // FR-51: an Agent acting through its tools only ever starts an Agent session of itself.
+        const kind = actor.agentId ? 'agent' : request.kind;
         if (!isFleetSessionKind(kind)) throw fleetSessionError('invalid', 'kind');
-        if (kind !== 'owner') {
-            throw fleetSessionError(
-                'invalid',
-                'Agent sessions are not available on this deployment yet',
-                {
-                    kind,
-                },
+        if (kind === 'agent') {
+            return this.startAgent(
+                node,
+                actor,
+                actor.agentId ? { ...request, kind: 'agent', agentId: actor.agentId } : request,
+                options,
             );
         }
         if (!isFleetSessionStartableProvider(request.provider))
@@ -507,6 +539,12 @@ export class FleetSessionService {
                 provider: session.provider,
                 cwd: session.cwd,
                 title: session.title,
+                // An Agent session starts again as the same Agent, with the
+                // first message it kept (redacted when it was stored).
+                ...(session.kind === 'agent' && session.agentId ? { agentId: session.agentId } : {}),
+                ...(session.kind === 'agent' && session.firstMessage
+                    ? { firstMessage: session.firstMessage }
+                    : {}),
                 ...(size.cols !== undefined ? { cols: size.cols } : {}),
                 ...(size.rows !== undefined ? { rows: size.rows } : {}),
             },
@@ -604,6 +642,13 @@ export class FleetSessionService {
             }
         }
         const ended = await this.endRow(session, 'user');
+        if (session.kind === 'agent') {
+            // Ending either ends both (R-1): withdraw the job (a queued one is
+            // dropped, a claimed one sees the cancel on its next keep-alive) and
+            // settle the Run.
+            await this.withdrawAgentJob(session.id);
+            await this.settleAgentRun(ended, 'cancelled', 'the session was ended by a person');
+        }
         await this.record('node.session.end', actor.userId, node, session.id, {
             reason: 'user',
             confirmationClass: 'confirm',
@@ -788,7 +833,319 @@ export class FleetSessionService {
             const next = await this.endRow(row, 'timeout');
             if (next.state === 'ended' && next.endedReason === 'timeout') ended += 1;
         }
+        // FL-04 P2: an Agent session waits for a slot (its job is queued) — up
+        // to ten minutes, then it is ended `timeout` with its job and Run.
+        const agentCutoff = new Date(this.now() - FLEET_AGENT_SESSION_QUEUED_TIMEOUT_MS);
+        for (const row of await this.sessions.findAgentStartingBefore(agentCutoff)) {
+            const next = await this.endRow(row, 'timeout');
+            if (next.state === 'ended' && next.endedReason === 'timeout') {
+                ended += 1;
+                await this.withdrawAgentJob(row.id);
+                await this.settleAgentRun(next, 'unconfirmed', 'no computer slot became free within ten minutes');
+            }
+        }
         return { ended };
+    }
+
+    // ─── Agent sessions (FL-04 P2) ─────────────────────────────────────────
+
+    /**
+     * Start an AGENT session (spec FR-42 … FR-51): the Agent (the caller's own),
+     * an agent CLI, a first message of 3–4 000 characters, the policy's chain
+     * (kill switch → node state → `--work` → reachable → daemon → CLI), then:
+     *
+     *   1. the session row, `starting` (its id is the daemon's session id);
+     *   2. its Run, trigger `session`, linked both ways (R-1);
+     *   3. the durable `agent-session` job pinned to the node, counted against
+     *      its `--concurrency` like `agent-task` (R-28) — the session stays
+     *      `starting` while the job waits for a slot.
+     *
+     * A start that cannot be queued ends the row and fails the Run, so there is
+     * never a session waiting on a job that does not exist. The first message
+     * is stored redacted; the job carries it as typed (like a Task's prompt).
+     */
+    private async startAgent(
+        node: FleetNode,
+        actor: FleetSessionActor,
+        request: FleetSessionStartRequest,
+        options: { restartOf?: FleetSession } = {},
+    ): Promise<FleetSessionView> {
+        const provider = request.provider;
+        if (!isFleetAgentSessionProvider(provider)) {
+            throw fleetSessionError('invalid', 'an Agent drives Claude Code or Codex in a session', {
+                field: 'provider',
+            });
+        }
+        const agentId = typeof request.agentId === 'string' ? request.agentId : '';
+        if (!/^[0-9a-f-]{36}$/i.test(agentId)) {
+            throw fleetSessionError('invalid', 'choose the Agent that works in this session', {
+                field: 'agentId',
+            });
+        }
+        const firstMessage = typeof request.firstMessage === 'string' ? request.firstMessage : '';
+        const trimmed = firstMessage.trim();
+        if (
+            trimmed.length < FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH ||
+            firstMessage.length > FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH ||
+            firstMessage.includes('\0')
+        ) {
+            throw fleetSessionError(
+                'invalid',
+                'an Agent session starts with a first message of 3–4 000 characters',
+                { field: 'firstMessage' },
+            );
+        }
+        const cwd = typeof request.cwd === 'string' ? request.cwd.trim() : '';
+        if (cwd.length === 0 || cwd.length > FLEET_SESSION_CWD_MAX_LENGTH || cwd.includes('\0')) {
+            throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
+        }
+        if (request.newWorktreeOf || request.checkoutId) {
+            throw fleetSessionError('invalid', 'New worktrees arrive with Checkouts', {
+                field: 'checkout',
+            });
+        }
+        if (!this.agents || !this.runs || !this.agentDispatcher) {
+            throw fleetSessionError('unreachable', 'this deployment does not run Agent sessions yet');
+        }
+        const agent = await this.agents.findByIdAndUser(agentId, actor.userId);
+        if (!agent) throw fleetSessionError('not_found', 'no such Agent', { field: 'agentId' });
+        // A node leases only its own owner's jobs, so an Agent session runs on the
+        // person's own computer (lane-log decision 36, question Q5).
+        if (node.userId !== actor.userId) {
+            throw fleetSessionError(
+                'unsupported_on_node',
+                `Agent sessions run on your own computers for now; ${node.name} belongs to someone else`,
+            );
+        }
+
+        const title = (
+            request.title?.trim() || defaultFleetSessionTitle(provider, cwd, firstMessage)
+        ).slice(0, FLEET_SESSION_TITLE_MAX_LENGTH);
+        const size = clampFleetSessionSize(request.cols, request.rows);
+        const consents =
+            this.node?.liveConsents(node.id) ??
+            effectiveConsents({
+                consents: node.consents,
+                capabilities: node.capabilities,
+                workerState: node.workerState,
+            });
+        const action: FleetAuditAction = options.restartOf
+            ? 'node.session.restart'
+            : 'node.session.start';
+        const refusal = canStartFleetSession({
+            node: {
+                name: node.name,
+                status: node.status,
+                kind: node.kind,
+                capabilities: node.capabilities ?? [],
+                lastHeartbeatAt: node.lastHeartbeatAt ?? null,
+                sessionDaemon: node.sessionDaemon ?? null,
+            },
+            consents,
+            kind: 'agent',
+            provider,
+            killSwitchOn: await this.isStopped(),
+            linkConnected: this.node?.isConnected(node.id) ?? false,
+            liveOwnerSessions: [],
+            lastSeenAgo: describeAgo(node.lastHeartbeatAt ?? null, this.now()),
+        });
+        if (refusal) {
+            await this.record(action, actor.userId, node, null, {
+                kind: 'agent',
+                provider,
+                agentId,
+                confirmationClass: 'plain',
+                outcome: 'refused',
+                code: refusal.code,
+            });
+            throw fleetSessionError(refusal.code, refusal.hint, refusal.details);
+        }
+
+        const id = randomUUID();
+        const now = new Date(this.now());
+        let row = await this.sessions.create({
+            id,
+            nodeId: node.id,
+            userId: actor.userId,
+            organizationId: node.organizationId ?? null,
+            kind: 'agent',
+            provider,
+            agentId,
+            agentRunId: null,
+            checkoutId: null,
+            cwd,
+            title,
+            state: 'starting',
+            outcome: null,
+            daemonSessionId: id,
+            providerSessionId: null,
+            firstMessage: redactSecrets(firstMessage).cleaned,
+            lastScreen: null,
+            restartOfSessionId: options.restartOf?.id ?? null,
+            startedBy: `agent:${agentId}`,
+            lastActivityAt: now,
+            startedAt: null,
+            endedAt: null,
+            endedReason: null,
+            exitCode: null,
+            recordingState: 'off',
+        });
+        let runId: string;
+        try {
+            const run = await this.runs.createQueued({
+                agentId,
+                userId: actor.userId,
+                triggerKind: 'session',
+                organizationId: node.organizationId ?? null,
+                runnerKind: 'fleet-session',
+                fleetSessionId: id,
+            });
+            runId = run.id;
+            await this.sessions.update(id, { agentRunId: run.id });
+            row = { ...row, agentRunId: run.id } as FleetSession;
+        } catch (error) {
+            this.logger.warn(
+                `Agent session ${id}: its Run could not be created: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            await this.endRow(row, 'exit');
+            throw fleetSessionError('internal', 'the Agent session could not start');
+        }
+
+        try {
+            await this.agentDispatcher.enqueue({
+                payload: {
+                    fleetSessionId: id,
+                    agentId,
+                    agentRunId: runId,
+                    nodeId: node.id,
+                    provider,
+                    cwd,
+                    title,
+                    firstMessage,
+                    cols: size.cols,
+                    rows: size.rows,
+                    permissionMode: FLEET_AGENT_SESSION_DEFAULT_PERMISSION_MODE,
+                    leaseTtlSec: FLEET_AGENT_SESSION_LEASE_TTL_SEC,
+                },
+                userId: actor.userId,
+                organizationId: node.organizationId ?? null,
+            });
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Agent session ${id}: its job could not be queued: ${reason}`);
+            await this.runs.markDispatchFailed(runId, 'the Agent session could not be queued');
+            await this.endRow(row, 'exit');
+            await this.record(action, actor.userId, node, id, {
+                kind: 'agent',
+                provider,
+                agentId,
+                confirmationClass: 'plain',
+                outcome: 'refused',
+                code: 'unreachable',
+            });
+            throw fleetSessionError('unreachable', `${node.name} could not be asked to start the session`);
+        }
+        await this.record(action, actor.userId, node, id, {
+            kind: 'agent',
+            provider,
+            agentId,
+            agentRunId: runId,
+            confirmationClass: 'plain',
+            outcome: 'queued',
+            ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
+        });
+        return toFleetSessionView(row);
+    }
+
+    /**
+     * The `agent-session` job was leased (the API's job listener): the Run is
+     * running. A lease of a session that is already over is withdrawn at once
+     * (the machine ends it on its next keep-alive). Never throws.
+     */
+    async agentSessionLeased(fleetSessionId: string): Promise<void> {
+        try {
+            const row = await this.sessions.findById(fleetSessionId);
+            if (!row || row.kind !== 'agent') return;
+            if (!isFleetSessionLive(row.state)) {
+                await this.withdrawAgentJob(row.id);
+                return;
+            }
+            if (row.agentRunId && this.runs) await this.runs.markStarted(row.agentRunId, null);
+        } catch (error) {
+            this.logger.warn(
+                `Agent session ${fleetSessionId}: lease not applied: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /**
+     * The `agent-session` job settled (done, failed, cancelled, expired): the
+     * session ends if it has not already (its exit evidence, else
+     * `unconfirmed`), and the Run settles with it. Idempotent; never throws.
+     */
+    async agentSessionJobSettled(
+        fleetSessionId: string,
+        settlement: FleetAgentSessionJobSettlement,
+    ): Promise<void> {
+        try {
+            const row = await this.sessions.findById(fleetSessionId);
+            if (!row || row.kind !== 'agent') return;
+            let current = row;
+            if (isFleetSessionLive(row.state)) {
+                const reason = settlement.result?.endedReason ?? 'exit';
+                current = await this.endRow(row, reason);
+                const exitCode =
+                    typeof settlement.result?.exitCode === 'number' ? settlement.result.exitCode : null;
+                if (exitCode !== null && current.exitCode === null) {
+                    await this.sessions.update(row.id, { exitCode });
+                    current = { ...current, exitCode } as FleetSession;
+                }
+            }
+            const outcome: FleetSessionOutcome =
+                settlement.result?.outcome ??
+                current.outcome ??
+                (settlement.succeeded ? 'success' : 'failure');
+            await this.settleAgentRun(
+                current,
+                outcome,
+                settlement.error ?? (settlement.succeeded ? 'the session ended' : 'the session failed'),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Agent session ${fleetSessionId}: settlement not applied: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /** Withdraw an Agent session's job; best effort. */
+    private async withdrawAgentJob(fleetSessionId: string): Promise<void> {
+        try {
+            await this.agentDispatcher?.cancelForSession?.(fleetSessionId);
+        } catch (error) {
+            this.logger.debug(
+                `Agent session ${fleetSessionId}: job not withdrawn: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /** Settle the Run of an ended Agent session (CAS on non-terminal: a second settle is a no-op). */
+    private async settleAgentRun(
+        row: Pick<FleetSession, 'id' | 'agentRunId' | 'userId'>,
+        outcome: FleetSessionOutcome,
+        summary: string,
+    ): Promise<void> {
+        if (!row.agentRunId || !this.runs) return;
+        try {
+            if (outcome === 'success') await this.runs.markCompleted(row.agentRunId, summary);
+            else if (outcome === 'cancelled') await this.runs.cancel(row.agentRunId, row.userId);
+            else await this.runs.markFailed(row.agentRunId, summary);
+        } catch (error) {
+            this.logger.warn(
+                `Agent session ${row.id}: its Run ${row.agentRunId} was not settled: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     // ─── Internals ─────────────────────────────────────────────────────────
@@ -825,6 +1182,13 @@ export class FleetSessionService {
                     outcome: 'ended',
                     requestedBy: `system:${patch.endedReason}`,
                 });
+            }
+            if (row.kind === 'agent') {
+                await this.settleAgentRun(
+                    { ...row, ...written } as FleetSession,
+                    patch.outcome ?? 'unconfirmed',
+                    patch.endedReason ? `the session ended (${patch.endedReason})` : 'the session ended',
+                );
             }
         } else {
             await this.sessions.update(row.id, written);

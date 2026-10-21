@@ -113,15 +113,24 @@ export function isFleetJobActive(status: FleetJobStatus): boolean {
  * one), plus `screen` only for the screen channel and `terminal` only for
  * the terminal channel — so a display-less machine can still serve a
  * terminal-only view.
+ *
+ * `agent-session` (FL-04 P2, CONTRACTS R-28) is an Agent working in an
+ * interactive terminal session on ONE machine: pinned to the node the
+ * session was started on, leased by its work lane and counted against its
+ * `--concurrency` exactly like `agent-task`, so it survives platform restarts
+ * and waits when the slots are full. The node launches the CLI under the
+ * Task-run isolation inside its session daemon and holds the lease while the
+ * session lives; the job completes with the exit evidence.
  */
-export type FleetJobKind = 'acceptance-checks' | 'agent-task' | 'browser-check' | 'computer-session';
+export type FleetJobKind = 'acceptance-checks' | 'agent-task' | 'browser-check' | 'computer-session' | 'agent-session';
 
 /** Canonical job-kind list. */
 export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
 	'acceptance-checks',
 	'agent-task',
 	'browser-check',
-	'computer-session'
+	'computer-session',
+	'agent-session'
 ];
 
 /**
@@ -244,7 +253,12 @@ export const FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC: Readonly<Record<FleetJobKind,
 	// 40 seconds, which cancels its job there and then. The queue SLA is only
 	// the backstop behind that, so it deliberately does not undercut the
 	// shortest existing default (the fallback an unknown kind fails closed to).
-	'computer-session': 2 * 60 * 60
+	'computer-session': 2 * 60 * 60,
+	// An Agent session (FL-04 P2). Like the live view it does not undercut the
+	// shortest existing default (the fallback an unknown kind fails closed to):
+	// the session sweeper ends one still waiting after ten minutes, and this
+	// queue SLA is only the backstop behind it.
+	'agent-session': 2 * 60 * 60
 });
 
 /** Floor/ceiling clamps applied to any operator-supplied queued max age. */

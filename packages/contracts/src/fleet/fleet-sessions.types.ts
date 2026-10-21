@@ -777,3 +777,112 @@ export function parseFleetSessionAck(value: unknown): FleetSessionAckMessage | n
 	const sessionIds = record.sessionIds.filter(isFleetDaemonSessionId).slice(0, FLEET_SESSION_LIST_MAX);
 	return { type: 'session.ack', sessionIds };
 }
+
+// ─── Agent sessions (FL-04 P2, the `agent-session` job) ─────────────────────
+
+/** The agent CLIs an Agent session may drive (an Agent never drives a bare shell). */
+export const FLEET_AGENT_SESSION_PROVIDERS = ['claude-code', 'codex'] as const;
+
+export type FleetAgentSessionProvider = (typeof FLEET_AGENT_SESSION_PROVIDERS)[number];
+
+export function isFleetAgentSessionProvider(value: unknown): value is FleetAgentSessionProvider {
+	return typeof value === 'string' && (FLEET_AGENT_SESSION_PROVIDERS as readonly string[]).includes(value);
+}
+
+/** How long a node holds an `agent-session` lease between keep-alives (the worker renews at a third). */
+export const FLEET_AGENT_SESSION_LEASE_TTL_SEC = 300;
+
+/** An Agent session still waiting for a slot this long after it was asked for is ended (the sweeper). */
+export const FLEET_AGENT_SESSION_QUEUED_TIMEOUT_MS = 10 * 60_000;
+
+/** The permission modes an Agent session may run under (spec FR-47; the default is `acceptEdits`). */
+export const FLEET_AGENT_SESSION_PERMISSION_MODES = ['default', 'acceptEdits', 'plan'] as const;
+
+export type FleetAgentSessionPermissionMode = (typeof FLEET_AGENT_SESSION_PERMISSION_MODES)[number];
+
+export const FLEET_AGENT_SESSION_DEFAULT_PERMISSION_MODE: FleetAgentSessionPermissionMode = 'acceptEdits';
+
+/**
+ * The `agent-session` job payload. Ids, the folder and the first message —
+ * never a command line, never a credential: the node composes argv and the
+ * isolated environment itself (CONTRACTS R-5, R-28).
+ */
+export interface FleetAgentSessionPayload {
+	/** The `fleet_sessions` row; also the daemon's session id. */
+	fleetSessionId: string;
+	agentId: string;
+	/** The Run this session owns (trigger `session`). */
+	agentRunId: string;
+	/** The ONE machine allowed to lease it. */
+	nodeId: string;
+	provider: FleetAgentSessionProvider;
+	cwd: string;
+	title: string;
+	firstMessage: string;
+	cols: number;
+	rows: number;
+	permissionMode: FleetAgentSessionPermissionMode;
+	leaseTtlSec: number;
+}
+
+/** Read an `agent-session` payload off a leased job, or null. */
+export function parseFleetAgentSessionPayload(value: unknown): FleetAgentSessionPayload | null {
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+	const record = value as Record<string, unknown>;
+	const id = (raw: unknown): raw is string => isFleetDaemonSessionId(raw);
+	if (!id(record.fleetSessionId) || !id(record.agentId) || !id(record.agentRunId) || !id(record.nodeId)) return null;
+	if (!isFleetAgentSessionProvider(record.provider)) return null;
+	if (typeof record.cwd !== 'string' || record.cwd.length === 0 || record.cwd.length > FLEET_SESSION_CWD_MAX_LENGTH)
+		return null;
+	if (record.cwd.includes('\0')) return null;
+	if (
+		typeof record.firstMessage !== 'string' ||
+		record.firstMessage.trim().length < FLEET_SESSION_FIRST_MESSAGE_MIN_LENGTH ||
+		record.firstMessage.length > FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH ||
+		record.firstMessage.includes('\0')
+	)
+		return null;
+	const title =
+		typeof record.title === 'string' && record.title.trim().length > 0
+			? record.title.trim().slice(0, FLEET_SESSION_TITLE_MAX_LENGTH)
+			: 'Agent session';
+	const size = clampFleetSessionSize(record.cols, record.rows);
+	const permissionMode = (FLEET_AGENT_SESSION_PERMISSION_MODES as readonly string[]).includes(
+		record.permissionMode as string
+	)
+		? (record.permissionMode as FleetAgentSessionPermissionMode)
+		: FLEET_AGENT_SESSION_DEFAULT_PERMISSION_MODE;
+	const ttl =
+		typeof record.leaseTtlSec === 'number' && Number.isFinite(record.leaseTtlSec) && record.leaseTtlSec > 0
+			? Math.min(3600, Math.max(30, Math.floor(record.leaseTtlSec)))
+			: FLEET_AGENT_SESSION_LEASE_TTL_SEC;
+	return {
+		fleetSessionId: record.fleetSessionId,
+		agentId: record.agentId,
+		agentRunId: record.agentRunId,
+		nodeId: record.nodeId,
+		provider: record.provider,
+		cwd: record.cwd,
+		title,
+		firstMessage: record.firstMessage,
+		cols: size.cols,
+		rows: size.rows,
+		permissionMode,
+		leaseTtlSec: ttl
+	};
+}
+
+/** What an `agent-session` job completes with: the exit evidence, nothing the terminal printed. */
+export interface FleetAgentSessionResult {
+	exitCode: number | null;
+	outcome: FleetSessionOutcome;
+	/** Why it ended, when something ended it (drain, the Agent, a person). */
+	endedReason?: FleetSessionEndedReason;
+	/** The CLI's own session id when the node saw it (resume, FR-50). */
+	providerSessionId: string | null;
+}
+
+/** The capability tags an `agent-session` job requires: the daemon's, and the CLI's. */
+export function fleetAgentSessionRequiredCapabilities(provider: FleetAgentSessionProvider): string[] {
+	return [FLEET_SESSIONS_CAPABILITY, FLEET_SESSION_PROVIDER_CAPABILITY[provider] ?? provider];
+}
