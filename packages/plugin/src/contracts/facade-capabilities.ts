@@ -150,8 +150,8 @@ export const PLUGIN_CAPABILITIES = {
 	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber',
 	// Cloud computers (FL-17, CONTRACTS R-15) — plugins that create, power and
 	// destroy machines at a cloud provider on the owner's own account and say
-	// what they cost (`IMachineProviderPlugin`). First plugin:
-	// `digitalocean-machines`. Consumed only through
+	// what they cost (`IMachineProviderPlugin`). The first plugin ships under
+	// `packages/plugins/`. Consumed only through
 	// `MachineProviderFacadeService`; see
 	// `capabilities/machine-provider.interface.ts`. Appended **last**, so every
 	// existing constant keeps its value and its position, and landed in the same

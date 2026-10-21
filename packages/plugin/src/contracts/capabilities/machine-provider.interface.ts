@@ -183,7 +183,7 @@ export function isMachineProviderError(value: unknown): value is MachineProvider
  * resolves). Reads are side-effect free.
  */
 export interface IMachineProviderPlugin extends IPlugin {
-	/** Provider display name (`DigitalOcean`). User copy only — core code never branches on it. */
+	/** Provider display name (the provider's brand). User copy only — core code never branches on it. */
 	readonly providerName: string;
 
 	/** True when the settings carry what the provider needs (a token, or a completed sign-in). */

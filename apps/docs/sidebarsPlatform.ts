@@ -207,6 +207,7 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-ports',
 				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
 				'features/fleet-virtual-computers',
+				'features/fleet-cloud-computers',
 				'features/integrations',
 				// The connector catalog is the per-provider detail behind
 				// Integrations — keep the two adjacent.

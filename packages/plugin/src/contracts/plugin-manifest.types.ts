@@ -126,8 +126,8 @@ export const PLUGIN_CATEGORIES = [
 	// this member sits); a mid-tuple insertion still fails both.
 	'identity',
 	// FL-17 (CONTRACTS R-15) — cloud computers: machine providers
-	// (`capabilities/machine-provider.interface.ts`). First plugin:
-	// `digitalocean-machines`. Appended **last**, and — like the three lines
+	// (`capabilities/machine-provider.interface.ts`); the first plugin ships
+	// under `packages/plugins/`. Appended **last**, and — like the three lines
 	// above — landed in the same change as its `CATEGORY_ICONS` /
 	// `CATEGORY_LABELS` entries in `apps/web/src/lib/utils/plugin-category-icons.ts`,
 	// because those maps are `Record<PluginCategory, …>`. The pinning specs that

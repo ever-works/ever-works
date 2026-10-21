@@ -504,7 +504,7 @@ export interface FleetCloudProviderView {
 	pluginId: string;
 	/** The plugin's display name. */
 	name: string;
-	/** The provider's display name (`DigitalOcean`). */
+	/** The provider's display name, as its plugin states it. */
 	providerName: string;
 	/** True when a token is saved or a sign-in completed (spec FR-2). */
 	configured: boolean;

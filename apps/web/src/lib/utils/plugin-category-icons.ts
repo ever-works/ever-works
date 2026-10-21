@@ -95,7 +95,7 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // its two map entries here are one change — these maps are
     // `Record<PluginCategory, …>`, so a missing entry stops apps/web compiling.
     identity: Fingerprint,
-    // FL-17 — machine providers (cloud computers; `digitalocean-machines`).
+    // FL-17 — machine providers (cloud computers created at a cloud provider).
     // Same rule as the lines above: the category and its icon land together.
     'machine-provider': Cloud,
 };
