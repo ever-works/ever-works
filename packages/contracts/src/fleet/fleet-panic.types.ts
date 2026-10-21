@@ -129,7 +129,27 @@ export type FleetAuditAction =
 	 * node's control policy (CONTRACTS §2.1, §7). One row per family changed;
 	 * details carry `family`, `from`, `to` — never a member's name.
 	 */
-	| 'node.policy.change';
+	| 'node.policy.change'
+	/**
+	 * Sessions on computers (FL-04, CONTRACTS §7) — every row carries
+	 * `family: 'sessions'`, `target` (the session id), `requestedBy`,
+	 * `confirmationClass` and `outcome`; never terminal bytes, typed input
+	 * or the first message (spec FR-36).
+	 */
+	| 'node.session.start'
+	/** Someone attached as a viewer or a driver (one row per attach, with the role). */
+	| 'node.session.attach'
+	/** One driver span — written once when it ends, with its start, end and byte count; never per keystroke. */
+	| 'node.session.input'
+	/** A prompt was answered (FL-05 writes it). */
+	| 'node.session.answer'
+	| 'node.session.rename'
+	/** A new session replaced an ended one (`restartOf`, the new session id). */
+	| 'node.session.restart'
+	/** A session was ended, with its reason. */
+	| 'node.session.end'
+	| 'node.session.recording.start'
+	| 'node.session.recording.stop';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -168,7 +188,16 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.link.connect',
 	'node.link.disconnect',
 	'node.link.channel-open',
-	'node.policy.change'
+	'node.policy.change',
+	'node.session.start',
+	'node.session.attach',
+	'node.session.input',
+	'node.session.answer',
+	'node.session.rename',
+	'node.session.restart',
+	'node.session.end',
+	'node.session.recording.start',
+	'node.session.recording.stop'
 ];
 
 /**

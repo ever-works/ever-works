@@ -55,6 +55,20 @@ Logs go to the journal (`StandardOutput=journal`), which journald already
 rotates and bounds (`SystemMaxUse=` in `journald.conf`), so the unit needs
 nothing of its own.
 
+**Sessions on computers (`--manage`).** A node started with `--manage` (owner
+sessions) or `--work` (Agent sessions) starts a detached **session daemon**
+that owns every session's terminal, so a node restart or upgrade ends no
+session. Under this hardened system unit two of its settings apply to that
+daemon too: the default `KillMode=control-group` stops the daemon — and every
+session — whenever the service stops or restarts, and `ProtectHome=read-only`
+/ `PrivateTmp=true` mean an owner session cannot write to its own home. The
+unit is left as it is (it is built for running jobs); a machine that should
+host owner sessions runs the node as the person's own **user** service
+(`systemctl --user`, with `loginctl enable-linger <user>`), or adds a drop-in
+with `KillMode=process` and `ProtectHome=false` after weighing what that
+means for jobs (a crashed node then leaves job processes behind, which the
+worker's quarantine gate already catches on the next start).
+
 ## Windows
 
 Enroll first, **as the account the node will run as**, then install from an
@@ -219,6 +233,15 @@ master key: Windows Credential Manager reads fail there exactly as they do
 under LocalSystem. The preflight says so. (A gMSA is not S4U either — its
 password is held by the domain controller, so it registers as a `Password`
 logon with no value.)
+
+The service also sets NSSM's `AppKillProcessTree` to `0`. A node started
+with `--manage` or `--work` starts a detached **session daemon** that owns
+every session's terminal (sessions on computers); NSSM's default would kill it
+— and every session — with the service's process tree on each stop, restart
+or upgrade. With the tree kill off only `node.exe` stops, and the next node
+process finds the daemon and its sessions where they were. (The scheduled-task
+branch never killed the tree.) Re-run the installer to apply it to a service
+installed before it existed.
 
 Remove with `uninstall-service.ps1`. That leaves the node enrolled — use
 `ever-works-node unenroll` to retire it on the platform too.

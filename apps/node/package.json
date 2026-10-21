@@ -41,7 +41,12 @@
 		"@ever-works/local-workspace-plugin": "workspace:*",
 		"@ever-works/plugin": "workspace:*",
 		"@ever-works/pty-local-plugin": "workspace:*",
+		"@xterm/addon-serialize": "^0.14.0",
+		"@xterm/headless": "^6.0.0",
 		"commander": "^14.0.2"
+	},
+	"optionalDependencies": {
+		"@homebridge/node-pty-prebuilt-multiarch": "^0.13.1"
 	},
 	"devDependencies": {
 		"@types/node": "^26.6.4",
