@@ -116,7 +116,7 @@
 
 ## P3 — Native fallback and editors
 
-- [ ] **T-39**. `apps/node/src/core/link/modules/schedule/native-scheduler/{cron,launchd,task-scheduler}.ts` + CLI verb `ever-works-node schedule-run <id>` in `apps/node/src/cli/program.ts`; install only when the node is not running as a service; remove on unenroll.
+- [x] **T-39**. `apps/node/src/core/link/modules/schedule/native-scheduler/{cron,launchd,task-scheduler}.ts` + CLI verb `ever-works-node schedule-run <id>` in `apps/node/src/cli/program.ts`; install only when the node is not running as a service; remove on unenroll.
       **Test**: per-OS spec with a fake command runner — block markers, idempotent install/remove.
 - [ ] **T-40**. Only once CONTRACTS §6 makes the grace and the failure threshold per schedule (spec §8b): editors for both in the dialog's **Advanced** section, with the columns that change adds.
       **Test**: unit spec — the clamps CONTRACTS then fixes; without the CONTRACTS change this task stays open.

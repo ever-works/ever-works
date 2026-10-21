@@ -76,12 +76,18 @@ import {
 } from './link/modules';
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
 import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
+import { createClipLinkModule, PasteTargets } from './link/modules/clip';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
 import { createSessionModule, type SessionModule } from './link/modules/session';
 import { createCommandModule } from './link/modules/command';
 import { createScheduleModule, type ScheduleModule } from './link/modules/schedule';
+import {
+	createNativeScheduler,
+	isNodeRunningAsService,
+	type NativeScheduleEntry
+} from './link/modules/schedule/native-scheduler';
 import { CommandOutputStore } from './link/modules/command/command-output-store';
 import { createPortsModule, type PortsModule } from './link/modules/ports';
 import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
@@ -730,6 +736,16 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	scheduleDir?: string;
 	/**
+	 * Schedules on computers (FL-13 P3) — `start --native-schedules`: when this
+	 * process does NOT run under a service manager, also hand every held
+	 * schedule to the operating system's scheduler (crontab block, LaunchAgents,
+	 * Task Scheduler folder), which starts `ever-works-node schedule-run <id>`
+	 * so a fire still runs while nobody has the node open. Opt-in.
+	 */
+	nativeSchedules?: boolean;
+	/** How the OS scheduler starts this build's CLI (the program and the arguments before `schedule-run <id>`). */
+	nativeScheduleCommand?: { file: string; args: string[] };
+	/**
 	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
 	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
 	 * tab lists log files under them (and FL-11's Files tab will browse them).
@@ -1129,10 +1145,50 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// when the shell runs one — the broker matches the `desktop` channels the
 	// platform opens to the views that asked (the legacy leg stays the fallback).
 	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
+	// Paste into a desktop (FL-11 P2): live views register here; the `clip`
+	// family (under `--attend`) reaches them through their own injectors.
+	const pasteTargets = new PasteTargets();
+	const clipLinkModule = consents.attend
+		? createClipLinkModule({ targets: pasteTargets, nodeName: config.name?.trim() || 'this computer' })
+		: null;
 	// Schedules on computers (FL-13): the `schedule` family and the machine's own
 	// timer loop, for a process started with --manage. The loop starts now —
 	// independent of the link (FR-12) — and follows the kill switch once a
 	// link is bound below.
+	// FL-13 P3: the OS-scheduler fallback, re-installed whenever the held set changes.
+	const nativeScheduler =
+		consents.manage &&
+		options.scheduleDir &&
+		options.nativeSchedules === true &&
+		options.nativeScheduleCommand &&
+		!isNodeRunningAsService(process.env, io.environment.platform)
+			? createNativeScheduler({
+					platform: io.environment.platform,
+					homedir: osHomedir(),
+					command: options.nativeScheduleCommand,
+					logger: io.logger
+				})
+			: null;
+	let lastNativeEntries = '';
+	const installNative = (entries: NativeScheduleEntry[]) => {
+		if (!nativeScheduler) return;
+		const key = JSON.stringify(entries);
+		if (key === lastNativeEntries) return;
+		lastNativeEntries = key;
+		void nativeScheduler
+			.install(entries)
+			.then((result) => {
+				for (const skipped of result.skipped) {
+					io.logger.warn(`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`);
+				}
+			})
+			.catch((error: unknown) => {
+				lastNativeEntries = '';
+				io.logger.warn(
+					`Schedules: the ${nativeScheduler.kind} fallback could not be updated: ${error instanceof Error ? error.message : String(error)}`
+				);
+			});
+	};
 	const scheduleModule: ScheduleModule | null =
 		consents.manage && options.scheduleDir
 			? createScheduleModule({
@@ -1144,7 +1200,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					env: process.env,
 					...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
 					timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
-					logger: io.logger
+					logger: io.logger,
+					...(nativeScheduler
+						? {
+								onHeld: (definitions) =>
+									installNative(
+										definitions.map((definition) => ({ id: definition.id, cadence: definition.cadence }))
+									)
+							}
+						: {})
 				})
 			: null;
 	if (scheduleModule) {
@@ -1188,6 +1252,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			healthLinkModule,
 			...(logsLinkModule ? [logsLinkModule] : []),
 			...(filesLinkModule ? [filesLinkModule] : []),
+			...(clipLinkModule ? [clipLinkModule] : []),
 			...(virtualModule ? [virtualModule] : []),
 			...(options.linkModules ?? [])
 		],
@@ -1202,9 +1267,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						homedir: osHomedir(),
 						env: process.env,
 						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
-						store: options.commandOutputDir ? new CommandOutputStore({ dir: options.commandOutputDir }) : null,
+						store: options.commandOutputDir
+							? new CommandOutputStore({ dir: options.commandOutputDir })
+							: null,
 						// FL-13: a schedule's run keeps its full output in the schedule's ring.
-						...(scheduleModule ? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) } : {}),
+						...(scheduleModule
+							? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) }
+							: {}),
 						logger: io.logger
 					})
 				}
@@ -1990,6 +2059,8 @@ function createAttendedLane(
 				profileFs,
 				// Fleet node link (FL-02 T-22): the view's leg over the link, when there is one.
 				...(computerLegs ? { linkLegs: computerLegs } : {}),
+				// FL-11 P2: a running view is reachable by a paste through its own injector.
+				pasteTargets,
 				...(options.env ? { env: options.env } : {})
 			},
 			signal

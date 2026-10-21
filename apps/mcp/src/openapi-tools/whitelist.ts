@@ -671,10 +671,10 @@ export const WHITELIST: WhitelistEntry[] = [
 		omitArgs: ['follow']
 	},
 
-	// Files on computers (3) — `apps/api/src/fleet/files/fleet-files.controller.ts`
-	// (FL-11 P1, CONTRACTS §11.3). All read-only: a computer's allowed roots, one
-	// folder's entries (flagged hidden / credential-shaped / link inside the root),
-	// one entry. No MCP tool downloads a file; copy and delete arrive with P2.
+	// Files on computers (5) — `apps/api/src/fleet/files/fleet-files.controller.ts`
+	// (FL-11, CONTRACTS §11.3). Reads (P1): a computer's allowed roots, one folder's
+	// entries (flagged hidden / credential-shaped / link inside the root), one entry.
+	// Acts (P2): copy between computers and delete. No MCP tool downloads a file.
 	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
 	{
 		method: 'GET',
@@ -693,6 +693,20 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/files/stat',
 		toolName: 'fleet_files_stat',
 		annotations: { readOnlyHint: true }
+	},
+	// P2 acts (a person's own client): a copy through Ever Works (skips same-name entries unless
+	// `replace` / `replaceAll`), and a delete that needs `confirmName` (CONTRACTS §2.2).
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/files/copy',
+		toolName: 'fleet_files_copy',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/files/delete',
+		toolName: 'fleet_files_delete',
+		annotations: { destructiveHint: true }
 	},
 
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
@@ -991,7 +1005,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/git/identity',
 		toolName: 'fleet_nodes_git_identity_get',
 		description:
-			"The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.",
+			'The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.',
 		annotations: { readOnlyHint: true }
 	},
 	{

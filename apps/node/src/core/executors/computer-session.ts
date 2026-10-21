@@ -21,6 +21,7 @@ import { ComputerFrameOutbox } from '../screen/frame-outbox';
 import { ComputerInputInjector } from '../screen/input-injector';
 import { type NodeLeg } from '../screen/node-leg';
 import { openComputerSessionLeg, type ComputerLegBroker } from '../link/computer-leg';
+import { injectorPasteTarget, type PasteTargets } from '../link/modules/clip/paste-targets';
 import { startNodeTerminalChannel, type NodeTerminalChannel } from '../screen/terminal-channel';
 
 /**
@@ -131,6 +132,12 @@ export interface ComputerSessionExecutorDeps {
 	 * with the legacy socket leg as the fallback. Absent → the legacy leg.
 	 */
 	linkLegs?: ComputerLegBroker | null;
+	/**
+	 * Paste into a desktop (FL-11 P2) — where a running view registers itself so
+	 * the link's `clip` family can reach its input injector (text lands only while
+	 * this view holds control). Absent → no paste reaches this machine's views.
+	 */
+	pasteTargets?: PasteTargets | null;
 	/** Read for `EVER_WORKS_NODE_LINK_LEGACY_LEG`; defaults to this process's environment. */
 	env?: Record<string, string | undefined>;
 }
@@ -182,6 +189,7 @@ export async function runComputerSessionJob(
 	let terminal: NodeTerminalChannel | null = null;
 	let leg: NodeLeg | null = null;
 	let injector: ComputerInputInjector | null = null;
+	let unregisterPaste: (() => void) | null = null;
 	let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
 	let fatal: ComputerCloseReason | null = null;
 
@@ -250,6 +258,12 @@ export async function runComputerSessionJob(
 					...(logger ? { logger } : {})
 				});
 				injector = inputs;
+				// FL-11 P2: a paste reaches this view through its own injector, and only while it lives.
+				unregisterPaste =
+					deps.pasteTargets?.register(
+						sessionId,
+						injectorPasteTarget((frame) => inputs.inject(frame))
+					) ?? null;
 				leg = openComputerSessionLeg({
 					sessionId,
 					broker: deps.linkLegs ?? null,
@@ -294,6 +308,7 @@ export async function runComputerSessionJob(
 		leg?.close();
 		// The view is over: whatever control it held is over too, and the
 		// Agent is told it may use its browser again.
+		unregisterPaste?.();
 		injector?.setControlled(false);
 		await Promise.allSettled([injector?.idle(), pump?.stop(), terminal?.stop()]);
 	}

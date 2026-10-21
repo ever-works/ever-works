@@ -2,7 +2,7 @@
 id: fleet-files
 title: Files on computers (browse, download, upload, delete)
 sidebar_label: Files on computers
-description: The Files tab of a Fleet computer — only the folders the machine shares (its checkouts, the node's workspace folder, folders listed with --files-root), downloads and uploads streamed through the node link, conflicts listed before anything is replaced, credential-shaped files gated, delete by typed name; nothing stored.
+description: The Files tab of a Fleet computer — only the folders the machine shares (its checkouts, the node's workspace folder, folders listed with --files-root), downloads, uploads and copies between computers streamed through Ever Works, conflicts listed before anything is replaced, credential-shaped files gated, delete by typed name, and pasting text into a live desktop; nothing stored.
 ---
 
 # Files on computers
@@ -78,11 +78,43 @@ Names that look like credentials — environment files (`.env`, `.env.*`), priva
 inside) first asks _"This looks like a credential file (.env). Download it anyway? It is sent only to your
 browser."_ **An Agent can never download one.** Only names are checked, never contents.
 
+## Copy to another computer
+
+Select entries and choose **Copy to another computer…**: pick the computer (offline ones, ones without
+machine management and ones that share no folder are listed greyed with the reason), one of its roots and a
+folder under it. **Check and copy** lists every same-name entry at the destination first — Skip by default,
+Replace per entry, Replace all — and then the copy runs as one transfer, shown in the Operations strip of
+**both** computers.
+
+The bytes go **through Ever Works only**: the platform reads from one computer and writes to the other, so the
+two machines never connect to each other (and need not be on the same network). The destination's progress
+paces the source, so a slow disk at one end never floods the platform. A copy follows every rule of an upload —
+a partial folder on the destination, nothing partial left behind on a cancel or a failure, 2 GiB and 5 000
+entries at most — and needs machine management and your `files` access on **both** computers. A
+credential-shaped file inside asks first. Each computer's audit records the copy and names the other one.
+
 ## Delete
 
 **Delete** asks you to type the entry's name — or, for several entries, the folder's name — and names the
 computer: _"Delete old-build from build-01? Type its name to confirm."_ The button enables only on an exact
 match. A link is removed as a link; its target is never touched.
+
+## Paste into a desktop
+
+While you **watch an Agent's computer live** and **hold control** of it, you can paste text from your own
+clipboard into it:
+
+1. switch on **Allow paste into this desktop** for that view — it is off by default, applies to this one view
+   only and is gone when the view ends;
+2. press `Ctrl/⌘+Shift+V`, or choose **Paste text…** — the dialog reads your clipboard (your browser asks once),
+   lets you edit the text, shows its size against the **256 KB** cap, and warns — without blocking — when it
+   looks like a secret: _"It is sent only to design-mac and never stored."_;
+3. **Paste** puts the text where the focus is on that computer.
+
+It is the clipboard's only direction: **nothing is ever read back** from the computer's clipboard, a paste goes
+to exactly one view, and the computer needs `--attend`. The paste is audited with its size only — never the text.
+Without control, or with the switch off, **Paste text…** is disabled and says why (_"Take control first"_,
+_"Switch on paste for this desktop first"_).
 
 ## Who can browse
 
@@ -100,5 +132,9 @@ counts, the bytes and who asked — **never file contents**.
 ## Agents, MCP and the CLI
 
 Agents get read-only tools — `fleet_files_roots`, `fleet_files_list`, `fleet_files_stat` — returning exactly
-what the tab shows, flags included. MCP has the same three. Copying between computers, deleting from an Agent
-(held for your approval) and pasting text into a desktop arrive with the next phase.
+what the tab shows, flags included. An Agent can also **ask** to copy (`fleet_files_copy`: the same-name entries
+at the destination are listed in its answer and skipped unless it asks to replace them) or delete
+(`fleet_files_delete`); both are **held for your approval in My Decisions** and run only when you approve — a
+delete never runs on a name the Agent typed. No Agent downloads a file, and none can paste into a desktop (an
+Agent cannot hold control of one). MCP has the three reads plus copy and delete for your own AI client (delete
+needs `confirmName`, the same typed name the tab asks for).

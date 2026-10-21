@@ -13,8 +13,11 @@ import {
     encodeFleetLinkAck,
     fleetFileBaseName,
     isFleetLinkErrorCode,
+    joinFleetFilePath,
+    sanitizeFleetFilesDownloadCheck,
     sanitizeFleetFilesWritePolicy,
     type FleetFilesOperationKind,
+    type FleetFilesOperationStarted,
     type FleetFilesOperationState,
     type FleetFilesOperationView,
     type FleetFilesTransfersResponse,
@@ -100,6 +103,16 @@ export interface FleetFilesUploadResult {
     replaced: number;
     skipped: number;
     skippedLinks: number;
+}
+
+export interface FleetFilesCopyInput {
+    root: unknown;
+    path?: unknown;
+    entries: unknown;
+    to: { nodeId: unknown; root: unknown; path?: unknown };
+    policy?: FleetFilesWritePolicy;
+    /** Class `confirm`: needed when a credential-shaped file is inside the selection (people only). */
+    confirm?: boolean;
 }
 
 interface TransferRecord {
@@ -197,6 +210,8 @@ export class FleetFilesTransferService {
         entries: number;
         totalBytes: number | null;
         peerNodeId?: string | null;
+        nodeName?: string | null;
+        peerNodeName?: string | null;
     }): TransferRecord {
         const requesterUserId = fleetLinkCallerUserId(input.caller);
         let nodeRunning = 0;
@@ -229,6 +244,8 @@ export class FleetFilesTransferService {
                 kind: input.kind,
                 nodeId: input.nodeId,
                 peerNodeId: input.peerNodeId ?? null,
+                ...(input.peerNodeName ? { peerNodeName: input.peerNodeName } : {}),
+                ...(input.nodeName ? { nodeName: input.nodeName } : {}),
                 label: input.label,
                 root: input.location.root,
                 path: input.location.path,
@@ -585,6 +602,338 @@ export class FleetFilesTransferService {
             for (const frame of early.splice(0)) onFrame(frame.kind, frame.payload);
         }
         return finished;
+    }
+
+    // ─── Copy between computers (P2, FR-24…FR-29) ──────────────────────────
+
+    async copyForUser(
+        userId: string,
+        nodeId: string,
+        input: FleetFilesCopyInput,
+    ): Promise<FleetFilesOperationStarted> {
+        await this.fleet.getVisibleForUser(userId, nodeId);
+        if (typeof input.to?.nodeId === 'string')
+            await this.fleet.getVisibleForUser(userId, input.to.nodeId);
+        return this.copy({ kind: 'user', userId }, nodeId, input);
+    }
+
+    /**
+     * Copy entries from one computer to another — or to another folder of the
+     * same one — THROUGH THE PLATFORM ONLY: a `files.pack` channel on the
+     * source and a `files.unpack` channel on the destination, the source's
+     * `DATA` frames forwarded unchanged to the destination and the destination's
+     * `ACK` credit forwarded back to the source, so the source is never more
+     * than one window ahead of the destination (FR-25) and the two machines
+     * never talk to each other (FR-24). Both computers' `files` audience and
+     * `--manage` are checked when their channels open (FR-28); same-name
+     * entries at the destination follow the policy (Skip by default, FR-26);
+     * one `node.files.copy` row is written on each computer naming the other
+     * (FR-27). Answers once both sides accepted; the bytes move in the
+     * background and the Operations strip of BOTH computers shows the transfer.
+     */
+    async copy(
+        caller: FleetLinkCaller,
+        nodeId: string,
+        input: FleetFilesCopyInput,
+    ): Promise<FleetFilesOperationStarted> {
+        const from = parseFleetFilesLocation(input.root, input.path);
+        const names = parseFleetFilesNames(input.entries, 'entries', FLEET_FILES_LIMITS.maxEntries);
+        const toNodeId = typeof input.to?.nodeId === 'string' ? input.to.nodeId : '';
+        if (!/^[0-9a-f-]{36}$/i.test(toNodeId)) {
+            throw fleetLinkError('invalid', 'to.nodeId — pick a computer', { field: 'to.nodeId' });
+        }
+        const to = parseFleetFilesLocation(input.to?.root, input.to?.path);
+        if (toNodeId === nodeId && to.root === from.root) {
+            if (to.path === from.path) {
+                throw fleetLinkError('invalid', 'Source and destination are the same folder', {
+                    field: 'to.path',
+                });
+            }
+            // U10's sibling: a folder copied into itself would never end.
+            const intoItself = names.some((name) => {
+                const top = joinFleetFilePath(from.path, name);
+                return to.path === top || to.path.startsWith(top + '/');
+            });
+            if (intoItself) {
+                throw fleetLinkError('invalid', 'A folder cannot be copied into itself', {
+                    field: 'to.path',
+                });
+            }
+        }
+        const [source, destination] = await Promise.all([
+            this.nodes.findById(nodeId),
+            this.nodes.findById(toNodeId),
+        ]);
+        if (!source || !destination) throw fleetLinkError('not_found', 'no such computer');
+        const policy = sanitizeFleetFilesWritePolicy(input.policy);
+        const record = this.begin({
+            kind: 'copy',
+            caller,
+            nodeId,
+            ownerUserId: source.userId,
+            location: from,
+            label: names.length === 1 ? names[0] : names.length + ' items',
+            entries: names.length,
+            totalBytes: null,
+            peerNodeId: toNodeId,
+            nodeName: source.name,
+            peerNodeName: destination.name,
+        });
+        const confirmed = caller.kind === 'user' && input.confirm === true;
+        const audit = (outcome: string, details: Record<string, unknown> = {}) =>
+            Promise.all([
+                this.files.record('node.files.copy', caller, nodeId, source.userId, {
+                    direction: 'out',
+                    root: from.root,
+                    path: from.path,
+                    peerNodeId: toNodeId,
+                    entries: record.view.entries,
+                    bytes: record.view.bytes,
+                    confirmationClass: input.confirm === true ? 'confirm' : 'plain',
+                    confirmed,
+                    outcome,
+                    ...details,
+                }),
+                this.files.record('node.files.copy', caller, toNodeId, destination.userId, {
+                    direction: 'in',
+                    root: to.root,
+                    path: to.path,
+                    peerNodeId: nodeId,
+                    entries: record.view.entries,
+                    bytes: record.view.bytes,
+                    confirmationClass: input.confirm === true ? 'confirm' : 'plain',
+                    confirmed,
+                    outcome,
+                    ...details,
+                }),
+            ]).then(() => undefined);
+
+        // The pipe's state, wired before any request so no frame can be missed.
+        let channelA: FleetLinkChannel | null = null;
+        let channelB: FleetLinkChannel | null = null;
+        let piping = false;
+        let credit: number = FLEET_FILES_LIMITS.windowBytes;
+        const queue: Uint8Array[] = [];
+        let endSeen = false;
+        let endSent = false;
+        let settled = false;
+        const tracker = new FleetFilesStreamTracker();
+
+        const finish = (
+            state: Exclude<FleetFilesOperationState, 'running'>,
+            error?: { code: string; hint: string },
+        ) => {
+            if (settled) return;
+            settled = true;
+            this.end(record, state, error ?? null);
+            for (const channel of [channelA, channelB]) {
+                if (channel && !channel.isClosed)
+                    channel.close('normal', state === 'done' ? undefined : state);
+            }
+            void audit(state, error ? { code: error.code } : {});
+        };
+        const flush = () => {
+            while (!settled && queue.length > 0 && credit >= queue[0].byteLength && channelB) {
+                const frame = queue.shift()!;
+                if (!channelB.sendBinary(FLEET_LINK_FRAME_KINDS.DATA, frame)) {
+                    finish('interrupted', {
+                        code: 'unreachable',
+                        hint: destination.name + ' went away during the copy',
+                    });
+                    return;
+                }
+                credit -= frame.byteLength;
+            }
+            if (!settled && endSeen && !endSent && queue.length === 0 && channelB) {
+                endSent = true;
+                channelB.sendBinary(FLEET_LINK_FRAME_KINDS.END, new Uint8Array(0));
+            }
+        };
+        const fromSource = (kind: number, payload: Uint8Array) => {
+            if (settled || !piping) return;
+            if (kind === FLEET_LINK_FRAME_KINDS.DATA) {
+                // The platform reads what it relays (never trusts it): a malformed
+                // stream, a path out of the stream or a size lie ends the copy.
+                const records = decodeFleetFilesRecords(payload);
+                if (!records) {
+                    finish('failed', {
+                        code: 'operation_failed',
+                        hint: source.name + ' sent a malformed transfer stream',
+                    });
+                    return;
+                }
+                let delta = 0;
+                for (const item of records) {
+                    const problem = tracker.push(item);
+                    if (problem) {
+                        finish('failed', { code: 'operation_failed', hint: problem });
+                        return;
+                    }
+                    if (item.tag === FLEET_FILES_RECORD_TAGS.bytes) delta += item.bytes.byteLength;
+                }
+                this.progress(record, delta);
+                queue.push(payload);
+                flush();
+            } else if (kind === FLEET_LINK_FRAME_KINDS.END) {
+                if (!tracker.complete) {
+                    finish('failed', {
+                        code: 'operation_failed',
+                        hint: 'the transfer ended in the middle of a file',
+                    });
+                    return;
+                }
+                endSeen = true;
+                flush();
+            }
+        };
+        const fromDestination = (kind: number, payload: Uint8Array) => {
+            if (settled || kind !== FLEET_LINK_FRAME_KINDS.ACK) return;
+            const granted = decodeFleetLinkAck(payload);
+            if (!granted || granted <= 0) return;
+            credit = Math.min(credit + granted, FLEET_FILES_LIMITS.windowBytes);
+            // FR-25: the source gets credit only for what the destination has written.
+            const ack = encodeFleetLinkAck(granted);
+            if (ack && channelA && !channelA.isClosed)
+                channelA.sendBinary(FLEET_LINK_FRAME_KINDS.ACK, ack);
+            flush();
+        };
+        const closedBy = (name: string) => (reason: FleetLinkCloseReason, hint?: string) => {
+            if (settled) return;
+            finish(this.closeState(reason), {
+                code: reason === 'normal' ? 'unreachable' : reason,
+                hint: hint ?? name + ' stopped the copy',
+            });
+        };
+
+        try {
+            channelA = await this.link.openChannel({
+                nodeId,
+                family: 'files',
+                params: { root: from.root, path: from.path },
+                caller,
+                requirement: {
+                    actionFamily: 'files',
+                    stateChanging: false,
+                    target: from.path || '/',
+                },
+                events: { binary: fromSource, close: closedBy(source.name) },
+            });
+            // What would move, nothing streamed: limits and credential-shaped files first (FR-16, FR-17).
+            const check = sanitizeFleetFilesDownloadCheck(
+                replyResult(
+                    await channelA.request(
+                        FLEET_FILES_MESSAGES.pack,
+                        { entries: names, dryRun: true },
+                        { timeoutMs: PACK_TIMEOUT_MS },
+                    ),
+                ),
+            );
+            if (check.credentialShapedCount > 0 && !confirmed) {
+                const first = fleetFileBaseName(check.credentialShaped[0] ?? '');
+                throw caller.kind === 'user'
+                    ? fleetLinkError(
+                          'confirmation_required',
+                          'This looks like a credential file (' +
+                              first +
+                              '). Copy it to ' +
+                              destination.name +
+                              ' anyway?',
+                          {
+                              class: 'confirm',
+                              credentialShaped: check.credentialShaped,
+                              count: check.credentialShapedCount,
+                          },
+                      )
+                    : fleetLinkError('permission_denied', CREDENTIAL_AGENT_HINT);
+            }
+            record.view.entries = check.entries;
+            record.view.totalBytes = check.bytes;
+            channelB = await this.link.openChannel({
+                nodeId: toNodeId,
+                family: 'files',
+                params: { root: to.root, path: to.path },
+                caller,
+                requirement: { actionFamily: 'files', stateChanging: true, target: to.path || '/' },
+                events: {
+                    binary: fromDestination,
+                    json: (message) => {
+                        if (message.type !== FLEET_FILES_MESSAGES.unpacked || settled) return;
+                        const failure = message.error as
+                            | { code?: unknown; hint?: unknown }
+                            | undefined;
+                        if (failure) {
+                            finish('failed', {
+                                code: isFleetLinkErrorCode(failure.code)
+                                    ? failure.code
+                                    : 'operation_failed',
+                                hint:
+                                    typeof failure.hint === 'string'
+                                        ? failure.hint
+                                        : destination.name + ' could not write the files',
+                            });
+                            return;
+                        }
+                        const count = (value: unknown) =>
+                            typeof value === 'number' && value >= 0 ? value : 0;
+                        record.view.replaced = count(message.replaced);
+                        record.view.skipped = count(message.skipped);
+                        record.view.skippedLinks = count(message.skippedLinks);
+                        finish('done');
+                    },
+                    close: closedBy(destination.name),
+                },
+            });
+            const unpack = replyResult(
+                await channelB.request(
+                    FLEET_FILES_MESSAGES.unpack,
+                    { policy, expectedEntries: check.entries, expectedBytes: check.bytes },
+                    { timeoutMs: 30_000 },
+                ),
+            ) as { operationId?: unknown } | null;
+            piping = true;
+            const pack = replyResult(
+                await channelA.request(
+                    FLEET_FILES_MESSAGES.pack,
+                    { entries: names, allowCredentialShaped: confirmed },
+                    { timeoutMs: PACK_TIMEOUT_MS },
+                ),
+            ) as { operationId?: unknown } | null;
+            const operationId = typeof pack?.operationId === 'string' ? pack.operationId : null;
+            record.view.operationId = operationId;
+            const requesterUserId = fleetLinkCallerUserId(caller);
+            if (this.operations && operationId) {
+                this.operations.track({
+                    operationId,
+                    nodeId,
+                    family: 'files',
+                    verb: FLEET_FILES_MESSAGES.pack,
+                    requesterUserId,
+                    ownerUserId: source.userId,
+                });
+            }
+            if (this.operations && typeof unpack?.operationId === 'string') {
+                this.operations.track({
+                    operationId: unpack.operationId,
+                    nodeId: toNodeId,
+                    family: 'files',
+                    verb: FLEET_FILES_MESSAGES.unpack,
+                    requesterUserId,
+                    ownerUserId: destination.userId,
+                });
+            }
+            record.cancel = () =>
+                finish('cancelled', { code: 'operation_failed', hint: 'cancelled' });
+            return { transferId: record.view.id, operationId };
+        } catch (error) {
+            const known = errorOf(error);
+            settled = true;
+            this.end(record, 'failed', known);
+            for (const channel of [channelA, channelB]) {
+                if (channel && !channel.isClosed) channel.close('normal');
+            }
+            await audit('refused', { code: known.code });
+            throw error;
+        }
     }
 
     // ─── Upload ────────────────────────────────────────────────────────────

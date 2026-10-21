@@ -153,14 +153,14 @@
 
 ## P2.A — Copy between machines
 
-- [ ] **T-17**. Copy bridge in `fleet-files-transfer.service.ts`: `files.pack` on the source and
+- [x] **T-17**. Copy bridge in `fleet-files-transfer.service.ts`: `files.pack` on the source and
       `files.unpack` on the destination, `DATA` piped inside the platform, destination `ACK`s
       forwarded to the source, one `operation.progress` stream, `CLOSE` on either side closes the
       other; audience + consent checked on **both** Nodes; audit `node.files.copy` on both with
       `peerNodeId`.
       **Test**: extend `fleet-files-transfer.service.spec.ts` — credits forwarded (source never more
       than one window ahead); failure on B removes B's partial dir and closes A; two audit rows.
-- [ ] **T-18**. `POST /copy` in `fleet-files.controller.ts` (replaces the P1 stub), conflicts via
+- [x] **T-18**. `POST /copy` in `fleet-files.controller.ts` (replaces the P1 stub), conflicts via
       the destination, same-folder refusal; `FilesCopyDialog.tsx` (destination computer/root/folder,
       greyed reasons for offline/unmanaged, _"build-01 and build-02 never talk to each other"_);
       BFF route `copy/route.ts`.
@@ -169,27 +169,27 @@
 
 ## P2.B — Paste into a desktop
 
-- [ ] **T-19**. Node: `apps/node/src/core/link/modules/clip.ts` — the `clip` `NodeModule` (one entry
+- [x] **T-19**. Node: `apps/node/src/core/link/modules/clip.ts` — the `clip` `NodeModule` (one entry
       in `link/modules/index.ts`, CONTRACTS R-40); opens with `{ viewId }` (R-27), `--attend` and
       FL-07 source required, one `CLIP` ≤ 256 KiB, calls `apps/node/src/core/screen/desktop-host.ts`
       `pasteText` _(FL-07)_, replies `clip.pasted`.
       **Test**: `apps/node/src/core/link/modules/clip.spec.ts` — over-cap refused before paste;
       consent refusal; never reads the clipboard (the host mock has no read method).
-- [ ] **T-20**. Platform: `packages/agent/src/fleet/files/fleet-clip.service.ts` (holder check via
+- [x] **T-20**. Platform: `packages/agent/src/fleet/files/fleet-clip.service.ts` (holder check via
       `packages/agent/src/computer/control-arbiter.service.ts`; per-view `pasteAllowed` relay state,
       reset on view end; cap; audit `node.clip.paste` bytes only) and
       `apps/api/src/fleet/desktop/fleet-clip.controller.ts` (`POST …/views/:viewId/clip`, `PATCH`
       `pasteAllowed` on the FL-07 view route).
       **Test**: `fleet-clip.service.spec.ts` — not holder / opt-in off → `permission_denied` with
       the two distinct hints; reset on end; `fleet-clip.controller.spec.ts`.
-- [ ] **T-21**. Web: `apps/web/src/components/fleet/desktop/DesktopPasteDialog.tsx` _(FL-07 dir)_
+- [x] **T-21**. Web: `apps/web/src/components/fleet/desktop/DesktopPasteDialog.tsx` _(FL-07 dir)_
       (clipboard read on gesture, size meter against 256 KB, non-blocking secret warning using
       `redactSecrets`'s matcher, _"Nothing is read back"_ line), **Allow paste into this desktop**
       in the Desktop tab's `⋯` menu, `Ctrl/⌘+Shift+V` while controlling; BFF `clip/route.ts`;
       i18n `fleet.desktop.paste.*`.
       **Test**: `DesktopPasteDialog.unit.spec.tsx` (cap; warning; disabled reasons verbatim);
       `apps/web/e2e/flow-fleet-desktop-paste.spec.ts`.
-- [ ] **T-22**. Tools: `fleet_files_copy` (`destructive`, `confirm`, conflicts in result, `replace`
+- [x] **T-22**. Tools: `fleet_files_copy` (`destructive`, `confirm`, conflicts in result, `replace`
       flag), `fleet_files_delete` (`destructive`, `confirm-destructive` → held as an
       `agent_action_proposals` row carrying the entries, CONTRACTS R-33; executes on the owner's
       approval), `fleet_desktop_paste` (`destructive`, denied unless granted, FL-07 grant required);

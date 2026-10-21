@@ -67,6 +67,14 @@ export interface ScheduleLoopOptions {
 	setTimer?: (callback: () => void, ms: number) => unknown;
 	clearTimer?: (handle: unknown) => void;
 	newId?: () => string;
+	/**
+	 * FL-13 P3 — the held set changed (loaded, or replaced by a sync): the
+	 * OS-scheduler fallback re-installs its entries from it. Never awaited
+	 * into the loop; a failure is the callback's own.
+	 */
+	onHeld?: (definitions: FleetScheduleDefinition[]) => void;
+	/** FL-13 P3 — write the loop's lease on every tick (off for the one-shot `schedule-run`). Default on. */
+	lease?: boolean;
 }
 
 interface RunningRun {
@@ -101,6 +109,7 @@ export class ScheduleLoop {
 		const { schedules, state } = await this.options.store.load();
 		for (const stored of schedules) this.schedules.set(stored.definition.id, stored);
 		this.paused = state.paused;
+		this.notifyHeld();
 		const settled = await this.options.history.settleInterrupted(this.now()).catch(() => 0);
 		if (settled > 0) this.options.logger?.info(`Schedules: ${settled} run(s) interrupted by a restart were recorded.`);
 		this.options.logger?.info(
@@ -129,7 +138,25 @@ export class ScheduleLoop {
 		const held = await this.options.store.replace(definitions, generation, this.schedules, this.now());
 		this.schedules.clear();
 		for (const stored of held) this.schedules.set(stored.definition.id, stored);
+		this.notifyHeld();
 		this.arm();
+	}
+
+	/** Resolves once no run is in flight (the one-shot `schedule-run` waits for its fire to end). */
+	async idle(): Promise<void> {
+		while (this.running.size > 0 || this.ticking) {
+			await Promise.all([...this.running.values()].map((run) => run.done));
+			if (this.ticking) await this.ticking;
+		}
+	}
+
+	private notifyHeld(): void {
+		if (!this.options.onHeld) return;
+		try {
+			this.options.onHeld([...this.schedules.values()].map((stored) => stored.definition));
+		} catch (error) {
+			this.options.logger?.warn(`Schedules: the held set could not be passed on: ${describe(error)}`);
+		}
 	}
 
 	/** Each held schedule's next fire on this machine's clock (ISO, or null) — the `schedule.sync` reply. */
@@ -190,6 +217,7 @@ export class ScheduleLoop {
 	private async tickOnce(): Promise<void> {
 		this.disarm();
 		if (this.stopped) return;
+		if (this.options.lease !== false) await this.options.store.touchAlive(this.now()).catch(() => undefined);
 		if (!this.paused) {
 			const now = this.now();
 			for (const stored of [...this.schedules.values()]) {

@@ -25,6 +25,7 @@ import {
     type FleetFileRootsResponse,
     type FleetFilesDeleteResult,
     type FleetFilesDownloadCheck,
+    type FleetFilesOperationStarted,
     type FleetFilesTransfersResponse,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
@@ -34,6 +35,7 @@ import { FleetMachineFactsEnabledGuard } from '../machine/fleet-machine-facts-en
 import {
     FleetFilesCancelQueryDto,
     FleetFilesConflictsDto,
+    FleetFilesCopyDto,
     FleetFilesDeleteDto,
     FleetFilesDownloadCheckDto,
     FleetFilesDownloadQueryDto,
@@ -257,6 +259,31 @@ export class FleetFilesController {
             },
             req,
         );
+    }
+
+    @Post('nodes/:id/files/copy')
+    @ApiOperation({
+        summary:
+            'Copy entries of a folder to another computer (or another folder of this one) THROUGH Ever Works: the two computers never connect to each other. Same-name entries at the destination are skipped unless `replace` names them or `replaceAll` is set — ask `conflicts` on the destination first. Both computers need --manage and my `files` access. Answers 202 once both sides accepted; follow it in `transfers` on either computer. Audited on both (`node.files.copy`).',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: FLEET_FILES_TRANSFER_RATE_LIMIT, ttl: 60_000 } })
+    copy(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetFilesCopyDto,
+    ): Promise<FleetFilesOperationStarted> {
+        return this.transfers.copyForUser(auth.userId, id, {
+            root: body.root,
+            path: body.path ?? '',
+            entries: body.entries,
+            to: { nodeId: body.to.nodeId, root: body.to.root, path: body.to.path ?? '' },
+            policy: {
+                ...(body.replaceAll ? { replaceAll: true } : {}),
+                ...(body.replace ? { replace: body.replace } : {}),
+            },
+            confirm: body.confirm === true,
+        });
     }
 
     @Post('nodes/:id/files/delete')
