@@ -783,7 +783,7 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
         expect(h.runs.createQueued).toHaveBeenCalledWith(
             expect.objectContaining({ triggerKind: 'session', fleetSessionId: view.id, agentId: AGENT_ID }),
         );
-        const enqueued = h.dispatcher.enqueue.mock.calls[0][0] as { payload: Record<string, unknown> };
+        const enqueued = (h.dispatcher.enqueue.mock.calls[0] as unknown[])[0] as { payload: Record<string, unknown> };
         expect(enqueued.payload).toMatchObject({ fleetSessionId: view.id, nodeId: NODE_ID, agentRunId: RUN_ID });
         // The machine is not asked on the link: the job carries the start.
         expect(h.port.request).not.toHaveBeenCalled();

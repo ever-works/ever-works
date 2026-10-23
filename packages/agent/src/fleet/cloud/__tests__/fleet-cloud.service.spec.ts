@@ -196,7 +196,7 @@ describe('FleetCloudService (FL-17)', () => {
         expect(row.status).toBe('enrolling');
         expect(row.providerMachineRef).toBe('4242');
         expect((row.providerMeta as { phase: string }).phase).toBe('booting');
-        const input = machines.create.mock.calls[0][2] as { bootstrapScript: string; tags: string[]; publicKey: string };
+        const input = (machines.create.mock.calls[0] as unknown[])[2] as { bootstrapScript: string; tags: string[]; publicKey: string };
         expect(input.tags).toEqual(['ever-works', `ever-works-node:${created.nodeId}`]);
         expect(input.bootstrapScript.startsWith('#cloud-config')).toBe(true);
         expect(input.publicKey.startsWith('ssh-ed25519 ')).toBe(true);
@@ -205,7 +205,9 @@ describe('FleetCloudService (FL-17)', () => {
         expect(token).toBeTruthy();
         expect(JSON.stringify(row)).not.toContain(token);
         expect(JSON.stringify(audit.tryRecord.mock.calls)).not.toContain(token);
-        const createAudit = audit.tryRecord.mock.calls.find(([entry]) => (entry as { action: string }).action === 'node.cloud.create');
+        const createAudit = (audit.tryRecord.mock.calls as unknown[][]).find(
+            ([entry]) => (entry as { action: string }).action === 'node.cloud.create',
+        );
         expect((createAudit?.[0] as { details: Record<string, unknown> }).details).toMatchObject({
             family: 'machines',
             providerPluginId: PLUGIN,
@@ -282,7 +284,7 @@ describe('FleetCloudService (FL-17)', () => {
         expect(machines.destroy).toHaveBeenCalledWith(PLUGIN, OWNER, '4242');
         expect(rows.has(row.id)).toBe(false);
         expect(typeof done.costSoFarCents).toBe('number');
-        const entry = audit.tryRecord.mock.calls
+        const entry = (audit.tryRecord.mock.calls as unknown[][])
             .map(([call]) => call as { action: string; details: Record<string, unknown> })
             .find((call) => call.action === 'node.cloud.destroy' && call.details.outcome === 'ok');
         expect(entry?.details.finalCostCents).toBe(done.costSoFarCents);

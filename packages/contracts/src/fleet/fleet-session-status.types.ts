@@ -894,8 +894,11 @@ export function parseFleetSessionStatusMessage(value: unknown): FleetSessionStat
 	const seq = parseSeq(record.seq);
 	if (seq === null) return null;
 	if (!isFleetSessionState(record.state) || record.state === 'ended') return null;
-	const outcome = record.outcome === null || record.outcome === undefined ? null : record.outcome;
-	if (outcome !== null && !isFleetSessionOutcome(outcome)) return null;
+	const rawOutcome = record.outcome === null || record.outcome === undefined ? null : record.outcome;
+	if (rawOutcome !== null && !isFleetSessionOutcome(rawOutcome)) return null;
+	// Typed explicitly: consumers that compile this source with `strictNullChecks: false`
+	// (packages/agent's ts-jest) do not get the `!== null` narrowing above.
+	const outcome = rawOutcome as FleetSessionOutcome | null;
 	if (typeof record.stateChangedAt !== 'string' || record.stateChangedAt.length > 40) return null;
 	const lastEvidence = parseFleetSessionLastEvidence(record.lastEvidence);
 	if (!lastEvidence) return null;
