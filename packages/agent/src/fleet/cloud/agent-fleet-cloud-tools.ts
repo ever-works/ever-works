@@ -127,7 +127,7 @@ export function buildFleetCloudTools(args: {
         name: 'fleet_cloud_list',
         description:
             'List the owner’s cloud computers (machines Ever Works created at a cloud provider) with provider, region, size, power state, hourly rate and cost so far, the usage totals (estimates from list prices), and the connected providers (pluginId for fleet_cloud_options). Read-only.',
-        parameters: { type: 'object', properties: {} },
+        parameters: { type: 'object', properties: {}, required: [] },
         invoke: async () => {
             try {
                 return await args.service.list(caller);
@@ -168,6 +168,7 @@ export function buildFleetCloudTools(args: {
         parameters: {
             type: 'object',
             properties: { nodeId: { type: 'string', description: 'Optional: one cloud computer (Fleet node id).' } },
+            required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };

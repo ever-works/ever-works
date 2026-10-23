@@ -107,7 +107,12 @@ export interface AgentMeetingToolSource {
 }
 
 export interface AgentFleetToolSource {
-    service: Pick<FleetService, 'listForUser'>;
+    /**
+     * `listForUser` backs `list_fleet_nodes`; the visible reads back FL-19's
+     * `fleet_nodes_list|get` (`buildFleetCoreTools`). The API binds the whole
+     * `FleetService`.
+     */
+    service: Pick<FleetService, 'listForUser' | 'listVisibleForUser' | 'getVisibleForUser'>;
     /**
      * Servers and ports (FL-10) — `fleet_ports_list` / `fleet_ports_open`.
      * Optional: unbound (a context without the API's node link), the two tools

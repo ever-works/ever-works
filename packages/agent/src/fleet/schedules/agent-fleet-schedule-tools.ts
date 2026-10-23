@@ -283,11 +283,11 @@ export function buildFleetScheduleTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                scheduleId: { type: 'string' },
+                scheduleId: { type: 'string', description: 'The schedule id.' },
                 nodeId: { type: 'string', description: 'Move it to this computer.' },
-                name: { type: 'string' },
-                command: { type: 'string' },
-                cwd: { type: 'string' },
+                name: { type: 'string', description: 'A short name (1–120 characters).' },
+                command: { type: 'string', description: 'The command line (at most 8 KiB).' },
+                cwd: { type: 'string', description: "Optional folder (default the owner's home, ~)." },
                 cadence: CADENCE_SCHEMA,
             },
             required: ['scheduleId'],
