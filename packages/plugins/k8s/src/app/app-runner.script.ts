@@ -40,9 +40,9 @@
  * ## `APP_RUNNER_IMAGE`
  *
  * A public Node.js runtime image, **pinned by digest** so a moved tag can never change what runs in
- * a customer's namespace. `node:22-alpine`'s multi-arch (OCI image index) digest
- * `sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32`, read from the public
- * Docker Hub registry API on 2026-09-18 — reviewed on bump, as §4.8 requires. The index digest is
+ * a customer's namespace. `node:22.23.4-alpine`'s (= `node:22-alpine`) multi-arch (OCI image index)
+ * digest `sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914`, read from the
+ * public Docker Hub registry API on 2026-10-23 — reviewed on bump, as §4.8 requires. The index digest is
  * deliberate: the runner must run on whatever architecture the customer's nodes are.
  */
 
@@ -53,7 +53,7 @@ export const APP_RUNNER_SCRIPT_VERSION = 1;
  * The runner image (plan §4.8: "a digest-pinned public Node.js runtime image"). Review on bump —
  * never a floating tag.
  */
-export const APP_RUNNER_IMAGE = 'node@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32';
+export const APP_RUNNER_IMAGE = 'node@sha256:fe4f6d74e20370acb04ad889077d14d0f64a9c8ea6a42bc60cddf1e844699914';
 
 /** Where `app-jobs.renderer.ts` mounts the runner ConfigMap. */
 export const APP_RUNNER_MOUNT_PATH = '/etc/ever-works';
