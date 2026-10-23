@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Development
-pnpm dev                # All apps (watch mode)
+pnpm dev:apps           # All apps except docs/desktop/node (watch mode) — there is no bare `pnpm dev`
 pnpm dev:api            # API only (NestJS, port 3100)
 pnpm dev:web            # Web only (Next.js, port 3000)
 pnpm dev:trigger        # Trigger.dev dev server

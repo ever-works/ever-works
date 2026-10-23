@@ -298,7 +298,7 @@ packages/
 
 ```bash
 # Development
-pnpm dev              # All apps
+pnpm dev:apps         # All apps (no bare `pnpm dev`)
 pnpm dev:api          # API only
 pnpm dev:web          # Web only
 
