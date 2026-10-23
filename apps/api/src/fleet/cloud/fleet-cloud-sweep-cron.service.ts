@@ -3,10 +3,17 @@ import { Cron } from '@nestjs/schedule';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { config } from '@ever-works/agent/config';
 import { FleetCloudSweepService } from '@ever-works/agent/fleet';
-import { FLEET_CLOUD_BOOTSTRAP_WATCH_CRON, FLEET_CLOUD_RECONCILE_CRON } from '@ever-works/contracts';
+import {
+    FLEET_CLOUD_BOOTSTRAP_WATCH_CRON,
+    FLEET_CLOUD_IDLE_CRON,
+    FLEET_CLOUD_RECONCILE_CRON,
+    FLEET_CLOUD_USAGE_CRON,
+} from '@ever-works/contracts';
 
 const RECONCILE_LOCK_KEY = 'fleet-cloud:reconcile';
 const WATCH_LOCK_KEY = 'fleet-cloud:bootstrap-watch';
+const USAGE_LOCK_KEY = 'fleet-cloud:usage';
+const IDLE_LOCK_KEY = 'fleet-cloud:idle';
 
 /**
  * Cloud computers (FL-17, plan §10, T-19) — the two sweeps when Trigger.dev is
@@ -19,7 +26,9 @@ const WATCH_LOCK_KEY = 'fleet-cloud:bootstrap-watch';
  *  - reconcile (hourly, FR-29): a machine the provider forgot reads `gone`;
  *  - bootstrap watch (every minute): a create the provider never answered
  *    fails, a booted machine moves to `installing`, a pending power / destroy
- *    settles.
+ *    settles;
+ *  - cost refresh (P2, every 10 minutes, FR-21) and the idle policy (P2,
+ *    every 10 minutes offset 5, FR-27 — never destroys anything).
  */
 @Injectable()
 export class FleetCloudSweepCronService {
@@ -76,6 +85,49 @@ export class FleetCloudSweepCronService {
             {
                 ttlMs: 50 * 1000,
                 onLocked: () => this.logger.debug('Skipping fleet-cloud-bootstrap-watch: another instance holds the lock'),
+            },
+        );
+    }
+
+    @Cron(FLEET_CLOUD_USAGE_CRON)
+    async runUsage(): Promise<void> {
+        if (config.trigger.shouldUseTrigger() || !config.fleet.isCloudEnabled()) return;
+        await this.taskLockService.runExclusive(
+            USAGE_LOCK_KEY,
+            async () => {
+                try {
+                    await this.sweeps.refreshUsage();
+                } catch (error) {
+                    const stack = error instanceof Error ? error.stack : String(error);
+                    this.logger.error('fleet-cloud-usage pass failed', stack);
+                }
+            },
+            {
+                ttlMs: 8 * 60 * 1000,
+                onLocked: () => this.logger.debug('Skipping fleet-cloud-usage: another instance holds the lock'),
+            },
+        );
+    }
+
+    @Cron(FLEET_CLOUD_IDLE_CRON)
+    async runIdle(): Promise<void> {
+        if (config.trigger.shouldUseTrigger() || !config.fleet.isCloudEnabled()) return;
+        await this.taskLockService.runExclusive(
+            IDLE_LOCK_KEY,
+            async () => {
+                try {
+                    const summary = await this.sweeps.evaluateIdle();
+                    if (summary.acted > 0) {
+                        this.logger.log(`fleet-cloud-idle pass: ${summary.machines} machine(s), ${summary.acted} acted on`);
+                    }
+                } catch (error) {
+                    const stack = error instanceof Error ? error.stack : String(error);
+                    this.logger.error('fleet-cloud-idle pass failed', stack);
+                }
+            },
+            {
+                ttlMs: 8 * 60 * 1000,
+                onLocked: () => this.logger.debug('Skipping fleet-cloud-idle: another instance holds the lock'),
             },
         );
     }
