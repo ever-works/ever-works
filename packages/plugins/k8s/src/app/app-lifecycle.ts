@@ -993,7 +993,8 @@ export class AppLifecycle {
 			// an earlier pause recorded (a second pause must not overwrite it with 0).
 			// A resume drops the record: the App runs again, so the count must not outlive its pause.
 			const running = asReplicaCount(liveDeployment?.spec?.replicas);
-			const recordPrePause = pause && running > 0 ? { [APP_PRE_PAUSE_REPLICAS_ANNOTATION]: String(running) } : {};
+			const recordPrePause: Record<string, string> =
+				pause && running > 0 ? { [APP_PRE_PAUSE_REPLICAS_ANNOTATION]: String(running) } : {};
 			await this.applyReplicas(
 				credential,
 				namespace,
