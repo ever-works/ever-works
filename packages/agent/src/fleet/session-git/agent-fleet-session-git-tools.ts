@@ -153,7 +153,7 @@ export function buildFleetSessionGitTools(args: {
                     checkoutId,
                     title: { type: 'string', description: 'At most 70 characters.' },
                     body: { type: 'string', description: 'What changed and why.' },
-                    draft: { type: 'boolean' },
+                    draft: { type: 'boolean', description: 'Open it as a draft pull request.' },
                     sessionId: { type: 'string', description: 'The session the pull request comes from (its ledger is credited).' },
                 },
                 required: ['checkoutId', 'title'],

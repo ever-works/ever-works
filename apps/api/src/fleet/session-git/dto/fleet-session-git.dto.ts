@@ -114,7 +114,7 @@ export class UpdateFleetAgentActionTemplatesDto {
     @ApiProperty({
         required: false,
         description: 'Templates by action id; an empty text falls back to the platform default.',
-        type: 'object',
+        type: Object,
         additionalProperties: { type: 'string' },
     })
     @IsOptional()

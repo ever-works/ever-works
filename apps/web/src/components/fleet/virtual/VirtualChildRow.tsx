@@ -61,7 +61,7 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
                 <span aria-hidden className={live.state === 'running' ? 'text-success' : undefined}>
                     {virtualStateGlyph(live.state)}
                 </span>{' '}
-                {t(`state.${VIRTUAL_STATE_KEYS[live.state]}`)} · {live.systemLabel} · {size}
+                {t(`state.${VIRTUAL_STATE_KEYS[live.state]}` as Parameters<typeof t>[0])} · {live.systemLabel} · {size}
                 {kind === 'vm' && live.activated === false ? (
                     <span title={t('activation.note')} data-testid="fleet-virtual-not-activated">
                         {' '}
@@ -73,7 +73,7 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
                 <ol className="mt-1 flex flex-wrap gap-2" aria-label={t('progress.label')}>
                     {steps.map((step, index) => (
                         <li key={step} className={index === current ? 'font-medium text-text dark:text-text-dark' : undefined}>
-                            {t(`progress.${VIRTUAL_PHASE_KEYS[step]}`)}
+                            {t(`progress.${VIRTUAL_PHASE_KEYS[step]}` as Parameters<typeof t>[0])}
                             {index < current ? ' ✓' : index === current ? ' …' : ''}
                         </li>
                     ))}

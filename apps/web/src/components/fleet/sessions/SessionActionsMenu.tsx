@@ -94,9 +94,9 @@ export function SessionActionsMenu({
         if (!action.available) {
             setHiddenNote(
                 t('hidden', {
-                    action: t(`labels.${actionLabelKey(action.id, null)}`),
+                    action: t(`labels.${actionLabelKey(action.id, null)}` as Parameters<typeof t>[0]),
                     reason: action.reason
-                        ? t(`reasons.${hiddenReasonKey(action.reason)}`, { branch: data?.context.branch ?? 'main' })
+                        ? t(`reasons.${hiddenReasonKey(action.reason)}` as Parameters<typeof t>[0], { branch: data?.context.branch ?? 'main' })
                         : '',
                 }),
             );
@@ -123,7 +123,7 @@ export function SessionActionsMenu({
 
     const disabled = data?.disabled ?? null;
     const label = (id: FleetSessionActionId, update: { number: number } | undefined) =>
-        update ? t('labels.update', { number: update.number }) : t(`labels.${actionLabelKey(id, null)}`);
+        update ? t('labels.update', { number: update.number }) : t(`labels.${actionLabelKey(id, null)}` as Parameters<typeof t>[0]);
 
     return (
         <div className="relative" ref={containerRef}>

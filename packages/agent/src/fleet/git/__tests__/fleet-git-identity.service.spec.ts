@@ -137,7 +137,7 @@ describe('FleetGitIdentityService.set (FR-14, FR-15, S8)', () => {
             },
         ]);
         expect(result.fields).toEqual(['user.name', 'user.email']);
-        const row = audit.tryRecord.mock.calls[0][0] as { action: string; details: Record<string, unknown> };
+        const row = (audit.tryRecord.mock.calls[0] as unknown[])[0] as { action: string; details: Record<string, unknown> };
         expect(row.action).toBe('node.git.identity.set');
         expect(row.details.fields).toEqual(['user.name', 'user.email']);
         expect(JSON.stringify(row)).not.toContain('your-login@users');

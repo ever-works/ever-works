@@ -22,7 +22,6 @@ import {
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -351,11 +350,9 @@ export function NewCloudComputerDialog({
                 )}
 
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="ghost">
-                            {t('create.cancel')}
-                        </Button>
-                    </DialogClose>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {t('create.cancel')}
+                    </Button>
                     {!empty ? (
                         <Button type="button" onClick={create} disabled={!canCreate} data-testid="fleet-cloud-create">
                             {createLabelPrice(size, options?.currency)

@@ -422,7 +422,7 @@ export function LogViewer({
             )}
 
             <footer className="px-3 py-1.5 border-t border-border dark:border-border-dark text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-footer">
-                {footer.map((part) => t(`viewer.${part.key}`, part.values)).join(' · ')}
+                {footer.map((part) => t(`viewer.${part.key}` as Parameters<typeof t>[0], part.values)).join(' · ')}
             </footer>
         </section>
     );
