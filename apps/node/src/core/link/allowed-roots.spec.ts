@@ -62,14 +62,14 @@ describe('isInsideRoot (FL-08)', () => {
 	});
 
 	it('folds case on Windows only', () => {
-		expect(isInsideRoot('C:\Code\API\logs\a.log', 'c:\code\api', 'win32')).toBe(true);
-		expect(isInsideRoot('D:\code\api\a.log', 'C:\code\api', 'win32')).toBe(false);
+		expect(isInsideRoot('C:\\Code\\API\\logs\\a.log', 'c:\\code\\api', 'win32')).toBe(true);
+		expect(isInsideRoot('D:\\code\\api\\a.log', 'C:\\code\\api', 'win32')).toBe(false);
 		expect(isInsideRoot('/Srv/App/a.log', '/srv/app', 'linux')).toBe(false);
 	});
 
 	it('names the filesystem roots of both shapes', () => {
 		expect(isFilesystemRoot('/', 'linux')).toBe(true);
-		expect(isFilesystemRoot('C:\', 'win32')).toBe(true);
+		expect(isFilesystemRoot('C:\\', 'win32')).toBe(true);
 		expect(isFilesystemRoot('/var/log', 'linux')).toBe(false);
 	});
 });
@@ -157,6 +157,6 @@ describe('standardLogDirs (FL-08)', () => {
 	it('lists each platform’s folders, none on Windows (spec §8b)', () => {
 		expect(standardLogDirs('linux', '/home/ops')).toEqual(['/var/log']);
 		expect(standardLogDirs('darwin', '/Users/ops')).toEqual(['/var/log', '/Library/Logs', '/Users/ops/Library/Logs']);
-		expect(standardLogDirs('win32', 'C:\Users\ops')).toEqual([]);
+		expect(standardLogDirs('win32', 'C:\\Users\\ops')).toEqual([]);
 	});
 });
