@@ -37,7 +37,8 @@ export function UseMyIdentityButton({
 }: {
     nodeId: string;
     onDone?: (result: FleetGitIdentitySetResult) => void;
-    size?: 'sm' | 'default';
+    /** A `Button` size; `md` is that component's default. */
+    size?: 'sm' | 'md';
     disabled?: boolean;
 }) {
     const t = useTranslations('fleet.gitIdentity');

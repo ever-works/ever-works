@@ -43,7 +43,7 @@ function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloud
         case 'creating':
         default:
             return t('block.creating', {
-                phase: t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as never, { provider: cloud.providerName }),
+                phase: t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as Parameters<typeof t>[0], { provider: cloud.providerName }),
             });
     }
 }
@@ -104,7 +104,7 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
                                 className={reached ? 'font-medium' : 'text-text-muted dark:text-text-muted-dark'}
                                 aria-current={phase === cloud.phase ? 'step' : undefined}
                             >
-                                {t(`progress.${CLOUD_PHASE_KEYS[phase]}` as never, { provider: cloud.providerName })}
+                                {t(`progress.${CLOUD_PHASE_KEYS[phase]}` as Parameters<typeof t>[0], { provider: cloud.providerName })}
                             </li>
                         );
                     })}

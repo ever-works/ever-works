@@ -65,7 +65,7 @@ export function VirtualRunsHereRows({ hostNodeId, allowed }: { hostNodeId: strin
                                 {child.name}
                             </Link>
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                ({t(`state.${VIRTUAL_STATE_KEYS[state]}`)})
+                                ({t(`state.${VIRTUAL_STATE_KEYS[state]}` as Parameters<typeof t>[0])})
                             </span>
                             {allowed && (running || state === 'stopped') ? (
                                 <Button

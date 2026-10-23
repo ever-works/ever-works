@@ -105,7 +105,7 @@ export function ComputerPicker({
                                 )}
                                 {!row.selectable && row.reason && (
                                     <span className="ml-auto text-xs text-warning" data-testid="fleet-handoff-reason">
-                                        {t(`reasons.${HANDOFF_REASON_KEYS[row.reason]}`, {
+                                        {t(`reasons.${HANDOFF_REASON_KEYS[row.reason]}` as Parameters<typeof t>[0], {
                                             agent: agent?.name ?? '',
                                             node: row.name,
                                             cli: agent ? tProviders(cliKey(agent.cli)) : '',
