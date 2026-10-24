@@ -74,6 +74,16 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
+	// Session git & actions (FL-06, CONTRACTS §7).
+	'node.session.action',
+	'node.session.pull-request.open',
+	// Schedules on computers (FL-13, CONTRACTS §7).
+	'node.schedule.create',
+	'node.schedule.update',
+	'node.schedule.delete',
+	'node.schedule.run',
+	'node.schedule.pause',
+	'node.schedule.resume',
 	// Logs on computers (FL-08, CONTRACTS §7).
 	'node.logs.read',
 	'node.logs.follow',
