@@ -36,6 +36,15 @@ describe('fleetCheckoutFolderName', () => {
 		expect(fleetCheckoutFolderName('nina/fix-login')).toBe('fix-login');
 		expect(fleetCheckoutFolderName('feature/über cool')).toBe('ber-cool');
 		expect(fleetCheckoutFolderName('///')).toBe('checkout');
+		expect(fleetCheckoutFolderName('team/..-fix-login.-')).toBe('fix-login');
+		expect(fleetCheckoutFolderName('-.-.')).toBe('checkout');
+	});
+
+	it('stays linear on a long run of dashes that does not end the name (CodeQL #283)', () => {
+		const hostile = `a${'-'.repeat(100_000)}b!`;
+		const started = Date.now();
+		expect(fleetCheckoutFolderName(hostile)).toBe(`a${'-'.repeat(79)}`);
+		expect(Date.now() - started).toBeLessThan(1_000);
 	});
 });
 
