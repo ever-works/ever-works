@@ -83,6 +83,11 @@ module.exports = {
         '^@ever-works/agent$': '<rootDir>/../../../packages/agent/src/index.ts',
         '^@ever-works/agent/(.*)$': '<rootDir>/../../../packages/agent/src/$1/index.ts',
         '^@ever-works/monitoring$': '<rootDir>/../../../packages/monitoring/src/index.ts',
+        // `packages/agent` imports `@ever-works/agent-plugins` (agent-plugins → facades →
+        // fleet/cloud → fleet), and its `main` is the BUILT dist. The promotion gate runs
+        // these specs right after `pnpm install`, with nothing built, so map it to source
+        // exactly as `packages/agent/jest.config.js` does.
+        '^@ever-works/agent-plugins$': '<rootDir>/../../../packages/agent-plugins/src/index.ts',
         // Desktop PRD M4 — the `node` job-runtime plugin, source-mapped
         // so the fleet dispatch specs exercise the real
         // NodeDispatcherFactory / NodeJobRuntimePlugin rather than a stub.
