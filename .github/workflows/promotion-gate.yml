@@ -268,8 +268,15 @@ jobs:
       - name: Contracts — fleet wire types and the package inventory guard
         run: pnpm --filter @ever-works/contracts test
 
+      # One worker and an 8 GiB heap, as the api's own `test` script runs jest
+      # (`--max-old-space-size=12288 … --maxWorkers=1`): these specs load the
+      # agent package from SOURCE through ts-jest, and since the 10-21 build
+      # sprint `node-contract.lifecycle.spec.ts` alone outgrows Node's default
+      # heap ("JavaScript heap out of memory", PR #2892).
       - name: Platform side — the DTOs still accept what a deployed node sends
-        run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm --filter ever-works-api exec jest --maxWorkers=1 --testPathPattern="fleet/__tests__/node-contract"
 
       # `apps/node` is the ONE exception to the note above. Its vitest resolves
       # `@ever-works/contracts` through the package ENTRY, not through source,
