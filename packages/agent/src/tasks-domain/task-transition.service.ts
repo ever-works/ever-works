@@ -38,6 +38,11 @@ import { TaskNotificationService } from './task-notification.service';
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import { describeTaskPatch } from '../domain-events/domain-event-task-fields';
 import { TaskRunDenormService } from './task-run-denorm.service';
+import {
+    isFleetSessionScheduleTask,
+    TASK_SESSION_SCHEDULE_DISPATCHER,
+    type TaskSessionScheduleDispatcher,
+} from './task-session-schedule.port';
 // Value import (not `import type`): Nest resolves the @Optional() class
 // injection below via emitted design:paramtypes metadata, which needs the
 // real class reference. No cycle: run-dispatch-gate.service imports only
@@ -63,6 +68,7 @@ import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 import { randomUUID } from 'node:crypto';
 import { AWAITING_OWNER_LABEL, isAwaitingOwner, withoutAwaitingOwner } from './awaiting-owner';
+import { agentBlockLiftRefusal, agentMayLiftBlock } from './agent-block-lift';
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -191,6 +197,17 @@ export interface TransitionOptions {
      * restore never counts as the owner starting the Task.
      */
     automaticRestore?: boolean;
+    /**
+     * Works-security (2026-10-18) — set ONLY by the platform callers that move
+     * the Task an agent run was dispatched for, as that run's lifecycle: the
+     * run finisher (`AGENT_RUN_TASK_FINISHER`), the workspace finalize step and
+     * the merge completion. With it, an agent-driven move to a NON-dispatching
+     * status keeps its ordinary side effects (a run finishing its Task to
+     * `done` still releases dependents and their agents). Never set by the
+     * agent `transitionTask` tool: the model picks that Task id. See
+     * {@link withAgentFanOutSuppressed}.
+     */
+    ownRunTask?: boolean;
 }
 
 /** Result of a sync walk: the Task after the last hop and the hops taken. */
@@ -220,6 +237,49 @@ export function withoutAgentForce(
         `Task ${taskId ?? '?'}: an agent-driven transition asked for force=true; ignored (agents run every gate).`,
     );
     return { ...opts, force: false };
+}
+
+/**
+ * Works-security (2026-10-18) — `AGENT_TRANSITIONS_NO_FANOUT` (default on).
+ * `false` restores the previous behaviour: an agent's move starts runs like a
+ * person's. Read per call so an operator can flip it without a rebuild.
+ */
+export function agentTransitionsNoFanOut(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.AGENT_TRANSITIONS_NO_FANOUT?.trim().toLowerCase() !== 'false';
+}
+
+/**
+ * Prompt-injection hardening — an AGENT's move never starts another agent's
+ * work. Applied centrally in {@link TaskTransitionService.transition}, so
+ * every agent path gets it (the `transitionTask` tool, the run finisher, the
+ * workspace finalize step, the merge completion, and any path added later):
+ * an agent-driven move carries `suppressAgentFanOut`, i.e. no `→ in_progress`
+ * fan-out to the Task's assigned agents and no fan-out down the auto-unblock
+ * cascade. Before this, an agent holding `canAssignTasks` could move any of
+ * the owner's Tasks (even `done → in_progress`) and start every agent
+ * assigned to it — on text an injected run may have written. Fleet-run tokens
+ * already got this at the controller; now it is the rule for every agent.
+ *
+ * The one exception keeps a run's own lifecycle intact: a platform caller
+ * moving the run's OWN Task (`ownRunTask`) to a status that dispatches
+ * nothing by itself — the finisher's `→ in_review` / `→ done` / `→ blocked` —
+ * keeps every side effect it had (reviewer stage, dependents released on
+ * done). `→ in_progress` is suppressed even then. Reviewer runs on
+ * `→ in_review` are untouched for all callers (a review must still happen
+ * before a merge), as are gates and notifications.
+ *
+ * The `awaiting-owner` hold (#2769) is unaffected: an agent still cannot move
+ * a held Task at all, and an agent move never counts as the owner starting it.
+ */
+export function withAgentFanOutSuppressed(
+    opts: TransitionOptions,
+    to: TaskStatus,
+    env: NodeJS.ProcessEnv = process.env,
+): TransitionOptions {
+    if (opts.actorType !== 'agent' || opts.suppressAgentFanOut === true) return opts;
+    if (!agentTransitionsNoFanOut(env)) return opts;
+    if (opts.ownRunTask === true && to !== TaskStatus.IN_PROGRESS) return opts;
+    return { ...opts, suppressAgentFanOut: true };
 }
 
 @Injectable()
@@ -282,6 +342,13 @@ export class TaskTransitionService {
         // same transaction as the status compare-and-set. Appended LAST +
         // @Optional (positional-spec arity rule); absent, nothing is recorded.
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // Schedules on computers (FL-13 P2, spec FR-8) — one fire of an
+        // Agent-session schedule starts as an Agent SESSION on the pinned
+        // computer. Appended LAST + @Optional (positional-spec arity rule);
+        // absent, such a Task dispatches like any other.
+        @Optional()
+        @Inject(TASK_SESSION_SCHEDULE_DISPATCHER)
+        private readonly sessionSchedules?: TaskSessionScheduleDispatcher,
     ) {}
 
     /**
@@ -290,7 +357,7 @@ export class TaskTransitionService {
      * side-effect columns).
      */
     async transition(task: Task, to: TaskStatus, opts: TransitionOptions = {}): Promise<Task> {
-        opts = withoutAgentForce(opts, this.logger, task.id);
+        opts = withAgentFanOutSuppressed(withoutAgentForce(opts, this.logger, task.id), to);
         // Prompt-injection hardening — a Task filed from an untrusted email
         // waits for its owner: no agent moves it (see `awaiting-owner.ts`).
         const awaitingOwner = isAwaitingOwner(task);
@@ -298,6 +365,20 @@ export class TaskTransitionService {
             throw new ForbiddenException(
                 `Task ${task.id} is waiting for its owner (label '${AWAITING_OWNER_LABEL}'): an agent cannot move it. The owner starts it.`,
             );
+        }
+        // Works-security (2026-10-18) — a blocked Task waits for a person, so no
+        // agent-driven move (the `transitionTask` tool, a run's finisher, the
+        // workspace finalize, a fleet run's token) lifts the block. The
+        // platform's auto-unblock restore is not an agent move. See
+        // `agent-block-lift.ts`.
+        if (
+            task.status === TaskStatus.BLOCKED &&
+            to !== TaskStatus.BLOCKED &&
+            opts.actorType === 'agent' &&
+            opts.automaticRestore !== true &&
+            !agentMayLiftBlock()
+        ) {
+            throw new ForbiddenException(agentBlockLiftRefusal(task.id));
         }
         const from = task.status;
         if (!ALLOWED[from]?.includes(to)) {
@@ -1315,6 +1396,13 @@ export class TaskTransitionService {
                 parked: false,
                 error: 'agent-not-found',
             };
+        }
+        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
+        // session on the computer the Agent is pinned to — the Fleet starts it
+        // (its own Run, trigger `session`, linked to this Task). Ownership was
+        // checked just above, at the one dispatch choke point.
+        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
+            return this.sessionSchedules.dispatch(task, agentId);
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;

@@ -48,7 +48,14 @@ import {
     CreditsSweepService,
     PaygService,
 } from '@ever-works/agent/subscriptions';
-import { FleetJobService, FleetNodeHealthService } from '@ever-works/agent/fleet';
+import {
+    FleetCheckoutReconcileService,
+    FleetJobService,
+    FleetNodeHealthService,
+    FleetSessionSweepService,
+    FleetVirtualReconcileService,
+    FleetCloudSweepService,
+} from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { SkillReadinessService } from '@ever-works/agent/skills';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
@@ -289,6 +296,42 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
             provide: FleetNodeHealthService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'FleetNodeHealthService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Sessions on computers (FL-04) — the fleet-session-sweeper cron calls
+        // sweepStale() over the internal RPC channel; the repositories and the
+        // node link live API-side.
+        {
+            provide: FleetSessionSweepService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetSessionSweepService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Checkouts on computers (FL-14) — the fleet-checkout-reconcile cron
+        // calls reconcile() over the internal RPC channel; the repositories and
+        // the node link live API-side.
+        {
+            provide: FleetCheckoutReconcileService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetCheckoutReconcileService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Virtual computers (FL-16) — the fleet-virtual-reconcile cron calls
+        // reconcile() over the internal RPC channel; the repositories and the
+        // node link live API-side.
+        {
+            provide: FleetVirtualReconcileService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetVirtualReconcileService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Cloud computers (FL-17) — the fleet-cloud-reconcile and
+        // fleet-cloud-bootstrap-watch crons call the two sweeps over the internal
+        // RPC channel; the repositories and the provider facade live API-side.
+        {
+            provide: FleetCloudSweepService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetCloudSweepService'),
             inject: [TriggerInternalApiClient],
         },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
@@ -607,6 +650,10 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         TaskWorkspaceService,
         FleetJobService,
         FleetNodeHealthService,
+        FleetSessionSweepService,
+        FleetCheckoutReconcileService,
+        FleetVirtualReconcileService,
+        FleetCloudSweepService,
         TaskGateRunnerService,
         TaskGateJudgeService,
         WorkRepository,

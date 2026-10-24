@@ -8,4 +8,5 @@ export * from './integration-inbox.service';
 export * from './integration-kb.service';
 export * from './integration-resources.service';
 export * from './integrations-api.module';
+export * from './kb-content-provenance';
 export * from './keyset-cursor';

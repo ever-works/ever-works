@@ -1,8 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+    buildFleetHealthHistoryPoints,
     FLEET_HEALTH_HOURLY_RETENTION_MS,
+    FLEET_HEALTH_MAX_HISTORY_POINTS,
+    FLEET_HEALTH_RANGE_MS,
+    FLEET_HEALTH_RANGE_RESOLUTION,
     FLEET_HEALTH_RAW_RETENTION_MS,
     FLEET_HEALTH_SAMPLE_MIN_INTERVAL_MS,
+    type FleetNodeHealthHistory,
+    type FleetNodeHealthRange,
     type FleetNodeHealthSnapshot,
     type FleetNodeHealthStored,
 } from '@ever-works/contracts';
@@ -142,6 +148,42 @@ export class FleetNodeHealthService {
         const { prunedRaw, prunedHourly } = await this.prune(nowMs);
         if (rollError !== null) throw rollError;
         return { enabled: true, rolledHours, hourlyRows, prunedRaw, prunedHourly };
+    }
+
+    /**
+     * FL-03 second phase — one computer's history over `range` (spec FR-20,
+     * FR-22): `{ disabled: true }` with the flag off (nothing is read), else
+     * at most 500 points from raw samples (1 h, 24 h) or hourly roll-ups (7 d,
+     * 90 d), averaged into equal buckets, with explicit gap points where the
+     * computer was silent (`buildFleetHealthHistoryPoints`). One indexed range
+     * read; the caller has already checked the computer is visible.
+     */
+    async history(
+        nodeId: string,
+        range: FleetNodeHealthRange,
+        now: Date = new Date(),
+    ): Promise<FleetNodeHealthHistory> {
+        if (!this.isHistoryEnabled()) return { nodeId, range, disabled: true };
+        const resolution = FLEET_HEALTH_RANGE_RESOLUTION[range];
+        const to = now.getTime();
+        const from = to - FLEET_HEALTH_RANGE_MS[range];
+        const rows = await this.samples.series(nodeId, resolution, new Date(from));
+        const { bucketMs, points } = buildFleetHealthHistoryPoints(rows, {
+            from,
+            to: to + 1,
+            resolution,
+            maxPoints: FLEET_HEALTH_MAX_HISTORY_POINTS,
+        });
+        return {
+            nodeId,
+            range,
+            disabled: false,
+            resolution,
+            from: new Date(from).toISOString(),
+            to: new Date(to).toISOString(),
+            bucketMs,
+            points,
+        };
     }
 
     /** Retention: raw rows past 7 days, hourly rows past 90 days. Idempotent. */

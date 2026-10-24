@@ -132,6 +132,42 @@ export interface InboxQuestionRaisedInput {
     sourceMeta?: InboxItemSourceMeta | null;
 }
 
+/**
+ * FL-05 (CONTRACTS R-12) — a session on a computer needs its person: a
+ * question or a permission request (one item of kind `question` /
+ * `approval` that IS the Decision in My Decisions), or a blocked / failed
+ * session (a `notice`). Idempotent per attention key (`sourceMeta.attentionKey`):
+ * a second raise for the same key files nothing. The session's own
+ * notification is sent by the session pipeline, so filing never rings.
+ */
+export interface InboxSessionAttentionRaisedInput {
+    userId: string;
+    kind: 'question' | 'approval' | 'notice';
+    title: string;
+    body: string;
+    options?: ReadonlyArray<{ id: string; label: string; recommended?: boolean }> | null;
+    agentId?: string | null;
+    agentRunId?: string | null;
+    organizationId?: string | null;
+    /** Carries `sessionId`, `sessionTitle`, `provider`, `nodeId`, `nodeName` and `attentionKey`. */
+    sourceMeta: InboxItemSourceMeta & { attentionKey: string; sessionId: string };
+}
+
+/**
+ * FL-05 — the attention behind a `fleet-session` item cleared: answered
+ * (through any door: the card, the detail, a tool, the CLI, the terminal),
+ * or expired with its session (R-12: never answered automatically).
+ */
+export interface InboxSessionAttentionClearedInput {
+    userId: string;
+    attentionKey: string;
+    reason: 'answered' | 'expired';
+    /** The option chosen — never free text (FR-49). */
+    optionId?: string | null;
+    /** One line recorded as the answer (e.g. "Answered in the terminal"); never the person's free text. */
+    note?: string | null;
+}
+
 export interface InboxProducer {
     /** Mirror a freshly-recorded escalation as an inbox item. */
     escalationRaised(input: InboxEscalationRaisedInput): Promise<void>;
@@ -157,6 +193,10 @@ export interface InboxProducer {
     escalationResolved?(input: InboxEscalationResolvedInput): Promise<void>;
     /** My Decisions: the proposal twin of {@link escalationResolved}. */
     proposalDecided?(input: InboxProposalDecidedInput): Promise<void>;
+    /** FL-05: file (once per attention key) the item for a session that needs its person. */
+    sessionAttentionRaised?(input: InboxSessionAttentionRaisedInput): Promise<void>;
+    /** FL-05: close that item — answered, or expired with its session. */
+    sessionAttentionCleared?(input: InboxSessionAttentionClearedInput): Promise<void>;
 }
 
 export const INBOX_PRODUCER = 'INBOX_PRODUCER' as const;

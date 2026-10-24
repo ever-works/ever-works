@@ -28,6 +28,8 @@ import {
     Hammer,
     // APW-12 T4 — the identity category's icon (see the map below).
     Fingerprint,
+    // FL-17 — the machine-provider category's icon (see the map below).
+    Cloud,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -93,6 +95,9 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // its two map entries here are one change — these maps are
     // `Record<PluginCategory, …>`, so a missing entry stops apps/web compiling.
     identity: Fingerprint,
+    // FL-17 — machine providers (cloud computers created at a cloud provider).
+    // Same rule as the lines above: the category and its icon land together.
+    'machine-provider': Cloud,
 };
 
 /**
@@ -131,6 +136,8 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     // English like every other label in this map: the file reads no i18n
     // bundle, so there is no locale leaf to add beside it.
     identity: 'Identity Providers',
+    // FL-17 — the `machine-provider` category (see the icon map above).
+    'machine-provider': 'Machine Providers',
 };
 
 // Type-safe assertion that all categories are covered

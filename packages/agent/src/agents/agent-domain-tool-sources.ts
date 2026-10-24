@@ -10,6 +10,23 @@ import type { IngestedEventRepository } from '../ingest/ingested-event.repositor
 import type { DigestService } from '../digest/digest.service';
 import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
+import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
+import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
+import type { FleetCloudService } from '../fleet/cloud/fleet-cloud.service';
+import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
+import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
+import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
+import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
+import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
+import type { FleetSessionActionService } from '../fleet/session-git/fleet-session-action.service';
+import type { FleetSessionPullRequestOpener } from '../fleet/session-git/agent-fleet-session-git-tools';
+import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
+import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
+import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
+import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
+import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
+import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
+import type { FleetOperationsToolPort, FleetStatusReaderPort, FleetWakeToolPort } from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -90,7 +107,149 @@ export interface AgentMeetingToolSource {
 }
 
 export interface AgentFleetToolSource {
-    service: Pick<FleetService, 'listForUser'>;
+    /**
+     * `listForUser` backs `list_fleet_nodes`; the visible reads back FL-19's
+     * `fleet_nodes_list|get` (`buildFleetCoreTools`). The API binds the whole
+     * `FleetService`.
+     */
+    service: Pick<FleetService, 'listForUser' | 'listVisibleForUser' | 'getVisibleForUser'>;
+    /**
+     * Servers and ports (FL-10) — `fleet_ports_list` / `fleet_ports_open`.
+     * Optional: unbound (a context without the API's node link), the two tools
+     * are simply not offered.
+     */
+    ports?: Pick<FleetPortsService, 'list' | 'open'>;
+    /** Servers and ports, phase 2 — `fleet_ports_preview_open|close` (offered only while the tunnel flag is on). */
+    portTunnels?: Pick<FleetPortTunnelService, 'open' | 'closeForUser' | 'isEnabled'>;
+    /**
+     * Services, processes and Docker on computers (FL-09) — backs
+     * `fleet_services_*`, `fleet_processes_*` and `fleet_docker_*`.
+     * Optional: unbound, those tools are simply not offered.
+     */
+    /**
+     * Virtual computers (FL-16) — backs `fleet_virtual_*`. Optional: unbound (or
+     * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
+     */
+    virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
+    /**
+     * Cloud computers (FL-17) — backs `fleet_cloud_*`. Optional: unbound (or
+     * `FLEET_CLOUD_ENABLED` off), those tools are simply not offered.
+     */
+    cloud?: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'>;
+    machine?: Pick<
+        FleetMachineActionsService,
+        | 'listServices'
+        | 'serviceAction'
+        | 'listProcesses'
+        | 'signalProcess'
+        | 'listContainers'
+        | 'containerAction'
+        | 'listImages'
+        | 'pullImage'
+        | 'listComposeProjects'
+        | 'describeComposeProject'
+        | 'composeAction'
+    >;
+    /**
+     * Computer health (FL-03 second phase) — when bound, the read-only
+     * `fleet_nodes_health` / `fleet_nodes_needs_a_look` tools are offered
+     * (`buildFleetHealthTools`). Optional and unbound by default: FL-19 owns
+     * the Agent catalogue and binds it with the Agent gates.
+     */
+    health?: {
+        service: Pick<FleetService, 'getVisibleForUser' | 'listVisibleForUser'>;
+        history: Pick<FleetNodeHealthService, 'history' | 'isHistoryEnabled'>;
+        needsALook?: Pick<NeedsALookService, 'forNodes'>;
+    };
+    /**
+     * Checkouts on computers (FL-14 P2, spec FR-29) — when bound, the
+     * `fleet_checkouts_*` tools are offered (`buildFleetCheckoutTools`), each
+     * act checked against the Node's `checkouts` audience for the Agent's
+     * owner and classified on the trust ladder (`safety/action-category.ts`).
+     */
+    checkouts?: {
+        service: Pick<
+            FleetCheckoutService,
+            'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
+        >;
+    };
+    /**
+     * Session git & actions (FL-06 P3, spec FR-26) — when bound, the
+     * `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` and
+     * `fleet_checkouts_open_pull_request` tools are offered
+     * (`buildFleetSessionGitTools`), each act checked against the Node's
+     * audience for the Agent's owner. The pull-request opener is the API's.
+     */
+    sessionGit?: {
+        actions: Pick<FleetSessionActionService, 'list' | 'send'>;
+        checkouts?: Pick<FleetCheckoutService, 'changes'>;
+        pullRequests?: FleetSessionPullRequestOpener;
+    };
+    /**
+     * Logs on computers (FL-08) — when bound, the read-only
+     * `fleet_logs_sources` / `fleet_logs_read` tools are offered
+     * (`buildFleetLogsTools`), reading through the API's node link. Optional
+     * and unbound by default: FL-19 owns the Agent catalogue and binds it
+     * (the API binds the port under `FLEET_LOGS_READER`).
+     */
+    logs?: {
+        reader: FleetLogsReaderPort;
+    };
+    /**
+     * Files on computers (FL-11) — when bound, the read-only
+     * `fleet_files_roots` / `fleet_files_list` / `fleet_files_stat` tools are
+     * offered (`buildFleetFilesTools`), reading through the API's node link.
+     * Optional and unbound by default: FL-19 owns the Agent catalogue and binds
+     * it (the API binds the port under `FLEET_FILES_READER`).
+     */
+    files?: {
+        reader: FleetFilesReaderPort;
+    };
+    /**
+     * FL-19 — `fleet_status` ("how is my fleet?" in one call): the API's status
+     * service under `FLEET_STATUS_READER`. Unbound, the tool is not offered.
+     */
+    status?: FleetStatusReaderPort;
+    /**
+     * FL-19 — `fleet_operations_get|list`: the node link's operations registry
+     * (FL-02). Unbound (no link in this context), the tools are not offered.
+     */
+    operations?: FleetOperationsToolPort;
+    /** FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the owner). Unbound, not offered. */
+    wake?: FleetWakeToolPort;
+}
+
+/**
+ * Commands on computers (FL-12 P2) — the `commands` tool family
+ * (`fleet/commands/agent-fleet-command-tools.ts`). `fleet_commands_run` only
+ * ever files an approval (`proposals`); the reads and the cancel use this.
+ */
+export interface AgentFleetCommandToolSource {
+    service: Pick<FleetCommandService, 'listRecent' | 'get' | 'cancel'>;
+}
+
+/**
+ * FL-15 P3 — Tasks on computers (`fleet/agent-fleet-task-tools.ts`): the
+ * hand-off options and the git identity check. Each half is optional; the
+ * builder offers nothing while FLEET_CHECKOUTS_ENABLED is off.
+ */
+export interface AgentFleetTaskToolSource {
+    handoff?: FleetTaskHandoffToolPort | null;
+    identity?: FleetGitIdentityToolPort | null;
+}
+
+/**
+ * Schedules on computers (FL-13 P2) — the `schedules` tool family
+ * (`fleet/schedules/agent-fleet-schedule-tools.ts`). Create, update, delete and
+ * run only ever file an approval (`proposals`); the reads, pause and resume use this.
+ */
+export interface AgentFleetScheduleToolSource {
+    service: Pick<FleetScheduleService, 'listForUser' | 'get' | 'runs' | 'pause' | 'resume'>;
+}
+
+/** FL-04 P2 — the `sessions` tool family (`fleet/agent-fleet-session-tools.ts`). */
+export interface AgentFleetSessionToolSource {
+    service: FleetSessionsToolService['service'];
 }
 
 export interface AgentPrReviewToolSource {
@@ -218,6 +377,13 @@ export interface AgentDomainToolSources {
     digest?: AgentDigestToolSource;
     meetings?: AgentMeetingToolSource;
     fleet?: AgentFleetToolSource;
+    fleetSessions?: AgentFleetSessionToolSource;
+    /** FL-12 P2 — bound only while FLEET_COMMANDS_ENABLED is on. */
+    fleetCommands?: AgentFleetCommandToolSource;
+    /** FL-15 P3 — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_*`. */
+    fleetTasks?: AgentFleetTaskToolSource;
+    /** FL-13 P2 — `fleet_schedules_*` (bound only while FLEET_COMMANDS_ENABLED is on). */
+    fleetSchedules?: AgentFleetScheduleToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;

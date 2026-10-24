@@ -13,6 +13,7 @@ import { ownershipScopeOf } from '../database/ownership-scope';
 // graph (repositories + the git facade) into the chat-tool assembly path.
 import type { TaskAgentReviewService } from './task-agent-review.service';
 import { SUBMIT_TASK_REVIEW_TOOL } from './task-agent-review';
+import type { FleetToolAnnotation } from '@ever-works/contracts';
 
 /**
  * Tasks feature — Phase 16.2 / 16.3 / 16.4.
@@ -52,6 +53,13 @@ export interface TaskToolDescriptor<TArgs = unknown, TResult = unknown> {
         required: string[];
     };
     invoke: (args: TArgs) => Promise<TResult | { error: string }>;
+    /**
+     * FL-19 (spec FR-2) — what a fleet tool declares about itself: read-only, or
+     * destructive with its confirmation class and AW-24 category, and the
+     * CONTRACTS §2.1 permission family. Optional and additive: no existing
+     * descriptor sets it, and nothing that reads a descriptor requires it.
+     */
+    annotations?: FleetToolAnnotation;
 }
 
 export interface CreateTaskArgs {

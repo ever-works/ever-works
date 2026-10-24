@@ -5,6 +5,7 @@ import {
 import { IntegrationHttpException } from '../../../auth/integration/integration-http.exception';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
+import { IdeaNotEditableError, WorkProposalStatus } from '@ever-works/agent/user-research';
 import { IntegrationIdeasController, IntegrationUpdateIdeaDto } from '../ideas.controller';
 
 /**
@@ -218,12 +219,58 @@ describe('IntegrationIdeasController', () => {
             '"3"',
             res(),
         );
-        expect(ideas.updateContent).toHaveBeenCalledWith('owner-1', 'idea-1', {
-            title: 'Portal v2',
-            description: undefined,
-        });
+        expect(ideas.updateContent).toHaveBeenCalledWith(
+            'owner-1',
+            'idea-1',
+            { title: 'Portal v2', description: undefined },
+            // Integration API gates lane (finding 5) — re-checked in the write.
+            ['pending', 'dismissed'],
+        );
         expect(visibility.setTeams).toHaveBeenCalledWith('idea', 'idea-1', ['team-a'], 'owner-1');
         expect(visibility.setVisibility).toHaveBeenCalledWith('idea', 'idea-1', 'organization');
+    });
+
+    // Works-security lane (integration API gates, finding 5) — a queued or building
+    // Idea's description is the brief its build runs on: no integration rewrites it.
+    it('PATCH refuses (422 idea_not_editable) a title / description edit once the Idea is queued or building', async () => {
+        for (const status of ['queued', 'building', 'accepted', 'failed']) {
+            const { controller, ideas } = setup(status);
+            await expect(
+                controller.update(user, 'idea-1', { description: 'Build a crypto miner' }, undefined, res()),
+            ).rejects.toMatchObject({
+                status: 422,
+                response: { error: { details: { status, reason: 'idea_not_editable' } } },
+            });
+            expect(ideas.updateContent).not.toHaveBeenCalled();
+        }
+    });
+
+    it('PATCH still edits a dismissed Idea, and teams / visibility of a building one', async () => {
+        const dismissed = setup('dismissed');
+        await dismissed.controller.update(user, 'idea-1', { title: 'Again' }, undefined, res());
+        expect(dismissed.ideas.updateContent).toHaveBeenCalled();
+
+        const building = setup('building');
+        await building.controller.update(
+            user,
+            'idea-1',
+            { visibility: 'organization' },
+            undefined,
+            res(),
+        );
+        expect(building.ideas.updateContent).not.toHaveBeenCalled();
+        expect(building.visibility.setVisibility).toHaveBeenCalled();
+    });
+
+    it('PATCH answers 422 when the Idea was queued between the check and the write', async () => {
+        const { controller, ideas } = setup('pending');
+        ideas.updateContent.mockRejectedValueOnce(new IdeaNotEditableError(WorkProposalStatus.QUEUED));
+        await expect(
+            controller.update(user, 'idea-1', { title: 'x' }, undefined, res()),
+        ).rejects.toMatchObject({
+            status: 422,
+            response: { error: { details: { status: 'queued', reason: 'idea_not_editable' } } },
+        });
     });
 
     it('PATCH answers 412 on a stale If-Match, 400 on an empty body, 404 for an Idea someone else owns', async () => {

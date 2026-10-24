@@ -323,6 +323,19 @@ export const config = {
             return undefined;
         },
         /**
+         * 2026-10-21 — `FLEET_PINNED_AGENT_HOLDS_FOR_NODE`. When on, a run whose Agent the
+         * owner pinned to a node (agent ↔ node affinity) is HELD for the fleet
+         * (`fleet-waiting`, `waiting-for-runner`) under `local-fallback` instead of being
+         * relocated to a cloud stand-in while that node cannot lease (prod T-45). An
+         * explicit `cloud` preference still runs in the cloud. Default OFF: the shipped
+         * `local-fallback` contract (relocate, notify `pinned-runner-offline`) stays the
+         * default until the owner flips it. App Works are held regardless (#2809, FR-12).
+         */
+        pinnedAgentHoldsForNode(): boolean {
+            const raw = (process.env.FLEET_PINNED_AGENT_HOLDS_FOR_NODE || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
          * Command template a node runs for one `agent-task` job.
          * Supports `{taskId}`, `{runId}` and `{agentId}` placeholders,
          * each substituted with an id validated against a strict
@@ -719,6 +732,142 @@ export const config = {
          */
         isNodeLinkEnabled(): boolean {
             return process.env.FLEET_NODE_LINK_ENABLED === 'true';
+        },
+        /**
+         * Sessions on computers (FL-04, CONTRACTS §9) — `FLEET_SESSIONS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**sessions**` route answers 404 (the surface is
+         * not even confirmed) and node reports on the link are dropped. A
+         * session needs the node link, so the link flag gates the machine
+         * calls on its own. Read per call: flipping it needs no restart.
+         */
+        isSessionsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_SESSIONS_ENABLED === 'true'
+            );
+        },
+        /**
+         * Commands on computers (FL-12, CONTRACTS §9) — `FLEET_COMMANDS_ENABLED`
+         * (shared with FL-13's Schedules). Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every `/api/fleet/commands**`
+         * route answers 404 (the surface is not even confirmed). A Command needs
+         * the node link, so the link flag gates the machine calls on its own.
+         * Read per call: flipping it needs no restart.
+         */
+        isCommandsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_COMMANDS_ENABLED === 'true'
+            );
+        },
+        /**
+         * Machine facts (FL-08, FL-09, FL-10 P1, FL-11 — CONTRACTS §9) —
+         * `FLEET_MACHINE_FACTS_ENABLED`. Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every logs, services, Docker,
+         * Compose, processes, ports and files route answers 404 (the surface
+         * is not even confirmed). Every one of those reaches the machine over
+         * the node link, so the link flag still gates the machine calls on its
+         * own. Read per call: flipping it needs no restart.
+         */
+        isMachineFactsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_MACHINE_FACTS_ENABLED === 'true'
+            );
+        },
+        /**
+         * Servers and ports, phase 2 (FL-10, CONTRACTS §9, R-17) —
+         * `FLEET_PORT_TUNNEL_ENABLED`: "Preview in my browser". Needs the
+         * machine-facts flag too, and a preview hostname
+         * ({@link getPortPreviewHost}); without either it is off. Off, the
+         * button is absent, the tunnel routes answer 404 and the preview host
+         * answers 404.
+         */
+        isPortTunnelEnabled(): boolean {
+            return (
+                this.isMachineFactsEnabled() &&
+                process.env.FLEET_PORT_TUNNEL_ENABLED === 'true' &&
+                this.getPortPreviewHost() !== null
+            );
+        },
+        /**
+         * The dedicated preview hostname tunnels are served on
+         * (`FLEET_PREVIEW_HOST`, e.g. `preview.ever.works`) — a bare host, no
+         * scheme, no path; anything else reads as unset. Dedicated so a
+         * tunnelled page can never read Ever Works' own cookies or storage.
+         */
+        getPortPreviewHost(): string | null {
+            const raw = (process.env.FLEET_PREVIEW_HOST ?? '').trim().toLowerCase();
+            if (raw.length === 0 || raw.length > 253) return null;
+            return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::\d{1,5})?$/.test(
+                raw,
+            )
+                ? raw
+                : null;
+        },
+        /**
+         * Checkouts on computers (FL-14, CONTRACTS §9) — `FLEET_CHECKOUTS_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/**checkouts**` route answers 404 and the
+         * reconcile sweep does nothing. Read per call: flipping it needs no
+         * restart.
+         */
+        isCheckoutsEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_CHECKOUTS_ENABLED === 'true'
+            );
+        },
+        /**
+         * Virtual computers (FL-16, CONTRACTS §9) — `FLEET_VIRTUAL_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/nodes/:id/virtual/**` route (and the node-facing
+         * `/api/internal/fleet/virtual/**`) answers 404, the reconcile sweep does
+         * nothing and no `vm-*` job is enqueued. Read per call: flipping it needs
+         * no restart. Children that already exist stay ordinary Nodes.
+         */
+        isVirtualEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_VIRTUAL_ENABLED === 'true'
+            );
+        },
+        /**
+         * Cloud computers (FL-17, CONTRACTS §9) — `FLEET_CLOUD_ENABLED`. Off
+         * unless set to `true`, and never without `FLEET_ENABLED`: with it off
+         * every `/api/fleet/providers/**` and `/api/fleet/cloud/**` route answers
+         * 404, the reconcile and bootstrap-watch sweeps do nothing and the Agent
+         * tools are not offered. Read per call: flipping it needs no restart.
+         * Cloud computers that already exist stay ordinary Nodes, and the
+         * "Remove from Fleet" guard (R-36) holds whatever the flag says.
+         */
+        isCloudEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_CLOUD_ENABLED === 'true'
+            );
+        },
+        /**
+         * Cloud computers (FL-17, plan §6) — the `ever-works-node` npm spec a
+         * cloud computer's bootstrap installs: `EVER_WORKS_NODE_CLOUD_RUNTIME_SPEC`
+         * (an exact `ever-works-node@<version>` or an `https://….tgz`), else
+         * `ever-works-node@<this platform's supported node version>`.
+         */
+        getCloudRuntimeSpec(): string | null {
+            const raw = process.env.EVER_WORKS_NODE_CLOUD_RUNTIME_SPEC?.trim();
+            return raw ? raw : null;
+        },
+        /**
+         * Checkouts on computers (FL-14 P3, spec §8b) — the image a
+         * container-isolated checkout's sessions and commands run in
+         * (`FLEET_CHECKOUT_CONTAINER_IMAGE`). One deployment default; no per-Work
+         * override. Anything that is not a plain image reference falls back to
+         * the default rather than reaching `docker run`.
+         */
+        getCheckoutContainerImage(): string {
+            const raw = (process.env.FLEET_CHECKOUT_CONTAINER_IMAGE ?? '').trim();
+            return /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}$/.test(raw) ? raw : 'node:26-bookworm';
         },
         /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`
@@ -1232,6 +1381,20 @@ export const config = {
              */
             cloudPushEnabled() {
                 return process.env.APP_WORKS_CLOUD_PUSH_ENABLED === 'true';
+            },
+
+            /**
+             * 2026-10-21 — `APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`: before a Deployment reaches
+             * the cluster, read the image config's `User` from the registry (with the App's own
+             * pull credential) and refuse an image the kubelet would refuse under
+             * `runAsNonRoot` — `managed_root_forbidden` (root / no user) or
+             * `image_user_unverifiable` (a user NAME) — unless the component declares a numeric
+             * `runAsUser`. Without it the same refusal arrives only from the kubelet, after the
+             * namespace was prepared and a Job or a rollout waited. A registry that cannot be read
+             * is a warning (`image_user_unchecked`), never a refusal. Default OFF; read per call.
+             */
+            imageUserPrecheckEnabled() {
+                return process.env.APP_WORKS_IMAGE_USER_PRECHECK_ENABLED === 'true';
             },
 
             /**

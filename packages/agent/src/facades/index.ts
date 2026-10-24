@@ -181,6 +181,14 @@ export {
 // Stripe); Goal evaluation (PR-8) consumes this.
 export { MetricsFacadeService, MetricsFacadeError } from './metrics.facade';
 
+// Machine Provider Facade — FL-17 (cloud computers, CONTRACTS R-15). The one
+// way core code reaches a `machine-provider` plugin; no provider is named.
+export {
+    MachineProviderFacadeService,
+    MachineProviderFacadeError,
+    type MachineProviderSummary,
+} from './machine-provider.facade';
+
 // Connection Scopes Facade — AW-15. Which plain-English access levels a
 // provider plugin declares; the tool-grant lattice stores the chosen level.
 export { ConnectionScopesFacadeService } from './connection-scopes.facade';

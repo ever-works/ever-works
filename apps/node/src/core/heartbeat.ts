@@ -71,7 +71,27 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Computer health (FL-03): the health snapshot. Its own
+	// NEWEST first. Schedules on computers (FL-13): the machine's IANA time
+	// zone. Its own tier, newest of all (it reached `develop` after FL-03's
+	// wake pair): a platform that predates schedules costs exactly this field.
+	['timeZone'],
+	// Computer health, second phase (FL-03): the primary
+	// interface's hardware address and the opaque network identity, sent only
+	// under `--manage` for Wake-on-LAN. Their own tier, newest of all (it
+	// reached `develop` after FL-02's self-update report): a platform that
+	// knows every older field but predates wake costs exactly these two.
+	['macAddress', 'lanId'],
+	// Fleet node link (FL-02 T-25): the opt-in self-update's
+	// report. Its own tier, newer than FL-04's daemon line (it reached
+	// `develop` after it): a platform that knows the daemon line but not this
+	// field costs the node exactly this one field.
+	['selfUpdate'],
+	// Sessions on computers (FL-04): the session daemon's health.
+	// A platform that predates it answers 400; the node strips this tier
+	// and keeps beating — losing only the daemon line, never its health or
+	// consents. Newer than the health snapshot: FL-03 reached `develop` first.
+	['daemon'],
+	// Computer health (FL-03): the health snapshot. Its own
 	// tier, so a platform that predates it costs exactly this one field —
 	// the consents, pinned CLI versions and enforced limits below keep
 	// flowing (FR-3, U9). Newer than the consents: FL-02 reached `develop`
@@ -445,13 +465,31 @@ function describeStrippedTiers(tiers: number): string {
 	if (tiers >= OPTIONAL_DESCRIPTION_FIELD_TIERS.length) {
 		return 'Platform rejected the optional self-description fields (worker state, housekeeping); it predates them. Reporting liveness only until this node restarts.';
 	}
-	if (tiers >= 3) {
+	// Named by the fields dropped, not by the tier's index, so a newer tier
+	// added on top never changes what an older one's message says.
+	const dropped = new Set<string>(OPTIONAL_DESCRIPTION_FIELD_TIERS.slice(0, tiers).flat());
+	if (dropped.has('cliVersions')) {
 		return 'Platform rejected the newest optional self-description fields (pinned CLI versions, enforced limits); it predates them. Still reporting worker state and housekeeping; the newer fields stay off until this node restarts.';
 	}
-	if (tiers >= 2) {
+	if (dropped.has('consents')) {
 		return 'Platform rejected the consents field; it predates the node link. Still reporting pinned CLI versions, enforced limits, worker state and housekeeping; the node link stays closed and the health snapshot off until this node restarts.';
 	}
-	return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
+	if (dropped.has('health')) {
+		return 'Platform rejected the health snapshot; it predates it. Still reporting everything else; health stays off until this node restarts.';
+	}
+	if (dropped.has('daemon')) {
+		return 'Platform rejected the session daemon field; it predates sessions on computers. Still reporting everything else; the daemon line stays off until this node restarts.';
+	}
+	if (dropped.has('selfUpdate')) {
+		return 'Platform rejected the self-update report; it predates it. Still reporting everything else; the report stays off until this node restarts.';
+	}
+	if (dropped.has('macAddress')) {
+		return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
+	}
+	if (dropped.has('timeZone')) {
+		return "Platform rejected the time zone; it predates schedules on computers. Still reporting everything else; schedules show this computer's times in UTC until this node restarts.";
+	}
+	return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
 }
 
 /** The same description with the newest `tiers` tiers of droppable fields removed (absent keys dropped too). */

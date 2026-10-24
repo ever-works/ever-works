@@ -186,6 +186,26 @@ export function RunReceiptView({
                         {t('openSession')}
                     </Link>
                 )}
+                {/* FL-04 P2 — an Agent session's Run links to the session on its computer. */}
+                {row.fleetSessionId && (
+                    <Link
+                        href={ROUTES.DASHBOARD_FLEET_SESSION(row.fleetSessionId)}
+                        className="block text-xs text-primary hover:underline"
+                        data-testid="run-receipt-fleet-session-link"
+                    >
+                        {t('openFleetSession')}
+                    </Link>
+                )}
+                {/* FL-04 P3 — re-watch the session's recording. */}
+                {row.fleetSessionId && (
+                    <Link
+                        href={`${ROUTES.DASHBOARD_FLEET_SESSION(row.fleetSessionId)}?rewatch=1`}
+                        className="block text-xs text-primary hover:underline"
+                        data-testid="run-receipt-fleet-session-rewatch"
+                    >
+                        {t('rewatchFleetSession')}
+                    </Link>
+                )}
             </Section>
 
             <Section title={t('filesTouched')} testId="run-receipt-files">

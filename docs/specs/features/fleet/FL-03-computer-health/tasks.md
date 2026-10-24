@@ -6,8 +6,8 @@
 
 **Epic ID:** `FL-03-computer-health`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1 in PR 1 (`feat/fl-03-computer-health-p1`)
-**Last updated:** 2026-10-18
+**Status:** `In progress` — P1 merged (#2736); P2 + P3 in PR 2 (`feat/fl-03-computer-health-p2`, #2831) — specs written, not yet run (Fast-build rule)
+**Last updated:** 2026-10-21
 
 ---
 
@@ -26,7 +26,7 @@
 
 ## P1.A — Contracts and node probe
 
-- [ ] **T-01**. Add `packages/contracts/src/fleet/fleet-node-health.types.ts` (snapshot, stored,
+- [x] **T-01**. Add `packages/contracts/src/fleet/fleet-node-health.types.ts` (snapshot, stored,
       `ComputerState`, `resolveComputerState`, `diskLowSeverity`, bounds) and export from
       `packages/contracts/src/fleet/index.ts`; extend `FleetNodeSelfDescription` / `FleetNodeView` in
       `fleet-node.types.ts` (`health?`, `macAddress?`, `lanId?`, `canWake?`, `lastWakeAttemptAt?`); add
@@ -41,7 +41,7 @@
       utilisation/memory queries; export from `apps/node/src/core/index.ts`.
       **Test**: `apps/node/src/core/health-probe.spec.ts` — every fact per OS with fake runners; hanging
       runner drops the field in 2 s; `gpu-probe.spec.ts` extend.
-- [ ] **T-03**. Heartbeat: `describe()` in `apps/node/src/core/runtime.ts` adds `health`, `macAddress`,
+- [x] **T-03**. Heartbeat: `describe()` in `apps/node/src/core/runtime.ts` adds `health`, `macAddress`,
       `lanId`; `OPTIONAL_DESCRIPTION_FIELD_TIERS` in `apps/node/src/core/heartbeat.ts:72-90` gains them in
       the newest tier; `apps/node/src/core/types.ts` `NodeSelfDescription` fields.
       **Test**: extend `apps/node/src/core/heartbeat.spec.ts` (sent; dropped first on 400);
@@ -61,7 +61,7 @@
       §4.5 columns with `resolution` `raw|hourly`) and `1796030100000-AddFleetNodeWakeFields.ts`
       (`health`, `macAddress`, `lanId`, `lastWakeAttemptAt`), guarded like `1795161700000-AddFleetModelUsageLimits.ts`.
       **Test**: apply twice on sqlite and Postgres; `migration:generate` afterwards empty.
-- [ ] **T-06**. `FleetService.heartbeat` (`packages/agent/src/fleet/fleet.service.ts:534-630`) stores
+- [x] **T-06**. `FleetService.heartbeat` (`packages/agent/src/fleet/fleet.service.ts:534-630`) stores
       `health` with receipt time (`sanitize` each number; absent never overwrites), `macAddress`
       (format-checked), `lanId`; DTO fields in `apps/api/src/fleet/dto/fleet.dto.ts`;
       `FleetNodeView` mapping adds them (masked MAC for non-owners).
@@ -76,7 +76,7 @@
       severity, action, stable id per producer; `helper-untrusted` silent without `helperTrust`.
       **Status (FL-03 PR 1)**: ✓ — bound through the `NEEDS_A_LOOK_PRODUCERS` token; the spec is
       `needs-a-look.spec.ts` and also runs every item through FL-01's real registry and normaliser.
-- [ ] **T-08**. `apps/api/src/fleet/fleet-health.controller.ts` with `GET /nodes/:id/health`
+- [x] **T-08**. `apps/api/src/fleet/fleet-health.controller.ts` with `GET /nodes/:id/health`
       (`view` family via FL-01's `FleetAccessService`); add the `machines` family check to the existing
       `POST nodes/:id/clear-model-throttle` (`apps/api/src/fleet/fleet.controller.ts:451`).
       **Test**: `apps/api/src/fleet/fleet-health.controller.spec.ts` — shape, 404 for strangers;
@@ -85,7 +85,7 @@
 
 ## P1.C — Web: cells, metric slot, sentences
 
-- [ ] **T-09**. `apps/web/src/components/fleet/health/computer-state.shared.ts` (state → i18n key +
+- [x] **T-09**. `apps/web/src/components/fleet/health/computer-state.shared.ts` (state → i18n key +
       action); use it in FL-01's `ComputerHeader.tsx`, `ComputerCards.tsx`, `FleetComputersTable.tsx`
       (word beside dot, action button); card cells read `node.health`.
       **Test**: `computer-state.shared.unit.spec.ts`; extend `ComputerCards.unit.spec.tsx` ("—", stale).
@@ -121,28 +121,28 @@
       in `packages/tasks/src/tasks/trigger/index.ts` beside `fleet-job-lease-sweeper`.
       **Test**: `packages/tasks/src/__tests__/fleet-health-rollup.task.spec.ts` — roll-up values,
       idempotent re-run, boundaries ±1 min.
-- [ ] **T-16**. `GET /nodes/:id/health/history` in `fleet-health.controller.ts` (ranges, ≤ 500 points,
+- [x] **T-16**. `GET /nodes/:id/health/history` in `fleet-health.controller.ts` (ranges, ≤ 500 points,
       gaps, `{ disabled: true }` when off); `fleetAPI.healthHistory`.
       **Test**: extend `fleet-health.controller.spec.ts` — each range picks the right resolution;
       downsampling to 500; flag off.
-- [ ] **T-17**. `apps/web/src/components/fleet/health/overview/HealthHistoryChart.tsx` (ranges,
+- [x] **T-17**. `apps/web/src/components/fleet/health/overview/HealthHistoryChart.tsx` (ranges,
       toggles, gaps, a11y text summary) registered with `registerOverviewBlock`; card sparkline in `ComputerCards.tsx`.
       i18n `fleet.history.*`.
       **Test**: `HealthHistoryChart.unit.spec.tsx` — gaps as breaks, off, empty, summary text.
-- [ ] **T-18**. Playwright `apps/web/e2e/flow-fleet-health-history.spec.ts` — flag off message; flag on
+- [x] **T-18**. Playwright `apps/web/e2e/flow-fleet-health-history.spec.ts` — flag off message; flag on
       ranges render harness samples.
       **Test**: itself.
 
 ## P3 — Reach: wake and refresh now
 
-- [ ] **T-19**. Node module `apps/node/src/core/link/modules/health.ts` (verbs `health.now`,
+- [x] **T-19**. Node module `apps/node/src/core/link/modules/health.ts` (verbs `health.now`,
       `wake.send`; `wake` tag when `manage` and a MAC) added to `apps/node/src/core/link/modules/index.ts`
       (FL-02).
       **Test**: `apps/node/src/core/link/modules/health.spec.ts` — snapshot reply on a `--work`-only
       link (`health.now` needs no `manage`, CONTRACTS R-31 / FL-02 `FLEET_LINK_VERB_CONSENT_OVERRIDES`);
       3 packets to the right addresses; MAC validation; `wake.send` refused without `manage`; tag
       conditions.
-- [ ] **T-20**. `POST /nodes/:id/health` (refresh now — `view` family, any open link, CONTRACTS R-31,
+- [x] **T-20**. `POST /nodes/:id/health` (refresh now — `view` family, any open link, CONTRACTS R-31,
       §2.1) and `POST /nodes/:id/wake` (`machines` family on the target) in
       `fleet-health.controller.ts` through FL-02's `FleetLinkService.request`; sibling selection
       (`same owner, same lanId, online, tags ⊇ { wake, managed }`); `lastWakeAttemptAt`; audit
@@ -150,29 +150,36 @@
       `"last seen …; wake it from …?"` on `unreachable`.
       **Test**: extend `fleet-health.controller.spec.ts` — every error code; the 11th refresh and the
       4th wake; audit row; sibling selection matrix.
-- [ ] **T-21**. Web: `apps/web/src/components/fleet/health/overview/WakePanel.tsx`, Refresh now
+- [x] **T-21**. Web: `apps/web/src/components/fleet/health/overview/WakePanel.tsx`, Refresh now
       enabled path with `fleetAPI.refreshHealth`, `fleetAPI.wake`; 20 s / 60 s listener polling
       `GET /nodes/:id` status; `R` / `W` shortcuts; i18n `fleet.wake.*`, `fleet.health.refresh*`.
       **Test**: `WakePanel.unit.spec.tsx` (every disabled reason, outcomes at 20 s / 60 s with fake
       timers); `HealthMetrics.unit.spec.tsx` extend (refresh success, `unreachable` → Try again).
-- [ ] **T-22**. Tool shapes handed to FL-19 under its catalogue names (FL-19 plan §9.1):
+- [x] **T-22**. Tool shapes handed to FL-19 under its catalogue names (FL-19 plan §9.1):
       `fleet_nodes_health` (`readOnly`; `range?` for history, `fresh: true` for Refresh now),
       `fleet_nodes_needs_a_look` (`readOnly`), `fleet_nodes_wake` (`destructive: false`, `plain`) with
       annotations in `packages/agent/src/fleet/agent-fleet-tools.ts` beside `list_fleet_nodes` (`:40`)
       — read-only ones wired now, the state-changing one exported as a descriptor for FL-19.
       **Test**: `packages/agent/src/fleet/__tests__/agent-fleet-tools.spec.ts` — annotations, envelopes.
-- [ ] **T-23**. Playwright `apps/web/e2e/flow-fleet-wake-refresh.spec.ts` — disabled variants; refresh
+- [x] **T-23**. Playwright `apps/web/e2e/flow-fleet-wake-refresh.spec.ts` — disabled variants; refresh
       round-trip via the node harness; wake via a harness sibling.
       **Test**: itself.
 
+**Status (FL-03 PR 2, #2831)**: T-16 … T-23 written — history read (`FleetNodeHealthService.history`,
+contracts `buildFleetHealthHistoryPoints`), `HealthHistoryChart` + `HealthHistoryBlock` + `HealthSparkline`,
+node `link/modules/health.ts` + `network-identity.ts`, `POST /nodes/:id/health`, `POST|GET /nodes/:id/wake`,
+`WakePanel`, Refresh now in `HealthMetrics`, `agent-fleet-health-tools.ts`, the two Playwright specs (API
+edge; the harness has no live node link). Specs named above exist and are NOT yet run. The T-09 second half
+is `ComputerStateSentence` in FL-01's cards, table (`renderState`) and header.
+
 ## P4 — Docs and rollout
 
-- [ ] **T-24**. Docs: `docs/features/fleet-health.md` (what is reported, states and fixes, history
+- [x] **T-24**. Docs: `docs/features/fleet-health.md` (what is reported, states and fixes, history
       retention and footprint, wake, refresh); add to `apps/docs/sidebarsPlatform.ts` beside
       `'features/fleet'` (`:183`); extend `docs/features/fleet.md` §"Health signals" with a pointer;
       update `docs/specs/features/fleet/TRACKER.md` row FL-03.
       **Test**: `pnpm --filter ever-works-docs build` — no broken-link warning.
-- [ ] **T-25**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; fleet, FL-01, FL-02 and
+- [ ] **T-25** (the cascade gate — Fast-build rule: nothing in PR 2 was run). `pnpm format && pnpm lint && pnpm test && pnpm build` green; fleet, FL-01, FL-02 and
       AW-11 e2e green with `FLEET_HEALTH_HISTORY_ENABLED` on and off.
 
 ## Definition of done

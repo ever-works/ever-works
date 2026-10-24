@@ -129,7 +129,176 @@ export type FleetAuditAction =
 	 * node's control policy (CONTRACTS §2.1, §7). One row per family changed;
 	 * details carry `family`, `from`, `to` — never a member's name.
 	 */
-	| 'node.policy.change';
+	| 'node.policy.change'
+	/**
+	 * Computer health (FL-03, CONTRACTS §7) — someone woke an offline computer
+	 * through a sibling on its network. One row per attempt; details carry
+	 * `target`, `via` (the sibling's id) and `outcome` (`sent` · `refused`).
+	 */
+	| 'node.wake'
+	/**
+	 * Sessions on computers (FL-04, CONTRACTS §7) — every row carries
+	 * `family: 'sessions'`, `target` (the session id), `requestedBy`,
+	 * `confirmationClass` and `outcome`; never terminal bytes, typed input
+	 * or the first message (spec FR-36).
+	 */
+	| 'node.session.start'
+	/** Someone attached as a viewer or a driver (one row per attach, with the role). */
+	| 'node.session.attach'
+	/** One driver span — written once when it ends, with its start, end and byte count; never per keystroke. */
+	| 'node.session.input'
+	/** A prompt was answered (FL-05 writes it). */
+	| 'node.session.answer'
+	| 'node.session.rename'
+	/** A new session replaced an ended one (`restartOf`, the new session id). */
+	| 'node.session.restart'
+	/** A session was ended, with its reason. */
+	| 'node.session.end'
+	| 'node.session.recording.start'
+	| 'node.session.recording.stop'
+	/**
+	 * Session git & actions (FL-06, CONTRACTS §7): an action prompt was typed
+	 * into a session (`action`, a redacted 200-character `promptPreview`, the
+	 * delivery) — an owner session's ledger is read back from these rows (R-38).
+	 */
+	| 'node.session.action'
+	/** A pull request was opened or updated for a session's checkout (platform-side, never a merge). */
+	| 'node.session.pull-request.open'
+	/**
+	 * Logs on computers (FL-08, CONTRACTS §7) — someone read a log source
+	 * (one row per open or one-shot read) or started following it. Details
+	 * carry `source` (the source id), `kind`, `requestedBy`, `lines`,
+	 * `redactions`, `confirmationClass: 'plain'` and `outcome`; never a log
+	 * line (spec FR-27).
+	 */
+	| 'node.logs.read'
+	| 'node.logs.follow'
+	/**
+	 * Files on computers (FL-11, CONTRACTS §7) — `list` (the first listing of
+	 * a root per person per visit), `read` (a download), `write` (an upload),
+	 * `copy` (P2, one row on each computer naming the other), `delete`.
+	 * Details carry `family: 'files'`, `root`, `path`, `entries`, `bytes`,
+	 * `requestedBy`, `confirmationClass`, `confirmed`, `peerNodeId` and
+	 * `outcome`; never a file's contents (spec FR-19).
+	 */
+	| 'node.files.list'
+	| 'node.files.read'
+	| 'node.files.write'
+	| 'node.files.copy'
+	| 'node.files.delete'
+	/** Paste into a desktop (FL-11 P2): the byte count only, never the text (FR-35). */
+	| 'node.clip.paste'
+	/**
+	 * Commands on computers (FL-12, CONTRACTS §7) — one row per computer a
+	 * Command ran on (or was refused on), with `family: 'commands'`, `target`
+	 * (the Command id), `runId`, `requestedBy`, `confirmationClass: 'confirm'`,
+	 * `outcome`, the exit code, the duration and whether output was truncated;
+	 * never the command's output and never the command line (spec FR-12, FR-13).
+	 */
+	| 'node.command.run'
+	/** A running Command was stopped on a computer, with its `reason` (user, kill switch, drain). */
+	| 'node.command.cancel'
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §7) — one row per change of a
+	 * Schedule, with `family: 'schedules'`, `target` (the Command id of a
+	 * Command schedule, the Task id of an Agent-session schedule),
+	 * `requestedBy`, `confirmationClass` and `outcome`; never the command
+	 * line and never output. A run the machine made on its own clock is
+	 * written as `node.command.run` with `requestedBy: schedule:<commandId>`
+	 * when it is reconciled (spec FR-27).
+	 */
+	| 'node.schedule.create'
+	| 'node.schedule.update'
+	| 'node.schedule.delete'
+	| 'node.schedule.run'
+	| 'node.schedule.pause'
+	| 'node.schedule.resume'
+	/**
+	 * Services, Docker, Compose and processes (FL-09, CONTRACTS §7) — one row
+	 * per act, refused ones included (`outcome: 'refused'`). `details` carry
+	 * `family`, `target` (service name, container or image id, project, pid),
+	 * `requestedBy`, `confirmationClass`, `outcome`, `blastRadiusKind` when the
+	 * node warned and `rootRequired`; never an environment value, a command
+	 * line or command output (spec FR-18, FR-29).
+	 */
+	| 'node.service.start'
+	| 'node.service.stop'
+	| 'node.service.restart'
+	| 'node.service.enable'
+	| 'node.service.disable'
+	| 'node.docker.container.start'
+	| 'node.docker.container.stop'
+	| 'node.docker.container.restart'
+	| 'node.docker.container.remove'
+	| 'node.docker.container.run'
+	| 'node.docker.container.exec'
+	| 'node.docker.image.pull'
+	| 'node.docker.image.remove'
+	| 'node.docker.image.prune'
+	| 'node.compose.up'
+	| 'node.compose.down'
+	| 'node.compose.restart'
+	| 'node.compose.pull'
+	/** A Stop (SIGTERM) or Kill (SIGKILL) sent to one process; `details.signal` names which. */
+	| 'node.process.signal'
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS §7) — every row carries
+	 * `family: 'checkouts'`, `target` (the checkout's path), `requestedBy`,
+	 * `confirmationClass` and `outcome`; never a credential or a remote URL
+	 * with one (spec FR-28).
+	 */
+	| 'node.checkout.create'
+	/** A checkout was deleted (folder removed) or forgotten (row only). */
+	| 'node.checkout.delete'
+	/** Fetch, pull, push — and a person's rescan of the code folders. */
+	| 'node.checkout.sync'
+	/** Moved to the bin (folder untouched). */
+	| 'node.checkout.archive'
+	/** Brought back from the bin. */
+	| 'node.checkout.restore'
+	/**
+	 * Servers and ports (FL-10, CONTRACTS §7) — one row per **Open** (port,
+	 * `target: desktop | preview-profile`, program or container, requester,
+	 * class `plain`; never a URL query or page content). An open on the desktop
+	 * from the Ports tab writes only this, never FL-07's `node.desktop.openUrl`.
+	 */
+	| 'node.port.open'
+	/** A preview tunnel opened (phase 2) — one row per tunnel, never per request (R-17). */
+	| 'node.port.preview.open'
+	/** A preview tunnel closed, with the reason, the precise trigger, the request count and the bytes. */
+	| 'node.port.preview.close'
+	/**
+	 * Tasks on computers (FL-15 P2, CONTRACTS §7) — **Use my Ever Works
+	 * identity** set a computer's global git `user.name` / `user.email`.
+	 * `details.fields` names what was set; never the email value (spec FR-15).
+	 */
+	| 'node.git.identity.set'
+	/**
+	 * Virtual computers (FL-16, CONTRACTS §7) — every row carries
+	 * `family: 'machines'`, the child as `target`, `requestedBy`,
+	 * `confirmationClass` and `outcome`, plus the system, CPUs, memory, disk
+	 * and image digest; never the guest password or an enrolment token.
+	 */
+	| 'node.vm.create'
+	| 'node.vm.start'
+	| 'node.vm.stop'
+	| 'node.vm.destroy'
+	/** A stopped virtual computer's CPUs / memory changed (P3). */
+	| 'node.vm.resize'
+	/** A Container recreated from the current catalogue image, keeping its home (P3). */
+	| 'node.vm.rebuild'
+	/** The one-time reveal of a Windows VM's generated password — `revealed: true`, never the value (P2). */
+	| 'node.vm.password.reveal'
+	/**
+	 * Cloud computers (FL-17, CONTRACTS §7) — every row carries
+	 * `family: 'machines'`, the Node as `target`, `requestedBy` (incl.
+	 * `system:idle-policy`), `confirmationClass` and `outcome`, plus the
+	 * provider plugin id, region, size and hourly rate — and, for destroy, the
+	 * final cost. Never the provider token, the enrolment token or a VPN key.
+	 */
+	| 'node.cloud.create'
+	| 'node.cloud.power'
+	| 'node.cloud.destroy';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -168,7 +337,73 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.link.connect',
 	'node.link.disconnect',
 	'node.link.channel-open',
-	'node.policy.change'
+	'node.policy.change',
+	'node.wake',
+	'node.session.start',
+	'node.session.attach',
+	'node.session.input',
+	'node.session.answer',
+	'node.session.rename',
+	'node.session.restart',
+	'node.session.end',
+	'node.session.recording.start',
+	'node.session.recording.stop',
+	'node.session.action',
+	'node.session.pull-request.open',
+	'node.logs.read',
+	'node.logs.follow',
+	'node.files.list',
+	'node.files.read',
+	'node.files.write',
+	'node.files.copy',
+	'node.files.delete',
+	'node.clip.paste',
+	'node.command.run',
+	'node.command.cancel',
+	'node.schedule.create',
+	'node.schedule.update',
+	'node.schedule.delete',
+	'node.schedule.run',
+	'node.schedule.pause',
+	'node.schedule.resume',
+	'node.service.start',
+	'node.service.stop',
+	'node.service.restart',
+	'node.service.enable',
+	'node.service.disable',
+	'node.docker.container.start',
+	'node.docker.container.stop',
+	'node.docker.container.restart',
+	'node.docker.container.remove',
+	'node.docker.container.run',
+	'node.docker.container.exec',
+	'node.docker.image.pull',
+	'node.docker.image.remove',
+	'node.docker.image.prune',
+	'node.compose.up',
+	'node.compose.down',
+	'node.compose.restart',
+	'node.compose.pull',
+	'node.process.signal',
+	'node.checkout.create',
+	'node.checkout.delete',
+	'node.checkout.sync',
+	'node.checkout.archive',
+	'node.checkout.restore',
+	'node.port.open',
+	'node.port.preview.open',
+	'node.port.preview.close',
+	'node.git.identity.set',
+	'node.vm.create',
+	'node.vm.start',
+	'node.vm.stop',
+	'node.vm.destroy',
+	'node.vm.resize',
+	'node.vm.rebuild',
+	'node.vm.password.reveal',
+	'node.cloud.create',
+	'node.cloud.power',
+	'node.cloud.destroy'
 ];
 
 /**

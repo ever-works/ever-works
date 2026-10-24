@@ -12,6 +12,7 @@ import { Work } from '../entities/work.entity';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { etagFor } from './if-match';
 import { ResourceNotFoundError } from './integration-api.errors';
+import { isKeyAuthoredContent } from './kb-content-provenance';
 import { type KeysetPage, type KeysetQuery, readKeysetPage } from './keyset-cursor';
 
 /** `GET /kb/documents` filters (contract v1 B.6 "KB"); the route validates the vocabularies. */
@@ -34,6 +35,12 @@ export interface IntegrationKbDocument {
     readonly etag: string;
     /** Set for a Work document; null for an organization document. */
     readonly workId: string | null;
+    /**
+     * Works-security lane (integration API gates, finding 2) — whether the
+     * current content was written by an integration key acting as itself (no
+     * person behind it); `kb-content-provenance.ts`. Not part of the DTO.
+     */
+    readonly keyAuthored?: boolean;
 }
 
 export interface IntegrationKbFolder {
@@ -119,7 +126,12 @@ export class IntegrationKbService {
             throw new ResourceNotFoundError('kb_document', id);
         }
         const dto = toIntegrationKbDocumentDto(row, organizationId);
-        return { dto, etag: etagFor(dto.version), workId: row.workId ?? null };
+        return {
+            dto,
+            etag: etagFor(dto.version),
+            workId: row.workId ?? null,
+            keyAuthored: isKeyAuthoredContent(row),
+        };
     }
 
     /** The Work, when it is one of the pinned organization's (`404 not_found` otherwise). */

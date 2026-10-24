@@ -6,6 +6,9 @@ import { ROUTES } from '@/lib/constants';
 import type { FleetComputerTabProps } from '../../registry';
 import { PolicyFamiliesEditor } from '../PolicyFamiliesEditor';
 import { ComputerMachineSettings } from '../ComputerMachineSettings';
+import { UpgradeRequiredSection } from '../../link/UpgradeRequiredSection';
+import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
+import { GitIdentityCard } from '../../git/GitIdentityCard';
 
 /**
  * Fleet hub (FL-01, spec §5.10) — a computer's Settings tab, FL-01's part:
@@ -14,9 +17,12 @@ import { ComputerMachineSettings } from '../ComputerMachineSettings';
  * credential) — the Computers tab's node panel, mounted unchanged. `machine`
  * carries what the credential hand-over needs; the page passes it (see
  * `SettingsTabServer`), and without it the tab links to the Computers tab.
+ * FL-02's "Node version" section (upgrade required, the exact command, the
+ * node's self-update) sits first, for the owner.
  */
 export default function SettingsTab({
     node,
+    flags,
     machine,
 }: FleetComputerTabProps & {
     machine?: { apiBaseUrl: string; desktopDownloadUrl: string; nodeDownloadUrl: string };
@@ -25,7 +31,12 @@ export default function SettingsTab({
     const isOwner = node.viewerRole === undefined || node.viewerRole === 'owner';
     return (
         <div className="space-y-8" data-testid="fleet-computer-settings">
+            {isOwner && <UpgradeRequiredSection node={node} />}
             <PolicyFamiliesEditor node={node} />
+            {/* Servers and ports (FL-10): the preview browser switch, owner only. */}
+            {isOwner && <PreviewBrowserSwitch node={node} />}
+            {/* Tasks on computers (FL-15 P2): Git on <computer>, behind FLEET_CHECKOUTS_ENABLED. */}
+            {flags?.FLEET_CHECKOUTS_ENABLED === true && <GitIdentityCard node={node} />}
             {isOwner && machine && <ComputerMachineSettings node={node} {...machine} />}
             {isOwner && !machine && (
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">

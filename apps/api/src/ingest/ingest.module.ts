@@ -14,6 +14,7 @@ import { GitHubAppWebhookController } from './github/github-app-webhook.controll
 import { GitHubPrReviewBridgeService } from './github/github-pr-review-bridge.service';
 import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatcher.service';
 import { GitHubIssueIntakeService } from './github/github-issue-intake.service';
+import { GitHubPrIntakeService } from './github/github-pr-intake.service';
 import { GitHubCheckIntakeService } from './github/github-check-intake.service';
 import { DependabotIncidentSource } from './incidents/dependabot-incident.source';
 import { JiraEventsController } from './jira/jira-events.controller';
@@ -133,6 +134,11 @@ import { TriageTaskFilerService } from './triage/triage-task-filer.service';
         // Issue + incident intake (§6, R2/R23).
         DependabotIncidentSource,
         GitHubIssueIntakeService,
+        // Tasks on computers (FL-15 P3) — `pull_request` actions the review
+        // bridge ignores (review requested, assigned, ready for review, …)
+        // as `github.pr` events: a third registered consumer on the one
+        // dispatcher, feeding the "about me" Trigger matcher.
+        GitHubPrIntakeService,
         // CI feedback + autonomous fix loop (slice AC, EW-806, R17) — a
         // SECOND registered consumer on the same one dispatcher, for the
         // `check_run` / `check_suite` / `workflow_run` deliveries nothing

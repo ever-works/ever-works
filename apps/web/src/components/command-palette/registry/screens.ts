@@ -13,8 +13,10 @@ import {
     Inbox,
     LayoutTemplate,
     Lightbulb,
+    Monitor,
     ListChecks,
     Plug,
+    ScrollText,
     Server,
     Settings,
     Sparkles,
@@ -354,6 +356,170 @@ export const FLEET_HUB_SCREENS: readonly PaletteScreen[] = [
     },
 ];
 
+/**
+ * Fleet hub (FL-01, FR-33, T-27) — "Go to computer <name>" for every computer
+ * the viewer may see, matched on its name like any other screen. The palette
+ * reads the computers when it opens (`useFleetPaletteComputers`) and adds
+ * these after the fixed list; with the hub off it reads none.
+ */
+export function fleetComputerScreens(
+    computers: ReadonlyArray<{ id: string; name: string }>,
+    options: { logs?: boolean } = {},
+): PaletteScreen[] {
+    const screens: PaletteScreen[] = computers.map((computer) => ({
+        id: `fleet.computer.${computer.id}`,
+        href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
+        icon: Monitor,
+        title: (t: PaletteTranslator) => t('fleet.palette.goToComputer', { name: computer.name }),
+        breadcrumb: fleet,
+    }));
+    // Logs on computers (FL-08, FR-33): "Logs on <computer>" for every
+    // computer the viewer may see, opening its Logs tab — only while machine
+    // facts are on (the tab is not registered otherwise).
+    if (options.logs) {
+        for (const computer of computers) {
+            screens.push({
+                id: `fleet.computer.${computer.id}.logs`,
+                href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'logs'),
+                icon: ScrollText,
+                title: (t: PaletteTranslator) => t('fleet.logs.palette', { name: computer.name }),
+                breadcrumb: fleet,
+            });
+        }
+    }
+    return screens;
+}
+
+/**
+ * Services, Docker and processes (FL-09, FR-23) — "Services on <name>",
+ * "Docker on <name>" and "Processes on <name>" for every computer the viewer
+ * may see that advertises the matching tag (a node only does under
+ * `--manage`), each opening that computer's tab. Docker's tab arrives with
+ * FL-09 P2; until then its row opens the tab's placeholder.
+ */
+const FLEET_MACHINE_TABS = [
+    { tag: 'services', tab: 'services', key: 'fleet.palette.servicesOn' },
+    { tag: 'docker', tab: 'docker', key: 'fleet.palette.dockerOn' },
+    { tag: 'processes', tab: 'processes', key: 'fleet.palette.processesOn' },
+    // Files on computers (FL-11, spec §5.9): "Files on <name>" for a computer with an allowed root.
+    { tag: 'files', tab: 'files', key: 'fleet.palette.filesOn' },
+] as const;
+
+export function fleetComputerMachineScreens(
+    computers: ReadonlyArray<{ id: string; name: string; capabilities?: readonly string[] }>,
+): PaletteScreen[] {
+    const out: PaletteScreen[] = [];
+    for (const computer of computers) {
+        for (const entry of FLEET_MACHINE_TABS) {
+            if (!computer.capabilities?.includes(entry.tag)) continue;
+            out.push({
+                id: `fleet.computer.${computer.id}.${entry.tab}`,
+                href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, entry.tab),
+                icon: Monitor,
+                title: (t: PaletteTranslator) => t(entry.key, { name: computer.name }),
+                breadcrumb: fleet,
+            });
+        }
+    }
+    return out;
+}
+
+/**
+ * Servers and ports (FL-10, FR-21) — "Ports on <computer>" for every computer
+ * the viewer may see that advertises `ports` (a node only does under
+ * `--manage`), opening its Ports tab.
+ */
+export function fleetComputerPortsScreens(
+    computers: ReadonlyArray<{ id: string; name: string; capabilities?: readonly string[] }>,
+): PaletteScreen[] {
+    // Like FL-09's rows: only a computer that advertises the tag (`ports`, under `--manage`).
+    return computers
+        .filter((computer) => computer.capabilities?.includes('ports') ?? false)
+        .map((computer) => ({
+            id: `fleet.computer.${computer.id}.ports`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id, 'ports'),
+            icon: Monitor,
+            title: (t: PaletteTranslator) => t('fleet.palette.portsOn', { name: computer.name }),
+            breadcrumb: fleet,
+        }));
+}
+
+/**
+ * Virtual computers (FL-16, spec FR-34, §5.9) — "New virtual computer" (the
+ * Computers tab with the dialog open) and, for every virtual computer the
+ * viewer may see, "Start <name>" or "Stop <name>", opening its page where the
+ * act and its confirmation live. Only while `FLEET_VIRTUAL_ENABLED` is on.
+ */
+export function fleetVirtualScreens(
+    computers: ReadonlyArray<{ id: string; name: string; hostNodeId?: string; virtualState?: string }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    const screens: PaletteScreen[] = [
+        {
+            id: 'fleet.virtual.new',
+            href: `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=virtual`,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.virtual.palette.newVirtual'),
+            breadcrumb: fleet,
+        },
+    ];
+    for (const computer of computers) {
+        if (!computer.hostNodeId) continue;
+        const running = computer.virtualState === 'running';
+        if (!running && computer.virtualState !== 'stopped') continue;
+        screens.push({
+            id: `fleet.virtual.${computer.id}.${running ? 'stop' : 'start'}`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
+            icon: Monitor,
+            title: (t: PaletteTranslator) =>
+                running
+                    ? t('fleet.virtual.palette.stop', { name: computer.name })
+                    : t('fleet.virtual.palette.start', { name: computer.name }),
+            breadcrumb: fleet,
+        });
+    }
+    return screens;
+}
+
+/**
+ * Cloud computers (FL-17, spec §5.8) — "New cloud computer" (the Computers tab
+ * with the dialog open) and, for every cloud computer the viewer may see,
+ * "Power off <name>" or "Power on <name>", opening its page where the act and
+ * its confirmation (with the billing sentence) live. Only while
+ * `FLEET_CLOUD_ENABLED` is on.
+ */
+export function fleetCloudScreens(
+    computers: ReadonlyArray<{ id: string; name: string; cloudPowerState?: string }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    const screens: PaletteScreen[] = [
+        {
+            id: 'fleet.cloud.new',
+            href: `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=cloud`,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.cloud.palette.newCloud'),
+            breadcrumb: fleet,
+        },
+    ];
+    for (const computer of computers) {
+        const running = computer.cloudPowerState === 'running';
+        if (!running && computer.cloudPowerState !== 'off') continue;
+        screens.push({
+            id: `fleet.cloud.${computer.id}.${running ? 'off' : 'on'}`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
+            icon: Monitor,
+            title: (t: PaletteTranslator) =>
+                running
+                    ? t('fleet.cloud.palette.powerOff', { name: computer.name })
+                    : t('fleet.cloud.palette.powerOn', { name: computer.name }),
+            breadcrumb: fleet,
+        });
+    }
+    return screens;
+}
+
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {
     /** Fleet hub (FL-01): add the hub's screens after Teams. */
@@ -446,13 +612,48 @@ const WORK_SUBPAGES: readonly WorkScreenBuilder[] = [
     },
 ];
 
+/** FL-19 (spec §5.4) — the Agent whose pages are open (`/agents/<uuid>…`, any locale prefix), or null. */
+export function getAgentIdFromPath(pathname: string): string | null {
+    const match =
+        /(?:^|\/)agents\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$|\?|#)/i.exec(
+            pathname,
+        );
+    return match ? match[1] : null;
+}
+
+/**
+ * FL-19 (spec §5.4) — "Fleet tools for this Agent": the Capabilities tab's Fleet tools block of the
+ * Agent being viewed (what it may read and do on my computers, and which gate refuses).
+ */
+export function agentFleetToolsScreens(
+    pathname: string,
+    options: { fleetEnabled?: boolean } = {},
+): PaletteScreen[] {
+    if (options.fleetEnabled === false) return [];
+    const agentId = getAgentIdFromPath(pathname);
+    if (!agentId) return [];
+    return [
+        {
+            id: `agent.fleetTools.${agentId}`,
+            href: `${ROUTES.DASHBOARD_AGENT_CAPABILITIES(agentId)}#fleet-tools`,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.tools.palette.forThisAgent'),
+            breadcrumb: (t: PaletteTranslator) => [t('dashboard.sidebar.navigation.agents')],
+        },
+    ];
+}
+
 /**
  * The screens available from `pathname`: every dashboard screen, plus the
- * sub-pages of the Work being viewed when the operator is inside one.
+ * sub-pages of the Work being viewed when the operator is inside one, plus
+ * (FL-19) the Agent's Fleet tools when an Agent's pages are open.
  */
 export function screensFor(pathname: string, options: ScreensForOptions = {}): PaletteScreen[] {
     const workId = getWorkIdFromPath(pathname);
-    const screens = dashboardScreens(options);
+    const screens = [
+        ...dashboardScreens(options),
+        ...agentFleetToolsScreens(pathname, { fleetEnabled: options.fleetHubEnabled }),
+    ];
     if (!workId) return screens;
     return [
         ...screens,

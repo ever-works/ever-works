@@ -393,7 +393,25 @@ export const FLEET_LINK_FAMILY_CONSENT: Readonly<Record<FleetLinkFamily, FleetLi
  */
 export const FLEET_LINK_VERB_CONSENT_OVERRIDES: Readonly<Record<string, FleetLinkConsentRequirement>> = {
 	/** A read allowed on any open link. */
-	'health.now': 'link'
+	'health.now': 'link',
+	/**
+	 * Checkouts on computers (FL-14, spec U2): a `--work`-only node still
+	 * lists the Task worktrees it holds; DISCOVERY (`rescan`) needs `--manage`,
+	 * which the verb checks on the machine and the platform narrows to.
+	 */
+	'checkouts.list': 'work-or-manage',
+	/**
+	 * Checkouts on computers (FL-14 P2, spec S9, U2): a Task run's checkout
+	 * needs only `--work`; a person's or an Agent's needs `--manage`, which the
+	 * verb checks on the machine from `createdBy` and the platform narrows to.
+	 */
+	'checkouts.create': 'work-or-manage',
+	/**
+	 * Session git & actions (FL-06, spec §4.4): the Changes view of a Task's
+	 * worktree needs only `--work`; any other checkout's needs `--manage`,
+	 * which the verb checks on the machine and the platform narrows to.
+	 */
+	'checkouts.changes': 'work-or-manage'
 };
 
 /** The consent one `machine` verb needs: its exception, else the family's. */
@@ -523,6 +541,8 @@ export const FLEET_LINK_MACHINE_VERB_ACTION_FAMILY: Readonly<Record<string, Flee
 	'wake.send': 'machines',
 	// CONTRACTS §3.3 (rev 4): `logs.sources` is a machine verb (a list needs no open channel).
 	logs: 'logs',
+	// FL-11: `files.roots` is a machine verb (the same precedent); the rest rides a `files` channel.
+	files: 'files',
 	services: 'services',
 	docker: 'docker',
 	compose: 'docker',
@@ -831,3 +851,29 @@ export interface FleetNodeLinkView {
 	bytesOut: number;
 	openChannels: number;
 }
+
+// ─── The computer-session leg over the link (FL-02 T-22, spec FR-34) ───────
+
+/**
+ * Channel-0 message a node sends when a live view (`computer-session`) it
+ * runs wants its inbound leg over the link: `{ type, sessionId }`. A node
+ * cannot open channels (CONTRACTS §3.2), so it asks, and the replica holding
+ * its link opens a `desktop` channel with `{ source:
+ * FLEET_LINK_COMPUTER_LEG_SOURCE, sessionId }` once it has checked the view
+ * is pinned to that node and live. The legacy WebSocket leg stays the
+ * fallback.
+ */
+export const FLEET_LINK_COMPUTER_LEG_REQUEST = 'computer.leg';
+
+/** `params.source` of a `desktop` channel that carries a live view's browser leg. */
+export const FLEET_LINK_COMPUTER_LEG_SOURCE = 'browser';
+
+/**
+ * JSON `type` on that channel: `{ type, data }`, `data` one computer frame as
+ * the relay encodes it (`encodeComputerFrame`: quality, refresh, mode, input)
+ * — the very frames the legacy leg carries, in the same encoding.
+ */
+export const FLEET_LINK_COMPUTER_LEG_FRAME = 'desktop.frame';
+
+/** How long a node waits for that channel before it opens the legacy leg. */
+export const FLEET_LINK_COMPUTER_LEG_WAIT_MS = 5_000;

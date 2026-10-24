@@ -1,4 +1,5 @@
 import type { AppSpec } from '@ever-works/contracts';
+import { TASK_ORIGIN_APP_PROVISIONING } from '../../entities/task-origin';
 import type { GitDiffFile, GitDiffResult } from '@ever-works/plugin';
 
 import {
@@ -259,10 +260,33 @@ describe('rule 4 — guarded App spec blocks', () => {
         expect(verdict.allowed).toBe(true);
     });
 
-    it('exempts an `app-provision` Task from THIS RULE ONLY', () => {
+    it('does NOT exempt a Task because it carries the `app-provision` label (works-security)', () => {
+        // Labels are free-form: an injected run could add this one to its own
+        // Task through `PATCH /api/tasks/:id`. The label exempts nothing.
+        const verdict = guard.evaluate({
+            rules: rules(),
+            diff: diff([file(APP_SPEC_PATH)]),
+            baseSpec: base,
+            headSpec: { kind: 'app', source: { relation: 'link' } } as AppSpec,
+            ...({ labels: [PROVISION_LABEL] } as object),
+        });
+        expect(verdict.code).toBe('guardedSpecBlock');
+        // Nor does any other origin string.
+        expect(
+            guard.evaluate({
+                rules: rules(),
+                diff: diff([file(APP_SPEC_PATH)]),
+                baseSpec: base,
+                headSpec: { kind: 'app', source: { relation: 'link' } } as AppSpec,
+                taskOrigin: 'app-provision',
+            }).code,
+        ).toBe('guardedSpecBlock');
+    });
+
+    it('exempts an App provisioning Task (server-written origin) from THIS RULE ONLY', () => {
         const provisioning = {
             rules: rules({ protectedPaths: ['infra/**'] }),
-            labels: [PROVISION_LABEL],
+            taskOrigin: TASK_ORIGIN_APP_PROVISIONING,
             baseSpec: base,
             headSpec: { kind: 'app', source: { relation: 'link' } } as AppSpec,
         };

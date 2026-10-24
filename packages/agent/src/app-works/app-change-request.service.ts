@@ -8,6 +8,9 @@ import type { Work } from '../entities/work.entity';
 import { appWorkCloudPushAllowed } from '../tasks-domain/app-work-cloud-push';
 import { resolveTaskRepository } from '../tasks-domain/task-repository';
 import { TasksService } from '../tasks-domain/tasks.service';
+import { AWAITING_OWNER_LABEL } from '../tasks-domain/awaiting-owner';
+import { NotificationService } from '../notifications/notification.service';
+import { NotificationCategory, NotificationType } from '../entities/notification.types';
 import {
     APP_WORK_AGENT_RESOLVER,
     AppWorkAgentResolverService,
@@ -63,6 +66,15 @@ export interface AppChangeRequestInput {
     readonly agentId?: string | null;
     /** Where the request came from, for the Task description (`chat`, `card`, `api`). */
     readonly channel?: string | null;
+    /**
+     * Works-security (2026-10-18) — file the Task but do NOT start it, even for the
+     * owner: the request was written by an AGENT outside a chat turn the owner is
+     * driving (`request_app_change` from a Task run, a heartbeat, a Task-chat reply).
+     * The Task carries the binding `awaiting-owner` label and the owner is notified
+     * here; pressing Run on it is the owner's call. One injected run must not start
+     * the next committing run with instructions it wrote itself.
+     */
+    readonly holdForOwner?: boolean;
 }
 
 /** An accepted change request. */
@@ -159,6 +171,9 @@ export class AppChangeRequestService {
         // still judges the branch.
         @Optional() private readonly rules?: AppWorkRulesService,
         @Optional() private readonly git?: GitFacadeService,
+        // Works-security (2026-10-18) — the owner notice for an agent-written request held
+        // for them. Appended LAST + @Optional() (positional-spec arity rule).
+        @Optional() private readonly notifications?: NotificationService,
     ) {}
 
     async request(input: AppChangeRequestInput): Promise<AppChangeRequestResult> {
@@ -254,6 +269,14 @@ export class AppChangeRequestService {
             return refused(409, 'appSpecMissing', missing);
         }
 
+        // ── held for the owner? ───────────────────────────────────────────────
+        // A member who is not the owner, or an agent writing the request outside a chat
+        // turn the owner drives: the Task is filed, labelled `awaiting-owner` (binding:
+        // no agent moves it, the fan-out never starts it) and NOT started.
+        const requestedByOwner = !input.actorUserId || input.actorUserId === ownerId;
+        const heldForAgent = input.holdForOwner === true;
+        const held = !requestedByOwner || heldForAgent;
+
         // ── the Task ──────────────────────────────────────────────────────────
         const target = safeTarget(work);
         let task: Task;
@@ -263,7 +286,7 @@ export class AppChangeRequestService {
                 {
                     title: changeTitle(text),
                     description: changeDescription(text, work, target, input.channel ?? null),
-                    labels: [APP_CHANGE_LABEL],
+                    labels: held ? [APP_CHANGE_LABEL, AWAITING_OWNER_LABEL] : [APP_CHANGE_LABEL],
                     workId: work.id,
                     agentId,
                     createdByType: 'user',
@@ -289,8 +312,8 @@ export class AppChangeRequestService {
         // injected text — is held for the owner: the Task exists, is assigned and sits
         // in the backlog, and the owner is told. Pressing Run on it is the owner's call.
         // The caller (the evolve route) tells the owner, from `awaitingOwner`.
-        const requestedByOwner = !input.actorUserId || input.actorUserId === ownerId;
-        if (!requestedByOwner) {
+        if (held) {
+            if (heldForAgent) await this.noticeOwnerOfAgentRequest(work, task);
             return {
                 status: 'accepted',
                 httpStatus: 202,
@@ -352,6 +375,35 @@ export class AppChangeRequestService {
             repository: target,
             warnings,
         };
+    }
+
+    /** An agent asked for a change outside a chat turn the owner drives: tell the owner. */
+    private async noticeOwnerOfAgentRequest(work: Work, task: Task): Promise<void> {
+        if (!this.notifications) return;
+        try {
+            await this.notifications.create({
+                userId: work.userId,
+                type: NotificationType.INFO,
+                category: NotificationCategory.TASK,
+                title: 'An agent asked to change your App Work',
+                message:
+                    'An agent filed a change request for your App Work while it was working on its own, not ' +
+                    'in a chat with you. The Task was filed and assigned but NOT started, because starting it ' +
+                    'runs a committing Agent with your credentials on instructions the agent wrote. Review the ' +
+                    'request on the Task and press Run if you want it made.',
+                actionUrl: taskUrlOf(task.id),
+                actionLabel: 'Open the Task',
+                metadata: {
+                    code: 'appChange.agentRequestHeld',
+                    workId: work.id,
+                    taskId: task.id,
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `App change: notifying the owner of work ${work.id} failed (${errorText(error)}).`,
+            );
+        }
     }
 
     /** The Work's change Tasks, newest first — what the chat panel lists under the input. */
@@ -518,7 +570,8 @@ export function changeDescription(
         '',
         `- Make the change in ${repo} on this Task's branch. The platform pushes the branch and opens a pull request into the repository's base branch; the change reaches the running app when that pull request is merged and the App Work rebuilds and redeploys.`,
         "- Never push to or merge the default branch yourself, and never merge a pull request — merging is the owner's decision (or the merge policy's).",
-        '- Keep the change focused on the request. Do not edit `.works/works.yml` protected blocks (`source`, `blueprint`, `license`, `upstreamSync`, `upstreamPullRequests`, `provisioning`) or CI workflows unless the request is explicitly about them.',
+        '- Keep the change focused on the request, and leave CI workflows alone unless the request is explicitly about them.',
+        '- The platform REFUSES the pull request when `.works/works.yml` changes `source`, `blueprint`, `license` or `upstreamSync`, removes an entry from `display.protectedPaths` or `agents.requireHumanMergePaths`, or switches on `upstreamPullRequests.enabled` or `provisioning.autoReprovision` — only a person may make those changes. Files matching `display.protectedPaths` (and `.github/workflows/**`) may not be edited at all, and a change to a path in `agents.requireHumanMergePaths` waits for a person to approve the merge.',
         '- If the request is ambiguous or needs a secret only the owner knows, ask instead of guessing.',
         '- Summarise what you changed and how to verify it when you finish.',
     ].join('\n');

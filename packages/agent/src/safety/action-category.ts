@@ -1,4 +1,5 @@
 import {
+    fleetToolEntryPointCategories,
     isActionCategory,
     matchesAnyToolPattern,
     moreRestrictiveCategory,
@@ -47,6 +48,12 @@ import {
  * nothing.
  */
 export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Object.freeze({
+    // ── Fleet tools (FL-19) — every `fleet_<family>_<verb>` row of the catalogue
+    // (`FLEET_TOOL_CATALOGUE`), so the ladder holds or refuses a machine act by
+    // its OWN category. Spread FIRST: an entry written below by the family's
+    // owning epic (FL-12, FL-14) overrides the catalogue's — the owner decided.
+    ...fleetToolEntryPointCategories(),
+
     // ── read.internal — reading what is already inside the workspace ──
     // Not laddered (FR-2): connections and tool grants decide this, and a
     // second way to express it would be a second thing to get wrong.
@@ -56,6 +63,17 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     getSkillFile: 'read.internal',
     list_escalations: 'read.internal',
     list_fleet_nodes: 'read.internal',
+    // Checkouts on computers (FL-14 P2) — reads, then the acts on a machine.
+    fleet_checkouts_list: 'read.internal',
+    fleet_checkouts_get: 'read.internal',
+    // Session git & actions (FL-06 P3) — reads.
+    fleet_sessions_actions_list: 'read.internal',
+    fleet_checkouts_changes: 'read.internal',
+    // FL-15 P3 — Tasks on computers.
+    fleet_tasks_handoff_options: 'read.internal',
+    fleet_nodes_git_identity_get: 'read.internal',
+    fleet_commands_list: 'read.internal',
+    fleet_commands_get: 'read.internal',
     list_meetings: 'read.internal',
     get_meeting_summary: 'read.internal',
     list_recent_events: 'read.internal',
@@ -90,11 +108,19 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     run_workflow_graph: 'write.internal',
     // APW-08 T26 — files and starts an App Work change Task (the PR is reviewed before merge).
     request_app_change: 'write.internal',
+    fleet_checkouts_create: 'write.internal',
+    fleet_checkouts_sync: 'write.internal',
+    fleet_checkouts_archive: 'write.internal',
+    // FL-06 P3 — types a prompt into a session (the agent there still asks before acting).
+    fleet_sessions_action: 'write.internal',
+    // FL-15 P3 — sets name + email only, on the owner's own computer, after `confirm`.
+    fleet_nodes_git_identity_set: 'write.internal',
     'facade:memory-write': 'write.internal',
     'facade:knowledge-write': 'write.internal',
 
     // ── write.destructive — removing data with no preserved copy ──
     'facade:hard-delete': 'write.destructive',
+    fleet_checkouts_delete: 'write.destructive',
     'facade:force-push': 'write.destructive',
 
     // ── message.internal — workspace members and other agents ──
@@ -111,6 +137,8 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // ── publish.external — deploy, publish, merge, open a public PR ──
     commitToRepo: 'publish.external',
     openPullRequest: 'publish.external',
+    // FL-06 P3 — the platform opens / updates a pull request (never merges).
+    fleet_checkouts_open_pull_request: 'publish.external',
     'facade:git-merge': 'publish.external',
     'facade:pull-request-gate': 'publish.external',
     'facade:deploy': 'publish.external',
@@ -132,6 +160,9 @@ export const ENTRY_POINT_CATEGORY: Readonly<Record<string, ActionCategory>> = Ob
     // ── machine.run — commands in the agent's own workspace directory ──
     'facade:terminal-session': 'machine.run',
     'facade:fleet-job-dispatch': 'machine.run',
+    // Commands on computers (FL-12 P2): an Agent asking to run a command on the owner's computers.
+    fleet_commands_run: 'machine.run',
+    fleet_commands_cancel: 'machine.run',
 
     // ── machine.admin — changing a computer ──
     'facade:node-admin': 'machine.admin',

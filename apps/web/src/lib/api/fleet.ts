@@ -4,6 +4,8 @@ import type {
     FleetEnrollableNodeKind,
     FleetNodeLimitCeiling,
     FleetNodeView,
+    FleetStatusView,
+    FleetToolsGateView,
     NeedsALookItem,
 } from '@ever-works/contracts';
 import { NEEDS_A_LOOK_PARTIAL_HEADER } from '@ever-works/contracts';
@@ -45,11 +47,21 @@ import type {
     FleetRunnerStatusView,
     // Computer health (FL-03).
     FleetNodeHealthView,
+    // Computer health, second phase (FL-03).
+    FleetNodeHealthHistory,
+    FleetNodeHealthRange,
+    FleetNodeWakeResult,
+    FleetNodeWakeStatus,
 } from '@ever-works/contracts';
 
 export type {
     // Computer health (FL-03).
     FleetNodeHealthView,
+    // Computer health, second phase (FL-03).
+    FleetNodeHealthHistory,
+    FleetNodeHealthRange,
+    FleetNodeWakeResult,
+    FleetNodeWakeStatus,
     FleetAgentNodeAffinityView,
     FleetCostCeilingView,
     FleetAuditView,
@@ -220,6 +232,16 @@ export const fleetAPI = {
         return serverMutation<FleetNodeView>({
             endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
             data: { isFavorite },
+            method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    /** Servers and ports (FL-10) — the "Preview browser" switch (owner only). */
+    setPreviewProfileEnabled: async (nodeId: string, previewProfileEnabled: boolean) => {
+        return serverMutation<FleetNodeView>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
+            data: { previewProfileEnabled },
             method: 'PATCH',
             wrapInData: false,
         });
@@ -536,6 +558,59 @@ export const fleetAPI = {
     health: async (nodeId: string) => {
         return serverFetch<FleetNodeHealthView>(
             `${BASE}/nodes/${encodeURIComponent(nodeId)}/health`,
+        );
+    },
+
+    /**
+     * Computer health, second phase (FL-03) — Refresh now: a fresh snapshot
+     * over the node link (any open link, CONTRACTS R-31). Answers the same
+     * shape as {@link health}.
+     */
+    refreshHealth: async (nodeId: string) => {
+        return serverMutation<FleetNodeHealthView>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}/health`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Computer health, second phase (FL-03) — the history over one range (≤ 500 points, gaps kept). */
+    healthHistory: async (nodeId: string, range: FleetNodeHealthRange) => {
+        return serverFetch<FleetNodeHealthHistory>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/health/history?range=${encodeURIComponent(range)}`,
+        );
+    },
+
+    /** Computer health, second phase (FL-03) — wake an offline computer through a sibling (audited). */
+    wake: async (nodeId: string) => {
+        return serverMutation<FleetNodeWakeResult>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Computer health, second phase (FL-03) — has the computer answered its last wake? */
+    wakeStatus: async (nodeId: string) => {
+        return serverFetch<FleetNodeWakeStatus>(
+            `${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`,
+        );
+    },
+
+    /** FL-19 — "how is my fleet?" in one read (`GET /api/fleet/status`). */
+    status: async () => {
+        return serverFetch<FleetStatusView>(`${BASE}/status`);
+    },
+
+    /**
+     * FL-19 — what one of my Agents may read and do in each fleet tool family
+     * (`GET /api/fleet/tools/gate?agentId=`), for its Capabilities "Fleet tools" block.
+     */
+    toolsGate: async (agentId: string) => {
+        return serverFetch<FleetToolsGateView>(
+            `${BASE}/tools/gate?agentId=${encodeURIComponent(agentId)}`,
         );
     },
 };

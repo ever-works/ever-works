@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import type { ReactNode } from 'react';
 import type { AppUpstreamStateResponse } from '@ever-works/contracts';
@@ -203,5 +203,27 @@ describe('AppSourceStatusCard', () => {
         expect(screen.getByTestId('app-source-retry-limit').textContent).toBe(
             "You've used all 3 retries for this hour. Try again later.",
         );
+    });
+
+    it('works-security — a viewer refused with edit_access_required is told why, not "try again"', async () => {
+        retryMock.mockResolvedValue({
+            success: false,
+            code: 'edit_access_required',
+            statusCode: 403,
+            message: 'You need edit access to this App Work to do that.',
+        });
+        renderCard(state({ state: 'timed_out' }));
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('app-source-retry'));
+        });
+
+        expect(retryMock).toHaveBeenCalledWith('w1');
+        expect(screen.getByTestId('app-source-retry-forbidden').textContent).toBe(
+            'You need edit access to this App Work to try again.',
+        );
+        expect(screen.queryByText("Couldn't start another attempt. Try again.")).toBeNull();
+        // The button stays: an editor on the same page is unaffected.
+        expect((screen.getByTestId('app-source-retry') as HTMLButtonElement).disabled).toBe(false);
     });
 });

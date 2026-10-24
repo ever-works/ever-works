@@ -20,6 +20,18 @@ export interface InboundTriggerEventMatcher {
     source?: string;
     kind?: string;
     workId?: string;
+    /** FL-15 P3: only GitHub events about the owner (their linked GitHub login). */
+    audience?: { me: InboundTriggerAudienceKind[] };
+}
+
+/** FL-15 P3: review requested from me · assigned to me · pull requests I opened. */
+export type InboundTriggerAudienceKind = 'review-requested' | 'assigned' | 'authored';
+
+/** FL-15 P3: the **GitHub: things for me** preset's body. */
+export interface GithubForMePresetInput {
+    audience?: InboundTriggerAudienceKind[];
+    agentId?: string;
+    autoStart?: InboundTriggerAutoStart;
 }
 
 /** What a fire produces — locked when the trigger is created. */
@@ -134,6 +146,14 @@ export const inboundTriggersAPI = {
     list: async (): Promise<InboundTriggerView[]> => {
         const res = await serverFetch<{ triggers: InboundTriggerView[] }>('/inbound-triggers');
         return res.triggers;
+    },
+
+    /** FL-15 P3: `POST /api/inbound-triggers/presets/github-for-me`. */
+    createGithubForMe: async (input: GithubForMePresetInput): Promise<InboundTriggerWithSecret> => {
+        return serverFetch<InboundTriggerWithSecret>('/inbound-triggers/presets/github-for-me', {
+            method: 'POST',
+            body: JSON.stringify(input),
+        });
     },
 
     create: async (input: CreateInboundTriggerInput): Promise<InboundTriggerWithSecret> => {

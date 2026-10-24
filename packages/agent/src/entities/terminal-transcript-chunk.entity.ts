@@ -1,4 +1,4 @@
-import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Check, Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
  * Terminal transcript chunk (streaming-terminal M9 / founder decision D1).
@@ -37,6 +37,11 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 @Entity({ name: 'terminal_transcript_chunks' })
 @Index('idx_terminal_transcript_chunks_run_seq', ['runId', 'seq'], { unique: true })
 @Index('idx_terminal_transcript_chunks_created', ['createdAt'])
+@Index('uq_terminal_transcript_chunks_session_seq', ['fleetSessionId', 'seq'], {
+    unique: true,
+    where: '"fleetSessionId" IS NOT NULL',
+})
+@Check('chk_terminal_transcript_chunks_key', '"runId" IS NOT NULL OR "fleetSessionId" IS NOT NULL')
 export class TerminalTranscriptChunk {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -45,9 +50,24 @@ export class TerminalTranscriptChunk {
      * `agent_runs.id`. Raw uuid, no `@ManyToOne` — the EW-654
      * cycle-avoidance rule every run-scoped side table follows. The FK
      * (ON DELETE CASCADE) is declared in the migration.
+     *
+     * Nullable since Sessions on computers (FL-04, CONTRACTS R-9): a chunk
+     * belongs to a Run OR to a Fleet session — exactly the rule the
+     * `chk_terminal_transcript_chunks_key` check holds (one of the two is
+     * set). Every run-keyed read filters by a run id, so a session chunk is
+     * never seen by them. Migration: `1796040000000-CreateFleetSessions`.
      */
-    @Column({ type: 'uuid' })
-    runId: string;
+    @Column({ type: 'uuid', nullable: true })
+    runId: string | null;
+
+    /**
+     * `fleet_sessions.id` — a terminal recording of a session on a
+     * computer (FL-04 P3, CONTRACTS R-9). Raw uuid like `runId`; the FK
+     * (ON DELETE CASCADE) is declared in the migration; `(fleetSessionId,
+     * seq)` is unique where set. Null for every Run chunk.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    fleetSessionId?: string | null;
 
     /** Publisher's monotonic per-session sequence number (>= 0). */
     @Column({ type: 'int' })

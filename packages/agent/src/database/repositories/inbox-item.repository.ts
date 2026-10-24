@@ -54,8 +54,22 @@ export interface ListInboxItemsOptions {
     taskId?: string;
     /** Only items from this producer — e.g. `fleet-run` for the Inbox's fleet filter (slice AU). */
     sourceType?: InboxItemSourceType;
+    /**
+     * Works-security (run-token scope) — only items of this Organization;
+     * `null` = only items with no Organization (the owner's personal scope).
+     * `undefined` (the default) = every Organization, exactly as before. Set
+     * for an Organization-pinned fleet-run token so a run in one Organization
+     * cannot read the owner's Inbox in another.
+     */
+    organizationId?: string | null;
     limit?: number;
     offset?: number;
+}
+
+/** Organization pin for the owner-scoped single-item and count reads. */
+export interface InboxOrganizationPin {
+    /** See {@link ListInboxItemsOptions.organizationId}. */
+    organizationId?: string | null;
 }
 
 /** Filters of the decision view of the Inbox (My Decisions). */
@@ -231,6 +245,22 @@ export class InboxItemRepository {
     }
 
     /**
+     * FL-05 producer dedup: the item already filed for this session
+     * attention key, if any (open or not — one edge, one item). The key lives
+     * in `sourceMeta` (text JSON), so the user's `fleet-session` items are
+     * read — newest first, bounded — and matched here; a session asks a
+     * handful of things a day, never thousands.
+     */
+    async findByFleetSessionAttentionKey(userId: string, attentionKey: string): Promise<InboxItem | null> {
+        const rows = await this.repository.find({
+            where: { userId, sourceType: 'fleet-session' as InboxItemSourceType },
+            order: { createdAt: 'DESC' },
+            take: 200,
+        });
+        return rows.find((row) => row.sourceMeta?.attentionKey === attentionKey) ?? null;
+    }
+
+    /**
      * One user's inbox, newest first. No `status` = the ACTIVE view
      * (everything not archived) — that is what the message list renders;
      * `archived` is its own tab.
@@ -258,6 +288,7 @@ export class InboxItemRepository {
         if (options.sourceType) {
             qb.andWhere('item.sourceType = :sourceType', { sourceType: options.sourceType });
         }
+        applyOrganizationPin(qb, options.organizationId);
         const [rows, total] = await qb
             .orderBy('item.createdAt', 'DESC')
             .skip(Math.max(0, options.offset ?? 0))
@@ -586,18 +617,32 @@ export class InboxItemRepository {
     }
 
     /** Unread badge count — unread AND not archived. */
-    async countUnreadForUser(userId: string): Promise<number> {
-        return this.repository
+    async countUnreadForUser(userId: string, pin: InboxOrganizationPin = {}): Promise<number> {
+        const qb = this.repository
             .createQueryBuilder('item')
             .where('item.userId = :userId', { userId })
             .andWhere('item.unread = :unread', { unread: true })
-            .andWhere('item.status != :archived', { archived: 'archived' })
-            .getCount();
+            .andWhere('item.status != :archived', { archived: 'archived' });
+        applyOrganizationPin(qb, pin.organizationId);
+        return qb.getCount();
     }
 
-    /** One item, owner-scoped. `null` for foreign AND missing ids. */
-    async findOwned(id: string, userId: string): Promise<InboxItem | null> {
-        return this.repository.findOne({ where: { id, userId } });
+    /**
+     * One item, owner-scoped. `null` for foreign AND missing ids — and, with
+     * an Organization pin, for an item of another Organization (the same
+     * answer, so a pinned caller learns nothing about the rest of the Inbox).
+     */
+    async findOwned(
+        id: string,
+        userId: string,
+        pin: InboxOrganizationPin = {},
+    ): Promise<InboxItem | null> {
+        if (pin.organizationId === undefined) {
+            return this.repository.findOne({ where: { id, userId } });
+        }
+        return this.repository.findOne({
+            where: { id, userId, organizationId: pin.organizationId ?? IsNull() },
+        });
     }
 
     /** Flip the read state. Owner-scoped; returns whether a row changed. */
@@ -712,5 +757,23 @@ function asJson(value: unknown): unknown {
         return JSON.parse(value);
     } catch {
         return null;
+    }
+}
+
+/**
+ * Works-security (run-token scope) — narrow a query to one Organization
+ * (`null` = items with no Organization). `undefined` leaves it untouched.
+ */
+function applyOrganizationPin(
+    qb: SelectQueryBuilder<InboxItem>,
+    organizationId: string | null | undefined,
+): void {
+    if (organizationId === undefined) return;
+    if (organizationId === null) {
+        qb.andWhere('item.organizationId IS NULL');
+    } else {
+        qb.andWhere('item.organizationId = :pinnedOrganizationId', {
+            pinnedOrganizationId: organizationId,
+        });
     }
 }

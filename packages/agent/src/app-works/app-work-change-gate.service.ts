@@ -97,10 +97,17 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 rules,
                 diff,
                 ...(await this.guardedSpecs(input, baseSha, diff)),
-                labels: input.taskLabels,
+                taskOrigin: input.taskOrigin,
             });
 
-            if (verdict.allowed) return { allowed: true, note: verdict.note };
+            if (verdict.allowed) {
+                // Works-security (2026-10-18) — carried through only when the
+                // guard named human-merge paths, so every other answer keeps
+                // its exact shape.
+                return verdict.humanMergePaths && verdict.humanMergePaths.length > 0
+                    ? { allowed: true, note: verdict.note, humanMergePaths: verdict.humanMergePaths }
+                    : { allowed: true, note: verdict.note };
+            }
             return {
                 allowed: false,
                 message: verdict.message ?? 'This change was refused by the Work’s rules.',
@@ -171,10 +178,10 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 rules,
                 diff: pathsOnlyDiff(input.paths),
                 ...specs,
-                // The cloud path's pre-push caller passes the Task's labels so
-                // its verdict equals `evaluate`'s (APW-04's `app-provision`
-                // exemption); the tool path passes none, which is no labels.
-                labels: input.taskLabels ?? [],
+                // The cloud path's pre-push caller passes the Task's origin so
+                // its verdict equals `evaluate`'s (APW-04's provisioning
+                // exemption); the tool path passes none, which is no exemption.
+                taskOrigin: input.taskOrigin ?? null,
             });
             if (verdict.allowed) return { allowed: true, note: null };
             return {

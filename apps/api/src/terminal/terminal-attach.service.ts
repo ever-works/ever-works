@@ -40,6 +40,13 @@ export interface TerminalAttachClaims {
      */
     jti?: string;
     /**
+     * Fleet node link (works-security, run-token scope) — the credential
+     * generation a link token was minted under (a one-way fingerprint of the
+     * node's credential hash). The link refuses a token whose generation is
+     * no longer the node's. Absent on every other token.
+     */
+    cred?: string;
+    /**
      * Fleet node link viewers (FL-02, `fleet-link-viewer` tokens only): the node
      * whose link carries the channel (`runId` is `<family>:<target>`, the path
      * the token opens) and the params the channel opens with. Absent on every
@@ -141,6 +148,9 @@ export class TerminalAttachService {
         if (payload.jti === undefined) {
             delete payload.jti;
         }
+        if (payload.cred === undefined) {
+            delete payload.cred;
+        }
         const body = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
         const mac = createHmac('sha256', key).update(body).digest('base64url');
         return { token: `${body}.${mac}`, expiresInSec: ttlSec };
@@ -180,7 +190,11 @@ export class TerminalAttachService {
                 (claims.jti !== undefined &&
                     (typeof claims.jti !== 'string' ||
                         claims.jti.length === 0 ||
-                        claims.jti.length > 128))
+                        claims.jti.length > 128)) ||
+                (claims.cred !== undefined &&
+                    (typeof claims.cred !== 'string' ||
+                        claims.cred.length === 0 ||
+                        claims.cred.length > 128))
             ) {
                 return null;
             }

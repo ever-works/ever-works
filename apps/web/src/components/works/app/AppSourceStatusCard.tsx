@@ -82,6 +82,8 @@ export function AppSourceStatusCard({
     const [retrying, setRetrying] = useState(false);
     const [retryLimited, setRetryLimited] = useState(false);
     const [retryFailed, setRetryFailed] = useState(false);
+    // Works-security — a viewer may read the card but not retry (`403 edit_access_required`).
+    const [retryForbidden, setRetryForbidden] = useState(false);
     const polls = useRef(0);
     // Read through a ref so a router object that is not referentially stable
     // can never restart the poll (and with it the 240 / 120 cap).
@@ -149,6 +151,7 @@ export function AppSourceStatusCard({
     const onRetry = async () => {
         setRetrying(true);
         setRetryFailed(false);
+        setRetryForbidden(false);
         try {
             const result = await retryUpstreamReadinessAction(workId);
             if (result.success) {
@@ -158,6 +161,8 @@ export function AppSourceStatusCard({
                 }));
             } else if (result.code === 'retry_limit_reached') {
                 setRetryLimited(true);
+            } else if (result.code === 'edit_access_required') {
+                setRetryForbidden(true);
             } else {
                 setRetryFailed(true);
             }
@@ -193,6 +198,15 @@ export function AppSourceStatusCard({
             )}
             {retryFailed && (
                 <p className="text-xs text-red-600 dark:text-red-400">{t('retryFailed')}</p>
+            )}
+            {retryForbidden && (
+                <p
+                    role="alert"
+                    className="text-xs text-red-600 dark:text-red-400"
+                    data-testid="app-source-retry-forbidden"
+                >
+                    {t('editAccessRequired')}
+                </p>
             )}
         </div>
     );

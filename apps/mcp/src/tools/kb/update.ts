@@ -6,6 +6,7 @@ import { toMcpError } from '../../api-client/api-error.js';
 import { fenceUntrustedToolResult } from '../../api-client/fence-untrusted.js';
 import { KB_DOCUMENT_STATUSES } from '@ever-works/contracts';
 import { resolveKbDocId } from './resolve-doc-id.js';
+import { kbUpdateAuthorship } from './review-gate.js';
 
 /**
  * EW-643 Phase 3 slice 3 — `kb.update` MCP tool.
@@ -51,7 +52,11 @@ export class KbUpdateTool {
 		try {
 			const docId = await resolveKbDocId(this.apiClient, input.workId, input.idOrPath);
 			const path = `/works/${encodeURIComponent(input.workId)}/kb/documents/${encodeURIComponent(docId)}`;
-			const result = await this.apiClient.request('PATCH', path, input.patch);
+			// Works-security: a content edit re-enters the review gate (see review-gate.ts).
+			const result = await this.apiClient.request('PATCH', path, {
+				...input.patch,
+				...kbUpdateAuthorship(input.patch)
+			});
 
 			return {
 				content: [{ type: 'text' as const, text: fenceUntrustedToolResult(JSON.stringify(result, null, 2)) }]

@@ -36,7 +36,11 @@ import {
     type KeysetPage,
 } from '@ever-works/agent/integrations-api';
 import { RecordVisibilityService } from '@ever-works/agent/record-visibility';
-import { WorkProposalService, WorkProposalStatus } from '@ever-works/agent/user-research';
+import {
+    IdeaNotEditableError,
+    WorkProposalService,
+    WorkProposalStatus,
+} from '@ever-works/agent/user-research';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
@@ -66,6 +70,17 @@ import {
     IsOptionalNonNull,
 } from './integration-request';
 import { IntegrationExternalRefDto } from './tasks-write.controller';
+
+/**
+ * Works-security lane (integration API gates, finding 5) — the Idea statuses
+ * whose title and description an integration may still change. Once queued or
+ * building, the build executor reads the description at run time as the
+ * build's brief; an accepted or failed Idea is history.
+ */
+const EDITABLE_IDEA_STATUSES: readonly WorkProposalStatus[] = [
+    WorkProposalStatus.PENDING,
+    WorkProposalStatus.DISMISSED,
+];
 
 /** The Idea title limit (`work_proposals.title varchar(120)`). */
 const IDEA_TITLE_MAX = 120;
@@ -366,7 +381,15 @@ export class IntegrationIdeasController {
         const current = await this.resources.get('idea', organizationId, id, source);
         const expected = expectedVersionOf(ifMatch);
         assertIfMatch(expected, Number(current.dto.version));
-        await this.owned(user, id);
+        const idea = await this.owned(user, id);
+        const textChange = dto.title !== undefined || dto.description !== undefined;
+        // Works-security lane (integration API gates, finding 5) — a queued or
+        // building Idea's description IS the brief its build runs on; rewriting
+        // it would be writing a running build's instructions. Checked before the
+        // first write; the write re-checks the status in its own WHERE.
+        if (textChange && !EDITABLE_IDEA_STATUSES.includes(idea.status)) {
+            throw ideaNotEditable(idea.status);
+        }
         // Every Team must be one of the pinned organization's (404 otherwise) BEFORE the
         // first write, so a foreign Team never leaves a half-applied PATCH behind.
         for (const teamId of dto.teamIds ?? []) {
@@ -374,11 +397,18 @@ export class IntegrationIdeasController {
         }
 
         await withExpectedVersion('idea', id, expected, async () => {
-            if (dto.title !== undefined || dto.description !== undefined) {
-                await this.ideas.updateContent(user.userId, id, {
-                    title: dto.title,
-                    description: dto.description,
-                });
+            if (textChange) {
+                try {
+                    await this.ideas.updateContent(
+                        user.userId,
+                        id,
+                        { title: dto.title, description: dto.description },
+                        EDITABLE_IDEA_STATUSES,
+                    );
+                } catch (error) {
+                    if (error instanceof IdeaNotEditableError) throw ideaNotEditable(error.status);
+                    throw error;
+                }
             }
             if (dto.teamIds !== undefined) {
                 await this.visibility.setTeams('idea', id, dto.teamIds, user.userId);
@@ -475,4 +505,14 @@ export class IntegrationIdeasController {
         if (resource.etag) res.setHeader('ETag', resource.etag);
         return resource.dto;
     }
+}
+
+/** `422 domain_rule` for a title / description edit of an Idea past `pending` / `dismissed`. */
+function ideaNotEditable(status: WorkProposalStatus): IntegrationHttpException {
+    return new IntegrationHttpException(
+        422,
+        'domain_rule',
+        `An Idea's title and description change only while it is pending or dismissed; this one is ${status} (a queued or building Idea's description is the brief its build runs on).`,
+        { status, reason: 'idea_not_editable', fields: ['title', 'description'] },
+    );
 }

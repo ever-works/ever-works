@@ -261,6 +261,12 @@ export interface AppProvisioningCapability {
     start(input: {
         workId: string;
         trigger: 'auto-create';
+        /**
+         * Works-security (2026-10-18) — the explicit "platform code, not a person" flag
+         * `AppProvisioningService.start` requires before it runs the owner's Agent on a
+         * start with no `userId`.
+         */
+        systemTrigger?: boolean;
     }): Promise<AppProvisioningStartOutcome | void>;
 }
 
@@ -1360,7 +1366,11 @@ export class AppSourceInitializerService implements AppForkReadyHandler {
         }
 
         try {
-            await this.provisioning.start({ workId: context.work.id, trigger: 'auto-create' });
+            await this.provisioning.start({
+                workId: context.work.id,
+                trigger: 'auto-create',
+                systemTrigger: true,
+            });
         } catch (error) {
             // APW-04's own row makes a second start a no-op, so a failure here is reported
             // and never fails the hand-off: the source IS on the branch.

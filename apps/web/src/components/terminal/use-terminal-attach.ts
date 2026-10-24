@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserApiFetch } from '@/lib/api/browser-api';
+import {
+    FleetSessionSocket,
+    sessionCloseVerdict,
+} from '@/components/fleet/sessions/session-socket';
 
 /**
  * Terminal attach hook (streaming-terminal M7).
@@ -65,7 +69,18 @@ export interface TerminalAttachOptions {
      * keyboard.
      */
     readOnly?: boolean;
+    /**
+     * What the pane attaches to (FL-04 P1b, CONTRACTS R-21). Absent = the Run
+     * named by `agentId` / `runId`, exactly as before. `fleet-session` attaches
+     * to a session on a computer through FL-02's viewer gateway: the token is
+     * minted from `/api/fleet/sessions/:id/attach-token`, the socket is the
+     * returned `wsUrl`, and the five states mean the same things.
+     */
+    source?: TerminalAttachSource;
 }
+
+/** The pane's source when it is not a Run (FL-04 P1b). */
+export type TerminalAttachSource = { kind: 'run' } | { kind: 'fleet-session'; sessionId: string };
 
 /** Bound on rehydration paging so a huge transcript cannot spin forever. */
 const TRANSCRIPT_MAX_PAGES = 20;
@@ -85,11 +100,15 @@ export function useTerminalAttach(
     options: TerminalAttachOptions = {},
 ): TerminalAttachApi {
     const readOnly = options.readOnly === true;
+    const fleetSessionId =
+        options.source?.kind === 'fleet-session' ? options.source.sessionId : null;
     const [state, setState] = useState<TerminalAttachState>('starting');
     const [endedReason, setEndedReason] = useState<string | null>(null);
     const [role, setRole] = useState<'driver' | 'viewer' | null>(null);
     const [nonce, setNonce] = useState(0);
     const socketRef = useRef<WebSocket | null>(null);
+    /** The fleet-session source's stream (FL-04 P1b); null for a Run. */
+    const fleetSocketRef = useRef<FleetSessionSocket | null>(null);
     const callbacksRef = useRef(callbacks);
     callbacksRef.current = callbacks;
     /**
@@ -104,6 +123,59 @@ export function useTerminalAttach(
         let socket: WebSocket | null = null;
         const doFetch = deps.fetchImpl ?? browserApiFetch;
         const WS = deps.webSocketImpl ?? WebSocket;
+
+        if (fleetSessionId) {
+            // FL-04 P1b: a session on a computer. Same five states; no Run
+            // transcript to rehydrate (the node replays its own scrollback).
+            setState('starting');
+            setEndedReason(null);
+            const fleetSocket = new FleetSessionSocket(
+                fleetSessionId,
+                readOnly ? 'viewer' : 'driver',
+                {
+                    onRole: (granted) => {
+                        if (!cancelled) setRole(granted);
+                    },
+                    onAttached: () => {
+                        if (!cancelled) setState('attached');
+                    },
+                    onBytes: (bytes) => callbacksRef.current.onBytes(bytes),
+                    onExit: (code) => {
+                        if (cancelled) return;
+                        setEndedReason('exit');
+                        setState('ended');
+                        callbacksRef.current.onExit?.('exit', code);
+                    },
+                    onRefused: (hint) => {
+                        if (hint) callbacksRef.current.onBanner?.(hint);
+                    },
+                    onNotice: (notice) => {
+                        if (notice.notice === 'paused') {
+                            callbacksRef.current.onBanner?.(notice.reason ?? 'paused');
+                        }
+                    },
+                    onClosed: (close) => {
+                        if (cancelled) return;
+                        const verdict = sessionCloseVerdict(close, false);
+                        setState((prev) => {
+                            if (prev === 'ended') return prev;
+                            if (verdict === 'ended') return 'ended';
+                            if (verdict === 'refused') return 'refused';
+                            return 'cannot-connect';
+                        });
+                    },
+                },
+                { fetchImpl: doFetch, webSocketImpl: WS },
+                () => ({ cols: 120, rows: 32 }),
+            );
+            fleetSocketRef.current = fleetSocket;
+            void fleetSocket.open();
+            return () => {
+                cancelled = true;
+                fleetSocketRef.current = null;
+                fleetSocket.close();
+            };
+        }
 
         setState('starting');
         setEndedReason(null);
@@ -266,10 +338,14 @@ export function useTerminalAttach(
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [agentId, runId, nonce, readOnly]);
+    }, [agentId, runId, nonce, readOnly, fleetSessionId]);
 
     const sendInput = useCallback(
         (data: string) => {
+            if (fleetSocketRef.current) {
+                fleetSocketRef.current.sendInput(data);
+                return;
+            }
             const socket = socketRef.current;
             if (!socket || socket.readyState !== socket.OPEN || role !== 'driver') return;
             socket.send(JSON.stringify({ kind: 'stdin', data: btoa(data) }));
@@ -279,6 +355,10 @@ export function useTerminalAttach(
 
     const sendResize = useCallback(
         (cols: number, rows: number) => {
+            if (fleetSocketRef.current) {
+                fleetSocketRef.current.sendResize(cols, rows);
+                return;
+            }
             const socket = socketRef.current;
             if (!socket || socket.readyState !== socket.OPEN || role !== 'driver') return;
             socket.send(JSON.stringify({ kind: 'resize', cols, rows }));

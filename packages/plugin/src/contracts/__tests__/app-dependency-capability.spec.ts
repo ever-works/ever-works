@@ -118,7 +118,7 @@ const PRE_APW07_CATEGORIES = [
  * append-only assertion below weaker, it makes it FAIL on a legitimate append,
  * which is exactly how this line was found.
  */
-const EXISTING_CATEGORIES = [...PRE_APW07_CATEGORIES, 'build', 'identity'] as const;
+const EXISTING_CATEGORIES = [...PRE_APW07_CATEGORIES, 'build', 'identity', 'machine-provider'] as const;
 
 describe('the app-dependency capability (APW-07 T3)', () => {
 	it('names the capability exactly as the plan does', () => {

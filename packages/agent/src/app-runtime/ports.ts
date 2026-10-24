@@ -92,6 +92,24 @@ export class AppPortUnavailableError extends Error {
     }
 }
 
+/**
+ * Security (sec/app-works-gates, 2026-10-18) — a `pull_credential_unavailable` refusal whose
+ * `message` is written for the **member** and is safe to show on the Deployment as its failure
+ * reason. The render-input builder carries this message through verbatim (redacted and capped)
+ * instead of its generic sentence, so the member reads WHY the owner's token was not used and
+ * what to do. The message is composed by the port from fixed text only — never from a token, a
+ * registry answer or a user-supplied value.
+ */
+export class AppPullCredentialRefusedError extends AppPortUnavailableError {
+    /** Read by the builder: this refusal's `message` may reach the member. */
+    readonly memberFacing = true;
+
+    constructor(message: string, reason?: string) {
+        super('pull_credential_unavailable', message, reason);
+        this.name = 'AppPullCredentialRefusedError';
+    }
+}
+
 /* -------------------------------------------------------------------------- *
  * AppsTierPolicy — semantics owned and bound by APW-10 (`plan.md` §9.6:1356–1368)
  * -------------------------------------------------------------------------- */
@@ -127,11 +145,28 @@ export const APPS_TIER_POLICY = Symbol('APPS_TIER_POLICY');
  * AppImagePullCredentialSource — implemented by APW-05 (`plan.md` §9.6:1370–1373)
  * -------------------------------------------------------------------------- */
 
+/**
+ * Security (sec/app-works-gates, 2026-10-18) — what the caller knows about the Deployment a pull
+ * credential is resolved for. Optional and additive (R-26): an implementation that ignores it keeps
+ * working, and an implementation that gates on it must treat a **missing** context as "no target,
+ * no requester" — fail closed.
+ */
+export interface AppImagePullCredentialContext {
+    /** The resolved deploy target the credential will be written into (`ref.target`). */
+    target?: AppDeployTarget | string | null;
+    /** Who requested the Deployment, from its row (`triggeredByUserId`); `null` for a Build/event. */
+    requestedByUserId?: string | null;
+    /** `true` only when that person asked from a signed-in session (never a key, agent or event). */
+    requestedByHumanSession?: boolean;
+}
+
 /** The read-only registry credential an App Work's image is pulled with. Implemented by APW-05. */
 export interface AppImagePullCredentialSource {
     resolve(
         workId: string,
         buildId: string,
+        // Security (sec/app-works-gates) — appended optional argument (R-26).
+        context?: AppImagePullCredentialContext,
     ): Promise<{ server: string; username: string; password: string } | null>;
 }
 

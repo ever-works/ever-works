@@ -7,6 +7,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { AuthSessionGuard } from './auth/guards/auth-session.guard';
+import { FleetRunOrgPinGuard } from './auth/guards/fleet-run-org-pin.guard';
 import { buildThrottlerConfig } from './config/throttler.config';
 import { config } from './config/constants';
 import { UserAwareThrottlerGuard } from './config/user-aware-throttler.guard';
@@ -72,6 +73,19 @@ import { CatalogModule } from './catalog/catalog.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { ComputerApiModule } from './computer/computer.module';
 import { FleetLinkApiModule } from './fleet-link/fleet-link.module';
+import { FleetSessionsApiModule } from './fleet/sessions/fleet-sessions-api.module';
+import { FleetCommandsApiModule } from './fleet/commands/fleet-commands-api.module';
+import { FleetSchedulesApiModule } from './fleet/schedules/fleet-schedules-api.module';
+import { FleetMachineApiModule } from './fleet/machine/fleet-machine-api.module';
+import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.module';
+import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
+import { FleetSessionGitApiModule } from './fleet/session-git/fleet-session-git-api.module';
+import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
+import { FleetCloudApiModule } from './fleet/cloud/fleet-cloud-api.module';
+import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
+import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
+import { FleetFilesApiModule } from './fleet/files/fleet-files-api.module';
+import { FleetToolsApiModule } from './fleet/tools/fleet-tools-api.module';
 import { RelayBusModule } from './relay/relay-bus.module';
 import { TeamsModule } from './teams/teams.module';
 import { DomainEventsApiModule } from './domain-events/domain-events-api.module';
@@ -308,6 +322,50 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // operations routes, and the service every machine tab calls. Dark
         // unless FLEET_ENABLED and FLEET_NODE_LINK_ENABLED are both on.
         FleetLinkApiModule,
+        // Sessions on computers (FL-04) — sessions on a machine kept by its
+        // session daemon, over the node link: the session routes, the link
+        // adapter and listener, and the sweeper fallback. Dark unless
+        // FLEET_SESSIONS_ENABLED (and the link) are on.
+        FleetSessionsApiModule,
+        // Commands on computers (FL-12) — one command line, N computers (FLEET_COMMANDS_ENABLED).
+        FleetCommandsApiModule,
+        // Schedules on computers (FL-13): the schedule link adapter, the node_schedule source, the reconcile pass.
+        FleetSchedulesApiModule,
+        // Services, Docker, Compose and processes on computers (FL-09) — the
+        // machine-action routes and the node-link adapter. Dark unless
+        // FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
+        FleetMachineApiModule,
+        // Checkouts on computers (FL-14) — clones and worktrees on a Node, over
+        // the node link: the checkout routes, the link adapter and listener,
+        // and the reconcile fallback. Dark unless FLEET_CHECKOUTS_ENABLED.
+        FleetCheckoutsApiModule,
+        // Tasks on computers (FL-15) — "Fix with an agent on this computer": the
+        // hand-off options read (the start is FL-04's, with `taskId`). Dark
+        // unless FLEET_SESSIONS_ENABLED and FLEET_CHECKOUTS_ENABLED.
+        FleetTasksApiModule,
+        // Session git & actions (FL-06) — the git line's pull request, the
+        // Changes view, the minute cadence. Dark unless FLEET_SESSIONS_ENABLED
+        // and FLEET_CHECKOUTS_ENABLED.
+        FleetSessionGitApiModule,
+        // Virtual computers (FL-16) — Containers (and, later, Windows VMs) created
+        // on a computer of the Fleet: the routes, the host-facing token mint and
+        // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
+        FleetVirtualApiModule,
+        // Cloud computers (FL-17) — machines created at a cloud provider through a
+        // machine-provider plugin: providers, options, create / power / destroy,
+        // and the reconcile + bootstrap-watch fallbacks. Dark unless FLEET_CLOUD_ENABLED.
+        FleetCloudApiModule,
+        // Servers and ports (FL-10) — what a computer listens on, and Open on
+        // the machine (its desktop or its preview browser), over the node link.
+        // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.
+        FleetPortsApiModule,
+        // Logs on computers (FL-08): /api/fleet/nodes/:id/logs/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
+        FleetLogsApiModule,
+        // Files on computers (FL-11): /api/fleet/nodes/:id/files/* (dark unless FLEET_MACHINE_FACTS_ENABLED).
+        FleetFilesApiModule,
+        // Agent, MCP & CLI surface (FL-19): GET /api/fleet/status and /api/fleet/tools/gate, and
+        // the status reader behind the `fleet_status` Agent tool (FLEET_ENABLED-gated).
+        FleetToolsApiModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,
@@ -474,6 +532,15 @@ import { DatabaseModule } from '@ever-works/agent/database';
         {
             provide: APP_GUARD,
             useClass: SessionScopeGuard,
+        },
+        // Works-security (run-token scope) — runs right AFTER SessionScopeGuard
+        // (which pins a fleet-run token's request scope to its Organization):
+        // a fleet-run token reaches `/api/works/{id}…` / `/api/deploy/works/{id}…`
+        // only for a Work of that same Organization (404 otherwise). A no-op for
+        // every other credential and when FLEET_RUN_TOKEN_ORG_PIN_ENFORCED=false.
+        {
+            provide: APP_GUARD,
+            useClass: FleetRunOrgPinGuard,
         },
         // EW-P1-2 — integration keys (`ew_int_…`). Runs AFTER SessionScopeGuard
         // (the scope a slug resolved is visible) and BEFORE ScopeOwnershipGuard.

@@ -20,6 +20,12 @@ import {
 } from '@/components/schedules/schedules-filters.shared';
 import type { ScheduleHealthSummary, SchedulePage } from '@/lib/api/schedules';
 import { LiveFeed } from '@/components/feed/LiveFeed';
+import { SessionsBoardClient } from '@/components/fleet/sessions/SessionsBoardClient';
+import {
+    buildSessionsQuery,
+    type SessionsViewState,
+} from '@/components/fleet/sessions/sessions-board.shared';
+import type { FleetSessionBoardResponse, FleetSessionView } from '@ever-works/contracts';
 import {
     feedFiltersToQuery,
     hasFeedFilterParams,
@@ -45,6 +51,7 @@ import {
     CalendarClock,
     Radio,
     Receipt,
+    TerminalSquare,
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Link } from '@/i18n/navigation';
@@ -84,6 +91,20 @@ export interface ActivitySchedulesPayload {
     healthFailed: boolean;
 }
 
+/**
+ * FL-05 — the Sessions view's payload: whether it exists here
+ * (`FLEET_SESSIONS_ENABLED`), the view state the link named, its first board
+ * or list, and the names it labels cards with.
+ */
+export interface ActivitySessionsPayload {
+    enabled: boolean;
+    view: SessionsViewState;
+    board: FleetSessionBoardResponse | null;
+    list: FleetSessionView[] | null;
+    nodes: Array<{ id: string; name: string }>;
+    viewerUserId: string | null;
+}
+
 interface ActivityClientProps {
     initialActivities: ActivityLogEntry[];
     totalActivities: number;
@@ -94,6 +115,8 @@ interface ActivityClientProps {
     runs: ActivityRunsPayload;
     /** Server-rendered Schedules page, when the page was opened on `?view=schedules`. */
     schedules: ActivitySchedulesPayload;
+    /** FL-05: the Sessions view (absent / disabled: no tab, `?view=sessions` falls back to the Log). */
+    sessions?: ActivitySessionsPayload;
 }
 
 /**
@@ -119,6 +142,7 @@ export function ActivityClient({
     initialFeedActors = null,
     runs,
     schedules,
+    sessions,
 }: ActivityClientProps) {
     const t = useTranslations('dashboard.activity');
     const tRuns = useTranslations('dashboard.runsPage');
@@ -173,10 +197,16 @@ export function ActivityClient({
     // so server and first client render agree — the persisted localStorage
     // value is restored in the mount effect below to avoid a hydration
     // mismatch.
+    const sessionsEnabled = sessions?.enabled === true;
+    // A view that exists on this deployment (FL-05: Sessions only with its flag on).
+    const isAvailableView = (value: string | null | undefined): value is ActivityView =>
+        isActivityView(value) && (value !== 'sessions' || sessionsEnabled);
     const [activeView, setActiveView] = useState<ActivityView>(() => {
         const fromUrl = searchParams.get(ACTIVITY_VIEW_PARAM);
-        return isActivityView(fromUrl) ? fromUrl : 'log';
+        return isAvailableView(fromUrl) ? fromUrl : 'log';
     });
+    // FL-05: the Sessions view's own state (mode, filters) as query parameters.
+    const [sessionsQuery, setSessionsQuery] = useState(() => (sessions ? buildSessionsQuery(sessions.view) : ''));
 
     // The Runs ledger owns its window, filters and open receipt; it reports
     // every change here so this component stays the single URL writer. Seeded
@@ -209,9 +239,9 @@ export function ActivityClient({
     // during SSR). The URL ?view= param always wins when present.
     useEffect(() => {
         const fromUrl = searchParams.get(ACTIVITY_VIEW_PARAM);
-        if (isActivityView(fromUrl)) return;
+        if (isAvailableView(fromUrl)) return;
         const stored = localStorage.getItem('activity-tab');
-        if (isActivityView(stored)) {
+        if (isAvailableView(stored)) {
             setActiveView(stored);
         }
         // Mount-only restore; intentionally not reactive to searchParams.
@@ -219,16 +249,18 @@ export function ActivityClient({
     }, []);
 
     const handleViewChange = useCallback((next: ActivityView) => {
+        if (next === 'sessions' && !sessionsEnabled) return;
         setActiveView(next);
         if (typeof window !== 'undefined') {
             localStorage.setItem('activity-tab', next);
         }
-    }, []);
+    }, [sessionsEnabled]);
 
     const isLogTab = activeView === 'log';
     const isRunsTab = activeView === 'runs';
     const isSchedulesTab = activeView === 'schedules';
     const isFeedTab = activeView === 'feed';
+    const isSessionsTab = activeView === 'sessions' && sessionsEnabled;
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
     // Sync the ACTIVE view's state → URL query params. The parameters are
@@ -254,6 +286,12 @@ export function ActivityClient({
             for (const [key, value] of new URLSearchParams(feedQuery)) {
                 params.set(key, value);
             }
+        } else if (activeView === 'sessions') {
+            // FL-05: the board's mode and filters, so a shared link reproduces the view (FR-44).
+            params.set(ACTIVITY_VIEW_PARAM, 'sessions');
+            for (const [key, value] of new URLSearchParams(sessionsQuery)) {
+                params.set(key, value);
+            }
         } else if (activeView === 'schedules') {
             params.set(ACTIVITY_VIEW_PARAM, 'schedules');
             // The list's own filters, written exactly as the `/schedules` page
@@ -277,7 +315,7 @@ export function ActivityClient({
         // uses — both views refetch through their own actions — and the address
         // bar would trail the interaction. `location.pathname` is the address
         // bar's own path, so an `/org/<slug>` prefix is kept.
-        if (activeView === 'runs' || activeView === 'schedules') {
+        if (activeView === 'runs' || activeView === 'schedules' || activeView === 'sessions') {
             window.history.replaceState(
                 null,
                 '',
@@ -290,6 +328,7 @@ export function ActivityClient({
         activeView,
         runsView,
         feedQuery,
+        sessionsQuery,
         scheduleFilters,
         actionType,
         status,
@@ -618,7 +657,7 @@ export function ActivityClient({
     // never been written down anywhere. Labels come from the namespace that
     // owns the feature, so nothing is duplicated and nothing drifts.
     const extraShortcutRows: ShortcutRow[] = [
-        { keys: ['l', 'r', 'f', 's'], label: t('shortcuts.switchView') },
+        { keys: sessionsEnabled ? ['l', 'r', 'f', 's', 'n'] : ['l', 'r', 'f', 's'], label: t('shortcuts.switchView') },
         { keys: ['a'], label: tFeed('filters.agentsGroup') },
         { keys: ['x'], label: tFeed('filters.onlyFailed') },
         { keys: ['1', '…', '5'], label: tFeed('filters.kindsGroup') },
@@ -630,6 +669,8 @@ export function ActivityClient({
         { key: 'runs' as const, icon: Receipt, label: t('viewToggle.runs') },
         { key: 'feed' as const, icon: Radio, label: t('viewToggle.feed') },
         { key: 'schedules' as const, icon: CalendarClock, label: t('viewToggle.schedules') },
+        // FL-05: every session on your computers, by what it needs from you.
+        ...(sessionsEnabled ? [{ key: 'sessions' as const, icon: TerminalSquare, label: t('viewToggle.sessions') }] : []),
     ];
 
     return (
@@ -722,6 +763,18 @@ export function ActivityClient({
                         write surface sits below it, exactly as before. */}
                     <TriggersManager createRef={triggerCreateRef} />
                 </>
+            )}
+
+            {isSessionsTab && sessions && (
+                <SessionsBoardClient
+                    initialView={sessions.view}
+                    initialBoard={sessions.board}
+                    initialList={sessions.list}
+                    nodes={sessions.nodes}
+                    agents={runs.agents.map((agent) => ({ id: agent.id, name: agent.name }))}
+                    viewerUserId={sessions.viewerUserId}
+                    onStateChange={setSessionsQuery}
+                />
             )}
 
             {isFeedTab && (

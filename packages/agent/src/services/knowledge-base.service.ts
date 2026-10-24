@@ -34,6 +34,11 @@ import {
 } from '../facades/vector-store.facade';
 import { rrfBlend } from './kb-rrf';
 import { hashNormalizedBody } from './kb-content-hash';
+import {
+    appContentWrite,
+    KB_LAST_CONTENT_WRITE_KEY,
+    type KbContentWrite,
+} from '../integrations-api/kb-content-provenance';
 import { buildKbContextBundle, type KbContextBundle } from './kb-context-bundle';
 import type { KbConsolidationMarker } from './memory-consolidation';
 import type { EntityManager } from 'typeorm';
@@ -201,6 +206,15 @@ interface UpdateDocumentInput {
      * Never read from a request body.
      */
     reviewState?: KbReviewState;
+    /**
+     * Works-security lane (integration API gates, finding 2) — who wrote this
+     * content, set ONLY by the integration API (`kb-content-provenance.ts`).
+     * Stored under `metadata.lastContentWrite` when the edit changes content
+     * (title, description, body, class); a content edit WITHOUT it marks the
+     * content `principal: 'app'` (on a marked or `imported` document), so a
+     * person's edit in the app supersedes a key's. Never read from a request body.
+     */
+    contentWrite?: KbContentWrite;
 }
 
 interface ListOptions {
@@ -2421,7 +2435,9 @@ export class KnowledgeBaseService {
             revision: 1,
             revisionAt: new Date(),
             normalizedContentHash: hashNormalizedBody(body),
-            metadata: { body } as Record<string, unknown>,
+            // Caller metadata (the integration API's content-write marker) rides
+            // alongside the body, as on a Work document (`createDocument`).
+            metadata: { ...(input.metadata ?? {}), body } as Record<string, unknown>,
             // M7 — same review-gate derivation as `createDocument`: the
             // consolidation synthesis path passes `source: agent` so
             // LLM-merged docs land as `proposed` (review queue), while
@@ -3404,6 +3420,13 @@ export class KnowledgeBaseService {
         title?: string;
         /** Derive the class from the extracted text instead of `targetClass`. */
         autoClassify?: boolean;
+        /**
+         * Works-security (#2804 review) — `proposed` when the upload came from
+         * anything but a person's session (`KB_NON_SESSION_WRITES_PROPOSED`):
+         * the created document then waits for a person's Accept like any other
+         * non-session KB write. Omitted = the source's own default (accepted).
+         */
+        reviewState?: KbReviewState;
     }): Promise<{ upload: WorkKnowledgeUpload; document: WorkKnowledgeDocument | null }> {
         await this.ownershipService.ensureCanEdit(input.workId, input.userId);
 
@@ -3499,6 +3522,9 @@ export class KnowledgeBaseService {
         workId: string,
         uploadId: string,
         userId: string,
+        // Works-security (#2804 review) — see `createUpload`'s `reviewState`.
+        // Appended LAST so positional callers keep their meaning.
+        opts: { reviewState?: KbReviewState } = {},
     ): Promise<{ upload: WorkKnowledgeUpload; document: WorkKnowledgeDocument | null }> {
         const access = await this.ownershipService.ensureCanEdit(workId, userId);
         if (access.role !== 'owner' && access.role !== 'manager') {
@@ -3541,6 +3567,7 @@ export class KnowledgeBaseService {
             tags: upload.tags ?? undefined,
             description: null,
             title: undefined,
+            reviewState: opts.reviewState,
         });
         // Same stale-state hazard as createUpload (see comment there): the
         // extract path updates the row but returns only the document, so
@@ -3602,6 +3629,7 @@ export class KnowledgeBaseService {
             description?: string | null;
             title?: string;
             autoClassify?: boolean;
+            reviewState?: KbReviewState;
         },
     ): Promise<WorkKnowledgeDocument | null> {
         let body: string | null = null;
@@ -3722,6 +3750,7 @@ export class KnowledgeBaseService {
                 tags: input.tags,
                 source: 'imported' as KbDocumentSource,
                 sourceUploadId: upload.id,
+                reviewState: input.reviewState,
             });
 
             const docRow = await this.documentRepository.findById(input.workId, doc.id);
@@ -3907,6 +3936,7 @@ export class KnowledgeBaseService {
             tags?: string[];
             description?: string | null;
             title?: string;
+            reviewState?: KbReviewState;
         },
     ): Promise<WorkKnowledgeDocument | null> {
         if (!this.hasBinaryViewer(input.file.mimeType)) {
@@ -3946,6 +3976,7 @@ export class KnowledgeBaseService {
             tags?: string[];
             description?: string | null;
             title?: string;
+            reviewState?: KbReviewState;
         },
     ): Promise<WorkKnowledgeDocument | null> {
         const klass = (input.targetClass ?? ('freeform' as KbDocumentClass)) as KbDocumentClass;
@@ -3964,6 +3995,7 @@ export class KnowledgeBaseService {
                 tags: input.tags,
                 source: 'imported' as KbDocumentSource,
                 sourceUploadId: upload.id,
+                reviewState: input.reviewState,
             });
             const docRow = await this.documentRepository.findById(input.workId, doc.id);
             if (!docRow) {
@@ -4274,6 +4306,30 @@ export class KnowledgeBaseService {
                 ...(row.metadata ?? {}),
                 body: input.body,
             } as Record<string, unknown>;
+        }
+
+        // Works-security lane (integration API gates, finding 2) — the content
+        // write marker follows every CONTENT edit: the integration API's own
+        // (stamped as given), anyone else's (`principal: 'app'` — their content
+        // supersedes the key's). Written only where a marker can matter: a row
+        // that already has one, or an `imported` row (the pre-marker fallback
+        // reads those), so every other document's metadata is left as it was.
+        const changesContent =
+            input.title !== undefined ||
+            input.description !== undefined ||
+            input.body !== undefined ||
+            input.class !== undefined;
+        const existingMetadata = (patch.metadata ?? row.metadata ?? {}) as Record<string, unknown>;
+        if (
+            changesContent &&
+            (input.contentWrite ||
+                KB_LAST_CONTENT_WRITE_KEY in existingMetadata ||
+                row.source === KbDocumentSource.IMPORTED)
+        ) {
+            patch.metadata = {
+                ...existingMetadata,
+                [KB_LAST_CONTENT_WRITE_KEY]: input.contentWrite ?? appContentWrite(),
+            };
         }
 
         const revision = this.revisionPatch(row, {

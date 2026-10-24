@@ -65,6 +65,19 @@ export class SchedulePageQueryDto extends ScheduleQueryDto {
     q?: string;
 }
 
+/**
+ * Body of `POST /api/schedules/:id/run-now` (all optional). A Command
+ * schedule on a computer (FL-13, FR-25) runs only with `confirm: true` —
+ * without it the answer is 409 `confirmation_required`; every other source
+ * ignores the field.
+ */
+export class RunScheduleNowDto {
+    @ApiPropertyOptional({ type: Boolean })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
 /** Body of `POST /api/schedules/:id/pause`. */
 export class PauseScheduleDto {
     @ApiPropertyOptional({

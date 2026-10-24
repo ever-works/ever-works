@@ -1,7 +1,8 @@
 import type { ComponentType } from 'react';
-import type { FleetActionFamily, FleetNodeView } from '@ever-works/contracts';
-import { isNeedsALookRoute } from '@ever-works/contracts';
+import type { FleetActionFamily, FleetNodeView, FleetViewerRole } from '@ever-works/contracts';
+import { fleetFamilyAllows, isNeedsALookRoute } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
+import { desktopHasConsentWiring } from './fleet-consents.shared';
 
 /**
  * Fleet hub (FL-01) — the internal module registry the hub and the computer
@@ -310,6 +311,44 @@ export interface FleetAddComputerItemRegistration {
 export interface FleetComputerActionProps {
     node: FleetNodeView;
     flags: FleetFeatureFlags;
+    /**
+     * The viewer's role on this computer (`node.viewerRole`, `owner` when the
+     * row carries none). Always set by the computer page; optional so a
+     * component's own specs may leave it out.
+     */
+    viewerRole?: FleetViewerRole;
+    /**
+     * Whether the action's `family` admits the viewer — the page's mirror of
+     * the server's check ({@link computerActionAllowed}), so the component can
+     * render itself disabled with the reason instead of offering an act the
+     * server will refuse. The server still decides; this never grants
+     * anything. Always set by the computer page.
+     */
+    allowed?: boolean;
+}
+
+/**
+ * Whether `family` admits the viewer of `node` (CONTRACTS §2.1): the owner
+ * always, an organisation role when the computer's policy for that family
+ * includes it. A row without `viewerRole` is the owner's own (`GET /nodes`).
+ */
+export function computerActionAllowed(node: FleetNodeView, family: FleetActionFamily): boolean {
+    const role: FleetViewerRole = node.viewerRole ?? 'owner';
+    return role === 'owner' || fleetFamilyAllows(node, role, family);
+}
+
+/** The props the computer page hands one registered action. */
+export function computerActionProps(
+    node: FleetNodeView,
+    flags: FleetFeatureFlags,
+    action: Pick<FleetComputerActionRegistration, 'family'>,
+): Required<FleetComputerActionProps> {
+    return {
+        node,
+        flags,
+        viewerRole: node.viewerRole ?? 'owner',
+        allowed: computerActionAllowed(node, action.family),
+    };
 }
 
 /**
@@ -353,8 +392,28 @@ export function getAddComputerItems(flags: FleetFeatureFlags): FleetAddComputerI
         .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id));
 }
 
-/** Add an act to every computer page's header or ⋯ menu. */
+/**
+ * Add an act to every computer page's header or ⋯ menu. Registering the same
+ * id twice keeps the last (hot reload). Two mistakes that would otherwise
+ * ship nothing visible fail at import time instead: `replaces` on a menu
+ * entry (only the header has placeholders), and a second action taking a
+ * header placeholder another action already took (only one can render).
+ */
 export function registerComputerAction(registration: FleetComputerActionRegistration): void {
+    if (registration.replaces && registration.placement !== 'header') {
+        throw new Error(
+            `Fleet computer action "${registration.id}" replaces "${registration.replaces}", which only a header action can`,
+        );
+    }
+    if (registration.replaces) {
+        for (const other of computerActions.values()) {
+            if (other.id !== registration.id && other.replaces === registration.replaces) {
+                throw new Error(
+                    `Fleet computer action "${registration.id}" replaces "${registration.replaces}", already taken by "${other.id}"`,
+                );
+            }
+        }
+    }
     computerActions.set(registration.id, registration);
 }
 
@@ -428,7 +487,17 @@ export type FleetTabState<P> =
     | { kind: 'not-shipped'; epic: string }
     | { kind: 'switched-off'; epic: string }
     | { kind: 'kind-cannot' }
-    | { kind: 'consent-missing'; consent: FleetTabConsent; command: string };
+    | {
+          kind: 'consent-missing';
+          consent: FleetTabConsent;
+          command: string;
+          /**
+           * FL-02 desktop parity: `tray` when the computer is a desktop app,
+           * whose owner turns the consent on from its tray rather than with a
+           * command line (`command` is then only a reference).
+           */
+          via?: 'tray';
+      };
 
 /** The consents a computer reports, as far as this build can tell. */
 export type FleetConsentsRead = Readonly<Record<FleetTabConsent, boolean>>;
@@ -448,7 +517,7 @@ function resolveSlot<P>(
     registered: { load: Loader<P> } | undefined,
     context: {
         flags: FleetFeatureFlags;
-        node?: Pick<FleetNodeView, 'kind'>;
+        node?: Pick<FleetNodeView, 'kind'> & Partial<Pick<FleetNodeView, 'link' | 'consents'>>;
         consents?: FleetConsentsRead;
     },
 ): FleetTabState<P> {
@@ -458,13 +527,17 @@ function resolveSlot<P>(
     const consent = slot.consent;
     if (consent && context.node) {
         const granted = context.consents?.[consent] === true;
-        if (!granted && KIND_CANNOT[context.node.kind]?.includes(consent))
+        // FL-02 desktop parity (R-10): a desktop app with the consents wiring
+        // CAN give them — from its tray.
+        const parity = desktopHasConsentWiring(context.node);
+        if (!granted && !parity && KIND_CANNOT[context.node.kind]?.includes(consent))
             return { kind: 'kind-cannot' };
         if (!granted) {
             return {
                 kind: 'consent-missing',
                 consent,
                 command: FLEET_CONSENT_START_COMMANDS[consent],
+                ...(parity ? { via: 'tray' as const } : {}),
             };
         }
     }
@@ -476,7 +549,7 @@ export function resolveComputerTab(
     id: FleetComputerTabId,
     context: {
         flags: FleetFeatureFlags;
-        node: Pick<FleetNodeView, 'kind'>;
+        node: Pick<FleetNodeView, 'kind'> & Partial<Pick<FleetNodeView, 'link' | 'consents'>>;
         consents: FleetConsentsRead;
     },
 ): FleetTabState<FleetComputerTabProps> {

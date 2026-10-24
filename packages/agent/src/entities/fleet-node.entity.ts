@@ -3,11 +3,17 @@ import type {
     ComputerControlPolicy,
     FleetNodeHealthStored,
     FleetConsents,
+    FleetSessionDaemonReport,
     FleetControlPolicyFamiliesInput,
     FleetNodeKind,
     FleetNodeModelThrottleView,
+    FleetNodeSelfUpdateReport,
     FleetNodeStatus,
     FleetNodeWorkerState,
+    FleetNodeOrigin,
+    FleetNodeVirtualKind,
+    FleetVirtualMeta,
+    FleetCloudMeta,
 } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
@@ -99,6 +105,12 @@ export { COMPUTER_CONTROL_POLICIES as FLEET_NODE_CONTROL_POLICIES } from '@ever-
 @Entity({ name: 'fleet_nodes' })
 @Index('idx_fleet_nodes_user', ['userId'])
 @Index('idx_fleet_nodes_credential', ['enrollmentTokenHash'], { unique: true })
+// Virtual computers (FL-16): the hub nests children under their host and the
+// per-host limit counts them, both by this column.
+@Index('idx_fleet_nodes_host', ['hostNodeId'])
+// Cloud computers (FL-17): one Node per provider machine. A plain unique index:
+// NULLs never collide on Postgres or SQLite, so every other Node is unaffected.
+@Index('idx_fleet_nodes_provider_machine', ['providerPluginId', 'providerMachineRef'], { unique: true })
 export class FleetNode {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -120,6 +132,71 @@ export class FleetNode {
     /** 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled'. */
     @Column({ type: 'varchar', length: 16 })
     status: FleetNodeStatus;
+
+    /**
+     * Virtual computers (FL-16, CONTRACTS §4.1, R-35) — how this row came into
+     * being: `enrolled` (a person minted a token and ran `enroll`; every row
+     * written before the column existed), `virtual` (created on a host by
+     * `FleetVirtualService`) or `cloud` (FL-17's provider flow). Written once,
+     * at creation; `kind` is unchanged by it (R-4). Validated in code, stored
+     * as `varchar`. Migration: `1796160000000-AddFleetNodeVirtualFields`.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'enrolled' })
+    origin: FleetNodeOrigin;
+
+    /**
+     * Virtual computers (FL-16) — the Node this one runs on. Written by
+     * `FleetVirtualService.create`; null for every machine enrolled on its own.
+     * Deliberately NOT a foreign key (history survives a host's deletion, the
+     * same rule as `fleet_jobs.nodeId`); the delete guards keep a host with
+     * children from being removed (spec FR-29).
+     */
+    @Column({ type: 'uuid', nullable: true })
+    hostNodeId?: string | null;
+
+    /** Virtual computers (FL-16) — `vm` · `container`; null unless `origin` is `virtual`. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    virtualKind?: FleetNodeVirtualKind | null;
+
+    /**
+     * Virtual computers (FL-16, CONTRACTS §4.1 `virtualMeta`) — the child's
+     * system, size, image and its create phase / machine state as the host last
+     * reported them, so the row still says what it is after job bodies are
+     * purged. Written by `FleetVirtualService` (create, the host's progress
+     * reports, the reconcile sweep). Never a password, a token or a host path.
+     * `simple-json` in a `text` column like {@link consents}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    virtualMeta?: FleetVirtualMeta | null;
+
+    /**
+     * Cloud computers (FL-17, CONTRACTS §4.1, R-15, R-35) — the
+     * `machine-provider` plugin that created this Node; null for every machine
+     * that was not created at a cloud provider. Core code never branches on its
+     * value (it resolves the plugin through the facade by capability).
+     * Migration: `1796170000000-AddFleetNodeProviderFields`.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    providerPluginId?: string | null;
+
+    /**
+     * Cloud computers (FL-17) — the provider's own id for the machine, written
+     * when the provider accepted the create; null before that and for every
+     * other Node. Unique with {@link providerPluginId} (reconciliation finds a
+     * row by it, and a machine is never two Nodes).
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    providerMachineRef?: string | null;
+
+    /**
+     * Cloud computers (FL-17, CONTRACTS §4.1 `providerMeta`) — region, size,
+     * hourly rate, created at, the power timeline, the idle policy and the cost
+     * snapshot (`FleetCloudMeta`). Written by `FleetCloudService` only. Never a
+     * provider token, an enrolment token, a password, a key or a VPN auth key.
+     * `simple-json` in a `text` column like {@link virtualMeta}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    providerMeta?: FleetCloudMeta | null;
 
     /**
      * sha256 hex of the current credential — the one-time enrollment
@@ -647,6 +724,17 @@ export class FleetNode {
     lastWakeAttemptAt?: Date | null;
 
     /**
+     * Schedules on computers (FL-13, CONTRACTS §4.1) — the IANA time zone the
+     * machine reports on every heartbeat (`Europe/Paris`); Command schedules
+     * on it fire on that wall clock. NULL = never reported (a daemon older
+     * than the field): schedules then read UTC. Validated with
+     * `isFleetTimeZone` before it is written.
+     * Migration: `1796130100000-AddFleetNodeTimeZone`.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    timeZone?: string | null;
+
+    /**
      * Fleet node link (FL-02, CONTRACTS §1.1) — what this machine's owner
      * switched on when starting the node: `{ work, attend, manage, usageScan }`,
      * as the last heartbeat reported it. NULL = never reported (a daemon
@@ -668,6 +756,31 @@ export class FleetNode {
      */
     @Column({ type: 'boolean', default: false })
     previewProfileEnabled: boolean;
+
+    /**
+     * Sessions on computers (FL-04, CONTRACTS §1.1, §4.1) — the session
+     * daemon as the node last reported it in the heartbeat's `daemon` block:
+     * `{ state: running|stopped|failed, reason?, sessions, storage?, hooks? }`.
+     * NULL = never reported (a node without `--manage`/`--work`, or a daemon
+     * older than the field); the Sessions tab then reads only the `sessions`
+     * tag. Normalised on write (`normalizeFleetSessionDaemonReport`).
+     *
+     * `simple-json` in a `text` column like {@link consents}.
+     * Migration: `1796040000000-CreateFleetSessions`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    sessionDaemon?: FleetSessionDaemonReport | null;
+    /**
+     * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update
+     * (`--auto-update`) as its last heartbeat reported it: on or off, and the
+     * outcome of its last attempt. NULL = never reported (a daemon older than
+     * the field). Read it through `normalizeFleetNodeSelfUpdate`.
+     *
+     * `simple-json` in a `text` column like {@link consents}.
+     * Migration: `1796020100000-AddFleetNodeSelfUpdate`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    selfUpdate?: FleetNodeSelfUpdateReport | null;
 
     @CreateDateColumn()
     createdAt: Date;

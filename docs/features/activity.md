@@ -226,3 +226,4 @@ Below 768px — phones and split-screen — the AI chat drawer stops being a sid
 - [Connectors](./connectors.md) — the plugins that produce the events in the **External activity** panel.
 - [Integrations](./integrations.md) — the Slack app, GitHub pull-request review, and the event envelope itself.
 - [Digests](./digests.md) — the daily or weekly briefing built from the same activity.
+- [Session status and the Sessions board](./fleet-session-status.md) — the **Sessions** view (key `n`): every session on your computers by what it needs from you.

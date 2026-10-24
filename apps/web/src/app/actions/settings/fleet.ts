@@ -637,6 +637,29 @@ export async function setFleetNodeFavoriteAction(
 }
 
 /**
+ * Servers and ports (FL-10) — switch a computer's preview browser on or off
+ * (`previewProfileEnabled`, owner only): whether Open may show a page in a
+ * browser profile on it that no agent uses.
+ */
+export async function setFleetNodePreviewProfileAction(
+    nodeId: string,
+    enabled: boolean,
+): Promise<FleetActionResult<FleetNodeView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setPreviewProfileEnabled(nodeId, enabled);
+        revalidatePath(HUB_LAYOUT_PATTERN, 'layout');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to switch the preview browser'),
+        };
+    }
+}
+
+/**
  * Fleet hub (FL-01) — change who may act in some action families on one
  * computer (owner only; audited `node.policy.change` by the API).
  */

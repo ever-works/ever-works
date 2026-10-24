@@ -101,6 +101,12 @@ import {
 	type ModelTranscriptEvidence
 } from './model-transcript';
 import { startMcpLoopbackProxy, type McpBridgeFetch, type McpLoopbackProxy } from './mcp-bridge';
+import {
+	auditCodexRepositoryLayers,
+	codexWindowsSandboxDowngrade,
+	withCodexDisclosures,
+	type RepositoryLayerFs
+} from './codex-repository-layers';
 import type { Logger } from '../logger';
 import type { FleetTaskWorkspaceErrorCode } from '../workspaces/fleet-task-workspace';
 import { extractRunEnvSecretValues } from '../workspaces/run-env-files';
@@ -522,6 +528,15 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 */
 	managedMcpConfigFs?: AgentTaskSessionConfigFs;
 	/**
+	 * works-security finding 5 (node 0.2.7): `lstat`-only presence checks of
+	 * the repository-local Codex layers (`.codex/config.toml`,
+	 * `.codex/hooks.json`) at the worktree root, so a Codex run whose checkout
+	 * carries one SAYS so in its containment block. Never opens a file.
+	 * Wired by the runtime to `defaultRepositoryLayerFs`; a hand-built `io`
+	 * gets none and the check is skipped, like {@link managedMcpConfigFs}.
+	 */
+	repositoryLayerFs?: RepositoryLayerFs;
+	/**
 	 * Self-build slice Q: reads / removes the owner-question file in the
 	 * worktree (and in writable mounts). Defaults to `node:fs`.
 	 */
@@ -598,7 +613,15 @@ export async function runAgentTaskJob(
 	// is provisioned or spawned: skip-permissions and node-run shell commands
 	// are this machine's decision, not the platform's.
 	enforceAgentTaskExecutionPolicy(
-		{ execution, setupCount: setup.length, stepCount: grantedSteps.length, checkCount: checks.length },
+		{
+			execution,
+			setupCount: setup.length,
+			stepCount: grantedSteps.length,
+			checkCount: checks.length,
+			// works-security (node 0.2.7): the bridge is the machine owner's
+			// decision too — the payload alone no longer turns it on.
+			mcpBridge: resolveMcpBridgeSpec(payload) !== null
+		},
 		io.executionPolicy
 	);
 
@@ -1443,6 +1466,29 @@ async function runModelStep(
 						effectiveCodexHome(io, modelEnvOverlay, execution.envPassthrough, execution.envGrants)
 					)
 				: undefined;
+		// works-security finding 5 (node 0.2.7): what control 16 cannot
+		// promise for a Codex run is SAID on the run, never only in the trust
+		// model — a repository-local `.codex/` layer in the checkout, and
+		// native Windows without the owner's `[windows] sandbox`. Disclosures
+		// only (a downgrade never fails a run); see codex-repository-layers.ts.
+		const codexDisclosures =
+			execution.provider === 'codex'
+				? [
+						await auditCodexRepositoryLayers({ workspacePath, fs: io.repositoryLayerFs }),
+						codexWindowsSandboxDowngrade({
+							platform: io.platform ?? process.platform,
+							settings: codexUserSettings,
+							skipPermissions: execution.skipPermissions === true
+						})
+					]
+				: [];
+		for (const disclosure of codexDisclosures) {
+			if (disclosure) {
+				io.logger?.warn(
+					`[fleet-node] job ${jobId}: containment note (${disclosure.control}) — ${disclosure.reason}`
+				);
+			}
+		}
 		// ONE model invocation: write the prompt, build and gate the command,
 		// spawn, parse. Run once for a fresh session — or, slice AU, once with
 		// `--resume` and, only when the CLI could not open that session at
@@ -1555,7 +1601,11 @@ async function runModelStep(
 		// and whoever reads the run should not have to find that in a node's
 		// log file.
 		if (droppedFlags.length > 0) model = { ...model, droppedFlags };
-		return { model, mcp: bridge.result(), containment: containment.record };
+		return {
+			model,
+			mcp: bridge.result(),
+			containment: withCodexDisclosures(containment.record, codexDisclosures)
+		};
 	} finally {
 		// Order matters. The proxy stops FIRST (a still-listening socket
 		// after the model exited is a live credential path nothing is
@@ -1600,7 +1650,8 @@ async function runModelStep(
  * Mirrors what the CLI applies: an absent, unreadable or unparseable file
  * is not in effect for the CLI either, so it does not refuse here.
  */
-async function refuseUnderClaudeManagedMcpConfig(
+/** Exported for the `agent-session` executor (FL-04 P2), which reuses this gate unchanged. */
+export async function refuseUnderClaudeManagedMcpConfig(
 	provider: FleetAgentExecutionProvider,
 	io: AgentTaskIo
 ): Promise<void> {
@@ -1750,7 +1801,8 @@ function supportsRestrictedMode(
  *      whose onboarding lives in the file being moved away from would
  *      fail every model step on a prompt `-p` cannot answer.
  */
-async function establishModelContainment(
+/** Exported for the `agent-session` executor (FL-04 P2), which reuses the Task-run isolation unchanged. */
+export async function establishModelContainment(
 	provider: FleetAgentExecutionProvider,
 	scratchDir: string,
 	scratchFs: AgentTaskScratchFs,
@@ -2735,7 +2787,7 @@ async function readModelOutput(
 }
 
 /** Per-job scratch directory PREFIX — the job id is a uuid, but never trust the wire. */
-function scratchDirName(jobId: string): string {
+export function scratchDirName(jobId: string): string {
 	const safe = jobId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80);
 	return safe || 'job';
 }

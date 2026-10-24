@@ -6,8 +6,8 @@
 
 **Epic ID:** `FL-01-fleet-hub`
 **Spec:** [`./spec.md`](./spec.md) · **Plan:** [`./plan.md`](./plan.md)
-**Status:** `In progress` — P1a merged (#2734), P1b merged (#2741); PR 3 roles in use (T-20, T-21, T-23, T-24, T-26)
-**Last updated:** 2026-10-18
+**Status:** `Merged` — P1a #2734, P1b #2741, PR 3 roles in use #2745, PR 4 polish #2749 (T-27 … T-31), PR 5 registry hooks pinned #2828
+**Last updated:** 2026-10-21
 
 ---
 
@@ -189,22 +189,34 @@
 
 ## P3 — Polish and docs
 
-- [ ] **T-27**. Palette section provider "Go to computer <name>" in
+- [x] **T-27**. Palette section provider "Go to computer <name>" in
       `apps/web/src/components/command-palette/registry/sections.ts` (search over visible nodes).
       **Test**: extend `sections.unit.spec.ts`.
-- [ ] **T-28**. Keyboard: `F` favourite, `?` sheet (`computer/ComputerShortcutSheet.tsx`), tab strips
+      _Done (#2749): `fleetComputerScreens` in `registry/screens.ts` (a screen per computer, not a
+      section provider) fed by `hooks/use-fleet-computers.ts`; tests in `sections.unit.spec.ts` and
+      `hooks/use-fleet-computers.unit.spec.ts`._
+- [x] **T-28**. Keyboard: `F` favourite, `?` sheet (`computer/ComputerShortcutSheet.tsx`), tab strips
       as `tablist` with arrow keys; `apps/web/e2e/flow-fleet-a11y.spec.ts` with an axe pass.
       **Test**: itself.
-- [ ] **T-29**. State audit: every surface in spec §5 has empty / loading / unavailable / error
+      _Done (#2749) as a keyboard walk; the axe pass needs a dev dependency the repo does not have
+      (OWNER-QUESTIONS C1). Unit specs: `ComputerShortcutSheet`, `F` in
+      `ComputerActionsMenu`, `1`–`6` in `FleetHubTabs`._
+- [x] **T-29**. State audit: every surface in spec §5 has empty / loading / unavailable / error
       variants from i18n keys; add missing keys.
       **Test**: `apps/web/src/components/fleet/__tests__/states.unit.spec.tsx` renders each variant.
-- [ ] **T-30**. Docs: `docs/features/fleet-hub.md` (hub, computer page, who can do what); add to
+      _Done (#2749). "Loading" is the server render (the app has no route `loading.tsx`); FL-01
+      adds none._
+- [x] **T-30**. Docs: `docs/features/fleet-hub.md` (hub, computer page, who can do what); add to
       `apps/docs/sidebarsPlatform.ts` beside `'features/fleet'` (`:183`); cross-link from
       `docs/features/fleet.md` §"Managing nodes"; update `docs/specs/features/fleet/TRACKER.md` row
       FL-01.
       **Test**: `pnpm --filter ever-works-docs build` — no broken-link warning.
-- [ ] **T-31**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; existing fleet and AW-11
+      _Done (#2749); the docs build and the TRACKER row run with the cascade (owner's Fast-build
+      rule, 2026-10-21)._
+- [x] **T-31**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; existing fleet and AW-11
       e2e specs green with `FLEET_HUB_ENABLED` on and off.
+      _Under the owner's Fast-build rule (2026-10-21) the per-package gates of PR 4 run once at the
+      cascade, not per PR; PRs 1–3 ran them (lane log)._
 
 ## Definition of done
 

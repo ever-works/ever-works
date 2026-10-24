@@ -7,10 +7,17 @@ import {
     type FleetExecutionPreferenceView,
     type FleetNodeView,
 } from '@/lib/api/fleet';
-import { resolveFleetDownloadUrls, resolvePublicApiBaseUrl } from '@/lib/fleet-flags';
+import {
+    isFleetCloudEnabled,
+    isFleetVirtualEnabled,
+    resolveFleetDownloadUrls,
+    resolvePublicApiBaseUrl,
+} from '@/lib/fleet-flags';
 import { FleetHubFrame } from '@/components/fleet/hub/FleetHubFrame';
 import { FleetComputersPanel } from '@/components/fleet/computers/FleetComputersPanel';
 import { FleetTelemetryOnMount } from '@/components/fleet/FleetTelemetryOnMount';
+import { NewVirtualComputerLauncher } from '@/components/fleet/virtual/NewVirtualComputerLauncher';
+import { NewCloudComputerLauncher } from '@/components/fleet/cloud/NewCloudComputerLauncher';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('fleet.hub');
@@ -83,6 +90,10 @@ export default async function FleetComputersPage({
                 preferencesError={preferencesError}
                 openAddKind={isFleetEnrollableNodeKind(addKind) ? addKind : null}
             />
+            {/* Virtual computers (FL-16): "Add computer ▾ › New virtual computer…" lands here. */}
+            {addKind === 'virtual' && isFleetVirtualEnabled() ? <NewVirtualComputerLauncher /> : null}
+            {/* Cloud computers (FL-17): "Add computer ▾ › New cloud computer…" lands here. */}
+            {addKind === 'cloud' && isFleetCloudEnabled() ? <NewCloudComputerLauncher /> : null}
         </FleetHubFrame>
     );
 }

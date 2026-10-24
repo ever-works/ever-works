@@ -797,6 +797,12 @@ importers:
       '@ever-works/pty-local-plugin':
         specifier: workspace:*
         version: link:../../packages/plugins/pty-local
+      '@xterm/addon-serialize':
+        specifier: ^0.14.0
+        version: 0.14.0
+      '@xterm/headless':
+        specifier: ^6.0.0
+        version: 6.0.0
       commander:
         specifier: ^14.0.2
         version: 14.0.3
@@ -813,6 +819,10 @@ importers:
       vitest:
         specifier: ^5.0.5
         version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.5)(happy-dom@20.14.5)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@26.6.4)(typescript@5.9.3))(vite@8.0.16(@types/node@26.6.4)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.9.1))
+    optionalDependencies:
+      '@homebridge/node-pty-prebuilt-multiarch':
+        specifier: ^0.13.1
+        version: 0.13.1
 
   apps/web:
     dependencies:
@@ -1933,6 +1943,24 @@ importers:
         version: 26.6.4
       tsup:
         specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.23))(jiti@2.6.1)(postcss@8.5.30)(typescript@5.9.3)(yaml@2.9.1)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@opentelemetry/api@1.9.1)(@types/node@26.6.4)(@vitest/coverage-v8@5.0.5)(happy-dom@20.14.5)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@26.6.4)(typescript@5.9.3))(vite@8.0.16(@types/node@26.6.4)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.9.1))
+
+  packages/plugins/digitalocean-machines:
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
+      tsup:
+        specifier: ^8.0.0
         version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.23))(jiti@2.6.1)(postcss@8.5.30)(typescript@5.9.3)(yaml@2.9.1)
       typescript:
         specifier: ^5.9.3
@@ -12847,6 +12875,12 @@ packages:
     resolution: {integrity: sha512-UFYkDm4HUahf2lnEyHvio51TNGiLK66mqP2JoATy7hRZeXaGMRDr00JiSF7m63vR5WKATF605yEggJKsw0JpMQ==}
     peerDependencies:
       '@xterm/xterm': ^5.0.0
+
+  '@xterm/addon-serialize@0.14.0':
+    resolution: {integrity: sha512-uteyTU1EkrQa2Ux6P/uFl2fzmXI46jy5uoQMKEOM0fKTyiW7cSn0WrFenHm5vO5uEXX/GpwW/FgILvv3r0WbkA==}
+
+  '@xterm/headless@6.0.0':
+    resolution: {integrity: sha512-5Yj1QINYCyzrZtf8OFIHi47iQtI+0qYFPHmouEfG8dHNxbZ9Tb9YGSuLcsEwj9Z+OL75GJqPyJbyoFer80a2Hw==}
 
   '@xterm/xterm@5.5.0':
     resolution: {integrity: sha512-hqJHYaQb5OptNunnyAnkHyM8aCjZ1MEIDTQu1iIbbTD/xops91NB5yq1ZK/dC2JDbVWtF23zUtl9JE2NqwT87A==}
@@ -33834,6 +33868,10 @@ snapshots:
   '@xterm/addon-fit@0.10.0(@xterm/xterm@5.5.0)':
     dependencies:
       '@xterm/xterm': 5.5.0
+
+  '@xterm/addon-serialize@0.14.0': {}
+
+  '@xterm/headless@6.0.0': {}
 
   '@xterm/xterm@5.5.0': {}
 

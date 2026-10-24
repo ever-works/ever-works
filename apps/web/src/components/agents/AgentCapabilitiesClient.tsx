@@ -42,6 +42,8 @@ import {
 } from './agent-capabilities.shared';
 import { AgentFleetSection } from './AgentFleetSection';
 import type { AgentFleetData } from './agent-fleet.shared';
+import { AgentFleetToolsSection } from './AgentFleetToolsSection';
+import type { AgentFleetToolsData } from './agent-fleet-tools.shared';
 import { AgentAccessLevelsSection } from './AgentAccessLevelsSection';
 import type { AgentAccessLevelRow } from './agent-access-levels.shared';
 import {
@@ -142,6 +144,12 @@ interface Props {
      * agent's current level each. Absent or empty hides the section.
      */
     accessLevels?: AgentAccessLevelRow[] | null;
+    /**
+     * FL-19 — the "Fleet tools" block: per tool family, may this Agent read /
+     * act on my computers, and which gate refuses. `null`/absent hides it
+     * (Fleet off); an error marker shows Retry.
+     */
+    fleetTools?: AgentFleetToolsData;
 }
 
 /** Same labels the Settings tab uses for the 8 flags. */
@@ -176,6 +184,7 @@ export function AgentCapabilitiesClient({
     environments = [],
     fleet = null,
     accessLevels = null,
+    fleetTools = null,
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities');
     const router = useRouter();
@@ -936,6 +945,16 @@ export function AgentCapabilitiesClient({
                 routing rule to show. */}
             {fleet && (
                 <AgentFleetSection agentId={agent.id} fleet={fleet} className={sectionClass} />
+            )}
+
+            {/* ── Section: Fleet tools (FL-19) — what this Agent may read and do on my
+                computers through its tools, and which gate refuses. Hidden with Fleet off. */}
+            {fleetTools && (
+                <AgentFleetToolsSection
+                    agentName={agent.name}
+                    data={fleetTools}
+                    className={sectionClass}
+                />
             )}
 
             {/* ── Section: Init Script ── */}

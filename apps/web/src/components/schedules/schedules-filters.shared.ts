@@ -37,6 +37,7 @@ export const SCHEDULE_FILTER_SOURCES: readonly ScheduleSourceType[] = [
     'source_validation',
     'data_sync',
     'inbound_trigger',
+    'node_schedule',
 ];
 
 export const SCHEDULE_FILTER_STATUSES: readonly ScheduleStatus[] = [

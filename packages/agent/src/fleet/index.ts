@@ -23,6 +23,21 @@ export * from './fleet-audit.service';
 // Fleet MCP bridge (self-build slice Z / EW-796) — run-scoped credentials.
 export * from './fleet-run-credential.service';
 export * from './agent-fleet-tools';
+// Sessions on computers (FL-04 P2) — the Agent's fleet_sessions_* tools.
+export * from './agent-fleet-session-tools';
+// Computer health (FL-03 second phase) — the health / needs-a-look tool shapes for FL-19.
+export * from './agent-fleet-health-tools';
+// Logs on computers (FL-08) — the log tool shapes and the port the API binds.
+export * from './logs/agent-fleet-logs-tools';
+// Files on computers (FL-11) — the file tool shapes and the port the API binds.
+export * from './files/agent-fleet-files-tools';
+// FL-19 — the Agent half of the fleet tool catalogue: the gate's published rule,
+// the descriptor decoration + FL-19's own tools, and `fleet_status`'s composition.
+export * from './fleet-tool-gate';
+export * from './fleet-tool-factory';
+export * from './fleet-status';
+export * from './fleet-held-call';
+export * from './fleet-requested-by';
 // Computer health (FL-03) — the health history and the five needs-a-look
 // producers (the registry they register into is FL-01's, below).
 export * from './fleet-node-health-sample.repository';
@@ -40,3 +55,24 @@ export { FleetExecutionPreference } from '../entities/fleet-execution-preference
 export { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
 export { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
 export { FleetAudit } from '../entities/fleet-audit.entity';
+// Sessions on computers (FL-04) — the session service, its policy and its node port.
+export * from './sessions';
+// Commands on computers (FL-12) — the command service, its policy and its node port.
+export * from './commands';
+// Schedules on computers (FL-13) — Command schedules, their node port and producer.
+export * from './schedules';
+// Machine actions (FL-09) — services, processes, Docker and Compose, and their node port.
+export * from './machine';
+// Checkouts on computers (FL-14) — the checkout service, its policy and its node port.
+export * from './checkouts';
+// Tasks on computers (FL-15 P2) — a computer's global git identity.
+export * from './git';
+// Session git & actions (FL-06) — the branch rule, action prompts, ledger.
+export * from './session-git';
+// Tasks on computers (FL-15 P3) — the hand-off and identity Agent tools.
+export * from './agent-fleet-task-tools';
+export * from './ports';
+// Virtual computers (FL-16) — children on a host, their service, policy and Agent tools.
+export * from './virtual';
+// Cloud computers (FL-17) — machines created at a cloud provider, their service, sweeps and Agent tools.
+export * from './cloud';
