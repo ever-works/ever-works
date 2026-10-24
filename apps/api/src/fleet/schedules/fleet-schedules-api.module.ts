@@ -4,6 +4,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import {
     FLEET_SCHEDULE_NODE_PORT,
     FLEET_SCHEDULE_TASKS_PORT,
+    FleetModule,
     FleetScheduleService,
     FleetSchedulesModule,
     FleetSessionsModule,
@@ -42,8 +43,11 @@ import { FleetCommandsEnabledGuard } from '../commands/fleet-commands-enabled.gu
 @Global()
 @Module({
     // P2: Agent-session schedules file a recurring Task (TasksDomainModule) and
-    // start each fire as an Agent session (FleetSessionsModule).
-    imports: [FleetSchedulesModule, FleetSessionsModule, TasksDomainModule, DatabaseModule],
+    // start each fire as an Agent session (FleetSessionsModule). FleetModule
+    // supplies `FleetAgentNodeAffinityRepository`, which the session dispatcher
+    // reads to find the computer an Agent is pinned to — without it the API
+    // does not boot (`UnknownDependenciesException`, Egress audit run 40003838391).
+    imports: [FleetModule, FleetSchedulesModule, FleetSessionsModule, TasksDomainModule, DatabaseModule],
     // P2: the resource routes the FL-19 catalogue names, and the breaker.
     controllers: [FleetSchedulesController, FleetNodeSchedulesController],
     providers: [

@@ -4,9 +4,39 @@ import {
 	assertCredentialCovers,
 	CheckoutCredentialError,
 	checkoutCredentialEnv,
+	createCheckoutCredentialClient,
 	withCheckoutCredential,
+	withoutTrailingSlashes,
 	type CheckoutCredentialClient
 } from './checkout-credential';
+
+describe('the platform base URL (CodeQL #284)', () => {
+	it('drops trailing slashes only, in linear time', () => {
+		expect(withoutTrailingSlashes('https://api.ever.works///')).toBe('https://api.ever.works');
+		expect(withoutTrailingSlashes('https://api.ever.works')).toBe('https://api.ever.works');
+		expect(withoutTrailingSlashes('///')).toBe('');
+		const hostile = `https://x${'/'.repeat(100_000)}y`;
+		const started = Date.now();
+		expect(withoutTrailingSlashes(hostile)).toBe(hostile);
+		expect(Date.now() - started).toBeLessThan(1_000);
+	});
+
+	it('mints against the trimmed base', async () => {
+		const fetchFn = vi.fn(async () => ({
+			ok: true,
+			status: 200,
+			json: async () => ({ token: 't', repository: 'acme/api', access: 'read' })
+		}));
+		const client = createCheckoutCredentialClient({
+			apiUrl: 'https://api.ever.works//',
+			nodeId: 'n1',
+			secret: 's',
+			fetchFn
+		});
+		await client.mint('c1', 'read');
+		expect(fetchFn).toHaveBeenCalledWith('https://api.ever.works/api/fleet/checkouts/c1/credential', expect.anything());
+	});
+});
 
 const CREDENTIAL = {
 	token: 'ghs_secret_token',

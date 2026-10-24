@@ -149,7 +149,9 @@ describe('what the node actually puts on the wire', () => {
 		// 15 → 16 with FL-04: the session daemon's report, sent by a process
 		// that may host sessions (`--manage` or `--work`).
 		// 16 → 17 with FL-02 T-25: the opt-in self-update report.
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(17);
+		// 17 → 18 with FL-13: the machine's IANA time zone, sent only when
+		// `describeSelf` resolved a valid one.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(18);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -261,7 +263,9 @@ describe('what the node actually puts on the wire', () => {
 			// Sessions on computers (FL-04).
 			daemon: { state: 'running', sessions: 0 },
 			// Fleet node link (FL-02 T-25).
-			selfUpdate: { enabled: false }
+			selfUpdate: { enabled: false },
+			// Schedules on computers (FL-13).
+			timeZone: 'Europe/Berlin'
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(

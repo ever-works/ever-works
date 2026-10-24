@@ -128,12 +128,53 @@ export function replaceCronBlock(current: string, lines: readonly string[]): str
 	return out.length > 0 ? `${out.join('\n')}\n` : '';
 }
 
+/**
+ * Why one word of the command cannot be written into a crontab line, or null
+ * when it can. A newline (or CR) would end the line and start another cron
+ * entry, a NUL truncates it, and a backslash directly before a `%` makes
+ * cron's own `\%` escape ambiguous (implementations disagree on whether that
+ * backslash escapes the next one or the `%`), so the line could end the
+ * command at that `%` and feed the rest to it as stdin. Such a word is
+ * refused rather than escaped. Pure.
+ */
+export function cronUnsafeWordReason(word: string): string | null {
+	if (word.includes('\n') || word.includes('\r')) return 'a command word contains a line break';
+	if (word.includes('\0')) return 'a command word contains a NUL character';
+	if (word.includes('\\%')) return 'a command word has a backslash directly before a %';
+	return null;
+}
+
+/**
+ * The crontab form of a shell-quoted command: every `%` becomes `\%` (cron
+ * turns an unescaped `%` into a newline and feeds the rest to the command as
+ * stdin). Only safe on words that passed {@link cronUnsafeWordReason}, where
+ * no backslash sits directly before a `%`, so the added backslash is always
+ * the one cron reads. Pure.
+ */
+function escapeCronPercent(line: string): string {
+	let out = '';
+	for (const char of line) out += char === '%' ? '\\%' : char;
+	return out;
+}
+
+/** Why `cronLine` gives no line for this entry, or null when it gives one. Pure. */
+export function cronLineSkipReason(entry: NativeScheduleEntry, command: NativeSchedulerOptions['command']): string | null {
+	if (!isFleetCommandId(entry.id)) return 'not a schedule id';
+	if (!fleetScheduleCadenceToCron(entry.cadence)) return 'not expressible as cron';
+	for (const word of [command.file, ...command.args]) {
+		const reason = cronUnsafeWordReason(word);
+		if (reason) return reason;
+	}
+	return null;
+}
+
 /** One crontab line: the cron, then the node, `schedule-run` and the id (`%` is special to cron). */
 export function cronLine(entry: NativeScheduleEntry, command: NativeSchedulerOptions['command']): string | null {
+	if (cronLineSkipReason(entry, command)) return null;
 	const cron = fleetScheduleCadenceToCron(entry.cadence);
-	if (!cron || !isFleetCommandId(entry.id)) return null;
+	if (!cron) return null;
 	const words = [command.file, ...command.args, 'schedule-run', entry.id].map(shellQuote).join(' ');
-	return `${cron} ${words.replace(/%/g, '\\%')}`;
+	return `${cron} ${escapeCronPercent(words)}`;
 }
 
 /** launchd's calendar entries for a cadence, `StartInterval` seconds, or why it cannot. Pure. */
@@ -199,6 +240,61 @@ ${timingXml}
 
 const WINDOWS_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
+/**
+ * One argument quoted for a Windows command line, so the program's C runtime
+ * (`CommandLineToArgvW` / MSVCRT rules) reads back exactly `word`. Task
+ * Scheduler hands `/TR` to `CreateProcess` as the whole command line, so the
+ * quoting has to follow those rules, not just escape `"`:
+ *
+ *   - a word with no space, tab, newline or `"` (and not empty) is left as is,
+ *     since backslashes are literal unless they precede a `"`;
+ *   - otherwise it is wrapped in `"…"`; every run of backslashes directly
+ *     before a `"` is doubled and the `"` gets one more backslash, and a run
+ *     of backslashes at the very end is doubled so the closing quote stays a
+ *     quote (`C:\dir\` → `"C:\dir\\"`).
+ *
+ * Pure. The same algorithm as libuv's `quote_cmd_arg` and Python's `list2cmdline`.
+ */
+export function windowsQuoteArg(word: string): string {
+	if (word.length > 0 && !/[\s"]/.test(word)) return word;
+	let out = '"';
+	let backslashes = 0;
+	for (const char of word) {
+		if (char === '\\') {
+			backslashes += 1;
+			continue;
+		}
+		if (char === '"') {
+			out += '\\'.repeat(backslashes * 2 + 1) + '"';
+		} else {
+			out += '\\'.repeat(backslashes) + char;
+		}
+		backslashes = 0;
+	}
+	return `${out}${'\\'.repeat(backslashes * 2)}"`;
+}
+
+/** Why one word cannot be carried in a Task Scheduler `/TR` line, or null. A NUL or a line break cannot. Pure. */
+export function schtasksUnsafeWordReason(word: string): string | null {
+	if (word.includes('\0')) return 'a command word contains a NUL character';
+	if (word.includes('\n') || word.includes('\r')) return 'a command word contains a line break';
+	return null;
+}
+
+/** The `/TR` command line for one schedule, or why it cannot be written. Pure. */
+export function schtasksRunLine(
+	entry: NativeScheduleEntry,
+	command: NativeSchedulerOptions['command']
+): { line: string } | { reason: string } {
+	if (!isFleetCommandId(entry.id)) return { reason: 'not a schedule id' };
+	const words = [command.file, ...command.args, 'schedule-run', entry.id];
+	for (const word of words) {
+		const reason = schtasksUnsafeWordReason(word);
+		if (reason) return { reason };
+	}
+	return { line: words.map(windowsQuoteArg).join(' ') };
+}
+
 /** `schtasks /Create` timing arguments for a cadence, or why it cannot. Pure. */
 export function schtasksTiming(cadence: FleetScheduleCadence): { args: string[] } | { reason: string } {
 	const form = fleetScheduleFormFromCadence(cadence);
@@ -243,7 +339,11 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 					if (line) {
 						lines.push(line);
 						result.installed.push(entry.id);
-					} else result.skipped.push({ id: entry.id, reason: 'not expressible as cron' });
+					} else
+						result.skipped.push({
+							id: entry.id,
+							reason: cronLineSkipReason(entry, options.command) ?? 'not expressible as cron'
+						});
 				}
 				const current = await read();
 				if (current === null) throw new Error('the crontab could not be read; it was left untouched');
@@ -334,12 +434,14 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 						result.skipped.push({ id: entry.id, reason: 'reason' in timing ? timing.reason : 'not a schedule id' });
 						continue;
 					}
+					const run = schtasksRunLine(entry, options.command);
+					if ('reason' in run) {
+						result.skipped.push({ id: entry.id, reason: run.reason });
+						continue;
+					}
 					const name = `${NATIVE_TASK_FOLDER}${entry.id}`;
 					wanted.add(name);
-					const run = [options.command.file, ...options.command.args, 'schedule-run', entry.id]
-						.map((word) => (/[\s"]/.test(word) ? `"${word.replace(/"/g, '\\"')}"` : word))
-						.join(' ');
-					const created = await exec('schtasks', ['/Create', '/F', '/TN', name, '/TR', run, ...timing.args]);
+					const created = await exec('schtasks', ['/Create', '/F', '/TN', name, '/TR', run.line, ...timing.args]);
 					if (created.code === 0) result.installed.push(entry.id);
 					else result.skipped.push({ id: entry.id, reason: created.stderr.split('\n', 1)[0] || 'schtasks refused it' });
 				}

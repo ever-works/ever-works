@@ -338,7 +338,13 @@ export function matchingCredential(
 
 function normaliseRegistry(value: unknown): string {
     let raw = text(value).toLowerCase();
-    raw = raw.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    raw = raw.replace(/^https?:\/\//, '');
+    // The host is everything before the first `/` — sliced, not matched with
+    // `/\/.*$/`, which is quadratic on a long run of slashes (CodeQL #282).
+    const slash = raw.indexOf('/');
+    if (slash >= 0) {
+        raw = raw.slice(0, slash);
+    }
     if (raw === 'index.docker.io' || raw === DOCKER_HUB_REGISTRY) {
         return 'docker.io';
     }
