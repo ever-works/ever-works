@@ -54,14 +54,14 @@ docker compose -f docker-compose.build.yml up --build -d
 
 Same services as `docker-compose.yml`, but each application image is built from the Dockerfiles under `.deploy/docker/`. The build context is the monorepo root so `turbo prune` can see every workspace. First build takes a few minutes; layer caching makes subsequent builds fast.
 
-## Just the infra (run platform apps with `pnpm dev`)
+## Just the infra (run platform apps with `pnpm dev:apps`)
 
 ```bash
 docker compose -f docker-compose.infra.yml --env-file .env.compose up -d
 
 # In another terminal, run the apps natively against the containers
 pnpm install
-pnpm dev
+pnpm dev:apps
 ```
 
 The apps will reach Postgres at `localhost:5432` and Redis at `localhost:6379` using the values in `.env.compose`.
