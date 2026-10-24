@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { Duplex } from 'stream';
 import type { IncomingMessage } from 'http';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -11,7 +12,7 @@ import {
     parseFleetLinkViewerPath,
     type FleetLinkFamily,
 } from '@ever-works/contracts';
-import { FleetLinkAttachService } from './fleet-link-attach.service';
+import { FleetLinkAttachService, type FleetLinkViewerClaims } from './fleet-link-attach.service';
 import { FleetLinkException } from './fleet-link.errors';
 import { FleetLinkGatewayService, type FleetWsPathHandler } from './fleet-link-gateway.service';
 import { FleetLinkViewerBridge } from './fleet-link-relay';
@@ -35,7 +36,47 @@ import { FleetLinkService } from './fleet-link.service';
  *     input, re-numbered output, slow viewers dropped.
  *
  * Pings every 30 s; two unanswered close the socket `4002`.
+ *
+ * A family's epic may observe its viewers ({@link FleetLinkViewerGatewayService.registerObserver},
+ * FL-04 P1b): admit or refuse one before its channel opens (the session viewer
+ * cap), learn when it opened and closed (presence, the attach audit row), the
+ * byte length of what it sent (a driver span's size — never the bytes), and
+ * re-check on every ping that it may still watch (audience membership); a
+ * viewer that may not is closed `4013`.
  */
+
+/** One viewer socket as an observer sees it. */
+export interface FleetLinkViewerHandle {
+    /** Unique per socket. */
+    readonly id: string;
+    readonly claims: FleetLinkViewerClaims;
+    /** When the token was accepted (ms since the epoch). */
+    readonly acceptedAt: number;
+}
+
+/** What a family learns about its viewers (FL-04 P1b). Every hook is optional; none sees a payload. */
+export interface FleetLinkViewerObserver {
+    /**
+     * Before the channel opens. Throw a `FleetLinkException` to refuse: the
+     * viewer reads the error as `channel.close` and the socket closes. An
+     * admitted viewer is always followed by exactly one {@link closed}.
+     */
+    admit?(viewer: FleetLinkViewerHandle): Promise<void> | void;
+    /** The channel is open and bridged. */
+    opened?(viewer: FleetLinkViewerHandle): void;
+    /** The viewer sent one binary message of `bytes` bytes (forwarded, or refused by its role). */
+    inbound?(viewer: FleetLinkViewerHandle, bytes: number): void;
+    /** Asked on every ping tick while open: false closes the viewer (it lost the right to watch). */
+    stillAllowed?(viewer: FleetLinkViewerHandle): Promise<boolean>;
+    /**
+     * A JSON control message the NODE sent on the viewer's channel (FL-08: the
+     * logs batch's `logs.initial-done`, whose counts the audit row records).
+     * Called before the message is forwarded; never sees a `DATA` payload.
+     */
+    nodeMessage?(viewer: FleetLinkViewerHandle, message: Record<string, unknown>): void;
+    /** The viewer is gone. */
+    closed?(viewer: FleetLinkViewerHandle): void;
+}
 
 const WS_MAX_PAYLOAD_BYTES = FLEET_LINK_MAX_FRAME_BYTES + 1024 * 1024;
 
@@ -43,6 +84,14 @@ interface ViewerState {
     bridge: FleetLinkViewerBridge | null;
     authenticating: boolean;
     missedPongs: number;
+    /** Set once the token is accepted. */
+    handle: FleetLinkViewerHandle | null;
+    observer: FleetLinkViewerObserver | null;
+    /** The observer admitted it: `closed` is owed. */
+    admitted: boolean;
+    opened: boolean;
+    closedTold: boolean;
+    checking: boolean;
 }
 
 @Injectable()
@@ -53,6 +102,7 @@ export class FleetLinkViewerGatewayService
     private wss: WebSocketServer | null = null;
     private pinger: NodeJS.Timeout | null = null;
     private readonly sockets = new Map<WebSocket, ViewerState>();
+    private readonly observers = new Map<FleetLinkFamily, FleetLinkViewerObserver>();
 
     constructor(
         private readonly gateway: FleetLinkGatewayService,
@@ -67,10 +117,16 @@ export class FleetLinkViewerGatewayService
         this.pinger.unref?.();
     }
 
+    /** Observe one family's viewers (one observer per family; a second replaces the first). */
+    registerObserver(family: FleetLinkFamily, observer: FleetLinkViewerObserver): void {
+        this.observers.set(family, observer);
+    }
+
     onApplicationShutdown(): void {
         if (this.pinger) clearInterval(this.pinger);
         for (const [ws, state] of [...this.sockets]) {
             state.bridge?.viewerClosed();
+            this.tellClosed(state);
             this.safeClose(ws, FLEET_LINK_VIEWER_CLOSE_CODES.shutdown, 'server shutting down');
         }
         this.sockets.clear();
@@ -92,7 +148,17 @@ export class FleetLinkViewerGatewayService
 
     /** Exposed for the spec. */
     onConnection(ws: WebSocket, path: { family: FleetLinkFamily; target: string }): void {
-        const state: ViewerState = { bridge: null, authenticating: false, missedPongs: 0 };
+        const state: ViewerState = {
+            bridge: null,
+            authenticating: false,
+            missedPongs: 0,
+            handle: null,
+            observer: null,
+            admitted: false,
+            opened: false,
+            closedTold: false,
+            checking: false,
+        };
         this.sockets.set(ws, state);
         const authTimer = setTimeout(() => {
             if (!state.bridge)
@@ -102,8 +168,17 @@ export class FleetLinkViewerGatewayService
 
         ws.on('message', (data: Buffer | ArrayBuffer | Buffer[], isBinary: boolean) => {
             if (state.bridge) {
-                if (isBinary) state.bridge.fromViewer(toBytes(data));
-                else
+                if (isBinary) {
+                    const bytes = toBytes(data);
+                    state.bridge.fromViewer(bytes);
+                    if (state.opened && state.handle) {
+                        try {
+                            state.observer?.inbound?.(state.handle, bytes.byteLength);
+                        } catch {
+                            // an observer never breaks the stream
+                        }
+                    }
+                } else
                     this.safeClose(
                         ws,
                         FLEET_LINK_VIEWER_CLOSE_CODES.protocol,
@@ -124,6 +199,7 @@ export class FleetLinkViewerGatewayService
             clearTimeout(authTimer);
             this.sockets.delete(ws);
             state.bridge?.viewerClosed();
+            this.tellClosed(state);
         });
         ws.on('error', (error) => {
             this.logger.debug(`fleet viewer socket error: ${error.message}`);
@@ -161,19 +237,57 @@ export class FleetLinkViewerGatewayService
             role: claims.role,
         });
         state.bridge = bridge;
+        const handle: FleetLinkViewerHandle = { id: randomUUID(), claims, acceptedAt: Date.now() };
+        state.handle = handle;
+        state.observer = this.observers.get(claims.family) ?? null;
         // CONTRACTS §3.3: a session channel opens with the viewer's mode.
         const params =
             claims.family === 'session' ? { ...claims.params, mode: claims.role } : claims.params;
         try {
+            if (state.observer?.admit) {
+                await state.observer.admit(handle);
+            }
+            state.admitted = true;
+            if (ws.readyState !== ws.OPEN || bridge.isEnded) {
+                this.tellClosed(state);
+                return;
+            }
+            const observer = state.observer;
+            // FL-08: an observer that reads the node's JSON messages sees each
+            // one before it is forwarded (bytes are never shown to it).
+            const events =
+                observer?.nodeMessage !== undefined
+                    ? {
+                          ...bridge.events,
+                          json: (message: Record<string, unknown>) => {
+                              try {
+                                  observer.nodeMessage?.(handle, message);
+                              } catch {
+                                  // an observer never breaks the stream
+                              }
+                              bridge.events.json?.(message);
+                          },
+                      }
+                    : bridge.events;
             const channel = await this.links.openChannel({
                 nodeId: claims.nodeId,
                 family: claims.family,
                 params,
                 caller: { kind: 'user', userId: claims.userId },
                 requirement: FleetLinkAttachService.requirementFor(claims.role, claims.requirement),
-                events: bridge.events,
+                events,
             });
             bridge.attach(channel);
+            if (!bridge.isEnded && ws.readyState === ws.OPEN) {
+                state.opened = true;
+                try {
+                    state.observer?.opened?.(handle);
+                } catch {
+                    // an observer never breaks the stream
+                }
+            } else {
+                this.tellClosed(state);
+            }
         } catch (error) {
             bridge.fail(
                 error instanceof FleetLinkException
@@ -183,9 +297,39 @@ export class FleetLinkViewerGatewayService
         }
     }
 
+    /** The observer's `closed`, exactly once, for a viewer it admitted. */
+    private tellClosed(state: ViewerState): void {
+        if (!state.admitted || state.closedTold || !state.handle) return;
+        state.closedTold = true;
+        try {
+            state.observer?.closed?.(state.handle);
+        } catch {
+            // an observer never breaks the gateway
+        }
+    }
+
+    /** A viewer the family says may no longer watch is closed (lost audience, ended session). */
+    private recheck(ws: WebSocket, state: ViewerState): void {
+        const observer = state.observer;
+        if (!state.opened || !state.handle || !observer?.stillAllowed || state.checking) return;
+        state.checking = true;
+        void observer
+            .stillAllowed(state.handle)
+            .then((allowed) => {
+                if (allowed || !this.sockets.has(ws)) return;
+                state.bridge?.viewerClosed();
+                this.safeClose(ws, FLEET_LINK_VIEWER_CLOSE_CODES.channelClosed, 'access changed');
+            })
+            .catch(() => undefined)
+            .finally(() => {
+                state.checking = false;
+            });
+    }
+
     private pingAll(): void {
         for (const [ws, state] of this.sockets) {
             state.bridge?.tick();
+            this.recheck(ws, state);
             if (state.missedPongs >= 2) {
                 state.bridge?.viewerClosed();
                 this.safeClose(ws, FLEET_LINK_VIEWER_CLOSE_CODES.silence, 'ping timeout', true);

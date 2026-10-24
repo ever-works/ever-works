@@ -5,6 +5,7 @@ import { ApiClientService } from '../../api-client/api-client.service.js';
 import { toMcpError } from '../../api-client/api-error.js';
 import { fenceUntrustedToolResult } from '../../api-client/fence-untrusted.js';
 import { KB_DOCUMENT_CLASSES, KB_DOCUMENT_STATUSES } from '@ever-works/contracts';
+import { kbCreateAuthorship } from './review-gate.js';
 
 /**
  * EW-643 Phase 3 slice 3 — `kb.create` MCP tool.
@@ -39,14 +40,17 @@ export class KbCreateTool {
 		name: 'kb.create',
 		description:
 			'Create a new Knowledge Base document for a Work. Returns the created KbDocumentDto. ' +
-			'Use kb.update to amend the body later, or kb.lock once the content is final.',
+			'Use kb.update to amend the body later, or kb.lock once the content is final. ' +
+			'The document is filed as a proposal: it feeds agent context once a person accepts it in the app.',
 		parameters: KbCreateSchema
 	})
 	async create(input: z.infer<typeof KbCreateSchema>) {
 		try {
 			const { workId, ...body } = input;
 			const path = `/works/${encodeURIComponent(workId)}/kb/documents`;
-			const result = await this.apiClient.request('POST', path, body);
+			// Works-security: an MCP-written document lands `proposed` / agent-
+			// authored, out of agent context until a person accepts it.
+			const result = await this.apiClient.request('POST', path, { ...body, ...kbCreateAuthorship() });
 
 			return {
 				content: [{ type: 'text' as const, text: fenceUntrustedToolResult(JSON.stringify(result, null, 2)) }]

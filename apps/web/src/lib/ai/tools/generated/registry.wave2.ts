@@ -315,6 +315,10 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         ],
         body: true,
         bodyHint: 'repoType (required, RepositoryType), isPrivate (required, boolean)',
+        // Works-security: flipping a repository to public publishes its
+        // whole history (and anything committed to it) to the internet.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'sync_work_data',
@@ -932,6 +936,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint: 'deploymentId (required, string, UUID of target deployment)',
         canvas: 'Detail',
+        // Works-security: changes what the live site serves, like deployWork.
+        requiresConfirmation: true,
     },
     {
         toolName: 'check_git_provider_connection',
@@ -1507,6 +1513,10 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         bodyHint:
             'recurrenceRule (required, string), recurrenceTimezone (optional, string), recurrenceEndsAt (optional, ISO 8601 date string), recurrenceMaxOccurrences (optional, number)',
         canvas: 'Detail',
+        // Works-security: a recurring Task spawns instances on a schedule —
+        // each one can dispatch its agents without anyone starting it.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'clear_task_recurring',
@@ -1712,6 +1722,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
                 type: 'string',
             },
         ],
+        // Works-security: starts a paid build, like buildIdea.
+        requiresConfirmation: true,
     },
     {
         toolName: 'rebuild_idea',
@@ -1727,6 +1739,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
                 type: 'string',
             },
         ],
+        // Works-security: starts a paid build that produces a new Work.
+        requiresConfirmation: true,
     },
     {
         toolName: 'list_idea_attachments',
@@ -1818,6 +1832,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint:
             'instruction (required), dryRun, maxWorksPerRun, maxItemsPerWork, maxBudgetCentsPerRun, requireApprovalBeforeCreate, requireApprovalBeforeDelete, requireApprovalAboveBudgetCents, dryRunByDefault',
+        // Works-security: queues autonomous (paid) work for the Work agent.
+        requiresConfirmation: true,
     },
     {
         toolName: 'cancel_work_agent_build_request',
@@ -1946,6 +1962,10 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint:
             'settings (optional object), secretSettings (optional object), metadata (optional object)',
+        // Works-security: `secretSettings` and base URLs — one changed base
+        // URL redirects every model call (and its prompts) for the Work.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'set_work_plugin_active_capability',
@@ -2026,6 +2046,10 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         path: '/api/plugins/composio/triggers',
         summary: 'Create a Composio trigger subscription',
         kind: 'create',
+        // Works-security (#2804 review): a trigger subscription is a standing
+        // inbound event feed into the account, like a webhook — the user's call.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
         body: true,
         bodyHint:
             'toolkitSlug (required string), triggerSlug (required string), composioConnectedAccountId (required string), config (optional object)',
@@ -2610,6 +2634,10 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         kind: 'update',
         body: true,
         bodyHint: 'repoFullName, createNew',
+        // Works-security: decides which GitHub repository the account's
+        // data is synced to — an injected repo would receive it.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'push_account_to_github',
@@ -3241,6 +3269,9 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint:
             'url (required), providerOverride, workId, viewportWidth, viewportHeight, format, fullPage, delay, blockAds, blockTrackers, blockCookieBanners',
+        // Works-security: the URL goes to a third-party provider; a planted
+        // instruction could smuggle a credential out in it.
+        refuseSecretArgs: true,
     },
     {
         toolName: 'get_screenshot_url',
@@ -3251,6 +3282,8 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint:
             'url (required), providerOverride, workId, viewportWidth, viewportHeight, format, fullPage, delay, blockAds, blockTrackers, blockCookieBanners',
+        // Works-security: same exfiltration channel as capture_screenshot.
+        refuseSecretArgs: true,
     },
     {
         toolName: 'check_search_availability',
@@ -3269,5 +3302,7 @@ export const WAVE2_OPERATIONS: OperationSpec[] = [
         body: true,
         bodyHint: 'query (required), workId, maxResults, includeDomains, excludeDomains',
         canvas: 'Table',
+        // Works-security: the query goes to a third-party search provider.
+        refuseSecretArgs: true,
     },
 ];

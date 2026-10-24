@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "Revisar o acesso ao aplicativo GitHub",
                     "openOnGitHub": "Abrir no GitHub",
                     "enableBuildWorkflow": "Ativar o fluxo de trabalho de build"
-                }
+                },
+                "editAccessRequired": "Você precisa de acesso de edição a este App Work para fazer isso."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Evolua-o com o agente dele",
                     "body": "Peça ao agente do Work para alterar o aplicativo — adicionar um recurso, corrigir um bug, atualizar uma dependência. Ele trabalha no repositório do Work e abre pull requests.",
                     "button": "Conversar sobre este aplicativo"
-                }
+                },
+                "editAccessRequired": "Você precisa de acesso de edição a este App Work para tentar novamente."
             },
             "builds": {
                 "title": "Builds",
@@ -7178,7 +7180,8 @@
                     "saved": "Destino salvo.",
                     "saveFailed": "Não foi possível salvar o destino: {reason}",
                     "changeNote": "Alterar o destino não remove nada que já esteja em execução.",
-                    "routeUnavailable": "Alterar o destino ainda não está disponível nesta instância."
+                    "routeUnavailable": "Alterar o destino ainda não está disponível nesta instância.",
+                    "ownerOnly": "Somente o proprietário do trabalho pode alterar onde o app é executado ou conectar um novo cluster."
                 },
                 "connect": {
                     "title": "Conectar seu cluster",
@@ -7219,7 +7222,8 @@
                     "saving": "Salvando…",
                     "saveBlocked": "Salvar fica disponível quando a verificação passar com todas as permissões necessárias.",
                     "saved": "Cluster conectado.",
-                    "saveFailed": "Não foi possível salvar a conexão do cluster: {reason}"
+                    "saveFailed": "Não foi possível salvar a conexão do cluster: {reason}",
+                    "ownerOnly": "Somente o proprietário do trabalho pode conectar um cluster ou alterar o contexto dele."
                 },
                 "check": {
                     "ok": "Conectado",
@@ -7356,7 +7360,8 @@
                         "resume": "Retomada solicitada.",
                         "remove": "Remoção solicitada.",
                         "cancelDeploy": "Cancelamento solicitado."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Somente o proprietário do trabalho pode excluir os dados armazenados."
                 },
                 "environment": {
                     "title": "Ambiente",
@@ -7445,8 +7450,11 @@
                         "confirm": "Excluir dados",
                         "requested": "Excluindo os dados de {kind}.",
                         "failed": "Não foi possível excluir os dados. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Somente o proprietário do trabalho pode excluir estes dados."
+                },
+                "ownerRequired": "Somente o proprietário do trabalho pode fazer isso.",
+                "ownerConfirmCluster": "Outro membro salvou esta conexão com o cluster, então o proprietário do trabalho precisa implantar uma vez para confirmá-la."
             },
             "appEnv": {
                 "errors": {

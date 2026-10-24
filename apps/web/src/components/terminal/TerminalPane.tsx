@@ -8,6 +8,7 @@ import { createTerminalRenderer } from './create-terminal-renderer';
 import {
     useTerminalAttach,
     type TerminalAttachDeps,
+    type TerminalAttachSource,
     type TerminalAttachState,
 } from './use-terminal-attach';
 
@@ -35,6 +36,12 @@ export interface TerminalPaneProps {
      * session someone else is driving instead of taking the keyboard.
      */
     readOnly?: boolean;
+    /**
+     * What the pane attaches to (FL-04 P1b). Absent = the Run named by
+     * `agentId` / `runId`, exactly as before; `{ kind: 'fleet-session',
+     * sessionId }` = a session on a computer (pass empty `agentId` / `runId`).
+     */
+    source?: TerminalAttachSource;
 }
 
 export function TerminalPane({
@@ -43,6 +50,7 @@ export function TerminalPane({
     createRenderer,
     attachDeps,
     readOnly,
+    source,
 }: TerminalPaneProps) {
     const t = useTranslations('dashboard.terminal');
     const hostRef = useRef<HTMLDivElement | null>(null);
@@ -63,7 +71,7 @@ export function TerminalPane({
             },
         },
         attachDeps,
-        { readOnly: readOnly === true },
+        source ? { readOnly: readOnly === true, source } : { readOnly: readOnly === true },
     );
 
     // Mount the renderer imperatively, once, into the child-free host.
@@ -87,7 +95,7 @@ export function TerminalPane({
             rendererRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [runId]);
+    }, [runId, source?.kind === 'fleet-session' ? source.sessionId : null]);
 
     // Latest attach api for the renderer callbacks without re-mounting.
     const attachRef = useRef(attach);

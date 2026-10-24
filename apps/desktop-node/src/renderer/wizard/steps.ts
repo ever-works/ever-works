@@ -1,5 +1,6 @@
 import {
 	API_HOST_OPTIONS,
+	DEFAULT_DESKTOP_CONSENTS,
 	DEFAULT_LIMITS_VIEW,
 	MAX_CONCURRENCY,
 	MAX_CPU_CEILING,
@@ -9,6 +10,7 @@ import {
 	MIN_MEMORY_CEILING_MB,
 	MIN_TOKEN_LENGTH,
 	type ApiHostChoice,
+	type DesktopConsentsView,
 	type EnrollMode,
 	type NodeResourceLimits
 } from '../../shared/ipc-contract';
@@ -55,6 +57,11 @@ export interface WizardProgress {
 	capabilities?: string[];
 	/** Resource ceilings this machine will enforce on itself (A16). */
 	limits?: NodeResourceLimits;
+	/**
+	 * Fleet node link (FL-02 T-26, spec §5.5) — what this computer lets Ever
+	 * Works do, chosen on the capabilities step. `undefined` = the defaults.
+	 */
+	consents?: DesktopConsentsView;
 	/** Flipped once the platform has accepted the enrollment. */
 	enrolled: boolean;
 }
@@ -230,4 +237,26 @@ export function firstIncompleteStep(progress: WizardProgress): WizardStepId {
 		}
 	}
 	return steps[steps.length - 1];
+}
+
+/** Fleet node link (FL-02 T-26) — the consents the wizard will enroll with. */
+export function wizardConsents(progress: WizardProgress): DesktopConsentsView {
+	return { ...DEFAULT_DESKTOP_CONSENTS, ...(progress.consents ?? {}) };
+}
+
+/** The three consents in the order the wizard and the tray show them (spec §5.5). */
+export const WIZARD_CONSENT_CHOICES: ReadonlyArray<{
+	key: keyof DesktopConsentsView;
+	label: string;
+	hint: string;
+}> = [
+	{ key: 'work', label: 'Run work for my agents', hint: 'lease jobs' },
+	{ key: 'attend', label: 'Allow live viewing from the dashboard', hint: 'screen, desktop' },
+	{ key: 'manage', label: 'Allow managing this computer', hint: 'logs, services, files, commands…' }
+];
+
+/** Flip one consent, keeping the others. */
+export function toggleWizardConsent(progress: WizardProgress, key: keyof DesktopConsentsView): WizardProgress {
+	const current = wizardConsents(progress);
+	return { ...progress, consents: { ...current, [key]: !current[key] } };
 }

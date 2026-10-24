@@ -16,6 +16,11 @@ import {
 import { agentsAPI } from '@/lib/api/agents';
 import { notificationPreferencesAPI } from '@/lib/api/notification-preferences';
 import { runsAPI } from '@/lib/api/runs';
+import { fleetAPI } from '@/lib/api/fleet';
+import { fleetSessionsAPI } from '@/lib/api/fleet-sessions';
+import { getAuthFromCookie } from '@/lib/auth';
+import { readFleetFeatureFlags } from '@/lib/fleet-flags';
+import { parseSessionsViewState } from '@/components/fleet/sessions/sessions-board.shared';
 import { ActivityClient } from './activity-client';
 import { ACTIVITY_VIEW_PARAM, isActivityView } from './activity-views';
 
@@ -57,6 +62,11 @@ export default async function ActivityPage({
     const feedRequested = view === 'feed';
     const runsRequested = isActivityView(view) && view === 'runs';
     const schedulesRequested = view === 'schedules';
+    // FL-05: the Sessions view exists only while FLEET_SESSIONS_ENABLED is on (else the page
+    // falls back to the Log, spec T-36); opened on it, its first board / list is read here.
+    const sessionsEnabled = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED'] as const).FLEET_SESSIONS_ENABLED === true;
+    const sessionsRequested = sessionsEnabled && view === 'sessions';
+    const sessionsView = parseSessionsViewState(source);
 
     const feedFilters = feedRequested ? parseFeedFilters(source) : null;
     // The Runs view's view-state lives in the same address bar, so a shared
@@ -81,7 +91,33 @@ export default async function ActivityPage({
         .then((prefs) => prefs.preference?.timezone || 'UTC')
         .catch(() => 'UTC');
 
-    const [response, feedPage, feedActors, resolvedTimeZone, agentRoster, ledger, schedules] =
+    const sessionFilters = {
+        ...(sessionsView.nodeId ? { nodeId: sessionsView.nodeId } : {}),
+        ...(sessionsView.agentId ? { agentId: sessionsView.agentId } : {}),
+        ...(sessionsView.kind ? { kind: sessionsView.kind } : {}),
+    };
+    const sessionsFirstPaint = sessionsEnabled
+        ? Promise.all([
+              sessionsRequested && sessionsView.mode === 'board'
+                  ? fleetSessionsAPI.board(sessionFilters).catch(() => null)
+                  : Promise.resolve(null),
+              sessionsRequested && sessionsView.mode === 'list'
+                  ? fleetSessionsAPI
+                        .list({ ...sessionFilters, limit: 200 })
+                        .then((page) => page.sessions)
+                        .catch(() => null)
+                  : Promise.resolve(null),
+              fleetAPI
+                  .listVisibleNodes()
+                  .then((nodes) => nodes.map((node) => ({ id: node.id, name: node.name })))
+                  .catch(() => [] as Array<{ id: string; name: string }>),
+              getAuthFromCookie()
+                  .then((user) => user?.id ?? null)
+                  .catch(() => null),
+          ])
+        : Promise.resolve(null);
+
+    const [response, feedPage, feedActors, resolvedTimeZone, agentRoster, ledger, schedules, sessionsPayload] =
         await Promise.all([
             getActivityLog({ limit: 25 }).catch(() => ({
                 success: false,
@@ -125,6 +161,7 @@ export default async function ActivityPage({
                       healthFailed: !healthResponse.ok,
                   }))
                 : Promise.resolve(null),
+            sessionsFirstPaint,
         ]);
 
     return (
@@ -152,6 +189,14 @@ export default async function ActivityPage({
                     failed: schedules?.failed ?? false,
                     health: schedules?.health ?? null,
                     healthFailed: schedules?.healthFailed ?? false,
+                }}
+                sessions={{
+                    enabled: sessionsEnabled,
+                    view: sessionsView,
+                    board: sessionsPayload?.[0] ?? null,
+                    list: sessionsPayload?.[1] ?? null,
+                    nodes: sessionsPayload?.[2] ?? [],
+                    viewerUserId: sessionsPayload?.[3] ?? null,
                 }}
             />
         </Suspense>

@@ -158,7 +158,15 @@ const PRE_IDENTITY_CATEGORIES = [
  * is still counted exactly once, and a member that disappears or is renamed
  * still fails the total.
  */
-const LATER_CAPABILITIES: readonly string[] = ['apps-tier', 'domain-event-subscriber'];
+const LATER_CAPABILITIES: readonly string[] = ['apps-tier', 'domain-event-subscriber', 'machine-provider'];
+
+/**
+ * Every category a LATER epic appended behind `identity`, in the tuple's own
+ * order — FL-17 added `machine-provider`. Same extension point as the list
+ * above: `remaining` below drops these, so the equality stays a statement about
+ * the members that existed before APW-12 T4.
+ */
+const LATER_CATEGORIES: readonly string[] = ['machine-provider'];
 
 /** The seven **Test connection** ids of FR-3, in its order (plan §4.1:340–351). */
 const EVERY_CHECK_ID: readonly IdentityProviderCheck['id'][] = [
@@ -295,7 +303,7 @@ describe('the identity-provider capability (APW-12 T4)', () => {
 
 		// The append-only guarantee, asserted rather than assumed: every pre-existing
 		// member is still there, in the same relative order, exactly once.
-		const remaining = PLUGIN_CATEGORIES.filter((entry) => entry !== 'identity');
+		const remaining = PLUGIN_CATEGORIES.filter((entry) => entry !== 'identity' && !LATER_CATEGORIES.includes(entry));
 		expect(remaining).toEqual([...PRE_IDENTITY_CATEGORIES]);
 		expect(new Set(PLUGIN_CATEGORIES).size).toBe(PLUGIN_CATEGORIES.length);
 

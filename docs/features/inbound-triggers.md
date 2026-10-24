@@ -43,6 +43,8 @@ An event-sourced trigger needs an **Event matcher** with at least one field: a p
 
 Both sources funnel into exactly the same Task-spawning path, so everything below about modes, templates, variables and the fire log applies to either one. Only the delivery half differs.
 
+An event matcher can also say **About me**: review requested from you, assigned to you, or pull requests you opened, matched against your linked GitHub account. The **GitHub: things for me** button creates such a trigger in one click — see [Tasks and GitHub on your computers](./fleet-tasks-and-github.md).
+
 ## How to create a trigger
 
 1. Go to **Tasks → Triggers** (`/tasks/triggers`) and click **New Trigger**.

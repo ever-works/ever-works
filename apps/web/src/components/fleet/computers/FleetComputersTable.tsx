@@ -29,6 +29,8 @@ export interface FleetComputersTableFavorites {
     renderName?: (node: FleetNodeView) => ReactNode;
     /** An "Open page" action beside Details (spec §5.6). */
     renderOpen?: (node: FleetNodeView) => ReactNode;
+    /** FL-03 — the state's sentence under the status word (the hub only; Settings passes none). */
+    renderState?: (node: FleetNodeView) => ReactNode;
 }
 
 interface FleetComputersTableProps {
@@ -79,6 +81,8 @@ export function FleetComputersTable({
     favorites,
 }: FleetComputersTableProps) {
     const t = useTranslations('dashboard.settings.fleet');
+    // Cloud computers (FL-17, CONTRACTS R-36): why Remove is disabled for one.
+    const tCloud = useTranslations('fleet.cloud');
     const kindLabel = (kind: FleetNodeKind): string => t(`kinds.${kind}` as never);
     const statusDotClass = fleetStatusDotClass;
     const formatLastSeen = formatFleetLastSeen;
@@ -177,6 +181,9 @@ export function FleetComputersTable({
                                         })}
                                     </span>
                                 ))}
+                                {favorites?.renderState ? (
+                                    <div className="mt-1">{favorites.renderState(node)}</div>
+                                ) : null}
                             </td>
                             <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
                                 {node.platform ?? '-'}
@@ -302,9 +309,13 @@ export function FleetComputersTable({
                                     <Button
                                         variant="ghost"
                                         onClick={() => onRemove(node)}
-                                        disabled={isPending}
+                                        disabled={isPending || Boolean(node.cloud && !node.cloud.removable)}
                                         data-testid={`fleet-node-remove-${node.id}`}
-                                        title={t('actions.remove')}
+                                        title={
+                                            node.cloud && !node.cloud.removable
+                                                ? tCloud('removeUnavailable.line')
+                                                : t('actions.remove')
+                                        }
                                     >
                                         <Trash2 className="w-4 h-4 text-danger" />
                                     </Button>

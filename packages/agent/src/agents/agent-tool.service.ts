@@ -65,6 +65,20 @@ import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
 import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
+import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
+import { buildFleetCloudTools } from '../fleet/cloud/agent-fleet-cloud-tools';
+import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
+import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
+import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
+import { buildFleetScheduleTools } from '../fleet/schedules/agent-fleet-schedule-tools';
+import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
+import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
+import { buildFleetSessionGitTools } from '../fleet/session-git/agent-fleet-session-git-tools';
+import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
+import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
+import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
+import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -99,6 +113,7 @@ import {
     requiredCredentialsForTool,
 } from '../policy/tool-credentials';
 import type {
+    FleetToolAnnotation,
     SubAgentDelegationResult,
     SubAgentScope,
     ToolGrantDecision,
@@ -174,6 +189,8 @@ export interface AgentToolDescriptor<TArgs = unknown, TResult = unknown> {
         required: string[];
     };
     invoke: (args: TArgs) => Promise<TResult | { error: string }>;
+    /** FL-19 (spec FR-2) — optional fleet tool annotation; see `TaskToolDescriptor.annotations`. */
+    annotations?: FleetToolAnnotation;
 }
 
 /**
@@ -318,7 +335,17 @@ export class AgentToolService {
      */
     resolveAllowedTools(
         agent: Agent,
-        runContext: { runId: string; editsThisRunByFile: Set<string>; missionId?: string } = {
+        runContext: {
+            runId: string;
+            editsThisRunByFile: Set<string>;
+            missionId?: string;
+            /**
+             * Works-security (2026-10-18) — the run is a Conversation reply its Agent's
+             * OWNER started. Only `request_app_change` reads it (an agent acting on its
+             * own files a change held for the owner). Absent = not an owner chat turn.
+             */
+            ownerChatTurn?: boolean;
+        } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
@@ -504,7 +531,10 @@ export class AgentToolService {
      * replay for no user-visible gain. Documented, not churned — see
      * `docs/specs/features/chat-everything/README.md` §4.1.
      */
-    private buildDomainTools(agent: Agent, runContext?: { runId: string }): AgentToolDescriptor[] {
+    private buildDomainTools(
+        agent: Agent,
+        runContext?: { runId: string; ownerChatTurn?: boolean },
+    ): AgentToolDescriptor[] {
         const sources = this.domainToolSources;
         if (!sources) return [];
 
@@ -564,6 +594,225 @@ export class AgentToolService {
         if (sources.fleet) {
             const fleet = sources.fleet;
             add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+            // Servers and ports (FL-10): read-only list + audited open, as the Agent for its owner.
+            if (fleet.ports) {
+                const ports = fleet.ports;
+                add('fleet-ports', () =>
+                    buildFleetPortsTools({
+                        agent: { id: agent.id, userId: agent.userId, name: agent.name ?? null },
+                        service: ports,
+                        tunnels: fleet.portTunnels ?? null,
+                    }),
+                );
+            }
+            // Services and processes on computers (FL-09) — every call runs the same
+            // chain a person's click does, as this Agent; a blast-radius act and every
+            // SIGKILL are held for the owner's approval (FR-22).
+            if (fleet.machine) {
+                const machine = fleet.machine;
+                add('fleet-machine', () =>
+                    buildFleetMachineTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: machine,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+            // Virtual computers (FL-16): list / options read-only; a create, a stop and a
+            // destroy are held for the owner's approval (spec S9).
+            if (fleet.virtual) {
+                const virtual = fleet.virtual;
+                add('fleet-virtual', () =>
+                    buildFleetVirtualTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: virtual,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+            // Cloud computers (FL-17): list / options / usage read-only; a create, a
+            // power change and a destroy are held for the owner's approval (spec S9).
+            if (fleet.cloud) {
+                const cloud = fleet.cloud;
+                add('fleet-cloud', () =>
+                    buildFleetCloudTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: cloud,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+            // Computer health (FL-03): the read-only health tools, when bound.
+            if (fleet.health) {
+                const health = fleet.health;
+                add('fleet-health', () =>
+                    buildFleetHealthTools({
+                        userId: agent.userId,
+                        service: health.service,
+                        history: health.history,
+                        ...(health.needsALook ? { needsALook: health.needsALook } : {}),
+                    }),
+                );
+            }
+            // Checkouts on computers (FL-14 P2): the checkout tools, when bound
+            // (and only while FLEET_CHECKOUTS_ENABLED is on — the builder reads it).
+            if (fleet.checkouts) {
+                const checkouts = fleet.checkouts;
+                add('fleet-checkouts', () =>
+                    buildFleetCheckoutTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        service: checkouts.service,
+                    }),
+                );
+            }
+            // Session git & actions (FL-06 P3): the action, Changes and pull-request
+            // tools, when bound (and only while FLEET_SESSIONS_ENABLED is on).
+            if (fleet.sessionGit) {
+                const sessionGit = fleet.sessionGit;
+                add('fleet-session-git', () =>
+                    buildFleetSessionGitTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        actions: sessionGit.actions,
+                        checkouts: sessionGit.checkouts ?? null,
+                        pullRequests: sessionGit.pullRequests ?? null,
+                    }),
+                );
+            }
+            // FL-19 — the tools the catalogue owns itself: `fleet_status` (when the API
+            // binds its status reader), `fleet_nodes_list|get`, `fleet_operations_get|list`
+            // (when the node link's operations registry is bound). All read-only.
+            add('fleet-core', () =>
+                buildFleetCoreTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    service: fleet.service,
+                    status: fleet.status ?? null,
+                    operations: fleet.operations ?? null,
+                }),
+            );
+            // FL-19 P2 — wake and cancel an operation (each when bound). The git identity
+            // tools are FL-15's own (`fleetTasks`), assembled below.
+            add('fleet-acts', () =>
+                buildFleetActTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    wake: fleet.wake ?? null,
+                    operations: fleet.operations ?? null,
+                }),
+            );
+            // Logs on computers (FL-08): the read-only log tools, when bound.
+            if (fleet.logs) {
+                const logs = fleet.logs;
+                add('fleet-logs', () =>
+                    buildFleetLogsTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: logs.reader,
+                    }),
+                );
+            }
+            // Files on computers (FL-11): the read-only file tools, when bound.
+            if (fleet.files) {
+                const files = fleet.files;
+                add('fleet-files', () =>
+                    buildFleetFilesTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: files.reader,
+                        // P2: copy and delete are held for the owner's approval.
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
+        }
+
+        // FL-04 P2 — the Agent's own sessions on computers (start is always an
+        // Agent session of THIS Agent, FR-51). Bound only while
+        // FLEET_SESSIONS_ENABLED is on.
+        if (sources.fleetSessions) {
+            const fleetSessions = sources.fleetSessions;
+            add('fleet-sessions', () =>
+                buildFleetSessionTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    service: fleetSessions.service,
+                }),
+            );
+        }
+
+        // FL-12 P2 — Commands on computers. `fleet_commands_run` never runs a
+        // command itself: it files an approval the owner decides in My
+        // Decisions (fail-closed without the queue). Bound only while
+        // FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetCommands) {
+            const fleetCommands = sources.fleetCommands;
+            add('fleet-commands', () =>
+                buildFleetCommandTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetCommands.service,
+                    proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-13 P2 — Schedules on computers. Create, update, delete and run never
+        // act themselves: each files an approval the owner decides in My Decisions
+        // (fail-closed without the queue); pause and resume apply at once. Bound
+        // only while FLEET_COMMANDS_ENABLED is on.
+        if (sources.fleetSchedules) {
+            const fleetSchedules = sources.fleetSchedules;
+            add('fleet-schedules', () =>
+                buildFleetScheduleTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    runId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: fleetSchedules.service,
+                    proposals: sources.proposals ?? null,
+                }),
+            );
+        }
+
+        // FL-15 P3 — Tasks on computers: the hand-off options (the start is
+        // `fleet_sessions_start` with `taskId`) and the git identity check.
+        if (sources.fleetTasks) {
+            const fleetTasks = sources.fleetTasks;
+            add('fleet-tasks', () =>
+                buildFleetTaskTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    handoff: fleetTasks.handoff ?? null,
+                    identity: fleetTasks.identity ?? null,
+                }),
+            );
         }
 
         // Fetching an arbitrary URL IS an outbound network call, so it
@@ -610,6 +859,9 @@ export class AgentToolService {
                     service: appChanges.service,
                     authorize: (userId, workId, level) =>
                         appChanges.authorize(userId, workId, level),
+                    // Platform state from the run, never model input: only an owner's
+                    // own Conversation turn starts a change directly (works-security).
+                    ownerChatTurn: runContext?.ownerChatTurn === true,
                 }),
             );
         }
@@ -711,7 +963,13 @@ export class AgentToolService {
             );
         }
 
-        return out;
+        // FL-19 (spec FR-2, FR-5, FR-25) — every catalogued `fleet_*` tool leaves the
+        // assembly annotated, with the no-credits sentence, its results secret-scanned
+        // and its refusals typed. Anything else (and the legacy `list_fleet_nodes`) is
+        // returned untouched.
+        return out.map(
+            (tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor,
+        );
     }
 
     /**
@@ -741,6 +999,8 @@ export class AgentToolService {
             editsThisRunByFile: Set<string>;
             missionId?: string;
             taskId?: string;
+            /** See {@link resolveAllowedTools}. */
+            ownerChatTurn?: boolean;
         } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),

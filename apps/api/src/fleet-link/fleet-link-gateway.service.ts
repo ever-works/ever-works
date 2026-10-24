@@ -43,6 +43,7 @@ import {
     type FleetLinkSocketPort,
 } from './fleet-link.registry';
 import { FleetLinkTokenService } from './fleet-link-token.service';
+import { isFleetPreviewHostRequest } from '../fleet/ports/preview-host.match';
 
 /**
  * Fleet node link — the WebSocket gateway on `/ws/fleet/link` (FL-02,
@@ -161,6 +162,9 @@ export class FleetLinkGatewayService implements OnApplicationBootstrap, OnApplic
 
     /** Exposed for the spec: decide what to do with one upgrade request. */
     handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
+        // Servers and ports (FL-10 P3): an upgrade on the dedicated preview host is a
+        // tunnelled page's own socket (hot reload) — the preview host handler's, never ours.
+        if (isFleetPreviewHostRequest(req)) return;
         const rawUrl = req.url ?? '';
         if (!rawUrl.startsWith(FLEET_WS_PATH_PREFIX)) return; // another gateway's
         if (!config.fleet.isEnabled() || !config.fleet.isNodeLinkEnabled()) {

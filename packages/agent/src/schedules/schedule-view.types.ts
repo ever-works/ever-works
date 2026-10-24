@@ -1,8 +1,12 @@
+import type { FleetScheduleView } from '@ever-works/contracts';
+
 /**
  * Schedules ("Cadence") — unified read-model types.
  *
  * A `ScheduleView` is a synthetic, read-only projection that unifies the
- * six heterogeneous scheduled sources in the platform into one row shape.
+ * eight heterogeneous scheduled sources in the platform into one row shape
+ * (the eighth, `node_schedule`, is a Command scheduled on one of the
+ * person's computers — FL-13).
  * It is NOT a table — every field is derived on the fly from the owning
  * entity (Task / Agent / Work / Mission). See
  * `docs/specs/features/schedules/spec.md` §1.3.
@@ -21,18 +25,20 @@ export type ScheduleSourceType =
     | 'mission_tick'
     | 'source_validation'
     | 'data_sync'
-    | 'inbound_trigger';
+    | 'inbound_trigger'
+    /** Schedules on computers (FL-13, R-2): a Command with a cadence, run on the computer's own clock. */
+    | 'node_schedule';
 
 /**
  * The kind of entity that owns the schedule. `trigger` is used by
  * inbound-trigger rows with no target Agent; when a target Agent is
  * set the row reuses `agent` (and links to that Agent).
  */
-export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger';
+export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger' | 'node';
 
 /**
  * Normalized status label so the UI renders one pill vocabulary across
- * all six sources (spec §4.5). Each source's own status enum maps into
+ * all eight sources (spec §4.5). Each source's own status enum maps into
  * one of these.
  */
 export type ScheduleStatus = 'active' | 'paused' | 'disabled' | 'error' | 'ended';
@@ -101,6 +107,19 @@ export interface ScheduleView {
      * `dashboard.schedules.nextReasons`, never a sentence.
      */
     nextRunReasonKey?: ScheduleNextRunReasonKey | null;
+
+    // ── Schedules on computers (FL-13) — optional, workspace reads only.
+
+    /** The computer the row runs on (a Command schedule; P2: a pinned recurring Task's chip). */
+    nodeId?: string | null;
+    /** Display name of {@link nodeId}, null when the computer was removed. */
+    nodeName?: string | null;
+    /** The computer's IANA zone (the row shows its time and the viewer's). */
+    nodeTimeZone?: string | null;
+    /** A Command schedule's own facts (command, folder, sync state, failure streak, last run). */
+    nodeSchedule?: FleetScheduleView;
+    /** FL-13 P2: a recurring Task the Schedules dialog made — each fire is an Agent session on {@link nodeId}. */
+    agentSession?: boolean;
 }
 
 /** Why a row has no next fire — see {@link ScheduleView.nextRunReasonKey}. */
@@ -120,7 +139,13 @@ export type ScheduleHealthReason =
     | 'past-one-shot'
     | 'unparseable'
     | 'no-agent'
-    | 'owner-archived';
+    | 'owner-archived'
+    /** FL-13: the computer was not started with `--manage` (only its owner can fix it). */
+    | 'consent-missing'
+    /** FL-13: the computer was removed (repair: move the schedule to another one). */
+    | 'node-removed'
+    /** FL-13: the node on the computer is older than schedules (update it). */
+    | 'node-unsupported';
 
 /** How a NEVER RUNS reason can be repaired. */
 export type ScheduleRepairClass = 'automatic' | 'choice' | 'none';
@@ -152,7 +177,11 @@ export type ScheduleControlReasonKey =
     | 'ownerInactive'
     | 'noAgent'
     | 'noAuthoredForm'
-    | 'notAvailableYet';
+    | 'notAvailableYet'
+    /** FL-13: Run now needs the computer online. */
+    | 'nodeOffline'
+    /** FL-13: the computer was not started with `--manage`. */
+    | 'consentMissing';
 
 export interface ScheduleControls {
     runNow: boolean;
@@ -251,6 +280,8 @@ export interface ScheduleQueryFilters {
     ownerType?: ScheduleOwnerType;
     /** Drop disabled/paused/ended rows when true. */
     enabledOnly?: boolean;
+    /** FL-13: only rows that run on this computer (`?node=<id>`). */
+    nodeId?: string;
 }
 
 /** Scope the aggregation runs under — mirrors Tier A read conventions (spec §2.2). */

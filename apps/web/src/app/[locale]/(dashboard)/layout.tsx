@@ -17,7 +17,12 @@ import type { UserPlugin } from '@/lib/api/plugins';
 import { redirect } from '@/i18n/navigation';
 import { getLocale } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
-import { isFleetHubEnabled } from '@/lib/fleet-flags';
+import {
+    isFleetCloudEnabled,
+    isFleetHubEnabled,
+    isFleetMachineFactsEnabled,
+    isFleetVirtualEnabled,
+} from '@/lib/fleet-flags';
 
 const FALLBACK_CATALOG: OnboardingCatalogResponse = {
     ai: [],
@@ -134,6 +139,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
             changelogUnreadCount={changelogUnreadCount}
             appLauncherEnabled={appLauncherEnabled}
             fleetHubEnabled={isFleetHubEnabled()}
+            fleetMachineFactsEnabled={isFleetMachineFactsEnabled()}
+            fleetVirtualEnabled={isFleetVirtualEnabled()}
+            fleetCloudEnabled={isFleetCloudEnabled()}
         >
             {children}
         </DashboardLayoutClient>

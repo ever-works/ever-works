@@ -9,7 +9,7 @@ import { createEnTranslator } from '../__tests__/en-translator';
 import type { PaletteRecentEntry } from '../hooks/use-palette-recents';
 import { commandsFor } from './commands';
 import { localMatchScore } from './local-match';
-import { screensFor } from './screens';
+import { fleetComputerScreens, screensFor } from './screens';
 import {
     buildPaletteSections,
     flattenRows,
@@ -304,5 +304,50 @@ describe('localMatchScore', () => {
 
     it('ignores case and Latin diacritics', () => {
         expect(localMatchScore('CAFE', 'Café menu')).toBe(90);
+    });
+});
+
+/**
+ * Fleet hub (FL-01, FR-33, T-27) — "Go to computer <name>" for each computer
+ * the viewer may see: a screen row, matched on the computer's name, that opens
+ * its page.
+ */
+describe('Go to computer <name> (Fleet hub)', () => {
+    const computers = [
+        { id: '11111111-1111-4111-8111-111111111111', name: 'build-01' },
+        { id: '22222222-2222-4222-8222-222222222222', name: 'design-mac' },
+    ];
+    const withComputers = (query: string) =>
+        input({
+            query,
+            screens: [
+                ...screensFor('/dashboard', { fleetHubEnabled: true }),
+                ...fleetComputerScreens(computers),
+            ],
+        });
+
+    it('builds one screen per computer, opening its page', () => {
+        const screens = fleetComputerScreens(computers);
+        expect(screens.map((screen) => [screen.title(t), screen.href])).toEqual([
+            ['Go to computer build-01', '/fleet/computers/11111111-1111-4111-8111-111111111111'],
+            ['Go to computer design-mac', '/fleet/computers/22222222-2222-4222-8222-222222222222'],
+        ]);
+        expect(screens[0].breadcrumb?.(t)).toEqual(['Fleet']);
+    });
+
+    it('finds a computer by its name', () => {
+        const rows = flattenRows(buildPaletteSections(withComputers('build-01')));
+        const row = rows.find((candidate) => candidate.title === 'Go to computer build-01');
+        expect(row?.action).toEqual({
+            type: 'screen',
+            href: '/fleet/computers/11111111-1111-4111-8111-111111111111',
+        });
+        expect(rows.some((candidate) => candidate.title === 'Go to computer design-mac')).toBe(
+            false,
+        );
+    });
+
+    it('offers nothing for computers when there are none to see', () => {
+        expect(fleetComputerScreens([])).toEqual([]);
     });
 });

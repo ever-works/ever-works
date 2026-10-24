@@ -167,6 +167,77 @@ describe('AppTargetCard', () => {
         fireEvent.click(screen.getByTestId('app-target-connect'));
         expect(onConnectCluster).toHaveBeenCalledTimes(1);
     });
+
+    describe("works-security — changing the target is the owner's", () => {
+        it('an ownerRequired refusal reads the owner-only sentence', async () => {
+            saveAppTargetActionMock.mockResolvedValue({
+                success: false,
+                code: 'ownerRequired',
+                httpStatus: 403,
+                error: "Only the Work owner can change the App's deploy target or its namespace.",
+            });
+            wrap(
+                <AppTargetCard
+                    workId={WORK_ID}
+                    target={view()}
+                    canEdit
+                    onConnectCluster={vi.fn()}
+                    onSaved={vi.fn()}
+                />,
+            );
+            fireEvent.click(screen.getByTestId('app-target-your-cluster'));
+            fireEvent.click(screen.getByTestId('app-target-save'));
+            await waitFor(() =>
+                expect(screen.getByTestId('app-target-error').textContent).toBe(
+                    'Only the Work owner can do this.',
+                ),
+            );
+        });
+
+        it('a non-owner sees the targets disabled with the reason; Connect stays', () => {
+            const onConnectCluster = vi.fn();
+            wrap(
+                <AppTargetCard
+                    workId={WORK_ID}
+                    target={view()}
+                    canEdit
+                    isOwner={false}
+                    onConnectCluster={onConnectCluster}
+                    onSaved={vi.fn()}
+                />,
+            );
+            const line = screen.getByTestId('app-target-owner-only');
+            expect(line.textContent).toBe(
+                'Only the Work owner can change where the app runs or connect a new cluster.',
+            );
+            const yourCluster = screen.getByTestId('app-target-your-cluster') as HTMLInputElement;
+            expect(yourCluster.disabled).toBe(true);
+            expect(yourCluster.getAttribute('aria-describedby')).toContain(line.id);
+            expect((screen.getByTestId('app-target-none') as HTMLInputElement).checked).toBe(true);
+            // Re-checking the stored connection and its settings remain an editor's.
+            const connect = screen.getByTestId('app-target-connect') as HTMLButtonElement;
+            expect(connect.disabled).toBe(false);
+            fireEvent.click(connect);
+            expect(onConnectCluster).toHaveBeenCalledTimes(1);
+        });
+
+        it('an owner (or an unknown role) can pick a target', () => {
+            wrap(
+                <AppTargetCard
+                    workId={WORK_ID}
+                    target={view()}
+                    canEdit
+                    isOwner
+                    onConnectCluster={vi.fn()}
+                    onSaved={vi.fn()}
+                />,
+            );
+            expect(screen.queryByTestId('app-target-owner-only')).toBeNull();
+            expect(
+                (screen.getByTestId('app-target-your-cluster') as HTMLInputElement).disabled,
+            ).toBe(false);
+        });
+    });
 });
 
 describe('AppDeployPage', () => {

@@ -75,6 +75,8 @@ import {
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { SessionCredentialOnly } from '../auth/integration/integration.decorators';
+import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
 import type { FleetNodeDetailView, FleetNodeDrainResult } from './fleet-admin.types';
 import {
     ClearFleetExecutionPreferenceDto,
@@ -500,6 +502,11 @@ export class FleetController {
     }
 
     @Post('nodes/:id/rotate')
+    // Works-security (run-token scope) — rotation MINTS a fresh enrollment
+    // token (a node credential in waiting): a person's session only, like the
+    // enrollment-token route below. A personal API key cannot mint one.
+    @SessionCredentialOnly('rotate a node credential')
+    @UseGuards(IntegrationForbiddenGuard)
     @ApiOperation({
         summary:
             'Rotate a node credential: mints a fresh one-time enrollment token (returned exactly once) and invalidates the old node secret immediately, so the machine must re-enroll.',
@@ -610,6 +617,13 @@ export class FleetController {
     }
 
     @Post('nodes/enrollment-token')
+    // Works-security (run-token scope) — an enrollment token enrolls a machine
+    // that then leases and runs the owner's jobs: minting one is minting a
+    // credential, so only a person in an interactive session may, exactly as
+    // for API keys. A leaked personal key (or an MCP client holding one) used
+    // to be able to enroll an attacker's machine into the owner's fleet.
+    @SessionCredentialOnly('mint a node enrollment token')
+    @UseGuards(IntegrationForbiddenGuard)
     @ApiOperation({
         summary:
             'Issue a one-time enrollment token for a new node (single-use, 15-minute expiry; the token is returned exactly once)',
@@ -645,10 +659,11 @@ export class FleetController {
             !Array.isArray(body.capabilities) &&
             body.dailyCostCeilingCents === undefined &&
             typeof body.isFavorite !== 'boolean' &&
-            body.controlPolicyFamilies === undefined
+            body.controlPolicyFamilies === undefined &&
+            typeof body.previewProfileEnabled !== 'boolean'
         ) {
             throw new BadRequestException(
-                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite and/or controlPolicyFamilies',
+                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite, controlPolicyFamilies and/or previewProfileEnabled',
             );
         }
         // Fleet hub (FL-01, FR-22): rename, pause / resume and disable /
@@ -668,7 +683,8 @@ export class FleetController {
             (Array.isArray(body.capabilities) ||
                 body.dailyCostCeilingCents !== undefined ||
                 typeof body.isFavorite === 'boolean' ||
-                body.controlPolicyFamilies !== undefined)
+                body.controlPolicyFamilies !== undefined ||
+                typeof body.previewProfileEnabled === 'boolean')
         ) {
             // Owner-only edits beside a lifecycle act are refused before ANY
             // write, so a mixed body can never half-apply.
@@ -716,6 +732,14 @@ export class FleetController {
                 auth.userId,
                 id,
                 body.controlPolicyFamilies,
+            );
+        }
+        // Servers and ports (FL-10): the "Preview browser" switch, owner only.
+        if (typeof body.previewProfileEnabled === 'boolean') {
+            view = await this.service.setPreviewProfileEnabledForUser(
+                auth.userId,
+                id,
+                body.previewProfileEnabled,
             );
         }
         // Pause first, disable second: when both arrive, the harder stop
@@ -839,6 +863,16 @@ export class FleetController {
             health: body.health,
             // Fleet node link (FL-02): the consents, should an enrolling node send them.
             consents: body.consents,
+            // Computer health, second phase (FL-03): never sent at enrol; validated by the service.
+            macAddress: body.macAddress,
+            lanId: body.lanId,
+            // Sessions on computers (FL-04): forwarded like every declared field
+            // (the conformance spec pins enroll and heartbeat to the DTO).
+            daemon: body.daemon,
+            // Fleet node link (FL-02 T-25): likewise.
+            selfUpdate: body.selfUpdate,
+            // Schedules on computers (FL-13): the machine's time zone, validated by the service.
+            timeZone: body.timeZone,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -886,6 +920,16 @@ export class FleetController {
             health: body.health,
             // Fleet node link (FL-02): the four consents the node runs with.
             consents: body.consents,
+            // Computer health, second phase (FL-03): hardware address and network
+            // identity (`--manage` only), validated and owner-salted by the service.
+            macAddress: body.macAddress,
+            lanId: body.lanId,
+            // Sessions on computers (FL-04): the session daemon's health.
+            daemon: body.daemon,
+            // Fleet node link (FL-02 T-25): the opt-in self-update report.
+            selfUpdate: body.selfUpdate,
+            // Schedules on computers (FL-13): the machine's time zone, validated by the service.
+            timeZone: body.timeZone,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

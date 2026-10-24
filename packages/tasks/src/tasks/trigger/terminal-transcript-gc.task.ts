@@ -43,6 +43,21 @@ export const terminalTranscriptGcTask = schedules.task({
                         ...summary,
                     });
                 }
+                // Sessions on computers (FL-04 P3, T-43): session recordings keep 14
+                // days whatever the plan. An API that predates the method answers
+                // an error here; the run sweep above has already done its work.
+                try {
+                    const sessions = await svc.sweepExpiredSessions();
+                    if (sessions.deletedChunks > 0) {
+                        logger.info('terminal-transcript-gc pruned expired session recordings', {
+                            ...sessions,
+                        });
+                    }
+                } catch (error) {
+                    logger.warn('terminal-transcript-gc could not sweep session recordings', {
+                        error: error instanceof Error ? error.message : String(error),
+                    });
+                }
                 return summary;
             },
             TriggerInternalModule,

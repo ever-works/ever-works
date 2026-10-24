@@ -5,9 +5,17 @@ import {
 	FLEET_PUSH_CAPABILITY,
 	FLEET_PUSH_MIN_GIT_VERSION,
 	FLEET_SCREEN_CAPABILITY,
+	normalizeFleetLanId,
+	normalizeFleetMacAddress,
+	FLEET_SESSIONS_CAPABILITY,
+	isFleetTimeZone,
+	normalizeFleetNodeSelfUpdate,
+	normalizeFleetSessionDaemonReport,
 	sanitizeFleetNodeHealthSnapshot,
 	type FleetConsents,
-	type FleetNodeHealthSnapshot
+	type FleetNodeHealthSnapshot,
+	type FleetNodeSelfUpdateReport,
+	type FleetSessionDaemonReport
 } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
 import { FLEET_MANAGED_CAPABILITY } from './link/modules/control';
@@ -404,7 +412,10 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	FLEET_SCREEN_CAPABILITY,
 	// Fleet node link (FL-02): `managed` exists only under `--manage`, which IS
 	// the opt-in — a selection written before the tag existed must not withhold it.
-	FLEET_MANAGED_CAPABILITY
+	FLEET_MANAGED_CAPABILITY,
+	// Sessions on computers (FL-04): `sessions` exists only while the session
+	// daemon a consent started answers — the consent IS the opt-in.
+	FLEET_SESSIONS_CAPABILITY
 ]);
 
 /**
@@ -535,6 +546,32 @@ export interface SelfDescriptionTelemetry {
 	 * then carries no `consents`, exactly as before.
 	 */
 	consents?: () => FleetConsents | null;
+	/**
+	 * Computer health, second phase (FL-03) — the primary interface's hardware
+	 * address and opaque network identity (`resolveNetworkIdentity`), for
+	 * Wake-on-LAN. Wired by the runtime under `--manage` only (spec FR-23);
+	 * heartbeat only, like `health`. Null or a throw leaves both fields ABSENT.
+	 */
+	network?: () => { macAddress: string; lanId: string } | null;
+	/**
+	 * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+	 * health (`SessionDaemonSupervisor.report()`). Absent on a process with
+	 * neither `--manage` nor `--work`, which then reports no `daemon` block.
+	 */
+	sessionDaemon?: () => FleetSessionDaemonReport | null;
+	/**
+	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report (on or
+	 * off, and its last outcome). Heartbeat only, in the newest strip tier;
+	 * null or a throw leaves the field ABSENT.
+	 */
+	selfUpdate?: () => FleetNodeSelfUpdateReport | null;
+	/**
+	 * Schedules on computers (FL-13, CONTRACTS §1.1) — the machine's IANA time
+	 * zone; its Command schedules fire on that clock. Heartbeat only, in the
+	 * newest strip tier; null, a throw or a value `isFleetTimeZone` refuses
+	 * leaves the field ABSENT.
+	 */
+	timeZone?: () => string | null;
 }
 
 /**
@@ -661,6 +698,30 @@ export async function describeSelf(
 			usageScan: consents.usageScan === true
 		};
 	}
+	// Computer health, second phase (FL-03). Both or neither, each validated
+	// here at the wire boundary for the reason the housekeeping block gives.
+	const network = await resolveTelemetry(telemetry.network);
+	if (network) {
+		const macAddress = normalizeFleetMacAddress(network.macAddress);
+		const lanId = normalizeFleetLanId(network.lanId);
+		if (macAddress && lanId) {
+			description.macAddress = macAddress;
+			description.lanId = lanId;
+		}
+	}
+	// Sessions on computers (FL-04). Normalised (bounded reason, known keys
+	// only) for the reason above: a wire payload, never a spread.
+	const daemon = normalizeFleetSessionDaemonReport(await resolveTelemetry(telemetry.sessionDaemon));
+	if (daemon) description.daemon = daemon;
+	// Fleet node link (FL-02 T-25): the self-update report, re-read through the
+	// contracts normaliser at the wire boundary for the same reason.
+	const selfUpdate = normalizeFleetNodeSelfUpdate(await resolveTelemetry(telemetry.selfUpdate));
+	if (selfUpdate) {
+		description.selfUpdate = selfUpdate;
+	}
+	// Schedules on computers (FL-13): the zone, validated at the wire boundary.
+	const timeZone = await resolveTelemetry(telemetry.timeZone);
+	if (isFleetTimeZone(timeZone)) description.timeZone = timeZone;
 	return description;
 }
 

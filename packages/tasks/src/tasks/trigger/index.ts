@@ -25,6 +25,15 @@ export * from './task-pr-status-sync.task';
 export * from './fleet-job-lease-sweeper.task';
 // Computer health (FL-03) — hourly roll-up and retention of the health history.
 export * from './fleet-health-rollup.task';
+// Sessions on computers (FL-04) — sessions that never confirmed their start end `unconfirmed`.
+export * from './fleet-session-sweeper.task';
+export * from './fleet-checkout-reconcile.task';
+export * from './fleet-checkout-bin-purge.task';
+// Virtual computers (FL-16) — mark children whose machine is gone and guests that never enrolled.
+export * from './fleet-virtual-reconcile.task';
+// Cloud computers (FL-17) — mark machines gone at their provider; settle creates and power acts in flight.
+export * from './fleet-cloud-reconcile.task';
+export * from './fleet-cloud-bootstrap-watch.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).

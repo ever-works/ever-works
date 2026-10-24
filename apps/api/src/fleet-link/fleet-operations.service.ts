@@ -115,6 +115,13 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
     private readonly unsubscribeRemote: Array<() => void> = [];
     /** Keyed `<nodeId> <operationId>`: the latest progress and the completion, if any. */
     private readonly early = new Map<string, EarlyUpdates>();
+    /**
+     * Listeners told when an operation ENDS on this replica — the node's
+     * completion, an interruption, the running-time cap. Added for checkouts
+     * on computers (FL-14): a slow list or a fetch that finished on the machine
+     * updates its row. Fired once per operation, on the replica that ended it.
+     */
+    private readonly endedListeners = new Set<(view: FleetOperationView) => void>();
 
     constructor(
         private readonly registry: FleetLinkRegistry,
@@ -198,6 +205,18 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
         this.registry.setOperationSink(null);
     }
 
+    /**
+     * Be told when an operation ends on this replica (FL-14). The listener
+     * receives a copy of the final view; it must not throw (a throw is logged
+     * and ignored). Returns the unsubscribe.
+     */
+    onEnded(listener: (view: FleetOperationView) => void): () => void {
+        this.endedListeners.add(listener);
+        return () => {
+            this.endedListeners.delete(listener);
+        };
+    }
+
     /** Start tracking an operation the node just announced. */
     track(input: {
         operationId: string;
@@ -239,6 +258,28 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
     /** The operation as `userId` may see it, or `not_found`. */
     get(operationId: string, userId: string): FleetOperationView {
         return { ...this.require(operationId, userId).view };
+    }
+
+    /**
+     * FL-19 (`fleet_operations_list`, `GET /api/fleet/operations`) — the
+     * operations `userId` may see (asked for them, or owns the node), newest
+     * first, optionally one state or one node. Only this replica's records (and
+     * those the relay bus shared with it) — the same set `get` answers from.
+     */
+    listForUser(
+        userId: string,
+        query: { state?: FleetOperationView['state']; nodeId?: string; limit?: number } = {},
+    ): FleetOperationView[] {
+        const limit = Math.min(Math.max(Math.floor(query.limit ?? 20), 1), 100);
+        const out: FleetOperationRecord[] = [];
+        for (const record of this.records.values()) {
+            if (record.requesterUserId !== userId && record.ownerUserId !== userId) continue;
+            if (query.state && record.view.state !== query.state) continue;
+            if (query.nodeId && record.view.nodeId !== query.nodeId) continue;
+            out.push(record);
+        }
+        out.sort((a, b) => b.startedAtMs - a.startedAtMs);
+        return out.slice(0, limit).map((record) => ({ ...record.view }));
     }
 
     /**
@@ -393,6 +434,17 @@ export class FleetOperationsService implements OnModuleInit, OnModuleDestroy {
         record.view = view;
         record.endedAtMs = now;
         this.share(record);
+        for (const listener of this.endedListeners) {
+            try {
+                listener({ ...view });
+            } catch (error) {
+                this.logger.warn(
+                    `An operation-ended listener failed for ${view.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
     }
 
     /** Apply the updates a node sent here before this replica knew the operation. */

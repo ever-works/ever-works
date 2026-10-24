@@ -43,6 +43,37 @@ export function isFleetHubEnabled(): boolean {
 }
 
 /**
+ * Machine facts (FL-08 logs first; FL-09 … FL-11) — `FLEET_MACHINE_FACTS_ENABLED`,
+ * matching `config.fleet.isMachineFactsEnabled()` on the API. Default OFF; on
+ * only for the literal `'true'` and only with the hub on, because every
+ * machine-facts surface (the Logs tab, "Logs on <computer>" in the palette)
+ * lives on the hub's computer page.
+ */
+export function isFleetMachineFactsEnabled(): boolean {
+    return isFleetHubEnabled() && process.env.FLEET_MACHINE_FACTS_ENABLED === 'true';
+}
+
+/**
+ * Virtual computers (FL-16) — `FLEET_VIRTUAL_ENABLED`, matching
+ * `config.fleet.isVirtualEnabled()` on the API. Default OFF; on only for the
+ * literal `'true'` and only with the hub on, because "New virtual computer…",
+ * the nested rows and the child's actions all live on the hub.
+ */
+export function isFleetVirtualEnabled(): boolean {
+    return isFleetHubEnabled() && process.env.FLEET_VIRTUAL_ENABLED === 'true';
+}
+
+/**
+ * Cloud computers (FL-17) — `FLEET_CLOUD_ENABLED`, matching
+ * `config.fleet.isCloudEnabled()` on the API. Default OFF; on only for the
+ * literal `'true'` and only with the hub on, because "New cloud computer…", the
+ * Cloud block and its actions all live on the hub.
+ */
+export function isFleetCloudEnabled(): boolean {
+    return isFleetHubEnabled() && process.env.FLEET_CLOUD_ENABLED === 'true';
+}
+
+/**
  * The per-epic Fleet flags of CONTRACTS §9, read on the server and passed
  * down to the hub so a tab whose epic shipped behind a flag can say "switched
  * off on this deployment" instead of rendering (spec U4). Every flag is

@@ -13,6 +13,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import {
     AppDeployRequestService,
+    AppTargetService,
     type AppDeployRequestResult,
 } from '@ever-works/agent/app-runtime';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
@@ -20,7 +21,9 @@ import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { AppDependenciesService } from '@ever-works/agent/app-dependencies';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { isHumanSession } from '../auth/machine-principal';
 import { AppDeployRequestDto, AppDeployResponseDto } from './dto/app-deploy.dto';
+import { appTargetChangeRequiresOwner, requireAppWorkOwnerSession } from './app-owner-gate';
 import { recordAppDependencyActivity } from './app-dependency-activity';
 
 /**
@@ -90,6 +93,16 @@ import { recordAppDependencyActivity } from './app-dependency-activity';
  * request itself is unchanged: until the dependency is `ready` its preconditions
  * still answer `422` naming it, and the Dependencies card shows it provisioning.
  * The retry can never fail the request — it is best-effort and `@Optional()`.
+ *
+ * ## The cluster is the owner's decision (works-security, 2026-10-18)
+ *
+ * A Deployment renders every env value and the image pull credential into the target cluster, so
+ * while `APP_TARGET_CHANGE_REQUIRES_OWNER` is on (the default) two deploys need the Work OWNER in
+ * a signed-in session (`app-owner-gate.ts`): one that sets `confirmClusterChange` (re-pointing a
+ * live App at another cluster), and one that would first use a your-cluster credential someone
+ * other than the owner saved — the owner's Deploy is that credential's confirmation, recorded
+ * before the request so the deploy preconditions (which refuse an unconfirmed credential for
+ * every trigger, auto-deploys included) let it through. Every other deploy stays an editor's.
  */
 @ApiTags('Works')
 @ApiBearerAuth('JWT-auth')
@@ -103,6 +116,9 @@ export class WorkAppDeployController {
         // graph (and this file's spec) builds the controller with the two it always had.
         @Optional() private readonly dependencies?: AppDependenciesService,
         @Optional() private readonly activity?: ActivityLogService,
+        // Works-security — the owner-confirmation reads/writes; optional so a lean graph (and the
+        // existing spec) still builds the controller. Without it only `confirmClusterChange` is gated.
+        @Optional() private readonly targets?: AppTargetService,
     ) {}
 
     /**
@@ -158,6 +174,7 @@ export class WorkAppDeployController {
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<AppDeployResponseDto> {
         await this.authorize(id, auth.userId);
+        await this.requireOwnerForClusterDecisions(id, auth, body?.confirmClusterChange === true);
         await this.retryTransientDependencies(id, auth.userId);
 
         const result: AppDeployRequestResult = await this.deployRequest.request({
@@ -167,6 +184,7 @@ export class WorkAppDeployController {
             trigger: 'manual',
             ...(body?.buildId ? { buildId: String(body.buildId) } : {}),
             ...(body?.confirmClusterChange === true ? { confirmClusterChange: true } : {}),
+            ...(isHumanSession(auth) ? { requestedByHumanSession: true } : {}),
         });
 
         // The service's own status, verbatim. Re-deriving one from `code` here is
@@ -194,6 +212,31 @@ export class WorkAppDeployController {
                 message: String(entry?.message ?? ''),
             })),
         };
+    }
+
+    /**
+     * Works-security — the owner + session gate of the class docstring. A credential that needs the
+     * owner's confirmation is confirmed here, after the gate passed and before the request runs.
+     */
+    private async requireOwnerForClusterDecisions(
+        workId: string,
+        auth: AuthenticatedUser,
+        confirmsClusterChange: boolean,
+    ): Promise<void> {
+        if (!appTargetChangeRequiresOwner()) return;
+        const needsConfirmation = this.targets?.clusterCredentialNeedsOwnerConfirmation
+            ? await this.targets.clusterCredentialNeedsOwnerConfirmation(workId)
+            : false;
+        if (!confirmsClusterChange && !needsConfirmation) return;
+        await requireAppWorkOwnerSession(
+            this.ownership,
+            workId,
+            auth,
+            needsConfirmation
+                ? 'confirm a cluster credential another member saved (deploy it once yourself)'
+                : 'confirm a change of the cluster this App runs on',
+        );
+        if (needsConfirmation) await this.targets?.confirmClusterCredential(workId, auth.userId);
     }
 
     /**

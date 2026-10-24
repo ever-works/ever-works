@@ -110,6 +110,7 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     APP_MANAGED_CRON_MIN_INTERVAL_MIN,
     appComponentDeadlineSeconds,
+    redactSecrets,
     type AppSpec,
     type AppSpecComponent,
     type AppSpecProbe,
@@ -140,11 +141,15 @@ import {
     APP_IMAGE_PULL_CREDENTIAL_SOURCE,
     APP_RUNTIME_ENV_SOURCE,
     APPS_TIER_POLICY,
+    AppPortUnavailableError,
+    type AppImagePullCredentialContext,
     type AppImagePullCredentialSource,
     type AppRuntimeEnvSource,
     type AppsTierPolicy,
 } from './ports.js';
 import type {
+    AppDeclaredSpec,
+    AppDeclaredSpecRequest,
     AppVerificationSpec,
     AppVerificationSpecRequest,
     AppVerificationSpecSource,
@@ -321,6 +326,15 @@ export interface AppRenderInputRequest {
     ttlMinutes?: number | null;
     /** FR-52/FR-53: a preview Deployment (§3:245). */
     preview?: { prNumber: number } | null;
+    /**
+     * Security (sec/app-works-gates) — who requested this Deployment, read by the orchestrator from
+     * the Deployment's OWN row (`triggeredByUserId`). `null`/absent for a Build- or event-triggered
+     * Deployment. Handed to the pull-credential port with `ref.target`, which decides whether the
+     * owner's git token may be written into the target cluster.
+     */
+    requestedByUserId?: string | null;
+    /** Security (sec/app-works-gates) — `true` only when that person asked from a signed-in session. */
+    requestedByHumanSession?: boolean | null;
 }
 
 /** One non-refusing report, the shape §5.4's warnings already use. */
@@ -477,6 +491,45 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
     }
 
     /**
+     * The App spec's **declared** shape at one commit — components (replicas, probes, rollout
+     * deadlines), jobs, cron and smoke — with nothing render-time assembled: no Build, no image, no
+     * pull credential, no env, no hosts and no target policy.
+     *
+     * The lifecycle ops (`resume`, `status-refresh`, `job-run`) act on an App that is **already
+     * running**: what they need from the spec is what it declares, not a fresh render. The
+     * verification-shaped read above refuses a Build-backed App whose request names no Build
+     * (`no_green_build`), so a paused managed App could never be resumed to its declared replicas
+     * (`status_spec_unavailable`, prod 2026-10-20). This read cannot hit that refusal.
+     *
+     * `undefined` when the App spec cannot be read or is not deployable — never a guessed shape.
+     */
+    async readDeclaredSpec(request: AppDeclaredSpecRequest): Promise<AppDeclaredSpec | undefined> {
+        const workId = text(request?.workId);
+        const namespace = text(request?.namespace);
+
+        if (!workId || !namespace) {
+            return undefined;
+        }
+
+        const requestedCommit = text(request?.specCommitSha) || null;
+        const read = await this.readSpec(workId, requestedCommit);
+
+        if (read.status !== 'ready' || !read.snapshot?.spec) {
+            return undefined;
+        }
+
+        const body = read.snapshot.spec;
+
+        return {
+            specCommitSha: requestedCommit || text(read.snapshot.commitSha) || '',
+            components: componentInputs(body, namespace),
+            jobs: jobInputs(body),
+            cron: cronInputs(body),
+            smoke: smokeInputs(body),
+        };
+    }
+
+    /**
      * The assembly both entry points share, returning the result **and** the spec it was read from —
      * the one fact `readVerificationSpec` needs for `dependencyKinds` and must not read twice.
      */
@@ -622,15 +675,23 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
                 );
             }
 
-            pullCredential = await this.resolvePullCredential(workId, buildId as string);
+            const pulled = await this.resolvePullCredential(workId, buildId as string, {
+                // Security (sec/app-works-gates): the port gates the owner-token fallback on the
+                // RESOLVED target and on who requested this Deployment (from its own row).
+                target: ref.target ?? null,
+                requestedByUserId: text(request?.requestedByUserId) || null,
+                requestedByHumanSession: request?.requestedByHumanSession === true,
+            });
 
-            if (pullCredential === undefined) {
+            if (pulled.status !== 'resolved') {
                 return refuse(
                     'pull_credential_unavailable',
-                    'the App image pull credential could not be resolved',
+                    pulled.reason || 'the App image pull credential could not be resolved',
                     specBody,
                 );
             }
+
+            pullCredential = pulled.credential;
 
             // Lane aw-deploy-3 — record WHICH credential pulled the image when it was the
             // fallback (the owner's whole-account GitHub token), so the Deployment says so. The
@@ -923,28 +984,50 @@ export class AppRenderInputBuilder implements AppVerificationSpecSource {
         }
     }
 
-    /** `undefined` = the port refused or threw; `null` = the port answered "no credential" (a public image). */
+    /**
+     * `status: 'resolved'` with `credential: null` = the port answered "no credential" (a public
+     * image); `status: 'refused'` = the port refused or threw. `reason` is the member-facing
+     * sentence when the port marked its refusal as one ({@link AppPullCredentialRefusedError} —
+     * e.g. "the owner's GitHub token is not sent to your cluster"), redacted and capped; `null`
+     * otherwise, so an arbitrary thrown message never becomes the Deployment's reason.
+     */
     private async resolvePullCredential(
         workId: string,
         buildId: string,
-    ): Promise<{ server: string; username: string; password: string } | null | undefined> {
+        context: AppImagePullCredentialContext,
+    ): Promise<
+        | {
+              status: 'resolved';
+              credential: { server: string; username: string; password: string } | null;
+              reason: null;
+          }
+        | { status: 'refused'; credential: null; reason: string | null }
+    > {
         try {
-            const credential = await this.pullCredentials?.resolve(workId, buildId);
+            const credential = await this.pullCredentials?.resolve(workId, buildId, context);
 
-            if (!credential || !text(credential.server) || !text(credential.username)) return null;
+            if (!credential || !text(credential.server) || !text(credential.username)) {
+                return { status: 'resolved', credential: null, reason: null };
+            }
 
             // Verbatim, field for field: the pull block is the port's answer (ACC-06-16).
             return {
-                server: credential.server,
-                username: credential.username,
-                password: credential.password,
+                status: 'resolved',
+                credential: {
+                    server: credential.server,
+                    username: credential.username,
+                    password: credential.password,
+                },
+                reason: null,
             };
         } catch (error) {
             this.logger.warn(
-                `App pull credential resolution failed for work ${workId}: ${messageOf(error)}`,
+                `App pull credential resolution failed for work ${workId}: ${
+                    redactSecrets(messageOf(error)).cleaned
+                }`,
             );
 
-            return undefined;
+            return { status: 'refused', credential: null, reason: memberFacingPullReason(error) };
         }
     }
 
@@ -1335,6 +1418,9 @@ export function jobInputs(spec: AppSpec | null | undefined): AppJobInput[] {
                 ? { timeoutSeconds: Math.floor(job.timeoutSeconds) }
                 : {}),
             ...(isPositiveNumber(job?.retries) ? { retries: Math.floor(job.retries) } : {}),
+            // Additive and default-off: only an explicit `true` reaches the renderer, so every
+            // existing input (and its golden render) is byte-for-byte unchanged.
+            ...(job?.expectsWork === true ? { expectsWork: true } : {}),
         };
     });
 }
@@ -1626,4 +1712,28 @@ function isNonNegativeNumber(value: unknown): value is number {
 /** A message for a log line or a warning. Never a value: only an error's own message. */
 function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** The longest member-facing pull refusal carried onto a Deployment (its `lastError` caps at 500). */
+const MEMBER_FACING_PULL_REASON_MAX_CHARS = 400;
+
+/**
+ * Security (sec/app-works-gates) — the pull port's own sentence, but ONLY for a refusal it marked
+ * member-facing ({@link AppPullCredentialRefusedError}: code `pull_credential_unavailable` and
+ * `memberFacing === true`). Defence in depth on top of the port's fixed text: the secret scanner
+ * runs over it and it is capped, so even a mis-composed message cannot carry a token to the member.
+ */
+function memberFacingPullReason(error: unknown): string | null {
+    if (!(error instanceof AppPortUnavailableError)) return null;
+    if (error.code !== 'pull_credential_unavailable') return null;
+    if ((error as { memberFacing?: unknown }).memberFacing !== true) return null;
+
+    const sentence = String(redactSecrets(text(error.message)).cleaned ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!sentence) return null;
+
+    return sentence.length > MEMBER_FACING_PULL_REASON_MAX_CHARS
+        ? `${sentence.slice(0, MEMBER_FACING_PULL_REASON_MAX_CHARS - 1)}…`
+        : sentence;
 }

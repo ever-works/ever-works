@@ -70,7 +70,14 @@ import {
     TasksService,
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
-import { FleetJobService, FleetNodeHealthService } from '@ever-works/agent/fleet';
+import {
+    FleetCheckoutReconcileService,
+    FleetJobService,
+    FleetNodeHealthService,
+    FleetSessionSweepService,
+    FleetVirtualReconcileService,
+    FleetCloudSweepService,
+} from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { ConversationMessageService } from '@ever-works/agent/conversations';
@@ -720,6 +727,26 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetNodeHealthService?: FleetNodeHealthService,
+        // Sessions on computers (FL-04) — backs the `fleet-session-sweeper`
+        // cron: the worker proxy calls `sweepStale()`, the facade's only
+        // member. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetSessionSweepService?: FleetSessionSweepService,
+        // Checkouts on computers (FL-14) — backs the `fleet-checkout-reconcile`
+        // cron: the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetCheckoutReconcileService?: FleetCheckoutReconcileService,
+        // Virtual computers (FL-16) — backs the `fleet-virtual-reconcile` cron:
+        // the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetVirtualReconcileService?: FleetVirtualReconcileService,
+        // Cloud computers (FL-17) — backs the `fleet-cloud-reconcile` and
+        // `fleet-cloud-bootstrap-watch` crons: the worker proxy calls the
+        // facade's two sweeps only. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetCloudSweepService?: FleetCloudSweepService,
     ) {}
 
     onModuleInit() {
@@ -843,6 +870,45 @@ export class TriggerInternalController implements OnModuleInit {
             // when the service is not bound.
             FleetNodeHealthService: this.fleetNodeHealthService
                 ? { rollupAndPrune: () => this.fleetNodeHealthService!.rollupAndPrune() }
+                : undefined,
+            // Sessions on computers (FL-04) — `fleet-session-sweeper` calls
+            // `sweepStale()` here, and only that: `FleetSessionSweepService` is
+            // already a one-member facade over `FleetSessionService` (whose
+            // start / end / rename must never reach the worker), so the derived
+            // allow-list is exactly `sweepStale`. `undefined` (a loud "Unknown
+            // remote target") when sessions are not mounted.
+            FleetSessionSweepService: this.fleetSessionSweepService
+                ? { sweepStale: () => this.fleetSessionSweepService!.sweepStale() }
+                : undefined,
+            // Checkouts on computers (FL-14) — `fleet-checkout-reconcile` calls
+            // `reconcile()` here, and only that: `FleetCheckoutReconcileService`
+            // is a one-member facade over `FleetCheckoutService` (whose archive
+            // / sync must never reach the worker). `undefined` (a loud "Unknown
+            // remote target") when checkouts are not mounted.
+            FleetCheckoutReconcileService: this.fleetCheckoutReconcileService
+                ? {
+                      reconcile: () => this.fleetCheckoutReconcileService!.reconcile(),
+                      purgeBin: () => this.fleetCheckoutReconcileService!.purgeBin(),
+                  }
+                : undefined,
+            // Virtual computers (FL-16) — `fleet-virtual-reconcile` calls
+            // `reconcile()` here, and only that: `FleetVirtualReconcileService`
+            // is a one-member facade over `FleetVirtualService` (whose create /
+            // destroy / token mint must never reach the worker). `undefined` (a
+            // loud "Unknown remote target") when virtual computers are not mounted.
+            FleetVirtualReconcileService: this.fleetVirtualReconcileService
+                ? { reconcile: () => this.fleetVirtualReconcileService!.reconcile() }
+                : undefined,
+            // Cloud computers (FL-17) — `fleet-cloud-reconcile` / `fleet-cloud-bootstrap-watch`
+            // call `reconcile()` / `watchBootstrap()` here, and only those:
+            // `FleetCloudSweepService` is a two-member facade over `FleetCloudService`
+            // (whose create / power / destroy must never reach the worker). `undefined`
+            // (a loud "Unknown remote target") when cloud computers are not mounted.
+            FleetCloudSweepService: this.fleetCloudSweepService
+                ? {
+                      reconcile: () => this.fleetCloudSweepService!.reconcile(),
+                      watchBootstrap: () => this.fleetCloudSweepService!.watchBootstrap(),
+                  }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

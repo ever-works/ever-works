@@ -23,9 +23,27 @@ import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
+import { ComputerLegBroker } from './link/computer-leg';
+import {
+	MANAGEMENT_LANE_CONCURRENCY,
+	MANAGEMENT_LANE_IDLE_POLL_MS,
+	MANAGEMENT_LANE_LEASE_TTL_SEC,
+	planManagementLane,
+	type ManagementLaneExecutor,
+	type ManagementLanePlan,
+	type ManagementLaneTables
+} from './management-lane';
+import { abortableSleep, createVirtualExecutors } from './executors/virtual';
+import { createVirtualModule } from './link/modules/virtual';
+import { defaultStdinRunner } from './link/modules/virtual/host';
+import { defaultVirtualStateFs, VirtualState } from './link/modules/virtual/state';
+import type { SecretStore } from './secret-store';
+import { kvmUsable, WindowsPasswordStore } from './link/modules/virtual/windows';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
+import { runAgentSessionJob } from './executors/agent-session';
+import { defaultRepositoryLayerFs } from './executors/codex-repository-layers';
 import { runBrowserCheckJob } from './executors/browser-check';
 import { runComputerSessionJob } from './executors/computer-session';
 import type { ModelCliPaths } from './executors/model-cli';
@@ -44,16 +62,57 @@ import { createAgentProfileFs, createAgentProfileManager, defaultAgentProfileRoo
 import { restrictDirectoryToOwnerWindows } from '../node-io';
 import { selectCaptureBackend, type CaptureBackend } from './screen/capture-backend';
 import { defaultWebSocketFactory, type WebSocketFactory } from './screen/cdp-connection';
-import { HeadlessBrowserCaptureBackend } from './screen/headless-browser-backend';
-import type { FleetConsents } from '@ever-works/contracts';
+import { HeadlessBrowserCaptureBackend, HeadlessPreviewBrowser } from './screen/headless-browser-backend';
+import type { FleetConsents, FleetNodeHealthSnapshot, FleetNodeSelfUpdateReport } from '@ever-works/contracts';
 import { createNodeLink, type NodeLink } from './link/link-client';
 import { toNodeLinkRecord, type NodeLinkRecord } from './link/link-record';
 import { defaultLinkSocketFactory, type LinkSocketFactory } from './link/link-socket';
-import { composeNodeLinkModules } from './link/modules';
+import { resolveAllowedRoots } from './link/allowed-roots';
+import {
+	composeNodeLinkModules,
+	createHealthLinkModule,
+	createMachineFactModules,
+	type WakeSender
+} from './link/modules';
+import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
+import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
+import { createClipLinkModule, PasteTargets } from './link/modules/clip';
+import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
+import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
+import { createSessionModule, type SessionModule } from './link/modules/session';
+import { createCommandModule } from './link/modules/command';
+import { createScheduleModule, type ScheduleModule } from './link/modules/schedule';
+import {
+	createNativeScheduler,
+	isNodeRunningAsService,
+	type NativeScheduleEntry
+} from './link/modules/schedule/native-scheduler';
+import { CommandOutputStore } from './link/modules/command/command-output-store';
+import { createPortsModule, type PortsModule } from './link/modules/ports';
+import { createMachineCommandRunner } from './link/modules/machine-facts/exec';
+import { createSystemBrowserOpener, type DesktopUrlOpener } from './link/modules/ports/open-desktop';
+import { defaultPreviewProfileRoot, PreviewBrowserManager } from './link/modules/ports/preview-browser';
+import { createCheckoutsModule } from './link/modules/checkouts';
+import type { CheckoutGitRunner } from './link/modules/checkouts/checkout-git';
+import {
+	createCheckoutCredentialClient,
+	type CheckoutCredentialFetch
+} from './link/modules/checkouts/checkout-credential';
+import type { ConnectFn } from './sessions/daemon-client';
+import { SessionDaemonSupervisor } from './sessions/daemon-supervisor';
+import { ensureDaemonToken } from './sessions/daemon-token';
+import type { SessionDaemonPaths } from './sessions/daemon/daemon-paths';
+import { NO_HOOK_OVERLAY, type HookOverlayPort } from './sessions/hook-overlay.port';
+import { resolveHookPaths } from './sessions/hook-client';
+import { SessionHookOverlay } from './sessions/hook-overlay';
+import { SessionStatusPipeline } from './sessions/session-status';
+import { spawn as spawnProcess } from 'node:child_process';
+import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	DEFAULT_WORKSPACE_MAX_AGE_DAYS,
 	effectiveMinFreeDiskBytes,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
@@ -113,6 +172,31 @@ export interface NodeIo {
 	 * (`createHealthProbeIo`); every test can leave it out.
 	 */
 	health?: HealthProbeIo;
+	/**
+	 * Computer health, second phase (FL-03) — the host's network interfaces
+	 * (`os.networkInterfaces()`), read for the primary interface's hardware
+	 * address and opaque network identity. Optional: without it the node
+	 * reports neither and advertises no `wake`. Read only under `--manage`.
+	 */
+	network?: () => NetworkInterfaceMap | null;
+	/**
+	 * Computer health, second phase (FL-03) — sends a Wake-on-LAN datagram
+	 * (`node:dgram`, bound in `node-io.ts`). Optional: without it `wake.send`
+	 * is not offered on the link.
+	 */
+	wakeSender?: WakeSender;
+	/**
+	 * Logs on computers (FL-08) — what the `logs` link module reads the machine
+	 * through. Optional: absent, the runtime binds the real one
+	 * (`createNodeLogIo`) for a `--manage` process.
+	 */
+	logs?: LogIo;
+	/**
+	 * Files on computers (FL-11) — what the `files` link module reads and
+	 * writes the machine through. Optional: absent, the runtime binds the real
+	 * one (`createNodeFilesIo`) for a `--manage` process.
+	 */
+	files?: FilesIo;
 }
 
 /**
@@ -398,6 +482,23 @@ export interface NodeRuntime {
 	 * reports why it is not open. The shell closes it at shutdown.
 	 */
 	link?: NodeLink;
+	/**
+	 * Sessions on computers (FL-04) — the session daemon's supervisor and the
+	 * link's `session` module, present when the shell said how to run the
+	 * daemon (`sessionDaemon`) and this process holds `--manage` or `--work`.
+	 * The shell starts the supervisor and stops it at shutdown; stopping
+	 * never ends a session (the daemon outlives this process).
+	 */
+	sessions?: {
+		supervisor: SessionDaemonSupervisor;
+		module: SessionModule;
+		/**
+		 * FL-05 — the status pipeline (hook endpoint, overlay, evidence merger).
+		 * The shell starts it with the supervisor and stops it at shutdown; the
+		 * endpoint FILE stays, so hooks spool while the node is down.
+		 */
+		status?: SessionStatusPipeline;
+	};
 	/** The consents this process was started with (CONTRACTS §1.1). */
 	consents: FleetConsents;
 	attended?: {
@@ -405,6 +506,17 @@ export interface NodeRuntime {
 		cadence: AttendedPollCadence;
 		/** The capture backend this machine selected, or null (terminal-only views). */
 		captureBackend: CaptureBackend | null;
+	};
+	/**
+	 * Fleet node link (FL-02, CONTRACTS R-34) — the management lane, present
+	 * only when a kind registered for it has its consent on here (none do in
+	 * FL-02: the kind list ships empty). Its own worker loop, one job at a
+	 * time, outside `--concurrency`; the shell starts and drains it with the
+	 * other lanes.
+	 */
+	management?: {
+		worker: WorkerLoop;
+		kinds: FleetJobKind[];
 	};
 }
 
@@ -536,10 +648,122 @@ export interface CreateNodeRuntimeOptions {
 	nodeLink?: boolean;
 	/** Extra link modules after the compile-time list (tests and embedders). */
 	linkModules?: readonly NodeModule[];
+	/**
+	 * Servers and ports (FL-10) — where the owner-level preview browser profile
+	 * lives; defaults to `~/.ever-works/preview-profile` (R-3), beside the Agent
+	 * profiles, never inside them.
+	 */
+	previewProfileRoot?: string;
+	/**
+	 * Servers and ports (FL-10) — the opener behind "Open on the desktop".
+	 * Undefined = the system opener when this process runs in a desktop session
+	 * with `--attend`; null = none (FL-07's helper binds its own when it lands).
+	 */
+	portsDesktopOpener?: DesktopUrlOpener | null;
+	/**
+	 * Services and processes (FL-09) — replaces the machine-facts modules the
+	 * runtime composes by default (`createMachineFactModules()`); tests pass `[]`
+	 * or fakes so no real `systemctl` / `ps` runs.
+	 */
+	machineFactModules?: readonly NodeModule[];
 	/** Test seam for the link socket; defaults to the runtime's WebSocket client. */
 	linkSocketFactory?: LinkSocketFactory | null;
 	/** Record the link's state beside the config so `status` / `doctor` can show it. Best-effort. */
 	persistLinkState?: (record: NodeLinkRecord) => Promise<void> | void;
+	/**
+	 * Fleet node link (FL-02, CONTRACTS R-34) — the management lane's kinds,
+	 * consents and executors. Defaults to the compile-time tables (empty in
+	 * FL-02); a test or an embedder passes its own.
+	 */
+	managementLane?: ManagementLaneTables;
+	/**
+	 * Virtual computers (FL-16) — the host's virtual data folder
+	 * (`<config dir>/virtual`). With it, `--manage` and a Linux or macOS host,
+	 * the `virtual` link module (`vm.list`, `vm.status`, the `virtual-host` tag)
+	 * and the management lane's `vm-create` / `vm-control` executors are
+	 * composed. Absent (the desktop shell, tests, embedders): neither is.
+	 */
+	virtualDataDir?: string;
+	/**
+	 * Virtual computers, phase 2 — where Windows VM passwords are kept: the
+	 * node's OS keychain. Null / absent: the documented owner-only file
+	 * fallback under the virtual data folder (announced once).
+	 */
+	virtualSecrets?: SecretStore | null;
+	/**
+	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
+	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
+	 * embedder without self-update leaves it unset and the field is absent.
+	 */
+	selfUpdateReport?: () => FleetNodeSelfUpdateReport | null;
+	/**
+	 * Called with every ACCEPTED heartbeat's version verdict (the floor,
+	 * whether this daemon is below it, the recommended version) — what the
+	 * self-update decides on. Never able to fail the beat.
+	 */
+	onHeartbeatAccepted?: (response: {
+		minNodeVersion?: string;
+		upgradeRequired?: boolean;
+		recommendedNodeVersion?: string;
+	}) => void;
+
+	/**
+	 * Sessions on computers (FL-04) — how to run this build's hidden
+	 * `session-daemon` subcommand (the Node binary and the CLI's entry), and
+	 * where the daemon lives. Absent (the desktop shell, tests, embedders):
+	 * no session daemon, and `sessions` is never advertised.
+	 */
+	sessionDaemon?: { command: string; args: string[]; paths: SessionDaemonPaths };
+	/** Test seam: replace the detached spawn of the daemon. */
+	sessionDaemonSpawn?: () => void;
+	/** Test seam: the local-socket connector. */
+	sessionDaemonConnect?: ConnectFn;
+	/** FL-05's per-session hook overlay; FL-04 ships none. */
+	sessionHookOverlay?: HookOverlayPort;
+	/** Folders besides home that owner sessions may start in (and Commands may run in, FL-12). */
+	sessionExtraRoots?: readonly string[];
+	/**
+	 * Commands on computers (FL-12) — where the last 30 runs' full output is
+	 * kept (`<configDir>/commands`). Absent: commands still run, no full
+	 * output is kept.
+	 */
+	commandOutputDir?: string;
+	/**
+	 * Schedules on computers (FL-13) — where the machine keeps its Command
+	 * schedules, their clock state, their last 30 runs and outputs
+	 * (`<configDir>/schedules`). With `--manage`, the schedule loop starts
+	 * whether or not the link is up. Absent: no schedules on this process.
+	 */
+	scheduleDir?: string;
+	/**
+	 * Schedules on computers (FL-13 P3) — `start --native-schedules`: when this
+	 * process does NOT run under a service manager, also hand every held
+	 * schedule to the operating system's scheduler (crontab block, LaunchAgents,
+	 * Task Scheduler folder), which starts `ever-works-node schedule-run <id>`
+	 * so a fire still runs while nobody has the node open. Opt-in.
+	 */
+	nativeSchedules?: boolean;
+	/** How the OS scheduler starts this build's CLI (the program and the arguments before `schedule-run <id>`). */
+	nativeScheduleCommand?: { file: string; args: string[] };
+	/**
+	 * Logs on computers (FL-08, CONTRACTS R-18) — extra folders the machine's
+	 * owner shares with the dashboard (`--files-root`, repeatable): the Logs
+	 * tab lists log files under them (and FL-11's Files tab will browse them).
+	 * Process-scoped, like `--manage`; never the home directory as a whole.
+	 */
+	filesRoots?: readonly string[];
+	/** Owner-only ACL for a file (Windows): the session daemon's token. */
+	restrictFile?: (file: string) => Promise<void> | void;
+	/**
+	 * Checkouts on computers (FL-14) — where the node-local checkout registry
+	 * lives (`checkouts.json` beside the config). Absent (the desktop shell,
+	 * tests, embedders): no checkouts module, so `checkouts.*` answers
+	 * `unsupported_on_node`. The code folders come from the stored config
+	 * (`start --code-folder`), never from the platform.
+	 */
+	checkoutsRegistryPath?: string;
+	/** Test seam: replace the checkouts module's git runner. */
+	checkoutsGit?: CheckoutGitRunner;
 }
 
 /**
@@ -610,12 +834,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// and the tools it spawns — stops running too (`loopRef` is set once the
 	// loop below exists).
 	let loopRef: HeartbeatLoop | null = null;
+	let probeHealth: (() => Promise<FleetNodeHealthSnapshot | null>) | undefined;
 	if (io.health) {
-		const probeHealth = createHealthProbe(io.health, {
+		const probe = createHealthProbe(io.health, {
 			workspacePath: io.workspacePath ?? workspaceRoot,
 			...(io.now ? { now: io.now } : {})
 		});
-		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probeHealth());
+		probeHealth = probe;
+		telemetry.health = () => (loopRef && !loopRef.acceptsField('health') ? null : probe());
 	}
 	// Agent computers: `--attend` is process-scoped consent, so it rides the
 	// environment the capability probe reads rather than the stored config —
@@ -633,10 +859,444 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		manage: options.manageEnabled === true,
 		usageScan: false
 	};
+	// Computer health, second phase (FL-03): this machine's primary interface,
+	// read fresh on every call (a laptop changes networks). Reported on the
+	// beat — hardware address and the opaque network identity, never an
+	// address — only under `--manage` (spec FR-23), and only while the
+	// platform has not proven it predates the pair.
+	const readNetwork = io.network
+		? (): LocalNetworkIdentity | null => {
+				try {
+					return resolveNetworkIdentity(io.network!());
+				} catch {
+					return null;
+				}
+			}
+		: undefined;
+	if (consents.manage && readNetwork) {
+		telemetry.network = () => {
+			if (loopRef && !loopRef.acceptsField('macAddress')) return null;
+			const identity = readNetwork();
+			return identity ? { macAddress: identity.macAddress, lanId: identity.lanId } : null;
+		};
+	}
+	// The `health` link module (FL-03): `health.now` (Refresh now) over the
+	// heartbeat's own probe, `wake.send` over this machine's interface, and the
+	// `wake` tag under `--manage`. Registered here, where the probe exists.
+	const healthLinkModule = createHealthLinkModule({
+		...(probeHealth ? { probeHealth } : {}),
+		...(readNetwork ? { network: readNetwork } : {}),
+		...(io.wakeSender ? { wakeSender: io.wakeSender } : {})
+	});
+	// Sessions on computers (FL-04): the session daemon's supervisor and the
+	// link's `session` module, for a process that may host sessions (owner
+	// sessions need `--manage`, Agent sessions `--work`) and whose shell said
+	// how to run the daemon. Started by the shell; the daemon outlives us.
+	let sessions: NodeRuntime['sessions'];
+	// The overlay launches use (FL-05's when the daemon runs; a test's own, or none).
+	let sessionHookOverlay: HookOverlayPort = options.sessionHookOverlay ?? NO_HOOK_OVERLAY;
+	if (options.sessionDaemon && (consents.manage || consents.work)) {
+		const daemon = options.sessionDaemon;
+		const supervisor = new SessionDaemonSupervisor({
+			paths: daemon.paths,
+			nodeVersion: io.version,
+			ensureToken: () =>
+				ensureDaemonToken({
+					tokenFile: daemon.paths.tokenFile,
+					...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+					warn: (message) => io.logger.warn(message)
+				}),
+			spawnDaemon:
+				options.sessionDaemonSpawn ??
+				(() => {
+					const child = spawnProcess(
+						daemon.command,
+						[
+							...daemon.args,
+							'session-daemon',
+							'--state-dir',
+							daemon.paths.stateDir,
+							'--socket',
+							daemon.paths.socketPath,
+							'--token-file',
+							daemon.paths.tokenFile
+						],
+						// Its own process group, no stdio tied to ours: it must
+						// outlive this process (a restart or an upgrade) and never
+						// receive the terminal's Ctrl-C.
+						{ detached: true, stdio: 'ignore', windowsHide: true, cwd: osHomedir() }
+					);
+					child.on('error', (error) =>
+						io.logger.warn(`Session daemon could not be started: ${error.message}`)
+					);
+					child.unref();
+				}),
+			...(options.sessionDaemonConnect ? { connect: options.sessionDaemonConnect } : {}),
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {})
+		});
+		// Session status (FL-05): the per-session hook overlay (R-6 — never the
+		// person's own configuration) and the pipeline that turns hooks, output,
+		// Ctrl-C and silence into a state. Its hook client runs on the same Node
+		// binary as the daemon.
+		const hookPaths = resolveHookPaths(daemon.paths.stateDir, io.environment.platform);
+		const hookOverlay = new SessionHookOverlay({
+			paths: hookPaths,
+			nodePath: daemon.command,
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			env: process.env,
+			cliVersion: async (provider) => {
+				const executable = pinnedModelCli[provider];
+				if (typeof executable !== 'string' || !executable.trim()) return null;
+				return (await cliCompat.probe(provider, executable)).version;
+			},
+			...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+			logger: io.logger
+		});
+		const statusPipeline = new SessionStatusPipeline({
+			daemon: supervisor,
+			paths: hookPaths,
+			overlay: hookOverlay,
+			homedir: osHomedir(),
+			platform: io.environment.platform,
+			...(options.restrictFile ? { restrictFile: options.restrictFile } : {}),
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		sessionHookOverlay = options.sessionHookOverlay ?? hookOverlay;
+		const sessionModule = createSessionModule({
+			supervisor,
+			consents,
+			nodeName: config.name?.trim() || 'this computer',
+			launch: {
+				platform: io.environment.platform,
+				env: process.env,
+				homedir: osHomedir(),
+				modelCli: pinnedModelCli,
+				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+				overlay: sessionHookOverlay
+			},
+			logger: io.logger,
+			onInput: (sessionId, data) => statusPipeline.observeInput(sessionId, data),
+			// FL-05 P2: `session.answer` — the pipeline types what the CLI expects.
+			answer: (sessionId, params) => statusPipeline.answer(sessionId, params)
+		});
+		sessions = { supervisor, module: sessionModule, status: statusPipeline };
+		// The daemon block carries the hook counters (CONTRACTS §1.1, FL-05 FR-6).
+		telemetry.sessionDaemon = () => ({ ...supervisor.report(), hooks: statusPipeline.hooksReport() });
+	}
+	// Servers and ports (FL-10): the `ports` module and the `desktop` family's
+	// preview source, for a process started with `--manage`. The preview
+	// browser is the probed one in an owner-level profile beside — never
+	// inside — the Agent profiles (R-3); without a browser it refuses with the
+	// sentence spec U10 gives. Open on the desktop uses the system opener only
+	// when the node itself runs in a desktop session with `--attend`, until
+	// FL-07's helper binds its own.
+	let portsModule: PortsModule | null = null;
+	if (consents.manage) {
+		const previewWebSockets =
+			options.webSocketFactory === undefined ? defaultWebSocketFactory() : options.webSocketFactory;
+		const browserPath = io.environment.browserPath;
+		const restrictPreview =
+			options.restrictProfileDir ??
+			(io.environment.platform === 'win32' ? restrictDirectoryToOwnerWindows : undefined);
+		const previewFs = createAgentProfileFs();
+		const preview = new PreviewBrowserManager({
+			starter: browserPath
+				? new HeadlessPreviewBrowser({ browserPath, webSocketFactory: previewWebSockets })
+				: null,
+			root: options.previewProfileRoot ?? defaultPreviewProfileRoot(options.env ?? process.env),
+			mkdir: (path) => previewFs.mkdir(path),
+			...(restrictPreview ? { restrictToOwner: restrictPreview } : {}),
+			nodeName: config.name?.trim() || 'this computer',
+			logger: io.logger,
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
+		});
+		portsModule = createPortsModule({
+			// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+			// `docker ps --format` carries braces and tabs a shell would split.
+			runner: createMachineCommandRunner(),
+			platform: io.environment.platform,
+			homedir: osHomedir(),
+			nodeName: config.name?.trim() || 'this computer',
+			attend: consents.attend,
+			desktopOpener:
+				options.portsDesktopOpener !== undefined
+					? options.portsDesktopOpener
+					: consents.attend && io.environment.hasDisplay
+						? createSystemBrowserOpener(io.runner, io.environment.platform)
+						: null,
+			preview,
+			logger: io.logger,
+			...(io.now ? { now: io.now } : {})
+		});
+	}
+	// Checkouts on computers (FL-14): the `checkouts.*` verbs, for a process
+	// that may list them (`--manage` for discovery, `--work` for Task worktrees).
+	const checkoutsModule =
+		options.checkoutsRegistryPath && (consents.manage || consents.work)
+			? createCheckoutsModule({
+					registryPath: options.checkoutsRegistryPath,
+					codeFolders: config.codeFolders ?? [],
+					workspaceRoot,
+					consents,
+					nodeName: config.name?.trim() || 'this computer',
+					platform: io.environment.platform,
+					...(options.checkoutsGit ? { git: options.checkoutsGit } : {}),
+					// FL-14 P2: the operation-scoped git credential a checkout Ever Works
+					// made authenticates with (never the machine's own helper).
+					credentials: createCheckoutCredentialClient({
+						apiUrl: apiBase.url,
+						nodeId: config.nodeId,
+						secret: config.secret,
+						fetchFn: io.fetchFn as unknown as CheckoutCredentialFetch,
+						userAgent,
+						protect: (token) => io.logger.protect(token),
+						unprotect: (token) => io.logger.unprotect(token)
+					}),
+					reaperMaxAgeMs: (config.workspaceGc?.maxAgeDays ?? DEFAULT_WORKSPACE_MAX_AGE_DAYS) * 86_400_000,
+					logger: io.logger
+				})
+			: undefined;
+	// Logs on computers (FL-08): the `logs` link module — the `logs` family,
+	// the `logs.sources` verb and the `logs` tag — for a `--manage` process
+	// only. The allowed roots (R-18, R-41) are re-resolved on every request:
+	// the standard log directories, ready checkouts (FL-14's registry), the
+	// workspace root and the `--files-root` folders, never the home directory.
+	let logsLinkModule: NodeModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		let user = 'this user';
+		try {
+			user = osUserInfo().username || user;
+		} catch {
+			// no passwd entry: the hint names no account
+		}
+		const logIo =
+			io.logs ??
+			createNodeLogIo({
+				platform,
+				// FL-09's machine runner: `execFile`, no shell, a scrubbed environment —
+				// `docker ps --format` carries braces, quotes and tabs `cmd.exe` would mangle.
+				runner: createMachineCommandRunner(),
+				homedir,
+				user,
+				...(typeof process.getuid === 'function' ? { uid: process.getuid() } : {})
+			});
+		logsLinkModule = createLogsLinkModule({
+			io: logIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				const resolved = await resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'logs',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? [],
+						logDirs: standardLogDirs(platform, homedir)
+					},
+					logIo.fs
+				);
+				return resolved.roots;
+			}
+		});
+	}
+	// Files on computers (FL-11): the `files` link module — the `files`
+	// family, the `files.roots` verb and the `files` tag — for a `--manage`
+	// process only. The allowed roots (R-18, R-39, R-41) are re-resolved on
+	// every request: ready checkouts, the workspace root and the
+	// `--files-root` folders — never the home directory, never a log folder.
+	let filesLinkModule: FilesLinkModule | null = null;
+	if (consents.manage) {
+		const platform = io.environment.platform;
+		const homedir = osHomedir();
+		const filesIo = io.files ?? createNodeFilesIo({ platform, homedir });
+		filesLinkModule = createFilesLinkModule({
+			io: filesIo,
+			nodeName: config.name?.trim() || 'this computer',
+			roots: async () => {
+				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
+				return resolveCanonicalAllowedRoots(
+					{
+						platform,
+						homedir,
+						purpose: 'files',
+						workspaceRoot,
+						checkouts,
+						extraRoots: options.filesRoots ?? []
+					},
+					filesIo
+				);
+			}
+		});
+	}
 	// Composed whether or not the link is built: the module tags (`managed`
-	// under `--manage`, …) describe this process's consents, not the socket.
+	// under `--manage`, `sessions` while the daemon answers, …) describe this
+	// process, not the socket — re-read on every beat, because `sessions`
+	// comes and goes with the daemon (FR-10).
+	// Fleet node link (FL-02 T-22): a live view's inbound leg rides the link
+	// when the shell runs one — the broker matches the `desktop` channels the
+	// platform opens to the views that asked (the legacy leg stays the fallback).
+	const computerLegs = options.nodeLink ? new ComputerLegBroker({ logger: io.logger }) : null;
+	// Paste into a desktop (FL-11 P2): live views register here; the `clip`
+	// family (under `--attend`) reaches them through their own injectors.
+	const pasteTargets = new PasteTargets();
+	const clipLinkModule = consents.attend
+		? createClipLinkModule({ targets: pasteTargets, nodeName: config.name?.trim() || 'this computer' })
+		: null;
+	// Schedules on computers (FL-13): the `schedule` family and the machine's own
+	// timer loop, for a process started with --manage. The loop starts now —
+	// independent of the link (FR-12) — and follows the kill switch once a
+	// link is bound below.
+	// FL-13 P3: the OS-scheduler fallback, re-installed whenever the held set changes.
+	const nativeScheduler =
+		consents.manage &&
+		options.scheduleDir &&
+		options.nativeSchedules === true &&
+		options.nativeScheduleCommand &&
+		!isNodeRunningAsService(process.env, io.environment.platform)
+			? createNativeScheduler({
+					platform: io.environment.platform,
+					homedir: osHomedir(),
+					command: options.nativeScheduleCommand,
+					logger: io.logger
+				})
+			: null;
+	let lastNativeEntries = '';
+	const installNative = (entries: NativeScheduleEntry[]) => {
+		if (!nativeScheduler) return;
+		const key = JSON.stringify(entries);
+		if (key === lastNativeEntries) return;
+		lastNativeEntries = key;
+		void nativeScheduler
+			.install(entries)
+			.then((result) => {
+				for (const skipped of result.skipped) {
+					io.logger.warn(`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`);
+				}
+			})
+			.catch((error: unknown) => {
+				lastNativeEntries = '';
+				io.logger.warn(
+					`Schedules: the ${nativeScheduler.kind} fallback could not be updated: ${error instanceof Error ? error.message : String(error)}`
+				);
+			});
+	};
+	const scheduleModule: ScheduleModule | null =
+		consents.manage && options.scheduleDir
+			? createScheduleModule({
+					consents,
+					dir: options.scheduleDir,
+					nodeName: config.name?.trim() || 'this computer',
+					platform: io.environment.platform,
+					homedir: osHomedir(),
+					env: process.env,
+					...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+					timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+					logger: io.logger,
+					...(nativeScheduler
+						? {
+								onHeld: (definitions) =>
+									installNative(
+										definitions.map((definition) => ({ id: definition.id, cadence: definition.cadence }))
+									)
+							}
+						: {})
+				})
+			: null;
+	if (scheduleModule) {
+		void scheduleModule
+			.start()
+			.catch((error: unknown) =>
+				io.logger.warn(`Schedules could not start: ${error instanceof Error ? error.message : String(error)}`)
+			);
+	}
+	// Virtual computers (FL-16): a host started with --manage on Linux or macOS,
+	// with a virtual data folder, reads its children (`vm.*`) and builds them
+	// (the management lane's executors, below). Never on Windows (spec U4).
+	const virtualState =
+		consents.manage &&
+		options.virtualDataDir?.startsWith('/') &&
+		(io.environment.platform === 'linux' || io.environment.platform === 'darwin')
+			? new VirtualState(options.virtualDataDir)
+			: null;
+	// Windows VMs (P2): the KVM probe (re-read every beat — a group change needs no
+	// restart) and the generated passwords (this host's keychain, or the owner-only
+	// file fallback the store announces).
+	const virtualKvm = (): boolean => kvmUsable({ platform: io.environment.platform, arch: io.environment.arch });
+	const virtualPasswords = virtualState
+		? new WindowsPasswordStore(
+				virtualState.root,
+				defaultVirtualStateFs,
+				options.virtualSecrets ?? null,
+				(message) => io.logger.warn(message)
+			)
+		: null;
+	const virtualModule = virtualState
+		? createVirtualModule({
+				state: virtualState,
+				kvm: virtualKvm,
+				env: options.env ?? process.env,
+				passwords: virtualPasswords
+			})
+		: null;
 	const linkModules = composeNodeLinkModules({
-		...(options.linkModules ? { extra: options.linkModules } : {}),
+		extra: [
+			healthLinkModule,
+			...(logsLinkModule ? [logsLinkModule] : []),
+			...(filesLinkModule ? [filesLinkModule] : []),
+			...(clipLinkModule ? [clipLinkModule] : []),
+			...(virtualModule ? [virtualModule] : []),
+			...(options.linkModules ?? [])
+		],
+		...(sessions ? { session: sessions.module } : {}),
+		// Commands on computers (FL-12): the `command` family, for a process started with --manage.
+		...(consents.manage
+			? {
+					command: createCommandModule({
+						consents,
+						nodeName: config.name?.trim() || 'this computer',
+						platform: io.environment.platform,
+						homedir: osHomedir(),
+						env: process.env,
+						...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+						store: options.commandOutputDir
+							? new CommandOutputStore({ dir: options.commandOutputDir })
+							: null,
+						// FL-13: a schedule's run keeps its full output in the schedule's ring.
+						...(scheduleModule
+							? { findStore: (runId: string) => scheduleModule.findOutputStore(runId) }
+							: {}),
+						logger: io.logger
+					})
+				}
+			: {}),
+		...(scheduleModule ? { schedule: scheduleModule } : {}),
+		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
+		...(computerLegs ? { computerLegs } : {}),
+		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
+		// FL-09 — services and processes (their verbs need --manage on this machine).
+		machineFacts:
+			options.machineFactModules ??
+			createMachineFactModules({
+				docker: {
+					// A bind mount may come only from this computer's shared folders (R-18, R-39).
+					allowedRoots: async () =>
+						resolveAllowedRoots({
+							workspaceRoot,
+							checkouts: checkoutsModule ? await checkoutsModule.readyPaths() : [],
+							purpose: 'files',
+							platform: io.environment.platform
+						})
+				}
+			}),
 		...(io.scheduler
 			? {
 					setTimer: (callback: () => void, ms: number) => io.scheduler!.setTimeout(callback, ms),
@@ -644,7 +1304,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				}
 			: {})
 	});
-	const linkModuleTags = linkModules.tags({ consents, platform: io.environment.platform, nodeVersion: io.version });
+	const moduleEnvironment = { consents, platform: io.environment.platform, nodeVersion: io.version };
+	const linkModuleTags = linkModules.tags(moduleEnvironment);
 	const environment: CapabilityEnvironment = {
 		...io.environment,
 		...(attendedCapture
@@ -656,7 +1317,42 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(consents.manage ? { managed: true } : {}),
 		...(linkModuleTags.length > 0 ? { linkModuleTags } : {})
 	};
+	const currentEnvironment = (): CapabilityEnvironment => {
+		const tags = linkModules.tags(moduleEnvironment);
+		const { linkModuleTags: _previous, ...rest } = environment;
+		return tags.length > 0 ? { ...rest, linkModuleTags: tags } : rest;
+	};
 	telemetry.consents = () => consents;
+	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
+	// Schedules on computers (FL-13): the zone this machine's schedules fire in.
+	telemetry.timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+	// The management lane (CONTRACTS R-34): which of its kinds this process may
+	// lease, and every kind it owns — the work lane below never leases those.
+	const virtualExecutors: ManagementLaneExecutor[] = virtualState
+		? createVirtualExecutors({
+				state: virtualState,
+				runner: createMachineCommandRunner(),
+				stdin: defaultStdinRunner,
+				// Built lazily: the shared job client exists once the lanes do.
+				client: () => jobClientFor(),
+				nodeVersion: io.version,
+				nodeMajor: Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10),
+				apiUrl: apiBase.url,
+				env: options.env ?? process.env,
+				sleep: abortableSleep,
+				now: io.now ?? Date.now,
+				logger: io.logger,
+				nodeName: config.name?.trim() || 'this computer',
+				platform: io.environment.platform,
+				arch: io.environment.arch,
+				kvm: virtualKvm,
+				passwords: virtualPasswords
+			})
+		: [];
+	const managementPlan = planManagementLane(
+		consents,
+		options.managementLane ?? (virtualExecutors.length > 0 ? { executors: virtualExecutors } : undefined)
+	);
 	// What the last beat advertised: the link's hello carries the same list,
 	// so the two can never disagree and the hello costs no second probe.
 	let lastDescribedCapabilities: readonly string[] = [];
@@ -689,7 +1385,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// agent CLI or filling a disk is exactly the kind of change an
 		// operator needs to see without restarting the node.
 		describe: async () => {
-			const description = await describeSelf(io.runner, environment, io.version, selection, telemetry);
+			const description = await describeSelf(io.runner, currentEnvironment(), io.version, selection, telemetry);
 			lastDescribedCapabilities = description.capabilities;
 			return description;
 		},
@@ -703,18 +1399,44 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			upgradeRequired?: boolean;
 			limitCeiling?: NodeLimitCeiling;
 			node?: { modelThrottles?: unknown };
+			recommendedNodeVersion?: string;
 		}) => {
 			attendedWake?.(response.pendingComputerSessions);
 			lifecycle.applyHeartbeat(response);
 			throttleTarget?.(response.node?.modelThrottles);
 			// Fleet node link (FL-02): the first accepted beat opens it (FR-1).
 			startLink?.();
+			// Fleet node link (FL-02 T-25): the self-update decides on the verdict.
+			if (options.onHeartbeatAccepted) {
+				try {
+					options.onHeartbeatAccepted({
+						...(response.minNodeVersion !== undefined ? { minNodeVersion: response.minNodeVersion } : {}),
+						...(response.upgradeRequired !== undefined
+							? { upgradeRequired: response.upgradeRequired }
+							: {}),
+						...(response.recommendedNodeVersion !== undefined
+							? { recommendedNodeVersion: response.recommendedNodeVersion }
+							: {})
+					});
+				} catch (error) {
+					io.logger.warn(
+						`Heartbeat listener failed: ${error instanceof Error ? error.message : String(error)}`
+					);
+				}
+			}
 		}
 	};
 
 	const loop = new HeartbeatLoop(loopOptions);
 	loopRef = loop;
-	const runtime: NodeRuntime = { client, loop, lifecycle, cliCompat, consents };
+	const runtime: NodeRuntime = {
+		client,
+		loop,
+		lifecycle,
+		cliCompat,
+		consents,
+		...(sessions ? { sessions } : {})
+	};
 
 	// ONE job client per process, shared by the work lane and the live-view
 	// lane, so both talk to the same pinned control plane with the same credential.
@@ -748,6 +1470,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(io.now ? { now: io.now } : {})
 		});
 		runtime.link = link;
+		// Sessions (FL-04): channel-0 facts, the kill switch and drain ride this link.
+		sessions?.module.bindLink(link);
+		// Session status (FL-05): `session.status` / `session.attention` ride this link too.
+		sessions?.status?.bindLink(link);
+		// Schedules (FL-13): the kill switch and drain reach the machine's own loop.
+		scheduleModule?.bindLink(link);
+		computerLegs?.bindLink(link);
 		let predatesLogged = false;
 		startLink = () => {
 			if (runtime.loop.acceptsField('consents')) {
@@ -819,6 +1548,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				const excluded: FleetJobKind[] = [];
 				if (options.attendEnabled) excluded.push('computer-session');
 				if (!executionPolicy.allowShellCommands) excluded.push('acceptance-checks');
+				// Fleet node link (CONTRACTS R-34): machine jobs belong to the
+				// management lane alone, whatever this process's consents.
+				for (const kind of managementPlan.ownedKinds) if (!excluded.includes(kind)) excluded.push(kind);
 				return excluded.length > 0 ? { excludeKinds: excluded } : {};
 			})(),
 			// Fleet usage limits: the CLIs an agent-task can run with here, so a
@@ -1046,6 +1778,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						// CLI's startup exit. Wired here for the same reason as
 						// above — a hand-built `io` never reads a developer's PC.
 						managedMcpConfigFs: defaultSessionConfigFs,
+						// works-security finding 5 (node 0.2.7): lstat-only presence
+						// checks of a checkout's own `.codex/` layers, so a Codex run
+						// whose repository carries one says so in its containment
+						// block. Never opens a file; wired here like the two above.
+						repositoryLayerFs: defaultRepositoryLayerFs,
 						// Self-build slice AU — this node's enrollment id, from the
 						// LOCAL config, so a job offering an earlier CLI session can
 						// tell whether that session lives on this machine. Never
@@ -1107,6 +1844,34 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				await pushCredentials?.dispose();
 			}
 		});
+		// Sessions on computers (FL-04 P2): an Agent working in an interactive
+		// session on this machine. The WORK lane only (never the attended
+		// lane), counted against `--concurrency` like `agent-task` (R-28);
+		// started through the session daemon under the Task-run isolation, the
+		// lease held while the session lives. Without a daemon (no `--work` /
+		// `--manage`, or the shell did not wire one) every job is refused with
+		// the reason rather than pretending to have run it.
+		worker.register('agent-session', (job, signal) =>
+			runAgentSessionJob(job, signal, {
+				workEnabled: options.workerEnabled === true,
+				daemon: sessions?.supervisor ?? null,
+				modelCli,
+				containment: {
+					sessionConfigFs: defaultSessionConfigFs,
+					managedMcpConfigFs: defaultSessionConfigFs,
+					modelCli,
+					nodeId: config.nodeId,
+					logger: io.logger,
+					...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {})
+				},
+				nodeId: config.nodeId,
+				homedir: osHomedir(),
+				...(options.sessionExtraRoots ? { extraRoots: options.sessionExtraRoots } : {}),
+				...(options.agentTaskScratchRoot !== undefined ? { scratchRoot: options.agentTaskScratchRoot } : {}),
+				platform: io.environment.platform as NodeJS.Platform,
+				overlay: sessionHookOverlay
+			})
+		);
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising
 		// the `browser` capability with no executor behind it would fail
@@ -1128,7 +1893,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	}
 
 	if (attendedCapture) {
-		const lane = createAttendedLane(config, io, options, environment, jobClientFor(), attendedCapture);
+		const lane = createAttendedLane(
+			config,
+			io,
+			options,
+			environment,
+			jobClientFor(),
+			attendedCapture,
+			computerLegs
+		);
 		runtime.attended = lane;
 		// The live-view lane leases through the same endpoint, so the same
 		// floor refuses it; hold it with the work lane.
@@ -1140,7 +1913,47 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		};
 	}
 
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, only when
+	// one of its kinds has its consent on here. None do in FL-02.
+	if (managementPlan.kinds.length > 0) {
+		const management = createManagementLane(io, options, jobClientFor(), managementPlan);
+		runtime.management = management;
+		// It leases through the same endpoint, so the same version floor holds it.
+		holdableLanes.push(management.worker);
+		management.worker.onUpgradeRequired((hold) => lifecycle.applyLeaseRefusal(hold.minNodeVersion));
+		runtime.jobClient ??= jobClientFor();
+	}
+
 	return runtime;
+}
+
+/**
+ * Fleet node link (FL-02, T-27, CONTRACTS R-34) — the management lane, a
+ * sibling of {@link createAttendedLane}: its own worker loop leasing ONLY the
+ * planned kinds, one job at a time and outside `--concurrency` (the work
+ * lane's limits are not shared), on a slow idle poll. Each planned kind's
+ * executor is registered from the plan.
+ */
+function createManagementLane(
+	io: NodeIo,
+	options: CreateNodeRuntimeOptions,
+	jobClient: FleetJobClient,
+	plan: ManagementLanePlan
+): NonNullable<NodeRuntime['management']> {
+	const worker = new WorkerLoop({
+		client: jobClient,
+		logger: io.logger,
+		limits: clampResourceLimits({ maxConcurrentJobs: MANAGEMENT_LANE_CONCURRENCY }),
+		leaseTtlSec: MANAGEMENT_LANE_LEASE_TTL_SEC,
+		idlePollMs: MANAGEMENT_LANE_IDLE_POLL_MS,
+		kinds: [...plan.kinds],
+		...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
+		...(io.scheduler ? { scheduler: io.scheduler } : {}),
+		...(io.now ? { now: io.now } : {}),
+		...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
+	});
+	for (const executor of plan.executors) worker.register(executor.kind, executor.run);
+	return { worker, kinds: [...plan.kinds] };
 }
 
 /** `2 concurrent job(s), CPU < 80%, no memory ceiling` — for the log line a ceiling change writes. */
@@ -1199,7 +2012,8 @@ function createAttendedLane(
 	options: CreateNodeRuntimeOptions,
 	environment: CapabilityEnvironment,
 	jobClient: FleetJobClient,
-	capture: AttendedCapture
+	capture: AttendedCapture,
+	computerLegs: ComputerLegBroker | null = null
 ): NonNullable<NodeRuntime['attended']> {
 	const { webSocketFactory, captureBackend } = capture;
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;
@@ -1242,7 +2056,12 @@ function createAttendedLane(
 				webSocketFactory,
 				logger: io.logger,
 				platform: environment.platform,
-				profileFs
+				profileFs,
+				// Fleet node link (FL-02 T-22): the view's leg over the link, when there is one.
+				...(computerLegs ? { linkLegs: computerLegs } : {}),
+				// FL-11 P2: a running view is reachable by a paste through its own injector.
+				pasteTargets,
+				...(options.env ? { env: options.env } : {})
 			},
 			signal
 		)

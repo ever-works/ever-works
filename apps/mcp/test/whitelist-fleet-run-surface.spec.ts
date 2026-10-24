@@ -101,7 +101,93 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	// Fleet mutations a run could turn against its own machine.
 	set_agent_node_affinity: 'fleet mutation',
 	clear_agent_node_affinity: 'fleet mutation',
-	drain_fleet_node: 'fleet mutation'
+	drain_fleet_node: 'fleet mutation',
+	// Sessions on computers (FL-04 P2): a person's terminals on their machines. A run's
+	// Agent works through its own `fleet_sessions_*` tools, never through a person's MCP surface.
+	fleet_sessions_list: "a person's sessions on their computers",
+	fleet_sessions_read: "a person's sessions on their computers (last screens)",
+	fleet_sessions_start: 'starts a process on a computer',
+	fleet_sessions_rename: "a person's sessions on their computers",
+	fleet_sessions_end: 'destructive: stops a process on a computer',
+	// Checkouts, logs, commands and ports (FL-14, FL-08, FL-12, FL-10) — the family epics added
+	// these tools without a run-token grant; FL-19 names the refusal so it is a decision. A run's
+	// Agent reaches its owner's computers through its own gated fleet tools, never through a
+	// person's MCP surface.
+	fleet_checkouts_list: "a person's checkouts on their computers",
+	fleet_checkouts_get: "a person's checkouts on their computers",
+	fleet_checkouts_create: 'writes on a computer',
+	fleet_checkouts_sync: 'pushes and pulls on a computer',
+	fleet_checkouts_archive: 'moves a checkout to the bin',
+	fleet_checkouts_delete: 'destructive: deletes a checkout',
+	fleet_logs_sources: "a computer's log sources",
+	fleet_logs_read: "a computer's logs",
+	fleet_commands_run: 'runs commands on computers',
+	fleet_commands_list: "a person's commands and their output",
+	fleet_commands_get: "a person's commands and their output",
+	fleet_commands_cancel: 'stops a command on a computer',
+	fleet_ports_list: 'what a computer listens on',
+	fleet_ports_open: 'opens a page on a computer',
+	fleet_ports_preview_close: "closes a person's preview tunnel",
+	// FL-19 P1 — the catalogue's reads: machine state of every computer the owner has.
+	fleet_status: "the owner's whole fleet at a glance",
+	fleet_nodes_health: "a computer's health",
+	fleet_nodes_needs_a_look: 'what needs a look on a computer',
+	fleet_services_list: 'the services on a computer',
+	fleet_processes_list: 'the processes on a computer',
+	fleet_docker_containers_list: 'the containers on a computer',
+	fleet_docker_images_list: 'the images on a computer',
+	fleet_docker_compose_list: 'the Compose projects on a computer',
+	fleet_operations_get: "a person's long operations",
+	fleet_operations_list: "a person's long operations",
+	fleet_nodes_git_identity_get: "a computer's git identity",
+	fleet_tasks_handoff_options: "a person's computers, checkouts and agents for a Task",
+	// FL-19 P2 — the catalogue's acts on MCP: every one changes a computer.
+	fleet_services_action: 'starts and stops services on a computer',
+	fleet_processes_signal: 'signals processes on a computer',
+	fleet_docker_container_action: 'starts, stops and removes containers on a computer',
+	fleet_docker_image_action: 'removes images on a computer',
+	fleet_docker_compose_action: 'brings Compose projects up and down on a computer',
+	fleet_nodes_wake: 'wakes a computer',
+	fleet_nodes_git_identity_set: "writes a computer's git identity",
+	fleet_operations_cancel: "stops a person's operation",
+	// FL-11 / FL-16 tools that landed beside FL-19 P2 without a run-token decision.
+	fleet_files_roots: "a computer's shared folders",
+	fleet_files_list: "the files on a person's computer",
+	fleet_files_stat: "the files on a person's computer",
+	fleet_virtual_list: "a person's virtual computers",
+	fleet_virtual_options: 'what a computer can host',
+	fleet_virtual_create: 'creates a virtual computer',
+	fleet_virtual_power: 'starts and stops a virtual computer',
+	fleet_virtual_destroy: 'destructive: destroys a virtual computer',
+	// FL-05 P2: typing an answer into a person's session prompt.
+	fleet_sessions_answer: "answers a prompt in a person's session",
+	// The 10-21 build sprint's tools that landed without a run-token decision (deny-by-omission
+	// already refused them; named here so the refusal is a decision). FL-06 session actions.
+	fleet_sessions_actions_list: "a person's session action ledger",
+	fleet_sessions_action: "types an action prompt into a person's session",
+	fleet_checkouts_changes: "the uncommitted diff of a person's checkout",
+	// Inbound triggers: a trigger starts runs later (configuration a later run inherits).
+	inbound_triggers_github_for_me: 'creates an inbound trigger that starts runs',
+	// FL-11 P2 files: writes on a computer.
+	fleet_files_copy: "writes files on a person's computer",
+	fleet_files_delete: "destructive: deletes files on a person's computer",
+	// FL-13 schedules: a schedule runs commands on a computer on its own clock.
+	fleet_schedules_list: "a person's schedules on their computers",
+	fleet_schedules_get: "a person's schedules on their computers",
+	fleet_schedules_runs: "a person's schedule history and its output",
+	fleet_schedules_create: 'schedules commands on a computer',
+	fleet_schedules_update: 'changes what a schedule runs',
+	fleet_schedules_delete: "destructive: deletes a person's schedule",
+	fleet_schedules_run: 'runs a schedule now',
+	fleet_schedules_pause: "changes a person's schedule",
+	fleet_schedules_resume: 'resumes scheduled commands',
+	// FL-17 cloud computers: spend.
+	fleet_cloud_list: "a person's cloud computers",
+	fleet_cloud_options: "a person's provider choices",
+	fleet_cloud_usage: "a person's cloud spend",
+	fleet_cloud_create: 'creates a cloud computer (spend)',
+	fleet_cloud_power: 'starts and stops a cloud computer',
+	fleet_cloud_destroy: 'destructive: destroys a cloud computer'
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */
@@ -169,8 +255,13 @@ describe('fleet-run token surface vs. the MCP whitelist', () => {
 	});
 
 	it('grants fleet READS, so a run can see the fleet it is part of', () => {
+		// Every fleet read that is not deliberately refused above (a person's sessions,
+		// checkouts, logs, schedules … on their own computers are refused by name).
 		const fleetReads = WHITELIST.filter(
-			(entry) => entry.path.startsWith('/api/fleet') && entry.method.toUpperCase() === 'GET'
+			(entry) =>
+				entry.path.startsWith('/api/fleet') &&
+				entry.method.toUpperCase() === 'GET' &&
+				!(entry.toolName !== undefined && entry.toolName in REFUSED_FOR_RUN_TOKENS)
 		);
 		expect(fleetReads.length).toBeGreaterThan(0);
 		for (const entry of fleetReads) {

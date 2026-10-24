@@ -5512,7 +5512,8 @@
                     "reviewGitHubAppAccess": "GitHub-app-toegang controleren",
                     "openOnGitHub": "Openen op GitHub",
                     "enableBuildWorkflow": "Build-workflow inschakelen"
-                }
+                },
+                "editAccessRequired": "Je hebt bewerkrechten voor deze App Work nodig om dat te doen."
             },
             "settings": {
                 "tabs": {
@@ -6905,7 +6906,8 @@
                     "title": "Ontwikkel hem verder met zijn agent",
                     "body": "Vraag de agent van de Work om de app te wijzigen — een functie toevoegen, een bug oplossen, een dependency upgraden. Hij werkt in de Work-repository en opent pull requests.",
                     "button": "Chatten over deze App"
-                }
+                },
+                "editAccessRequired": "Je hebt bewerkrechten voor deze App Work nodig om het opnieuw te proberen."
             },
             "builds": {
                 "title": "Builds",
@@ -7178,7 +7180,8 @@
                     "saved": "Doel opgeslagen.",
                     "saveFailed": "Kon het doel niet opslaan: {reason}",
                     "changeNote": "Het doel wijzigen verwijdert niets wat al draait.",
-                    "routeUnavailable": "Het doel wijzigen is nog niet beschikbaar op deze instantie."
+                    "routeUnavailable": "Het doel wijzigen is nog niet beschikbaar op deze instantie.",
+                    "ownerOnly": "Alleen de werk-eigenaar kan wijzigen waar de app draait of een nieuw cluster koppelen."
                 },
                 "connect": {
                     "title": "Je cluster koppelen",
@@ -7219,7 +7222,8 @@
                     "saving": "Opslaan…",
                     "saveBlocked": "Opslaan is mogelijk zodra de controle slaagt met alle vereiste rechten.",
                     "saved": "Cluster gekoppeld.",
-                    "saveFailed": "Kon de clusterverbinding niet opslaan: {reason}"
+                    "saveFailed": "Kon de clusterverbinding niet opslaan: {reason}",
+                    "ownerOnly": "Alleen de werk-eigenaar kan een cluster koppelen of de context ervan wijzigen."
                 },
                 "check": {
                     "ok": "Verbonden",
@@ -7356,7 +7360,8 @@
                         "resume": "Hervatten aangevraagd.",
                         "remove": "Verwijderen aangevraagd.",
                         "cancelDeploy": "Annuleren aangevraagd."
-                    }
+                    },
+                    "deleteDataOwnerOnly": "Alleen de werk-eigenaar kan opgeslagen gegevens verwijderen."
                 },
                 "environment": {
                     "title": "Omgeving",
@@ -7445,8 +7450,11 @@
                         "confirm": "Gegevens verwijderen",
                         "requested": "De gegevens van {kind} worden verwijderd.",
                         "failed": "De gegevens konden niet worden verwijderd. {reason}"
-                    }
-                }
+                    },
+                    "deleteDataOwnerOnly": "Alleen de werk-eigenaar kan deze gegevens verwijderen."
+                },
+                "ownerRequired": "Alleen de werk-eigenaar kan dit doen.",
+                "ownerConfirmCluster": "Een ander lid heeft deze clusterverbinding opgeslagen, dus de werk-eigenaar moet één keer uitrollen om die te bevestigen."
             },
             "appEnv": {
                 "errors": {

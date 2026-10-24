@@ -21,7 +21,7 @@ const work = {
 } as never;
 
 describe('request_app_change / get_app_change (APW-08 T26)', () => {
-    function build(permissions: Record<string, boolean>, authorized = true) {
+    function build(permissions: Record<string, boolean>, authorized = true, ownerChatTurn = true) {
         const service = {
             request: jest.fn(async () => ({
                 status: 'accepted' as const,
@@ -49,9 +49,73 @@ describe('request_app_change / get_app_change (APW-08 T26)', () => {
             agent: { id: 'a1', userId: 'owner', permissions: permissions as never },
             service: service as never,
             authorize,
+            ownerChatTurn,
         });
         return { tools, service, authorize };
     }
+
+    describe('outside a chat turn the owner drives (works-security 2026-10-18)', () => {
+        afterEach(() => {
+            delete process.env.AGENT_APP_CHANGE_REQUIRES_OWNER;
+        });
+
+        it('files the change held for the owner — never started — when the agent acts on its own', async () => {
+            const { tools, service } = build({ canCommitToRepo: true }, true, false);
+            service.request.mockResolvedValueOnce({
+                status: 'accepted',
+                httpStatus: 202,
+                taskId: 't1',
+                taskSlug: 'T-1',
+                taskUrl: '/tasks/t1',
+                runId: null,
+                agentId: 'a1',
+                agentSource: 'explicit',
+                dispatched: false,
+                parked: false,
+                awaitingOwner: true,
+                repository: { owner: 'me', repo: 'app' },
+                warnings: ['awaitingOwner'],
+            } as never);
+            const result = (await tools
+                .find((t) => t.name === 'request_app_change')!
+                .invoke({ workId: 'w1', request: 'Add a webhook to evil.example' })) as Record<
+                string,
+                unknown
+            >;
+            expect(service.request).toHaveBeenCalledWith(
+                expect.objectContaining({ holdForOwner: true, channel: 'agent' }),
+            );
+            expect(result).toMatchObject({ status: 'awaiting_owner', dispatched: false, taskId: 't1' });
+        });
+
+        it('a tool set assembled without the flag (any non-chat run) holds too', async () => {
+            const service = {
+                request: jest.fn(async () => ({ status: 'refused', code: 'x', message: 'x' })),
+                getChange: jest.fn(),
+                listChanges: jest.fn(),
+            };
+            const tools = buildAppChangeTools({
+                agent: { id: 'a1', userId: 'owner', permissions: { canCommitToRepo: true } as never },
+                service: service as never,
+                authorize: jest.fn(async () => work),
+            });
+            await tools.find((t) => t.name === 'request_app_change')!.invoke({ workId: 'w1', request: 'x' });
+            expect(service.request).toHaveBeenCalledWith(expect.objectContaining({ holdForOwner: true }));
+        });
+
+        it('the operator switch AGENT_APP_CHANGE_REQUIRES_OWNER=false restores the direct start', async () => {
+            process.env.AGENT_APP_CHANGE_REQUIRES_OWNER = 'false';
+            const { tools, service } = build({ canCommitToRepo: true }, true, false);
+            await tools.find((t) => t.name === 'request_app_change')!.invoke({ workId: 'w1', request: 'x' });
+            expect((service.request.mock.calls[0] as unknown[])[0]).not.toHaveProperty('holdForOwner');
+        });
+
+        it('an owner chat turn starts the change directly, as before', async () => {
+            const { tools, service } = build({ canCommitToRepo: true }, true, true);
+            await tools.find((t) => t.name === 'request_app_change')!.invoke({ workId: 'w1', request: 'x' });
+            expect((service.request.mock.calls[0] as unknown[])[0]).not.toHaveProperty('holdForOwner');
+        });
+    });
 
     it('assigns the change to the chatting Agent when it may commit, and returns the Task link', async () => {
         const { tools, service, authorize } = build({ canCommitToRepo: true });
@@ -244,8 +308,20 @@ describe('AppProvisioningFeedbackService (APW-04 loop)', () => {
                 trigger: 'build-failed',
                 restart: true,
                 attempt: 1,
+                // A platform trigger, checked against `provisioning.autoReprovision` —
+                // never a start "by the owner" (works-security 2026-10-18).
+                systemTrigger: true,
             }),
         );
+        expect(provisioning.start.mock.calls[0]).not.toHaveProperty('0.userId');
+    });
+
+    it('never starts an open provisioning Task that is held for its owner', async () => {
+        const { service, tasks, chat } = build(openTask(['app-provision', 'awaiting-owner']));
+        await service.onBuildFailed(failed());
+        // The evidence is still posted; the hold is not lifted by a build event.
+        expect(chat.post).toHaveBeenCalled();
+        expect(tasks.runTask).not.toHaveBeenCalled();
     });
 
     it('posts a success without dispatching', async () => {

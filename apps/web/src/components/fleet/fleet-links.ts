@@ -6,3 +6,6 @@ export const FLEET_PROGRAM_TRACKER_URL =
 
 /** The manual's Fleet page, linked as "How this works" (spec §5.3). */
 export const FLEET_DOCS_URL = 'https://docs.ever.works/features/fleet';
+
+/** Files on computers (FL-11) — "How roots work" under the Files tab (spec §5.1). */
+export const FLEET_FILES_DOCS_URL = 'https://docs.ever.works/features/fleet-files';

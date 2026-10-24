@@ -86,7 +86,16 @@ describe('AppTargetService.check (POST app-target/check)', () => {
             kubeContext: 'prod',
         });
         expect(works.update).toHaveBeenCalledWith('w-1', { deployProvider: 'k8s' });
-        expect(states.patchRuntimeState).toHaveBeenCalledWith('w-1', { target: 'your-cluster' });
+        expect(states.patchRuntimeState).toHaveBeenCalledWith('w-1', {
+            target: 'your-cluster',
+            targetSettings: {
+                clusterCredential: expect.objectContaining({
+                    savedByUserId: 'u-1',
+                    savedByOwner: false,
+                    ownerConfirmedAt: null,
+                }),
+            },
+        });
         expect(ops.dispatch).toHaveBeenCalledWith(
             expect.objectContaining({ op: 'cluster-check', workId: 'w-1', userId: 'u-1' }),
         );
@@ -411,5 +420,197 @@ describe('AppTargetService — rollback, lifecycle, ops and source offer (lane a
         ]);
         expect(status.sourceOffer).toEqual({ url: 'https://github.com/acme/app/tree/c0ffee' });
         expect(evaluate).toHaveBeenCalledWith(expect.objectContaining({ commitSha: 'c2' }));
+    });
+});
+
+describe('AppTargetService — works-security: cluster credential provenance and owner decisions', () => {
+    const ENV = 'EVER_WORKS_APPS_GUARD_DEPENDENCY_KUBECONFIG';
+    const previous = process.env[ENV];
+    afterEach(() => {
+        if (previous === undefined) delete process.env[ENV];
+        else process.env[ENV] = previous;
+    });
+
+    it('records who saved a kubeconfig, and whether they were the owner', async () => {
+        const editor = harness({ target: 'your-cluster', targetSettings: { tls: 'none' } });
+        await editor.service.check('w-1', 'u-editor', { kubeconfig: KUBECONFIG }, { isOwner: false });
+        const editorPatch = editor.states.patchRuntimeState.mock.calls.at(-1)?.[1] as {
+            target?: string;
+            targetSettings: { tls?: string; clusterCredential: Record<string, unknown> };
+        };
+        // An already-chosen target is not moved, and the other settings are kept.
+        expect(editorPatch.target).toBeUndefined();
+        expect(editorPatch.targetSettings.tls).toBe('none');
+        expect(editorPatch.targetSettings.clusterCredential).toMatchObject({
+            savedByUserId: 'u-editor',
+            savedByOwner: false,
+            ownerConfirmedAt: null,
+        });
+        expect(await editor.service.clusterCredentialNeedsOwnerConfirmation('w-1')).toBe(true);
+
+        const owner = harness({ target: 'none', targetSettings: {} });
+        await owner.service.check('w-1', 'u-owner', { kubeconfig: KUBECONFIG }, { isOwner: true });
+        expect(owner.states.patchRuntimeState.mock.calls.at(-1)?.[1]).toMatchObject({
+            target: 'your-cluster',
+            targetSettings: { clusterCredential: { savedByUserId: 'u-owner', savedByOwner: true } },
+        });
+        expect(await owner.service.clusterCredentialNeedsOwnerConfirmation('w-1')).toBe(false);
+        // The provenance is bookkeeping, never a setting the API returns.
+        const body = await owner.service.getTarget('w-1', 'u-owner');
+        expect(body.settings).not.toHaveProperty('clusterCredential');
+    });
+
+    it('a changed kube context is a new credential: provenance is recorded and an old confirmation cleared', async () => {
+        const h = harness({
+            target: 'your-cluster',
+            targetSettings: {
+                clusterCredential: {
+                    savedByUserId: 'u-editor',
+                    savedByOwner: false,
+                    ownerConfirmedByUserId: 'u-owner',
+                    ownerConfirmedAt: '2026-10-18T00:00:00.000Z',
+                },
+            },
+        });
+        expect(await h.service.clusterCredentialNeedsOwnerConfirmation('w-1')).toBe(false);
+        await h.service.check('w-1', 'u-editor', { kubeContext: 'other' }, { isOwner: false });
+        expect(h.settings.writePlatformManagedWorkSettings).toHaveBeenCalledWith('k8s', 'w-1', {
+            kubeContext: 'other',
+        });
+        expect(await h.service.clusterCredentialNeedsOwnerConfirmation('w-1')).toBe(true);
+    });
+
+    it("the owner's confirmation is recorded and satisfies the rule", async () => {
+        const h = harness({
+            target: 'your-cluster',
+            targetSettings: { clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false } },
+        });
+        await expect(h.service.confirmClusterCredential('w-1', 'u-owner')).resolves.toBe(true);
+        expect(h.states.patchRuntimeState.mock.calls.at(-1)?.[1]).toMatchObject({
+            targetSettings: {
+                clusterCredential: {
+                    savedByUserId: 'u-editor',
+                    ownerConfirmedByUserId: 'u-owner',
+                    ownerConfirmedAt: expect.any(String),
+                },
+            },
+        });
+        expect(await h.service.clusterCredentialNeedsOwnerConfirmation('w-1')).toBe(false);
+    });
+
+    it('refuses an unsupported kubeconfig shape before storing it, using the plugin check, unless switched off', async () => {
+        const h = harness();
+        (h.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({
+            ok: false,
+            code: 'kubeconfig_exec_unsupported',
+            message: 'This kubeconfig runs a credential plugin, which Ever Works does not accept.',
+        }));
+        const refused = await h.service.check('w-1', 'u-1', { kubeconfig: KUBECONFIG });
+        expect(refused).toMatchObject({
+            ok: false,
+            refusal: { httpStatus: 422, code: 'kubeconfig_unsupported' },
+        });
+        expect(h.settings.writePlatformManagedWorkSettings).not.toHaveBeenCalled();
+        expect(h.ops.dispatch).not.toHaveBeenCalled();
+        expect(JSON.stringify(refused)).not.toContain('sentinel-secret-7f3a');
+
+        process.env[ENV] = 'false';
+        const off = harness();
+        (off.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({
+            ok: false,
+            code: 'kubeconfig_exec_unsupported',
+        }));
+        await expect(
+            off.service.check('w-1', 'u-1', { kubeconfig: KUBECONFIG }),
+        ).resolves.toMatchObject({ ok: true });
+        expect(off.settings.writePlatformManagedWorkSettings).toHaveBeenCalled();
+    });
+
+    it('a supported shape (or a plugin without the check) is stored as before', async () => {
+        const h = harness();
+        (h.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({ ok: true }));
+        await expect(
+            h.service.check('w-1', 'u-1', { kubeconfig: KUBECONFIG }),
+        ).resolves.toMatchObject({ ok: true });
+        expect(h.settings.writePlatformManagedWorkSettings).toHaveBeenCalled();
+    });
+
+    it('pendingTargetChange names a target or namespace change and nothing else', async () => {
+        const h = harness({ target: 'your-cluster', targetSettings: { namespaceOverride: 'app-a' } });
+        await expect(
+            h.service.pendingTargetChange('w-1', { target: 'your-cluster', settings: { tls: 'none' } }),
+        ).resolves.toEqual({ targetChanges: false, namespaceChanges: false });
+        await expect(
+            h.service.pendingTargetChange('w-1', {
+                target: 'your-cluster',
+                settings: { namespaceOverride: 'app-a' },
+            }),
+        ).resolves.toEqual({ targetChanges: false, namespaceChanges: false });
+        await expect(
+            h.service.pendingTargetChange('w-1', {
+                target: 'your-cluster',
+                settings: { namespaceOverride: 'attacker' },
+            }),
+        ).resolves.toEqual({ targetChanges: false, namespaceChanges: true });
+        await expect(h.service.pendingTargetChange('w-1', { target: 'none' })).resolves.toEqual({
+            targetChanges: true,
+            namespaceChanges: false,
+        });
+        // A body putTarget refuses anyway changes nothing.
+        await expect(h.service.pendingTargetChange('w-1', { target: 'mars' })).resolves.toEqual({
+            targetChanges: false,
+            namespaceChanges: false,
+        });
+    });
+
+    it('putTarget keeps the credential provenance (the settings parser never accepts it)', async () => {
+        const h = harness({
+            target: 'your-cluster',
+            targetSettings: { clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false } },
+        });
+        await h.service.putTarget('w-1', 'u-editor', {
+            target: 'your-cluster',
+            settings: { tls: 'none', clusterCredential: { savedByOwner: true } },
+        });
+        expect(h.states.patchRuntimeState.mock.calls.at(-1)?.[1]).toMatchObject({
+            targetSettings: {
+                tls: 'none',
+                clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false },
+            },
+        });
+        expect(await h.service.clusterCredentialNeedsOwnerConfirmation('w-1')).toBe(true);
+    });
+
+    it('rollback forwards confirmClusterChange and requestedByHumanSession to the request path', async () => {
+        const h = harness({ target: 'your-cluster', currentDeploymentId: 'd-new' });
+        const request = jest.fn(async () => ({ status: 'accepted', httpStatus: 202 }) as never);
+        const service = new AppTargetService(
+            h.states as never,
+            h.works as never,
+            h.deployments as never,
+            h.registry as never,
+            h.settings as never,
+            h.ops,
+            new ConfigAppsTierPolicy({}),
+            undefined,
+            { request } as never,
+        );
+        h.deployments.findById.mockImplementation(async (id: string) =>
+            id === 'd-old' ? { id: 'd-old', workId: 'w-1', state: 'READY', appRender: {} } : null,
+        );
+        await service.rollback(
+            'w-1',
+            'u-owner',
+            { deploymentId: 'd-old', confirmClusterChange: true },
+            { requestedByHumanSession: true },
+        );
+        expect(request).toHaveBeenCalledWith(
+            expect.objectContaining({ confirmClusterChange: true, requestedByHumanSession: true }),
+        );
+        request.mockClear();
+        await service.rollback('w-1', 'u-editor', { deploymentId: 'd-old' });
+        const call = (request.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+        expect(call.confirmClusterChange).toBeUndefined();
+        expect(call.requestedByHumanSession).toBeUndefined();
     });
 });

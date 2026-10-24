@@ -1,7 +1,7 @@
 'use client';
 
 import { RecordVisibilityPanel } from '@/components/record-visibility';
-import { useRef, useState, useTransition } from 'react';
+import { useRef, useState, useTransition, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, ArrowUpRight, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -123,8 +123,18 @@ export function TaskDetailClient({
     initialActivity = [],
     initialActivityTotal = 0,
     initialActivityError = null,
+    fleetAction = null,
+    fleetSection = null,
 }: {
     task: Task;
+    /**
+     * Tasks on computers (FL-15 P1) — **Fix with an agent on this computer**
+     * beside Run with agent, and the **Computer** block after the run
+     * controls. Server-rendered by the page (flag- and node-gated), so this
+     * client component only places them; null renders nothing.
+     */
+    fleetAction?: ReactNode;
+    fleetSection?: ReactNode;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
@@ -394,6 +404,7 @@ export function TaskDetailClient({
                                     so re-assigning must remount it rather
                                     than leave a stale list behind. */}
                                 <RunWithAgentMenu key={agentId ?? 'no-agent'} taskId={task.id} />
+                                {fleetAction}
                                 <TaskDeleteButton taskId={task.id} taskSlug={task.slug} />
                             </div>
                         </div>
@@ -539,6 +550,9 @@ export function TaskDetailClient({
                         run parked on a fleet question shows the question +
                         Inbox link instead of the Resume form. */}
                     <TaskRunControls run={initialGateRun} openQuestion={initialOpenQuestion} />
+
+                    {/* Tasks on computers (FL-15 P1) — the Computer block. */}
+                    {fleetSection}
 
                     {/* Quality gates (Wave 3 M6) — Checks section */}
                     <TaskChecksSection task={task} initialGateRun={initialGateRun} />

@@ -1,3 +1,4 @@
+import type { TaskOrigin } from './task-origin';
 import {
     Column,
     CreateDateColumn,
@@ -60,6 +61,10 @@ export type TaskActorType = 'user' | 'agent';
  * never be an assignee, reviewer or approver.
  */
 export type TaskAuthorType = TaskActorType | 'integration';
+
+// Works-security (2026-10-18) — `Task.origin`'s values live in a leaf module
+// so the App change guard can read them without importing the entity graph.
+export { TASK_ORIGIN_APP_PROVISIONING, type TaskOrigin } from './task-origin';
 
 /**
  * EW-P1-2 — display-only attribution an integration may attach when it writes
@@ -542,6 +547,21 @@ export class Task {
      */
     @Column({ type: 'int', nullable: true })
     delegationDepth?: number | null;
+
+    /**
+     * Which platform flow filed this Task, when one did ({@link TaskOrigin}).
+     *
+     * SERVER-WRITTEN provenance, like `delegationDepth`: deliberately absent
+     * from every create/update DTO and from `UpdateTaskInput`, so no client,
+     * integration, fleet run or agent tool can set or change it. A label is
+     * the wrong carrier for an authorization input — labels are free-form and
+     * writable through `PATCH /api/tasks/:id` — so decisions that used to key
+     * off a label read this instead (works-security 2026-10-18: the App change
+     * guard's `app-provision` exemption). `null` for every ordinary Task and
+     * for every row filed before the column existed.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    origin?: TaskOrigin | null;
 
     // ── Scheduled (one-shot) ───────────────────────────────────────
     /**

@@ -36,6 +36,8 @@ import { TaskPrPill } from './TaskPrPill';
 import { TaskDueChip } from './TaskDueChip';
 import { TaskDiffSheet } from './TaskDiffSheet';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
+import { FixOnComputerButton } from './FixOnComputerButton';
+import { useFleetTaskHandoffEnabled } from '@/components/fleet/tasks/handoff-context';
 import {
     Inbox,
     Circle,
@@ -229,6 +231,8 @@ function TaskKanbanCard({
     const targets = NEXT_STATUS[task.status] ?? [];
     const runButtonRef = useRef<HTMLDivElement | null>(null);
     const changedFiles = task.run?.changedFilesCount ?? null;
+    // FL-15 P1 (T-06): "Fix with an agent on this computer" beside Run, when the server allows it.
+    const fleetHandoff = useFleetTaskHandoffEnabled();
 
     return (
         <div
@@ -402,6 +406,7 @@ function TaskKanbanCard({
                             onOpenChange={onPickerOpenChange}
                         />
                     </div>
+                    {fleetHandoff && <FixOnComputerButton taskId={task.id} taskSlug={task.slug} compact />}
                     <span className="text-[10px] text-text-muted dark:text-text-muted-dark">
                         {new Date(task.updatedAt).toLocaleDateString(undefined, {
                             month: 'short',

@@ -36,6 +36,159 @@ no tokens (§2.2); command and schedule messages (§3.3); operation states incl.
 FL-12…FL-15 routes (§11.2); R-41 (ready-only roots, `--code-folder`). Per-schedule grace and
 failure thresholds stay fixed (§6) until the owner asks for editors.
 
+**Revision 7 (2026-10-21)** — FL-04 P1 (lane-log decision 3): the heartbeat `daemon` block gains `storage`
+(§1.1); the `session` family opens with an optional `kind`, gains the `session.screen` verb, the platform→node
+channel-0 `session.ack`, the `session.notice` notices, `daemon` on `session.list` and an optional `reason` on
+`session.event` (§3.3); `FleetNode.sessionDaemon` (§4.1); `FleetSession.exitCode` and `startedBy` (§4.2).
+
+**Revision 10 (2026-10-21)** — FL-04 P3 (recording, AW-11 P3): session recordings are session-keyed
+`terminal_transcript_chunks` (R-9) kept `FLEET_SESSION_RECORDING_RETENTION_DAYS` = 14 days whatever the plan;
+`GET /api/fleet/sessions/:id/recording` answers `FleetSessionRecordingManifest { state, chunks, durationMs, firstAt,
+lastAt, driverSpans[], expired, retentionDays }`, or with `?from=<seq>&limit=<n>` a `FleetSessionRecordingPage
+{ chunks[{ seq, text, at }], lastSeq, hasMore }`; `POST …/recording { on }` answers the session; defaults: Agent
+sessions recorded, owner sessions when the node's `recordWatchSessions` is on; the platform records through a
+watch-only `session` channel (a system caller) on the replica holding the link.
+
+**Revision 9 (2026-10-21)** — FL-04 P2 (Agent sessions): job kind `agent-session` (§6 / R-28) with
+`FleetAgentSessionPayload { fleetSessionId, agentId, agentRunId, nodeId, provider: claude-code|codex, cwd, title,
+firstMessage, cols, rows, permissionMode, leaseTtlSec }` (ids, the folder and the first message — never a command
+line), required tags `sessions` + the CLI's, idempotency key `fleet-session:<id>`, pinned to `payload.nodeId`, lease
+TTL 300 s, queue SLA 2 h (the session sweeper ends one still waiting after 10 min); result `FleetAgentSessionResult
+{ exitCode, outcome, endedReason?, providerSessionId }`; `agent_runs.fleetSessionId` + trigger `session` (§4.2, R-1,
+slot `1796040100000`); `RunLedgerRow.fleetSessionId?`. An Agent session runs on the person's own computer (a node
+leases only its owner's jobs).
+
+**Revision 8 (2026-10-21)** — FL-04 P1b: session viewers (§3.3 "Session viewers") — the browser's
+`session.attach`, the watcher and driver JSON allow-lists of the `session` family, the attach-token body,
+`presence` on the session detail, watchers admitted under the kill switch.
+
+**Revision 9 (2026-10-21)** — FL-14 P1 (lane-log decisions 1–5): `checkouts.list` needs `work-or-manage`
+(a `FLEET_LINK_VERB_CONSENT_OVERRIDES` entry, §3.3) and discovery (`rescan`) `--manage`, checked on the machine; the node
+keys a checkout by its absolute path, so `checkouts.list` takes `paths` (not `checkoutIds`) and answers
+`{ checkouts, complete, truncated, codeFolders, scannedAt, checkoutsRoot, remoteBranches? }`, and
+`checkouts.sync` takes `{ path, op, checkoutId? }`; a person's rescan is audited as `node.checkout.sync` with
+`op: 'rescan'` (§7). Shapes in `packages/contracts/src/fleet/fleet-checkout.types.ts`.
+
+**Revision 11 (2026-10-21)** — FL-12 P1 (lane log `docs/internal/fleet/lanes/FL-12.md`, decisions 2–5): the
+`command` family opens with `{ commandId, nodeId, runId }` and its node→platform messages carry the fields of §3.3
+"Command family details"; `fleet_commands.commandRedacted` and `fleet_command_runs.errorCode`, `errorHint`,
+`outputBytes`, `capped` (§4.4, FL-12's own slots); the per-computer refusal lives on the run row, the `failedReason`
+enum is unchanged.
+
+**Revision 12 (2026-10-21)** — FL-14 P2 (lane-log decisions 12–18): `checkouts.create` needs `work-or-manage` (a
+Task's checkout on `--work`, a person's or an Agent's on `--manage`, checked on the machine from `createdBy`);
+`checkouts.create { checkoutId, path, source: { kind: 'clone', repoUrl, credential? } | { kind: 'worktree',
+parentPath }, branch, baseRef, createdBy }` with the platform naming the exact path under the node's
+`checkoutsRoot`; `checkouts.delete { path, mode: 'preview'|'delete'|'forget', expected? }` answering
+`{ evidence: { uncommitted, unpushedCommits, hasLocks }, removed, branchKept }`; `checkouts.list` gains
+`archivedPaths` (the platform's bin, so archived checkouts are not roots, R-41); the scoped credential route is
+`POST /api/fleet/checkouts/:id/credential` (node-authenticated; §11.2's internal-prefix note stands for later moves).
+
+**Revision 13 (2026-10-21)** — FL-14 P3 (lane-log decisions 19–21): `checkouts.create` gains `isolation`,
+`containerImage` (the deployment default `FLEET_CHECKOUT_CONTAINER_IMAGE`) and `sharedFolders` (worktrees only, linked
+when git ignores them); the bin purge is the daily scheduled task `fleet-checkout-bin-purge` (`23 3 * * *`).
+
+**Revision 14 (2026-10-21)** — FL-05 P1 (session status): `session.status { sessionId, seq, state, outcome,
+stateChangedAt, lastEvidence, hooks?, boundaryUntil }` and `session.attention { sessionId, seq, attention | null,
+finished? }` on channel 0 (§3.3 "Session status"), applied newer-`seq`-only; `lastEvidence.detail` carries `{ event, seq,
+rule?, userLine?, agentLine? }` (the card's two lines, so no sixth column); `attention` gains optional `allowsText` and
+`tool`, options are `{ id, label, primary?, deny? }` (keys stay on the node); the Claude Code overlay may also register
+`PostToolUse` (a permission answered in the terminal ends `needs_you`); the hook client is one Node script
+(`<state>/hooks/hook-client.cjs`) reading `<state>/hook-endpoint.json`; heartbeat `daemon.hooks` counters are
+`badTokenLastMinute · spooled · events · spoolApplied · unknownSession · malformed · unknownEvents · endpointUp`.
+Shapes in `packages/contracts/src/fleet/fleet-session-status.types.ts`.
+
+**Revision 15 (2026-10-21)** — FL-05 P2 (attention): Inbox source type `fleet-session` (appended after `fleet-run`) with
+`sourceMeta` gaining `sessionId · sessionTitle · provider · attentionKey`; a question / permission is ONE Inbox item of
+kind `question` / `approval` per attention key, blocked / failed a `notice`; a free-text answer is never stored (the
+Inbox records the option id only). `POST /api/fleet/sessions/:id/answer { key, optionId? | text?, source? }` answers
+`202 { key, answered }`; `PATCH /api/fleet/sessions/:id { acknowledge: <key> }` beside `{ title }`. Notification events
+`fleet_session_needs_you · fleet_session_finished · fleet_session_failed` (deduplication key = the attention key, plus
+the 5 s per-subject window). R-32's "may answer other sessions" is read from the Agent's `permissions.canAnswerOtherSessions`
+(absent = off; no editor yet). The node answers `session.answer` only on a `driver` channel, refuses a key that is not
+its current attention (`invalid`), and types the CLI's keys itself — the platform never sends keys. The rules file
+guard is `validateFleetSessionRulesFile` (`fleet-session-rules.types.ts`). Tools `fleet_sessions_question` (readOnly) /
+`fleet_sessions_answer` (`confirm`), MCP `fleet_sessions_answer`, CLI `fleet session question|answer`.
+
+**Revision 16 (2026-10-21)** — FL-05 P3 (board): `GET /api/fleet/sessions?view=board[&nodeId&agentId&kind]` answers
+`FleetSessionBoardResponse { columns: { needs_you, working, done, idle }, generatedAt }` — every LIVE session on the
+computers in the reader's `sessions` audience (at most 400), each column most recently moved first, `done` only for 24 h
+after it finished (`fleetSessionBoardColumn`); the list is the existing paged `GET /api/fleet/sessions`. The Activity
+view is `sessions` (key `n`) and exists only while `FLEET_SESSIONS_ENABLED` is on; its address-bar state is `mode`
+(`board|list`), `g` (`day|week`), `agent`, `node`, `kind`, `state`.
+
+**Revision 17 (2026-10-21)** — FL-13 P1 (lane log `docs/internal/fleet/lanes/FL-13.md`): the `schedule` family's
+messages are written down in `packages/contracts/src/fleet/fleet-schedules.types.ts` — `schedule.sync { generation,
+definitions[] }` answered `{ generation, held, refused, next, timeZone }`, `schedule.runs { since }` answered `{ runs,
+more, timeZone }` (each run `{ runId, scheduleId, scheduledFor, startedAt, endedAt, status, failedReason, exitCode,
+head, tail, truncated, capped, bytes, kept, trigger }`), `schedule.runNow { id, runId }` answered `{ runId, startedAt }`;
+one short-lived channel per request. A schedule's ONE computer is `nodeIds[0]`. A schedule's run keeps the machine's run
+id as its `fleet_command_runs` id (reconciliation is an upsert by it). Schedule routes are FL-12's paths (`POST
+/commands` with `cadence` + `name` → 201, `PATCH` / `DELETE /commands/:id`, `/commands/:id/runs?limit≤30`); Run now /
+Pause / Resume ride `/api/schedules/node_schedule:<id>/…` and `run-now` takes `{ confirm }` (other sources ignore it).
+`ScheduleOwnerType` gains `node`; the heartbeat's newest strip tier is `timeZone`; the node advertises `schedules`
+under `--manage`; `HomeScheduleKind` gains `node_schedule`. A command line that trips the secret scanner is refused
+`invalid` (a schedule's line is stored to be re-synced, and the platform stores no secret).
+
+**Revision 18 (2026-10-21)** — FL-15 (lane log `docs/internal/fleet/lanes/FL-15.md`): `FleetSessionStartRequest`
+gains `taskId?` (an Agent session's Run carries the Task; refused `busy` while the same Agent works it, `invalid` off
+the Agent's pinned computer, `limit_exceeded` with no free agent slot) and `checkoutId` is now honoured (a `ready`,
+host-isolated checkout on the same computer; its path is the folder); `GET /sessions?taskId=`; `FleetSessionView.task?`
+(`FleetSessionTaskRef { id, slug, title }`); the hand-off's closed reason set gains `no-access`
+(`FLEET_HANDOFF_REASONS`, owner question Q1); `git.identity` / `git.setIdentity` reply `{ name, email, helper, readAt
+[, fields] }` with `{ set, value? }` fields, set takes `{ name, email }` only; audit `node.git.identity.set` details
+`{ fields, emailSource }` (never the email); event matchers gain `audience { me: review-requested | assigned |
+authored }`; `POST /api/inbound-triggers/presets/github-for-me`; `github.pr` events for `review_requested`,
+`review_request_removed`, `assigned`, `unassigned`, `ready_for_review`, `reopened`, `closed` with `requestedReviewer`,
+`assignee`, `assignees`, `author`, `headRef`, `headRepo`, `fork`, `maintainerCanModify`. Shapes in
+`packages/contracts/src/fleet/fleet-task-handoff.types.ts`.
+
+**Revision 19 (2026-10-21)** — FL-13 P2 (lane log decisions 18–24): §11.2 gains `/schedules`, `/schedules/:id`
+(GET, PATCH, DELETE), `/schedules/:id/runs`, `/schedules/:id/run|pause|resume` (the routes FL-19's catalogue names; the
+`fleet_schedules_*` rows are `live`), `/nodes/:id/schedules/pause-all` + `/resume-all { breakerAt }` (the breaker scope
+"this computer": one `pausedAt` instant per Pause all, 15-minute Undo, cap 500) and `/nodes/:id/schedules/agents`
+beside `/nodes/:id/schedules/agent-session`. An Agent-session schedule is a recurring Task (R-29) whose labels carry
+`fleet:session-schedule`, `fleet:provider:<claude-code|codex>` and optionally `fleet:checkout:<uuid>`; each fire is
+started by `TaskTransitionService.dispatchAgentRun` through `TASK_SESSION_SCHEDULE_DISPATCHER` as an FL-04 Agent session
+on the Agent's affinity node. The Agent tools' writes are held as Approval-queue proposals (`payload.kind:
+'fleet-schedule-write'`). `ScheduleView` gains optional `agentSession`.
+
+**Revision 22 (2026-10-22)** — FL-06 P3 (lane log decisions 21–25): Clean up is `DELETE /checkouts/:id?cleanUp=1`,
+whose gate also refuses while a live session uses the worktree (`invalid`, rule `live-session`); `GET`/`PUT
+/api/fleet/agents/:agentId/action-templates` answer `FleetAgentActionTemplates { agentId, agentName, branchPrefix{ value,
+default }, actions{ <id>: { value, default } }, error, agentYml, hash }` (the PUT takes `{ branchPrefix?, actions?,
+expectedHash? }` and saves `agent.yml` through the Agent file service); Agent tools and MCP tools
+`fleet_sessions_actions_list` (readOnly), `fleet_sessions_action` (`plain`), `fleet_checkouts_changes` (readOnly),
+`fleet_checkouts_pull_request_get` (MCP, readOnly), `fleet_checkouts_open_pull_request` (`plain`, never merges); CLI
+`fleet session actions|action`, `fleet checkout changes|pull-request`, `fleet checkout delete --clean-up`.
+
+**Revision 21 (2026-10-21)** — FL-06 P2 (lane log decisions 13–20): `GET /sessions/:id/actions` answers
+`FleetSessionActionsResponse { sessionId, actions[{ id, available, reason?, update?, warning?, unresolvedComments?,
+readAsAnswer? }], templates{ <id>: { text, source: default|agent } }, context, disabled }`; `POST /sessions/:id/actions
+{ actionId, prompt }` → `202 { ledgerId, delivery: pending|delivered|undelivered }`; `GET /sessions/:id/actions/ledger` →
+`{ sessionId, entries[FleetSessionActionLedgerEntry], sessionCostCents }`; `POST /sessions/:id/actions/:ledgerId/resend
+{ prompt? }`; `POST /checkouts/:id/pull-request { title, body?, draft?, sessionId? }` → `{ number, url, state, updated,
+taskId }` and the new `GET /checkouts/:id/pull-request/draft` → `FleetPullRequestDraft`; `session.input` may carry
+`source: 'action'` + `actionId`; one `node.session.action` row per send (`action`, redacted `promptPreview`, `delivery`)
+and one `node.session.pull-request.open` per opened / updated pull request (`checkoutId`, `number`, `url`, `updated`);
+`agent.yml` may carry `fleet { branchPrefix?, actions?{ <id>: template } }` (validated on save); the git provider
+contract gains optional `updatePullRequest`; `FLEET_RUN_TOKEN_ROUTES` gains `GET`/`POST
+/api/fleet/checkouts/{id}/pull-request`.
+
+**Revision 20 (2026-10-21)** — FL-06 P1 (session git, lane log `docs/internal/fleet/lanes/FL-06.md` decisions 1–12):
+`FleetSessionView.git` (`FleetSessionGitRef { checkoutId, path, kind, state, isolation, createdBy, repository, branch,
+gitLine }`) on every session view; `checkouts.changes { path, maxBytes?, checkoutId? }` answers
+`FleetCheckoutChangesReply { path, files[{ path, previousPath, status, added, removed, binary, patch, truncated }],
+truncated, omittedFiles, omittedBytes, totalBytes, at }` and needs `work-or-manage` (a `FLEET_LINK_VERB_CONSENT_OVERRIDES`
+entry: a Task's worktree on `--work`, any other checkout `--manage`, checked on the machine); `GET
+/sessions/branch-proposal?nodeId&checkoutId&agentId?&firstMessage?&title?&taskId?` answers `FleetSessionBranchProposal
+{ branch, base, suffixed, source: task|message|title|generated, reason, repository, remoteChecked }`; `GET
+/checkouts/:id/pull-request` answers `FleetCheckoutPullRequestFacts { checkoutId, pr, unresolvedComments, mergeable,
+baseRef, defaultBranch, checkedAt, unknownSince }` (only `pr` is stored, on the git line); the node's `pr: null` never
+overwrites the platform's resolved `pr` while the branch is unchanged; audit names `node.session.action` and
+`node.session.pull-request.open` are in `FLEET_AUDIT_ACTIONS`. Shapes in
+`packages/contracts/src/fleet/fleet-session-actions.types.ts`.
+
 ---
 
 ## 0. Resolutions (R-1 … R-41)
@@ -113,7 +266,7 @@ All other heartbeat payload additions are optional fields (old nodes omit them):
 | `macAddress`, `lanId`                                                                         | FL-03 | wake                                                                                              |
 | `timeZone` (IANA)                                                                             | FL-13 | schedules                                                                                         |
 | `helperTrust`                                                                                 | FL-07 | R-8                                                                                               |
-| `daemon { state, reason?, sessions, hooks? }`                                                 | FL-04 | session daemon health (`state`: `running · stopped · failed`)                                     |
+| `daemon { state, reason?, sessions, storage?, hooks? }`                                       | FL-04 | session daemon health (`state`: `running · stopped · failed`; `storage`: `ok · failing`, spec U15) |
 | `helper { trust, version?, verifiedAt? }`, `displays[]`, `desktopReasons[]`, `helperEvents[]` | FL-07 | native helper state, display list, why the Desktop source is unavailable, recent admission events |
 
 ### 1.2 Capability tags (advertised by the node; `cap:` requirements on jobs — existing mechanism)
@@ -243,12 +396,12 @@ state-changing requests, leave processes running), `link.resume`, and `link.drai
 
 | Family     | Opens with                                                                                   | Messages (JSON on the channel)                                                                                                                                                                                                                                        | Consent                      |
 | ---------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `session`  | `{ sessionId, mode: 'viewer'\|'driver' }`                                                    | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`; node→platform (channel 0): `session.list`, `session.event`, `session.status`, `session.attention` | work / manage                |
+| `session`  | `{ sessionId, mode: 'viewer'\|'driver', kind?: 'owner'\|'agent' }`                            | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`, `session.screen`; platform→node (channel 0): `session.ack { sessionIds }`; node→platform (channel 0): `session.list { sessions[], daemon }`, `session.event` (optional `reason`, e.g. on `exited`), `session.status`, `session.attention`; node→viewer on the channel: `session.notice` (`paused · resumed · drain · slow-viewer · size · replay`) | work (Agent) / manage (owner) |
 | `desktop`  | `{ source: 'desktop'\|'browser', display?, profile?: 'agent'\|'preview', viewId, quality? }` | `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`, `desktop.openUrl`, `desktop.mode`; node→platform `desktop.stats`, `desktop.displayChanged`; input via `INPUT`                                                                         | attend                       |
 | `logs`     | `{ source, path?, unit?, container?, lines, sources?[] }`                                    | `logs.read`, `logs.follow`, `logs.pause`, `logs.resume`, `logs.earlier`; node→platform `logs.initial-done`, `logs.earlier-done`, `logs.notice`. `logs.sources` is a `machine` verb (a list needs no open channel)                                                     | manage                       |
 | `machine`  | (one per link, lazily)                                                                       | `services.list\|action`, `docker.*`, `compose.*`, `processes.list\|signal`, `ports.list\|open\|preview`, `checkouts.list\|create\|delete\|sync\|changes`, `git.identity\|setIdentity`, `health.now`, `wake.send`, `vm.*`, `runner.*`                                  | manage (see §2.1 for family) |
 | `files`    | `{ root, path }`                                                                             | `files.list`, `files.stat`, `files.pack` (DATA out), `files.unpack` (DATA in), `files.delete`                                                                                                                                                                         | manage                       |
-| `command`  | `{ commandId, nodeId }`                                                                      | `command.run` → `DATA`/`EXIT`, `command.cancel`; node→platform `command.output` (head/tail on finish), `command.truncated`, `command.timeout`                                                                                                                         | manage                       |
+| `command`  | `{ commandId, nodeId, runId }`                                                               | `command.run` → `DATA`/`EXIT`, `command.cancel`; node→platform `command.output` (head/tail on finish), `command.truncated`, `command.timeout`                                                                                                                         | manage                       |
 | `schedule` | (one per link)                                                                               | `schedule.sync { generation, definitions[] }` (the reply carries the applied `generation`; pause/resume re-send the full set), `schedule.runs { since }`, `schedule.runNow`                                                                                           | manage                       |
 | `tunnel`   | `{ tunnelId, port }`                                                                         | HTTP request/response bodies as `DATA` with a `JSON` envelope per request                                                                                                                                                                                             | manage                       |
 | `clip`     | `{ viewId }`                                                                                 | `CLIP` frames                                                                                                                                                                                                                                                         | attend                       |
@@ -262,7 +415,52 @@ the node went away mid-operation; never reported as `done`).
 
 **Consent exceptions per verb.** The `machine` family needs `manage` except `health.now`, which is
 allowed on any open link (R-31). The link implementation keeps these exceptions in one table
-(`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code.
+(`FLEET_LINK_VERB_CONSENT_OVERRIDES`) so later epics add a verb there, not a branch in code. FL-14 adds
+`checkouts.list: work-or-manage` (revision 9).
+
+**Command family details (FL-12, revision 11).** One channel per run, opened with `{ commandId, nodeId, runId }`.
+`command.run { runId, command, cwd?, timeoutSec }` answers `{ pid, startedAt, shell }` once the process exists (a
+shell that cannot start answers `operation_failed` with the first line of the error); `DATA` frames of at most 64 KiB
+follow until 10 MiB, then `command.truncated { runId, bytes }`; `command.timeout { runId, timeoutSec }` when the
+timeout fired; then, once, `command.output { runId, head, tail, truncated, capped, bytes, exitCode, reason?, detail?,
+kept }` — the machine's own 64 KiB head and tail (authoritative over the platform's live copy), `reason` ∈ `timeout ·
+kill-switch · drain · shell-failed · cancelled-by-user` when the node ended the run itself, `kept` when it holds the
+full output — then `EXIT [code]` (124 timeout, 130 cancel, 137 kill switch or drain) and `channel.close`.
+`command.cancel { runId }` is accepted on ANY `command` channel (the platform opens a short-lived one, so a cancel
+works from any API replica). A link drop does not end a command; the end is reported when the channel resumes.
+`command.read { runId }` (FL-12 P2, "Open full output") streams one run's kept output from the machine's store on a
+short-lived channel of its own: the reply carries `{ bytes }`, then `DATA` chunks of at most 64 KiB, then `END` and
+the close (`not_found` when the machine no longer keeps it).
+
+**Session family details (FL-04, revision 7).** `kind` on the open lets the node check the consent before
+the channel opens (`--manage` for owner sessions, `--work` for Agent sessions, R-5) and again against the
+daemon's own record. Every session `start`/`end`/`rename`/`restart`/`resize`/`input`/`screen` request uses a
+short-lived channel of its own; an attached viewer holds one channel for its life. `session.ack` tells the
+daemon the platform holds an ended session's last screen, so it may forget it. `session.list` (after every
+`link.ready`) carries the daemon health block of §1.1. `session.event exited` may carry `reason` (one of the
+§4.2 `endedReason` values, e.g. `drain`, `kill-switch`) when the daemon ended the process itself.
+
+**Session viewers (FL-04 P1b, revision 8).** A browser attached through §3.4 sends `session.attach
+{ cols, rows }` on its channel right after `viewer.ready`; the node answers in the channel's own `mode` (a
+watcher's size is ignored) and the replay follows as `DATA`. A watcher (`viewer`) may send only
+`session.attach` and `session.screen` (`FLEET_LINK_VIEWER_JSON_TYPES.session`); a driver only
+`session.attach`, `session.input`, `session.resize`, `session.screen` (`FLEET_LINK_DRIVER_JSON_TYPES`) plus
+`DATA`/`RESIZE` frames — starting, ending, renaming and restarting go through the §11.2 routes, with their
+confirmation class and audit row, never through a live view. The attach-token body is `{ role, cols?, rows? }`
+(`FleetSessionAttachTokenRequest`). The detail answers `presence { attached[], drivers, watchers }` for a live
+session, counted by the API replica that serves the reader. A watcher is not kept out by the kill switch (it reads
+the stop banner); a driver is.
+
+**Session status (FL-05, revision 14).** The node runs ONE state machine per session
+(`mergeFleetSessionEvidence`, contracts) over the CLI's hooks, the daemon's output and exit, a driver's Ctrl-C and the
+clock, and reports on channel 0 after every change: `session.status` (the merged state, outcome, `stateChangedAt`,
+`lastEvidence`, what was injected, the boundary window) and, when the attention moved, `session.attention` (the edge, or
+`null` when it cleared; `finished: true` when a turn ended and it is news). `seq` never goes below the node's clock in
+ms, so the platform applies a status only when it is newer than the row's `lastEvidence.detail.seq` — also across a node
+restart — and never for an ended session; an attention with the key the row holds keeps `raisedAt` and
+`acknowledgedAt`. After every (re)connect the node re-sends where each reported session stands. A shell is never
+`needs_you` or `done`, whatever a report says. `session.answer { key, answer: { optionId } | { text } }` (platform →
+node, P2) names the option by id; the keys to type stay on the node.
 
 ### 3.4 Viewer side (browser → platform)
 
@@ -302,6 +500,7 @@ allowed values validated in code, as existing fleet columns are.
 | `providerMachineRef`    | text null                                   | provider's own id                                                                              | FL-17 |
 | `providerMeta`          | jsonb null                                  | region, size, hourly rate, created at, power timeline, idle policy, cost snapshot (no secrets) | FL-17 |
 | `virtualMeta`           | jsonb null                                  | system, image, CPUs, memory, disk (survives job-body purge)                                    | FL-16 |
+| `sessionDaemon`         | simple-json null                            | the session daemon block of the latest beat (§1.1), for the computer page and the start gate  | FL-04 |
 
 ### 4.2 `FleetSession` (new, table `fleet_sessions`, FL-04 slot 00; FL-05 slot 00 adds the last five rows)
 
@@ -328,6 +527,8 @@ allowed values validated in code, as existing fleet columns are.
 | `startedAt`, `endedAt` | timestamptz                                                                    |                                                                                                                                      |
 | `endedReason`          | enum null `user · agent · exit · node-restart · timeout · kill-switch · drain` |                                                                                                                                      |
 | `recordingState`       | enum `off · recording · stored`                                                | R-9                                                                                                                                  |
+| `exitCode`             | integer null                                                                   | the process exit code when the daemon saw one (revision 7)                                                                           |
+| `startedBy`            | varchar(80)                                                                    | `user:<id>` or `agent:<id>` — who started it, the §2.3 `requestedBy` shape (revision 7)                                              |
 | `costCents`            | integer null                                                                   | created by FL-20's `1796200000000-AddFleetSessionUsage`, not FL-04's slot; mirrored from the Run; filled by FL-20 for owner sessions |
 | `tokens`               | jsonb null                                                                     | FL-20                                                                                                                                |
 | `attention`            | jsonb null `{ key, reason, prompt, options[], raisedAt, acknowledgedAt }`      | §5.2 (FL-05)                                                                                                                         |
@@ -383,14 +584,19 @@ allowed values validated in code, as existing fleet columns are.
 | `deletedAt`                          | timestamptz null                                                                           | soft delete of a schedule (FL-13 slot 00)                       |
 
 FL-12's `CreateFleetCommands` creates every column above the `pausedAt` row (including `cadence`,
-`name`, `enabled`, `lastRunAt`, `nextRunAt`); FL-13's slot 00 (`AddFleetCommandCadence`) adds the
+`name`, `enabled`, `lastRunAt`, `nextRunAt`) plus `commandRedacted boolean` (revision 11: the stored command line
+was redacted by the secret scanner); FL-13's slot 00 (`AddFleetCommandCadence`) adds the
 last three rows and `fleet_command_runs.scheduledFor`.
 
 `fleet_command_runs`: `commandId`, `nodeId`, `startedAt`, `endedAt`, `exitCode`, `status`
 (`running · done · failed · timeout · skipped-overlap · skipped-offline`), `failedReason`
 (enum null `link-lost · node-restart · kill-switch · drain · shell-failed · cancelled-by-user`),
 `outputHead` / `outputTail` (first and last 64 KiB), `outputRef` (full output kept on the node for
-30 runs), `truncated boolean`, `scheduledFor` (timestamptz null; FL-13).
+30 runs), `truncated boolean`, `scheduledFor` (timestamptz null; FL-13). Revision 11 (FL-12's slot 01) adds
+`errorCode` (varchar null, a §8 code) and `errorHint` (text null) — a computer that refused BEFORE the command ran
+(`unreachable`, `consent_missing`, `permission_denied`, `unsupported_on_node`, `busy`, `kill_switch`) or a start
+that failed (`operation_failed`, with `failedReason: shell-failed`) — `outputBytes` (int) and `capped` (boolean,
+the node stopped keeping output at 10 MiB).
 
 ### 4.5 `FleetNodeHealthSample` (new, table `fleet_node_health_samples`, FL-03)
 
@@ -673,7 +879,7 @@ All under `/api/fleet` (existing controller root), authenticated, `FLEET_ENABLED
 `/sessions/branch-proposal`, `/checkouts/:id/pull-request` (GET, POST),
 `/checkouts`, `/nodes/:id/checkouts`, `/checkouts/:id`, `/checkouts/:id/changes`,
 `/nodes/:id/git/identity`, `/commands/:id/cancel`, `/commands/:id/runs/:runId/output`,
-`/nodes/:id/schedules/agent-session`, `/checkouts/:id/refresh`, `/checkouts/:id/sync`,
+`/nodes/:id/commands/last` (FL-12 P2: the caller's latest run on that computer), `/nodes/:id/schedules/agent-session`, `/checkouts/:id/refresh`, `/checkouts/:id/sync`,
 `/checkouts/:id/archive`, `/checkouts/:id/restore`, `/tasks/:taskId/handoff-options`,
 `/nodes/:id/virtual`, `/providers`, `/providers/:plugin/options`, `/cloud`,
 `/nodes/:id/runners`, `/runners/jobs`, `/usage`, `/operations/:id` (GET, DELETE), `/link-token` (node credential).

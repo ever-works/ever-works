@@ -75,9 +75,15 @@ import {
     MACHINE_REFUSED_TASK_FIELDS,
     fleetRunBindingOf,
     isFleetRunRequest,
+    machinePrincipalKind,
     refuseMachinePrincipalAction,
+    refuseMachinePrincipalAutonomousTextEdit,
     refuseMachinePrincipalFields,
+    refuseMachinePrincipalReservedLabels,
+    refuseRunTokenRefileOfBranchedTask,
     requireHumanSession,
+    reservedLabelRestrictionOf,
+    rethrowReservedLabelRefusal,
     widerAgentPermissions,
     type MachinePrincipalRequest,
 } from '../auth/machine-principal';
@@ -146,6 +152,19 @@ function clampNumeric(raw: string | undefined, max: number): number {
     const parsed = Number(raw);
     if (!Number.isFinite(parsed) || parsed <= 0) return max;
     return Math.min(Math.floor(parsed), max);
+}
+
+/**
+ * Works-security (2026-10-18) — the trailing `TasksService.create` / `update`
+ * options argument that restricts a machine principal's reserved-label writes,
+ * or NO argument for a person (so a person's call is exactly what it was).
+ */
+function reservedLabelOptionsOf(
+    auth: AuthenticatedUser,
+    req: MachinePrincipalRequest | undefined,
+): [] | [{ restrictReservedLabels: { who: string } }] {
+    const restrictReservedLabels = reservedLabelRestrictionOf(auth, req);
+    return restrictReservedLabels ? [{ restrictReservedLabels }] : [];
 }
 
 /**
@@ -519,9 +538,13 @@ export class TasksController {
             'acceptance checks and setup steps are commands a node runs; a person adds them in the app.',
         );
         refuseRunTokenSchedule(body, req);
+        // Works-security (2026-10-18) — no control-signal label (a hold, a
+        // release marker, a retry counter) on a Task a machine principal files.
+        refuseMachinePrincipalReservedLabels(auth, req, [], body.labels);
         await this.refuseRunTokenWiderAgent(auth, req, body.agentId);
         if (body.parentTaskId) await this.refuseIntegrationPrivateTask(auth, body.parentTaskId);
         const createdBy = this.createdByFor(auth, req);
+        const labelOptions = reservedLabelOptionsOf(auth, req);
         return this.service.create(
             auth.userId,
             {
@@ -551,6 +574,7 @@ export class TasksController {
                 estimateMinutes: body.estimateMinutes ?? null,
             },
             this.scopeContext.getScope(),
+            ...labelOptions,
         );
     }
 
@@ -683,6 +707,31 @@ export class TasksController {
         );
         refuseRunTokenSchedule(body, req);
         await this.refuseRunTokenWiderAgent(auth, req, body.agentId);
+        // Works-security (2026-10-18) — the body-aware refusals that need the
+        // Task as it is NOW, read only for a machine principal (a person's PATCH
+        // costs no extra read):
+        //   - reserved labels (`awaiting-owner`, `release:*`, ...) are neither
+        //     added nor removed;
+        //   - a recurring template's / scheduled Task's title, description and
+        //     Work (the text every later fire dispatches) are not rewritten;
+        //   - a fleet run does not re-file a branched Task to another Work or
+        //     Agent (its merge is judged in that Work, under that policy).
+        if (machinePrincipalKind(auth, req)) {
+            const current = await this.service.getOne(
+                auth.userId,
+                id,
+                this.scopeContext.getScope(),
+            );
+            refuseMachinePrincipalReservedLabels(auth, req, current.labels, body.labels);
+            refuseMachinePrincipalAutonomousTextEdit(
+                auth,
+                req,
+                current as unknown as Record<string, unknown>,
+                body as unknown as Record<string, unknown>,
+            );
+            refuseRunTokenRefileOfBranchedTask(req, current, body);
+        }
+        const labelOptions = reservedLabelOptionsOf(auth, req);
         // `scheduledAt` arrives as an ISO string on the wire and the
         // service works in `Date` (the column is a timestamptz). The
         // three states are distinct: absent = untouched, null = clear
@@ -703,7 +752,10 @@ export class TasksController {
                 startAt: toOptionalDate(body.startAt),
             },
             this.scopeContext.getScope(),
-        );
+            // The service re-checks the labels against the row it writes,
+            // closing the read-then-write window above.
+            ...labelOptions,
+        ).catch((error: unknown) => rethrowReservedLabelRefusal(error, auth, req));
     }
 
     @Get(':id/subtasks')

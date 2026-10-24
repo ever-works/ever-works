@@ -113,6 +113,31 @@ export class AppDeployDeploymentStoreAdapter implements AppDeployDeploymentStore
     }
 
     /**
+     * Security (sec/app-works-gates) — who requested this Deployment: the `triggeredByUserId`
+     * column and `appRender.requestedByHumanSession` (written by `rowDraft` from the API's
+     * `AppDeployRequest.requestedByHumanSession`). Narrow on purpose, like {@link findById}: the
+     * worker's pull-credential gate needs these three facts and nothing else off the row. A row it
+     * cannot read answers `null`, which the orchestrator reads as "requested by nobody".
+     */
+    async findRequester(deploymentId: string): Promise<{
+        workId: string | null;
+        triggeredByUserId: string | null;
+        requestedByHumanSession: boolean;
+    } | null> {
+        if (!this.deployments) return null;
+
+        const row = await this.deployments.findById(deploymentId);
+        if (!row) return null;
+
+        const render = (row.appRender ?? null) as { requestedByHumanSession?: unknown } | null;
+        return {
+            workId: row.workId ?? null,
+            triggeredByUserId: row.triggeredByUserId ?? null,
+            requestedByHumanSession: render?.requestedByHumanSession === true,
+        };
+    }
+
+    /**
      * `tasks.md:1155` — mark the replaced row `SUPERSEDED`, MERGING
      * `supersededBy` into `appRender`.
      *

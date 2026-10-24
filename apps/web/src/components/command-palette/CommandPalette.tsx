@@ -38,8 +38,23 @@ import { PALETTE_RECENT_BOOST_WINDOW_MS, usePaletteRecents } from './hooks/use-p
 import { useWorkspaceSearch } from './hooks/use-workspace-search';
 import { isInAppDestination } from './registry/destination';
 import { commandsFor, workSwitchCommands } from './registry/commands';
-import { screensFor } from './registry/screens';
-import { useFleetHubEnabled } from '@/components/fleet/FleetHubFlagProvider';
+import {
+    fleetComputerMachineScreens,
+    fleetComputerPortsScreens,
+    fleetComputerScreens,
+    fleetVirtualScreens,
+    fleetCloudScreens,
+    screensFor,
+} from './registry/screens';
+import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
+import {
+    useFleetHubEnabled,
+    useFleetMachineFactsEnabled,
+    useFleetVirtualEnabled,
+    useFleetCloudEnabled,
+} from '@/components/fleet/FleetHubFlagProvider';
+import { useFleetPaletteSessions } from './hooks/use-fleet-palette-sessions';
+import { paletteSessionsFrom } from './registry/palette-sessions';
 import {
     buildPaletteSections,
     filterLabel,
@@ -249,9 +264,31 @@ export function CommandPalette({
     }, [commandContext, response]);
     // Fleet hub (FL-01, FR-13): the hub's screens exist only while it is on.
     const fleetHubEnabled = useFleetHubEnabled();
+    const fleetMachineFactsEnabled = useFleetMachineFactsEnabled();
+    const fleetVirtualEnabled = useFleetVirtualEnabled();
+    const fleetCloudEnabled = useFleetCloudEnabled();
+    // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
+    const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
+    // FL-05 (FR-46): the sessions waiting on the person open the empty palette.
+    const fleetSessionBoard = useFleetPaletteSessions(open, fleetHubEnabled);
+    const paletteSessions = useMemo(
+        () => paletteSessionsFrom(fleetSessionBoard, fleetComputers, t),
+        [fleetSessionBoard, fleetComputers, t],
+    );
     const screens = useMemo(
-        () => screensFor(appPath, { fleetHubEnabled }),
-        [appPath, fleetHubEnabled],
+        () => [
+            ...screensFor(appPath, { fleetHubEnabled }),
+            ...fleetComputerScreens(fleetComputers, { logs: fleetMachineFactsEnabled }),
+            // FL-09 (FR-23): "Services on <name>", "Docker on <name>", "Processes on <name>".
+            ...fleetComputerMachineScreens(fleetComputers),
+            // Servers and ports (FL-10): "Ports on <computer>".
+            ...fleetComputerPortsScreens(fleetComputers),
+            // Virtual computers (FL-16): "New virtual computer", "Start / Stop <name>".
+            ...fleetVirtualScreens(fleetComputers, fleetVirtualEnabled),
+            // Cloud computers (FL-17): "New cloud computer", "Power off / on <name>".
+            ...fleetCloudScreens(fleetComputers, fleetCloudEnabled),
+        ],
+        [appPath, fleetHubEnabled, fleetMachineFactsEnabled, fleetVirtualEnabled, fleetCloudEnabled, fleetComputers],
     );
 
     const sections = useMemo(
@@ -266,8 +303,9 @@ export function CommandPalette({
                 recents,
                 response,
                 settled,
+                sessions: paletteSessions,
             }),
-        [t, query, filter, commandContext, commands, screens, recents, response, settled],
+        [t, query, filter, commandContext, commands, screens, recents, response, settled, paletteSessions],
     );
     const rows = useMemo(() => flattenRows(sections), [sections]);
 

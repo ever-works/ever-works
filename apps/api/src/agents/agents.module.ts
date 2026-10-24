@@ -126,12 +126,37 @@ import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/in
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
+    FleetCommandService,
+    FleetScheduleService,
+    FleetSessionActionService,
     FleetJobService,
     FleetKillSwitchService,
+    FleetMachineActionsService,
+    FleetVirtualService,
+    FleetCloudService,
     FleetModule,
+    FleetPortsService,
+    FleetCheckoutService,
+    FleetGitIdentityService,
+    FleetPortTunnelService,
     FleetService,
+    FleetSessionService,
+    FleetNodeHealthService,
+    NeedsALookService,
+    FLEET_LOGS_READER,
+    FLEET_STATUS_READER,
+    FLEET_WAKE_TOOL_PORT,
+    type FleetLogsReaderPort,
+    type FleetStatusReaderPort,
+    type FleetWakeToolPort,
 } from '@ever-works/agent/fleet';
+import { FleetPullRequestService } from '../fleet/session-git/fleet-pull-request.service';
+import { config } from '@ever-works/agent/config';
+// Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
+// (global through FleetTasksApiModule; optional below).
+import { FleetTaskHandoffService } from '../fleet/tasks/fleet-task-handoff.service';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
+import { FleetOperationsService } from '../fleet-link/fleet-operations.service';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
     PolicyModule,
@@ -590,6 +615,10 @@ async function assertRealWriteTarget(
                         // under a 'required' checks policy. Human transitions
                         // (API/UI) never pass actorType and are unaffected.
                         actorType: 'agent',
+                        // Works-security: the finisher moves the run's OWN Task
+                        // (`ownRunTask`), so a `→ done` still releases dependents;
+                        // the agent `transitionTask` tool never sets it.
+                        ownRunTask: true,
                     });
                     return { status: row.status };
                 },
@@ -1870,7 +1899,7 @@ async function assertRealWriteTarget(
                                     rulesBase
                                         ? gate.evaluate({
                                               work: target.work,
-                                              taskLabels: [],
+                                              taskOrigin: null,
                                               owner: target.owner,
                                               repo: target.repo,
                                               gitOptions: { userId, providerId, workId },
@@ -2109,6 +2138,65 @@ async function assertRealWriteTarget(
                 // `resolve_escalation` and `editAgentFile`. APPENDED LAST (positional),
                 // optional: unbound, both tools refuse instead of acting.
                 { token: AgentApprovalsService, optional: true },
+                // Services and processes on computers (FL-09) — backs the
+                // `fleet_services_*` / `fleet_processes_*` tools. APPENDED LAST
+                // (positional), optional: unbound, those tools are not offered.
+                { token: FleetMachineActionsService, optional: true },
+                // FL-04 P2 — the `sessions` tool family (fleet_sessions_*). APPENDED
+                // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED
+                // off) the six tools are simply not offered.
+                { token: FleetSessionService, optional: true },
+                // Servers and ports (FL-10) — backs `fleet_ports_list` / `fleet_ports_open`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortsService, optional: true },
+                // Checkouts on computers (FL-14 P2) — backs the `fleet_checkouts_*`
+                // tools. APPENDED LAST (positional), optional: unbound (checkouts not
+                // mounted), the tools are simply not offered.
+                { token: FleetCheckoutService, optional: true },
+                // Commands on computers (FL-12 P2) — backs `fleet_commands_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the four
+                // tools are not offered; `fleet_commands_run` only ever files an approval.
+                { token: FleetCommandService, optional: true },
+                // Servers and ports, phase 2 — backs `fleet_ports_preview_open|close`.
+                // APPENDED LAST (positional), optional: unbound, the two tools are not offered.
+                { token: FleetPortTunnelService, optional: true },
+                // FL-19 — the Agent, MCP & CLI surface. All APPENDED LAST (positional) and
+                // optional: unbound, the matching tools are simply not offered.
+                //  - `fleet_status` (the API's status service, FleetToolsApiModule);
+                { token: FLEET_STATUS_READER, optional: true },
+                //  - `fleet_operations_get|list` (FL-02's operations registry, FleetLinkApiModule);
+                { token: FleetOperationsService, optional: true },
+                //  - `fleet_logs_sources|read` (FL-08's reader, FleetLogsApiModule);
+                { token: FLEET_LOGS_READER, optional: true },
+                //  - `fleet_nodes_health|needs_a_look` (FL-03's history + the needs-a-look registry).
+                { token: FleetNodeHealthService, optional: true },
+                { token: NeedsALookService, optional: true },
+                // Virtual computers (FL-16) — backs `fleet_virtual_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_VIRTUAL_ENABLED off) the
+                // five tools are not offered; create / stop / destroy only ever file an approval.
+                { token: FleetVirtualService, optional: true },
+                // Tasks on computers (FL-15 P3) — backs `fleet_tasks_handoff_options` and
+                // `fleet_nodes_git_identity_*`. APPENDED LAST (positional), optional:
+                // unbound (or FLEET_CHECKOUTS_ENABLED off) the tools are not offered.
+                { token: FleetTaskHandoffService, optional: true },
+                { token: FleetGitIdentityService, optional: true },
+                // FL-19 P2 — `fleet_nodes_wake` (FL-03's wake route as the Agent's owner).
+                // APPENDED LAST (positional), optional.
+                { token: FLEET_WAKE_TOOL_PORT, optional: true },
+                // Schedules on computers (FL-13 P2) — backs `fleet_schedules_*`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the
+                // tools are not offered; create/update/delete/run only ever file an approval.
+                { token: FleetScheduleService, optional: true },
+                // Session git & actions (FL-06 P3) — backs `fleet_sessions_actions_list|action`,
+                // `fleet_checkouts_changes` and `fleet_checkouts_open_pull_request`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED off) the
+                // tools are not offered.
+                { token: FleetSessionActionService, optional: true },
+                { token: FleetPullRequestService, optional: true },
+                // Cloud computers (FL-17) — backs `fleet_cloud_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_CLOUD_ENABLED off) the six
+                // tools are not offered; create / power / destroy only ever file an approval.
+                { token: FleetCloudService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2132,6 +2220,25 @@ async function assertRealWriteTarget(
                 agentReviews: TaskAgentReviewService,
                 appChangeService?: AppChangeRequestService | null,
                 approvals?: AgentApprovalsService | null,
+                fleetMachine?: FleetMachineActionsService | null,
+                fleetSessions?: FleetSessionService | null,
+                fleetPorts?: FleetPortsService | null,
+                checkouts?: FleetCheckoutService | null,
+                fleetCommands?: FleetCommandService | null,
+                fleetPortTunnels?: FleetPortTunnelService | null,
+                fleetStatus?: FleetStatusReaderPort | null,
+                fleetOperations?: FleetOperationsService | null,
+                fleetLogs?: FleetLogsReaderPort | null,
+                fleetHealth?: FleetNodeHealthService | null,
+                needsALook?: NeedsALookService | null,
+                fleetVirtual?: FleetVirtualService | null,
+                fleetTaskHandoff?: FleetTaskHandoffService | null,
+                fleetGitIdentity?: FleetGitIdentityService | null,
+                fleetWake?: FleetWakeToolPort | null,
+                fleetSchedules?: FleetScheduleService | null,
+                fleetSessionActions?: FleetSessionActionService | null,
+                fleetPullRequests?: FleetPullRequestService | null,
+                fleetCloud?: FleetCloudService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2152,7 +2259,65 @@ async function assertRealWriteTarget(
                 ingest: { repository: ingestedEvents },
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
-                fleet: { service: fleet },
+                fleet: {
+                    service: fleet,
+                    ...(checkouts ? { checkouts: { service: checkouts } } : {}),
+                    ...(fleetMachine ? { machine: fleetMachine } : {}),
+                    ...(fleetPorts ? { ports: fleetPorts } : {}),
+                    ...(fleetPortTunnels ? { portTunnels: fleetPortTunnels } : {}),
+                    // FL-19 — the catalogue's own reads and the families FL-03 / FL-08
+                    // left for FL-19 to bind. Each only while its flag is on.
+                    ...(fleetStatus ? { status: fleetStatus } : {}),
+                    ...(fleetOperations && config.fleet.isNodeLinkEnabled()
+                        ? { operations: fleetOperations }
+                        : {}),
+                    ...(fleetLogs && config.fleet.isMachineFactsEnabled()
+                        ? { logs: { reader: fleetLogs } }
+                        : {}),
+                    ...(fleetHealth
+                        ? {
+                              health: {
+                                  service: fleet,
+                                  history: fleetHealth,
+                                  ...(needsALook ? { needsALook } : {}),
+                              },
+                          }
+                        : {}),
+                    ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
+                    ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
+                    ...(fleetSessionActions && config.fleet.isSessionsEnabled()
+                        ? {
+                              sessionGit: {
+                                  actions: fleetSessionActions,
+                                  ...(checkouts ? { checkouts } : {}),
+                                  ...(fleetPullRequests ? { pullRequests: fleetPullRequests } : {}),
+                              },
+                          }
+                        : {}),
+                    ...(fleetCloud && config.fleet.isCloudEnabled() ? { cloud: fleetCloud } : {}),
+                },
+                ...(fleetSessions && config.fleet.isSessionsEnabled()
+                    ? { fleetSessions: { service: fleetSessions } }
+                    : {}),
+                ...(fleetCommands && config.fleet.isCommandsEnabled()
+                    ? { fleetCommands: { service: fleetCommands } }
+                    : {}),
+                ...((fleetTaskHandoff || fleetGitIdentity) && config.fleet.isCheckoutsEnabled()
+                    ? {
+                          fleetTasks: {
+                              handoff: fleetTaskHandoff
+                                  ? {
+                                        options: (userId: string, taskId: string, agentId: string | null) =>
+                                            fleetTaskHandoff.options(userId, taskId, agentId),
+                                    }
+                                  : null,
+                              identity: fleetGitIdentity ?? null,
+                          },
+                      }
+                    : {}),
+                ...(fleetSchedules && config.fleet.isCommandsEnabled()
+                    ? { fleetSchedules: { service: fleetSchedules } }
+                    : {}),
                 // Audit G22 — headless browsing. Only `read` is passed, so the
                 // capability's page-driving `act` is unreachable from chat.
                 browser: { facade: browser },

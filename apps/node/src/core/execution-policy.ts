@@ -59,10 +59,25 @@ export function enforceAgentTaskExecutionPolicy(
 		setupCount: number;
 		stepCount: number;
 		checkCount: number;
+		/**
+		 * The payload asks for the platform MCP bridge. Optional so a caller
+		 * predating the switch reads as "no bridge asked for".
+		 */
+		mcpBridge?: boolean;
 	},
 	policy: NodeExecutionPolicy | undefined
 ): void {
 	if (!policy) return;
+	// works-security (node 0.2.7): the bridge only ever starts for a model
+	// step, so a job without one has nothing to refuse here.
+	if (input.mcpBridge === true && input.execution && policy.allowMcpBridge === false) {
+		throw new NodeExecutionPolicyError(
+			"Refused by this node's local execution policy: the job asks to start the platform MCP bridge, which " +
+				'gives the model platform tools (questions, Task updates, creating Tasks) authenticated with a run ' +
+				`credential, and this machine's owner switched that off. ${NODE_POLICY_COMMAND_HINT} ` +
+				'(flag: --allow-mcp-bridge), or run this Agent without external tools.'
+		);
+	}
 	if (input.execution?.skipPermissions === true && !policy.allowSkipPermissions) {
 		throw new NodeExecutionPolicyError(
 			`Refused by this node's local execution policy: the job asks to run ${String(input.execution.provider)} ` +

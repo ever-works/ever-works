@@ -27,6 +27,17 @@ export interface WhitelistEntry {
 	 * tool until someone lists them (works-security lane 3a).
 	 */
 	bodyArgs?: readonly string[];
+	/**
+	 * Works-security (2026-10-18) — the tool writes Task `labels`, and must
+	 * not add or remove a RESERVED one (`awaiting-owner`, `app-provision`,
+	 * `release:*`, `provision-attempt-*`; `@ever-works/contracts`
+	 * `isReservedTaskLabel`). `create`: none may be sent. `update`: the
+	 * handler reads the Task first and refuses a list that differs from it in
+	 * any reserved label. The API cannot tell an MCP call from the owner's own
+	 * session when the server forwards the caller's JWT, so the check lives
+	 * here. Off with `TASK_RESERVED_LABELS_ENFORCED=false`.
+	 */
+	reservedTaskLabels?: 'create' | 'update';
 }
 
 /**
@@ -375,11 +386,18 @@ export const WHITELIST: WhitelistEntry[] = [
 	// caller could plant the command the next run executes, so both tools lose
 	// the field too; the API refuses it for fleet-run tokens and integration
 	// keys, and a person adds checks in the app.
+	//
+	// `labels` stay writable, but never a reserved one (works-security
+	// 2026-10-18): `awaiting-owner` holds a Task for its owner, `release:*`
+	// forces a human approval on a promotion / revert, `provision-attempt-*`
+	// is a retry cap. An agent steered by injected text must not lift a hold
+	// or drop an approval by rewriting the list (`reservedTaskLabels`).
 	{
 		method: 'POST',
 		path: '/api/tasks',
 		toolName: 'create_task',
-		omitArgs: ['requireAllApprovers', 'acceptanceChecks']
+		omitArgs: ['requireAllApprovers', 'acceptanceChecks'],
+		reservedTaskLabels: 'create'
 	},
 	{ method: 'POST', path: '/api/tasks/run-batch', toolName: 'run_tasks_batch' },
 	{
@@ -392,7 +410,8 @@ export const WHITELIST: WhitelistEntry[] = [
 		method: 'PATCH',
 		path: '/api/tasks/{id}',
 		toolName: 'update_task',
-		omitArgs: ['requireAllApprovers', 'acceptanceChecks']
+		omitArgs: ['requireAllApprovers', 'acceptanceChecks'],
+		reservedTaskLabels: 'update'
 	},
 	{
 		method: 'DELETE',
@@ -591,6 +610,547 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
+
+	// Checkouts on computers (6) — FL-14, `apps/api/src/fleet/checkouts/
+	// fleet-checkouts.controller.ts`, the same names as the Agent tools
+	// (CONTRACTS §11.3). Pull, push, archive and delete answer
+	// `confirmation_required` first; the caller repeats with `confirm` /
+	// `confirmName` (CONTRACTS §2.2). The node-facing credential route
+	// (`/api/fleet/checkouts/{id}/credential`) is deliberately NOT exposed.
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts',
+		toolName: 'fleet_checkouts_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_get',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/checkouts', toolName: 'fleet_checkouts_create' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/sync', toolName: 'fleet_checkouts_sync' },
+	{ method: 'POST', path: '/api/fleet/checkouts/{id}/archive', toolName: 'fleet_checkouts_archive' },
+	{
+		method: 'DELETE',
+		path: '/api/fleet/checkouts/{id}',
+		toolName: 'fleet_checkouts_delete',
+		annotations: { destructiveHint: true }
+	},
+
+	// Session git & actions (5) — FL-06, `apps/api/src/fleet/session-git/`, the same names as the
+	// Agent tools (CONTRACTS §11.3). An action is typed into the session as owner input (the agent
+	// there still asks before acting); the pull request is opened or updated by the platform
+	// through the GitHub App and never merged. Clean up is `fleet_checkouts_delete` with `cleanUp`.
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions/{id}/actions',
+		toolName: 'fleet_sessions_actions_list',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/sessions/{id}/actions', toolName: 'fleet_sessions_action' },
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}/changes',
+		toolName: 'fleet_checkouts_changes',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}/pull-request',
+		toolName: 'fleet_checkouts_pull_request_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/checkouts/{id}/pull-request',
+		toolName: 'fleet_checkouts_open_pull_request'
+	},
+
+	// Tasks on computers (3) — FL-15 (CONTRACTS §11.3). The hand-off options for a Task (read-only;
+	// the start itself is `fleet_sessions_start` with `taskId`), and a computer's global git
+	// identity: read, and "Use my Ever Works identity" (class `confirm`: the first call answers
+	// `confirmation_required` with what would be set; repeat with `confirm: true`).
+	// (The two reads — `fleet_tasks_handoff_options`, `fleet_nodes_git_identity_get` — sit in FL-19's block below.)
+	{ method: 'POST', path: '/api/fleet/nodes/{id}/git/identity', toolName: 'fleet_nodes_git_identity_set' },
+	// GitHub: things for me (FL-15 P3) — one event Trigger over GitHub events about me.
+	{
+		method: 'POST',
+		path: '/api/inbound-triggers/presets/github-for-me',
+		toolName: 'inbound_triggers_github_for_me'
+	},
+
+	// Logs on computers (2) — `apps/api/src/fleet/logs/fleet-logs.controller.ts`
+	// (FL-08, CONTRACTS §11.3). Both read-only: list a computer's log sources,
+	// read at most 500 secret-scanned lines of one. The read never follows; a
+	// `follow` argument is cut from the tool (the route refuses it anyway).
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/logs/sources',
+		toolName: 'fleet_logs_sources',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/logs/read',
+		toolName: 'fleet_logs_read',
+		annotations: { readOnlyHint: true },
+		omitArgs: ['follow']
+	},
+
+	// Files on computers (5) — `apps/api/src/fleet/files/fleet-files.controller.ts`
+	// (FL-11, CONTRACTS §11.3). Reads (P1): a computer's allowed roots, one folder's
+	// entries (flagged hidden / credential-shaped / link inside the root), one entry.
+	// Acts (P2): copy between computers and delete. No MCP tool downloads a file.
+	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/roots',
+		toolName: 'fleet_files_roots',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/list',
+		toolName: 'fleet_files_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/files/stat',
+		toolName: 'fleet_files_stat',
+		annotations: { readOnlyHint: true }
+	},
+	// P2 acts (a person's own client): a copy through Ever Works (skips same-name entries unless
+	// `replace` / `replaceAll`), and a delete that needs `confirmName` (CONTRACTS §2.2).
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/files/copy',
+		toolName: 'fleet_files_copy',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/files/delete',
+		toolName: 'fleet_files_delete',
+		annotations: { destructiveHint: true }
+	},
+
+	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
+	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
+	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
+	// `confirmation_required` with the sentence to show). Typing into a session is the Agent-side
+	// `fleet_sessions_send` tool only — there is no REST input route; full parity is FL-19.
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions',
+		toolName: 'fleet_sessions_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions/{id}',
+		toolName: 'fleet_sessions_read',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/nodes/{id}/sessions', toolName: 'fleet_sessions_start' },
+	{ method: 'PATCH', path: '/api/fleet/sessions/{id}', toolName: 'fleet_sessions_rename' },
+	{
+		method: 'POST',
+		path: '/api/fleet/sessions/{id}/end',
+		toolName: 'fleet_sessions_end',
+		annotations: { destructiveHint: true }
+	},
+	// FL-05 P2 — answering what a session asks (a question or a permission prompt): an option the CLI
+	// showed or a free text; the attention (what it asks) rides `fleet_sessions_read`.
+	{
+		method: 'POST',
+		path: '/api/fleet/sessions/{id}/answer',
+		toolName: 'fleet_sessions_answer',
+		description:
+			"Answer what one of my sessions on a computer is waiting for: one of the options it showed (optionId) or, for a question that takes one, a free text. key is the session's attention key (from fleet_sessions_read). Refused once it was answered (in the terminal too), and while the computer is away."
+	},
+
+	// Commands on computers (4) — FL-12 P2, `apps/api/src/fleet/commands/fleet-commands.controller.ts`
+	// (dark unless FLEET_COMMANDS_ENABLED). One command line on one or more of the caller's computers, in
+	// the machine owner's login shell with no input. CONTRACTS §2.2 class `confirm`: without
+	// `confirm: true` the API answers `confirmation_required` with one line per computer; repeat the call
+	// with `confirm: true` once the person agreed. Output is read back with `fleet_commands_get`.
+	{
+		method: 'POST',
+		path: '/api/fleet/commands',
+		toolName: 'fleet_commands_run',
+		description:
+			"Run one shell command on one or more of my fleet computers, in the machine owner's login shell, as the owner, with no input (prompts fail). These are real machines, not a sandbox. Without confirm: true it answers confirmation_required with one line per computer (shell, folder, or why it cannot run); repeat with confirm: true once agreed. Answers one run per computer; read the output with fleet_commands_get.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/commands',
+		toolName: 'fleet_commands_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/commands/{id}',
+		toolName: 'fleet_commands_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/commands/{id}/cancel',
+		toolName: 'fleet_commands_cancel',
+		annotations: { destructiveHint: false }
+	},
+
+	// Schedules on computers (9) — FL-13 P2, `apps/api/src/fleet/schedules/fleet-schedules.controller.ts`
+	// (dark unless FLEET_COMMANDS_ENABLED). A Command on ONE of the caller's computers, on that computer's
+	// own clock, in the machine owner's login shell. CONTRACTS §2.2 class `confirm` for create, update
+	// (a move or a change of what runs), delete and run: without `confirm: true` the API answers
+	// `confirmation_required` with the shell, the folder and the next fires; repeat with `confirm: true`
+	// once the person agreed. Pause and resume are `plain`.
+	{
+		method: 'GET',
+		path: '/api/fleet/schedules',
+		toolName: 'fleet_schedules_list',
+		description:
+			"List my schedules on computers (optionally nodeId): name, command, when it runs on the computer's own clock, next fire, last run, failure streak and whether the computer holds the latest copy. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/schedules/{id}',
+		toolName: 'fleet_schedules_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/schedules/{id}/runs',
+		toolName: 'fleet_schedules_runs',
+		description:
+			"A schedule's last runs (newest first, at most 30): the fire, the status or why it was skipped, the exit code, and the first and last 64 KiB of its output. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/schedules',
+		toolName: 'fleet_schedules_create',
+		description:
+			"Schedule one shell command on ONE of my fleet computers: name, nodeId, command, optional cwd, and cadence { kind: 'interval'|'daily'|'weekdays'|'cron', expr?, at? } on the computer's own clock. These are real machines, not a sandbox. Without confirm: true it answers confirmation_required with the shell, the folder and the next three fires; repeat with confirm: true once agreed.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'PATCH',
+		path: '/api/fleet/schedules/{id}',
+		toolName: 'fleet_schedules_update',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'DELETE',
+		path: '/api/fleet/schedules/{id}',
+		toolName: 'fleet_schedules_delete',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/schedules/{id}/run',
+		toolName: 'fleet_schedules_run',
+		description:
+			'Run one of my schedules now on its computer (the next fire does not move). Needs confirm: true; busy while a run is going, unreachable while the computer is offline.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/schedules/{id}/pause',
+		toolName: 'fleet_schedules_pause',
+		annotations: { destructiveHint: false }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/schedules/{id}/resume',
+		toolName: 'fleet_schedules_resume',
+		annotations: { destructiveHint: false }
+	},
+
+	// Servers and ports (FL-10, CONTRACTS §2.1) — `apps/api/src/fleet/ports/fleet-ports.controller.ts`.
+	// The list is a read of the machine (nothing stored, nothing audited); open is
+	// not destructive — it opens the port's page ON the machine (its desktop or its
+	// preview browser) and is audited `node.port.open`. Dark unless
+	// FLEET_MACHINE_FACTS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/ports',
+		toolName: 'fleet_ports_list',
+		description:
+			'List the TCP ports a fleet computer is listening on, read on the machine: web servers first (title, status, program or container), other ports, hidden system ports. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/ports/{port}/open',
+		toolName: 'fleet_ports_open',
+		description:
+			"Open a fleet computer's web server ON that machine: its default browser on its desktop, or its preview browser (a profile no agent uses). Takes a port number only; audited.",
+		annotations: { destructiveHint: false }
+	},
+	// FL-10 P2 — close a preview tunnel (dark unless FLEET_PORT_TUNNEL_ENABLED). Opening one is NOT
+	// exposed here: its answer carries a one-time address into the owner's tunnel, which a tool must
+	// never hold (spec U15); the in-platform Agent tool opens one without that address.
+	{
+		method: 'DELETE',
+		path: '/api/fleet/nodes/{id}/ports/{port}/preview',
+		toolName: 'fleet_ports_preview_close',
+		description: "Close the person's preview tunnel to a port on a fleet computer.",
+		annotations: { destructiveHint: false }
+	},
+
+	// Virtual computers (FL-16, plan §9, CONTRACTS §11.3) — `apps/api/src/fleet/virtual/fleet-virtual.controller.ts`.
+	// Same names as the in-platform Agent tools. Acts satisfy their confirmation class
+	// with the request fields (`confirm: true`, `confirmName`); without them the API
+	// answers 409 `confirmation_required` with the summary to show. Dark unless
+	// FLEET_VIRTUAL_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/virtual',
+		toolName: 'fleet_virtual_list',
+		description:
+			'List the virtual computers (Containers, Windows VMs) a fleet computer hosts, with system, size, create phase and state, and the host memory net of what they reserve. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/virtual/options',
+		toolName: 'fleet_virtual_options',
+		description:
+			'Which fleet computers can host a new virtual computer of a system (?system=), with free memory, free disk, KVM and why each other one cannot, plus the systems, sizes and the host "Choose for me" picks ({id} may be `auto`). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual',
+		toolName: 'fleet_virtual_create',
+		description:
+			'Create a Container on a fleet computer ({id}, or `auto` for the host with the most free memory). It uses that computer’s CPU, memory and disk; no credits are spent. Needs `confirm: true`; without it the answer is 409 with the host, CPUs, memory and disk to confirm.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual/{childId}/power',
+		toolName: 'fleet_virtual_power',
+		description:
+			'Start or stop a virtual computer (`action: start | stop`; stop needs `confirm: true` — a Container stops within 10 seconds).',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/virtual/{childId}/destroy',
+		toolName: 'fleet_virtual_destroy',
+		description:
+			'Destroy a virtual computer: its machine and disk on the host, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name. Refused while a Run or a session is live on it.',
+		annotations: { destructiveHint: true }
+	},
+
+	// Cloud computers (FL-17 P1) — machines created at a cloud provider through a machine-provider
+	// plugin, billed to the owner's own provider account. Each route 404s unless FLEET_CLOUD_ENABLED.
+	// Create needs the acknowledged monthly price and `confirm: true` (the 409 carries the price
+	// sentence); destroy needs `confirmName`.
+	{
+		method: 'GET',
+		path: '/api/fleet/cloud',
+		toolName: 'fleet_cloud_list',
+		description:
+			'List the cloud computers (machines created at a cloud provider) with provider, region, size, power state, hourly rate and cost so far, the usage totals (list-price estimates) and the connected providers. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/providers/{plugin}/options',
+		toolName: 'fleet_cloud_options',
+		description:
+			'Regions, sizes with current monthly and hourly list prices, software presets and the connected account for one machine provider ({plugin} from fleet_cloud_list). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/cloud/usage',
+		toolName: 'fleet_cloud_usage',
+		description:
+			'What the cloud computers cost: per hour now, this month so far and projected — estimates from list prices, never counted against model-spend budgets. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud',
+		toolName: 'fleet_cloud_create',
+		description:
+			'Create a cloud computer at a provider on the owner’s account (it bills until destroyed). Needs `acknowledgedPriceCents` = the size’s monthly price from fleet_cloud_options (a stale price is refused with the current one) and `confirm: true`; without it the answer is 409 with the price sentence.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud/{id}/power',
+		toolName: 'fleet_cloud_power',
+		description:
+			'Power a cloud computer on or off (`action: on | off`, `confirm: true`; the 409 says whether the provider still bills it while off). Power on is refused while the Fleet is stopped.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud/{id}/destroy',
+		toolName: 'fleet_cloud_destroy',
+		description:
+			'Destroy a cloud computer: the machine and its disk at the provider, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name (the 409 states the cost so far). Refused while a Run or a session is live on it.',
+		annotations: { destructiveHint: true }
+	},
+
+	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
+	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,
+	// processes and Docker (FL-09), long operations (FL-02). Same names as the Agent tools; each
+	// route keeps its own flag (404 while dark). `fleet_nodes_list|get` are the Agent names of the
+	// routes the legacy `list_fleet_nodes` / `get_fleet_node` entries above already expose, which
+	// stay exactly as they are (spec FR-3). Enrolment, heartbeat, lease, attach-token and
+	// credential routes are never exposed (spec FR-17).
+	{
+		method: 'GET',
+		path: '/api/fleet/status',
+		toolName: 'fleet_status',
+		description:
+			'How is my fleet, in one call: every computer I may see (status, platform, consents, CPU / memory / disk, live sessions), what needs a look on them with the fix for each, whether the fleet kill switch is on, and the server time. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/health',
+		toolName: 'fleet_nodes_health',
+		description:
+			"One fleet computer's health from its latest check-in (CPU, memory, disk, load, uptime, GPU, pending reboot, failed services), whether it is stale, and its state in plain words with its one fix. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/needs-a-look',
+		toolName: 'fleet_nodes_needs_a_look',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/services',
+		toolName: 'fleet_services_list',
+		description:
+			"The services on one fleet computer (systemd, launchd or Windows services), failed first, read on the machine. Needs the computer's services audience and --manage. Read-only.",
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/processes',
+		toolName: 'fleet_processes_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/docker/containers',
+		toolName: 'fleet_docker_containers_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/docker/images',
+		toolName: 'fleet_docker_images_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/docker/compose',
+		toolName: 'fleet_docker_compose_list',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/operations/{id}',
+		toolName: 'fleet_operations_get',
+		description:
+			'A long operation on one of my fleet computers (a call that answered with an operationId): running, done, failed, cancelled or interrupted, its progress, and the result or the error. An interrupted operation never reads done. Read-only; poll it while it runs.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/operations',
+		toolName: 'fleet_operations_list',
+		annotations: { readOnlyHint: true }
+	},
+	// Tasks & GitHub on the fleet (FL-15) — the reads behind "Fix on a computer" and the Git card
+	// (dark unless FLEET_CHECKOUTS_ENABLED; hand-off options also need FLEET_SESSIONS_ENABLED).
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/git/identity',
+		toolName: 'fleet_nodes_git_identity_get',
+		description:
+			'The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/tasks/{taskId}/handoff-options',
+		toolName: 'fleet_tasks_handoff_options',
+		description:
+			'Where a Task could be fixed on one of my computers: the computers that can take it, the checkouts of its repository on each, and the agents available there. Start the session with fleet_sessions_start and the taskId. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+
+	// FL-19 P2 — the acts of the catalogue that had no MCP entry (CONTRACTS §2.2: a confirming act
+	// answers `confirmation_required` with the summary first; repeat with `confirm: true`,
+	// `confirmName`, or `acknowledgeBlastRadius: true` as the answer says — never a token). They act
+	// as the API-key user, so the computer's own audience is checked for that person (spec FR-18).
+	// `fleet_docker_run` stays off MCP: a run may carry secret values a person types (FL-09).
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/services/{name}/{action}',
+		toolName: 'fleet_services_action',
+		description:
+			"Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.",
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/processes/{pid}/signal',
+		toolName: 'fleet_processes_signal',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/containers/{cid}/{action}',
+		toolName: 'fleet_docker_container_action',
+		description:
+			'Start, stop, restart, pause, unpause or remove one Docker container on one of my fleet computers. Class confirm (remove: confirm-destructive — send confirmName with the container name). Audited.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/images/{iid}/{action}',
+		toolName: 'fleet_docker_image_action',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/docker/compose/{project}/{action}',
+		toolName: 'fleet_docker_compose_action',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/wake',
+		toolName: 'fleet_nodes_wake',
+		annotations: { destructiveHint: false }
+	},
+	{
+		method: 'DELETE',
+		path: '/api/fleet/operations/{id}',
+		toolName: 'fleet_operations_cancel',
+		description: 'Ask the computer to stop a long operation that is still running. It then reads cancelled.',
+		annotations: { destructiveHint: false }
+	},
 
 	// Agents (9) — `apps/api/src/agents/agents.controller.ts`. Read the
 	// roster and run history, kick or cancel a run, pause / resume.

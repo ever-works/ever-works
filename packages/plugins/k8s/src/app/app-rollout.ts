@@ -79,7 +79,14 @@ export type Instant = string | number | Date;
 export interface AppRolloutContainerState {
 	waiting?: { reason?: string; message?: string } | null;
 	running?: { startedAt?: Instant | null } | null;
-	terminated?: { reason?: string; exitCode?: number; startedAt?: Instant | null; finishedAt?: Instant | null } | null;
+	terminated?: {
+		reason?: string;
+		exitCode?: number;
+		startedAt?: Instant | null;
+		finishedAt?: Instant | null;
+		/** The container's termination message (`terminationMessagePath`, `/dev/termination-log`). */
+		message?: string;
+	} | null;
 }
 
 export interface AppRolloutContainerStatus {

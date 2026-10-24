@@ -1,12 +1,14 @@
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     Inject,
     Injectable,
     Logger,
     NotFoundException,
     Optional,
+    UnprocessableEntityException,
 } from '@nestjs/common';
 import type { IPlugin } from '@ever-works/plugin';
 import {
@@ -44,9 +46,23 @@ import {
     fleetConsentsDiffer,
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
+    normalizeFleetNodeSelfUpdate,
+    isFleetTimeZone,
     normalizeFleetNodeWorkerState,
+    normalizeFleetSessionDaemonReport,
     sanitizeFleetNodeHealthSnapshot,
+    FLEET_LAN_ID_LENGTH,
+    isFleetNodeAsleep,
+    maskFleetMacAddress,
+    normalizeFleetLanId,
+    normalizeFleetMacAddress,
+    selectFleetWakeSiblings,
+    isFleetNodeOrigin,
+    isFleetVirtualKind,
+    FLEET_CLOUD_REMOVE_HINT,
 } from '@ever-works/contracts';
+import { fleetVirtualViewOf } from './virtual/fleet-virtual.view';
+import { fleetCloudRemovableNode, fleetCloudViewOf } from './cloud/fleet-cloud.view';
 import type {
     FleetAuditAction,
     FleetNodeHealthStored,
@@ -57,6 +73,7 @@ import type {
     FleetNodeLoadView,
     FleetNodeWorkerState,
     FleetViewerRole,
+    FleetWakeRoute,
 } from '@ever-works/contracts';
 import { config } from '../config';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
@@ -98,6 +115,13 @@ export const FLEET_ENROLLMENT_TOKEN_TTL_MS = FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_
 
 /** Default silence after which an `online` node sweeps to `offline` (5 minutes). */
 export const FLEET_NODE_OFFLINE_AFTER_MS = FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS;
+
+/**
+ * Virtual computers (FL-16, lane decision 8) — how long a host must have been
+ * silent before a child's registration may be removed without destroying the
+ * machine (nothing can confirm the machine either way any more).
+ */
+export const FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS = 24 * 60 * 60 * 1000;
 
 /** Kinds a machine can enroll as ('k8s' is list-time only, never a row). */
 export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
@@ -249,6 +273,35 @@ export interface EnrollInput {
      * blanks it.
      */
     consents?: unknown;
+    /**
+     * Computer health, second phase (FL-03) — the primary interface's
+     * hardware address (`--manage` only). UNTRUSTED: validated with
+     * `normalizeFleetMacAddress`; an unusable value is dropped, never a 400.
+     * Stored together with {@link lanId}, both or neither; absent leaves the
+     * stored pair alone.
+     */
+    macAddress?: unknown;
+    /** Computer health, second phase (FL-03) — the opaque network identity; re-hashed with the owner's id. */
+    lanId?: unknown;
+    /**
+     * Sessions on computers (FL-04, CONTRACTS §1.1) — the session daemon's
+     * health `{ state, reason?, sessions, storage?, hooks? }`. Untrusted off
+     * the wire: normalised (bounded reason, known keys only); absent leaves the
+     * stored report alone like every other telemetry field.
+     */
+    daemon?: unknown;
+    /**
+     * Fleet node link (FL-02 T-25, spec U16) — the node's opt-in self-update
+     * report. Untrusted: normalized here; absent leaves the stored report
+     * alone like every other telemetry field.
+     */
+    selfUpdate?: unknown;
+    /**
+     * Schedules on computers (FL-13, CONTRACTS §1.1) — the machine's IANA time
+     * zone. Untrusted: kept only when `isFleetTimeZone` accepts it; absent or
+     * unusable leaves the stored zone alone.
+     */
+    timeZone?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -720,6 +773,18 @@ export class FleetService {
         }
         // Fleet node link (FL-02): the consents, stored only when they changed.
         const consentChange = applyReportedConsents(node, refresh, patch);
+        // Computer health, second phase (FL-03): the hardware address and the
+        // owner-salted network identity, for Wake-on-LAN.
+        applyReportedNetworkIdentity(node, refresh, patch);
+        // Sessions on computers (FL-04): the session daemon's health, as reported.
+        const daemonReport = normalizeFleetSessionDaemonReport(refresh.daemon);
+        if (daemonReport) patch.sessionDaemon = daemonReport;
+        // Fleet node link (FL-02 T-25): the self-update report, likewise.
+        applyReportedSelfUpdate(node, refresh, patch);
+        // Schedules on computers (FL-13): the machine's time zone, when it changed.
+        if (isFleetTimeZone(refresh.timeZone) && node.timeZone !== refresh.timeZone) {
+            patch.timeZone = refresh.timeZone;
+        }
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -1135,7 +1200,14 @@ export class FleetService {
         await this.announceOfflineTransitions(userId, cutoff);
         await this.repository.sweepOffline(userId, cutoff);
         const rows = await this.repository.findByUser(userId);
-        return rows.map((row) => this.toView(row));
+        // Computer health, second phase (FL-03): which offline computer can be
+        // woken, and through which sibling — judged over this same list (one
+        // owner, one read), never a second query.
+        return withWakeRoutes(
+            rows.map((row) => this.toView(row)),
+            Date.now(),
+            config.fleet.getNodeOfflineAfterMs(),
+        );
     }
 
     /**
@@ -1145,7 +1217,71 @@ export class FleetService {
      * stays independent of the job runtime.
      */
     async getForUser(userId: string, nodeId: string): Promise<FleetNodeView> {
-        return this.toView(await this.getOwnedNode(userId, nodeId));
+        const node = await this.getOwnedNode(userId, nodeId);
+        return { ...this.toView(node), canWake: await this.wakeRouteFor(node) };
+    }
+
+    /**
+     * Computer health, second phase (FL-03) — the owner's computers that can
+     * wake `target` right now, best first (spec FR-24): same owner, same
+     * network identity, online by status and by their last beat, advertising
+     * `wake` and `managed`. Empty when the target never reported a network
+     * identity. One read of the owner's rows.
+     */
+    async listWakeSiblings(target: FleetNode): Promise<FleetNode[]> {
+        if (!normalizeFleetLanId(target.lanId)) return [];
+        const rows = await this.repository.findByUser(target.userId);
+        return selectFleetWakeSiblings(target, rows, {
+            now: Date.now(),
+            offlineAfterMs: config.fleet.getNodeOfflineAfterMs(),
+        });
+    }
+
+    /** The sibling an offline `node` can be woken through, or null (FR-24). */
+    async wakeRouteFor(node: FleetNode): Promise<FleetWakeRoute | null> {
+        try {
+            const now = Date.now();
+            const offlineAfterMs = config.fleet.getNodeOfflineAfterMs();
+            if (!isFleetNodeAsleep(node, now, offlineAfterMs)) return null;
+            if (!normalizeFleetMacAddress(node.macAddress)) return null;
+            const [first] = await this.listWakeSiblings(node);
+            return first ? { nodeId: first.id, name: first.name } : null;
+        } catch {
+            // Best-effort decoration of a read: never fail the read for it.
+            return null;
+        }
+    }
+
+    /**
+     * Computer health, second phase (FL-03) — Refresh now landed: store the
+     * snapshot a `health.now` reply carried exactly as a beat's would be stored
+     * (sanitised, stamped with the platform's receipt time, the disk-low and
+     * sample markers carried forward), WITHOUT touching the liveness columns or
+     * writing a history sample — a refresh is not a beat (FR-18, FR-28).
+     * Answers the stored snapshot, or null when the reply held nothing usable.
+     */
+    async applyRefreshedHealth(
+        nodeId: string,
+        raw: unknown,
+        receivedAt: Date = new Date(),
+    ): Promise<FleetNodeHealthStored | null> {
+        const node = await this.repository.findById(nodeId);
+        if (!node) return null;
+        const health = buildStoredHealth(
+            raw,
+            receivedAt,
+            toStoredHealthView(node.health),
+            { diskFreeBytes: node.diskFreeBytes, minFreeDiskBytes: node.minFreeDiskBytes },
+            false,
+        );
+        if (!health) return null;
+        await this.repository.update(node.id, { health });
+        return health;
+    }
+
+    /** Computer health, second phase (FL-03) — stamp a wake attempt on the target (FR-26 reads it back). */
+    async recordWakeAttempt(nodeId: string, at: Date = new Date()): Promise<void> {
+        await this.repository.update(nodeId, { lastWakeAttemptAt: at });
     }
 
     /**
@@ -1202,7 +1338,16 @@ export class FleetService {
             };
         }
         const { node, role } = await this.access.resolveVisible(nodeId, userId);
-        if (role === 'owner') return { view: { ...this.toView(node), viewerRole: 'owner' }, role };
+        if (role === 'owner') {
+            return {
+                view: {
+                    ...this.toView(node),
+                    canWake: await this.wakeRouteFor(node),
+                    viewerRole: 'owner',
+                },
+                role,
+            };
+        }
         const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
         return { view: toSharedView(this.toView(node), node, role, cutoff), role };
     }
@@ -1227,6 +1372,29 @@ export class FleetService {
             await this.repository.update(node.id, { isFavorite });
         }
         return this.toView({ ...node, isFavorite } as FleetNode);
+    }
+
+    /**
+     * Servers and ports (FL-10, CONTRACTS §4.1, R-3) — the computer Settings
+     * switch "Preview browser": whether **Open** on a listening port may use
+     * the node's owner-level preview browser profile. Owner only (the same
+     * posture as the star): anyone else who may see the node is refused
+     * `permission_denied`. The column is FL-02's (`1796020000000`); FL-10 owns
+     * setting and reading it.
+     */
+    async setPreviewProfileEnabledForUser(
+        userId: string,
+        nodeId: string,
+        enabled: boolean,
+    ): Promise<FleetNodeView> {
+        if (typeof enabled !== 'boolean') {
+            throw new BadRequestException('previewProfileEnabled must be true or false');
+        }
+        const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
+        if (Boolean(node.previewProfileEnabled) !== enabled) {
+            await this.repository.update(node.id, { previewProfileEnabled: enabled });
+        }
+        return this.toView({ ...node, previewProfileEnabled: enabled } as FleetNode);
     }
 
     /**
@@ -1330,7 +1498,12 @@ export class FleetService {
         const now = Date.now();
         const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
         return rows
-            .filter((row) => row.status === 'enrolling')
+            // A virtual computer being built (FL-16) is not a token a person
+            // minted: its row waits for the guest, which is handed its own
+            // token when it is ready. The hub shows it under its host instead.
+            // A cloud computer (FL-17) is the same: its token went into the
+            // provider's bootstrap, and the hub shows the row with its phase.
+            .filter((row) => row.status === 'enrolling' && row.origin !== 'virtual' && row.origin !== 'cloud')
             .map((row) => {
                 const issuedAtMs = credentialIssuedAtMs(row);
                 const hasIssuedAt = Number.isFinite(issuedAtMs);
@@ -1381,6 +1554,9 @@ export class FleetService {
                 'Only an unused enrollment token can be revoked; rotate the node credential instead',
             );
         }
+        // Cloud computers (FL-17, R-36): an enrolling cloud computer may already
+        // have a billing machine behind its token — the same guard as Remove.
+        this.assertCloudRemovable(node);
         await this.repository.delete(node.id);
         // The row is gone, so the audit row is the only surviving record
         // that this machine was ever half-registered. `nodeId` carries no
@@ -1777,6 +1953,23 @@ export class FleetService {
     async unenrollByCredential(nodeId: unknown, secret: unknown): Promise<boolean> {
         const node = await this.authenticateNodeByCredential(nodeId, secret);
         if (!node) return false;
+        // Cloud computers (FL-17, CONTRACTS R-36): a cloud machine that leaves
+        // must not take its registration with it while the provider may still
+        // bill — the owner destroys it from the Fleet. Its credential dies here
+        // (heartbeat fails closed on a NULL hash) and the row stays, drained.
+        if ((node.origin === 'cloud' || node.providerPluginId) && !fleetCloudRemovableNode(node)) {
+            await this.repository.update(node.id, { status: 'disabled', enrollmentTokenHash: null });
+            await this.tryAuditNode({
+                action: 'node.unenroll',
+                actorUserId: null,
+                ownerUserId: node.userId,
+                nodeId: node.id,
+                before: { status: node.status, name: node.name, kind: node.kind },
+                after: { status: 'disabled' },
+                extra: { via: 'node', keptForDestroy: true },
+            });
+            return true;
+        }
         await this.repository.delete(node.id);
         // The registration is gone; this row is the only record that the
         // machine ever existed, and `fleet_audit.nodeId` carries no FK so
@@ -1809,6 +2002,14 @@ export class FleetService {
         confirmation: FleetRemoveConfirmation = {},
     ): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
+        // Virtual computers (FL-16, spec FR-29, the R-36 shape) — two additive
+        // refusals, checked before anything is deleted: a host that still hosts
+        // children, and a child whose machine still runs on its host.
+        await this.assertVirtualRemovable(node);
+        // Cloud computers (FL-17, CONTRACTS R-36, spec FR-19) — an additive
+        // refusal: a cloud computer's registration is removed by Destroy, never
+        // by Remove, while the provider may still be billing for its machine.
+        this.assertCloudRemovable(node);
         if (confirmation.confirmName !== undefined) {
             assertConfirmName(node, confirmation.confirmName);
             ctx = {
@@ -1820,6 +2021,71 @@ export class FleetService {
         await this.auditLifecycle('node.delete', userId, node, ctx, {
             before: { status: node.status, name: node.name, kind: node.kind },
             after: null,
+        });
+    }
+
+    /**
+     * Cloud computers (FL-17, CONTRACTS R-36, spec FR-19, U2, U6) — a cloud
+     * computer's registration is refused removal with `unsupported_on_node`
+     * ("destroy it instead; it bills until destroyed") until the provider has
+     * reported its machine gone, or the create failed before a machine existed.
+     * Every other Node passes untouched. Synchronous: the facts are on the row.
+     */
+    private assertCloudRemovable(node: FleetNode): void {
+        if (node.origin !== 'cloud' && !node.providerPluginId) return;
+        if (fleetCloudRemovableNode(node)) return;
+        const hint = `${node.name} is a cloud computer — ${FLEET_CLOUD_REMOVE_HINT}`;
+        throw new UnprocessableEntityException({
+            statusCode: 422,
+            message: hint,
+            error: { code: 'unsupported_on_node', hint, details: { origin: 'cloud', action: 'destroy' } },
+        });
+    }
+
+    /**
+     * Virtual computers (FL-16, spec FR-29, FR-30, U14) — whether a Node's
+     * registration may be removed:
+     *
+     *  - a HOST with children is refused `busy`, naming them ("destroy or
+     *    remove its 2 virtual computers first");
+     *  - a virtual CHILD whose machine still exists is refused
+     *    `unsupported_on_node` with "destroy it instead" — an orphaned machine
+     *    would keep running on the host. Allowed again once the machine is
+     *    known to be gone (`gone`), never built (`failed`, `not-enrolled`), its
+     *    host's registration is gone, or its host has been silent for a day
+     *    (lane decision 8: nothing can confirm the machine either way, and the
+     *    owner must not be left with a registration they can never remove).
+     */
+    private async assertVirtualRemovable(node: FleetNode): Promise<void> {
+        // Read through a guard: a repository double built before FL-16 has no
+        // children finder, and a registry without one has no children.
+        const finder = (this.repository as Partial<FleetNodeRepository>).findByHostNodeIds;
+        const children = typeof finder === 'function' ? await finder.call(this.repository, [node.id]) : [];
+        if (children.length > 0) {
+            const names = children.map((child) => child.name).sort();
+            const hint =
+                children.length === 1
+                    ? `destroy or remove ${names[0]} first — it is a virtual computer on ${node.name}`
+                    : `destroy or remove its ${children.length} virtual computers first`;
+            throw new ConflictException({
+                statusCode: 409,
+                message: hint,
+                error: { code: 'busy', hint, details: { children: names } },
+            });
+        }
+        if (node.origin !== 'virtual' && !node.hostNodeId) return;
+        const state = node.virtualMeta?.state ?? null;
+        if (state === 'gone' || state === 'failed' || state === 'not-enrolled') return;
+        if (node.status === 'enrolling' && state === null) return;
+        const host = node.hostNodeId ? await this.repository.findById(node.hostNodeId) : null;
+        if (!host) return;
+        const hostBeat = host.lastHeartbeatAt ? new Date(host.lastHeartbeatAt).getTime() : NaN;
+        if (!Number.isFinite(hostBeat) || Date.now() - hostBeat > FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS) return;
+        const hint = `${node.name} still runs on ${host.name}; destroy it instead`;
+        throw new UnprocessableEntityException({
+            statusCode: 422,
+            message: hint,
+            error: { code: 'unsupported_on_node', hint, details: { hostNodeId: host.id } },
         });
     }
 
@@ -2114,6 +2380,17 @@ export class FleetService {
             // Computer health (FL-03): the latest snapshot off the row — one
             // read per computer, never a join to the history.
             health: toStoredHealthView(node.health),
+            // Computer health, second phase (FL-03): the hardware address MASKED
+            // (never in full, plan §11), the stored network identity and the last
+            // wake attempt. Owner views only — `toSharedView` is an allow-list
+            // that does not carry them. `canWake` is filled in by the reads that
+            // know the owner's other computers.
+            macAddress: maskFleetMacAddress(node.macAddress),
+            lanId: normalizeFleetLanId(node.lanId),
+            lastWakeAttemptAt: node.lastWakeAttemptAt ? toIso(node.lastWakeAttemptAt) : null,
+            // Schedules on computers (FL-13): the zone the machine's schedules fire in.
+            timeZone: node.timeZone ?? null,
+            canWake: null,
             // Fleet hub (FL-01): the owner's star and the policy in force,
             // every family filled in (the legacy column read through as
             // `desktop` when the map has no entry for it).
@@ -2123,7 +2400,34 @@ export class FleetService {
             // `effectiveConsents`, never as "nothing allowed".
             consents: normalizeFleetConsents(node.consents),
             previewProfileEnabled: Boolean(node.previewProfileEnabled),
+            // Sessions on computers (FL-04). Null = never reported.
+            sessionDaemon: normalizeFleetSessionDaemonReport(node.sessionDaemon),
+            // Fleet node link (FL-02 T-25). Omitted when never reported, so a
+            // view of a daemon older than the field is exactly what it was.
+            ...selfUpdateView(node),
+            // Virtual computers (FL-16): how the row came into being, the host
+            // a child runs on, what it is, and its system / size / state.
+            origin: isFleetNodeOrigin(node.origin) ? node.origin : 'enrolled',
+            hostNodeId: node.hostNodeId ?? null,
+            virtualKind: isFleetVirtualKind(node.virtualKind) ? node.virtualKind : null,
+            virtual: fleetVirtualViewOf(node),
+            // Cloud computers (FL-17): the provider plugin and the Cloud block
+            // (provider, region, size, power, phase, cost, R-36 removability).
+            providerPluginId: node.providerPluginId ?? null,
+            cloud: fleetCloudViewOf(node),
         };
+    }
+
+    /**
+     * Virtual computers (FL-16) — the wire view of a row for a caller of a
+     * known role: the owner's full view, anyone else the shared projection
+     * (`toSharedView`). For a service that already resolved the role (the
+     * children of a host); it decides nothing about access itself.
+     */
+    viewForRole(node: FleetNode, role: FleetViewerRole): FleetNodeView {
+        if (role === 'owner') return { ...this.toView(node), viewerRole: 'owner' };
+        const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
+        return toSharedView(this.toView(node), node, role, cutoff);
     }
 }
 
@@ -2238,6 +2542,78 @@ function applyReportedConsents(
     return { before, after };
 }
 
+/** Fleet node link (FL-02 T-25) — the stored self-update report as a view field, or nothing. */
+function selfUpdateView(node: FleetNode): Pick<FleetNodeView, 'selfUpdate'> {
+    const report = normalizeFleetNodeSelfUpdate(node.selfUpdate);
+    return report ? { selfUpdate: report } : {};
+}
+
+/**
+ * Fleet node link (FL-02 T-25) — fold a beat's self-update report into the
+ * patch: normalized (only known fields, bounded), written only when it
+ * differs from the stored one, and left alone when the beat carried none.
+ */
+function applyReportedSelfUpdate(
+    node: FleetNode,
+    refresh: EnrollInput,
+    patch: Partial<FleetNode>,
+): void {
+    const after = normalizeFleetNodeSelfUpdate(refresh.selfUpdate);
+    if (after === null) return;
+    const before = normalizeFleetNodeSelfUpdate(node.selfUpdate);
+    if (before && JSON.stringify(before) === JSON.stringify(after)) return;
+    patch.selfUpdate = after;
+}
+
+/**
+ * Computer health, second phase (FL-03) — the network identity a beat
+ * reported, stored for Wake-on-LAN: the hardware address normalised, the
+ * network identity RE-HASHED with the owner's id (so two owners on one
+ * network never share a stored value, and sibling matching can only ever
+ * find the owner's own computers). Both or neither; an unusable value is
+ * dropped (never a 400); absent leaves the stored pair alone; an unchanged
+ * pair writes nothing.
+ */
+function applyReportedNetworkIdentity(
+    node: FleetNode,
+    refresh: EnrollInput,
+    patch: Partial<FleetNode>,
+): void {
+    const macAddress = normalizeFleetMacAddress(refresh.macAddress);
+    const reported = normalizeFleetLanId(refresh.lanId);
+    if (!macAddress || !reported) return;
+    const lanId = saltFleetLanId(node.userId, reported);
+    if (node.macAddress !== macAddress) patch.macAddress = macAddress;
+    if (node.lanId !== lanId) patch.lanId = lanId;
+}
+
+/** `sha256(ownerId + newline + reported lanId)`, first 16 hex characters. */
+export function saltFleetLanId(userId: string, reported: string): string {
+    return createHash('sha256')
+        .update(`${userId}\n${reported}`)
+        .digest('hex')
+        .slice(0, FLEET_LAN_ID_LENGTH);
+}
+
+/**
+ * Computer health, second phase (FL-03) — stamp `canWake` on every asleep
+ * computer of ONE owner's list that has a hardware address and an online
+ * sibling on its network (spec FR-24). Pure over the list.
+ */
+export function withWakeRoutes(
+    views: FleetNodeView[],
+    now: number,
+    offlineAfterMs: number,
+): FleetNodeView[] {
+    return views.map((view) => {
+        if (view.kind === 'k8s') return view;
+        if (!view.macAddress || !view.lanId) return { ...view, canWake: null };
+        if (!isFleetNodeAsleep(view, now, offlineAfterMs)) return { ...view, canWake: null };
+        const [first] = selectFleetWakeSiblings(view, views, { now, offlineAfterMs });
+        return { ...view, canWake: first ? { nodeId: first.id, name: first.name } : null };
+    });
+}
+
 /**
  * Fleet hub (FL-01) — the view of a Node someone else owns, as an
  * Organization member sees it (`view` grants listing only).
@@ -2298,6 +2674,16 @@ function toSharedView(
         isFavorite: false,
         hostNodeId: view.hostNodeId ?? null,
         virtualKind: view.virtualKind ?? null,
+        // Virtual computers (FL-16) — DECIDED shared: the origin and the child's
+        // system, size and state are what the nested row shows anyone who may
+        // see the host; the block carries no password, token or host path.
+        origin: view.origin ?? 'enrolled',
+        virtual: view.virtual ?? null,
+        // Cloud computers (FL-17) — DECIDED shared: the Cloud block is what the
+        // computer page shows anyone who may see it (spec S10: a member sees the
+        // machine and its cost, the actions disabled); prices and states only.
+        providerPluginId: view.providerPluginId ?? null,
+        cloud: view.cloud ?? null,
         // Computer health (FL-03) — DECIDED shared: reading health is the `view`
         // family (FL-03 spec §7, "Read health / history: view / org-members").
         // The stored snapshot carries numbers, booleans, a failed-service COUNT
@@ -2332,6 +2718,10 @@ export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
     'isFavorite',
     'hostNodeId',
     'virtualKind',
+    'origin',
+    'virtual',
+    'providerPluginId',
+    'cloud',
     'health',
 ];
 

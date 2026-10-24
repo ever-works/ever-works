@@ -2197,6 +2197,9 @@ export class GitHubApiService {
 			// request's head repository disappearing; `null` is that answer,
 			// not an omission.
 			headRepoFullName: headRepoFullName(pr),
+			// Works-security (2026-10-18): the head BRANCH, so the merge gate
+			// can pin a pull request number to the Task branch it judged.
+			headRef: pr.head?.ref ?? null,
 			url: pr.html_url,
 			title: pr.title
 		};
@@ -2625,6 +2628,43 @@ export class GitHubApiService {
 		});
 
 		return { id: data.id, body: data.body || '' };
+	}
+
+	/**
+	 * Rewrite an open pull request's title and/or body (FL-06 FR-16). Only the
+	 * fields given are sent; state, base and head are never touched.
+	 */
+	async updatePullRequest(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		changes: { readonly title?: string; readonly body?: string },
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequest> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		const { data } = await octokit.rest.pulls.update({
+			owner,
+			repo,
+			pull_number: prNumber,
+			...(changes.title !== undefined ? { title: changes.title } : {}),
+			...(changes.body !== undefined ? { body: changes.body } : {})
+		});
+
+		const author = await this.buildPrAuthor(data.user, token, baseUrl);
+		return {
+			number: data.number,
+			title: data.title,
+			state: data.merged_at ? 'merged' : (data.state as 'open' | 'closed'),
+			head: data.head.ref,
+			base: data.base.ref,
+			url: data.html_url,
+			createdAt: data.created_at,
+			updatedAt: data.updated_at,
+			body: data.body ?? undefined,
+			...(author ? { author } : {})
+		};
 	}
 
 	async closePullRequest(

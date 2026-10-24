@@ -449,6 +449,37 @@ describe('HeartbeatLoop', () => {
 			expect(scripted.requests[2]).not.toHaveProperty('consents');
 		});
 
+		it('strips the session daemon block first (FL-04), keeping the consents and the link', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const entries: LogEntry[] = [];
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: ['managed', 'sessions'],
+					workerState: 'idle',
+					consents: { work: false, attend: false, manage: true, usageScan: false },
+					daemon: { state: 'running', sessions: 2 }
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('daemon');
+			expect(scripted.requests[1]).not.toHaveProperty('daemon');
+			expect(scripted.requests[1]).toMatchObject({ consents: { manage: true }, workerState: 'idle' });
+			expect(loop.acceptsField('daemon')).toBe(false);
+			expect(loop.acceptsField('consents')).toBe(true);
+			expect(entries.some((entry) => entry.message.includes('the daemon line stays off'))).toBe(true);
+		});
+
 		it('falls back to the legacy 16 tags first when a platform refuses a longer list, keeping every field', async () => {
 			const scheduler = fakeScheduler();
 			const tags = Array.from({ length: 18 }, (_, index) => `tag-${index}`);
@@ -617,6 +648,40 @@ describe('HeartbeatLoop', () => {
 			expect(scripted.sent()).toBe(3);
 			expect(scripted.requests[2]).not.toHaveProperty('health');
 			expect(scripted.requests[2]).toHaveProperty('cliVersions');
+		});
+
+		it('drops ONLY the hardware address and network identity against a platform that predates wake (FL-03 P2)', async () => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok, ok]);
+			const entries: LogEntry[] = [];
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: [],
+					macAddress: 'aa:bb:cc:dd:ee:f0',
+					lanId: 'a1b2c3d4e5f60718',
+					health: { cpuPercent: 31.2 },
+					workerState: 'idle'
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('macAddress');
+			expect(scripted.requests[1]).not.toHaveProperty('macAddress');
+			expect(scripted.requests[1]).not.toHaveProperty('lanId');
+			// The snapshot is one tier older and keeps flowing.
+			expect(scripted.requests[1]).toMatchObject({ health: { cpuPercent: 31.2 }, workerState: 'idle' });
+			expect(loop.acceptsField('macAddress')).toBe(false);
+			expect(loop.acceptsField('health')).toBe(true);
+			expect(entries.some((entry) => entry.message.includes('predates Wake-on-LAN'))).toBe(true);
 		});
 
 		it('says the health snapshot is latched off — and only it — so its probe can stop (FL-03)', async () => {

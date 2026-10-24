@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
+import type { FleetCloudMeta, FleetNodeOrigin, FleetNodeVirtualKind, FleetVirtualMeta } from '@ever-works/contracts';
 import {
     FleetNode,
     FleetNodeKind,
@@ -19,6 +20,16 @@ export interface CreateFleetNodeData {
     /** When the credential above was minted — drives token expiry. */
     credentialIssuedAt?: Date | null;
     capabilities?: string[];
+    /** Virtual computers (FL-16): `virtual` for a child; absent = the column default (`enrolled`). */
+    origin?: FleetNodeOrigin;
+    /** Virtual computers (FL-16): the host a child runs on. */
+    hostNodeId?: string | null;
+    virtualKind?: FleetNodeVirtualKind | null;
+    virtualMeta?: FleetVirtualMeta | null;
+    /** Cloud computers (FL-17): the machine-provider plugin and the machine's facts (no secrets). */
+    providerPluginId?: string | null;
+    providerMachineRef?: string | null;
+    providerMeta?: FleetCloudMeta | null;
 }
 
 /** Columns the enroll CAS is allowed to stamp alongside the flip. */
@@ -111,6 +122,25 @@ export class FleetNodeRepository {
             out.push(
                 ...(await this.repository.find({
                     select: { id: true, status: true },
+                    where: { id: In([...chunk]) },
+                })),
+            );
+        }
+        return out;
+    }
+
+    /**
+     * Commands on computers (FL-12) — the id and name of each of these rows,
+     * for a Command's cards; an id with no row (a removed computer) is simply
+     * absent. Chunked like {@link findStatusesByIds}.
+     */
+    async findNamesByIds(ids: readonly string[]): Promise<Array<Pick<FleetNode, 'id' | 'name'>>> {
+        const out: Array<Pick<FleetNode, 'id' | 'name'>> = [];
+        for (let start = 0; start < ids.length; start += STATUS_READ_CHUNK) {
+            const chunk = ids.slice(start, start + STATUS_READ_CHUNK);
+            out.push(
+                ...(await this.repository.find({
+                    select: { id: true, name: true },
                     where: { id: In([...chunk]) },
                 })),
             );
@@ -213,6 +243,44 @@ export class FleetNodeRepository {
 
     async update(id: string, patch: Partial<FleetNode>): Promise<void> {
         await this.repository.update(id, patch);
+    }
+
+    /**
+     * Virtual computers (FL-16) — every child of these hosts, whoever owns it
+     * (a child is owned by its host's owner, but the read is by host so a
+     * host's limit and its delete guard never miss one). Empty input → [].
+     */
+    async findByHostNodeIds(hostNodeIds: readonly string[]): Promise<FleetNode[]> {
+        const ids = [...new Set(hostNodeIds.filter((id) => typeof id === 'string' && id.length > 0))];
+        if (ids.length === 0) return [];
+        return this.repository.find({ where: { hostNodeId: In(ids) }, order: { name: 'ASC' } });
+    }
+
+    /**
+     * Cloud computers (FL-17) — every cloud computer of every owner (the
+     * reconcile and bootstrap-watch sweeps), oldest first, bounded.
+     */
+    async findCloudNodes(limit = 2000): Promise<FleetNode[]> {
+        return this.repository.find({
+            where: { origin: 'cloud' },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /** Cloud computers (FL-17) — the row a provider machine belongs to, or null. */
+    async findByProviderMachine(providerPluginId: string, providerMachineRef: string): Promise<FleetNode | null> {
+        if (!providerPluginId || !providerMachineRef) return null;
+        return this.repository.findOne({ where: { providerPluginId, providerMachineRef } });
+    }
+
+    /** Virtual computers (FL-16) — every child of any host (the reconcile sweep), bounded. */
+    async findVirtualChildren(limit = 2000): Promise<FleetNode[]> {
+        return this.repository.find({
+            where: { hostNodeId: Not(IsNull()) },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
     }
 
     /**

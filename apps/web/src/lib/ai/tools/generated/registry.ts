@@ -1,5 +1,16 @@
 import type { HttpMethod } from './api-call';
-import { mentionsSomeone, touchesAgentPrivileges } from './privileged';
+import {
+    TASK_CREATE_ALLOWED_FIELDS,
+    TASK_PRIVILEGED_FIELDS,
+    TASK_UPDATE_ALLOWED_FIELDS,
+    changesTaskLabels,
+    createsStartedTask,
+    mentionsSomeone,
+    redirectsNotificationChannel,
+    redirectsWebhook,
+    startsTaskWork,
+    touchesAgentPrivileges,
+} from './privileged';
 
 /**
  * Manifest-driven chat-tool registry.
@@ -78,6 +89,33 @@ export interface OperationSpec {
      * into making them. Defaults to `destructive` wording.
      */
     confirmationKind?: 'destructive' | 'privileged';
+    /**
+     * Security (works-security, 2026-10-18): the request-body ALLOWLIST for an
+     * operation whose DTO mixes everyday fields with controls. The factory
+     * forwards only `allowed` + `privileged` keys (anything else is dropped
+     * and reported back as `ignoredFields`), and a call that carries any
+     * `privileged` key needs the user's confirmation (privileged card, with a
+     * preview of exactly those fields) — the control stays usable, one click
+     * away, but never on the model's say-so alone.
+     */
+    bodyFields?: {
+        allowed: readonly string[];
+        privileged?: readonly string[];
+    };
+    /**
+     * Security: refuse the call when any string argument (path, query or
+     * body, nested) carries something that looks like a credential. For tools
+     * that hand a URL or text to a third party (screenshot, web search), where
+     * a planted instruction could otherwise smuggle a key out in the query.
+     */
+    refuseSecretArgs?: boolean;
+    /**
+     * Security: response fields that hold a one-time secret (a freshly minted
+     * API key). They are lifted out of the result into `__secretOnce`, which
+     * the chat UI shows to the user once; the model is never shown the value
+     * and the conversation store never saves it.
+     */
+    secretResultFields?: readonly string[];
     /** Optional canvas artifact this result renders nicely as (documentation only). */
     canvas?: string;
 }
@@ -205,6 +243,10 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         summary: 'Resume a paused agent.',
         kind: 'action',
         params: [id('Agent id')],
+        // Works-security: a resumed agent starts heartbeat runs on its own
+        // cadence (spend + autonomous work) — the user's call, like run_agent_now.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'run_agent_now',
@@ -249,6 +291,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [id('Agent id')],
         body: true,
         bodyHint: 'taskId.',
+        // Works-security: the route pre-creates an AgentRun and enqueues it —
+        // it STARTS a run, exactly like run_agent_now.
+        requiresConfirmation: true,
     },
 
     // ── Meetings (Wave 8, feature a) ─────────────────────────────
@@ -412,18 +457,29 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'create',
         body: true,
         bodyHint:
-            'title (required), description, priority, dueDate, labels, missionId, ideaId, workId, parentTaskId, extraRepos (array of { repoConnectionId, mountDir?, writable? } — repository-registry connection ids; extra repositories mounted next to the Work’s repository when the task runs on a fleet node).',
+            'title (required), description, priority, status (backlog or todo; anything else needs confirmation), dueAt, startAt, estimateMinutes, labels, missionId, ideaId, workId, parentTaskId. Needs the user’s confirmation: agentId, scheduledAt, teamId, goalId, acceptanceChecks, requireAllApprovers, isolationMode, maxGateAttempts, extraRepos (array of { repoConnectionId, mountDir?, writable? } — repository-registry connection ids; extra repositories mounted next to the Work’s repository when the task runs on a fleet node).',
+        // Works-security (2026-10-18): an injected email or Task text could
+        // otherwise have the assistant file a Task whose setup command runs
+        // on a fleet node, or one assigned/scheduled to an agent. Everyday
+        // fields go straight through; the controls need a confirmation.
+        bodyFields: { allowed: TASK_CREATE_ALLOWED_FIELDS, privileged: TASK_PRIVILEGED_FIELDS },
+        confirmWhen: createsStartedTask,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'update_task',
         method: 'PATCH',
         path: '/api/tasks/{id}',
-        summary: 'Update a task’s fields.',
+        summary: 'Update a task’s fields (use transition_task to change its status).',
         kind: 'update',
         params: [id('Task id')],
         body: true,
         bodyHint:
-            'Any of: title, description, priority, dueDate, status, labels, extraRepos (array of { repoConnectionId, mountDir?, writable? } — repository-registry connection ids; null clears).',
+            'Any of: title, description, priority, dueAt, startAt, estimateMinutes, missionId, ideaId, workId, parentTaskId. Needs the user’s confirmation: labels (the list is replaced), agentId, scheduledAt, teamId, goalId, acceptanceChecks, requireAllApprovers, isolationMode, maxGateAttempts, extraRepos (array of { repoConnectionId, mountDir?, writable? } — repository-registry connection ids; null clears).',
+        // Works-security (2026-10-18): see create_task.
+        bodyFields: { allowed: TASK_UPDATE_ALLOWED_FIELDS, privileged: TASK_PRIVILEGED_FIELDS },
+        confirmWhen: changesTaskLabels,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'delete_task',
@@ -442,7 +498,15 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'action',
         params: [id('Task id')],
         body: true,
-        bodyHint: 'status (e.g. in_progress, completed, blocked).',
+        bodyHint:
+            'to (required: backlog, todo, in_progress, in_review, blocked, done or cancelled). Moving to in_progress, in_review, done or cancelled can start agent runs and needs the user’s confirmation, as does force.',
+        // Works-security (2026-10-18): `→ in_progress` dispatches every
+        // assigned agent, `→ in_review` plans reviewer runs, and `→ done` /
+        // `cancelled` release dependents (which can start theirs). `force`
+        // skips the approver gate.
+        bodyFields: { allowed: ['to', 'mode'], privileged: ['force'] },
+        confirmWhen: startsTaskWork,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'add_task_assignee',
@@ -655,6 +719,10 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'create',
         body: true,
         bodyHint: 'type, name, config.',
+        // Works-security: a channel is a destination the platform sends
+        // notification content to — an injected one would forward it out.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'update_notification_channel',
@@ -665,6 +733,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [id('Channel id')],
         body: true,
         bodyHint: 'Any of: name, config, enabled.',
+        // Works-security: changing `config` re-points the destination.
+        confirmWhen: redirectsNotificationChannel,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'delete_notification_channel',
@@ -700,6 +771,13 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'create',
         body: true,
         bodyHint: 'name, optional expiresAt/scopes.',
+        // Works-security: a personal key acts as the user everywhere. It is
+        // minted only on the user's confirmation, and the plaintext key goes
+        // to the user's screen once — never into the model's context (where a
+        // later tool call could carry it out) or the stored conversation.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
+        secretResultFields: ['key'],
     },
     {
         toolName: 'revoke_api_key',
@@ -730,6 +808,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [workId],
         body: true,
         bodyHint: 'userId or email, role.',
+        // Works-security: grants a person access to the Work.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'update_work_member',
@@ -740,6 +821,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [workId, { name: 'memberId', in: 'path', required: true, type: 'string' }],
         body: true,
         bodyHint: 'role.',
+        // Works-security: changes what a person may do on the Work.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'remove_work_member',
@@ -759,6 +843,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [workId],
         body: true,
         bodyHint: 'email, role.',
+        // Works-security: sends an email and grants access once accepted.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'list_work_invitations',
@@ -796,6 +883,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [workId],
         body: true,
         bodyHint: 'cap, currency, scope (global or pluginId), overageBehaviour.',
+        // Works-security: a budget decides how much the platform may spend.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'update_work_budget',
@@ -806,6 +896,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [workId, { name: 'budgetId', in: 'path', required: true, type: 'string' }],
         body: true,
         bodyHint: 'Any of: cap, overageBehaviour.',
+        // Works-security: raising a cap / changing overage allows more spend.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'delete_work_budget',
@@ -859,6 +952,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'create',
         body: true,
         bodyHint: 'url, events[], optional secret.',
+        // Works-security: a webhook ships event payloads to an outside URL.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'update_webhook',
@@ -869,6 +965,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [id('Webhook id')],
         body: true,
         bodyHint: 'Any of: url, events, enabled.',
+        // Works-security: changing url / events re-points what goes out.
+        confirmWhen: redirectsWebhook,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'delete_webhook',
@@ -1086,6 +1185,10 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         summary: 'Enable a plugin for the account.',
         kind: 'action',
         params: [{ name: 'pluginId', in: 'path', required: true, type: 'string' }],
+        // Works-security: a plugin gains access to the account's data and
+        // can become the provider every model call goes through.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'disable_plugin',
@@ -1105,6 +1208,10 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [{ name: 'pluginId', in: 'path', required: true, type: 'string' }],
         body: true,
         bodyHint: 'settings object matching the plugin schema.',
+        // Works-security: settings hold secrets and base URLs — one changed
+        // base URL redirects every model call (and its prompts) elsewhere.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'enable_work_plugin',
@@ -1113,6 +1220,9 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         summary: 'Enable a plugin for a specific Work.',
         kind: 'action',
         params: [workId, { name: 'pluginId', in: 'path', required: true, type: 'string' }],
+        // Works-security: same as enable_plugin, for one Work.
+        requiresConfirmation: true,
+        confirmationKind: 'privileged',
     },
     {
         toolName: 'disable_work_plugin',

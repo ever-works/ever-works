@@ -48,6 +48,7 @@ import {
     APP_HOSTS_DEPLOYMENT_STORE,
     APP_HOSTS_WORK_STORE,
     APP_IMAGE_REFERENCE_RESOLVER,
+    APP_IMAGE_USER_INSPECTOR,
     APP_RUNTIME_EVENT_SINK,
     APP_RUNTIME_NOTIFICATIONS,
     APP_UPSTREAM_STATE_READER,
@@ -58,6 +59,7 @@ import {
     ConfigAppsTierPolicy,
     PublicGitHubCommitAncestry,
     RegistryAppImageReferenceResolver,
+    RegistryAppImageUserInspector,
     workerAppDeployDispatcher,
 } from '@ever-works/agent/app-runtime';
 import { APP_DEPLOY_HOST_SOURCE } from '@ever-works/agent/app-runtime';
@@ -743,6 +745,12 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         {
             provide: APP_IMAGE_REFERENCE_RESOLVER,
             useFactory: () => new RegistryAppImageReferenceResolver(),
+        },
+        // 2026-10-21: the registry `USER` pre-check — consulted only while
+        // `APP_WORKS_IMAGE_USER_PRECHECK_ENABLED=true` (default off).
+        {
+            provide: APP_IMAGE_USER_INSPECTOR,
+            useFactory: () => new RegistryAppImageUserInspector(),
         },
         // T29: the two producers, written through the proxied `NotificationService`.
         {

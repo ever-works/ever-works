@@ -19,9 +19,19 @@ import {
     type FleetComputerGroup,
 } from '../fleet-hub.shared';
 import { osKeyOf } from '../fleet-os.shared';
+import { ComputerStateSentence } from '../health/ComputerStateSentence';
+import { HealthSparkline } from '../health/HealthSparkline';
+import { VirtualChildRow } from '../virtual/VirtualChildRow';
+import { CloudCardLine } from '../cloud/CloudCardLine';
 
 interface ComputerCardsProps {
     nodes: FleetNodeView[];
+    /**
+     * Computer health, second phase (FL-03) — whether the deployment keeps
+     * health history (`FLEET_HEALTH_HISTORY_ENABLED`): each card then carries
+     * a sparkline of the last hour's CPU. Off (the default), no history read.
+     */
+    historyEnabled?: boolean;
 }
 
 /**
@@ -34,7 +44,7 @@ interface ComputerCardsProps {
  * and when it last checked in, relative with the absolute time as a tooltip.
  * A computer someone else owns says "Shared with you".
  */
-export function ComputerCards({ nodes }: ComputerCardsProps) {
+export function ComputerCards({ nodes, historyEnabled = false }: ComputerCardsProps) {
     const t = useTranslations('fleet.overview.computers');
     const persisted = nodes.filter((node) => node.persisted);
     const groups = groupComputersByHost(persisted);
@@ -65,17 +75,31 @@ export function ComputerCards({ nodes }: ComputerCardsProps) {
             </div>
             <ul aria-label={t('listLabel')} className="space-y-2">
                 {groups.map((group) => (
-                    <ComputerCardGroup key={group.node.id} group={group} />
+                    <ComputerCardGroup
+                        key={group.node.id}
+                        group={group}
+                        historyEnabled={historyEnabled}
+                    />
                 ))}
             </ul>
         </section>
     );
 }
 
-function ComputerCardGroup({ group }: { group: FleetComputerGroup }) {
+function ComputerCardGroup({
+    group,
+    historyEnabled,
+}: {
+    group: FleetComputerGroup;
+    historyEnabled: boolean;
+}) {
     return (
         <li>
-            <ComputerCard node={group.node} hostName={group.hostName ?? undefined} />
+            <ComputerCard
+                node={group.node}
+                hostName={group.hostName ?? undefined}
+                historyEnabled={historyEnabled}
+            />
             {group.children.length > 0 && (
                 <ul className="mt-2 ml-6 space-y-2 border-l border-border dark:border-border-dark pl-3">
                     {group.children.map((child) => (
@@ -84,7 +108,11 @@ function ComputerCardGroup({ group }: { group: FleetComputerGroup }) {
                                 aria-hidden="true"
                                 className="absolute -left-3 top-1/2 w-3 border-t border-border dark:border-border-dark"
                             />
-                            <ComputerCard node={child} hostName={group.node.name} />
+                            <ComputerCard
+                                node={child}
+                                hostName={group.node.name}
+                                historyEnabled={historyEnabled}
+                            />
                         </li>
                     ))}
                 </ul>
@@ -93,7 +121,15 @@ function ComputerCardGroup({ group }: { group: FleetComputerGroup }) {
     );
 }
 
-function ComputerCard({ node, hostName }: { node: FleetNodeView; hostName?: string }) {
+function ComputerCard({
+    node,
+    hostName,
+    historyEnabled = false,
+}: {
+    node: FleetNodeView;
+    hostName?: string;
+    historyEnabled?: boolean;
+}) {
     const t = useTranslations('fleet');
     const locale = useLocale();
     // The absolute tooltips are the reader's time zone, so they wait for the
@@ -200,6 +236,10 @@ function ComputerCard({ node, hostName }: { node: FleetNodeView; hostName?: stri
                     }
                 >
                     {cell(t('overview.computers.cpu'), health?.cpuPercent)}
+                    {/* FL-03 second phase: the last hour of CPU (FR-21), history on only. */}
+                    {historyEnabled && health && state !== 'offline' ? (
+                        <HealthSparkline nodeId={node.id} />
+                    ) : null}
                     {cell(t('overview.computers.memory'), health?.memPercent)}
                     {cell(t('overview.computers.disk'), health?.diskPercent)}
                 </span>
@@ -215,6 +255,13 @@ function ComputerCard({ node, hostName }: { node: FleetNodeView; hostName?: stri
                         : t('overview.computers.neverChecked')}
                 </span>
             </div>
+            {/* FL-03: the state's why beside FL-01's word — a limit's reset time, the
+                node's own reason, "can be woken from build-01" — never a repeat of it. */}
+            {mounted ? (
+                <div className="mt-1 ml-6">
+                    <ComputerStateSentence node={node} wakeVia={node.canWake?.name ?? null} />
+                </div>
+            ) : null}
             {hostName && (
                 <p
                     className="mt-1 ml-6 text-xs text-text-muted dark:text-text-muted-dark"
@@ -225,6 +272,10 @@ function ComputerCard({ node, hostName }: { node: FleetNodeView; hostName?: stri
                         : t('overview.computers.nestedVm', { host: hostName })}
                 </p>
             )}
+            {/* FL-16: a virtual computer's system, size, state and create progress. */}
+            {node.virtual ? <VirtualChildRow node={node} /> : null}
+            {/* FL-17: a cloud computer's provider, region, price and cost so far. */}
+            {node.cloud ? <CloudCardLine node={node} /> : null}
         </Link>
     );
 }

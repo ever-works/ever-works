@@ -249,6 +249,8 @@ describe('a fleet run never starts autonomous work', () => {
             TASK_ID,
             expect.objectContaining({ scheduledAt: null }),
             scope,
+            // Works-security (2026-10-18): a fleet run's writes are reserved-label restricted.
+            { restrictReservedLabels: { who: 'A fleet-run credential' } },
         );
     });
 
@@ -306,6 +308,7 @@ describe('a fleet run never starts autonomous work', () => {
             USER_ID,
             expect.objectContaining({ createdByType: 'agent', createdById: OWN_AGENT }),
             scope,
+            { restrictReservedLabels: { who: 'A fleet-run credential' } },
         );
     });
 

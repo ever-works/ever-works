@@ -4,6 +4,7 @@ import { Bot, CalendarClock, Clock, HeartPulse, Monitor, Moon, TriangleAlert } f
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { AgentAttachmentsPanel } from '@/components/agents/AgentAttachmentsPanel';
 import { AgentGuardrailsCard } from '@/components/agents/AgentGuardrailsCard';
+import { AgentSessionsBlock } from '@/components/agents/AgentSessionsBlock';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { MessageAgentButton } from '@/components/ai/conversations/ConversationEntryButtons';
 import { Button } from '@/components/ui/button';
@@ -215,6 +216,9 @@ export default async function AgentDashboardPage({ params }: { params: Promise<{
 
             {/* Dispatch guardrails */}
             <AgentGuardrailsCard agentId={id} initial={agent.guardrails ?? null} />
+
+            {/* Sessions on computers (FL-04 P2) — renders nothing unless FLEET_SESSIONS_ENABLED. */}
+            <AgentSessionsBlock agentId={id} agentName={agent.name} />
 
             <AgentAttachmentsPanel agentId={id} initial={attachments} />
         </div>

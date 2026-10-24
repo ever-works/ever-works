@@ -594,6 +594,16 @@ export interface GitPullRequestStatus {
 	 * reported none, `undefined` that this read did not report it.
 	 */
 	readonly headRepoFullName?: string | null;
+	/**
+	 * The head BRANCH name (`pr.head.ref`), as the provider reports it.
+	 * Optional and additive (works-security 2026-10-18): the merge gate
+	 * merges a Task's pull request by NUMBER after every gate judged the
+	 * Task's BRANCH, so it refuses a pull request whose live head branch is
+	 * not the Task's recorded one. `null` when the provider reported none,
+	 * `undefined` when this read did not report it (the gate then keeps its
+	 * previous behaviour).
+	 */
+	readonly headRef?: string | null;
 }
 
 // ── Workflow runs (release promotion lane, self-build slice AI) ─────
@@ -980,6 +990,19 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		token: string
 	): Promise<{ id: number; body: string }>;
 	closePullRequest?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequest>;
+	/**
+	 * Change an open pull request's title and/or body (FL-06 spec FR-16: "Update
+	 * the pull request #n" rewrites it instead of opening a second one). Never
+	 * its state, base or head — and never a merge. OPTIONAL: a provider without
+	 * it is refused as unsupported.
+	 */
+	updatePullRequest?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		changes: { readonly title?: string; readonly body?: string },
+		token: string
+	): Promise<GitPullRequest>;
 
 	// Utility
 	repositoryExists?(owner: string, repo: string, token: string): Promise<boolean>;

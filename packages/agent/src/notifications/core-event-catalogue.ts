@@ -204,6 +204,33 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         urgent: false,
         defaultChannels: IN_APP,
     },
+    // --- Sessions on computers (FL-05, spec FR-37 … FR-40) ---
+    {
+        key: 'fleet_session_needs_you',
+        category: 'agent',
+        title: 'A session needs you',
+        description:
+            'A session on one of your computers stopped to ask — for permission to run a tool, an answer to a question — or is blocked.',
+        urgent: true,
+        quietHoursBypassNeedsOptIn: true,
+        defaultChannels: IN_APP_AND_EMAIL,
+    },
+    {
+        key: 'fleet_session_finished',
+        category: 'agent',
+        title: 'A session finished',
+        description: 'An agent session on one of your computers finished its turn while you were not looking at it.',
+        urgent: false,
+        defaultChannels: IN_APP,
+    },
+    {
+        key: 'fleet_session_failed',
+        category: 'agent',
+        title: 'A session failed',
+        description: 'An agent session on one of your computers ended with an error.',
+        urgent: false,
+        defaultChannels: IN_APP,
+    },
     // --- Emitted by producers but never registered before AW-13 ---
     {
         key: 'credits_balance_exhausted',

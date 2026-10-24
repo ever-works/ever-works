@@ -1,5 +1,14 @@
 import { Command, CommanderError } from 'commander';
+import { homedir as osHomedir } from 'node:os';
+import { stat as statFile, unlink as removeFile } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
+import type { FleetVirtualSystemId } from '@ever-works/contracts';
+import { parseCatalogueLock, resolveVirtualImage, VIRTUAL_CONTAINER_IMAGES } from '../core/link/modules/virtual/catalogue';
+import { resolveWindowsImage } from '../core/link/modules/virtual/windows';
+import { createNativeScheduler } from '../core/link/modules/schedule/native-scheduler';
+import { ScheduleHistory } from '../core/link/modules/schedule/schedule-history';
+import { ScheduleLoop } from '../core/link/modules/schedule/schedule-loop';
+import { ScheduleStore } from '../core/link/modules/schedule/schedule-store';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
@@ -74,6 +83,15 @@ import {
 	writeNodeLinkRecord
 } from '../core/link/link-record';
 import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
+import { DaemonControlClient } from '../core/sessions/daemon-client';
+import { resolveSessionDaemonPaths } from '../core/sessions/daemon/daemon-paths';
+import { installDaemonProcessHandlers, runSessionDaemon } from '../core/sessions/daemon/daemon-main';
+import {
+	SELF_UPDATE_EXIT_CODE,
+	SelfUpdateController,
+	readSelfUpdateRecord,
+	writeSelfUpdateRecord
+} from '../core/link/self-update';
 
 /**
  * `ever-works-node` CLI.
@@ -96,6 +114,8 @@ import { NODE_SOURCE_UPGRADE_HINT } from '../core/worker-loop';
 
 export const EXIT_OK = 0;
 export const EXIT_FAILURE = 1;
+/** A command line that cannot be run as written (`enroll` with both or neither of --token / --token-file). */
+export const EXIT_USAGE = 2;
 /** Not enrolled / no usable config — distinct so scripts can branch on it. */
 export const EXIT_NOT_ENROLLED = 3;
 
@@ -149,6 +169,25 @@ export interface CliDeps {
 	};
 	/** Wall clock for ages and stamps; defaults to `Date.now`. */
 	now?: () => number;
+	/**
+	 * Sessions on computers (FL-04) — how to run this build's hidden
+	 * `session-daemon` subcommand: the Node binary and this CLI's entry
+	 * script. Set by the real executable only; absent (tests, embedders)
+	 * means no session daemon is started and `sessions` is never advertised.
+	 */
+	sessionDaemonCommand?: { command: string; args: string[] };
+	/** Owner-only ACL for a file on Windows (the session daemon's token). */
+	restrictFile?: (file: string) => Promise<void> | void;
+	/** Virtual computers (FL-16): the `enroll --token-file` reader (tests inject a fake). */
+	enrollTokenFileIo?: EnrollTokenFileIo;
+	/** The session daemon's own entry (the hidden subcommand); a seam for the CLI spec. */
+	runSessionDaemon?: typeof runSessionDaemon;
+	/**
+	 * Fleet node link (FL-02 T-25) — the running binary's real path, so the
+	 * opt-in self-update can tell an `npm install -g` install (which it
+	 * upgrades) from anything else (which it refuses). Unset → refused.
+	 */
+	entryPath?: string | null;
 }
 
 /**
@@ -198,7 +237,16 @@ async function requireConfig(deps: CliDeps): Promise<NodeConfig> {
 
 export interface EnrollCommandOptions {
 	apiUrl: string;
-	token: string;
+	/** The one-time token on the command line — or, instead, {@link tokenFile}. */
+	token?: string;
+	/**
+	 * Virtual computers (FL-16, CONTRACTS R-35, spec FR-14) — read the one-time
+	 * token from this file instead of the command line (where any user of the
+	 * machine can read it in the process list). The file is read once, trimmed
+	 * and DELETED; on POSIX it must belong to this user and be readable by no
+	 * one else (0600 or tighter). Exactly one of --token / --token-file.
+	 */
+	tokenFile?: string;
 	name?: string;
 	heartbeatInterval?: string;
 	/** Comma-separated capability opt-in (A15). Omitted = offer everything detected. */
@@ -316,7 +364,78 @@ function describeWorkspaceGc(policy: NodeWorkspaceGcPolicy): string {
 	return `max age ${policy.maxAgeDays} d, ${policy.maxCount === null ? 'no count budget' : `at most ${policy.maxCount}`}`;
 }
 
+/** What `--token-file` reads through (injected so the checks are testable without a disk). */
+export interface EnrollTokenFileIo {
+	/** `{ uid, mode }` of the file, or null when it does not exist. */
+	stat(path: string): Promise<{ uid: number; mode: number } | null>;
+	readFile(path: string): Promise<string | null>;
+	remove(path: string): Promise<void>;
+	/** The current user's uid (POSIX), or null where it does not apply. */
+	currentUid(): number | null;
+}
+
+function defaultEnrollTokenFileIo(deps: CliDeps): EnrollTokenFileIo {
+	return {
+		stat: async (path) => {
+			try {
+				const info = await statFile(path);
+				return { uid: info.uid, mode: info.mode };
+			} catch {
+				return null;
+			}
+		},
+		readFile: (path) => deps.fs.readFile(path),
+		remove: async (path) => {
+			if (deps.fs.remove) await deps.fs.remove(path);
+			else await removeFile(path).catch(() => undefined);
+		},
+		currentUid: () => (typeof process.getuid === 'function' ? process.getuid() : null)
+	};
+}
+
+/**
+ * The one-time token of `enroll` (CONTRACTS R-35): `--token`, or the contents
+ * of `--token-file` (read once, trimmed, then deleted — whether or not it
+ * held a usable token, so a token file never outlives the attempt). Both or
+ * neither is a usage error (exit 2). On POSIX a token file that another user
+ * owns, or that group / others may read, is refused before it is read.
+ */
+export async function resolveEnrollToken(
+	deps: CliDeps,
+	options: Pick<EnrollCommandOptions, 'token' | 'tokenFile'>,
+	io: EnrollTokenFileIo = deps.enrollTokenFileIo ?? defaultEnrollTokenFileIo(deps)
+): Promise<string> {
+	const hasToken = typeof options.token === 'string' && options.token.length > 0;
+	const hasFile = typeof options.tokenFile === 'string' && options.tokenFile.length > 0;
+	if (hasToken === hasFile) {
+		throw new CliError('enroll needs exactly one of --token <token> or --token-file <file>', EXIT_USAGE);
+	}
+	if (hasToken) return options.token as string;
+	const path = options.tokenFile as string;
+	const info = await io.stat(path);
+	if (!info) throw new CliError(`The token file ${path} does not exist`);
+	try {
+		if (deps.platform !== 'win32') {
+			const uid = io.currentUid();
+			if (uid !== null && info.uid !== uid) {
+				throw new CliError(`The token file ${path} belongs to another user; refusing to read it`);
+			}
+			if ((info.mode & 0o077) !== 0) {
+				throw new CliError(`The token file ${path} is readable by other users (it must be 0600); refusing to read it`);
+			}
+		}
+		const raw = await io.readFile(path);
+		const token = (raw ?? '').trim();
+		if (!token) throw new CliError(`The token file ${path} is empty`);
+		return token;
+	} finally {
+		// The file is spent either way: never leave a token behind.
+		await io.remove(path).catch(() => undefined);
+	}
+}
+
 export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): Promise<void> {
+	const token = await resolveEnrollToken(deps, options);
 	const heartbeatIntervalMs = parseIntervalSeconds(options.heartbeatInterval);
 	const capabilitySelection = parseCapabilityList(options.capabilities);
 	const limits = parseLimitFlags(options);
@@ -324,7 +443,7 @@ export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): P
 	const config = await enrollNode({
 		...deps.io,
 		apiUrl: options.apiUrl,
-		token: options.token,
+		token,
 		kind: 'node',
 		...(options.name !== undefined ? { name: options.name } : {}),
 		...(heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs } : {}),
@@ -393,6 +512,97 @@ export interface StartCommandOptions {
 	 * independent of `--work` and `--attend`.
 	 */
 	manage?: boolean;
+	/**
+	 * Fleet node link (FL-02 T-25) — let this machine upgrade itself when the
+	 * platform raises its version floor or names a recommended version: it
+	 * waits for running jobs, installs through npm, and exits 75 so its
+	 * service manager starts the new binary. Off by default (report only).
+	 */
+	autoUpdate?: boolean;
+	/**
+	 * Schedules on computers (FL-13 P3) — also hand this machine's schedules to
+	 * the operating system's scheduler when the node is not a service, so they
+	 * run while nobody has the node open. Off by default; process-scoped.
+	 */
+	nativeSchedules?: boolean;
+	/**
+	 * Checkouts on computers (FL-14, CONTRACTS R-41) — a folder this machine's
+	 * owner keeps code in; discovery walks it for git clones. Repeatable;
+	 * persisted (the list given replaces the stored one), like
+	 * `--workspace-root`.
+	 */
+	codeFolder?: string[];
+	/**
+	 * Logs on computers (FL-08, CONTRACTS R-18) — a folder this machine shares
+	 * with the dashboard (repeatable): the Logs tab lists the log files under
+	 * it, beside the standard log directories and the workspace root. Absolute;
+	 * never a filesystem root (the home directory as a whole is refused by the
+	 * resolver). Process-scoped, like `--manage`.
+	 */
+	filesRoot?: string[];
+}
+
+/** Parse every `--files-root` (FL-08): absolute, not a filesystem root, de-duplicated. */
+export function parseFilesRoots(raw: readonly string[] | undefined, platform: string): string[] {
+	const out: string[] = [];
+	for (const entry of raw ?? []) {
+		const value = entry.trim();
+		if (value.length === 0) throw new CliError('--files-root must not be empty');
+		const path = platform === 'win32' ? win32 : posix;
+		if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+			throw new CliError(`--files-root must be an absolute directory (got "${entry}")`);
+		}
+		const normalized = path.resolve(value);
+		if (normalized === path.parse(normalized).root) {
+			throw new CliError(`--files-root cannot be a filesystem root (got "${entry}")`);
+		}
+		if (!out.includes(normalized)) out.push(normalized);
+	}
+	return out;
+}
+
+/**
+ * Parse `--code-folder` (FL-14, spec FR-3): every value absolute (a leading
+ * `~/` is the home folder), never a filesystem root, and never the home
+ * folder ITSELF — discovery must not walk a whole home directory. Duplicates
+ * collapse. `undefined` / empty means the flag was not given.
+ */
+export function parseCodeFolders(
+	raw: readonly string[] | undefined,
+	platform: string,
+	home: string = osHomedir()
+): string[] | undefined {
+	if (!raw || raw.length === 0) return undefined;
+	const path = platform === 'win32' ? win32 : posix;
+	const homeResolved = home ? path.resolve(home) : '';
+	const out: string[] = [];
+	for (const entry of raw) {
+		let value = entry.trim();
+		if (value.length === 0) throw new CliError('--code-folder must not be empty');
+		if (value === '~') {
+			throw new CliError('--code-folder cannot be your whole home folder; name the folder you keep code in');
+		}
+		if ((value.startsWith('~/') || value.startsWith('~\\')) && homeResolved) {
+			value = path.join(homeResolved, value.slice(2));
+		}
+		if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+			throw new CliError(`--code-folder must be an absolute directory (got "${entry}")`);
+		}
+		const normalized = path.resolve(value);
+		if (normalized === path.parse(normalized).root) {
+			throw new CliError(`--code-folder cannot be a filesystem root (got "${entry}")`);
+		}
+		const same =
+			platform === 'win32'
+				? normalized.toLowerCase() === homeResolved.toLowerCase()
+				: normalized === homeResolved;
+		if (homeResolved && same) {
+			throw new CliError('--code-folder cannot be your whole home folder; name the folder you keep code in');
+		}
+		if (!out.includes(normalized)) out.push(normalized);
+	}
+	if (out.length > 32) throw new CliError('--code-folder can be given at most 32 times');
+	return out;
 }
 
 /**
@@ -443,6 +653,8 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const override = parseIntervalSeconds(options.heartbeatInterval);
 	// Usage errors first, before the config is even read.
 	const workspaceRoot = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
+	const codeFolders = parseCodeFolders(options.codeFolder, deps.platform);
+	const filesRoots = parseFilesRoots(options.filesRoot, deps.platform);
 	const workspaceGcOverrides = parseWorkspaceGcFlags(options);
 	const stored = await requireConfig(deps);
 	// The reaper policy is persisted on `start` (see `StartCommandOptions`),
@@ -461,11 +673,20 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// directory in the admin's own profile, reported as "nothing to
 	// reclaim" while the node refused every job for want of space on D:.
 	const rootChanged = workspaceRoot !== undefined && workspaceRoot !== stored.workspaceRoot;
-	if (workspaceGcOverrides !== undefined || rootChanged) {
+	// `--code-folder` is persisted for the same reason (FL-14): the service
+	// re-reads it on every start, and `install-service` re-applies flags.
+	const foldersChanged =
+		codeFolders !== undefined && JSON.stringify(codeFolders) !== JSON.stringify(stored.codeFolders ?? []);
+	if (workspaceGcOverrides !== undefined || rootChanged || foldersChanged) {
 		await saveConfig(
 			deps.fs,
 			deps.configPath,
-			{ ...stored, workspaceGc, ...(workspaceRoot !== undefined ? { workspaceRoot } : {}) },
+			{
+				...stored,
+				workspaceGc,
+				...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
+				...(codeFolders !== undefined ? { codeFolders } : {})
+			},
 			{ platform: deps.platform, secrets: deps.secrets ?? null, logger: deps.io.logger }
 		);
 	}
@@ -473,12 +694,19 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...stored,
 		workspaceGc,
 		...(workspaceRoot !== undefined ? { workspaceRoot } : {}),
+		...(codeFolders !== undefined ? { codeFolders } : {}),
 		...(override === undefined ? {} : { heartbeatIntervalMs: override })
 	};
 
 	const workerEnabled = options.work === true;
 	const attendEnabled = options.attend === true;
 	const manageEnabled = options.manage === true;
+	// Fleet node link (FL-02 T-25): the opt-in self-update. Built after the
+	// runtime (it needs the lanes to know when the machine is idle), reached
+	// through these closures from the heartbeat.
+	const autoUpdate = options.autoUpdate === true;
+	let selfUpdate: SelfUpdateController | null = null;
+	let restartForUpdate: string | null = null;
 	// A node paused by `ever-works-node pause` comes back paused: the
 	// operator drained the machine on purpose, and a service restart
 	// (or a reboot) must not quietly hand it work again.
@@ -562,9 +790,73 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// link opens on the first accepted heartbeat when any of --work,
 		// --attend, --manage is on; its state is recorded for `status`.
 		manageEnabled,
+		// Logs on computers (FL-08): the folders this machine shares (R-18).
+		...(filesRoots.length > 0 ? { filesRoots } : {}),
 		nodeLink: true,
-		persistLinkState: (record) => writeNodeLinkRecord(deps.fs, deps.configPath, record)
+		persistLinkState: (record) => writeNodeLinkRecord(deps.fs, deps.configPath, record),
+		// Sessions on computers (FL-04): the session daemon, for a process that
+		// may host sessions (`--manage` or `--work`). It is spawned detached and
+		// outlives this process, so a restart or an upgrade ends no session.
+		...(deps.sessionDaemonCommand
+			? {
+					sessionDaemon: {
+						...deps.sessionDaemonCommand,
+						paths: resolveSessionDaemonPaths({
+							configPath: deps.configPath,
+							platform: deps.platform,
+							env: process.env
+						})
+					}
+				}
+			: {}),
+		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {}),
+		// Commands on computers (FL-12): the last 30 runs' full output, beside the config.
+		commandOutputDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'commands'
+		),
+		// Schedules on computers (FL-13): the machine's own schedules, their runs and outputs, beside the config.
+		scheduleDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'schedules'
+		),
+		// Fleet node link (FL-02 T-25): the self-update's report rides every
+		// beat, and every accepted beat's version verdict reaches it.
+		selfUpdateReport: () => selfUpdate?.report() ?? null,
+		// Schedules on computers (FL-13 P3): the OS-scheduler fallback, opt-in.
+		...(options.nativeSchedules === true && deps.sessionDaemonCommand
+			? {
+					nativeSchedules: true,
+					nativeScheduleCommand: {
+						file: deps.sessionDaemonCommand.command,
+						args: [...deps.sessionDaemonCommand.args]
+					}
+				}
+			: {}),
+		onHeartbeatAccepted: (response) => selfUpdate?.onHeartbeat(response),
+		// Checkouts on computers (FL-14): the node-local checkout registry,
+		// beside the config like the session daemon's state.
+		checkoutsRegistryPath: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'checkouts.json'
+		),
+		// Virtual computers (FL-16): the children this host builds keep their
+		// folders (bootstrap, meta, the catalogue lock) beside the config. A
+		// Windows host never hosts virtual computers (spec U4).
+		...(deps.platform !== 'win32'
+			? {
+					virtualDataDir: posix.join(posix.dirname(deps.configPath), 'virtual'),
+					// Windows VM passwords (FL-16 P2) live in the same keychain as the node credential.
+					virtualSecrets: deps.secrets ?? null
+				}
+			: {})
 	});
+	// The daemon starts with the node, before the first beat, so that beat can
+	// already report it (and advertise `sessions`).
+	runtime.sessions?.supervisor.start();
+	// Session status (FL-05): the hook endpoint, its file and client — before the
+	// first session starts, so its hooks have somewhere to go.
+	void runtime.sessions?.status?.start();
 	if (workerEnabled) {
 		// Node lifecycle (slice AR): say at startup what each pinned CLI is
 		// and whether this node can drive it — the first place an operator
@@ -574,6 +866,29 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	}
 	const { loop, worker } = runtime;
 	const attendedWorker = runtime.attended?.worker ?? null;
+	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, present only
+	// when a kind registered for it has its consent on (none in FL-02).
+	const managementWorker = runtime.management?.worker ?? null;
+	selfUpdate = new SelfUpdateController({
+		enabled: autoUpdate,
+		currentVersion: deps.io.version,
+		runner: deps.io.runner,
+		logger: deps.io.logger,
+		platform: deps.platform,
+		entryPath: deps.entryPath ?? null,
+		// Never kills work: an upgrade waits until no lane runs a job.
+		isIdle: () =>
+			[worker, attendedWorker, managementWorker].every(
+				(lane) => !lane || lane.getState().activeJobIds.length === 0
+			),
+		requestRestart: (to) => {
+			restartForUpdate = to;
+			requestShutdown();
+		},
+		persist: (record) => writeSelfUpdateRecord(deps.fs, deps.configPath, record),
+		previous: await readSelfUpdateRecord(deps.fs, deps.configPath),
+		...(deps.now ? { now: deps.now } : {})
+	});
 	// One line per ACCEPTED beat. The loop patches its state more than once per
 	// beat (`connected`, then the next attempt's delay) and every patch
 	// notifies, so keying on the state alone logged each beat twice. Keyed on
@@ -629,11 +944,17 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					: 'Live view enabled — terminal only: no browser was found here to show a screen'
 			);
 		}
+		if (managementWorker) {
+			await managementWorker.start();
+			deps.out(
+				`Management lane enabled — leasing [${(runtime.management?.kinds ?? []).join(', ')}] one at a time, outside --concurrency`
+			);
+		}
 	};
 	let lanesStarted: Promise<void> = Promise.resolve();
 	let laneStartFailed = false;
 	let laneStartFailure: unknown = undefined;
-	if (worker || attendedWorker) {
+	if (worker || attendedWorker || managementWorker) {
 		if (loop.getState().state === 'connected') {
 			await startLanes();
 		} else {
@@ -725,6 +1046,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// The link first: channels end `normal` and nothing reconnects while the
 	// lanes below drain.
 	runtime.link?.close();
+	// Sessions (FL-04): let go of the daemon — never stop it. Every session
+	// keeps running and the next node process finds them all.
+	runtime.sessions?.module.dispose();
+	await runtime.sessions?.status?.stop().catch(() => undefined);
+	runtime.sessions?.supervisor.stop();
 	loop.stop();
 	await loop.settled();
 	// A start that was waiting for an accepted beat ends here (the loop is
@@ -739,6 +1065,10 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		}
 		await attendedWorker.stop();
 	}
+	if (managementWorker) {
+		// Drains like the work lane: a machine job in flight finishes and reports.
+		await managementWorker.stop();
+	}
 	if (worker) {
 		// Drains: stops leasing at once, then WAITS for the jobs already
 		// running so their verdicts reach the platform instead of being
@@ -748,6 +1078,14 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		deps.out(`Worker host stopped (completed ${state.completed}, failed ${state.failed}).`);
 	}
 	deps.out('Stopped.');
+	// Fleet node link (FL-02 T-25): a self-update installed a new binary; exit
+	// 75 so the service manager starts it.
+	if (restartForUpdate !== null) {
+		throw new CliError(
+			`Restarting into ever-works-node ${restartForUpdate} (self-update) — exit ${SELF_UPDATE_EXIT_CODE} asks the service manager to start the new binary.`,
+			SELF_UPDATE_EXIT_CODE
+		);
+	}
 	if (laneStartFailed) {
 		throw new CliError(
 			`Worker lanes failed to start after the first accepted heartbeat: ${describeError(laneStartFailure)}`,
@@ -802,14 +1140,16 @@ export interface PolicyCommandOptions {
 	allowSkipPermissions?: string;
 	allowShellCommands?: string;
 	restrictedMode?: string;
+	allowMcpBridge?: string;
 }
 
-/** One line: both control-18 switches, in words. */
+/** One line: every local execution-policy switch, in words. */
 export function describeExecutionPolicy(policy: NodeExecutionPolicy): string {
 	return (
 		`skip-permissions ${policy.allowSkipPermissions ? 'ALLOWED' : 'refused'}, ` +
 		`node-run shell commands ${policy.allowShellCommands ? 'ALLOWED' : 'refused'}, ` +
-		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}`
+		`Claude Code restricted mode ${policy.restrictedMode ? 'on' : 'OFF'}, ` +
+		`platform MCP bridge ${policy.allowMcpBridge ? 'allowed' : 'REFUSED'}`
 	);
 }
 
@@ -835,17 +1175,19 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 	const skip = parsePolicySwitch('--allow-skip-permissions', options.allowSkipPermissions);
 	const shell = parsePolicySwitch('--allow-shell-commands', options.allowShellCommands);
 	const restricted = parsePolicySwitch('--restricted-mode', options.restrictedMode);
-	if (skip === undefined && shell === undefined && restricted === undefined) {
+	const mcpBridge = parsePolicySwitch('--allow-mcp-bridge', options.allowMcpBridge);
+	if (skip === undefined && shell === undefined && restricted === undefined && mcpBridge === undefined) {
 		deps.out(`policy       ${describeExecutionPolicy(current)}`);
 		deps.out(
-			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off`.'
+			'Change it with `ever-works-node policy --allow-skip-permissions on|off --allow-shell-commands on|off --restricted-mode on|off --allow-mcp-bridge on|off`.'
 		);
 		return;
 	}
 	const next: NodeExecutionPolicy = {
 		allowSkipPermissions: skip ?? current.allowSkipPermissions,
 		allowShellCommands: shell ?? current.allowShellCommands,
-		restrictedMode: restricted ?? current.restrictedMode
+		restrictedMode: restricted ?? current.restrictedMode,
+		allowMcpBridge: mcpBridge ?? current.allowMcpBridge
 	};
 	await saveConfig(
 		deps.fs,
@@ -871,6 +1213,12 @@ export async function runPolicy(deps: CliDeps, options: PolicyCommandOptions): P
 		deps.out(
 			'Note: Claude Code restricted mode is OFF — runs keep the baseline isolation (no repository settings, no ' +
 				'hooks) but get the command-running built-ins back and read your ~/.claude/settings.json.'
+		);
+	}
+	if (!next.allowMcpBridge) {
+		deps.out(
+			'Note: the platform MCP bridge is OFF — jobs whose Agent has external tools enabled are refused on this ' +
+				'machine instead of running with platform tools.'
 		);
 	}
 	deps.out('Restart the node service for a running worker to apply the change.');
@@ -992,6 +1340,8 @@ export async function runUnenroll(deps: CliDeps, options: { localOnly?: boolean 
 	}
 
 	await clearConfig(deps.fs, deps.configPath, config, { secrets: deps.secrets ?? null });
+	// Schedules on computers (FL-13 P3): whatever the OS-scheduler fallback wrote goes with the enrolment.
+	await removeNativeSchedules(deps);
 
 	if (options.localOnly === true) {
 		deps.out(`Removed the local credential for node ${config.nodeId}.`);
@@ -1548,8 +1898,14 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	// Node lifecycle (slice AR): daemon version vs floor, CLI compatibility.
 	const lifecycle = await gatherLifecycle(deps, report.config);
 	const now = (deps.now ?? (() => Date.now()))();
+	// Sessions on computers (FL-04): the session daemon, asked read-only.
+	const sessions = await describeSessionDaemon(deps);
+	// Virtual computers (FL-16 P3, T-36): what each system is pinned to here.
+	const virtual = await describeVirtualCatalogue(deps);
 	if (options.json === true) {
-		deps.out(JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle) }, null, 2));
+		deps.out(
+			JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual }, null, 2)
+		);
 		return;
 	}
 	printHousekeepingHeader(deps, report, now);
@@ -1560,7 +1916,48 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 		`consents     ${linkRecord ? describeConsents(linkRecord.consents) : 'unknown (the service has not reported them yet)'}`
 	);
 	deps.out(`link         ${describeLinkRecord(linkRecord, now)}`);
+	deps.out(
+		`sessions     ${
+			sessions.daemon === 'running'
+				? `daemon running, ${sessions.sessions ?? 0} session(s), terminal ${sessions.pty === 'available' ? 'available' : `missing — ${sessions.reason ?? 'unknown'}`}`
+				: `daemon not running — ${sessions.reason ?? 'unknown'}`
+		}`
+	);
+	if (virtual) {
+		const pinned = virtual.catalogue.filter((entry) => entry.digest).length;
+		deps.out(
+			`virtual      ${pinned} of ${virtual.catalogue.length} Container system(s) pinned here; Windows installer image ${
+				virtual.windowsImage ?? 'not configured'
+			}`
+		);
+	}
 	printPlan(deps, report.plan, now);
+}
+
+/**
+ * Virtual computers (FL-16 P3, T-36) — the host's system catalogue as it stands
+ * here: each Container system's image, the digest it is pinned to (or not yet),
+ * and where that came from (the catalogue, the lock file, an operator
+ * override); and the operator's Windows installer image. Null on Windows (no
+ * virtual computers there). Never throws.
+ */
+export async function describeVirtualCatalogue(deps: CliDeps): Promise<{
+	catalogue: Array<{ systemId: string; ref: string; digest: string | null; source: string }>;
+	windowsImage: string | null;
+} | null> {
+	if (deps.platform === 'win32') return null;
+	try {
+		const lockPath = posix.join(posix.dirname(deps.configPath), 'virtual', 'catalogue.lock.json');
+		const lock = parseCatalogueLock(await deps.fs.readFile(lockPath).catch(() => null));
+		const catalogue: Array<{ systemId: string; ref: string; digest: string | null; source: string }> = [];
+		for (const systemId of Object.keys(VIRTUAL_CONTAINER_IMAGES) as FleetVirtualSystemId[]) {
+			const image = resolveVirtualImage(systemId, { env: process.env, lock });
+			if (image) catalogue.push({ systemId, ref: image.ref, digest: image.digest, source: image.source });
+		}
+		return { catalogue, windowsImage: resolveWindowsImage(process.env)?.ref ?? null };
+	} catch {
+		return null;
+	}
 }
 
 /** `gc`: plan, then reap — unless `--dry-run`, which prints the plan and writes nothing. */
@@ -1641,7 +2038,11 @@ export function buildProgram(deps: CliDeps): Command {
 		.command('enroll')
 		.description('Enroll this machine using a one-time token from the Fleet settings page')
 		.requiredOption('-a, --api-url <url>', 'Platform API base URL (e.g. https://api.ever.works)')
-		.requiredOption('-t, --token <token>', 'One-time enrollment token (single-use, expires in 15 minutes)')
+		.option('-t, --token <token>', 'One-time enrollment token (single-use, expires in 15 minutes)')
+		.option(
+			'--token-file <file>',
+			'Read the one-time token from this file instead (owner-only, 0600; deleted after it is read). Exactly one of --token / --token-file'
+		)
 		.option('-n, --name <name>', 'Local display label (the platform assigns the authoritative name)')
 		.option(
 			'-i, --heartbeat-interval <seconds>',
@@ -1696,6 +2097,15 @@ export function buildProgram(deps: CliDeps): Command {
 			'Allow managing this machine from the dashboard — owner sessions, logs, services, Docker, processes, ports, files, commands, schedules (off by default; independent of --work and --attend)'
 		)
 		.option(
+			'--auto-update',
+			'Upgrade this node itself when the platform raises its minimum version or names a recommended one (waits for running jobs; npm installs only; off by default)'
+		)
+		.option(
+			'--files-root <dir>',
+			'With --manage: share this folder with the dashboard (the Files tab browses it, the Logs tab lists the log files under it); repeatable',
+			(value: string, previous: string[] = []) => [...previous, value]
+		)
+		.option(
 			'-c, --concurrency <count>',
 			'Max jobs to execute at once when --work is set (overrides the stored limit)'
 		)
@@ -1719,6 +2129,15 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--workspace-root <dir>',
 			'Absolute directory for the persistent per-Task worktrees of agent tasks (default: EVER_WORKS_NODE_WORKSPACE_ROOT, then ~/.ever-works/fleet-workspaces)'
+		)
+		.option(
+			'--native-schedules',
+			"With --manage and when not running as a service: also hand this machine's schedules to the OS scheduler (crontab / LaunchAgents / Task Scheduler) so they run while the node is closed"
+		)
+		.option(
+			'--code-folder <dir>',
+			'A folder you keep code in; Ever Works lists the git clones under it, three folders deep (repeatable; persisted; needs --manage)',
+			(value: string, previous: string[] = []) => [...previous, value]
 		)
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
@@ -1756,6 +2175,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--restricted-mode <on|off>',
 			'Run Claude Code with --restricted when it supports it (no shell tools, no settings files). Default on.'
+		)
+		.option(
+			'--allow-mcp-bridge <on|off>',
+			'Let jobs start the platform MCP bridge (platform tools for the model, run-scoped credential). Default on.'
 		)
 		.action(async (options: PolicyCommandOptions) => {
 			await runPolicy(deps, options);
@@ -1818,7 +2241,90 @@ export function buildProgram(deps: CliDeps): Command {
 			await runGc(deps, options);
 		});
 
+	// Schedules on computers (FL-13 P3): what the OS scheduler starts. Hidden.
+	program
+		.command('schedule-run', { hidden: true })
+		.description("Run what is due of this computer's schedules once (started by the OS scheduler; not for direct use)")
+		.argument('<id>', 'The schedule the OS scheduler fired')
+		.action(async (id: string) => {
+			await runScheduleRun(deps, id);
+		});
+
+	// Sessions on computers (FL-04): the session daemon's own entry. Hidden —
+	// the node starts it, a person never does (README D3: one installable).
+	program
+		.command('session-daemon', { hidden: true })
+		.description('Run the session daemon (started by the node; not for direct use)')
+		.requiredOption('--state-dir <dir>', 'The daemon state directory')
+		.requiredOption('--socket <path>', 'The local socket or named pipe to listen on')
+		.requiredOption('--token-file <file>', 'The token file that guards the socket')
+		.action(async (options: SessionDaemonCommandOptions) => {
+			await runSessionDaemonCommand(deps, options);
+		});
+
 	return program;
+}
+
+interface SessionDaemonCommandOptions {
+	stateDir: string;
+	socket: string;
+	tokenFile: string;
+}
+
+/**
+ * `ever-works-node session-daemon` (hidden). Starts listening and returns;
+ * the listening socket keeps the process alive until the daemon's idle rule
+ * (no session, no node, five minutes) or a system shutdown ends it.
+ */
+export async function runSessionDaemonCommand(deps: CliDeps, options: SessionDaemonCommandOptions): Promise<void> {
+	const join = deps.platform === 'win32' ? win32.join : posix.join;
+	const logFile = join(options.stateDir, 'daemon.log');
+	const run = deps.runSessionDaemon ?? runSessionDaemon;
+	let daemon: Awaited<ReturnType<typeof runSessionDaemon>>;
+	try {
+		daemon = await run({
+			stateDir: options.stateDir,
+			socketPath: options.socket,
+			tokenFile: options.tokenFile,
+			logFile,
+			version: deps.io.version
+		});
+	} catch (error) {
+		throw new CliError(
+			`The session daemon could not start: ${error instanceof Error ? error.message : String(error)}`
+		);
+	}
+	if (!deps.runSessionDaemon) installDaemonProcessHandlers(daemon, logFile);
+}
+
+/**
+ * The session daemon as `doctor` reports it — read-only: it never creates a
+ * token and never starts a daemon.
+ */
+export async function describeSessionDaemon(
+	deps: CliDeps
+): Promise<{ daemon: 'running' | 'not-running'; pty?: 'available' | 'missing'; sessions?: number; reason?: string }> {
+	const paths = resolveSessionDaemonPaths({ configPath: deps.configPath, platform: deps.platform, env: process.env });
+	let token: string | null = null;
+	try {
+		token = (await deps.fs.readFile(paths.tokenFile))?.trim() ?? null;
+	} catch {
+		token = null;
+	}
+	if (!token) return { daemon: 'not-running', reason: 'no session daemon has been started on this computer' };
+	try {
+		const client = await DaemonControlClient.connect({ socketPath: paths.socketPath, token, timeoutMs: 2_000 });
+		const health = client.welcome;
+		client.close();
+		return {
+			daemon: 'running',
+			pty: health.pty,
+			sessions: health.sessions,
+			...(health.ptyReason ? { reason: health.ptyReason } : {})
+		};
+	} catch {
+		return { daemon: 'not-running', reason: 'the session daemon did not answer on its local socket' };
+	}
 }
 
 /**
@@ -1846,5 +2352,65 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
 		const message = error instanceof Error ? error.message : String(error);
 		deps.io.logger.error(deps.io.logger.redact(message));
 		return EXIT_FAILURE;
+	}
+}
+
+/** `<configDir>/schedules` — where `start` keeps the schedules (FL-13). */
+function scheduleDirFor(deps: CliDeps): string {
+	const paths = deps.platform === 'win32' ? win32 : posix;
+	return paths.join(paths.dirname(deps.configPath), 'schedules');
+}
+
+/**
+ * `ever-works-node schedule-run <id>` (hidden; FL-13 P3) — what the OS
+ * scheduler starts at a fire. When a node process holds the schedule loop
+ * (its lease is fresh) this does nothing: that loop runs the fire on its own
+ * clock. Otherwise it loads the held schedules, runs whatever is due (the
+ * same catch-up rule as the loop: within the 60-minute grace, at most once
+ * per fire, one at a time per schedule), waits for the runs to end and exits.
+ * The runs are kept in the history and reported on the next link.
+ */
+export async function runScheduleRun(deps: CliDeps, id: string): Promise<void> {
+	const dir = scheduleDirFor(deps);
+	const store = new ScheduleStore({ dir });
+	if (await store.isLoopAlive(Date.now())) {
+		deps.out(`The node is running; its own clock runs schedule ${id}.`);
+		return;
+	}
+	let nodeName = 'this computer';
+	try {
+		const config = await requireConfig(deps);
+		nodeName = config.name?.trim() || nodeName;
+	} catch {
+		// A schedule still runs on a machine whose config cannot be read now.
+	}
+	const loop = new ScheduleLoop({
+		store,
+		history: new ScheduleHistory({ dir }),
+		nodeName,
+		platform: deps.platform,
+		homedir: osHomedir(),
+		env: process.env,
+		timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null,
+		logger: deps.io.logger,
+		lease: false
+	});
+	await loop.start();
+	await loop.idle();
+	loop.dispose();
+}
+
+/** Remove every OS-scheduler entry the fallback wrote (best-effort; `unenroll`). */
+async function removeNativeSchedules(deps: CliDeps): Promise<void> {
+	try {
+		await createNativeScheduler({
+			platform: deps.platform,
+			homedir: osHomedir(),
+			command: { file: '', args: [] }
+		})?.remove();
+	} catch (error) {
+		deps.io.logger.warn(
+			`Could not remove the OS-scheduler entries of this node's schedules: ${error instanceof Error ? error.message : String(error)}`
+		);
 	}
 }

@@ -8,14 +8,17 @@ import {
     NotFoundException,
     Param,
     Post,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { config } from '@ever-works/agent/config';
 import {
+    FLEET_OPERATION_STATES,
     isFleetLinkId,
     type FleetOperationCancelResult,
+    type FleetOperationState,
     type FleetOperationView,
 } from '@ever-works/contracts';
 import { Public } from '../auth/decorators/public.decorator';
@@ -64,13 +67,47 @@ export class FleetLinkController {
         summary:
             "Mint this node's single-use, five-minute token for its one outbound link socket (/ws/fleet/link). Node-credential authenticated; 404 while the deployment does not accept node links.",
     })
-    mintLinkToken(
+    async mintLinkToken(
         @CurrentFleetNode() node: AuthenticatedFleetNode,
         // Validated so the credential body has the one shape every node route accepts.
         @Body() _credential: FleetJobNodeCredentialDto,
-    ): FleetLinkTokenGrant {
+    ): Promise<FleetLinkTokenGrant> {
         if (!config.fleet.isNodeLinkEnabled()) throw new NotFoundException();
-        return this.tokens.mint(node.id);
+        // Works-security (run-token scope) — bound to the node's current
+        // credential generation, so a rotation refuses it at hello.
+        return this.tokens.mintForNode(node.id);
+    }
+
+    /**
+     * FL-19 — my recent long operations (`fleet_operations_list`, `ever-works fleet
+     * operations list`): newest first, kept one hour after they end. An unknown
+     * `state` or a malformed `nodeId` is `invalid`.
+     */
+    @Get('operations')
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary:
+            'My recent long operations on my computers (running, done, failed, cancelled or interrupted), newest first; optionally one state or one computer. Kept one hour after they end.',
+    })
+    listOperations(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('state') state?: string,
+        @Query('nodeId') nodeId?: string,
+        @Query('limit') limit?: string,
+    ): FleetOperationView[] {
+        if (!config.fleet.isNodeLinkEnabled()) return [];
+        if (state !== undefined && !(FLEET_OPERATION_STATES as readonly string[]).includes(state)) {
+            throw fleetLinkError('invalid', 'state is running, done, failed, cancelled or interrupted');
+        }
+        if (nodeId !== undefined && !/^[0-9a-f-]{36}$/i.test(nodeId)) {
+            throw fleetLinkError('invalid', 'nodeId must be a computer id');
+        }
+        const parsed = limit === undefined ? undefined : Number(limit);
+        return this.operations.listForUser(auth.userId, {
+            ...(state ? { state: state as FleetOperationState } : {}),
+            ...(nodeId ? { nodeId } : {}),
+            ...(parsed !== undefined && Number.isFinite(parsed) ? { limit: parsed } : {}),
+        });
     }
 
     @Get('operations/:id')
