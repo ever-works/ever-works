@@ -980,6 +980,17 @@ export const WHITELIST: WhitelistEntry[] = [
 			'What the cloud computers cost: per hour now, this month so far and projected — estimates from list prices, never counted against model-spend budgets. Read-only.',
 		annotations: { readOnlyHint: true }
 	},
+	// Usage & cost on the fleet (FL-20 P1) — what the model work on a person's computers would
+	// cost at LIST price, from each computer's opt-in transcript scan (counts only). Read-only;
+	// 404s unless FLEET_USAGE_SCAN_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/usage',
+		toolName: 'fleet_usage_get',
+		description:
+			'What the model work on my computers would cost at list price over the last 1, 7, 30 or 90 days (`days`, default 7): totals, by model, by computer with each one’s last scan, busiest checkouts and sessions — optionally one computer (`node`) or one model (`model`). Counts come from each computer’s opt-in transcript scan (token counts only). The machines’ own sign-ins paid; Ever Works charged nothing (the `note`). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
 	{
 		method: 'POST',
 		path: '/api/fleet/cloud',
@@ -1003,6 +1014,14 @@ export const WHITELIST: WhitelistEntry[] = [
 		description:
 			'Destroy a cloud computer: the machine and its disk at the provider, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name (the 409 states the cost so far). Refused while a Run or a session is live on it.',
 		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'PATCH',
+		path: '/api/fleet/cloud/{id}/idle-policy',
+		toolName: 'fleet_cloud_idle_policy',
+		description:
+			'Set a cloud computer’s idle policy: `mode` nothing | tell-me | power-off, `afterHours` 1–72. Idle means no session working, no job running and the CPU under 5 % the whole time; Ever Works never destroys a cloud computer on its own.',
+		annotations: { destructiveHint: false }
 	},
 
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool

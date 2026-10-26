@@ -41,8 +41,8 @@ The dialog lists the providers you connected (with the account they are connecte
 - **Software** — Docker, Node.js, Claude Code and Codex, all ticked by default. Node.js is always installed: the
   node runtime needs it.
 
-Before **Create · $24/mo** the dialog states the price and the billing rule: *about $24/month ($0.036/hour), billed
-by the provider to your account from the moment it exists until you destroy it — also while powered off.* If the
+Before **Create · $24/mo** the dialog states the price and the billing rule: _about $24/month ($0.036/hour), billed
+by the provider to your account from the moment it exists until you destroy it — also while powered off._ If the
 provider's price changed while the dialog was open, Create is refused and the dialog reloads the prices and asks
 again.
 
@@ -60,6 +60,33 @@ being created or gone, and what it costs — **per hour, this month, since it wa
 (capped at the monthly price). Every figure is an **estimate from the provider's list prices; your bill may differ**.
 Cloud spend is never counted against model-spend budgets or the fleet model-cost ceiling.
 
+The figures are refreshed every ten minutes. Where the provider plugin can read your account's own month-to-date figure,
+it is shown beside the estimate and labelled as the provider's — it covers everything on that account, not only the
+machines Ever Works created.
+
+## What they cost together
+
+The Fleet hub's Overview carries a **Cloud computers** block: what your cloud computers bill per hour right now, this
+month so far — **machines destroyed this month still count** — the projected month, and a row per machine (destroyed
+ones last, marked "destroyed — still counted this month"). The same estimate disclaimer applies.
+
+## Idle policy
+
+Every cloud computer has an idle policy, shown in its Cloud block with **Change**:
+
+- **Nothing** — never mind;
+- **Tell me after N hours** (the default, 3 hours) — the hub shows _"fra-nina has been idle for 4 h · $0.28 while
+  idle"_ with **Power off…**, and one Inbox item arrives for that stretch of idleness; the Cloud block offers
+  **Keep running**, which starts the count again;
+- **Power off after N hours** — Ever Works powers the machine off, records it in the Fleet audit as done by
+  `system:idle-policy`, and the hub shows _"fra-nina was powered off after 2 h idle — it still bills while off"_ with
+  **Power on…**.
+
+N is a whole number from 1 to 72. **Idle** means, for the whole time: no session working or waiting for you, no job
+running, and the CPU under 5 % in every health sample. A powered-off machine, or one still being created, is never
+idle. Changing the policy starts the count again from that moment. **Ever Works never destroys a cloud computer on its
+own** — the policy can only tell you or power the machine off.
+
 ## Power off, power on, destroy
 
 - **Power off** asks first and says whether the provider still bills the machine while it is off (DigitalOcean does).
@@ -72,37 +99,39 @@ Cloud spend is never counted against model-spend budgets or the fleet model-cost
 ## Why "Remove from Fleet" is disabled
 
 Removing a registration leaves the machine behind — and a cloud machine keeps billing until it is destroyed. So for a
-cloud computer **Remove from Fleet** is disabled with the line *"Cloud computers are destroyed, not removed, so a machine
-you pay for is never left behind"*, and the server refuses it (`unsupported_on_node`, "destroy it instead"). It becomes
+cloud computer **Remove from Fleet** is disabled with the line _"Cloud computers are destroyed, not removed, so a machine
+you pay for is never left behind"_, and the server refuses it (`unsupported_on_node`, "destroy it instead"). It becomes
 available when the provider reports the machine gone (destroyed outside Ever Works), or when the create failed before
 any machine existed.
 
 ## Needs a look
 
 - **Never came online** — the provider runs the machine but it has not enrolled ten minutes after the create: the hub
-  shows *"nyc-ops never came online and is billing $0.036/h"* with **Destroy…**.
+  shows _"nyc-ops never came online and is billing $0.036/h"_ with **Destroy…**.
 - **Could not be created** — the provider refused (for example a droplet limit); its first line is shown, nothing bills.
 - **Gone at the provider** — destroyed outside Ever Works; it no longer bills and can be removed.
+- **Idle for N hours** and **powered off after N hours idle** — from the idle policy (above).
 
 ## Agents, MCP and the API
 
 Agents use `fleet_cloud_list`, `fleet_cloud_options` and `fleet_cloud_usage` (read-only) and `fleet_cloud_create`,
-`fleet_cloud_power`, `fleet_cloud_destroy`. A create needs `acknowledgedPriceCents` — the monthly price the Agent read
-— and is refused when the price changed. Create, power changes and destroy are **always held for your approval** in My
-Decisions, with the exact size and price. On MCP the three acts register only when the operator sets
-`MCP_PRIVILEGED_TOOLS=true`.
+`fleet_cloud_power`, `fleet_cloud_destroy` and `fleet_cloud_idle_policy`. A create needs `acknowledgedPriceCents` —
+the monthly price the Agent read — and is refused when the price changed. Create, power changes, destroy and idle-policy
+changes are **always held for your approval** in My Decisions, with the exact size and price (or the policy change). On
+MCP the four acts register only when the operator sets `MCP_PRIVILEGED_TOOLS=true`.
 
-| Route | What it does |
-| --- | --- |
-| `GET /api/fleet/providers` | The machine providers enabled for you |
-| `GET /api/fleet/providers/:plugin/options` | Regions, sizes with list prices, software, account |
-| `GET /api/fleet/cloud` · `GET /api/fleet/cloud/usage` | Your cloud computers and their cost |
-| `POST /api/fleet/cloud` | Create (`acknowledgedPriceCents`, `confirm: true`) |
-| `POST /api/fleet/cloud/:id/power` | `on` · `off` (`confirm: true`) |
-| `POST /api/fleet/cloud/:id/destroy` | Destroy (`confirmName`) |
+| Route                                                 | What it does                                                         |
+| ----------------------------------------------------- | -------------------------------------------------------------------- |
+| `GET /api/fleet/providers`                            | The machine providers enabled for you                                |
+| `GET /api/fleet/providers/:plugin/options`            | Regions, sizes with list prices, software, account                   |
+| `GET /api/fleet/cloud` · `GET /api/fleet/cloud/usage` | Your cloud computers and their cost                                  |
+| `POST /api/fleet/cloud`                               | Create (`acknowledgedPriceCents`, `confirm: true`)                   |
+| `POST /api/fleet/cloud/:id/power`                     | `on` · `off` (`confirm: true`)                                       |
+| `POST /api/fleet/cloud/:id/destroy`                   | Destroy (`confirmName`)                                              |
+| `GET /api/fleet/cloud/:id/usage`                      | One cloud computer's cost                                            |
+| `PUT /api/fleet/cloud/:id/idle-policy` (or `PATCH`)   | `mode` (`nothing`, `tell-me` or `power-off`) and `afterHours` (1–72) |
+| `POST /api/fleet/cloud/:id/keep-running`              | Start the idle count again                                           |
 
 ## Coming next
 
-The idle policy (tell me, or power off after N idle hours), the provider's own month-to-date figure and a Usage-tab
-block, sign-in with the provider, the overlay-VPN preset, unclaimed-machine detection and the `ever-works fleet cloud`
-CLI.
+Sign-in with the provider, the overlay-VPN preset, unclaimed-machine detection and the `ever-works fleet cloud` CLI.

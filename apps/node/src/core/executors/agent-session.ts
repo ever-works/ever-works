@@ -22,7 +22,12 @@ import {
 	type AgentTaskIo,
 	type AgentTaskScratchFs
 } from './agent-task';
-import { MODEL_CLI_EMPTY_MCP_CONFIG, MODEL_CLI_FLEET_SETTINGS, modelCliMcpIsolationEnv } from './model-cli';
+import {
+	MODEL_CLI_EMPTY_MCP_CONFIG,
+	MODEL_CLI_FLEET_SETTINGS,
+	modelCliMcpIsolationEnv,
+	type ModelCliPaths
+} from './model-cli';
 import { expandHome } from '../sessions/owner-session-launcher';
 import type { HookOverlayPort } from '../sessions/hook-overlay.port';
 import type { DaemonSessionInfo, DaemonWatchEvent } from '../sessions/daemon/daemon-protocol';
@@ -93,8 +98,8 @@ export interface AgentSessionIo {
 	/** `--work` is on (FR-46). */
 	workEnabled: boolean;
 	daemon: AgentSessionDaemon | null;
-	/** The CLI paths this node resolved. */
-	modelCli: Partial<Record<'claude-code' | 'codex', string>>;
+	/** The CLI paths this node resolved (a missing or `null` entry = that CLI is not on this machine). */
+	modelCli: ModelCliPaths;
 	/** The containment seams `agent-task` uses (parent env, platform, config readers, session homes). */
 	containment: AgentTaskIo;
 	/** This node's enrollment id: a job pinned to another node is refused. */
@@ -199,11 +204,7 @@ export function buildAgentSessionArgv(input: {
 }
 
 function isInfoList(value: unknown): value is { sessions: DaemonSessionInfo[] } {
-	return (
-		typeof value === 'object' &&
-		value !== null &&
-		Array.isArray((value as { sessions?: unknown }).sessions)
-	);
+	return typeof value === 'object' && value !== null && Array.isArray((value as { sessions?: unknown }).sessions);
 }
 
 /**
@@ -217,9 +218,13 @@ export async function runAgentSessionJob(
 	io: AgentSessionIo
 ): Promise<Record<string, unknown>> {
 	const payload = parseFleetAgentSessionPayload(job.payload);
-	if (!payload) throw new AgentSessionRefusal('invalid', 'this Agent session request is not one this node understands');
+	if (!payload)
+		throw new AgentSessionRefusal('invalid', 'this Agent session request is not one this node understands');
 	if (!io.workEnabled) {
-		throw new AgentSessionRefusal('consent_missing', 'Agent sessions need work switched on: ever-works-node start --work');
+		throw new AgentSessionRefusal(
+			'consent_missing',
+			'Agent sessions need work switched on: ever-works-node start --work'
+		);
 	}
 	if (io.nodeId && payload.nodeId !== io.nodeId) {
 		throw new AgentSessionRefusal('invalid', 'this Agent session was started on another computer');
@@ -257,7 +262,9 @@ export async function runAgentSessionJob(
 		}
 		const mcpIsolation = modelCliMcpIsolationEnv(payload.provider);
 		const overlay: NodeCommandEnvOverlay = { ...(containment.envOverlay ?? {}), ...(mcpIsolation ?? {}) };
-		const hook = io.overlay ? await io.overlay.hookOverlayFor('agent', payload.provider, payload.fleetSessionId) : null;
+		const hook = io.overlay
+			? await io.overlay.hookOverlayFor('agent', payload.provider, payload.fleetSessionId)
+			: null;
 		const env = buildNodeCheckEnv(null, io.containment.parentEnv, null, overlay) as Record<string, string>;
 		for (const [key, value] of Object.entries(hook?.env ?? {})) env[key] = value;
 		env.EVER_WORKS_SESSION_ID = payload.fleetSessionId;
@@ -293,7 +300,9 @@ export async function runAgentSessionJob(
 		if (launch.typeAfterStart) {
 			const text = launch.typeAfterStart;
 			setTimer(() => {
-				void daemon.request('input', { sessionId: payload.fleetSessionId, data: `${text}\r` }).catch(() => undefined);
+				void daemon
+					.request('input', { sessionId: payload.fleetSessionId, data: `${text}\r` })
+					.catch(() => undefined);
 			}, io.typeAfterStartMs ?? 1_500);
 		}
 

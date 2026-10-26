@@ -4,12 +4,15 @@ import {
 	FLEET_CLOUD_ACTION_CLASS,
 	FLEET_CLOUD_DEFAULT_IDLE_POLICY,
 	FLEET_CLOUD_DEFAULT_SOFTWARE,
+	FLEET_CLOUD_IDLE_REQUESTER,
 	FLEET_CLOUD_MAX_PER_OWNER,
 	clampFleetCloudIdleHours,
 	fleetCloudBilledIntervals,
 	fleetCloudCost,
 	fleetCloudCreateSummary,
 	fleetCloudDestroySummary,
+	fleetCloudIdleAttentionKey,
+	fleetCloudIdleHours,
 	fleetCloudNodeIdFromTags,
 	fleetCloudNodeTag,
 	fleetCloudPowerOffSummary,
@@ -157,6 +160,43 @@ describe('cost model (FR-21, FR-22)', () => {
 		const freeOff = fleetCloudCost(meta({ powerTimeline: timeline, billsWhileOff: false }), now);
 		expect(billsOff.sinceCreatedCents).toBeCloseTo(6 * 3.6, 1);
 		expect(freeOff.sinceCreatedCents).toBeCloseTo(3 * 3.6, 1);
+	});
+
+	it('splits a machine across the month boundary: this month counts only its own hours (P2, FR-22)', () => {
+		const m = meta({ machineCreatedAt: '2026-09-30T20:00:00.000Z', createdAt: '2026-09-30T20:00:00.000Z' });
+		const cost = fleetCloudCost(m, Date.parse('2026-10-01T06:00:00.000Z'));
+		expect(cost.sinceCreatedCents).toBeCloseTo(10 * 3.6, 1);
+		expect(cost.monthToDateCents).toBeCloseTo(6 * 3.6, 1);
+	});
+
+	it('projects a running machine to the monthly price, and a powered-off free machine to what it already cost', () => {
+		const now = Date.parse('2026-10-18T07:00:00.000Z');
+		expect(fleetCloudCost(meta({ machineCreatedAt: '2026-10-01T00:00:00.000Z' }), now).projectedMonthCents).toBe(2400);
+		const off = meta({
+			billsWhileOff: false,
+			powerState: 'off',
+			powerTimeline: [
+				{ state: 'running', at: '2026-10-15T00:00:00.000Z' },
+				{ state: 'off', at: '2026-10-15T10:00:00.000Z' }
+			]
+		});
+		const cost = fleetCloudCost(off, now);
+		expect(cost.hourlyCents).toBe(0);
+		expect(cost.projectedMonthCents).toBeCloseTo(10 * 3.6, 1);
+	});
+});
+
+describe('idle policy helpers (P2, FR-27)', () => {
+	it('keys one window per node and start, and counts whole idle hours', () => {
+		const id = '0f8fad5b-d9cb-469f-a165-70867728950e';
+		expect(fleetCloudIdleAttentionKey(id, '2026-10-21T09:00:00.000Z')).toBe(
+			`fleet-node:${id}:cloud-idle:2026-10-21T09:00:00.000Z`
+		);
+		expect(fleetCloudIdleHours('2026-10-21T09:00:00.000Z', Date.parse('2026-10-21T12:59:00.000Z'))).toBe(3);
+		expect(fleetCloudIdleHours(null)).toBeNull();
+		expect(fleetCloudIdleHours('2026-10-21T09:00:00.000Z', Date.parse('2026-10-21T08:00:00.000Z'))).toBeNull();
+		expect(FLEET_CLOUD_IDLE_REQUESTER).toBe('system:idle-policy');
+		expect(FLEET_CLOUD_ACTION_CLASS['idle-policy']).toBe('plain');
 	});
 });
 

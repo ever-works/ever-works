@@ -103,8 +103,13 @@ export function createPortsModule(options: PortsModuleOptions): PortsModule {
 	const stopped = new StoppedPortTracker();
 	let toolState: 'unknown' | 'present' | 'missing' = 'unknown';
 	let lastMissingLogAt = 0;
-	let cache: { at: number; rows: FleetListeningPort[]; tool: FleetPortDiscoveryTool; truncated: boolean } | null =
-		null;
+	// Asserted, not annotated: an annotated `= null` narrows `typeof cache` below to `null` (→ `never`).
+	let cache = null as {
+		at: number;
+		rows: FleetListeningPort[];
+		tool: FleetPortDiscoveryTool;
+		truncated: boolean;
+	} | null;
 	let building: Promise<NonNullable<typeof cache>> | null = null;
 	let watchedControl: NodeLinkControlState | null = null;
 	/** The last answer per port, reused for {@link PROBE_CACHE_MS} and when a fresh probe is late. */

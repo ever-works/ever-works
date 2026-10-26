@@ -15616,7 +15616,12 @@
                 "idleTellMe": "Tell me after {hours} h",
                 "idlePowerOff": "Power off after {hours} h",
                 "address": "Public address {ip} (Ever Works never connects in; the machine connects out).",
-                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer."
+                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer.",
+                "idleFor": "idle for {duration}",
+                "keepRunning": "Keep running",
+                "keptRunning": "{name} keeps running; the idle policy waits its hours again.",
+                "poweredOffByPolicy": "Powered off by the idle policy {duration} ago, after {hours} h idle.",
+                "changeIdlePolicy": "Change"
             },
             "power": {
                 "off": "Power off",
@@ -15653,6 +15658,135 @@
                 "newCloud": "New cloud computer",
                 "powerOff": "Power off {name}",
                 "powerOn": "Power on {name}"
+            },
+            "idlePolicy": {
+                "title": "Idle policy",
+                "modes": {
+                    "nothing": "Nothing",
+                    "tellMe": "Tell me after",
+                    "powerOff": "Power off after"
+                },
+                "hours": "hours",
+                "hoursLabel": "Hours of idleness for “{mode}”",
+                "range": "Enter a whole number of hours from {min} to {max}.",
+                "meaning": "Idle means: no session working, no job running, CPU under 5 % for the whole time.",
+                "neverDestroys": "Ever Works never destroys a cloud computer on its own.",
+                "save": "Save",
+                "cancel": "Cancel",
+                "saved": "The idle policy of {name} is saved; it counts from now.",
+                "failed": "The idle policy could not be saved."
+            },
+            "usage": {
+                "title": "Cloud computers",
+                "totals": "now {hour}/h · this month {month} · projected {projected} (list prices)",
+                "providerMtd": "{provider} reports {amount} this month for your whole account.",
+                "caption": "What each cloud computer costs this month",
+                "columns": {
+                    "name": "Computer",
+                    "where": "Provider · region · size",
+                    "hourly": "Per hour",
+                    "month": "This month",
+                    "state": "State"
+                },
+                "destroyedName": "{name} (destroyed {date})",
+                "states": {
+                    "provisioning": "creating",
+                    "running": "running",
+                    "off": "off",
+                    "gone": "gone",
+                    "unknown": "unknown",
+                    "destroyed": "destroyed — still counted this month"
+                },
+                "disclaimer": "Estimates from the providers' list prices; your bill may differ. Machine costs are not counted in model-spend Budgets.",
+                "failed": "Cloud computer costs could not be loaded."
+            }
+        },
+        "usage": {
+            "payerNote": "List price — what this would cost on a pay-as-you-go key. The machine's own sign-in paid for it; Ever Works charged nothing.",
+            "chip": {
+                "cost": "{cost} · list",
+                "tokensOnly": "tokens only · {tokens}",
+                "tokensOnlyModel": "tokens only · {model} · {tokens}"
+            },
+            "receipt": {
+                "line": "Model work on {computer} · {cost} at list price (v{version}) · {in} in · {out} out · {cache} cache",
+                "lineTokensOnly": "Model work on {computer} · tokens only · {in} in · {out} out · {cache} cache",
+                "unknownModels": "Not in the price list (tokens only, no dollar figure): {models}"
+            },
+            "overview": {
+                "title": "Usage",
+                "loading": "Loading usage…",
+                "line": "Usage 7 d · {cost} · scan on · last scan {age} ago",
+                "lineNoScan": "Usage 7 d · {cost} · scan on · no scan yet",
+                "tokensOnly": "tokens only",
+                "offline": "offline",
+                "catchingUp": "catching up · {pct} % scanned",
+                "open": "Open usage",
+                "off": "Usage scan is off — run `ever-works-node start --usage-scan` on {computer}",
+                "unsupported": "Update the node on {computer} to report usage",
+                "error": "Could not load usage — {hint}"
+            },
+            "tab": {
+                "periodLabel": "Period",
+                "periods": {
+                    "today": "Today",
+                    "d7": "7 days",
+                    "d30": "30 days",
+                    "d90": "90 days"
+                },
+                "totals": "{cost} at list price · {tokens} tokens · {requests} requests",
+                "topModel": "top model {model}",
+                "tokensOnly": "tokens only",
+                "unknownModels": "excludes {count} requests on unknown models ({models}) — tokens only",
+                "excludedNodes": "Not shown: {count} computer(s) you may not see",
+                "otherHidden": "Not shown: sessions not started from Ever Works on computers you do not own",
+                "priceList": "Priced at model list prices v{version}.",
+                "priceListMixed": "Priced at model list prices {versions}; v{version} in effect since {since}.",
+                "catchingUp": "catching up · {pct} % scanned on {computer}",
+                "byModel": "By model",
+                "nothingYet": "Nothing counted in this period yet.",
+                "unknownModel": "(unknown) {model}",
+                "requests": "{count} req",
+                "byComputer": "By computer",
+                "offline": "offline",
+                "scannedAgo": "scanned {age} ago",
+                "noScanYet": "no scan yet",
+                "scanOff": "Usage scan is off",
+                "rescan": "Scan now",
+                "rescanQueued": "scan requested",
+                "busiestCheckouts": "Busiest checkouts",
+                "otherFolders": "other folders",
+                "onComputer": "on {computer}",
+                "sessions": "Sessions",
+                "agentSessions": "{name} {count}",
+                "unknownAgent": "an Agent",
+                "ownerSessions": "owner sessions {count}",
+                "otherSessions": "other (not started from Ever Works) {count}",
+                "otherNotShown": "other: not shown",
+                "filterComputer": "Computer: {computer}",
+                "filterModel": "Model: {model}",
+                "clearFilter": "Clear filter",
+                "failed": "Could not load usage",
+                "empty": {
+                    "title": "No computer is reporting usage yet",
+                    "command": "Switch it on on a computer:",
+                    "promise": "The scan reads {sentence}."
+                }
+            },
+            "agent": {
+                "title": "Fleet work by computer — last 30 days, at list price",
+                "row": "{cost} · {requests} requests",
+                "tokensOnly": "tokens only",
+                "none": "No fleet work counted for this Agent in the last 30 days.",
+                "error": "Could not load fleet usage — {hint}"
+            },
+            "schedule": {
+                "cost": "last run {last} · 30 d {month} · list",
+                "none": "—"
+            },
+            "palette": {
+                "usage": "Fleet usage",
+                "usageOn": "Usage on {name}"
             }
         }
     }

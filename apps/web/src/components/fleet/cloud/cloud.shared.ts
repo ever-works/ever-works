@@ -1,11 +1,20 @@
 import {
+    FLEET_CLOUD_DEFAULT_IDLE_POLICY,
     FLEET_CLOUD_DEFAULT_SOFTWARE,
+    FLEET_CLOUD_IDLE_MAX_HOURS,
+    FLEET_CLOUD_IDLE_MIN_HOURS,
     FLEET_CLOUD_UNENROLLED_AFTER_MIN,
+    clampFleetCloudIdleHours,
     formatFleetCloudMoney,
+    isFleetCloudIdlePolicyMode,
+    type FleetCloudIdlePolicy,
+    type FleetCloudIdlePolicyMode,
     type FleetCloudOptionsView,
     type FleetCloudPhase,
     type FleetCloudSizeView,
     type FleetCloudSoftwareId,
+    type FleetCloudUsageRow,
+    type FleetCloudUsageView,
     type FleetNodeCloudView,
     type FleetNodeView,
 } from '@ever-works/contracts';
@@ -175,3 +184,78 @@ export const CLOUD_SOFTWARE_KEYS: Readonly<Record<FleetCloudSoftwareId, string>>
     codex: 'codex',
     'overlay-vpn': 'overlayVpn',
 };
+
+// ─── Idle policy and usage (P2, spec §5.6, §5.7) ─────────────────────────────
+
+/** The editor's working copy: the mode, and the hours as typed (a field may be empty mid-edit). */
+export interface IdlePolicyDraft {
+    mode: FleetCloudIdlePolicyMode;
+    hours: string;
+}
+
+/** The editor starts from the stored policy, or the default "Tell me after 3 h" (spec FR-25, S6). */
+export function idlePolicyDraftOf(policy: FleetCloudIdlePolicy | null | undefined): IdlePolicyDraft {
+    const mode = policy && isFleetCloudIdlePolicyMode(policy.mode) ? policy.mode : FLEET_CLOUD_DEFAULT_IDLE_POLICY.mode;
+    const hours = policy ? clampFleetCloudIdleHours(policy.afterHours) : FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours;
+    return { mode, hours: String(hours) };
+}
+
+/** What Save sends: the hours clamped to 1–72 whole hours (an empty field reads as the default 3). */
+export function idlePolicyFromDraft(draft: IdlePolicyDraft): FleetCloudIdlePolicy {
+    const typed = draft.hours.trim();
+    return {
+        mode: isFleetCloudIdlePolicyMode(draft.mode) ? draft.mode : FLEET_CLOUD_DEFAULT_IDLE_POLICY.mode,
+        afterHours: typed === '' ? FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours : clampFleetCloudIdleHours(typed),
+    };
+}
+
+/** True when the typed hours are a whole number within 1–72 (the field shows the range otherwise). */
+export function idleHoursValid(hours: string): boolean {
+    if (!/^\d{1,3}$/.test(hours.trim())) return false;
+    const value = Number(hours.trim());
+    return value >= FLEET_CLOUD_IDLE_MIN_HOURS && value <= FLEET_CLOUD_IDLE_MAX_HOURS;
+}
+
+/** Whether Save would change anything. */
+export function idlePolicyChanged(stored: FleetCloudIdlePolicy | null | undefined, draft: IdlePolicyDraft): boolean {
+    const next = idlePolicyFromDraft(draft);
+    const current = idlePolicyDraftOf(stored);
+    if (next.mode !== current.mode) return true;
+    return next.mode !== 'nothing' && String(next.afterHours) !== current.hours;
+}
+
+/**
+ * The block's idle facts (spec S6, S7): idle long enough for the policy, or
+ * powered off by it — null when neither (the policy line alone is shown).
+ */
+export function cloudIdleState(
+    cloud: Pick<FleetNodeCloudView, 'idleWindowReached' | 'idleSince' | 'poweredOffByPolicyAt' | 'powerState' | 'pending'>,
+): 'idle' | 'poweredOffByPolicy' | null {
+    if (cloud.poweredOffByPolicyAt && cloud.powerState === 'off' && cloud.pending === null) return 'poweredOffByPolicy';
+    if (cloud.idleWindowReached && cloud.idleSince && cloud.pending === null && cloud.powerState === 'running') return 'idle';
+    return null;
+}
+
+/**
+ * The usage table's rows (spec §5.7): live machines first by this month's
+ * cost (highest first), then the ones destroyed this month, newest first.
+ */
+export function cloudUsageRows(usage: Pick<FleetCloudUsageView, 'machines'> | null | undefined): FleetCloudUsageRow[] {
+    const rows = [...(usage?.machines ?? [])];
+    const live = rows.filter((row) => !row.destroyedAt).sort((a, b) => b.monthToDateCents - a.monthToDateCents);
+    const destroyed = rows
+        .filter((row) => Boolean(row.destroyedAt))
+        .sort((a, b) => Date.parse(b.destroyedAt ?? '') - Date.parse(a.destroyedAt ?? ''));
+    return [...live, ...destroyed];
+}
+
+/**
+ * The search parameter a "needs a look" item links with to open one of the
+ * page's acts (`?cloud=power-off`), or null for anything else.
+ */
+export function cloudActFromQuery(value: string | null | undefined): 'off' | 'on' | 'destroy' | null {
+    if (value === 'power-off') return 'off';
+    if (value === 'power-on') return 'on';
+    if (value === 'destroy') return 'destroy';
+    return null;
+}

@@ -1477,6 +1477,61 @@ const HELPER_EXPORTS = [
 	'FLEET_HELPER_SEEN_EVENT_IDS'
 ] as const;
 
+/** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
+const USAGE_EXPORTS = [
+	'FLEET_USAGE_PROVIDERS',
+	'isFleetUsageProvider',
+	'FLEET_USAGE_SCAN_CAPABILITY',
+	'FLEET_USAGE_SCAN_INTERVAL_MS',
+	'FLEET_USAGE_SCAN_CRON',
+	'FLEET_USAGE_REPORT_MAX_ROWS',
+	'FLEET_USAGE_REPORT_MAX_BYTES',
+	'FLEET_USAGE_PERIODS',
+	'isFleetUsagePeriodDays',
+	'FLEET_USAGE_DEFAULT_PERIOD',
+	'FLEET_USAGE_PAYER_NOTE',
+	'FLEET_USAGE_PRIVACY_SENTENCE',
+	'fleetUsageOptInHint',
+	'FLEET_USAGE_ZERO_TOKENS',
+	'FLEET_USAGE_OTHER_FOLDER_PREFIX',
+	'FLEET_USAGE_MAX_MODEL_CHARS',
+	'FLEET_USAGE_MAX_SESSION_ID_CHARS',
+	'FLEET_USAGE_MAX_FOLDER_CHARS',
+	'FLEET_USAGE_MAX_TOKENS',
+	'isFleetUsageModelId',
+	'isFleetUsageProviderSessionId',
+	'isFleetUsageFolderBucket',
+	'isFleetUsageOtherFolder',
+	'fleetUsageHourStart',
+	'normalizeFleetUsageTokens',
+	'normalizeFleetUsageRow',
+	'normalizeFleetUsageReport',
+	'normalizeFleetUsageScanPayload',
+	'maxFleetUsageTokens',
+	'addFleetUsageTokens',
+	'totalFleetUsageTokens',
+	'parseFleetSessionUsage',
+	'formatFleetUsageCents',
+	'formatFleetUsageTokens',
+	// FL-20 P2 — the schedule rows' Task cost read.
+	'FLEET_USAGE_TASK_COSTS_MAX_IDS'
+] as const;
+
+/** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
+const CLOUD_P2_EXPORTS = [
+	'FLEET_CLOUD_BUSY_SESSION_STATES',
+	'FLEET_CLOUD_IDLE_REQUESTER',
+	'FLEET_CLOUD_USAGE_FRESH_MS',
+	'fleetCloudIdleAttentionKey',
+	'fleetCloudIdleHours'
+] as const;
+
+const MODEL_LIST_PRICES_EXPORTS = [
+	'MODEL_TOKEN_CLASSES',
+	'findModelListPriceEntry',
+	'priceModelTokensCents'
+] as const;
+
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
@@ -1521,7 +1576,10 @@ const ALL_EXPORTS = [
 	...CLOUD_EXPORTS,
 	...DESKTOP_EXPORTS,
 	...DESKTOP_TILES_EXPORTS,
-	...HELPER_EXPORTS
+	...HELPER_EXPORTS,
+	...USAGE_EXPORTS,
+	...MODEL_LIST_PRICES_EXPORTS,
+	...CLOUD_P2_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -2030,7 +2088,27 @@ const FUNCTION_EXPORTS = [
 	'isFleetHelperEventKind',
 	'normalizeFleetHelperEvent',
 	'normalizeFleetHelperEvents',
-	'fleetHelperEventAuditAction'
+	'fleetHelperEventAuditAction',
+	'isFleetUsageProvider',
+	'isFleetUsagePeriodDays',
+	'fleetUsageOptInHint',
+	'isFleetUsageModelId',
+	'isFleetUsageProviderSessionId',
+	'isFleetUsageFolderBucket',
+	'isFleetUsageOtherFolder',
+	'fleetUsageHourStart',
+	'normalizeFleetUsageTokens',
+	'normalizeFleetUsageRow',
+	'normalizeFleetUsageReport',
+	'normalizeFleetUsageScanPayload',
+	'maxFleetUsageTokens',
+	'addFleetUsageTokens',
+	'totalFleetUsageTokens',
+	'parseFleetSessionUsage',
+	'formatFleetUsageCents',
+	'formatFleetUsageTokens',
+	'findModelListPriceEntry',
+	'priceModelTokensCents'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -2045,7 +2123,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1245 runtime symbols', () => {
+	it('exposes exactly these 1288 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2138,10 +2216,13 @@ describe('fleet barrel', () => {
 		// session-status, session-rules, commands, schedules, tools, task-handoff,
 		// virtual, cloud), each a group above and a row in the witness table below,
 		// plus three in existing modules (`SPRINT_EXISTING_MODULE_EXPORTS`).
-		// → 1245 with desktop view & control (FL-07): 70 symbols in three NEW modules
-		// (`fleet-desktop.types.ts`, `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a
-		// group above and a row in the witness table below.
-		expect(Object.keys(fleet)).toHaveLength(1245);
+		// → +37 with FL-20 (usage & cost): thirty-four symbols of `fleet-usage.types.ts`
+		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
+		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
+		// → +1 with FL-20 P2 (`FLEET_USAGE_TASK_COSTS_MAX_IDS`).
+		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
+		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 70);
 	});
 
 	it.each([
@@ -2187,7 +2268,9 @@ describe('fleet barrel', () => {
 		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER'],
 		['fleet-desktop.types.js', 'FLEET_DESKTOP_REASONS'],
 		['fleet-desktop-tiles.codec.js', 'encodeDesktopTiles'],
-		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS']
+		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS'],
+		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
+		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

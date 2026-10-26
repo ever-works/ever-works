@@ -4,7 +4,9 @@ import {
     IsArray,
     IsBoolean,
     IsIn,
+    IsInt,
     IsNumber,
+    Max,
     IsOptional,
     IsString,
     IsUUID,
@@ -14,9 +16,13 @@ import {
     MinLength,
 } from 'class-validator';
 import {
+    FLEET_CLOUD_IDLE_MAX_HOURS,
+    FLEET_CLOUD_IDLE_MIN_HOURS,
+    FLEET_CLOUD_IDLE_POLICY_MODES,
     FLEET_CLOUD_NAME_PATTERN,
     FLEET_CLOUD_SOFTWARE_IDS,
     type FleetActionConfirmFields,
+    type FleetCloudIdlePolicyMode,
     type FleetCloudPowerAction,
     type FleetCloudSoftwareId,
 } from '@ever-works/contracts';
@@ -107,6 +113,19 @@ export class FleetCloudDestroyDto {
     @IsString()
     @MaxLength(39)
     confirmName?: string;
+}
+
+/** P2 (spec FR-25) — nothing · tell me after N hours · power off after N hours; N 1–72. */
+export class FleetCloudIdlePolicyDto {
+    @ApiProperty({ enum: FLEET_CLOUD_IDLE_POLICY_MODES })
+    @IsIn([...FLEET_CLOUD_IDLE_POLICY_MODES])
+    mode: FleetCloudIdlePolicyMode;
+
+    @ApiProperty({ minimum: FLEET_CLOUD_IDLE_MIN_HOURS, maximum: FLEET_CLOUD_IDLE_MAX_HOURS, default: 3 })
+    @IsInt()
+    @Min(FLEET_CLOUD_IDLE_MIN_HOURS)
+    @Max(FLEET_CLOUD_IDLE_MAX_HOURS)
+    afterHours: number;
 }
 
 export function cloudConfirmFields(body: { confirm?: boolean; confirmName?: string } | null | undefined): FleetActionConfirmFields {

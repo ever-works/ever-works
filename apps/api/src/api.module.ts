@@ -82,6 +82,7 @@ import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
 import { FleetSessionGitApiModule } from './fleet/session-git/fleet-session-git-api.module';
 import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
 import { FleetCloudApiModule } from './fleet/cloud/fleet-cloud-api.module';
+import { FleetUsageApiModule } from './fleet/usage/fleet-usage-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
 import { FleetFilesApiModule } from './fleet/files/fleet-files-api.module';
@@ -356,6 +357,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // machine-provider plugin: providers, options, create / power / destroy,
         // and the reconcile + bootstrap-watch fallbacks. Dark unless FLEET_CLOUD_ENABLED.
         FleetCloudApiModule,
+        // Usage & cost on the fleet (FL-20) — the opt-in transcript scan's dispatcher,
+        // the report ingest (a job-completion listener), and /api/fleet/usage.
+        // Dark unless FLEET_USAGE_SCAN_ENABLED.
+        FleetUsageApiModule,
         // Servers and ports (FL-10) — what a computer listens on, and Open on
         // the machine (its desktop or its preview browser), over the node link.
         // Dark unless FLEET_MACHINE_FACTS_ENABLED (and the link) are on.

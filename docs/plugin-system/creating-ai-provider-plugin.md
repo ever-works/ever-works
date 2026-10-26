@@ -1017,7 +1017,7 @@ pnpm build
 
 4. **Build.** Run `pnpm build` from the repo root. Turborepo handles dependency ordering.
 
-5. **Start the dev server.** Run `pnpm dev` and navigate to the Plugins page in the web UI. Your plugin should appear in the AI Providers section.
+5. **Start the dev server.** Run `pnpm dev:apps` from the repo root and navigate to the Plugins page in the web UI. Your plugin should appear in the AI Providers section.
 
 ## How `AiOperations` Works Under the Hood
 
