@@ -1397,6 +1397,67 @@ const CLOUD_EXPORTS = [
 	'fleetCloudDestroySummary'
 ] as const;
 
+/** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
+const USAGE_EXPORTS = [
+	'FLEET_USAGE_PROVIDERS',
+	'isFleetUsageProvider',
+	'FLEET_USAGE_SCAN_CAPABILITY',
+	'FLEET_USAGE_SCAN_INTERVAL_MS',
+	'FLEET_USAGE_SCAN_CRON',
+	'FLEET_USAGE_REPORT_MAX_ROWS',
+	'FLEET_USAGE_REPORT_MAX_BYTES',
+	'FLEET_USAGE_PERIODS',
+	'isFleetUsagePeriodDays',
+	'FLEET_USAGE_DEFAULT_PERIOD',
+	'FLEET_USAGE_PAYER_NOTE',
+	'FLEET_USAGE_PRIVACY_SENTENCE',
+	'fleetUsageOptInHint',
+	'FLEET_USAGE_ZERO_TOKENS',
+	'FLEET_USAGE_OTHER_FOLDER_PREFIX',
+	'FLEET_USAGE_MAX_MODEL_CHARS',
+	'FLEET_USAGE_MAX_SESSION_ID_CHARS',
+	'FLEET_USAGE_MAX_FOLDER_CHARS',
+	'FLEET_USAGE_MAX_TOKENS',
+	'isFleetUsageModelId',
+	'isFleetUsageProviderSessionId',
+	'isFleetUsageFolderBucket',
+	'isFleetUsageOtherFolder',
+	'fleetUsageHourStart',
+	'normalizeFleetUsageTokens',
+	'normalizeFleetUsageRow',
+	'normalizeFleetUsageReport',
+	'normalizeFleetUsageScanPayload',
+	'maxFleetUsageTokens',
+	'addFleetUsageTokens',
+	'totalFleetUsageTokens',
+	'parseFleetSessionUsage',
+	'formatFleetUsageCents',
+	'formatFleetUsageTokens'
+] as const;
+
+/** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
+const CLOUD_P2_EXPORTS = [
+	'FLEET_CLOUD_BUSY_SESSION_STATES',
+	'FLEET_CLOUD_IDLE_REQUESTER',
+	'FLEET_CLOUD_USAGE_FRESH_MS',
+	'fleetCloudIdleAttentionKey',
+	'fleetCloudIdleHours'
+] as const;
+
+/** Cloud computers P3 (FL-17, #2902) — the deployment site tag and the reconcile requester (same module). */
+const CLOUD_P3_EXPORTS = [
+	'FLEET_CLOUD_SITE_TAG_PREFIX',
+	'FLEET_CLOUD_RECONCILE_REQUESTER',
+	'fleetCloudSiteTag',
+	'fleetCloudSiteFromTags'
+] as const;
+
+const MODEL_LIST_PRICES_EXPORTS = [
+	'MODEL_TOKEN_CLASSES',
+	'findModelListPriceEntry',
+	'priceModelTokensCents'
+] as const;
+
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
@@ -1438,7 +1499,11 @@ const ALL_EXPORTS = [
 	...TOOLS_EXPORTS,
 	...TASK_HANDOFF_EXPORTS,
 	...VIRTUAL_EXPORTS,
-	...CLOUD_EXPORTS
+	...CLOUD_EXPORTS,
+	...USAGE_EXPORTS,
+	...MODEL_LIST_PRICES_EXPORTS,
+	...CLOUD_P2_EXPORTS,
+	...CLOUD_P3_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -1895,6 +1960,8 @@ const FUNCTION_EXPORTS = [
 	'isFleetVirtualState',
 	'fleetCloudNodeTag',
 	'fleetCloudNodeIdFromTags',
+	'fleetCloudSiteTag',
+	'fleetCloudSiteFromTags',
 	'isFleetCloudName',
 	'isFleetCloudSoftwareId',
 	'normalizeFleetCloudSoftware',
@@ -1915,7 +1982,27 @@ const FUNCTION_EXPORTS = [
 	'fleetCloudPriceSentence',
 	'fleetCloudCreateSummary',
 	'fleetCloudPowerOffSummary',
-	'fleetCloudDestroySummary'
+	'fleetCloudDestroySummary',
+	'isFleetUsageProvider',
+	'isFleetUsagePeriodDays',
+	'fleetUsageOptInHint',
+	'isFleetUsageModelId',
+	'isFleetUsageProviderSessionId',
+	'isFleetUsageFolderBucket',
+	'isFleetUsageOtherFolder',
+	'fleetUsageHourStart',
+	'normalizeFleetUsageTokens',
+	'normalizeFleetUsageRow',
+	'normalizeFleetUsageReport',
+	'normalizeFleetUsageScanPayload',
+	'maxFleetUsageTokens',
+	'addFleetUsageTokens',
+	'totalFleetUsageTokens',
+	'parseFleetSessionUsage',
+	'formatFleetUsageCents',
+	'formatFleetUsageTokens',
+	'findModelListPriceEntry',
+	'priceModelTokensCents'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -2023,7 +2110,11 @@ describe('fleet barrel', () => {
 		// session-status, session-rules, commands, schedules, tools, task-handoff,
 		// virtual, cloud), each a group above and a row in the witness table below,
 		// plus three in existing modules (`SPRINT_EXISTING_MODULE_EXPORTS`).
-		expect(Object.keys(fleet)).toHaveLength(1175);
+		// → +37 with FL-20 (usage & cost): thirty-four symbols of `fleet-usage.types.ts`
+		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
+		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
+		// → +4 with FL-17 P3 (site tag, reconcile requester), same module (`CLOUD_P3_EXPORTS`).
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 4);
 	});
 
 	it.each([
@@ -2066,7 +2157,9 @@ describe('fleet barrel', () => {
 		['fleet-tools.types.js', 'FLEET_TOOL_FAMILIES'],
 		['fleet-task-handoff.types.js', 'FLEET_HANDOFF_REASONS'],
 		['fleet-virtual.types.js', 'FLEET_NODE_ORIGINS'],
-		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER']
+		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER'],
+		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
+		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

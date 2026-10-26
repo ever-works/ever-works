@@ -8,6 +8,7 @@ import {
 	normalizeFleetLanId,
 	normalizeFleetMacAddress,
 	FLEET_SESSIONS_CAPABILITY,
+	FLEET_USAGE_SCAN_CAPABILITY,
 	isFleetTimeZone,
 	normalizeFleetNodeSelfUpdate,
 	normalizeFleetSessionDaemonReport,
@@ -141,6 +142,13 @@ export interface CapabilityEnvironment {
 	 * link, which advertises exactly what it did before.
 	 */
 	linkModuleTags?: readonly string[];
+	/**
+	 * Usage & cost on the fleet (FL-20, CONTRACTS §1.2) — the owner switched
+	 * the transcript scan on (`--usage-scan`) AND a Claude Code or Codex record
+	 * folder exists here. What the `usage-scan` tag stands on; the runtime
+	 * re-reads it every beat.
+	 */
+	usageScan?: boolean;
 }
 
 /**
@@ -374,7 +382,10 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 			: null,
 		// Fleet node link (FL-02): the module tags, LAST, so a node that already
 		// advertised everything above keeps advertising exactly that.
-		...(environment.linkModuleTags ?? [])
+		...(environment.linkModuleTags ?? []),
+		// Usage & cost on the fleet (FL-20): only under --usage-scan, after the
+		// module tags so every older node's list keeps its order.
+		environment.usageScan === true ? FLEET_USAGE_SCAN_CAPABILITY : null
 	]);
 }
 
@@ -415,7 +426,10 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	FLEET_MANAGED_CAPABILITY,
 	// Sessions on computers (FL-04): `sessions` exists only while the session
 	// daemon a consent started answers — the consent IS the opt-in.
-	FLEET_SESSIONS_CAPABILITY
+	FLEET_SESSIONS_CAPABILITY,
+	// Usage & cost on the fleet (FL-20): `usage-scan` exists only under
+	// --usage-scan, which IS the opt-in.
+	FLEET_USAGE_SCAN_CAPABILITY
 ]);
 
 /**

@@ -16,6 +16,7 @@ import type {
     FleetSessionProvider,
     FleetSessionRecordingState,
     FleetSessionState,
+    FleetSessionUsage,
 } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
@@ -57,6 +58,8 @@ import { PortableDateColumn } from './_types';
 // FL-05 (`1796050000000-AddFleetSessionAttention`): the board's orderings.
 @Index('idx_fleet_sessions_user_state_changed', ['userId', 'state', 'stateChangedAt'])
 @Index('idx_fleet_sessions_org_state_changed', ['organizationId', 'state', 'stateChangedAt'])
+// FL-20 (`1796200000000-AddFleetSessionUsage`): attribution by the CLI's own session id (R-13).
+@Index('idx_fleet_sessions_provider_session', ['provider', 'providerSessionId'])
 export class FleetSession {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -192,6 +195,25 @@ export class FleetSession {
     /** End of the session-boundary window (5 s after a start or resume): a `done` inside it is not news (FR-39). */
     @PortableDateColumn({ nullable: true })
     boundaryUntil?: Date | null;
+
+    // ─── FL-20 — usage & cost (CONTRACTS §4.2; slot `1796200000000`) ───
+
+    /**
+     * Tokens by model and class, requests, first / last activity and the
+     * list-price version the figures used (`FleetSessionUsage`). DERIVED from
+     * the Session's `fleet_usage_samples` by `FleetUsageReconcilerService` on
+     * every report that touches it — never written anywhere else.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    tokens?: FleetSessionUsage | null;
+
+    /**
+     * The Session's model work at LIST price, in cents (priced models only;
+     * null when nothing could be priced). Written with `tokens`; an Agent
+     * session's Run carries the same figure on `agent_runs.costCents`.
+     */
+    @Column({ type: 'int', nullable: true })
+    costCents?: number | null;
 
     @CreateDateColumn()
     createdAt: Date;

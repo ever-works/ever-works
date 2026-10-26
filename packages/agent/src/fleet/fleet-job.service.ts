@@ -324,6 +324,9 @@ export class FleetJobService {
         if (kind === 'agent-session') {
             return this.resolveAgentSessionTarget(payload?.nodeId);
         }
+        if (kind === 'usage-scan') {
+            return this.resolveUsageScanTarget(payload?.nodeId);
+        }
         if (kind !== 'agent-task') {
             return null;
         }
@@ -346,6 +349,24 @@ export class FleetJobService {
         const node = await this.nodes.findById(nodeId);
         if (!node) {
             throw new BadRequestException('An agent-session job must name a node that exists');
+        }
+        return node.id;
+    }
+
+    /**
+     * Usage & cost on the fleet (FL-20) — a transcript scan reads the records
+     * of ONE machine, so a `usage-scan` job is always pinned to
+     * `payload.nodeId` (another computer of the same owner must never lease
+     * it). The dispatcher (the one enqueuer) chose the node; this only refuses
+     * a job that names no node, or a node that does not exist.
+     */
+    private async resolveUsageScanTarget(nodeId: unknown): Promise<string> {
+        if (typeof nodeId !== 'string' || !isUUID(nodeId)) {
+            throw new BadRequestException('A usage-scan job must name the node it is for');
+        }
+        const node = await this.nodes.findById(nodeId);
+        if (!node) {
+            throw new BadRequestException('A usage-scan job must name a node that exists');
         }
         return node.id;
     }
