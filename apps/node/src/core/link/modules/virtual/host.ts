@@ -1,11 +1,7 @@
 import { spawn } from 'node:child_process';
-import type {
-	FleetJobView,
-	FleetVirtualEnrollTokenResponse,
-	FleetVirtualPhase,
-	FleetVirtualState
-} from '@ever-works/contracts';
+import type { FleetJobView, FleetVirtualEnrollTokenResponse } from '@ever-works/contracts';
 import type { CommandRunner } from '../../../capabilities';
+import type { FleetVirtualProgressFields } from '../../../job-client';
 import type { Logger } from '../../../logger';
 import { firstLine, machineChildEnv } from '../machine-facts/exec';
 import { safeOutputLine } from '../machine-facts/docker-ops';
@@ -31,13 +27,7 @@ export interface VirtualJobClient {
 	reportVirtualProgress(
 		childNodeId: string,
 		jobId: string,
-		report: {
-			phase?: FleetVirtualPhase;
-			state?: FleetVirtualState;
-			error?: string | null;
-			image?: { ref: string; digest: string | null } | null;
-			activated?: boolean | null;
-		},
+		report: FleetVirtualProgressFields,
 		leaseGeneration?: number
 	): Promise<void>;
 }
@@ -133,7 +123,11 @@ export async function docker(
 }
 
 /** True when the guest's file exists (`docker exec … test -f`). */
-export async function guestHasFile(deps: Pick<VirtualHostDeps, 'runner'>, childNodeId: string, path: string): Promise<boolean> {
+export async function guestHasFile(
+	deps: Pick<VirtualHostDeps, 'runner'>,
+	childNodeId: string,
+	path: string
+): Promise<boolean> {
 	const result = await deps.runner.run(DOCKER, guestTestFileArgs(childNodeId, path), { timeoutMs: 15_000 });
 	return result.code === 0;
 }
@@ -193,12 +187,20 @@ export async function handOverToken(
 ): Promise<void> {
 	const minted = await deps.client().mintVirtualEnrollToken(childNodeId, job.id, job.leaseGeneration);
 	const token = minted?.token;
-	if (typeof token !== 'string' || token.length < 16) throw new VirtualHostError('the platform did not hand over a token');
+	if (typeof token !== 'string' || token.length < 16)
+		throw new VirtualHostError('the platform did not hand over a token');
 	deps.logger?.protect(token);
 	try {
-		const written = await deps.stdin(DOCKER, guestWriteTokenArgs(childNodeId, GUEST_TOKEN_FILE), `${token}\n`, 30_000);
+		const written = await deps.stdin(
+			DOCKER,
+			guestWriteTokenArgs(childNodeId, GUEST_TOKEN_FILE),
+			`${token}\n`,
+			30_000
+		);
 		if (written.code !== 0) {
-			throw new VirtualHostError(`could not hand the token over: ${safeOutputLine(firstLine(written.stderr, 'failed'))}`);
+			throw new VirtualHostError(
+				`could not hand the token over: ${safeOutputLine(firstLine(written.stderr, 'failed'))}`
+			);
 		}
 		await report(deps, job, childNodeId, { phase: 'enrolling' });
 		await waitFor(deps, () => guestHasFile(deps, childNodeId, enrolledMarker), {
@@ -209,7 +211,9 @@ export async function handOverToken(
 		});
 	} finally {
 		// The guest's `enroll --token-file` deletes it; this is the belt.
-		await deps.runner.run(DOCKER, guestRemoveFileArgs(childNodeId, GUEST_TOKEN_FILE), { timeoutMs: 15_000 }).catch(() => undefined);
+		await deps.runner
+			.run(DOCKER, guestRemoveFileArgs(childNodeId, GUEST_TOKEN_FILE), { timeoutMs: 15_000 })
+			.catch(() => undefined);
 		deps.logger?.unprotect?.(token);
 	}
 }

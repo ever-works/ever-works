@@ -16,9 +16,11 @@ describe('delete evidence (FL-14 spec FR-24, S7)', () => {
 	});
 
 	const git =
-		(answers: Record<string, { code: number; stdout: string }>): CheckoutGitRunner =>
-		async (args) =>
-			answers[args.join(' ')] ?? { code: 1, stdout: '', stderr: '' };
+		(answers: Record<string, { code: number; stdout: string; stderr?: string }>): CheckoutGitRunner =>
+		async (args) => {
+			const answer = answers[args.join(' ')];
+			return answer ? { stderr: '', ...answer } : { code: 1, stdout: '', stderr: '' };
+		};
 
 	it('counts uncommitted files and commits on no remote', async () => {
 		const evidence = await readChangesEvidence(
@@ -38,7 +40,10 @@ describe('delete evidence (FL-14 spec FR-24, S7)', () => {
 	});
 
 	it('fails closed: what git cannot establish counts as would-be-lost', async () => {
-		const evidence = await readChangesEvidence(dir, git({ 'rev-parse --verify --quiet HEAD': { code: 0, stdout: 'a' } }));
+		const evidence = await readChangesEvidence(
+			dir,
+			git({ 'rev-parse --verify --quiet HEAD': { code: 0, stdout: 'a' } })
+		);
 		expect(evidence.uncommitted).toBe(EVIDENCE_UNKNOWN);
 		expect(evidence.unpushedCommits).toBe(EVIDENCE_UNKNOWN);
 	});
@@ -57,7 +62,9 @@ describe('delete evidence (FL-14 spec FR-24, S7)', () => {
 	});
 
 	it('refuses an execute whose evidence grew past what was confirmed (plan §6)', () => {
-		expect(evidenceGrew({ uncommitted: 2, unpushedCommits: 1 }, { uncommitted: 2, unpushedCommits: 1 })).toBe(false);
+		expect(evidenceGrew({ uncommitted: 2, unpushedCommits: 1 }, { uncommitted: 2, unpushedCommits: 1 })).toBe(
+			false
+		);
 		expect(evidenceGrew({ uncommitted: 3, unpushedCommits: 1 }, { uncommitted: 2, unpushedCommits: 1 })).toBe(true);
 		expect(evidenceGrew({ uncommitted: 0, unpushedCommits: 0 }, undefined)).toBe(false);
 		expect(evidenceGrew({ uncommitted: 1, unpushedCommits: 0 }, undefined)).toBe(true);

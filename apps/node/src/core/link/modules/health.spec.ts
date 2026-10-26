@@ -91,7 +91,8 @@ describe('wake.send', () => {
 		const verb = module.machineVerbs![FLEET_WAKE_SEND_VERB]!;
 		expect(verb.stateChanging).toBe(true);
 
-		const result = await verb.run(context({ params: { macAddress: '11-22-33-44-55-66' } }));
+		// A unicast address: an odd first octet (0x11) is a multicast one, which the normaliser refuses.
+		const result = await verb.run(context({ params: { macAddress: '12-22-33-44-55-66' } }));
 
 		expect(result).toEqual({ sent: 3, destinations: 2 });
 		expect(sender.sent).toEqual([
@@ -104,14 +105,14 @@ describe('wake.send', () => {
 		]);
 		const packet = (sender.send as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Uint8Array;
 		expect(packet.length).toBe(102);
-		expect([...packet.slice(6, 12)]).toEqual([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+		expect([...packet.slice(6, 12)]).toEqual([0x12, 0x22, 0x33, 0x44, 0x55, 0x66]);
 	});
 
 	it('counts a packet as sent when one destination refused it', async () => {
 		const sender = recordingSender(['255.255.255.255']);
 		const module = createHealthLinkModule({ wakeSender: sender, network, sleep: noSleep });
 		const result = await module.machineVerbs![FLEET_WAKE_SEND_VERB]!.run(
-			context({ params: { macAddress: '11:22:33:44:55:66' } })
+			context({ params: { macAddress: '12:22:33:44:55:66' } })
 		);
 		expect(result).toEqual({ sent: 3, destinations: 2 });
 	});
@@ -120,7 +121,7 @@ describe('wake.send', () => {
 		const sender = recordingSender(['255.255.255.255', '192.168.1.255']);
 		const module = createHealthLinkModule({ wakeSender: sender, network, sleep: noSleep });
 		await expect(
-			module.machineVerbs![FLEET_WAKE_SEND_VERB]!.run(context({ params: { macAddress: '11:22:33:44:55:66' } }))
+			module.machineVerbs![FLEET_WAKE_SEND_VERB]!.run(context({ params: { macAddress: '12:22:33:44:55:66' } }))
 		).rejects.toMatchObject({ error: { code: 'operation_failed' } });
 	});
 
@@ -147,7 +148,7 @@ describe('wake.send', () => {
 	it('answers unsupported_on_node without a usable interface', async () => {
 		const module = createHealthLinkModule({ wakeSender: recordingSender(), network: () => null, sleep: noSleep });
 		await expect(
-			module.machineVerbs![FLEET_WAKE_SEND_VERB]!.run(context({ params: { macAddress: '11:22:33:44:55:66' } }))
+			module.machineVerbs![FLEET_WAKE_SEND_VERB]!.run(context({ params: { macAddress: '12:22:33:44:55:66' } }))
 		).rejects.toMatchObject({ error: { code: 'unsupported_on_node' } });
 	});
 
@@ -162,7 +163,7 @@ describe('wake.send', () => {
 			}
 		});
 		await module.machineVerbs![FLEET_WAKE_SEND_VERB]!.run(
-			context({ params: { macAddress: '11:22:33:44:55:66' }, signal: abort.signal })
+			context({ params: { macAddress: '12:22:33:44:55:66' }, signal: abort.signal })
 		);
 		expect(sender.sent).toHaveLength(2);
 	});
