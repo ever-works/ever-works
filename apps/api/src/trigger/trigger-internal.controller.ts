@@ -137,6 +137,8 @@ import {
     AppDeployDispatchRelay,
     AppDeployRequestService,
     AppRuntimeEventRelayService,
+    // APW-06 T58 / §9.8 (lane aw-safety) — the deletion's completion edge (`finishDeletion`).
+    AppRuntimeDeletionService,
 } from '@ever-works/agent/app-runtime';
 // APW-06 T71 (A0.7) — the runtime-state row and the env source the isolated App runtime worker
 // proxies by name (plan §6.4). Both read or write rows, so neither can be local in the worker.
@@ -748,6 +750,12 @@ export class TriggerInternalController implements OnModuleInit {
         // sweeps only. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetCloudSweepService?: FleetCloudSweepService,
+        // APW-06 T58 / §9.8 (lane aw-safety, 2026-10-26) — the completion edge of an App Work's
+        // deletion: the isolated worker's `APP_WORK_DELETION_COMPLETION` dials
+        // `AppRuntimeDeletionService.finishDeletion` here (provided by the `@Global()`
+        // `AppRuntimePortsModule`). Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly appRuntimeDeletionService?: AppRuntimeDeletionService,
     ) {}
 
     onModuleInit() {
@@ -1076,6 +1084,25 @@ export class TriggerInternalController implements OnModuleInit {
                 ? { read: (workId: string) => this.appBuildPullTokenReader!.read(String(workId)) }
                 : undefined,
             AppDeployRequestService: this.appDeployRequestService,
+            // APW-06 T58 / §9.8 (lane aw-safety) — a ONE-member facade (the `PluginAllowlistReader`
+            // precedent): the worker may finish a deletion and nothing else — never
+            // `requestDeletion` (that is the owner's, through `deleteWork`) and never the op
+            // handler. The completion behind it refuses unless the runtime-state row records a
+            // deletion the owner asked for (`AppWorkDeletionCompletionService`). The report is
+            // rebuilt by `finishDeletion` (kinds, names and codes only) before anyone reads it.
+            AppRuntimeDeletionService: this.appRuntimeDeletionService
+                ? {
+                      finishDeletion: (workId: string, report?: unknown) =>
+                          this.appRuntimeDeletionService!.finishDeletion(
+                              String(workId),
+                              report && typeof report === 'object'
+                                  ? (report as Parameters<
+                                        AppRuntimeDeletionService['finishDeletion']
+                                    >[1])
+                                  : undefined,
+                          ),
+                  }
+                : undefined,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

@@ -307,9 +307,17 @@ export class AppClusterOpRouter {
         const route = this.route(op);
 
         // ---- R-15, centrally -------------------------------------------------------------
-        const guard = await this.deletionGuard(workId);
-        if (guard.code) {
-            return this.refuse(payload, guard.code, route, null, guard.detail);
+        //
+        // Lane aw-safety (2026-10-26): every op EXCEPT the deletion itself. `delete-app-work` is
+        // dispatched only AFTER §9.7's claim set `deletionRequestedAt`, so guarding it too refused
+        // every removal `app_work_deleting` and no App Work's workloads could ever be torn down.
+        // The deletion handler carries the inverse guard of its own: it refuses `not_deleting`
+        // when the row does NOT record a deletion (`handleDeleteAppWork`).
+        if (route !== 'deletion') {
+            const guard = await this.deletionGuard(workId);
+            if (guard.code) {
+                return this.refuse(payload, guard.code, route, null, guard.detail);
+            }
         }
 
         if (route === 'unowned') {

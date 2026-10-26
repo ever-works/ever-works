@@ -1053,6 +1053,16 @@ export const workAPI = {
         }
     },
 
+    /**
+     * APW-06 T59 (lane aw-safety, 2026-10-26) — **what deleting this App Work removes**:
+     * `GET /api/works/:id/app-deletion-preview` (owner only). Names, kinds and sizes only.
+     * Every failure is rethrown: the dialog then says the preview could not be read rather
+     * than showing an empty list that would read as "nothing to remove".
+     */
+    getAppDeletionPreview: async (id: string): Promise<AppDeletionPreviewResponse> => {
+        return serverFetch<AppDeletionPreviewResponse>(`/works/${id}/app-deletion-preview`);
+    },
+
     // Import methods
     analyzeRepository: async (data: AnalyzeRepositoryDto) => {
         return serverMutation<AnalyzeRepositoryResponseDto>({
@@ -1291,3 +1301,23 @@ export const workAPI = {
         });
     },
 };
+
+/** One line of the App Work delete preview — a kind and a name or label, never a value. */
+export interface AppDeletionPreviewEntry {
+    kind: string;
+    name?: string;
+    label?: string;
+    sizeGiB?: number;
+}
+
+/** `GET /api/works/:id/app-deletion-preview` (`AppRuntimeDeletionService.describeDeletion`). */
+export interface AppDeletionPreviewResponse {
+    target: AppDeployTargetChoice;
+    deployed: boolean;
+    deleting: boolean;
+    stateUnreadable: boolean;
+    deployInProgress: boolean;
+    removes: AppDeletionPreviewEntry[];
+    keeps: AppDeletionPreviewEntry[];
+    destroysWithData: AppDeletionPreviewEntry[];
+}
