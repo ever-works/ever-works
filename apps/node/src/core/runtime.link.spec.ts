@@ -181,9 +181,31 @@ describe('createNodeRuntime — the node link', () => {
 		runtime.loop.stop();
 		await flush(20);
 		const sent = beats(p.calls);
-		// The node peels optional fields NEWEST first (time zone, wake, self-update, daemon, health, …), so the
-		// platform sees one refused beat per newer tier this beat carries, then the first one without consents.
+		// The node peels optional fields NEWEST first, one tier per refused beat, until the platform accepts:
+		// here every beat that still carries consents is refused, so each step must drop exactly the next tier
+		// (of those this beat carries) and add nothing, and the first beat without consents is accepted.
+		const tiersNewestFirst = [
+			['timeZone'],
+			['macAddress', 'lanId'],
+			['selfUpdate'],
+			['daemon'],
+			['health'],
+			['consents']
+		];
 		expect(sent.length).toBeGreaterThanOrEqual(2);
+		let tier = 0;
+		for (let i = 1; i < sent.length; i += 1) {
+			const before = sent[i - 1]!;
+			const after = sent[i]!;
+			while (tier < tiersNewestFirst.length && !tiersNewestFirst[tier]!.some((key) => key in before)) tier += 1;
+			expect(tier).toBeLessThan(tiersNewestFirst.length);
+			const removed = Object.keys(before)
+				.filter((key) => !(key in after))
+				.sort();
+			expect(removed).toEqual(tiersNewestFirst[tier]!.filter((key) => key in before).sort());
+			expect(Object.keys(after).every((key) => key in before)).toBe(true);
+			tier += 1;
+		}
 		const accepted = sent.at(-1)!;
 		for (const refused of sent.slice(0, -1)) expect(refused).toHaveProperty('consents');
 		expect(accepted).not.toHaveProperty('consents');
