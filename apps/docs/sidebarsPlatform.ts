@@ -212,6 +212,8 @@ const sidebars: SidebarsConfig = {
 				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
 				'features/fleet-virtual-computers',
 				'features/fleet-cloud-computers',
+				// GitHub Actions self-hosted runners installed on computers of the Fleet (FL-18).
+				'features/fleet-actions-runners',
 				// What an Agent, the MCP server and the CLI may do on those computers, and the gates (FL-19).
 				'features/fleet-agent-tools',
 				'features/integrations',
