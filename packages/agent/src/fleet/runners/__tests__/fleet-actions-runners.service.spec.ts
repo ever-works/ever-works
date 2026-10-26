@@ -1,3 +1,4 @@
+import { ActionsRunnersFacadeError } from '../../../facades/actions-runners.facade';
 import { readFleetMachineError } from '../../machine/fleet-machine.errors';
 import { FleetActionsRunnersService } from '../fleet-actions-runners.service';
 
@@ -89,7 +90,6 @@ function harness(opts: { stopped?: boolean; existing?: number; consents?: Record
         listTargets: jest.fn(async () => [{ scope: 'repo', target: 'acme/api', accountLogin: 'acme', installationEntityId: 'inst-1' }]),
         resolveTarget: jest.fn(async (_u: string, scope: string, target: string) => {
             if (target !== 'acme/api') {
-                const { ActionsRunnersFacadeError } = await import('../../../facades/actions-runners.facade');
                 throw new ActionsRunnersFacadeError('install the Ever Works GitHub App on it first', 'resolveTarget', 'not-covered');
             }
             return { scope, target, installationId: 1, installationEntityId: 'inst-1', accountLogin: 'acme', repositoryIds: [7] };
