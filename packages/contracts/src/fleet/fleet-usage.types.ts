@@ -606,6 +606,97 @@ export interface FleetUsageRescanResult {
 	jobId: string;
 }
 
+/**
+ * The digest's fleet line (FL-20 P3): the person's own computers' model work
+ * over a digest window, at list price.
+ */
+export interface FleetUsageDigestLine {
+	/** List-price cents over the priced models; null = tokens only. */
+	costCents: number | null;
+	tokens: FleetUsageTokens;
+	requests: number;
+	/** Requests on models with no list price (tokens only). */
+	unknownRequests: number;
+	/** Computers that reported work in the window. */
+	computers: number;
+	/** {@link FLEET_USAGE_PAYER_NOTE}, verbatim. */
+	note: string;
+}
+
+const CSV_HEADER = [
+	'section',
+	'name',
+	'computer',
+	'requests',
+	'input_tokens',
+	'output_tokens',
+	'cache_read_tokens',
+	'cache_write_tokens',
+	'list_price_usd'
+] as const;
+
+/** One CSV cell: quoted when needed, and never read as a formula by a spreadsheet. */
+function csvCell(value: string | number | null): string {
+	if (value === null) return '';
+	let text = String(value);
+	if (typeof value === 'string' && /^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+	return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function csvDollars(cents: number | null): string | null {
+	return cents === null || !Number.isFinite(cents) ? null : (cents / 100).toFixed(2);
+}
+
+/**
+ * The Usage object as one CSV (FL-20 P3, "export"): one row per model, per
+ * computer, per busiest checkout and per Agent, then a `total` row and the
+ * payer sentence as the last row. Dollars are list price (`list_price_usd`
+ * empty = tokens only, never 0 for an unknown model — FR-8). The same text the
+ * tab downloads and `ever-works fleet usage --csv` prints.
+ */
+export function fleetUsageCsv(view: FleetUsageView): string {
+	const rows: Array<Array<string | number | null>> = [[...CSV_HEADER]];
+	const tokenCells = (tokens: FleetUsageTokens) => [tokens.in, tokens.out, tokens.cacheRead, tokens.cacheWrite];
+	for (const line of view.byModel) {
+		rows.push(['model', line.model, null, line.requests, ...tokenCells(line.tokens), csvDollars(line.costCents)]);
+	}
+	for (const line of view.byNode) {
+		rows.push([
+			'computer',
+			line.name,
+			line.name,
+			line.requests,
+			...tokenCells(line.tokens),
+			line.scan.state === 'on' ? csvDollars(line.costCents) : null
+		]);
+	}
+	for (const line of view.busiestCheckouts) {
+		rows.push([
+			'checkout',
+			line.path ?? 'other folders',
+			line.nodeName,
+			null,
+			...tokenCells(line.tokens),
+			csvDollars(line.costCents)
+		]);
+	}
+	for (const agent of view.sessions.agents) {
+		rows.push(['agent', agent.name ?? agent.agentId, null, null, null, null, null, null, csvDollars(agent.costCents)]);
+	}
+	rows.push(['total', `last ${view.days} day(s)`, null, view.totals.requests, ...tokenCells(view.totals.tokens), csvDollars(view.totals.costCents)]);
+	rows.push(['note', view.note, null, null, null, null, null, null, null]);
+	return rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
+}
+
+/** `fleet-usage-30d-2026-10-27.csv` (plus the computer or model filter when set). */
+export function fleetUsageCsvFilename(view: FleetUsageView): string {
+	const day = view.to.slice(0, 10);
+	const scope = [view.nodeId ? `node-${view.nodeId.slice(0, 8)}` : null, view.model ? view.model.replace(/[^A-Za-z0-9.-]/g, '_') : null]
+		.filter(Boolean)
+		.join('-');
+	return `fleet-usage-${view.days}d${scope ? `-${scope}` : ''}-${day}.csv`;
+}
+
 /** Format cents as `$0.42` (two decimals; `<$0.01` for a positive amount under a cent). */
 export function formatFleetUsageCents(cents: number | null): string | null {
 	if (cents === null || !Number.isFinite(cents)) return null;

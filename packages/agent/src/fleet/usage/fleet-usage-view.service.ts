@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThanOrEqual, Repository } from 'typeorm';
+import { Between, In, MoreThanOrEqual, Repository } from 'typeorm';
 import {
     FLEET_USAGE_PAYER_NOTE,
     FLEET_USAGE_TASK_COSTS_MAX_IDS,
@@ -15,6 +15,7 @@ import {
     type FleetUsagePricesView,
     type FleetUsageProvider,
     type FleetUsageScanState,
+    type FleetUsageDigestLine,
     type FleetUsageTaskCost,
     type FleetUsageTaskCostsView,
     type FleetUsageView,
@@ -347,6 +348,32 @@ export class FleetUsageViewService {
             out.set(runId, priced.costCents === null ? null : priced.cents);
         }
         return out;
+    }
+
+    /**
+     * The digest's fleet line (FL-20 P3; `DIGEST_FLEET_USAGE_READER`): the
+     * user's OWN computers' model work in the window — every attribution,
+     * "other" included (they are the owner's machines) — at list price. Null
+     * with the flag off or nothing scanned.
+     */
+    async fleetUsageForDigest(userId: string, since: Date, until: Date): Promise<FleetUsageDigestLine | null> {
+        if (!config.fleet.isUsageScanEnabled() || !userId) return null;
+        const nodes = (await this.nodes.findByUser(userId)).filter((node) => node.consents?.usageScan === true);
+        if (nodes.length === 0) return null;
+        const rows = await this.samples.find({
+            where: { nodeId: In(nodes.map((node) => node.id)), bucketStart: Between(since, until) },
+            take: 20_000,
+        });
+        if (rows.length === 0) return null;
+        const priced = priceUsageGroups(groupFleetUsageSamples(rows), this.prices);
+        return {
+            costCents: priced.costCents,
+            tokens: priced.tokens,
+            requests: priced.requests,
+            unknownRequests: priced.unknownRequests,
+            computers: new Set(rows.map((row) => row.nodeId)).size,
+            note: FLEET_USAGE_PAYER_NOTE,
+        };
     }
 
     /** P2 — keep the rows attributed to one Agent (its sessions, or its Task runs). */

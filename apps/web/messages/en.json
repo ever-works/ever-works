@@ -15673,7 +15673,8 @@
                     "title": "No computer is reporting usage yet",
                     "command": "Switch it on on a computer:",
                     "promise": "The scan reads {sentence}."
-                }
+                },
+                "exportCsv": "Export CSV"
             },
             "agent": {
                 "title": "Fleet work by computer — last 30 days, at list price",
@@ -15689,6 +15690,17 @@
             "palette": {
                 "usage": "Fleet usage",
                 "usageOn": "Usage on {name}"
+            },
+            "prices": {
+                "title": "Price list v{version} — in effect since {since}",
+                "loading": "Loading the price list…",
+                "history": "Versions: {versions}. Figures keep the version they were priced at.",
+                "model": "Model",
+                "in": "Input",
+                "out": "Output",
+                "cacheRead": "Cache read",
+                "cacheWrite": "Cache write",
+                "perMillion": "US dollars per million tokens, at the providers’ published pay-as-you-go rates."
             }
         }
     }

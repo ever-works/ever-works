@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import {
     FLEET_USAGE_DEFAULT_PERIOD,
     FLEET_USAGE_PERIODS,
+    fleetUsageCsv,
     formatFleetUsageCents,
     formatFleetUsageTokens,
     isFleetUsagePeriodDays,
@@ -120,7 +121,8 @@ export const usageCommand = new Command('usage')
     .option('--on <computer>', 'Only this computer (its name or id)')
     .option('--model <model>', 'Only this model id')
     .option('--json', 'Machine-readable output: { ok, data }')
-    .action(async (options: { days?: string; on?: string; model?: string; json?: boolean }) => {
+    .option('--csv', 'The same figures as CSV (one row per model, computer, checkout and Agent)')
+    .action(async (options: { days?: string; on?: string; model?: string; json?: boolean; csv?: boolean }) => {
         const json = options.json === true;
         const days = parseFleetUsageDays(options.days);
         if (days === null) {
@@ -134,6 +136,6 @@ export const usageCommand = new Command('usage')
         await runFleetVerb<FleetUsageView>(
             json,
             { method: 'GET', path: '/fleet/usage', query: { days, node, model: options.model } },
-            printFleetUsage,
+            options.csv === true && !json ? (view) => process.stdout.write(fleetUsageCsv(view)) : printFleetUsage,
         );
     });

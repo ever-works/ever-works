@@ -1434,7 +1434,10 @@ const USAGE_EXPORTS = [
 	'formatFleetUsageCents',
 	'formatFleetUsageTokens',
 	// FL-20 P2 — the schedule rows' Task cost read.
-	'FLEET_USAGE_TASK_COSTS_MAX_IDS'
+	'FLEET_USAGE_TASK_COSTS_MAX_IDS',
+	// FL-20 P3 — the CSV export.
+	'fleetUsageCsv',
+	'fleetUsageCsvFilename'
 ] as const;
 
 /** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
@@ -2105,7 +2108,8 @@ describe('fleet barrel', () => {
 		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
 		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
 		// → +1 with FL-20 P2 (`FLEET_USAGE_TASK_COSTS_MAX_IDS`).
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1);
+		// → +2 with FL-20 P3 (`fleetUsageCsv`, `fleetUsageCsvFilename`).
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2);
 	});
 
 	it.each([

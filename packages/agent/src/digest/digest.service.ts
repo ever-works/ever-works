@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     ORGANIZATION_DIGEST_DEFAULT_CADENCE,
     type OrganizationDigestCadence,
@@ -18,7 +18,8 @@ import { GoalStatus } from '../entities/goal.entity';
 import { Task, TaskStatus } from '../entities/task.entity';
 import type { AgentRun } from '../entities/agent-run.entity';
 import type { GoalDto } from '../goals/types';
-import type { AgentEscalationDto } from '@ever-works/contracts';
+import type { AgentEscalationDto, FleetUsageDigestLine } from '@ever-works/contracts';
+import { DIGEST_FLEET_USAGE_READER, type DigestFleetUsageReader } from './digest-fleet-usage-reader';
 import {
     ComposeDigestOptions,
     ComposeOrgDigestOptions,
@@ -142,6 +143,12 @@ export class DigestService {
         @Optional() private readonly organizationRepository?: OrganizationRepository,
         @Optional() private readonly tenantRepository?: TenantRepository,
         @Optional() private readonly aiFacade?: AiFacadeService,
+        // FL-20 P3 — the fleet line ("Your machines ran $4.20 of model work
+        // yesterday"). APPENDED LAST and optional for the same positional-arity
+        // reason; unbound (or FLEET_USAGE_SCAN_ENABLED off) there is no section.
+        @Optional()
+        @Inject(DIGEST_FLEET_USAGE_READER)
+        private readonly fleetUsage?: DigestFleetUsageReader | null,
     ) {}
 
     /**
@@ -169,8 +176,10 @@ export class DigestService {
         );
         const goals = await this.loadActiveGoals(userId);
         const escalations = await this.loadOpenEscalations(userId, since);
+        const fleetUsage = await this.loadFleetUsage(userId, since, until);
 
         return this.assemble({
+            fleetUsage,
             scope: 'personal',
             subjectId: userId,
             heading: `Your ${options.period} digest`,
@@ -558,6 +567,8 @@ export class DigestService {
         escalations: AgentEscalationDto[];
         narrativeRequested: boolean;
         metricsUserId: string | null;
+        /** FL-20 P3 — personal digests only; never part of the quiet calculation. */
+        fleetUsage?: FleetUsageDigestLine | null;
     }): Promise<ComposedDigest> {
         const { since, until } = input;
         const inWindow = (ts: Date | null | undefined): boolean =>
@@ -622,6 +633,7 @@ export class DigestService {
             prsOpened,
             goals: input.goals,
             escalations: input.escalations,
+            fleetUsage: input.fleetUsage ?? null,
         });
 
         // The narrative is composed FROM the rendered facts, never from
@@ -807,6 +819,19 @@ export class DigestService {
      * Best-effort: the digest is a read path and an escalation-store
      * hiccup must degrade to "no section", never to no digest.
      */
+    /** FL-20 P3 — the fleet line; a failing read never fails the digest. */
+    private async loadFleetUsage(userId: string, since: Date, until: Date): Promise<FleetUsageDigestLine | null> {
+        if (!this.fleetUsage) return null;
+        try {
+            return await this.fleetUsage.fleetUsageForDigest(userId, since, until);
+        } catch (error) {
+            this.logger.warn(
+                `Digest for ${userId}: the fleet usage line could not be read: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return null;
+        }
+    }
+
     private async loadOpenEscalations(userId: string, since: Date): Promise<AgentEscalationDto[]> {
         if (!this.escalations) return [];
         try {
@@ -946,6 +971,7 @@ export class DigestService {
         prsOpened: Task[];
         goals: GoalDto[];
         escalations: AgentEscalationDto[];
+        fleetUsage?: FleetUsageDigestLine | null;
     }): string {
         const { counts } = input;
         const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -1018,6 +1044,27 @@ export class DigestService {
             if (input.escalations.length > MAX_ITEMS_PER_SECTION) {
                 lines.push(`- …and ${input.escalations.length - MAX_ITEMS_PER_SECTION} more`);
             }
+        }
+
+        // FL-20 P3 — what the person's own computers' model work would have cost
+        // at list price. Never part of the quiet calculation (it is not
+        // platform activity), so it never makes a digest send on its own.
+        if (input.fleetUsage && (input.fleetUsage.requests > 0 || input.fleetUsage.costCents)) {
+            const usage = input.fleetUsage;
+            const when = input.period === 'daily' ? 'yesterday' : 'this week';
+            const cost = usage.costCents === null ? null : `$${(usage.costCents / 100).toFixed(2)}`;
+            lines.push('', '## Your computers', '');
+            lines.push(
+                cost
+                    ? `- Your machines ran ${cost} of model work ${when} at list price · ${usage.requests} request${usage.requests === 1 ? '' : 's'} on ${usage.computers} computer${usage.computers === 1 ? '' : 's'}`
+                    : `- Your machines ran ${usage.requests} model request${usage.requests === 1 ? '' : 's'} ${when} on models without a list price (tokens only)`,
+            );
+            if (cost && usage.unknownRequests > 0) {
+                lines.push(
+                    `- ${usage.unknownRequests} request${usage.unknownRequests === 1 ? '' : 's'} on models without a list price are counted in tokens only`,
+                );
+            }
+            lines.push(`- _${usage.note}_`);
         }
 
         if (input.goals.length > 0) {

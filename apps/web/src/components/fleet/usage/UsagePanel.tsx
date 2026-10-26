@@ -21,6 +21,8 @@ import {
     UsageSessionsBreakdown,
     UsageTotals,
 } from './UsageBlocks';
+import { UsageExportButton } from './UsageExportButton';
+import { UsagePriceHistory } from './UsagePriceHistory';
 import { usagePeriodForKey, usagePeriodFrom, usageTabState } from './usage-tab.shared';
 
 type Loaded = { key: string; view: FleetUsageView | null; error: FleetLinkError | null };
@@ -98,6 +100,8 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
                             {t('filterModel', { model })} <X className="w-3 h-3" aria-label={t('clearFilter')} />
                         </button>
                     )}
+                    {/* P3 — the object on screen as one CSV. */}
+                    {view && <UsageExportButton view={view} />}
                 </div>
             </div>
 
@@ -135,6 +139,8 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
                     </div>
                     <UsageBusiestCheckouts view={view} />
                     <UsageSessionsBreakdown view={view} />
+                    {/* P3 — the price-list version history (spec U8). */}
+                    <UsagePriceHistory view={view} />
                 </>
             ) : null}
         </div>

@@ -108,6 +108,21 @@ in `usage/state.json` beside the node's config, readable by the node's user only
 With no computer reporting yet the tab says so, with the command and what the scan reads. The palette has **Fleet
 usage** and **Usage on <computer>**.
 
+### Export and the price list
+
+- **Export CSV** on the tab downloads what is on screen — one row per model, computer, busiest checkout and Agent,
+  a total and the sentence above as the last row; an unknown model's price cell is empty, never 0. The CLI prints the
+  same text with `ever-works fleet usage --csv`.
+- **Price list** at the foot of the tab lists every published version with the date it took effect and the per-model
+  rates of the one in effect (per million tokens: input, output, cache read, cache write). When a period mixes
+  versions the tab says so — *priced at model list prices v1; v2 in effect since …*.
+
+## In your digest
+
+With a daily or weekly digest switched on, a **Your computers** section says what your machines ran in the window —
+*Your machines ran $4.20 of model work yesterday at list price · 212 requests on 2 computers* — with the sentence
+above. It never makes a quiet digest send on its own.
+
 ## On the Agent's Budgets tab and the schedule rows
 
 - An Agent's **Budgets** tab lists, per computer, what its sessions and Task runs there would cost over the last 30
