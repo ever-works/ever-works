@@ -14860,7 +14860,8 @@
                 "system": "system log",
                 "file": "file",
                 "container": "container",
-                "service": "service"
+                "service": "service",
+                "runner": "Actions runner"
             },
             "sources": {
                 "title": "Sources",
