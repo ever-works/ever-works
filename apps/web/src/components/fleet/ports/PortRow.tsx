@@ -87,7 +87,7 @@ export function PortRow({
     const program = programLine(port);
     const defaultTarget = list.defaultTarget;
     const reasonText = (state: FleetPortOpenTargetState) =>
-        t(`reasons.${reasonKey(state.reason)}`, { name: nodeName, command: state.command ?? '' });
+        t(`reasons.${reasonKey(state.reason)}` as Parameters<typeof t>[0], { name: nodeName, command: state.command ?? '' });
     const isWeb = port.kind === 'web' && !port.stopped;
 
     const copy = async () => {

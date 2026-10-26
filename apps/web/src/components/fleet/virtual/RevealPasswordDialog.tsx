@@ -8,7 +8,6 @@ import { revealFleetVirtualPasswordAction } from '@/app/actions/fleet/virtual';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -111,11 +110,9 @@ export function RevealPasswordDialog({
                     </div>
                 ) : null}
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="ghost">
-                            {t('close')}
-                        </Button>
-                    </DialogClose>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {t('close')}
+                    </Button>
                     {!password ? (
                         <Button type="button" onClick={reveal} disabled={pending} data-testid="fleet-virtual-password-reveal">
                             {t('reveal')}

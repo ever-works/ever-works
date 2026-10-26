@@ -867,7 +867,7 @@ export const config = {
          */
         getCheckoutContainerImage(): string {
             const raw = (process.env.FLEET_CHECKOUT_CONTAINER_IMAGE ?? '').trim();
-            return /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}$/.test(raw) ? raw : 'node:22-bookworm';
+            return /^[A-Za-z0-9][A-Za-z0-9._\/:@-]{0,254}$/.test(raw) ? raw : 'node:26-bookworm';
         },
         /**
          * Fleet node link (FL-02, CONTRACTS R-7, §9) — `FLEET_RELAY_REQUIRE_BUS=true`

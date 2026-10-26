@@ -616,7 +616,7 @@ export class SchedulesService {
             ]);
 
             const nowMs = now.getTime();
-            const projected = rows.map((task) => {
+            const projected = rows.map((task): ProjectedRow => {
                 const exhausted =
                     task.recurrenceMaxOccurrences != null &&
                     task.recurrenceOccurredCount >= task.recurrenceMaxOccurrences;

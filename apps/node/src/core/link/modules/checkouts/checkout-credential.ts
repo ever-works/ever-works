@@ -52,6 +52,16 @@ export const CHECKOUT_CREDENTIAL_UNSET_ENV: readonly string[] = ['GIT_ASKPASS', 
 /** Bound on the mint and the revoke. */
 const CREDENTIAL_TIMEOUT_MS = 15_000;
 
+/**
+ * `url` without its trailing `/`s, by a scan from the end. `/\/+$/` is
+ * quadratic on a long run of slashes that does not end the string (CodeQL #284).
+ */
+export function withoutTrailingSlashes(url: string): string {
+	let end = url.length;
+	while (end > 0 && url.charCodeAt(end - 1) === 0x2f) end -= 1;
+	return url.slice(0, end);
+}
+
 /** The node-authenticated client over the platform's credential route. */
 export function createCheckoutCredentialClient(options: {
 	apiUrl: string;
@@ -63,7 +73,7 @@ export function createCheckoutCredentialClient(options: {
 	protect?: (token: string) => void;
 	unprotect?: (token: string) => void;
 }): CheckoutCredentialClient {
-	const base = options.apiUrl.replace(/\/+$/, '');
+	const base = withoutTrailingSlashes(options.apiUrl);
 	return {
 		async mint(checkoutId, access, signal) {
 			const timeout = AbortSignal.timeout(CREDENTIAL_TIMEOUT_MS);

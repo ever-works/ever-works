@@ -895,12 +895,22 @@ export function proposeFleetCheckoutBranch(base: string, taken: Iterable<string>
 /** A folder name for a new checkout, from its branch: `nina/fix-login` → `fix-login`. */
 export function fleetCheckoutFolderName(branch: string): string {
 	const last = branch.split('/').filter((part) => part.length > 0).pop() ?? branch;
-	const slug = last
-		.replace(/[^A-Za-z0-9._-]+/g, '-')
-		.replace(/^[-.]+/, '')
-		.replace(/[-.]+$/, '')
-		.slice(0, 80);
+	const slug = trimDashesAndDots(last.replace(/[^A-Za-z0-9._-]+/g, '-')).slice(0, 80);
 	return slug || 'checkout';
+}
+
+/**
+ * `s` without leading and trailing `-` / `.` — a linear scan from both ends.
+ * `/[-.]+$/` is quadratic on a long run of dashes that does not end the
+ * string (CodeQL #283), and a branch name is the caller's input.
+ */
+function trimDashesAndDots(s: string): string {
+	const edge = (char: string) => char === '-' || char === '.';
+	let start = 0;
+	let end = s.length;
+	while (start < end && edge(s[start])) start += 1;
+	while (end > start && edge(s[end - 1])) end -= 1;
+	return s.slice(start, end);
 }
 
 /** Evidence from the node, or null. */

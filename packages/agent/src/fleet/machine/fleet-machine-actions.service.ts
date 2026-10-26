@@ -10,6 +10,7 @@ import {
     FLEET_CONTAINER_ACTION_BASE_CLASS,
     fleetRunPreview,
     validateFleetRunRequest,
+    type FleetRunValidation,
     type FleetContainerAction,
     type FleetContainersListResult,
     type FleetImagePruneResult,
@@ -288,7 +289,9 @@ export class FleetMachineActionsService {
     ): Promise<Record<string, unknown> | FleetOperationRef> {
         const validated = validateFleetRunRequest(input.request);
         if (!validated.ok) {
-            throw fleetMachineError('invalid', validated.hint, { field: validated.field });
+            // `strictNullChecks: false` here: `!validated.ok` does not narrow the union.
+            const refused = validated as Extract<FleetRunValidation, { ok: false }>;
+            throw fleetMachineError('invalid', refused.hint, { field: refused.field });
         }
         const request = validated.request;
         return this.act<Record<string, unknown>>({

@@ -135,7 +135,8 @@ describe('FleetSessionService.answer', () => {
         expect(h.current().attention).toBeNull();
         expect(h.current().state).toBe('working');
         expect(h.sink.attentionCleared).toHaveBeenCalledTimes(1);
-        const details = h.audit.tryRecord.mock.calls.at(-1)?.[0]?.details;
+        const details = ((h.audit.tryRecord.mock.calls.at(-1) as unknown[] | undefined)?.[0] as { details?: unknown } | undefined)
+            ?.details;
         expect(details).toMatchObject({ key: permission().key, optionId: '1', outcome: 'answered', source: 'card' });
         expect(JSON.stringify(details)).not.toContain('"text"');
     });

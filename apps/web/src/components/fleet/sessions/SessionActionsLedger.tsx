@@ -59,7 +59,7 @@ export function SessionActionsLedger({ sessionId, refreshKey }: { sessionId: str
                             <span className="tabular-nums text-text-muted dark:text-text-muted-dark">
                                 {clock.format(new Date(entry.sentAt))}
                             </span>
-                            <span className="font-medium text-text dark:text-text-dark">{tLabels(actionLabelKey(entry.actionId))}</span>
+                            <span className="font-medium text-text dark:text-text-dark">{tLabels(actionLabelKey(entry.actionId) as Parameters<typeof tLabels>[0])}</span>
                             <span className="text-text-muted dark:text-text-muted-dark">
                                 {cost.kind === 'unknown'
                                     ? t('costUnknown')

@@ -24,7 +24,9 @@ export type InboxItemSourceType =
     | 'proposal'
     | 'system'
     | 'work'
-    | 'fleet-run';
+    | 'fleet-run'
+    // FL-05 (contracts `InboxItemSourceType`): a session on a computer that needs you.
+    | 'fleet-session';
 
 /**
  * Self-build slice Q — where a `fleet-run` question came from. Mirrors the
@@ -42,6 +44,13 @@ export interface InboxItemSourceMeta {
     prUrl?: string | null;
     /** Set when the model asked from a mounted repository (`.mounts/<dir>`). */
     mountDir?: string | null;
+    /** FL-05 — the session a `fleet-session` item is about. */
+    sessionId?: string | null;
+    sessionTitle?: string | null;
+    /** `claude-code` · `codex` · … — rendered as the CLI's name. */
+    provider?: string | null;
+    /** The attention key (CONTRACTS §5.2): one identity for the card, this item and the notification. */
+    attentionKey?: string | null;
 }
 
 /** Mirrors `INBOX_MAX_REPLY_CHARS` — the API 400s past it. */
