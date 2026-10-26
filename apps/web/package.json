@@ -37,8 +37,8 @@
         "test:e2e:phase-a": "playwright test webhooks-trigger-receiver-api admin-tenant-runtime-allowlist tenant-job-runtime-trigger-3mode"
     },
     "dependencies": {
-        "@ai-sdk/openai-compatible": "^2.0.41",
-        "@ai-sdk/react": "^3.0.156",
+        "@ai-sdk/openai-compatible": "^2.0.87",
+        "@ai-sdk/react": "^3.0.319",
         "@ever-works/app-launcher": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
@@ -54,7 +54,7 @@
         "@tiptap/react": "^2.10.4",
         "@tiptap/starter-kit": "^2.10.4",
         "@tiptap/suggestion": "^2.10.4",
-        "ai": "^6.0.154",
+        "ai": "^6.0.316",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
         "date-fns": "^4.1.0",
