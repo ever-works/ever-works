@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { FleetLinkExtensionMessage } from '@ever-works/contracts';
 import { resolveHookPaths, type HookFs } from '../hook-client';
 import { HookEndpoint, type HookEndpointEvent } from '../hook-endpoint';
@@ -57,7 +57,7 @@ function harness(provider: DaemonSessionInfo['provider'] = 'claude-code') {
 	const connectedListeners: Array<(client: unknown) => void> = [];
 	const daemon: SessionStatusDaemon = {
 		healthy: true,
-		request: async <T,>() => ({ sessions: [info({ provider })] }) as T,
+		request: async <T>() => ({ sessions: [info({ provider })] }) as T,
 		onEvent: (listener) => {
 			eventListeners.push(listener);
 			return () => undefined;
@@ -67,7 +67,8 @@ function harness(provider: DaemonSessionInfo['provider'] = 'claude-code') {
 			return () => undefined;
 		}
 	};
-	let onHook: ((event: HookEndpointEvent) => void) | null = null;
+	// Asserted, not annotated: an annotated `= null` narrows the closure's call below to `never`.
+	const onHook = null as ((event: HookEndpointEvent) => void) | null;
 	const endpoint = new HookEndpoint({
 		token: 't'.repeat(64),
 		isKnownSession: () => true,
@@ -93,6 +94,7 @@ function harness(provider: DaemonSessionInfo['provider'] = 'claude-code') {
 		now: () => now,
 		scheduler: { setTimeout: () => null, clearTimeout: () => undefined }
 	});
+	let started = false;
 	let linkListener: ((state: { phase: string; linkGeneration: number | null }) => void) | null = null;
 	pipeline.bindLink({
 		getState: () => ({ phase: 'connected', linkGeneration: 1 }),
@@ -106,7 +108,12 @@ function harness(provider: DaemonSessionInfo['provider'] = 'claude-code') {
 		}
 	});
 	const hook = async (body: Record<string, unknown>) => {
-		const event: HookEndpointEvent = { sessionId: SESSION, provider: provider === 'codex' ? 'codex' : 'claude', body, at: now };
+		const event: HookEndpointEvent = {
+			sessionId: SESSION,
+			provider: provider === 'codex' ? 'codex' : 'claude',
+			body,
+			at: now
+		};
 		const evidence = await normalizeHookEvent(event, { homedir: '/home/dana' });
 		await pipeline.addEvidence(SESSION, evidence);
 	};
@@ -118,6 +125,12 @@ function harness(provider: DaemonSessionInfo['provider'] = 'claude-code') {
 			now += ms;
 		},
 		connect: async () => {
+			// The pipeline follows the daemon only once started (it subscribes to `onConnected` in `start()`).
+			if (!started) {
+				started = true;
+				running.push(pipeline);
+				await pipeline.start();
+			}
 			for (const listener of connectedListeners) listener(null);
 			await new Promise((resolve) => setTimeout(resolve, 0));
 		},
@@ -129,6 +142,13 @@ function harness(provider: DaemonSessionInfo['provider'] = 'claude-code') {
 	};
 }
 
+/** Pipelines a test started: their hook endpoints are stopped after each test. */
+const running: SessionStatusPipeline[] = [];
+
+afterEach(async () => {
+	for (const pipeline of running.splice(0)) await pipeline.stop();
+});
+
 describe('SessionStatusPipeline', () => {
 	it('prompt → permission → stop reports each change once (ACC-FL05-06)', async () => {
 		const h = harness();
@@ -136,7 +156,11 @@ describe('SessionStatusPipeline', () => {
 		await h.hook({ hook_event_name: 'SessionStart', source: 'startup' });
 		h.advance(10_000);
 		await h.hook({ hook_event_name: 'UserPromptSubmit', prompt: 'run the migration tests' });
-		await h.hook({ hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'pnpm db:migrate' } });
+		await h.hook({
+			hook_event_name: 'PermissionRequest',
+			tool_name: 'Bash',
+			tool_input: { command: 'pnpm db:migrate' }
+		});
 		const permission = h.sent.find((message) => message.type === 'session.attention');
 		expect(permission?.attention).toMatchObject({ reason: 'permission', prompt: 'Allow Bash(pnpm db:migrate)?' });
 		h.advance(30_000);

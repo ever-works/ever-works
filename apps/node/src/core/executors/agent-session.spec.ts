@@ -5,6 +5,7 @@ import {
 	buildAgentSessionArgv,
 	resolveAgentSessionFolder,
 	runAgentSessionJob,
+	type AgentSessionDaemon,
 	type AgentSessionIo
 } from './agent-session';
 
@@ -35,7 +36,10 @@ function job(payload: Record<string, unknown> = {}): FleetJobView {
 function io(over: Partial<AgentSessionIo> = {}): AgentSessionIo {
 	return {
 		workEnabled: true,
-		daemon: { request: vi.fn(async () => ({})), onEvent: vi.fn(() => () => undefined) },
+		daemon: {
+			request: vi.fn(async () => ({})),
+			onEvent: vi.fn(() => () => undefined)
+		} as unknown as AgentSessionDaemon,
 		modelCli: { 'claude-code': '/usr/local/bin/claude' },
 		containment: {},
 		nodeId: UUID,
@@ -121,21 +125,32 @@ describe('agent-session executor (FL-04 P2)', () => {
 		expect((await refusal(runAgentSessionJob(job(), signal, io({ workEnabled: false })))).code).toBe(
 			'consent_missing'
 		);
-		expect((await refusal(runAgentSessionJob(job({ nodeId: '22222222-2222-4222-8222-222222222222' }), signal, io()))).code).toBe(
-			'invalid'
+		expect(
+			(await refusal(runAgentSessionJob(job({ nodeId: '22222222-2222-4222-8222-222222222222' }), signal, io())))
+				.code
+		).toBe('invalid');
+		expect((await refusal(runAgentSessionJob(job(), signal, io({ modelCli: {} })))).code).toBe(
+			'unsupported_on_node'
 		);
-		expect((await refusal(runAgentSessionJob(job(), signal, io({ modelCli: {} })))).code).toBe('unsupported_on_node');
 		expect((await refusal(runAgentSessionJob(job({ provider: 'shell' }), signal, io()))).code).toBe('invalid');
-		expect((await refusal(runAgentSessionJob(job(), signal, io({ daemon: null })))).code).toBe('unsupported_on_node');
+		expect((await refusal(runAgentSessionJob(job(), signal, io({ daemon: null })))).code).toBe(
+			'unsupported_on_node'
+		);
 	});
 
 	it('never downgrades: a computer that cannot isolate refuses with the reason, and starts nothing', async () => {
-		const daemon = { request: vi.fn(async () => ({})), onEvent: vi.fn(() => () => undefined) };
+		const daemon = {
+			request: vi.fn(async () => ({})),
+			onEvent: vi.fn(() => () => undefined)
+		};
 		const error = await refusal(
 			runAgentSessionJob(
 				job(),
 				new AbortController().signal,
-				io({ daemon, containment: { modelHomeIsolation: 'inherit' } as never })
+				io({
+					daemon: daemon as unknown as AgentSessionDaemon,
+					containment: { modelHomeIsolation: 'inherit' } as never
+				})
 			)
 		);
 		expect(error.code).toBe('unsupported_on_node');
