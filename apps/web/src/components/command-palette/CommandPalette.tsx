@@ -44,6 +44,7 @@ import {
     fleetComputerScreens,
     fleetVirtualScreens,
     fleetCloudScreens,
+    fleetUsageScreens,
     fleetRunnersScreens,
     screensFor,
 } from './registry/screens';
@@ -53,6 +54,7 @@ import {
     useFleetMachineFactsEnabled,
     useFleetVirtualEnabled,
     useFleetCloudEnabled,
+    useFleetUsageEnabled,
     useFleetActionsRunnersEnabled,
 } from '@/components/fleet/FleetHubFlagProvider';
 import { useFleetPaletteSessions } from './hooks/use-fleet-palette-sessions';
@@ -269,6 +271,7 @@ export function CommandPalette({
     const fleetMachineFactsEnabled = useFleetMachineFactsEnabled();
     const fleetVirtualEnabled = useFleetVirtualEnabled();
     const fleetCloudEnabled = useFleetCloudEnabled();
+    const fleetUsageEnabled = useFleetUsageEnabled();
     const fleetActionsRunnersEnabled = useFleetActionsRunnersEnabled();
     // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
     const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
@@ -290,6 +293,8 @@ export function CommandPalette({
             ...fleetVirtualScreens(fleetComputers, fleetVirtualEnabled),
             // Cloud computers (FL-17): "New cloud computer", "Power off / on <name>".
             ...fleetCloudScreens(fleetComputers, fleetCloudEnabled),
+            // Usage & cost (FL-20): "Fleet usage", "Usage on <name>".
+            ...fleetUsageScreens(fleetComputers, fleetUsageEnabled),
             // Actions runners (FL-18): "Install Actions runners on <name>".
             ...fleetRunnersScreens(fleetComputers, fleetActionsRunnersEnabled),
         ],
@@ -299,6 +304,7 @@ export function CommandPalette({
             fleetMachineFactsEnabled,
             fleetVirtualEnabled,
             fleetCloudEnabled,
+            fleetUsageEnabled,
             fleetActionsRunnersEnabled,
             fleetComputers,
         ],

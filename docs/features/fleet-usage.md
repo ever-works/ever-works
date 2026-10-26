@@ -90,6 +90,32 @@ in `usage/state.json` beside the node's config, readable by the node's user only
 - **Agent tool, MCP, CLI** — `fleet_usage_get { days?, node?, model? }` and `ever-works fleet usage [--days 1|7|30|90]
   [--on <computer>] [--model <id>] [--json]` return the same object, read-only, with the sentence in `note`.
 
+## The Usage tab
+
+**Fleet → Usage** answers "where did the month go?" for every computer you may see: **Today, 7, 30 or 90 days**
+(keys `1`–`4`), then
+
+- the totals line — cost at list price, tokens, requests and the top model — with the sentence above right beneath it,
+  and *excludes N requests on unknown models* when some model has no list price;
+- **By model** and **By computer** — click a model or a computer to filter the tab to it. Each computer shows its last
+  scan (*scanned 4 min ago*); an **offline** one keeps its numbers and its age (*offline · scanned 2 d ago*); one with
+  the scan off shows the opt-in command instead of numbers. The owner can ask an online computer to **Scan now**;
+- **Busiest checkouts** — the known checkouts and shared folders that cost most (*other folders* for the rest), each
+  opening the computer's Checkouts tab;
+- **Sessions** — per Agent, your own sessions, and **other (not started from Ever Works)**;
+- *catching up · 42 % scanned on build-01* while a first scan drains a large backlog.
+
+With no computer reporting yet the tab says so, with the command and what the scan reads. The palette has **Fleet
+usage** and **Usage on <computer>**.
+
+## On the Agent's Budgets tab and the schedule rows
+
+- An Agent's **Budgets** tab lists, per computer, what its sessions and Task runs there would cost over the last 30
+  days at list price. The Budget figure above it already includes that work (the non-debiting rows described above);
+  the rows say where it came from.
+- On a computer's **Schedules** tab, an Agent-session schedule (a pinned recurring Task) shows *last run $0.42 · 30 d
+  $6.10 · list* (`GET /api/fleet/usage/tasks?ids=…`, your own Runs only).
+
 ## Sessions not started from Ever Works
 
 A session someone opened at the computer's keyboard has no Ever Works session or Run. Its tokens are kept as

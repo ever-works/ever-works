@@ -1,8 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, MoreThanOrEqual, Repository } from 'typeorm';
 import {
     FLEET_USAGE_PAYER_NOTE,
+    FLEET_USAGE_TASK_COSTS_MAX_IDS,
     FLEET_USAGE_ZERO_TOKENS,
     fleetUsageOptInHint,
     isFleetUsagePeriodDays,
@@ -14,6 +15,8 @@ import {
     type FleetUsagePricesView,
     type FleetUsageProvider,
     type FleetUsageScanState,
+    type FleetUsageTaskCost,
+    type FleetUsageTaskCostsView,
     type FleetUsageView,
     type FleetViewerRole,
     type RunReceiptFleetUsage,
@@ -46,7 +49,11 @@ export interface FleetUsageQuery {
     days?: unknown;
     nodeId?: string | null;
     model?: string | null;
+    /** P2 — only this Agent's work (its sessions and Task runs): the Agent page's Budgets tab. */
+    agentId?: string | null;
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Busiest checkouts shown (the tab's line, spec §0). */
 const MAX_CHECKOUT_LINES = 6;
@@ -109,8 +116,11 @@ export class FleetUsageViewService {
         );
         const owned = new Set(scope.filter((entry) => entry.role === 'owner').map((entry) => entry.node.id));
         // Other sessions are the machine owner's alone (spec §8b).
-        const visible = rows.filter((row) => owned.has(row.nodeId) || row.fleetSessionId || row.agentRunId);
+        let visible = rows.filter((row) => owned.has(row.nodeId) || row.fleetSessionId || row.agentRunId);
         const otherHidden = visible.length !== rows.length;
+        // P2 — one Agent's work only: rows attributed to its sessions or its Task runs.
+        const agentId = typeof query.agentId === 'string' && UUID.test(query.agentId) ? query.agentId : null;
+        if (agentId) visible = await this.onlyAgent(visible, agentId);
 
         const priced = priceUsageGroups(visible, this.prices);
         const facts = await this.scans.factsFor(scope.map((entry) => entry.node.id));
@@ -151,7 +161,8 @@ export class FleetUsageViewService {
         byNode.sort((a, b) => (b.costCents ?? -1) - (a.costCents ?? -1) || a.name.localeCompare(b.name));
 
         const busiestCheckouts = await this.busiestCheckouts(visible, scope);
-        const sessions = await this.sessionsBreakdown(visible, rows, owned);
+        // With an Agent filter there are no "other" rows: other sessions name no Agent (FR-6).
+        const sessions = await this.sessionsBreakdown(visible, agentId ? visible : rows, owned);
 
         let catchingUp: FleetUsageView['catchingUp'] = null;
         for (const line of byNode) {
@@ -170,6 +181,7 @@ export class FleetUsageViewService {
             to: to.toISOString(),
             nodeId: query.nodeId ?? null,
             model,
+            agentId,
             totals: {
                 costCents: priced.costCents,
                 tokens: priced.tokens,
@@ -230,6 +242,138 @@ export class FleetUsageViewService {
             unknownModels: priced.unknownModels,
             note: FLEET_USAGE_PAYER_NOTE,
         };
+    }
+
+    /**
+     * `GET /api/fleet/usage/tasks?ids=` (FL-20 P2, spec FR-16) — what each
+     * recurring Task's Runs cost at list price: the newest Run's figure and
+     * the last 30 days' total, for the FL-13 schedule rows. The caller's OWN
+     * Runs only (a Task's schedule is its owner's); an unknown id answers an
+     * empty line, never an error, so the row simply shows no cost.
+     */
+    async taskCosts(
+        caller: FleetCaller,
+        taskIds: readonly string[],
+        now: Date = new Date(),
+    ): Promise<FleetUsageTaskCostsView> {
+        const userId = typeof caller === 'string' ? caller : caller.userId;
+        const ids = [...new Set(taskIds.filter((id) => typeof id === 'string' && UUID.test(id)))].slice(
+            0,
+            FLEET_USAGE_TASK_COSTS_MAX_IDS,
+        );
+        if (ids.length === 0 || !userId) return { tasks: [], note: FLEET_USAGE_PAYER_NOTE };
+        const since = new Date(now.getTime() - 30 * DAY_MS);
+        const runs = await this.runs.find({
+            where: { userId, taskId: In(ids), createdAt: MoreThanOrEqual(since) },
+            select: { id: true, taskId: true, createdAt: true },
+            order: { createdAt: 'DESC' },
+            take: 2000,
+        });
+        // A Task that did not run in the window still names its newest Run.
+        const seen = new Set(runs.map((run) => run.taskId));
+        for (const taskId of ids.filter((id) => !seen.has(id))) {
+            const latest = await this.runs.findOne({
+                where: { userId, taskId },
+                select: { id: true, taskId: true, createdAt: true },
+                order: { createdAt: 'DESC' },
+            });
+            if (latest) runs.push(latest);
+        }
+        const centsByRun = await this.runCents(runs.map((run) => run.id));
+        const tasks = ids.map((taskId): FleetUsageTaskCost => {
+            const own = runs
+                .filter((run) => run.taskId === taskId)
+                .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            if (own.length === 0) return { taskId, lastRun: null, last30DaysCents: null, runs30Days: 0 };
+            const newest = own[0];
+            const inWindow = own.filter((run) => new Date(run.createdAt).getTime() >= since.getTime());
+            let cents = 0;
+            let priced = false;
+            for (const run of inWindow) {
+                const value = centsByRun.get(run.id);
+                if (typeof value === 'number') {
+                    cents += value;
+                    priced = true;
+                }
+            }
+            const last = centsByRun.get(newest.id);
+            return {
+                taskId,
+                lastRun: {
+                    runId: newest.id,
+                    at: new Date(newest.createdAt).toISOString(),
+                    costCents: typeof last === 'number' ? Math.round(last) : null,
+                },
+                last30DaysCents: priced ? Math.round(cents) : null,
+                runs30Days: inWindow.length,
+            };
+        });
+        return { tasks, note: FLEET_USAGE_PAYER_NOTE };
+    }
+
+    /** Fractional list-price cents per Run (through its Sessions and directly); null = nothing priced. */
+    private async runCents(runIds: readonly string[]): Promise<Map<string, number | null>> {
+        const out = new Map<string, number | null>();
+        if (runIds.length === 0) return out;
+        const runBySession = new Map<string, string>();
+        const samplesByRun = new Map<string, FleetUsageSample[]>();
+        const push = (runId: string, sample: FleetUsageSample) =>
+            samplesByRun.set(runId, [...(samplesByRun.get(runId) ?? []), sample]);
+        for (let i = 0; i < runIds.length; i += 200) {
+            const chunk = runIds.slice(i, i + 200);
+            const sessions = await this.sessions.find({
+                where: { agentRunId: In([...chunk]) },
+                select: { id: true, agentRunId: true },
+            });
+            for (const session of sessions) if (session.agentRunId) runBySession.set(session.id, session.agentRunId);
+            for (const sample of await this.samples.find({ where: { agentRunId: In([...chunk]) } })) {
+                if (sample.agentRunId) push(sample.agentRunId, sample);
+            }
+        }
+        const sessionIds = [...runBySession.keys()];
+        for (let i = 0; i < sessionIds.length; i += 200) {
+            const viaSessions = await this.samples.find({
+                where: { fleetSessionId: In(sessionIds.slice(i, i + 200)) },
+            });
+            for (const sample of viaSessions) {
+                const runId = sample.fleetSessionId ? runBySession.get(sample.fleetSessionId) : undefined;
+                if (runId) push(runId, sample);
+            }
+        }
+        for (const runId of runIds) {
+            const rows = samplesByRun.get(runId);
+            if (!rows || rows.length === 0) continue;
+            const priced = priceUsageGroups(groupFleetUsageSamples(rows), this.prices);
+            out.set(runId, priced.costCents === null ? null : priced.cents);
+        }
+        return out;
+    }
+
+    /** P2 — keep the rows attributed to one Agent (its sessions, or its Task runs). */
+    private async onlyAgent(rows: readonly GroupedRow[], agentId: string): Promise<GroupedRow[]> {
+        const sessionIds = [...new Set(rows.map((row) => row.fleetSessionId).filter((id): id is string => !!id))];
+        const runIds = [...new Set(rows.map((row) => row.agentRunId).filter((id): id is string => !!id))];
+        const agentSessions = new Set<string>();
+        const agentRuns = new Set<string>();
+        for (let i = 0; i < sessionIds.length; i += 200) {
+            const found = await this.sessions.find({
+                where: { id: In(sessionIds.slice(i, i + 200)), agentId },
+                select: { id: true },
+            });
+            for (const session of found) agentSessions.add(session.id);
+        }
+        for (let i = 0; i < runIds.length; i += 200) {
+            const found = await this.runs.find({
+                where: { id: In(runIds.slice(i, i + 200)), agentId },
+                select: { id: true },
+            });
+            for (const run of found) agentRuns.add(run.id);
+        }
+        return rows.filter(
+            (row) =>
+                (!!row.fleetSessionId && agentSessions.has(row.fleetSessionId)) ||
+                (!!row.agentRunId && agentRuns.has(row.agentRunId)),
+        );
     }
 
     /** `GET /api/fleet/usage/prices` — the list in effect and its history (read-only). */

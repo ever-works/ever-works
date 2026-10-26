@@ -74,6 +74,16 @@ export function isFleetCloudEnabled(): boolean {
 }
 
 /**
+ * Usage & cost on the fleet (FL-20) — `FLEET_USAGE_SCAN_ENABLED`, matching
+ * `config.fleet.isUsageScanEnabled()` on the API. Default OFF; on only for the
+ * literal `'true'` and only with the hub on, because the Usage tab and its
+ * palette entries live on the hub.
+ */
+export function isFleetUsageScanEnabled(): boolean {
+    return isFleetHubEnabled() && process.env.FLEET_USAGE_SCAN_ENABLED === 'true';
+}
+
+/**
  * Actions runners on computers (FL-18) — `FLEET_ACTIONS_RUNNERS_ENABLED`,
  * matching `config.fleet.isActionsRunnersEnabled()` on the API. Default OFF; on
  * only for the literal `'true'` and only with the hub on, because the Actions

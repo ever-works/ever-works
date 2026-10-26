@@ -1489,7 +1489,9 @@ const USAGE_EXPORTS = [
 	'totalFleetUsageTokens',
 	'parseFleetSessionUsage',
 	'formatFleetUsageCents',
-	'formatFleetUsageTokens'
+	'formatFleetUsageTokens',
+	// FL-20 P2 — the schedule rows' Task cost read.
+	'FLEET_USAGE_TASK_COSTS_MAX_IDS'
 ] as const;
 
 /** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
@@ -2193,10 +2195,11 @@ describe('fleet barrel', () => {
 		// → +37 with FL-20 (usage & cost): thirty-four symbols of `fleet-usage.types.ts`
 		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
 		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
+		// → +1 with FL-20 P2 (`FLEET_USAGE_TASK_COSTS_MAX_IDS`).
 		// → +52 with FL-18 (Actions runners on computers): the fifty-one symbols of
 		// `fleet-actions-runners.types.ts` — a NEW module, one row below — and
 		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 52);
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 52);
 	});
 
 	it.each([
