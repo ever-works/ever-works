@@ -298,7 +298,7 @@ packages/
 
 ```bash
 # Development
-pnpm dev:apps         # All apps (no bare `pnpm dev`)
+pnpm dev:apps         # API, web, MCP and hosting operator (no bare `pnpm dev`)
 pnpm dev:api          # API only
 pnpm dev:web          # Web only
 

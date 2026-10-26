@@ -109,7 +109,7 @@ pnpm dev:web    # Runs on http://localhost:3000
 The dashboard expects the API to be running on port 3100. Start both simultaneously with:
 
 ```bash
-pnpm dev:apps   # Starts the API, web dashboard and MCP server in parallel
+pnpm dev:apps   # Starts the API, web dashboard, MCP server and hosting operator in parallel
 ```
 
 ## Build Output

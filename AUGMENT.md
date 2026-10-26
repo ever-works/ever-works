@@ -26,7 +26,7 @@ pnpm install
 cp apps/api/.env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env
 
-# Start development (API + Web + MCP; there is no bare `pnpm dev`)
+# Start development (API + Web + MCP + hosting operator; there is no bare `pnpm dev`)
 pnpm dev:apps
 ```
 
