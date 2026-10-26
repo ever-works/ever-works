@@ -362,6 +362,17 @@ export interface FleetNodeDesktopView {
 	reportedAt: string | null;
 }
 
+/** What `fleet_nodes.desktopFacts` stores (FL-07 slot 00): the last report plus the audited event ids. */
+export interface FleetNodeDesktopFacts {
+	helper: FleetHelperStatusView | null;
+	displays: FleetDisplayView[];
+	reasons: FleetDesktopReason[];
+	/** Platform receipt time of the report (ISO). */
+	reportedAt: string;
+	/** Admission event ids already written to `fleet_audit` (newest last, bounded). */
+	seenEventIds: string[];
+}
+
 /** The helper as a heartbeat reports it (`helper { trust, version?, verifiedAt? }` plus what the tab names). */
 export interface FleetHelperStatusView {
 	trust: FleetHelperTrust;

@@ -76,3 +76,5 @@ export * from './ports';
 export * from './virtual';
 // Cloud computers (FL-17) — machines created at a cloud provider, their service, sweeps and Agent tools.
 export * from './cloud';
+// Desktop view & control (FL-07) — the desktop facts a heartbeat reports, and the helper admission audit.
+export * from './desktop';
