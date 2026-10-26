@@ -1047,7 +1047,15 @@ describe('createNodeRuntime — the attended live-view lane (Agent computers)', 
 		// FL-16 registered them, the management lane's VM jobs — nor FL-18's runner jobs (CONTRACTS R-34).
 		expect(leases).toContainEqual(
 			expect.objectContaining({
-				excludeKinds: ['computer-session', 'acceptance-checks', 'vm-create', 'vm-control', 'runner-install', 'runner-control']
+				excludeKinds: [
+					'computer-session',
+					'acceptance-checks',
+					'vm-create',
+					'vm-control',
+					'usage-scan',
+					'runner-install',
+					'runner-control'
+				]
 			})
 		);
 	});
