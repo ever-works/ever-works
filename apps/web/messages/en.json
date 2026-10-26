@@ -15632,6 +15632,68 @@
                 "off": "Usage scan is off — run `ever-works-node start --usage-scan` on {computer}",
                 "unsupported": "Update the node on {computer} to report usage",
                 "error": "Could not load usage — {hint}"
+            },
+            "tab": {
+                "periodLabel": "Period",
+                "periods": {
+                    "today": "Today",
+                    "d7": "7 days",
+                    "d30": "30 days",
+                    "d90": "90 days"
+                },
+                "totals": "{cost} at list price · {tokens} tokens · {requests} requests",
+                "topModel": "top model {model}",
+                "tokensOnly": "tokens only",
+                "unknownModels": "excludes {count} requests on unknown models ({models}) — tokens only",
+                "excludedNodes": "Not shown: {count} computer(s) you may not see",
+                "otherHidden": "Not shown: sessions not started from Ever Works on computers you do not own",
+                "priceList": "Priced at model list prices v{version}.",
+                "priceListMixed": "Priced at model list prices {versions}; v{version} in effect since {since}.",
+                "catchingUp": "catching up · {pct} % scanned on {computer}",
+                "byModel": "By model",
+                "nothingYet": "Nothing counted in this period yet.",
+                "unknownModel": "(unknown) {model}",
+                "requests": "{count} req",
+                "byComputer": "By computer",
+                "offline": "offline",
+                "scannedAgo": "scanned {age} ago",
+                "noScanYet": "no scan yet",
+                "scanOff": "Usage scan is off",
+                "rescan": "Scan now",
+                "rescanQueued": "scan requested",
+                "busiestCheckouts": "Busiest checkouts",
+                "otherFolders": "other folders",
+                "onComputer": "on {computer}",
+                "sessions": "Sessions",
+                "agentSessions": "{name} {count}",
+                "unknownAgent": "an Agent",
+                "ownerSessions": "owner sessions {count}",
+                "otherSessions": "other (not started from Ever Works) {count}",
+                "otherNotShown": "other: not shown",
+                "filterComputer": "Computer: {computer}",
+                "filterModel": "Model: {model}",
+                "clearFilter": "Clear filter",
+                "failed": "Could not load usage",
+                "empty": {
+                    "title": "No computer is reporting usage yet",
+                    "command": "Switch it on on a computer:",
+                    "promise": "The scan reads {sentence}."
+                }
+            },
+            "agent": {
+                "title": "Fleet work by computer — last 30 days, at list price",
+                "row": "{cost} · {requests} requests",
+                "tokensOnly": "tokens only",
+                "none": "No fleet work counted for this Agent in the last 30 days.",
+                "error": "Could not load fleet usage — {hint}"
+            },
+            "schedule": {
+                "cost": "last run {last} · 30 d {month} · list",
+                "none": "—"
+            },
+            "palette": {
+                "usage": "Fleet usage",
+                "usageOn": "Usage on {name}"
             }
         }
     }
