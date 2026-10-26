@@ -5,10 +5,12 @@ import {
     parseFleetSessionAttention,
     parseFleetSessionHooks,
     parseFleetSessionLastEvidence,
+    parseFleetSessionUsage,
     type FleetSessionView,
 } from '@ever-works/contracts';
 import type { FleetCheckout } from '../../entities/fleet-checkout.entity';
 import type { FleetSession } from '../../entities/fleet-session.entity';
+import { config } from '../../config';
 
 const iso = (value: Date | string | null | undefined): string | null => {
     if (!value) return null;
@@ -60,6 +62,13 @@ export function toFleetSessionView(
     view.lastEvidence = row.lastEvidence ? parseFleetSessionLastEvidence(row.lastEvidence) : null;
     view.boundaryUntil = iso(row.boundaryUntil);
     if (options.includeScreen) view.lastScreen = row.lastScreen ?? null;
+    // FL-20 (CONTRACTS §4.2): what the computer's usage scan attributed to it —
+    // only while FLEET_USAGE_SCAN_ENABLED is on (flag off hides the chip, FR-10).
+    const usageOn = config.fleet.isUsageScanEnabled();
+    const usage = usageOn && row.tokens ? parseFleetSessionUsage(row.tokens) : null;
+    view.tokens = usage;
+    view.costCents = usageOn && typeof row.costCents === 'number' ? row.costCents : null;
+    view.priceListVersion = usage?.priceListVersion ?? null;
     return view;
 }
 
