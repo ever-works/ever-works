@@ -980,6 +980,17 @@ export const WHITELIST: WhitelistEntry[] = [
 			'What the cloud computers cost: per hour now, this month so far and projected — estimates from list prices, never counted against model-spend budgets. Read-only.',
 		annotations: { readOnlyHint: true }
 	},
+	// Usage & cost on the fleet (FL-20 P1) — what the model work on a person's computers would
+	// cost at LIST price, from each computer's opt-in transcript scan (counts only). Read-only;
+	// 404s unless FLEET_USAGE_SCAN_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/usage',
+		toolName: 'fleet_usage_get',
+		description:
+			'What the model work on my computers would cost at list price over the last 1, 7, 30 or 90 days (`days`, default 7): totals, by model, by computer with each one’s last scan, busiest checkouts and sessions — optionally one computer (`node`) or one model (`model`). Counts come from each computer’s opt-in transcript scan (token counts only). The machines’ own sign-ins paid; Ever Works charged nothing (the `note`). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
 	{
 		method: 'POST',
 		path: '/api/fleet/cloud',

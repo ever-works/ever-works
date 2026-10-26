@@ -819,8 +819,10 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		{ phase: 'P3', route: POST('/api/fleet/runners/jobs/{jobId}/cancel'), cli: 'fleet runners cancel-run' }
 	),
 
-	// ── usage (FL-20) ──
-	read('fleet_usage_get', 'view', 'FL-20', 'FLEET_USAGE_SCAN_ENABLED', 'planned', {
+	// ── usage (FL-20) ── P1 shipped: the Usage object (totals, by model, by computer, busiest
+	// checkouts, sessions) every surface renders, read-only, with the payer sentence in `note`.
+	read('fleet_usage_get', 'view', 'FL-20', 'FLEET_USAGE_SCAN_ENABLED', 'live', {
+		phase: 'P3',
 		route: GET('/api/fleet/usage'),
 		cli: 'fleet usage'
 	}),
