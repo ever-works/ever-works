@@ -16,7 +16,9 @@ import {
     type FleetUsageScanState,
     type FleetUsageView,
     type FleetViewerRole,
+    type RunReceiptFleetUsage,
 } from '@ever-works/contracts';
+import { config } from '../../config';
 import { Agent } from '../../entities/agent.entity';
 import { AgentRun } from '../../entities/agent-run.entity';
 import { FleetCheckout } from '../../entities/fleet-checkout.entity';
@@ -29,6 +31,7 @@ import { FleetNodeRepository } from '../fleet-node.repository';
 import { fleetUsageError } from './fleet-usage.errors';
 import { bigintCount, priceUsageGroups, type UsageGroup } from './fleet-usage.math';
 import { FleetUsageScanService, type FleetUsageScanFacts } from './fleet-usage-scan.service';
+import { groupFleetUsageSamples } from './fleet-usage-reconciler.service';
 
 /** One grouped row of `fleet_usage_samples` for the period. */
 interface GroupedRow extends UsageGroup {
@@ -185,6 +188,46 @@ export class FleetUsageViewService {
                 effectiveFrom: current?.effectiveFrom ?? '',
                 versionsUsed: priced.versionsUsed,
             },
+            note: FLEET_USAGE_PAYER_NOTE,
+        };
+    }
+
+    /**
+     * The Run receipt's fleet line (FL-20, spec FR-11; `RUN_RECEIPT_FLEET_USAGE_READER`):
+     * every sample attributed to the Run — through its Sessions or directly
+     * (a Task run's CLI session) — priced per (model, version), rounded once.
+     * Null with the flag off or when the Run has no scanned usage. The caller
+     * (`RunReceiptService`) already checked the viewer may read the Run.
+     */
+    async runFleetUsage(runId: string): Promise<RunReceiptFleetUsage | null> {
+        if (!config.fleet.isUsageScanEnabled() || !runId) return null;
+        const sessions = await this.sessions.find({ where: { agentRunId: runId }, select: { id: true } });
+        const rows = [
+            ...(sessions.length > 0
+                ? await this.samples.find({ where: { fleetSessionId: In(sessions.map((session) => session.id)) } })
+                : []),
+            ...(await this.samples.find({ where: { agentRunId: runId } })),
+        ];
+        if (rows.length === 0) return null;
+        const priced = priceUsageGroups(groupFleetUsageSamples(rows), this.prices);
+        // The computer that carried most of the Run's tokens names the line.
+        const byNode = new Map<string, number>();
+        for (const row of rows) {
+            byNode.set(
+                row.nodeId,
+                (byNode.get(row.nodeId) ?? 0) + bigintCount(row.inputTokens) + bigintCount(row.outputTokens),
+            );
+        }
+        const nodeId = [...byNode.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        const node = await this.nodes.findById(nodeId);
+        return {
+            nodeId,
+            nodeName: node?.name ?? 'a computer',
+            costCents: priced.costCents,
+            tokens: priced.tokens,
+            requests: priced.requests,
+            priceListVersion: priced.versionsUsed.length > 0 ? priced.versionsUsed[priced.versionsUsed.length - 1] : null,
+            unknownModels: priced.unknownModels,
             note: FLEET_USAGE_PAYER_NOTE,
         };
     }

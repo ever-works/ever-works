@@ -551,6 +551,27 @@ export interface FleetUsagePricesView {
 	note: string;
 }
 
+/**
+ * The Run receipt's fleet line (spec FR-11, §5.4): the model work a Run did
+ * on one computer, at list price — "Model work on build-01 · $0.42 at list
+ * price (v1) · 61 k in · 9 k out · 212 k cache". Absent on a Run with no
+ * scanned usage (or with `FLEET_USAGE_SCAN_ENABLED` off).
+ */
+export interface RunReceiptFleetUsage {
+	nodeId: string;
+	nodeName: string;
+	/** List-price cents over the priced models; null = tokens only. */
+	costCents: number | null;
+	tokens: FleetUsageTokens;
+	requests: number;
+	/** The newest price-list version the figure used; null when nothing was priced. */
+	priceListVersion: number | null;
+	/** Models with no list price (tokens only, excluded from `costCents`). */
+	unknownModels: string[];
+	/** {@link FLEET_USAGE_PAYER_NOTE}, verbatim. */
+	note: string;
+}
+
 /** `POST /api/fleet/usage/rescan` answer. */
 export interface FleetUsageRescanResult {
 	jobId: string;

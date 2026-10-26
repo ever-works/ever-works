@@ -1,7 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { DatabaseModule } from '@ever-works/agent/database';
-import { FleetModule, FleetUsageModule } from '@ever-works/agent/fleet';
+import { RUN_RECEIPT_FLEET_USAGE_READER } from '@ever-works/agent/agents';
+import { FleetModule, FleetUsageModule, FleetUsageViewService } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetUsageController } from './fleet-usage.controller';
 import { FleetUsageEnabledGuard } from './fleet-usage-enabled.guard';
@@ -34,7 +35,10 @@ import { FleetUsageScanCronService } from './fleet-usage-scan-cron.service';
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetUsageEnabledGuard,
+        // The Run receipt's fleet line (FR-11): `RunReceiptService` (AW-09) reads it
+        // through this optional port; exported from this @Global module so it resolves.
+        { provide: RUN_RECEIPT_FLEET_USAGE_READER, useExisting: FleetUsageViewService },
     ],
-    exports: [FleetUsageModule],
+    exports: [FleetUsageModule, RUN_RECEIPT_FLEET_USAGE_READER],
 })
 export class FleetUsageApiModule {}
