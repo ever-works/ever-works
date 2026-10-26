@@ -1,6 +1,7 @@
 import type {
 	ConnectionValidationResult,
 	IMachineProviderPlugin,
+	IOAuthPlugin,
 	IPlugin,
 	JsonSchema,
 	MachineProviderCreateInput,
@@ -9,6 +10,9 @@ import type {
 	MachineProviderMachineState,
 	MachineProviderOptions,
 	MachineProviderUsage,
+	OAuthConfig,
+	OAuthToken,
+	OAuthUser,
 	PluginCategory,
 	PluginContext,
 	PluginHealthCheck,
@@ -18,6 +22,15 @@ import type {
 import { MachineProviderError } from '@ever-works/plugin';
 
 import { DigitalOceanApi } from './digitalocean-api.js';
+import {
+	DIGITALOCEAN_OAUTH_BASE,
+	ENV_DIGITALOCEAN_OAUTH_CLIENT_ID,
+	ENV_DIGITALOCEAN_OAUTH_CLIENT_SECRET,
+	digitalOceanAuthorizationUrl,
+	exchangeDigitalOceanCode,
+	isDigitalOceanOAuthConfigured,
+	refreshDigitalOceanToken
+} from './digitalocean-oauth.js';
 
 /**
  * Cloud computers (FL-17, CONTRACTS R-15) — the first `machine-provider`
@@ -45,6 +58,13 @@ import { DigitalOceanApi } from './digitalocean-api.js';
  *
  * The API token is an `x-secret`, user-scope setting: it reaches this plugin
  * in the per-call settings and goes nowhere but the `Authorization` header.
+ *
+ * P3 (spec FR-31): "Sign in with DigitalOcean" — when the operator registered
+ * an application (`DIGITALOCEAN_OAUTH_CLIENT_ID` / `_SECRET`, or the admin
+ * `clientId` / `clientSecret` settings) the plugin also advertises `oauth`;
+ * after a sign-in the facade hands the stored access token in as
+ * `settings.oauthAccessToken`. A saved API token wins when both exist; the
+ * token path always works.
  */
 
 /** The image every cloud computer boots (plan §6 OS matrix). */
@@ -67,6 +87,26 @@ export const digitalOceanMachinesSettingsSchema: JsonSchema = {
 			title: 'Default region',
 			description: 'The region the New cloud computer dialog selects first (for example nyc3 or fra1).',
 			'x-scope': 'user'
+		},
+		// P3 (spec FR-31) — the operator's OAuth application. Named `clientId` /
+		// `clientSecret` because the platform's OAuth service reads exactly those.
+		clientId: {
+			type: 'string',
+			title: 'OAuth client ID',
+			description:
+				'Operator only: the client ID of a DigitalOcean OAuth application, to offer Sign in with DigitalOcean. Its redirect URI is the app URL followed by /api/oauth/digitalocean-machines/callback/plugins.',
+			'x-envVar': ENV_DIGITALOCEAN_OAUTH_CLIENT_ID,
+			'x-adminOnly': true,
+			'x-scope': 'global'
+		},
+		clientSecret: {
+			type: 'string',
+			title: 'OAuth client secret',
+			description: 'Operator only: the client secret of that DigitalOcean OAuth application.',
+			'x-secret': true,
+			'x-envVar': ENV_DIGITALOCEAN_OAUTH_CLIENT_SECRET,
+			'x-adminOnly': true,
+			'x-scope': 'global'
 		}
 	}
 } as JsonSchema;
@@ -97,10 +137,15 @@ interface DoDroplet {
 	created_at?: string;
 	tags?: string[];
 	networks?: { v4?: Array<{ ip_address?: string; type?: string }> };
+	size_slug?: string;
+	region?: { slug?: string };
 }
 
+/** The token a call uses: the saved API token, else the access token of a completed sign-in (P3). */
 function tokenOf(settings?: PluginSettings): string {
-	const token = settings && typeof settings.apiToken === 'string' ? settings.apiToken.trim() : '';
+	const apiToken = settings && typeof settings.apiToken === 'string' ? settings.apiToken.trim() : '';
+	const signedIn = settings && typeof settings.oauthAccessToken === 'string' ? settings.oauthAccessToken.trim() : '';
+	const token = apiToken || signedIn;
 	if (!token) {
 		throw new MachineProviderError('unauthorized', 'no DigitalOcean API token is saved; add one in the plugin settings');
 	}
@@ -133,7 +178,9 @@ function toMachine(droplet: DoDroplet): MachineProviderMachine {
 		ipv4: publicIpv4(droplet),
 		tags: Array.isArray(droplet.tags) ? droplet.tags : [],
 		name: droplet.name,
-		createdAt: droplet.created_at ?? null
+		createdAt: droplet.created_at ?? null,
+		regionId: typeof droplet.region?.slug === 'string' ? droplet.region.slug : null,
+		sizeId: typeof droplet.size_slug === 'string' ? droplet.size_slug : null
 	};
 }
 
@@ -146,7 +193,7 @@ function safeTag(tag: string): string {
 	return tag.replace(/[^A-Za-z0-9_:-]/g, '-').slice(0, 255);
 }
 
-export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlugin {
+export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlugin, IOAuthPlugin {
 	readonly id = 'digitalocean-machines';
 	readonly name = 'DigitalOcean Machines';
 	readonly version = '1.0.0';
@@ -160,16 +207,19 @@ export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlug
 	/** Test seams: a fetch implementation and a base URL (the fake API); production uses neither. */
 	constructor(
 		private readonly fetchImpl: typeof fetch = fetch,
-		private readonly baseUrl?: string
+		private readonly baseUrl?: string,
+		private readonly oauthBaseUrl: string = DIGITALOCEAN_OAUTH_BASE
 	) {}
 
 	/**
-	 * `machine-provider`; P3 adds `oauth` here when the operator registered an
-	 * application (`DIGITALOCEAN_OAUTH_CLIENT_ID` / `_SECRET`), the deployment
-	 * plugin's env-gated pattern.
+	 * `machine-provider`, plus `oauth` only when the operator registered an
+	 * application (`DIGITALOCEAN_OAUTH_CLIENT_ID` and `_SECRET` both set) — the
+	 * deployment plugins' env-gated pattern. A getter, so the live instance is
+	 * always right; the manifest lists `oauth` too (the registry indexes it), and
+	 * the facade reads this getter for Sign in (spec FR-31).
 	 */
 	get capabilities(): readonly string[] {
-		return ['machine-provider'];
+		return isDigitalOceanOAuthConfigured() ? ['machine-provider', 'oauth'] : ['machine-provider'];
 	}
 
 	async onLoad(context: PluginContext): Promise<void> {
@@ -224,8 +274,40 @@ export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlug
 		};
 	}
 
+	/** A saved API token, or a completed sign-in (the facade passes its access token as `oauthAccessToken`). */
 	isConfigured(settings?: PluginSettings): boolean {
-		return Boolean(settings && typeof settings.apiToken === 'string' && settings.apiToken.trim());
+		const has = (value: unknown) => typeof value === 'string' && value.trim().length > 0;
+		return Boolean(settings && (has(settings.apiToken) || has(settings.oauthAccessToken)));
+	}
+
+	// ─── Sign in with DigitalOcean (P3, spec FR-31) ─────────────────────────
+
+	getAuthorizationUrl(state: string, config?: Partial<OAuthConfig>): string {
+		return digitalOceanAuthorizationUrl(state, config, process.env, this.oauthBaseUrl);
+	}
+
+	exchangeCodeForToken(code: string, config?: Partial<OAuthConfig>): Promise<OAuthToken> {
+		return exchangeDigitalOceanCode(code, config, this.fetchImpl, process.env, this.oauthBaseUrl);
+	}
+
+	refreshAccessToken(refreshToken: string, config?: Partial<OAuthConfig>): Promise<OAuthToken> {
+		return refreshDigitalOceanToken(refreshToken, config, this.fetchImpl, process.env, this.oauthBaseUrl);
+	}
+
+	/** The signed-in account (`GET /v2/account`): its uuid, email and team name. */
+	async getAuthenticatedUser(token: string): Promise<OAuthUser> {
+		const res = await new DigitalOceanApi(token, this.fetchImpl, this.baseUrl).request<{
+			account?: { uuid?: string; email?: string; team?: { name?: string } };
+		}>({ method: 'GET', path: '/v2/account' });
+		const account = res.data?.account;
+		const id = typeof account?.uuid === 'string' ? account.uuid : '';
+		if (!id) throw new MachineProviderError('unauthorized', 'DigitalOcean did not say which account signed in');
+		const email = typeof account?.email === 'string' ? account.email : undefined;
+		const team = typeof account?.team?.name === 'string' && account.team.name.trim() ? account.team.name.trim() : undefined;
+		const user: { -readonly [K in keyof OAuthUser]: OAuthUser[K] } = { id, username: email ?? id };
+		if (email) user.email = email;
+		if (team) user.name = team;
+		return user;
 	}
 
 	async validateConnection(settings: Record<string, unknown>): Promise<ConnectionValidationResult> {
