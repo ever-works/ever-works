@@ -8,6 +8,7 @@ import {
     isFleetCloudPowerState,
     isFleetCloudSoftwareId,
     normalizeFleetCloudIdlePolicy,
+    type FleetCloudIdlePolicy,
     type FleetCloudMeta,
     type FleetCloudPhase,
     type FleetCloudPowerEvent,
@@ -82,6 +83,8 @@ export function normalizeCloudMeta(value: unknown): FleetCloudMeta | null {
             : [],
         ipv4: typeof raw.ipv4 === 'string' && /^[0-9.]{7,15}$/.test(raw.ipv4) ? raw.ipv4 : null,
         unenrolledNoticeAt: iso(raw.unenrolledNoticeAt),
+        idleNotifiedKey: typeof raw.idleNotifiedKey === 'string' ? raw.idleNotifiedKey.slice(0, 200) : null,
+        poweredOffByPolicyAt: iso(raw.poweredOffByPolicyAt),
     };
 }
 
@@ -161,9 +164,24 @@ export function fleetCloudViewOf(
             computedAt: new Date(nowMs).toISOString(),
         },
         goneAt: meta.goneAt ?? null,
+        idleWindowReached: idleWindowReached(meta, nowMs),
+        poweredOffByPolicyAt: meta.poweredOffByPolicyAt ?? null,
         hasMachine,
         removable: fleetCloudRemovable({ hasMachine, meta: { powerState: meta.powerState, phase } }),
     };
+}
+
+/** P2 (spec S6): the idle window has lasted the policy's hours, and the policy is not `nothing`. */
+export function idleWindowReached(meta: FleetCloudMeta, nowMs: number): boolean {
+    if (meta.idlePolicy.mode === 'nothing' || !meta.idleSince || meta.powerState !== 'running') return false;
+    const since = Date.parse(meta.idleSince);
+    return Number.isFinite(since) && nowMs - since >= meta.idlePolicy.afterHours * 60 * 60 * 1000;
+}
+
+/** "Tell me after 3 h" — a policy in the words the dialog and the Decision text use (spec §5.6). */
+export function fleetCloudIdlePolicyLabel(policy: FleetCloudIdlePolicy): string {
+    if (policy.mode === 'nothing') return 'Nothing';
+    return `${policy.mode === 'power-off' ? 'Power off' : 'Tell me'} after ${policy.afterHours} h`;
 }
 
 /** Append one power transition, keeping the newest {@link FLEET_CLOUD_MAX_POWER_TIMELINE}. */
