@@ -2,11 +2,16 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } f
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetUsageScanService, FleetUsageViewService } from '@ever-works/agent/fleet';
-import type { FleetUsagePricesView, FleetUsageRescanResult, FleetUsageView } from '@ever-works/contracts';
+import type {
+    FleetUsagePricesView,
+    FleetUsageRescanResult,
+    FleetUsageTaskCostsView,
+    FleetUsageView,
+} from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FleetUsageQueryDto, FleetUsageRescanDto } from './dto/fleet-usage.dto';
+import { FleetUsageQueryDto, FleetUsageRescanDto, FleetUsageTaskCostsQueryDto } from './dto/fleet-usage.dto';
 import { FleetUsageEnabledGuard } from './fleet-usage-enabled.guard';
 
 /**
@@ -45,7 +50,25 @@ export class FleetUsageController {
             days: query.days,
             nodeId: query.node ?? null,
             model: query.model ?? null,
+            agentId: query.agent ?? null,
         });
+    }
+
+    @Get('tasks')
+    @ApiOperation({
+        summary:
+            "What my recurring Tasks' Agent sessions cost at list price: each Task's newest Run and its last 30 days (the schedule rows). My own Runs only. Read-only.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async tasks(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: FleetUsageTaskCostsQueryDto,
+    ): Promise<FleetUsageTaskCostsView> {
+        return this.views.taskCosts(
+            auth.userId,
+            query.ids.split(',').map((id) => id.trim()),
+        );
     }
 
     @Post('rescan')

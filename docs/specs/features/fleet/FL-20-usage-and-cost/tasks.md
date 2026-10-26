@@ -83,13 +83,13 @@
       **Test**: entity spec; migration applies twice.
 - [x] **T-23**. Reconciler upserts hourly samples (session and other) by `dedupeKey`; the backlog percentage shown is the newest `usage-scan` job's `result.backlogPct`.
       **Test**: reconciler spec — `dedupeKey` upsert with null key parts; other rows owner-only flag.
-- [ ] **T-24**. `GET /api/fleet/usage` served from samples: totals, byModel, byNode (last-scan age, offline), busiestCheckouts, sessions breakdown, `unknownModels`.
+- [x] **T-24**. `GET /api/fleet/usage` served from samples: totals, byModel, byNode (last-scan age, offline), busiestCheckouts, sessions breakdown, `unknownModels`.
       **Test**: controller spec — offline node retained; unknown models excluded from dollars with note.
-- [ ] **T-25**. Hub tab: fill FL-01's `/fleet/usage` page (FL-01 creates `apps/web/src/app/[locale]/(dashboard)/fleet/usage/page.tsx` and `DASHBOARD_FLEET_USAGE` — CONTRACTS §11.1; this task adds neither) with `registerHubTab({ id: 'usage', … })`; components `UsagePanel.tsx`, `UsagePeriodControl.tsx`, `UsageTotals.tsx`, `UsageByModel.tsx`, `UsageByComputer.tsx`, `UsageBusiestCheckouts.tsx`, `UsageSessionsBreakdown.tsx`, `UsageCatchingUp.tsx`, `usage.shared.ts`; server action `apps/web/src/app/actions/dashboard/fleet-usage.ts`.
+- [x] **T-25**. Hub tab: fill FL-01's `/fleet/usage` page (FL-01 creates `apps/web/src/app/[locale]/(dashboard)/fleet/usage/page.tsx` and `DASHBOARD_FLEET_USAGE` — CONTRACTS §11.1; this task adds neither) with `registerHubTab({ id: 'usage', … })`; components `UsagePanel.tsx`, `UsagePeriodControl.tsx`, `UsageTotals.tsx`, `UsageByModel.tsx`, `UsageByComputer.tsx`, `UsageBusiestCheckouts.tsx`, `UsageSessionsBreakdown.tsx`, `UsageCatchingUp.tsx`, `usage.shared.ts`; server action `apps/web/src/app/actions/dashboard/fleet-usage.ts`.
       **Test**: `usage.shared.unit.spec.ts`; Playwright `apps/web/e2e/flow-fleet-usage.spec.ts`.
-- [ ] **T-26**. Agent Budgets tab row per computer (`apps/web/src/components/agents/AgentFleetUsageRows.tsx`); the Budgets roll-up needs no new code path — the T-12 ledger rows (`fleet-node:<provider>`) are already summed by the Agent budget aggregator (spec §8b, resolved).
+- [x] **T-26**. Agent Budgets tab row per computer (`apps/web/src/components/agents/AgentFleetUsageRows.tsx`); the Budgets roll-up needs no new code path — the T-12 ledger rows (`fleet-node:<provider>`) are already summed by the Agent budget aggregator (spec §8b, resolved).
       **Test**: budget guard spec — scan-attributed fleet cost counts toward the cap, labelled list price, never debits credits.
-- [ ] **T-27**. FL-13 schedule rows: last-run and 30-day cost from samples (`apps/web/src/components/fleet/schedules/ScheduleRunHistory.tsx`).
+- [x] **T-27**. FL-13 schedule rows: last-run and 30-day cost from samples (`apps/web/src/components/fleet/schedules/ScheduleRunHistory.tsx`).
       **Test**: unit spec extended.
 
 ## P3 — Digest, export, versions
@@ -113,6 +113,13 @@
 - T-13: the report is ingested by a `fleet.job.completed` listener; a report over the cap is ignored (never acknowledged).
 - T-14: the dispatcher is an API cron (`FleetUsageScanCronService`), not a `packages/tasks` file (decision 13).
 - T-21 (Playwright) is not written tonight — the brief runs no e2e.
+
+## P2 notes (lane O1, 2026-10-27)
+
+- T-24 shipped with P1 (the view was served from samples from the first report); P2 adds `?agent=`.
+- T-25: the tab components live in `UsagePanel.tsx` + `UsageBlocks.tsx` (+ `usage-tab.shared.ts`); keys 1–4 switch periods.
+- T-26: `AgentFleetUsageRows.tsx` reads `GET /api/fleet/usage?agent=&days=30`; the Budget figure already counts the work.
+- T-27: `ScheduleUsageCost.tsx` on the Agent-session rows of `SchedulesPanel.tsx`, from `GET /api/fleet/usage/tasks?ids=`.
 
 ## Definition of done
 

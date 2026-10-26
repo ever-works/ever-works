@@ -522,6 +522,11 @@ export interface FleetUsageView {
 	nodeId: string | null;
 	/** Set when the view is filtered by model (`?model=`). */
 	model: string | null;
+	/**
+	 * Set when the view is filtered to one Agent's work (`?agent=`, P2 — the
+	 * Agent page's Budgets tab: its fleet cost per computer). Absent from a P1 platform.
+	 */
+	agentId?: string | null;
 	totals: FleetUsageTotals;
 	byModel: FleetUsageModelLine[];
 	byNode: FleetUsageNodeLine[];
@@ -568,6 +573,30 @@ export interface RunReceiptFleetUsage {
 	priceListVersion: number | null;
 	/** Models with no list price (tokens only, excluded from `costCents`). */
 	unknownModels: string[];
+	/** {@link FLEET_USAGE_PAYER_NOTE}, verbatim. */
+	note: string;
+}
+
+/** Most Task ids one `GET /api/fleet/usage/tasks` call takes (a computer's Agent-session schedules). */
+export const FLEET_USAGE_TASK_COSTS_MAX_IDS = 50;
+
+/**
+ * What one recurring Task's Agent sessions cost (spec FR-16, P2) — the FL-13
+ * schedule row's "last run $0.42 · 30 d $6.10", at list price.
+ */
+export interface FleetUsageTaskCost {
+	taskId: string;
+	/** The Task's newest Run and its scanned model work; null when it never ran. */
+	lastRun: { runId: string; at: string; costCents: number | null } | null;
+	/** The Task's Runs of the last 30 days at list price (priced models only); null when nothing priced. */
+	last30DaysCents: number | null;
+	/** How many of the Task's Runs started in the last 30 days. */
+	runs30Days: number;
+}
+
+/** `GET /api/fleet/usage/tasks?ids=…` — the caller's own Runs only. */
+export interface FleetUsageTaskCostsView {
+	tasks: FleetUsageTaskCost[];
 	/** {@link FLEET_USAGE_PAYER_NOTE}, verbatim. */
 	note: string;
 }
