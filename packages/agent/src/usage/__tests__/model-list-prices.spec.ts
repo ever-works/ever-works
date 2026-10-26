@@ -43,6 +43,15 @@ describe('PublishedModelListPrices', () => {
         expect(priced?.model).toBe('claude-sonnet-4-5');
     });
 
+    it('matches a family exactly or with a release suffix — a newer model is never priced as an older one', () => {
+        expect(prices.find('claude-opus-5-5')?.model).toBe('claude-opus-5-5');
+        expect(prices.find('claude-opus-5')?.model).toBe('claude-opus-5');
+        expect(prices.find('claude-sonnet-4-6[1m]')?.model).toBe('claude-sonnet-4-6');
+        expect(prices.find('claude-haiku-4-5-20251001')?.model).toBe('claude-haiku-4-5');
+        expect(prices.find('claude-mythos-5-1')?.model).toBe('claude-fable-5-1');
+        expect(prices.find('claude-opus-5-6')).toBeNull();
+    });
+
     it('answers null for an unknown model — never zero', () => {
         expect(prices.price({ in: 10, out: 10, cacheRead: 0, cacheWrite: 0 }, 'local-7b')).toBeNull();
         expect(prices.find('claude-opus-9')).toBeNull();
