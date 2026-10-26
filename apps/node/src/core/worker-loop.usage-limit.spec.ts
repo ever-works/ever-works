@@ -105,7 +105,8 @@ describe('WorkerLoop — model usage limits', () => {
 
 		await vi.waitFor(() => expect(loop.getState().activeJobIds).toEqual([]));
 		await loop.tick();
-		expect(client.requests.at(-1)?.excludeKinds).toEqual(['agent-task']);
+		// Agent sessions (FL-04 P2) drive the same model CLI, so they stop leasing with it.
+		expect(client.requests.at(-1)?.excludeKinds).toEqual(['agent-task', 'agent-session']);
 		expect(describeWorkerHealth(loop.getState())).toEqual({
 			workerState: 'throttled',
 			workerStateReason: `claude-code: weekly limit until ${RESET}`

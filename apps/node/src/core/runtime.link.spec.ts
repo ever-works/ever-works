@@ -181,11 +181,14 @@ describe('createNodeRuntime — the node link', () => {
 		runtime.loop.stop();
 		await flush(20);
 		const sent = beats(p.calls);
-		expect(sent).toHaveLength(2);
-		expect(sent[0]).toHaveProperty('consents');
-		expect(sent[1]).not.toHaveProperty('consents');
+		// The node peels optional fields NEWEST first (time zone, wake, self-update, daemon, health, …), so the
+		// platform sees one refused beat per newer tier this beat carries, then the first one without consents.
+		expect(sent.length).toBeGreaterThanOrEqual(2);
+		const accepted = sent.at(-1)!;
+		for (const refused of sent.slice(0, -1)) expect(refused).toHaveProperty('consents');
+		expect(accepted).not.toHaveProperty('consents');
 		// Everything else the older platform understands is still reported.
-		expect(sent[1].capabilities).toEqual(sent[0].capabilities);
+		expect(accepted.capabilities).toEqual(sent[0].capabilities);
 		expect(runtime.loop.getState().lastHeartbeatAt).not.toBeNull();
 		expect(runtime.loop.acceptsField('consents')).toBe(false);
 		expect(sockets.sockets).toHaveLength(0);
