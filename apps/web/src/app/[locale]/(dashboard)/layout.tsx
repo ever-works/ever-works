@@ -18,6 +18,7 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale } from 'next-intl/server';
 import { ROUTES } from '@/lib/constants';
 import {
+    isFleetActionsRunnersEnabled,
     isFleetCloudEnabled,
     isFleetHubEnabled,
     isFleetMachineFactsEnabled,
@@ -142,6 +143,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             fleetMachineFactsEnabled={isFleetMachineFactsEnabled()}
             fleetVirtualEnabled={isFleetVirtualEnabled()}
             fleetCloudEnabled={isFleetCloudEnabled()}
+            fleetActionsRunnersEnabled={isFleetActionsRunnersEnabled()}
         >
             {children}
         </DashboardLayoutClient>
