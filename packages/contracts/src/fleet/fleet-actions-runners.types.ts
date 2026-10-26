@@ -262,13 +262,18 @@ export function normalizeFleetActionsRunnerLabels(
 
 /** A computer name turned into a runner-name stem (letters, digits, `.`, `_`, `-`; at most 60). */
 export function fleetActionsRunnerNameStem(computerName: string | null | undefined): string {
-	const cleaned = (computerName ?? '')
-		.trim()
-		.replace(/[^A-Za-z0-9._-]+/g, '-')
-		.replace(/^[^A-Za-z0-9]+/, '')
-		.replace(/-+$/, '')
-		.slice(0, 60);
-	return cleaned || 'runner';
+	// Bounded first, then trimmed with index scans rather than an end-anchored `-+$`
+	// (polynomial on a long run of dashes).
+	const cleaned = (computerName ?? '').trim().slice(0, 200).replace(/[^A-Za-z0-9._-]+/g, '-');
+	let start = 0;
+	while (start < cleaned.length && !isAsciiAlphanumeric(cleaned.charCodeAt(start))) start += 1;
+	let end = cleaned.length;
+	while (end > start && cleaned.charCodeAt(end - 1) === 0x2d) end -= 1;
+	return cleaned.slice(start, end).slice(0, 60) || 'runner';
+}
+
+function isAsciiAlphanumeric(code: number): boolean {
+	return (code >= 0x30 && code <= 0x39) || (code >= 0x41 && code <= 0x5a) || (code >= 0x61 && code <= 0x7a);
 }
 
 /**

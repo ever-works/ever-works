@@ -35,6 +35,9 @@ describe('install requests', () => {
 		expect(fleetActionsRunnerDefaultNames('build-01', 2, ['BUILD-01-1'])).toEqual(['build-01-2', 'build-01-3']);
 		expect(fleetActionsRunnerDefaultNames('Design Mac', 1)).toEqual(['Design-Mac-1']);
 		expect(fleetActionsRunnerDefaultNames('', 1)).toEqual(['runner-1']);
+		// A long run of dashes is trimmed in linear time (no end-anchored regex).
+		expect(fleetActionsRunnerDefaultNames('build--' + '-'.repeat(50_000), 1)).toEqual(['build-1']);
+		expect(fleetActionsRunnerDefaultNames('-'.repeat(50_000) + 'x', 1)).toEqual(['runner-1']);
 	});
 
 	it('accepts only GitHub-shaped names, labels and targets', () => {
