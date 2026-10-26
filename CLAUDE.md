@@ -200,12 +200,12 @@ If you find a stray doc in the root, move it into `docs/` (most likely
 | Concern            | Package                                        | Version          |
 | ------------------ | ---------------------------------------------- | ---------------- |
 | Backend framework  | NestJS                                         | 11.2.7           |
-| Frontend framework | Next.js                                        | 16.1.5           |
-| React              | React                                          | 19.2.3           |
-| ORM                | TypeORM                                        | 0.3.28           |
+| Frontend framework | Next.js                                        | 16.3.8           |
+| React              | React                                          | 19.2.5           |
+| ORM                | TypeORM                                        | 0.3.31           |
 | AI                 | LangChain (@langchain/core, @langchain/openai) | ^0.3.80, ^0.6.17 |
 | Validation         | class-validator / zod                          | 0.14.3 / ^3.25   |
-| Background jobs    | BullMQ / Trigger.dev                           | ^5.66 / 4.3.3    |
+| Background jobs    | BullMQ / Trigger.dev                           | ^5.66 / 4.7.4    |
 | TypeScript         | TypeScript                                     | 5.9.3            |
 
 ## Known Gotchas
