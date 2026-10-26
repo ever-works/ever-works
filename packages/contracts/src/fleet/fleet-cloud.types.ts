@@ -658,6 +658,20 @@ export interface FleetCloudUsageRow {
 	destroyedAt: string | null;
 }
 
+/**
+ * P2 (spec FR-23) — the provider's OWN month-to-date figure for the owner's
+ * whole account at that provider, where its plugin can read it. Shown beside
+ * the estimate and labelled as the provider's; never added to the estimate
+ * (it covers everything on the account, not only Ever Works machines).
+ */
+export interface FleetCloudProviderMonthToDate {
+	providerPluginId: string;
+	providerName: string;
+	monthToDateCents: number;
+	/** ISO-8601 instant the cost job read it. */
+	computedAt: string;
+}
+
 /** `GET /api/fleet/cloud/usage` and the `usage` of `GET /api/fleet/cloud` (spec S8, FR-23). */
 export interface FleetCloudUsageView {
 	hourlyCents: number;
@@ -668,7 +682,12 @@ export interface FleetCloudUsageView {
 	estimate: true;
 	machines: FleetCloudUsageRow[];
 	computedAt: string;
+	/** P2 (FR-23): the providers' own month-to-date figures for the caller's accounts, when readable. */
+	providerMonthToDate?: FleetCloudProviderMonthToDate[];
 }
+
+/** P2 (spec FR-21): a cost snapshot younger than this is not recomputed (two overlapping fires write once). */
+export const FLEET_CLOUD_USAGE_FRESH_MS = 5 * 60 * 1000;
 
 /** `GET /api/fleet/cloud` — the caller's cloud computers and their usage. */
 export interface FleetCloudListView {

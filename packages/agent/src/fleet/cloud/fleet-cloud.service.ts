@@ -12,6 +12,7 @@ import {
     FLEET_CLOUD_SOFTWARE_IDS,
     FLEET_CLOUD_TAG,
     FLEET_CLOUD_UNENROLLED_AFTER_MIN,
+    FLEET_CLOUD_USAGE_FRESH_MS,
     fleetCloudCost,
     fleetCloudCreateSummary,
     fleetCloudIdleHours,
@@ -36,6 +37,7 @@ import {
     type FleetCloudMeta,
     type FleetCloudOperationResponse,
     type FleetCloudOptionsView,
+    type FleetCloudProviderMonthToDate,
     type FleetCloudProvidersView,
     type FleetCloudSoftwareId,
     type FleetCloudUsageView,
@@ -67,7 +69,13 @@ import { FleetNodeHealthSampleRepository } from '../fleet-node-health-sample.rep
 import { INBOX_PRODUCER, type InboxProducer } from '../../inbox/inbox-producer.port';
 import { evaluateCloudIdle } from './idle-policy';
 import { buildCloudBootstrap, FLEET_CLOUD_DEFAULT_RUNTIME_VERSION } from './bootstrap-script';
-import { appendPowerEvent, cloudHasMachine, fleetCloudViewOf, normalizeCloudMeta } from './fleet-cloud.view';
+import {
+    appendPowerEvent,
+    cloudHasMachine,
+    fleetCloudIdlePolicyLabel,
+    fleetCloudViewOf,
+    normalizeCloudMeta,
+} from './fleet-cloud.view';
 import { generateThrowawayPublicKey } from './throwaway-key';
 
 /**
@@ -101,6 +109,12 @@ import { generateThrowawayPublicKey } from './throwaway-key';
 
 /** A provider create that has not answered after this long is marked failed by the watch. */
 const ASKING_PROVIDER_TIMEOUT_MS = 10 * 60 * 1000;
+
+/**
+ * P2 — how far back the idle pass reads health samples: two of its 10-minute
+ * cadences, so a pass that ran late still sees every sample since the last.
+ */
+const IDLE_SAMPLE_LOOKBACK_MS = 20 * 60 * 1000;
 
 /** The hint for a disabled / unusable provider plugin (spec U5). */
 function pluginDisabledHint(providerName: string): string {
@@ -182,7 +196,14 @@ export class FleetCloudService {
         const visible = await this.visibleCloudNodes(userId);
         const machines = visible.map(({ node, role }) => this.fleet.viewForRole(node, role));
         const { providers } = await this.listProviders(caller).catch(() => ({ providers: [] }));
-        return { machines, usage: usageOf(visible.map((entry) => entry.node)), providers };
+        const nowMs = Date.now();
+        const usage = usageOf(
+            visible.map((entry) => entry.node),
+            nowMs,
+            await this.destroyedThisMonth(userId, nowMs),
+            userId,
+        );
+        return { machines, usage, providers };
     }
 
     /** One cloud computer (`GET /api/fleet/cloud/:id`), for anyone in its `view` audience. */
@@ -201,9 +222,21 @@ export class FleetCloudService {
         if (nodeId) {
             const { node } = await this.resolve(nodeId, userId, 'view');
             this.requireCloud(node);
-            return usageOf([node]);
+            return usageOf([node], Date.now(), [], node.userId === userId ? userId : null);
         }
-        return usageOf(await this.ownCloudNodes(userId), Date.now(), await this.destroyedThisMonth(userId));
+        return this.usageSummary(userId);
+    }
+
+    /**
+     * The owner's Cloud computers usage block (spec FR-22, FR-23, S8) — every
+     * cloud computer they own, the ones destroyed this month (from their
+     * `node.cloud.destroy` audit rows) and the providers' own month-to-date
+     * figures. List-price estimates: never added to model-spend Budgets or the
+     * fleet model-cost ceiling (FR-24). FL-20's `GET /api/fleet/usage`
+     * composes its `cloud` block from this method (plan §5).
+     */
+    async usageSummary(userId: string, nowMs: number = Date.now()): Promise<FleetCloudUsageView> {
+        return usageOf(await this.ownCloudNodes(userId), nowMs, await this.destroyedThisMonth(userId, nowMs), userId);
     }
 
     /**
@@ -211,9 +244,9 @@ export class FleetCloudService {
      * registration is gone, so their figures come from their `node.cloud.destroy`
      * audit rows (the cost this month at destroy time). Best-effort.
      */
-    private async destroyedThisMonth(userId: string): Promise<FleetCloudUsageRow[]> {
+    private async destroyedThisMonth(userId: string, nowMs: number = Date.now()): Promise<FleetCloudUsageRow[]> {
         if (!this.audit || typeof this.audit.forOwnerActionSince !== 'function') return [];
-        const since = new Date(fleetCloudMonthStartMs(Date.now()));
+        const since = new Date(fleetCloudMonthStartMs(nowMs));
         const rows = await this.audit.forOwnerActionSince(userId, 'node.cloud.destroy', since).catch(() => []);
         const out: FleetCloudUsageRow[] = [];
         for (const row of rows) {
@@ -238,17 +271,8 @@ export class FleetCloudService {
 
     // ─── Idle policy (P2, spec FR-25 – FR-28) ────────────────────────────
 
-    /**
-     * Change a cloud computer's idle policy (FR-25): nothing · tell me after N
-     * hours · power off after N hours, N 1–72. `machines` audience, `plain`.
-     * Audited `node.policy.change` with `{ policy: 'idle', from, to }` (C §7).
-     */
-    async setIdlePolicy(
-        caller: FleetMachineCaller,
-        nodeId: string,
-        input: Partial<FleetCloudIdlePolicy> | null | undefined,
-    ): Promise<FleetNodeView> {
-        this.requireEnabled();
+    /** A requested policy, validated (FR-25): `invalid` naming the field, else the policy. */
+    private readIdlePolicy(input: Partial<FleetCloudIdlePolicy> | null | undefined): FleetCloudIdlePolicy {
         const mode = input?.mode;
         if (!isFleetCloudIdlePolicyMode(mode)) {
             throw fleetMachineError('invalid', 'mode must be nothing, tell-me or power-off', { field: 'mode' });
@@ -260,14 +284,56 @@ export class FleetCloudService {
             hours < FLEET_CLOUD_IDLE_MIN_HOURS ||
             hours > FLEET_CLOUD_IDLE_MAX_HOURS
         ) {
-            throw fleetMachineError('invalid', 'afterHours must be a whole number of hours from 1 to 72', {
-                field: 'afterHours',
-            });
+            throw fleetMachineError(
+                'invalid',
+                `afterHours must be a whole number of hours from ${FLEET_CLOUD_IDLE_MIN_HOURS} to ${FLEET_CLOUD_IDLE_MAX_HOURS}`,
+                { field: 'afterHours' },
+            );
         }
+        return { mode, afterHours: hours };
+    }
+
+    /**
+     * Every gate of an idle-policy change WITHOUT writing it — the Agent tool
+     * runs this, then holds the change for the owner's approval with the
+     * returned sentence as the Decision text (lane decision 13). Refusals are
+     * the same `invalid` / `not_found` / `permission_denied` a write answers.
+     */
+    async previewIdlePolicy(
+        caller: FleetMachineCaller,
+        nodeId: string,
+        input: Partial<FleetCloudIdlePolicy> | null | undefined,
+    ): Promise<{ nodeId: string; name: string; from: FleetCloudIdlePolicy; to: FleetCloudIdlePolicy; summary: string }> {
+        this.requireEnabled();
+        const to = this.readIdlePolicy(input);
         const { node, meta } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
-        const to: FleetCloudIdlePolicy = { mode, afterHours: hours };
+        return {
+            nodeId: node.id,
+            name: node.name,
+            from: meta.idlePolicy,
+            to,
+            summary: `Change ${node.name}'s idle policy from ${fleetCloudIdlePolicyLabel(meta.idlePolicy)} to ${fleetCloudIdlePolicyLabel(to)}. Ever Works never destroys a cloud computer on its own.`,
+        };
+    }
+
+    /**
+     * Change a cloud computer's idle policy (FR-25): nothing · tell me after N
+     * hours · power off after N hours, N 1–72. `machines` audience, `plain`.
+     * Audited `node.policy.change` with `{ policy: 'idle', from, to }` (C §7).
+     * A change starts the idle window again, so the new policy waits its full
+     * hours from now — switching to "power off after 1 h" never powers a machine
+     * off the moment it is saved (lane decision 14).
+     */
+    async setIdlePolicy(
+        caller: FleetMachineCaller,
+        nodeId: string,
+        input: Partial<FleetCloudIdlePolicy> | null | undefined,
+    ): Promise<FleetNodeView> {
+        this.requireEnabled();
+        const to = this.readIdlePolicy(input);
+        const { node, meta, role } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
         const from = meta.idlePolicy;
-        await this.nodes.update(node.id, { providerMeta: { ...meta, idlePolicy: to } });
+        await this.patchMeta(node.id, (fresh) => ({ ...fresh, idlePolicy: to, idleSince: null, idleNotifiedKey: null }));
         await this.record('node.policy.change', fleetMachineCallerUserId(caller), node.userId, node.id, {
             targetName: node.name,
             requestedBy: describeFleetMachineCaller(caller),
@@ -278,99 +344,111 @@ export class FleetCloudService {
             to,
         });
         const updated = (await this.nodes.findById(node.id)) ?? node;
-        return this.fleet.viewForRole(updated, 'owner');
+        return this.fleet.viewForRole(updated, role);
     }
 
-    /** "Keep running" (spec S6): start a new idle window now, so the policy waits its hours again. */
+    /**
+     * "Keep running" (spec S6, §5.7): start the idle window again now, so the
+     * policy waits its hours again before it tells or powers off. Audited
+     * `node.policy.change` (`act: 'keep-running'`). Nothing changes on a
+     * machine that is not idle.
+     */
     async keepRunning(caller: FleetMachineCaller, nodeId: string): Promise<FleetNodeView> {
         this.requireEnabled();
-        const { node, meta } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
+        const { node, meta, role } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
         const now = new Date().toISOString();
-        await this.nodes.update(node.id, { providerMeta: { ...meta, idleSince: meta.idleSince ? now : null } });
+        if (meta.idleSince) {
+            await this.patchMeta(node.id, (fresh) => (fresh.idleSince ? { ...fresh, idleSince: now } : null));
+            await this.record('node.policy.change', fleetMachineCallerUserId(caller), node.userId, node.id, {
+                targetName: node.name,
+                requestedBy: describeFleetMachineCaller(caller),
+                confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
+                outcome: 'ok',
+                policy: 'idle',
+                act: 'keep-running',
+                from: meta.idlePolicy,
+                to: meta.idlePolicy,
+                idleSince: meta.idleSince,
+            });
+        }
         const updated = (await this.nodes.findById(node.id)) ?? node;
-        return this.fleet.viewForRole(updated, 'owner');
+        return this.fleet.viewForRole(updated, role);
     }
 
     /**
      * The idle sweep (every 10 minutes, offset 5 — plan §10, FR-27). For every
-     * cloud computer: judge the evidence (sessions, jobs, CPU samples since the
-     * window opened), keep the window on the row, and — once per window — tell
-     * the owner (one Inbox notice; the item is computed on read) or power the
-     * machine off (`node.cloud.power` with `requestedBy: system:idle-policy`).
-     * NEVER destroys anything (FR-28). Best-effort per machine.
+     * cloud computer: judge the evidence (sessions, jobs, the CPU samples since
+     * the last pass), keep the window on the row, and — once per window — tell
+     * the owner (one Inbox notice; the `cloud-idle` item is computed on read
+     * from the window) or power the machine off (`node.cloud.power` with
+     * `requestedBy: system:idle-policy`, CONTRACTS §2.3). NEVER destroys
+     * anything (FR-28): the only provider call here is a power-off. Best-effort
+     * per machine; every write goes onto the freshest row.
      */
-    async evaluateIdle(): Promise<{ machines: number; acted: number }> {
+    async evaluateIdle(nowMs: number = Date.now()): Promise<{ machines: number; acted: number }> {
         if (!config.fleet.isCloudEnabled()) return { machines: 0, acted: 0 };
-        const nowMs = Date.now();
         const loads = new Map<string, Record<string, { activeJobCount: number }>>();
         let machines = 0;
         let acted = 0;
         for (const node of await this.nodes.findCloudNodes()) {
             const meta = normalizeCloudMeta(node.providerMeta);
             if (!meta || !cloudHasMachine(node) || meta.powerState === 'gone' || !node.providerPluginId) continue;
+            // A "nothing" policy keeps no window; an open one from an earlier policy is closed below.
             if (meta.idlePolicy.mode === 'nothing' && !meta.idleSince) continue;
             machines += 1;
             try {
-                if (!loads.has(node.userId) && this.jobs) {
-                    const load = await this.jobs.loadByNodeForUser(node.userId).catch(() => ({}));
+                if (!loads.has(node.userId)) {
+                    const load = this.jobs ? await this.jobs.loadByNodeForUser(node.userId).catch(() => ({})) : {};
                     loads.set(node.userId, load as Record<string, { activeJobCount: number }>);
                 }
                 const live = this.sessions ? await this.sessions.findLiveForNode(node.id).catch(() => []) : [];
                 const busySessions = live.filter((session) =>
                     FLEET_CLOUD_BUSY_SESSION_STATES.includes(String((session as { state?: unknown }).state)),
                 ).length;
-                const since = meta.idleSince ? new Date(meta.idleSince) : new Date(nowMs - 15 * 60 * 1000);
+                // Every earlier sample of an open window was already judged flat (a
+                // busy one would have closed it), so only the samples since the last
+                // pass are read — two cadences back, never before the window opened.
+                const lookback = nowMs - IDLE_SAMPLE_LOOKBACK_MS;
+                const opened = meta.idleSince ? Date.parse(meta.idleSince) : NaN;
+                const since = new Date(Number.isFinite(opened) ? Math.max(opened, lookback) : lookback);
                 const samples = this.healthSamples
                     ? await this.healthSamples.series(node.id, 'raw', since).catch(() => [])
                     : [];
+                const latestCpu = (node.health as { cpuPercent?: unknown } | null | undefined)?.cpuPercent;
                 const cpuSamples =
                     samples.length > 0
                         ? samples.map((sample) => (typeof sample.cpuPercent === 'number' ? sample.cpuPercent : null))
-                        : [typeof node.health?.cpuPercent === 'number' ? node.health.cpuPercent : null];
-                const decision = evaluateCloudIdle({
-                    nodeId: node.id,
-                    status: node.status,
-                    meta,
-                    busySessions,
-                    activeJobs: loads.get(node.userId)?.[node.id]?.activeJobCount ?? 0,
-                    cpuSamples,
-                    nowMs,
-                });
-                const next: FleetCloudMeta = { ...meta, idleSince: decision.idleSince };
+                        : [typeof latestCpu === 'number' ? latestCpu : null];
+                const decision =
+                    meta.idlePolicy.mode === 'nothing'
+                        ? { idleSince: null, windowReached: false, act: 'none' as const, attentionKey: null }
+                        : evaluateCloudIdle({
+                              nodeId: node.id,
+                              status: node.status,
+                              meta,
+                              busySessions,
+                              activeJobs: loads.get(node.userId)?.[node.id]?.activeJobCount ?? 0,
+                              cpuSamples,
+                              nowMs,
+                          });
                 if (decision.act === 'tell-me') {
-                    next.idleNotifiedKey = decision.attentionKey;
-                    await this.notice(node, meta, decision.idleSince, 'idle');
-                    acted += 1;
-                } else if (decision.act === 'power-off' && this.machines) {
-                    try {
-                        await this.machines.power(node.providerPluginId, node.userId, node.providerMachineRef!, 'off');
-                        const at = new Date(nowMs).toISOString();
-                        next.idleNotifiedKey = decision.attentionKey;
-                        next.pending = 'powering-off';
-                        next.poweredOffByPolicyAt = at;
-                        await this.record('node.cloud.power', null, node.userId, node.id, {
-                            targetName: node.name,
-                            requestedBy: FLEET_CLOUD_IDLE_REQUESTER,
-                            confirmationClass: 'plain',
-                            outcome: 'ok',
-                            action: 'off',
-                            idleHours: fleetCloudIdleHours(decision.idleSince, nowMs),
-                            ...this.priceExtra(node, meta),
-                        });
-                        await this.notice(node, meta, decision.idleSince, 'powered-off');
+                    const wrote = await this.patchMeta(node.id, (fresh) =>
+                        fresh.idleNotifiedKey === decision.attentionKey
+                            ? null
+                            : { ...fresh, idleSince: decision.idleSince, idleNotifiedKey: decision.attentionKey },
+                    );
+                    if (wrote) {
+                        await this.notice(node, meta, decision.idleSince, 'idle', nowMs);
                         acted += 1;
-                    } catch (error) {
-                        this.logger.warn(
-                            `idle policy could not power off ${node.id}: ${error instanceof Error ? error.message : String(error)}`,
-                        );
                     }
+                    continue;
                 }
-                if (
-                    next.idleSince !== meta.idleSince ||
-                    next.idleNotifiedKey !== meta.idleNotifiedKey ||
-                    next.pending !== meta.pending
-                ) {
-                    await this.nodes.update(node.id, { providerMeta: next });
+                if (decision.act === 'power-off') {
+                    if (await this.powerOffByPolicy(node, decision, nowMs)) acted += 1;
+                    continue;
+                }
+                if (decision.idleSince !== (meta.idleSince ?? null)) {
+                    await this.patchMeta(node.id, (fresh) => ({ ...fresh, idleSince: decision.idleSince }));
                 }
             } catch (error) {
                 this.logger.debug(
@@ -381,26 +459,84 @@ export class FleetCloudService {
         return { machines, acted };
     }
 
+    /**
+     * The idle policy powers a machine off (S7, FR-27): re-read the row and act
+     * only if it still runs with nothing pending and this window was not acted
+     * on; the provider call is a power-off, never a destroy (FR-28). Allowed
+     * while the kill switch is on — it stops spending (R-36). Audited as
+     * `node.cloud.power` by `system:idle-policy` (no person acted).
+     */
+    private async powerOffByPolicy(
+        node: FleetNode,
+        decision: { idleSince: string | null; attentionKey: string | null },
+        nowMs: number,
+    ): Promise<boolean> {
+        if (!this.machines || !node.providerPluginId || !node.providerMachineRef) return false;
+        const fresh = await this.nodes.findById(node.id);
+        const meta = fresh ? normalizeCloudMeta(fresh.providerMeta) : null;
+        if (!fresh || !meta || meta.powerState !== 'running' || meta.pending !== null) return false;
+        if (meta.idleNotifiedKey === decision.attentionKey) return false;
+        try {
+            await this.machines.power(node.providerPluginId, node.userId, node.providerMachineRef, 'off');
+        } catch (error) {
+            const hint = await this.providerFailureHint(error, node.providerPluginId, node.userId, meta.providerName);
+            this.logger.warn(`idle policy could not power off ${node.id}: ${hint}`);
+            await this.record('node.cloud.power', null, node.userId, node.id, {
+                targetName: node.name,
+                requestedBy: FLEET_CLOUD_IDLE_REQUESTER,
+                confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
+                outcome: 'failed',
+                code: 'operation_failed',
+                hint,
+                action: 'off',
+                ...this.priceExtra(node, meta),
+            });
+            return false;
+        }
+        const at = new Date(nowMs).toISOString();
+        await this.patchMeta(node.id, (latest) => ({
+            ...latest,
+            idleSince: decision.idleSince,
+            idleNotifiedKey: decision.attentionKey,
+            pending: 'powering-off',
+            powerStateAt: at,
+            poweredOffByPolicyAt: at,
+        }));
+        await this.record('node.cloud.power', null, node.userId, node.id, {
+            targetName: node.name,
+            requestedBy: FLEET_CLOUD_IDLE_REQUESTER,
+            confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
+            outcome: 'ok',
+            action: 'off',
+            idleHours: fleetCloudIdleHours(decision.idleSince, nowMs),
+            policy: meta.idlePolicy,
+            ...this.priceExtra(node, meta),
+        });
+        await this.notice(node, meta, decision.idleSince, 'powered-off', nowMs);
+        return true;
+    }
+
     /** One Inbox notice per idle window (FR-27). Never throws. */
     private async notice(
         node: FleetNode,
         meta: FleetCloudMeta,
         idleSince: string | null,
         variant: 'idle' | 'powered-off',
+        nowMs: number = Date.now(),
     ): Promise<void> {
         if (!this.inbox) return;
-        const hours = fleetCloudIdleHours(idleSince) ?? meta.idlePolicy.afterHours;
+        const hours = fleetCloudIdleHours(idleSince, nowMs) ?? meta.idlePolicy.afterHours;
         const rate = formatFleetCloudMoney(meta.hourlyRateCents, { currency: meta.currency, perHour: true });
         const message =
             variant === 'idle'
                 ? {
                       title: `${node.name} has been idle for ${hours} h`,
-                      body: `It bills about ${rate} at ${meta.providerName}. Power it off or destroy it from the Fleet, or keep it running.`,
+                      body: `It bills about ${rate}/hour at ${meta.providerName}. Power it off or destroy it from the Fleet, or keep it running.`,
                   }
                 : {
                       title: `${node.name} was powered off after ${hours} h idle`,
                       body: meta.billsWhileOff
-                          ? `${meta.providerName} still bills this size while it is off. Destroy it to stop the bill, or power it on.`
+                          ? `${meta.providerName} still bills this size while it is off. Destroy it to stop the bill, or power it on when you need it.`
                           : 'Power it on from the Fleet when you need it again.',
                   };
         try {
@@ -416,48 +552,58 @@ export class FleetCloudService {
 
     /**
      * The cost sweep (every 10 minutes, FR-21): recompute every machine's cost
-     * snapshot from the pure model and, where the plugin can read it, the
-     * provider's own account-wide month-to-date figure (one call per provider
-     * and owner). Skips a snapshot computed in the last five minutes (two
-     * overlapping fires write once).
+     * snapshot from the pure model (`fleetCloudCost`, per second, capped per
+     * calendar month) and, where the plugin can read it, the provider's own
+     * account-wide month-to-date figure (one call per provider and owner).
+     * Compare-and-set on `cost.computedAt`: a snapshot younger than five
+     * minutes, or one another pass wrote since this one read the row, is left
+     * alone — two overlapping fires write once.
      */
-    async refreshUsage(): Promise<{ machines: number; changed: number }> {
+    async refreshUsage(nowMs: number = Date.now()): Promise<{ machines: number; changed: number }> {
         if (!config.fleet.isCloudEnabled()) return { machines: 0, changed: 0 };
-        const nowMs = Date.now();
-        const providerFigures = new Map<string, number | null>();
-        let machines = 0;
-        let changed = 0;
-        for (const node of await this.nodes.findCloudNodes()) {
-            const meta = normalizeCloudMeta(node.providerMeta);
-            if (!meta || !node.providerPluginId) continue;
-            machines += 1;
-            const last = meta.cost?.computedAt ? Date.parse(meta.cost.computedAt) : NaN;
-            if (Number.isFinite(last) && nowMs - last < 5 * 60 * 1000) continue;
+        const nodes = (await this.nodes.findCloudNodes()).filter(
+            (node) => node.providerPluginId && normalizeCloudMeta(node.providerMeta),
+        );
+        // One provider read per provider + owner, with every machine ref the owner has there.
+        const groups = new Map<string, { pluginId: string; userId: string; refs: string[] }>();
+        for (const node of nodes) {
             const key = `${node.providerPluginId}::${node.userId}`;
-            if (!providerFigures.has(key)) {
-                let figure: number | null = null;
-                if (this.machines && cloudHasMachine(node)) {
-                    const usage = await this.machines
-                        .usage(node.providerPluginId, node.userId, [node.providerMachineRef!])
-                        .catch(() => null);
-                    figure = typeof usage?.providerMonthToDateCents === 'number' ? usage.providerMonthToDateCents : null;
-                }
-                providerFigures.set(key, figure);
-            }
-            const cost = fleetCloudCost(meta, nowMs);
-            await this.nodes.update(node.id, {
-                providerMeta: {
-                    ...meta,
-                    cost: {
-                        ...cost,
-                        providerMonthToDateCents: providerFigures.get(key) ?? null,
-                        computedAt: new Date(nowMs).toISOString(),
-                    },
-                },
-            });
-            changed += 1;
+            const group = groups.get(key) ?? { pluginId: node.providerPluginId!, userId: node.userId, refs: [] };
+            if (cloudHasMachine(node)) group.refs.push(node.providerMachineRef!);
+            groups.set(key, group);
         }
-        return { machines, changed };
+        const figures = new Map<string, number | null>();
+        for (const [key, group] of groups) {
+            let figure: number | null = null;
+            if (this.machines && group.refs.length > 0) {
+                const usage = await this.machines.usage(group.pluginId, group.userId, group.refs).catch(() => null);
+                const cents = usage?.providerMonthToDateCents;
+                figure = typeof cents === 'number' && Number.isFinite(cents) && cents >= 0 ? cents : null;
+            }
+            figures.set(key, figure);
+        }
+        let changed = 0;
+        const computedAt = new Date(nowMs).toISOString();
+        for (const node of nodes) {
+            const read = normalizeCloudMeta(node.providerMeta)!;
+            const readAt = read.cost?.computedAt ?? null;
+            const last = readAt ? Date.parse(readAt) : NaN;
+            if (Number.isFinite(last) && nowMs - last < FLEET_CLOUD_USAGE_FRESH_MS) continue;
+            const key = `${node.providerPluginId}::${node.userId}`;
+            const wrote = await this.patchMeta(node.id, (fresh) => {
+                if ((fresh.cost?.computedAt ?? null) !== readAt) return null;
+                return {
+                    ...fresh,
+                    cost: {
+                        ...fleetCloudCost(fresh, nowMs),
+                        providerMonthToDateCents: figures.get(key) ?? null,
+                        computedAt,
+                    },
+                };
+            }).catch(() => false);
+            if (wrote) changed += 1;
+        }
+        return { machines: nodes.length, changed };
     }
 
     // ─── Create (spec FR-6 – FR-14) ──────────────────────────────────────
@@ -1023,7 +1169,7 @@ export class FleetCloudService {
         nodeId: string,
         auditAction: FleetAuditAction,
         refusedWhileStopped: boolean,
-    ): Promise<{ node: FleetNode; meta: FleetCloudMeta }> {
+    ): Promise<{ node: FleetNode; meta: FleetCloudMeta; role: FleetViewerRole }> {
         const userId = fleetMachineCallerUserId(caller);
         const { node, role } = await this.resolve(nodeId, userId, 'view');
         this.requireCloud(node);
@@ -1046,7 +1192,7 @@ export class FleetCloudService {
                 family: 'machines',
             });
         }
-        return { node, meta };
+        return { node, meta, role };
     }
 
     /** Destroy is refused `busy` while a Run or a Session is live on the machine (FR-20). */
@@ -1263,6 +1409,25 @@ export class FleetCloudService {
         }
     }
 
+    /**
+     * Re-read the row and write `mutate(freshest meta)`; `null` from `mutate`
+     * writes nothing. The sweeps judge a row they read earlier, so they write
+     * onto the freshest copy — a power act or a policy change a person made in
+     * between is kept, not overwritten. True when something was written.
+     */
+    private async patchMeta(
+        nodeId: string,
+        mutate: (meta: FleetCloudMeta, node: FleetNode) => FleetCloudMeta | null,
+    ): Promise<boolean> {
+        const fresh = await this.nodes.findById(nodeId);
+        const meta = fresh ? normalizeCloudMeta(fresh.providerMeta) : null;
+        if (!fresh || !meta) return false;
+        const next = mutate(meta, fresh);
+        if (!next) return false;
+        await this.nodes.update(nodeId, { providerMeta: next });
+        return true;
+    }
+
     private async record(
         action: FleetAuditAction,
         actorUserId: string | null,
@@ -1286,15 +1451,40 @@ export function usageOf(
     nodes: readonly FleetNode[],
     nowMs: number = Date.now(),
     destroyed: readonly FleetCloudUsageRow[] = [],
+    /**
+     * Whose provider accounts' own month-to-date figures to carry (FR-23):
+     * only that owner's machines contribute one — a machine shared through an
+     * Organization never shows its owner's account-wide bill. Null = none.
+     */
+    accountOwnerUserId: string | null = null,
 ): FleetCloudUsageView {
     let hourly = 0;
     let monthToDate = 0;
     let projected = 0;
     let currency = 'USD';
     const machines: FleetCloudUsageRow[] = [];
+    const providerFigures = new Map<string, FleetCloudProviderMonthToDate>();
     for (const node of nodes) {
         const view = fleetCloudViewOf(node, nowMs);
         if (!view) continue;
+        const stored = normalizeCloudMeta(node.providerMeta)?.cost ?? null;
+        if (
+            accountOwnerUserId !== null &&
+            node.userId === accountOwnerUserId &&
+            node.providerPluginId &&
+            stored &&
+            typeof stored.providerMonthToDateCents === 'number'
+        ) {
+            const seen = providerFigures.get(node.providerPluginId);
+            if (!seen || Date.parse(stored.computedAt) > Date.parse(seen.computedAt)) {
+                providerFigures.set(node.providerPluginId, {
+                    providerPluginId: node.providerPluginId,
+                    providerName: view.providerName,
+                    monthToDateCents: stored.providerMonthToDateCents,
+                    computedAt: stored.computedAt,
+                });
+            }
+        }
         currency = view.currency;
         hourly += view.cost.hourlyCents;
         monthToDate += view.cost.monthToDateCents;
@@ -1327,5 +1517,6 @@ export function usageOf(
         estimate: true,
         machines,
         computedAt: new Date(nowMs).toISOString(),
+        providerMonthToDate: [...providerFigures.values()],
     };
 }

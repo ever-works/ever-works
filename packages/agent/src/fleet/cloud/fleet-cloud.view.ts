@@ -8,6 +8,7 @@ import {
     isFleetCloudPowerState,
     isFleetCloudSoftwareId,
     normalizeFleetCloudIdlePolicy,
+    type FleetCloudIdlePolicy,
     type FleetCloudMeta,
     type FleetCloudPhase,
     type FleetCloudPowerEvent,
@@ -175,6 +176,12 @@ export function idleWindowReached(meta: FleetCloudMeta, nowMs: number): boolean 
     if (meta.idlePolicy.mode === 'nothing' || !meta.idleSince || meta.powerState !== 'running') return false;
     const since = Date.parse(meta.idleSince);
     return Number.isFinite(since) && nowMs - since >= meta.idlePolicy.afterHours * 60 * 60 * 1000;
+}
+
+/** "Tell me after 3 h" — a policy in the words the dialog and the Decision text use (spec §5.6). */
+export function fleetCloudIdlePolicyLabel(policy: FleetCloudIdlePolicy): string {
+    if (policy.mode === 'nothing') return 'Nothing';
+    return `${policy.mode === 'power-off' ? 'Power off' : 'Tell me'} after ${policy.afterHours} h`;
 }
 
 /** Append one power transition, keeping the newest {@link FLEET_CLOUD_MAX_POWER_TIMELINE}. */
