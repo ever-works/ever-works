@@ -1,13 +1,19 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { isFleetCloudName, isFleetCloudPowerAction, normalizeFleetCloudSoftware } from '@ever-works/contracts';
+import {
+    isFleetCloudIdlePolicyMode,
+    isFleetCloudName,
+    isFleetCloudPowerAction,
+    normalizeFleetCloudSoftware,
+} from '@ever-works/contracts';
 import { AgentActionProposalDecidedEvent } from '../../agent-approvals/agent-action-proposal-decided.event';
 import { FLEET_CLOUD_ACTION_PROPOSAL_KIND } from './agent-fleet-cloud-tools';
 import { FleetCloudService } from './fleet-cloud.service';
 
 /**
  * Cloud computers (FL-17, spec S9, CONTRACTS R-33) — runs a held Agent act
- * (`fleet_cloud_create`, a power change, a destroy) once a PERSON approved it
+ * (`fleet_cloud_create`, a power change, a destroy and — P2 — an idle-policy
+ * change) once a PERSON approved it
  * in My Decisions. The act runs as the Agent (`requestedBy: agent:<id>`) with
  * the confirmation the approval stands for; every gate runs again — a price
  * that changed since the Agent read it is refused `invalid` (the approval
@@ -63,6 +69,14 @@ export class FleetCloudProposalListener {
             if (payload.verb === 'power') {
                 if (!isFleetCloudPowerAction(args.action)) return;
                 await this.cloud.power(caller, payload.nodeId, args.action, { confirm: true });
+                return;
+            }
+            if (payload.verb === 'idle-policy') {
+                if (!isFleetCloudIdlePolicyMode(args.mode) || typeof args.afterHours !== 'number') {
+                    this.logger.warn(`Approved cloud-computer idle policy ${event.proposalId} is invalid; not run`);
+                    return;
+                }
+                await this.cloud.setIdlePolicy(caller, payload.nodeId, { mode: args.mode, afterHours: args.afterHours });
                 return;
             }
             if (payload.verb === 'destroy') {
