@@ -136,6 +136,8 @@ export * from '../apps-tier/config-apps-tier-policy';
 export * from './app-build-succeeded.listener';
 // APW-06 T33 / T31 (lane aw-deploy-2) — the app-target/app-status service and the cluster-op gate.
 export * from './app-target.service';
+// Lane aw-ops (2026-10-27) — the API-side redaction pass over a cached log tail (FR-48).
+export * from './app-log-redaction';
 // Works-security (2026-10-18) — the owner-only App actions' switches and the credential rule.
 export * from './app-owner-gates';
 export * from './app-spec-applied.listener';
