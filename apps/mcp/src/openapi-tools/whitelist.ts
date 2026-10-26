@@ -1015,6 +1015,14 @@ export const WHITELIST: WhitelistEntry[] = [
 			'Destroy a cloud computer: the machine and its disk at the provider, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name (the 409 states the cost so far). Refused while a Run or a session is live on it.',
 		annotations: { destructiveHint: true }
 	},
+	{
+		method: 'PATCH',
+		path: '/api/fleet/cloud/{id}/idle-policy',
+		toolName: 'fleet_cloud_idle_policy',
+		description:
+			'Set a cloud computer’s idle policy: `mode` nothing | tell-me | power-off, `afterHours` 1–72. Idle means no session working, no job running and the CPU under 5 % the whole time; Ever Works never destroys a cloud computer on its own.',
+		annotations: { destructiveHint: false }
+	},
 
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
 	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,

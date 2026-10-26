@@ -5,12 +5,15 @@ import {
     isFleetLinkErrorCode,
     type FleetCloudCreateRequest,
     type FleetCloudCreateResponse,
+    type FleetCloudIdlePolicy,
     type FleetCloudListView,
     type FleetCloudOperationResponse,
     type FleetCloudOptionsView,
     type FleetCloudPowerAction,
     type FleetCloudProvidersView,
+    type FleetCloudUsageView,
     type FleetLinkError,
+    type FleetNodeView,
 } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 import { getAuthFromCookie } from '@/lib/auth';
@@ -109,4 +112,22 @@ export async function destroyFleetCloudAction(
     confirmName?: string,
 ): Promise<FleetCloudResult<FleetCloudOperationResponse>> {
     return run(() => fleetCloudAPI.destroy(nodeId, confirmName));
+}
+
+/** P2 (spec S8, FR-23) — the Cloud computers usage block: estimates from list prices. */
+export async function fleetCloudUsageAction(): Promise<FleetCloudResult<FleetCloudUsageView>> {
+    return run(() => fleetCloudAPI.usage());
+}
+
+/** P2 (spec FR-25) — the idle policy; the API validates the mode and the 1–72 hours again. */
+export async function setFleetCloudIdlePolicyAction(
+    nodeId: string,
+    policy: FleetCloudIdlePolicy,
+): Promise<FleetCloudResult<FleetNodeView>> {
+    return run(() => fleetCloudAPI.setIdlePolicy(nodeId, { mode: policy.mode, afterHours: policy.afterHours }));
+}
+
+/** P2 (spec S6) — "Keep running": the idle window starts again now. */
+export async function keepFleetCloudRunningAction(nodeId: string): Promise<FleetCloudResult<FleetNodeView>> {
+    return run(() => fleetCloudAPI.keepRunning(nodeId));
 }

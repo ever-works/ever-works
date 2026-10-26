@@ -41,7 +41,10 @@ export interface ClassifyInput {
 }
 
 function programKey(name: string | null | undefined): string {
-	return (name ?? '').trim().toLowerCase().replace(/\.exe$/, '');
+	return (name ?? '')
+		.trim()
+		.toLowerCase()
+		.replace(/\.exe$/, '');
 }
 
 /** True when a listener is a system listener by port, range or program (before any probe). */
@@ -51,6 +54,10 @@ export function isSystemNoise(listener: RawListener, platform: string): boolean 
 		if (FLEET_WINDOWS_NOISE_PORTS.includes(listener.port)) return true;
 		const [low, high] = FLEET_WINDOWS_DYNAMIC_RPC_RANGE;
 		if (listener.port >= low && listener.port <= high) return true;
+		// The kernel's "System" process (PID 4, or 0 for the idle process) also hosts real sites through
+		// HTTP.sys: it is probed, and `classifyListener` calls it noise only when it does not answer as a
+		// server of its own (spec U7).
+		if (program === 'system' && (listener.pid === 4 || listener.pid === 0)) return false;
 		return program.length > 0 && FLEET_WINDOWS_NOISE_PROGRAMS.includes(program);
 	}
 	if (FLEET_UNIX_NOISE_PORTS.includes(listener.port)) return true;

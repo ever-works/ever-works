@@ -1196,7 +1196,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			.install(entries)
 			.then((result) => {
 				for (const skipped of result.skipped) {
-					io.logger.warn(`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`);
+					io.logger.warn(
+						`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`
+					);
 				}
 			})
 			.catch((error: unknown) => {
@@ -1222,7 +1224,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						? {
 								onHeld: (definitions) =>
 									installNative(
-										definitions.map((definition) => ({ id: definition.id, cadence: definition.cadence }))
+										definitions.map((definition) => ({
+											id: definition.id,
+											cadence: definition.cadence
+										}))
 									)
 							}
 						: {})
@@ -1961,7 +1966,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			environment,
 			jobClientFor(),
 			attendedCapture,
-			computerLegs
+			computerLegs,
+			pasteTargets
 		);
 		runtime.attended = lane;
 		// The live-view lane leases through the same endpoint, so the same
@@ -2074,7 +2080,8 @@ function createAttendedLane(
 	environment: CapabilityEnvironment,
 	jobClient: FleetJobClient,
 	capture: AttendedCapture,
-	computerLegs: ComputerLegBroker | null = null
+	computerLegs: ComputerLegBroker | null = null,
+	pasteTargets: PasteTargets | null = null
 ): NonNullable<NodeRuntime['attended']> {
 	const { webSocketFactory, captureBackend } = capture;
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;

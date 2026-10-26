@@ -6,8 +6,8 @@
 
 **Feature ID**: `FL-17-cloud-computers`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `Draft` · P1 built on `feat/fl-17-cloud-p1` (#2873; T-21 Playwright and the controller spec left for the cascade — lane log `docs/internal/fleet/lanes/FL-17.md`)
-**Last updated**: 2026-10-21
+**Status**: `Draft` · P1 merged (#2873; T-21 Playwright and the controller spec left for the cascade); P2 built on `feat/fl-17-cost-idle-p2` (#2884) — lane log `docs/internal/fleet/lanes/FL-17.md`
+**Last updated**: 2026-10-26
 
 ---
 
@@ -178,28 +178,41 @@
 
 # PHASE 2 — Cost and idle
 
-- [ ] **T-23**. Add `packages/agent/src/fleet/cloud/cost-model.ts` (pure: per-second accrual from
+- [x] **T-23**. Add `packages/agent/src/fleet/cloud/cost-model.ts` (pure: per-second accrual from
       `powerTimeline`, monthly cap, MTD incl. destroyed, projection) and
       `packages/tasks/src/tasks/trigger/fleet-cloud-usage.task.ts` (every 10 min).
       **Test**: `cost-model.spec.ts` (table of lifetimes × rates; cap; month boundary; destroyed
       counted); task spec (CAS on `computedAt`).
-- [ ] **T-24**. Add `idle-policy.ts` (pure: idle over window from samples, sessions, jobs; off/enrolling
+      _Built (P2, #2884): the model is the contracts' `fleetCloudCost` (shared with the web — lane decision 15), pinned
+      in `packages/contracts/src/fleet/__tests__/fleet-cloud.spec.ts` (month boundary, cap, projection, destroyed);
+      the job is `FleetCloudService.refreshUsage` (CAS — `fleet-cloud-p2.service.spec.ts`) and
+      `packages/tasks/src/tasks/trigger/fleet-cloud-usage.task.ts` (`fleet-cloud-p2.task.spec.ts`)._
+- [x] **T-24**. Add `idle-policy.ts` (pure: idle over window from samples, sessions, jobs; off/enrolling
       never idle) and `fleet-cloud-idle.task.ts` (every 10 min, offset 5): `tell-me` → one `cloud-idle`
       item + Inbox item per window; `power-off` → `facade.power(off)` + audit `node.cloud.power`
       (`requestedBy: system:idle-policy`, CONTRACTS §2.3) + item; the policy change itself audits
       `node.policy.change`.
       **Test**: `idle-policy.spec.ts` truth table; `fleet-cloud-idle.task.spec.ts` — exactly one item
       per window; never destroys.
-- [ ] **T-25**. API: `GET /cloud/:id/usage`, `PUT /cloud/:id/idle-policy`; `FleetCloudService.usageSummary`
+      _Built (P2, #2884): `idle-policy.spec.ts`, `fleet-cloud-p2.service.spec.ts` (one notice per window, power-off
+      audited as `system:idle-policy`, never destroys), `fleet-cloud-p2.task.spec.ts`._
+- [x] **T-25**. API: `GET /cloud/:id/usage`, `PUT /cloud/:id/idle-policy`; `FleetCloudService.usageSummary`
       wired into FL-20's `GET /api/fleet/usage` composer.
       **Test**: extend the controller spec; usage summary excludes Budgets (FR-24).
-- [ ] **T-26**. Web: `IdlePolicyEditor.tsx` (computer Settings tab contribution), `CloudUsageBlock.tsx`
+      _Built (P2, #2884): `PUT`/`PATCH …/idle-policy`, `POST …/keep-running`, `GET …/:id/usage`;
+      `FleetCloudService.usageSummary(userId)` is the method FL-20's composer reads (FL-20 lands in parallel — lane
+      decision 19). Controller spec still open (as in P1)._
+- [x] **T-26**. Web: `IdlePolicyEditor.tsx` (computer Settings tab contribution), `CloudUsageBlock.tsx`
       (Usage tab contribution), needs-a-look item actions (Power off / Keep running / Power on /
       Destroy…).
       **Test**: `IdlePolicyEditor.unit.spec.tsx` (clamp; default tell-me 3 h), `CloudUsageBlock.unit.spec.tsx`.
-- [ ] **T-27**. Tools: `fleet_cloud_usage` (readOnly), `fleet_cloud_idle_policy`; extend MCP whitelist
+      _Built (P2, #2884): the editor opens in place from the Cloud block's **Change**; the usage block is on the hub
+      Overview (lane decision 19); items link `?cloud=power-off|power-on`._
+- [x] **T-27**. Tools: `fleet_cloud_usage` (readOnly), `fleet_cloud_idle_policy`; extend MCP whitelist
       and the tools spec. Extend the e2e spec with the policy save and the Usage block.
       **Test**: tool annotations; e2e green.
+      _Built (P2, #2884) except the e2e extension (T-21's Playwright spec does not exist yet): `fleet_cloud_idle_policy`
+      Agent tool (held — lane decision 13), MCP whitelist + privileged list._
 
 ---
 
