@@ -16,6 +16,7 @@
  */
 
 import type { CreditSettlementMode } from '../billing/meter.types.js';
+import type { RunReceiptFleetUsage } from '../fleet/fleet-usage.types.js';
 
 /** The three window granularities the ledger navigates by. */
 export const RUN_LEDGER_GRANULARITIES = ['day', 'week', 'month'] as const;
@@ -302,4 +303,10 @@ export interface RunReceipt {
 	/** True when the run reached its capture cap and older timeline entries were dropped. */
 	captureTruncated: boolean;
 	knowledge: RunKnowledgeCitation[];
+	/**
+	 * Usage & cost on the fleet (FL-20, spec FR-11) — the model work this Run
+	 * did on a computer, at list price, from that computer's opt-in usage scan.
+	 * Absent from a platform that predates it; null when there is none.
+	 */
+	fleetUsage?: RunReceiptFleetUsage | null;
 }

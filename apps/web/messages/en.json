@@ -15602,6 +15602,32 @@
                 "disclaimer": "Estimates from the providers' list prices; your bill may differ. Machine costs are not counted in model-spend Budgets.",
                 "failed": "Cloud computer costs could not be loaded."
             }
+        },
+        "usage": {
+            "payerNote": "List price — what this would cost on a pay-as-you-go key. The machine's own sign-in paid for it; Ever Works charged nothing.",
+            "chip": {
+                "cost": "{cost} · list",
+                "tokensOnly": "tokens only · {tokens}",
+                "tokensOnlyModel": "tokens only · {model} · {tokens}"
+            },
+            "receipt": {
+                "line": "Model work on {computer} · {cost} at list price (v{version}) · {in} in · {out} out · {cache} cache",
+                "lineTokensOnly": "Model work on {computer} · tokens only · {in} in · {out} out · {cache} cache",
+                "unknownModels": "Not in the price list (tokens only, no dollar figure): {models}"
+            },
+            "overview": {
+                "title": "Usage",
+                "loading": "Loading usage…",
+                "line": "Usage 7 d · {cost} · scan on · last scan {age} ago",
+                "lineNoScan": "Usage 7 d · {cost} · scan on · no scan yet",
+                "tokensOnly": "tokens only",
+                "offline": "offline",
+                "catchingUp": "catching up · {pct} % scanned",
+                "open": "Open usage",
+                "off": "Usage scan is off — run `ever-works-node start --usage-scan` on {computer}",
+                "unsupported": "Update the node on {computer} to report usage",
+                "error": "Could not load usage — {hint}"
+            }
         }
     }
 }
