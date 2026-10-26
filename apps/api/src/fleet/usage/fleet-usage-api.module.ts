@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { FleetModule, FleetUsageModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetUsageController } from './fleet-usage.controller';
@@ -24,7 +25,8 @@ import { FleetUsageScanCronService } from './fleet-usage-scan-cron.service';
  */
 @Global()
 @Module({
-    imports: [FleetUsageModule, FleetModule],
+    // DatabaseModule: `DistributedTaskLockService` injects the `CacheEntry` repository.
+    imports: [FleetUsageModule, FleetModule, DatabaseModule],
     controllers: [FleetUsageController],
     providers: [
         FleetUsageScanCronService,
