@@ -104,7 +104,7 @@ overrides:
   '@prisma/config>deepmerge-ts': '>=8.0.2 <9.0.0'
   '@humanfs/node@<0.16.8': '>=0.16.8 <0.17.0'
   colord@<2.9.4: '>=2.10.0 <3.0.0'
-  postcss-selector-parser@>=6.1.0 <6.1.3: '>=6.1.5 <7.0.0'
+  postcss-selector-parser@<6.1.5: '>=6.1.5 <7.0.0'
   postcss-selector-parser@>=7.1.0 <7.1.3: '>=7.1.7 <8.0.0'
   '@hono/node-server@>=2.0.0 <2.0.10': '>=2.1.5 <3.0.0'
   uuid@<11.0.0: '>=11.1.1 <12.0.0'
@@ -1004,8 +1004,8 @@ importers:
         specifier: ^4.2.2
         version: 4.2.2
       '@tailwindcss/typography':
-        specifier: ^0.5.19
-        version: 0.5.19(tailwindcss@4.2.2)
+        specifier: ^0.5.20
+        version: 0.5.20(tailwindcss@4.2.2)
       '@testing-library/jest-dom':
         specifier: ^6.9.1
         version: 6.9.1
@@ -11707,10 +11707,10 @@ packages:
   '@tailwindcss/postcss@4.2.2':
     resolution: {integrity: sha512-n4goKQbW8RVXIbNKRB/45LzyUqN451deQK0nzIeauVEqjlI49slUlgKYJM2QyUzap/PcpnS7kzSUmPb1sCRvYQ==}
 
-  '@tailwindcss/typography@0.5.19':
-    resolution: {integrity: sha512-w31dd8HOx3k9vPtcQh5QHP9GwKcgbMp87j58qi6xgiBnFFtKEAgCWnDw4qUT8aHwkCp8bKvb/KGKWWHedP0AAg==}
+  '@tailwindcss/typography@0.5.20':
+    resolution: {integrity: sha512-hwbzQuNUfcPvbegQFatVPl/MY/tcM9KLl963hQ5laJKPh81TEZ1+dNG9PirGvcaDBkp+BCshExAyKVPW91dozw==}
     peerDependencies:
-      tailwindcss: '>=3.0.0 || insiders || >=4.0.0-alpha.20 || >=4.0.0-beta.1'
+      tailwindcss: '>=3.0.0 || >=4.0.0 || insiders'
 
   '@tanstack/react-virtual@3.13.23':
     resolution: {integrity: sha512-XnMRnHQ23piOVj2bzJqHrRrLg4r+F86fuBcwteKfbIjJrtGxb4z7tIvPVAe4B+4UVwo9G4Giuz5fmapcrnZ0OQ==}
@@ -19982,10 +19982,6 @@ packages:
     peerDependencies:
       postcss: '>=8.5.32 <9.0.0'
 
-  postcss-selector-parser@6.0.10:
-    resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
-    engines: {node: '>=4'}
-
   postcss-selector-parser@6.1.5:
     resolution: {integrity: sha512-TEHFzb5KRDKaOgJ4TYE+0jyJtFbjLvkdVOu0fZ2b6MTWzoqZd4Le+61aEppWkvTlYePgOX4ATL1wsAIPMLTw6Q==}
     engines: {node: '>=4'}
@@ -26790,7 +26786,7 @@ snapshots:
     dependencies:
       '@eslint/object-schema': 2.1.7
       debug: 4.4.3(supports-color@10.2.2)
-      minimatch: 10.2.6
+      minimatch: 10.2.5
     transitivePeerDependencies:
       - supports-color
 
@@ -32351,9 +32347,9 @@ snapshots:
       postcss: 8.5.32
       tailwindcss: 4.2.2
 
-  '@tailwindcss/typography@0.5.19(tailwindcss@4.2.2)':
+  '@tailwindcss/typography@0.5.20(tailwindcss@4.2.2)':
     dependencies:
-      postcss-selector-parser: 6.0.10
+      postcss-selector-parser: 6.1.5
       tailwindcss: 4.2.2
 
   '@tanstack/react-virtual@3.13.23(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
@@ -33384,7 +33380,7 @@ snapshots:
       '@typescript-eslint/utils': 8.53.1(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.53.1
       eslint: 9.39.2(jiti@2.6.1)
-      ignore: 7.0.12
+      ignore: 7.0.6
       natural-compare: 1.4.0
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
@@ -33541,7 +33537,7 @@ snapshots:
       '@typescript-eslint/types': 8.53.1
       '@typescript-eslint/visitor-keys': 8.53.1
       debug: 4.4.3(supports-color@10.2.2)
-      minimatch: 10.2.6
+      minimatch: 10.2.5
       semver: 7.8.5
       tinyglobby: 0.2.17
       ts-api-utils: 2.5.0(typescript@5.9.3)
@@ -34262,7 +34258,7 @@ snapshots:
       js-yaml: 4.3.2
       json5: 2.2.3
       lazy-val: 1.0.5
-      minimatch: 10.2.6
+      minimatch: 10.2.5
       pkijs: 3.4.0
       plist: 3.1.0
       proper-lockfile: 4.1.2
@@ -36915,7 +36911,7 @@ snapshots:
       hasown: 2.0.4
       is-core-module: 2.17.0
       is-glob: 4.0.3
-      minimatch: 3.1.5
+      minimatch: 10.2.5
       object.fromentries: 2.0.8
       object.groupby: 1.0.3
       object.values: 1.2.1
@@ -36943,7 +36939,7 @@ snapshots:
       hasown: 2.0.4
       jsx-ast-utils: 3.3.5
       language-tags: 1.0.9
-      minimatch: 3.1.5
+      minimatch: 10.2.5
       object.fromentries: 2.0.8
       safe-regex-test: 1.1.0
       string.prototype.includes: 2.0.1
@@ -36991,7 +36987,7 @@ snapshots:
       estraverse: 5.3.0
       hasown: 2.0.4
       jsx-ast-utils: 3.3.5
-      minimatch: 3.1.5
+      minimatch: 10.2.5
       object.entries: 1.1.9
       object.fromentries: 2.0.8
       object.values: 1.2.1
@@ -39649,7 +39645,7 @@ snapshots:
       lodash.isstring: 4.0.1
       lodash.once: 4.1.1
       ms: 2.1.3
-      semver: 7.8.1
+      semver: 7.8.5
 
   jstransformer@1.0.0:
     dependencies:
@@ -42524,11 +42520,6 @@ snapshots:
       postcss: 8.5.32
       postcss-selector-parser: 7.1.7
 
-  postcss-selector-parser@6.0.10:
-    dependencies:
-      cssesc: 3.0.0
-      util-deprecate: 1.0.2
-
   postcss-selector-parser@6.1.5:
     dependencies:
       cssesc: 3.0.0
@@ -43389,7 +43380,7 @@ snapshots:
 
   readdir-glob@1.1.3:
     dependencies:
-      minimatch: 10.2.6
+      minimatch: 10.2.5
 
   readdirp@3.6.0:
     dependencies:
