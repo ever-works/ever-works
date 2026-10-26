@@ -1009,7 +1009,8 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/cloud/{id}/idle-policy',
 		toolName: 'fleet_cloud_idle_policy',
 		description:
-			'Set a cloud computer’s idle policy: `mode` nothing | tell-me | power-off, `afterHours` 1–72. Idle means no session working, no job running and the CPU under 5 % the whole time; Ever Works never destroys a cloud computer on its own.'
+			'Set a cloud computer’s idle policy: `mode` nothing | tell-me | power-off, `afterHours` 1–72. Idle means no session working, no job running and the CPU under 5 % the whole time; Ever Works never destroys a cloud computer on its own.',
+		annotations: { destructiveHint: false }
 	},
 
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool

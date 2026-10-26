@@ -10,8 +10,8 @@ import { FleetCloudService } from './fleet-cloud.service';
 /**
  * Cloud computers (FL-17) — the sweeps' narrow facade.
  *
- * The `fleet-cloud-reconcile` and `fleet-cloud-bootstrap-watch` Trigger tasks
- * reach the API over the internal worker RPC, whose allow-list is derived from
+ * The `fleet-cloud-reconcile`, `fleet-cloud-bootstrap-watch` and (P2)
+ * `fleet-cloud-usage` / `fleet-cloud-idle` Trigger tasks reach the API over the internal worker RPC, whose allow-list is derived from
  * a service's prototype. Exposing `FleetCloudService` itself would publish
  * create / power / destroy to the worker; this facade publishes exactly the
  * sweeps — reconcile, bootstrap watch and (P2) the cost refresh and the idle

@@ -187,7 +187,8 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_cloud_usage: "a person's cloud spend",
 	fleet_cloud_create: 'creates a cloud computer (spend)',
 	fleet_cloud_power: 'starts and stops a cloud computer',
-	fleet_cloud_destroy: 'destructive: destroys a cloud computer'
+	fleet_cloud_destroy: 'destructive: destroys a cloud computer',
+	fleet_cloud_idle_policy: 'decides when a cloud computer is powered off (spend)'
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

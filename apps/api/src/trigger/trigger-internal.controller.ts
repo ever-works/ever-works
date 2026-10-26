@@ -742,9 +742,10 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetVirtualReconcileService?: FleetVirtualReconcileService,
-        // Cloud computers (FL-17) — backs the `fleet-cloud-reconcile` and
-        // `fleet-cloud-bootstrap-watch` crons: the worker proxy calls the
-        // facade's two sweeps only. Appended LAST + @Optional() per the arity rule above.
+        // Cloud computers (FL-17) — backs the `fleet-cloud-reconcile`,
+        // `fleet-cloud-bootstrap-watch` and (P2) `fleet-cloud-usage` /
+        // `fleet-cloud-idle` crons: the worker proxy calls the facade's four
+        // sweeps only. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetCloudSweepService?: FleetCloudSweepService,
     ) {}
@@ -900,15 +901,15 @@ export class TriggerInternalController implements OnModuleInit {
                 ? { reconcile: () => this.fleetVirtualReconcileService!.reconcile() }
                 : undefined,
             // Cloud computers (FL-17) — `fleet-cloud-reconcile` / `fleet-cloud-bootstrap-watch`
-            // call `reconcile()` / `watchBootstrap()` here, and only those:
-            // `FleetCloudSweepService` is a two-member facade over `FleetCloudService`
+            // call `reconcile()` / `watchBootstrap()` here, and (P2) `fleet-cloud-usage` /
+            // `fleet-cloud-idle` call `refreshUsage()` / `evaluateIdle()`, and only those:
+            // `FleetCloudSweepService` is a four-member facade over `FleetCloudService`
             // (whose create / power / destroy must never reach the worker). `undefined`
             // (a loud "Unknown remote target") when cloud computers are not mounted.
             FleetCloudSweepService: this.fleetCloudSweepService
                 ? {
                       reconcile: () => this.fleetCloudSweepService!.reconcile(),
                       watchBootstrap: () => this.fleetCloudSweepService!.watchBootstrap(),
-                      // P2 — `fleet-cloud-usage` and `fleet-cloud-idle`.
                       refreshUsage: () => this.fleetCloudSweepService!.refreshUsage(),
                       evaluateIdle: () => this.fleetCloudSweepService!.evaluateIdle(),
                   }

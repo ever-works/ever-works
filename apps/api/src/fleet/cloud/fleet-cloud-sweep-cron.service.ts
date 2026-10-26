@@ -16,7 +16,7 @@ const USAGE_LOCK_KEY = 'fleet-cloud:usage';
 const IDLE_LOCK_KEY = 'fleet-cloud:idle';
 
 /**
- * Cloud computers (FL-17, plan §10, T-19) — the two sweeps when Trigger.dev is
+ * Cloud computers (FL-17, plan §10, T-19) — the sweeps when Trigger.dev is
  * not the runtime: the `FleetVirtualReconcileCronService` shape — a Nest
  * `@Cron` on the SAME shared schedule, gated on `!config.trigger.shouldUseTrigger()`
  * so it and the `fleet-cloud-*` tasks never both run, inside

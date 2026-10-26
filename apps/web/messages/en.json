@@ -15518,7 +15518,12 @@
                 "idleTellMe": "Tell me after {hours} h",
                 "idlePowerOff": "Power off after {hours} h",
                 "address": "Public address {ip} (Ever Works never connects in; the machine connects out).",
-                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer."
+                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer.",
+                "idleFor": "idle for {duration}",
+                "keepRunning": "Keep running",
+                "keptRunning": "{name} keeps running; the idle policy waits its hours again.",
+                "poweredOffByPolicy": "Powered off by the idle policy {duration} ago, after {hours} h idle.",
+                "changeIdlePolicy": "Change"
             },
             "power": {
                 "off": "Power off",
@@ -15555,6 +15560,47 @@
                 "newCloud": "New cloud computer",
                 "powerOff": "Power off {name}",
                 "powerOn": "Power on {name}"
+            },
+            "idlePolicy": {
+                "title": "Idle policy",
+                "modes": {
+                    "nothing": "Nothing",
+                    "tellMe": "Tell me after",
+                    "powerOff": "Power off after"
+                },
+                "hours": "hours",
+                "hoursLabel": "Hours of idleness for “{mode}”",
+                "range": "Enter a whole number of hours from {min} to {max}.",
+                "meaning": "Idle means: no session working, no job running, CPU under 5 % for the whole time.",
+                "neverDestroys": "Ever Works never destroys a cloud computer on its own.",
+                "save": "Save",
+                "cancel": "Cancel",
+                "saved": "The idle policy of {name} is saved; it counts from now.",
+                "failed": "The idle policy could not be saved."
+            },
+            "usage": {
+                "title": "Cloud computers",
+                "totals": "now {hour}/h · this month {month} · projected {projected} (list prices)",
+                "providerMtd": "{provider} reports {amount} this month for your whole account.",
+                "caption": "What each cloud computer costs this month",
+                "columns": {
+                    "name": "Computer",
+                    "where": "Provider · region · size",
+                    "hourly": "Per hour",
+                    "month": "This month",
+                    "state": "State"
+                },
+                "destroyedName": "{name} (destroyed {date})",
+                "states": {
+                    "provisioning": "creating",
+                    "running": "running",
+                    "off": "off",
+                    "gone": "gone",
+                    "unknown": "unknown",
+                    "destroyed": "destroyed — still counted this month"
+                },
+                "disclaimer": "Estimates from the providers' list prices; your bill may differ. Machine costs are not counted in model-spend Budgets.",
+                "failed": "Cloud computer costs could not be loaded."
             }
         }
     }
