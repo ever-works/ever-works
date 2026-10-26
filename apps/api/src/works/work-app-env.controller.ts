@@ -2,10 +2,12 @@ import {
     Body,
     Controller,
     Get,
+    HttpCode,
     HttpException,
     HttpStatus,
     Param,
     ParseUUIDPipe,
+    Post,
     Put,
     UseGuards,
 } from '@nestjs/common';
@@ -22,11 +24,14 @@ import {
     AppEnvEditorService,
     isAppEnvEditorRefusal,
     isAppEnvRefusalError,
+    type AppEnvImportPreview,
+    type AppEnvRotateResponse,
 } from '@ever-works/agent/app-env';
 import { config } from '@ever-works/agent/config';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
 import {
     APP_ENV_PUTS_PER_MINUTE,
+    APP_ENV_ROTATIONS_PER_HOUR,
     type AppEnvListResponse,
     type AppEnvPatchResponse,
 } from '@ever-works/contracts';
@@ -153,6 +158,65 @@ export class WorkAppEnvController {
         }
     }
 
+    /**
+     * Lane aw-ops (APW-07 T28) — `POST /api/works/:id/app-env/import-preview`: what a pasted
+     * `.env` would change — per line `add` / `replace` / `remove` / `skipped` / `refused`, with the
+     * line number and a value-free reason — written nowhere. The import itself is the `PUT` with
+     * `{ import: { dotenv } }`. Edit access: the preview tells which names hold a value.
+     */
+    @Post(':id/app-env/import-preview')
+    @Throttle({ long: { limit: APP_ENV_PUTS_PER_MINUTE, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Preview a .env import into an App Work’s Environment',
+        description:
+            'Parses `{ import: { dotenv } }` and answers, per line, what the import would do and why — ' +
+            'never a value. Nothing is stored.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @HttpCode(HttpStatus.OK)
+    async previewImport(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: unknown,
+    ): Promise<AppEnvImportPreview> {
+        await this.authorize(id, auth.userId, 'edit');
+        try {
+            return await this.editor.previewImport(id, { userId: auth.userId, canEdit: true }, body);
+        } catch (error) {
+            throw mapEditorError(error);
+        }
+    }
+
+    /**
+     * Lane aw-ops (APW-07 T24, FR-13/FR-15) — `POST /api/works/:id/app-env/:name/rotate`
+     * `{ confirmName }`: a fresh value for one generated entry (a key pair as a pair). 10 per hour
+     * (plan §5). The answer carries the new version and the table, never the value.
+     */
+    @Post(':id/app-env/:name/rotate')
+    @Throttle({ long: { limit: APP_ENV_ROTATIONS_PER_HOUR, ttl: 3_600_000 } })
+    @ApiOperation({
+        summary: 'Rotate a generated App env value',
+        description:
+            'Replaces a generated value (both halves of a key pair) with a fresh one. `confirmName` must ' +
+            'be the name exactly. Emits `app.env.rotated` and an Activity row with the name only.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiParam({ name: 'name', description: 'The env name' })
+    @HttpCode(HttpStatus.OK)
+    async rotate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('name') name: string,
+        @Body() body: unknown,
+    ): Promise<AppEnvRotateResponse> {
+        await this.authorize(id, auth.userId, 'edit');
+        try {
+            return await this.editor.rotate(id, { userId: auth.userId, canEdit: true }, name, body);
+        } catch (error) {
+            throw mapEditorError(error);
+        }
+    }
+
     /** View (or edit) access to a visible App Work, or the one refusal each failure gets. */
     private async authorize(
         workId: string,
@@ -215,6 +279,17 @@ export class WorkAppEnvController {
             return false;
         }
     }
+}
+
+/** An editor or service refusal → its HTTP answer; anything else is rethrown untouched. */
+function mapEditorError(error: unknown): unknown {
+    if (isAppEnvEditorRefusal(error)) {
+        return refusal(error.code, error.status, error.message, error.names);
+    }
+    if (isAppEnvRefusalError(error)) {
+        return refusal(error.code, error.status, error.message);
+    }
+    return error;
 }
 
 /** One stable refusal body: `{ status: 'error', code, message, names? }`. */
