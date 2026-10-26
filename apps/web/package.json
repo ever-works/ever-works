@@ -44,7 +44,7 @@
         "@ever-works/plugin": "workspace:*",
         "@headlessui/react": "^2.2.10",
         "@lottiefiles/dotlottie-react": "^0.18.10",
-        "@novu/react": "^3.6.0",
+        "@novu/react": "^3.19.2",
         "@tanstack/react-virtual": "^3.13.23",
         "@tiptap/extension-link": "^2.10.4",
         "@tiptap/extension-mention": "^2.10.4",
