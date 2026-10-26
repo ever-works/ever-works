@@ -118,11 +118,12 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
         }
 
         const claim = await this.readClaim(id);
-        if (!claim.claimed) {
-            this.logger.warn(
-                `Refused to complete the deletion of work ${id}: ${claim.code}. The row is kept.`,
-            );
-            throw new AppWorkDeletionCompletionRefusedError(claim.code);
+        if (claim.claimed !== true) {
+            // Read through a cast: this package compiles without `strictNullChecks`, which turns
+            // off discriminated-union narrowing on `claim.claimed`.
+            const code = (claim as { code: 'not_deleting' | 'runtime_state_unreadable' }).code;
+            this.logger.warn(`Refused to complete the deletion of work ${id}: ${code}. The row is kept.`);
+            throw new AppWorkDeletionCompletionRefusedError(code);
         }
 
         const lifecycle = this.resolveLifecycle();
@@ -131,7 +132,7 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
         }
 
         await this.tellOwner({
-            userId: claim.requestedByUserId || String(work.userId ?? ''),
+            userId: (claim as { requestedByUserId: string | null }).requestedByUserId || String(work.userId ?? ''),
             workId: id,
             workName: String(work.name || work.slug || 'Your App'),
             report,
