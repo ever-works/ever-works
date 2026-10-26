@@ -1,25 +1,50 @@
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { ModuleRef } from '@nestjs/core';
+import { Logger } from '@nestjs/common';
 import { isAppWorkKind } from '@ever-works/contracts';
-import { WorkRepository } from '@ever-works/agent/database';
-import { WORK_APP_RUNTIME_STATES } from '@ever-works/agent/app-launcher';
+
+import { NotificationCategory, NotificationType } from '../entities/notification.types';
 import type {
     AppDeletionObjectRef,
     AppWorkDeletionCompletion,
     AppWorkDeletionCompletionReport,
-} from '@ever-works/agent/app-runtime';
-import { NotificationService } from '@ever-works/agent/notifications';
-import { NotificationCategory, NotificationType } from '@ever-works/agent/entities';
-import { WorkLifecycleService } from '@ever-works/agent/services';
-import { getOptionalProvider } from '@ever-works/agent/utils';
+} from './app-runtime-deletion.service';
 
-/** The one read this completion makes of the runtime-state row. */
-interface DeletionClaimReader {
+/** The one read this completion makes of the Work. */
+export interface AppWorkDeletionCompletionWorks {
+    findById(
+        workId: string,
+    ): Promise<{ id: string; kind?: string | null; userId?: string | null; name?: string | null; slug?: string | null } | null>;
+}
+
+/** The one read this completion makes of the runtime-state row (`WORK_APP_RUNTIME_STATES`). */
+export interface AppWorkDeletionClaimReader {
     getOrCreate(workId: string): Promise<{
         deletionRequestedAt?: Date | string | number | null;
         deletionRequestedByUserId?: string | null;
     } | null>;
 }
+
+/** The owner notification writer (`NotificationService.create`, narrowed). */
+export interface AppWorkDeletionNotifier {
+    create(dto: {
+        userId: string;
+        type: NotificationType;
+        category: NotificationCategory;
+        title: string;
+        message: string;
+        isPersistent?: boolean;
+        deduplicationKey?: string;
+        metadata?: Record<string, unknown>;
+    }): Promise<unknown>;
+}
+
+/**
+ * APW-01's `WorkLifecycleService.completeAppWorkDeletion`, resolved LAZILY by the caller (§9.8:
+ * never a constructor edge — `WorkLifecycleService` injects the deletion port, which is this
+ * cycle). `undefined` ⇔ APW-01 is not in the container.
+ */
+export type AppWorkDeletionLifecycleResolver = () =>
+    | { completeAppWorkDeletion(workId: string): Promise<boolean> }
+    | undefined;
 
 /** Why a completion was refused — reason codes only. */
 export type AppWorkDeletionCompletionRefusal =
@@ -41,7 +66,7 @@ export class AppWorkDeletionCompletionRefusedError extends Error {
  * the one place a finished App runtime removal turns into APW-01's
  * `WorkLifecycleService.completeAppWorkDeletion(workId)`, which deletes the Work row.
  *
- * It is reached from the isolated worker — the `delete-app-work` op's `finishDeletion` dials the
+ * It is reached from the isolated worker: the `delete-app-work` op's `finishDeletion` dials the
  * API's `AppRuntimeDeletionService.finishDeletion` over the internal channel (`remoteMap`), and
  * that method calls this binding. Because the hop ends in a destructive call, the binding is a
  * guard first:
@@ -50,28 +75,28 @@ export class AppWorkDeletionCompletionRefusedError extends Error {
  * 2. **Only an App Work** — any other kind is refused `not_an_app_work`.
  * 3. **Only a Work whose runtime-state row records a deletion** (`deletionRequestedAt`, the claim
  *    §9.7:1490 takes when the OWNER confirms the delete). A row without one is refused
- *    `not_deleting`, and a row that cannot be read is refused `runtime_state_unreadable`: whatever
- *    calls this hop, it cannot delete a Work nobody asked to delete.
+ *    `not_deleting`, and a row that cannot be read `runtime_state_unreadable`: whatever calls this
+ *    hop, it cannot delete a Work nobody asked to delete.
  * 4. **The owner is told** what was removed and what may remain on which target (FR-40a: "the
  *    member MUST be told what may remain on which target") — a notification, because it outlives
  *    the Work row, the Deploy tab and the Activity link that go with it.
- * 5. Only then APW-01's completion, resolved lazily through `ModuleRef` (§9.8: never a
- *    constructor edge — `WorkLifecycleService` injects the deletion port, which is this cycle).
+ * 5. Only then APW-01's completion, through the lazy resolver.
  *
- * Every step refuses by THROWING; `AppRuntimeDeletionService.finishDeletion` catches and answers
+ * Every refusal THROWS; `AppRuntimeDeletionService.finishDeletion` catches and answers
  * `completed: false`, so the Work row is kept and the worker reports the removal as unfinished.
+ *
+ * A plain class: the API's `AppRuntimePortsModule` builds it with a factory (the collaborators
+ * plus the `ModuleRef` lookup of `WorkLifecycleService`), so this package never imports the
+ * lifecycle service and closes no import cycle.
  */
-@Injectable()
 export class AppWorkDeletionCompletionService implements AppWorkDeletionCompletion {
     private readonly logger = new Logger(AppWorkDeletionCompletionService.name);
 
     constructor(
-        private readonly moduleRef: ModuleRef,
-        @Optional() private readonly works?: WorkRepository,
-        @Optional()
-        @Inject(WORK_APP_RUNTIME_STATES)
-        private readonly states?: DeletionClaimReader,
-        @Optional() private readonly notifications?: NotificationService,
+        private readonly works?: AppWorkDeletionCompletionWorks,
+        private readonly states?: AppWorkDeletionClaimReader,
+        private readonly notifications?: AppWorkDeletionNotifier,
+        private readonly lifecycle?: AppWorkDeletionLifecycleResolver,
     ) {}
 
     async completeAppWorkDeletion(
@@ -100,21 +125,35 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
             throw new AppWorkDeletionCompletionRefusedError(claim.code);
         }
 
+        const lifecycle = this.resolveLifecycle();
+        if (!lifecycle) {
+            throw new AppWorkDeletionCompletionRefusedError('lifecycle_unavailable');
+        }
+
         await this.tellOwner({
-            userId: claim.requestedByUserId || work.userId,
+            userId: claim.requestedByUserId || String(work.userId ?? ''),
             workId: id,
-            workName: work.name || work.slug || 'Your App',
+            workName: String(work.name || work.slug || 'Your App'),
             report,
         });
 
-        const lifecycle = getOptionalProvider<WorkLifecycleService>(
-            this.moduleRef,
-            WorkLifecycleService,
-        );
-        if (!lifecycle || typeof lifecycle.completeAppWorkDeletion !== 'function') {
-            throw new AppWorkDeletionCompletionRefusedError('lifecycle_unavailable');
-        }
         return lifecycle.completeAppWorkDeletion(id);
+    }
+
+    private resolveLifecycle(): ReturnType<AppWorkDeletionLifecycleResolver> {
+        try {
+            const lifecycle = this.lifecycle?.();
+            return lifecycle && typeof lifecycle.completeAppWorkDeletion === 'function'
+                ? lifecycle
+                : undefined;
+        } catch (error) {
+            this.logger.warn(
+                `APW-01's completion could not be resolved: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return undefined;
+        }
     }
 
     /** The claim, or the reason there is none. A read that fails is never taken as a claim. */
@@ -130,7 +169,8 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
             if (!row || !isSet(row.deletionRequestedAt)) {
                 return { claimed: false, code: 'not_deleting' };
             }
-            const by = typeof row.deletionRequestedByUserId === 'string' ? row.deletionRequestedByUserId : '';
+            const by =
+                typeof row.deletionRequestedByUserId === 'string' ? row.deletionRequestedByUserId : '';
             return { claimed: true, requestedByUserId: by || null };
         } catch (error) {
             this.logger.warn(
@@ -143,9 +183,9 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
     }
 
     /**
-     * The owner's notification — names, kinds and the target only (never a host, a namespace
-     * address, a value or a token: the report was already reduced to `{ kind, name }` refs).
-     * A failure here never blocks the completion: the Activity row is the second record.
+     * The owner's notification — kinds, names and the target only (never a host, an address, a
+     * value or a token: the report was already reduced to `{ kind, name }` refs). A failure here
+     * never blocks the completion: the Activity row is the second record.
      */
     private async tellOwner(input: {
         userId: string;
@@ -158,7 +198,7 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
         }
         const mayRemain = refsOf(input.report?.mayRemain);
         const target = targetLabel(input.report?.target);
-        const name = String(input.workName).slice(0, 120);
+        const name = input.workName.slice(0, 120);
 
         try {
             await this.notifications.create({
@@ -178,7 +218,8 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
                 isPersistent: mayRemain.length > 0,
                 deduplicationKey: `app-work-deleted:${input.workId}`,
                 metadata: {
-                    eventKey: mayRemain.length > 0 ? 'app_work_deleted_may_remain' : 'app_work_deleted',
+                    eventKey:
+                        mayRemain.length > 0 ? 'app_work_deleted_may_remain' : 'app_work_deleted',
                     workId: input.workId,
                     target: input.report?.target ?? null,
                     code: input.report?.code ?? null,

@@ -1610,7 +1610,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
             return false;
         }
         try {
-            const members = getOptionalProvider(this.moduleRef, WorkMemberRepository);
+            const members = getOptionalProvider<WorkMemberRepository>(this.moduleRef, WorkMemberRepository);
             const member = await members?.findMember(workId, userId);
             return member?.role === WorkMemberRole.OWNER;
         } catch (error) {

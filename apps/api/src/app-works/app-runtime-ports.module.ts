@@ -1,7 +1,9 @@
 import { Global, Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { DatabaseModule, WorkRepository } from '@ever-works/agent/database';
-import { NotificationsModule } from '@ever-works/agent/notifications';
+import { NotificationService, NotificationsModule } from '@ever-works/agent/notifications';
+import { WorkLifecycleService } from '@ever-works/agent/services';
+import { getOptionalProvider } from '@ever-works/agent/utils';
 import { WORK_APP_RUNTIME_STATES } from '@ever-works/agent/app-launcher';
 import {
     APP_CLUSTER_OP_DISPATCHER,
@@ -11,14 +13,17 @@ import {
     APP_WORK_DELETION_PORT_PROVIDER,
     AppRuntimeDeletionService,
     AppRuntimeStateModule,
+    AppWorkDeletionCompletionService,
     buildAppClusterOpDispatcherProviders,
     type AppClusterOpDispatcher,
+    type AppWorkDeletionClaimReader,
+    type AppWorkDeletionCompletionWorks,
+    type AppWorkDeletionNotifier,
     type AppDependenciesService,
     type AppWorkDeletionCompletion,
     type WorkAppRuntimeStateDeletionStore,
 } from '@ever-works/agent/app-runtime';
 import { AppDependenciesModule } from '@ever-works/agent/app-dependencies';
-import { AppWorkDeletionCompletionService } from './app-work-deletion-completion.service';
 
 /**
  * APW-06 T33 / T58 / T73, plan §9.8 (lane aw-safety, 2026-10-26) — **the API's App runtime ports
@@ -74,7 +79,27 @@ import { AppWorkDeletionCompletionService } from './app-work-deletion-completion
     ],
     providers: [
         ...buildAppClusterOpDispatcherProviders(),
-        AppWorkDeletionCompletionService,
+        // The guarded completion. APW-01's `WorkLifecycleService` is looked up LAZILY (§9.8: the
+        // port and the lifecycle service form a cycle, so never a constructor edge), and only when
+        // a finished removal is completed.
+        {
+            provide: AppWorkDeletionCompletionService,
+            useFactory: (
+                moduleRef: ModuleRef,
+                works?: AppWorkDeletionCompletionWorks,
+                states?: AppWorkDeletionClaimReader,
+                notifications?: AppWorkDeletionNotifier,
+            ) =>
+                new AppWorkDeletionCompletionService(works, states, notifications, () =>
+                    getOptionalProvider<WorkLifecycleService>(moduleRef, WorkLifecycleService),
+                ),
+            inject: [
+                ModuleRef,
+                { token: WorkRepository, optional: true },
+                { token: WORK_APP_RUNTIME_STATES, optional: true },
+                { token: NotificationService, optional: true },
+            ],
+        },
         { provide: APP_WORK_DELETION_COMPLETION, useExisting: AppWorkDeletionCompletionService },
         {
             provide: AppRuntimeDeletionService,

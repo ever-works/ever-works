@@ -408,6 +408,10 @@ const WORKER_BOUND: readonly string[] = [
     'APP_UPSTREAM_STATE_READER',
     'APP_VERIFICATION_SINK',
     'APP_VERIFICATION_SPEC_SOURCE',
+    // Lane aw-safety (2026-10-26) — the deletion's completion edge, a one-member proxy of the API's
+    // `AppRuntimeDeletionService.finishDeletion` (`workerAppWorkDeletionCompletion`). Still in
+    // UNBOUND below: no module of THIS package provides it (the API's ports module does).
+    'APP_WORK_DELETION_COMPLETION',
     'WORK_APP_RUNTIME_STATES',
 ];
 
