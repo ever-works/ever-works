@@ -81,6 +81,7 @@ import { FleetCheckoutsApiModule } from './fleet/checkouts/fleet-checkouts-api.m
 import { FleetTasksApiModule } from './fleet/tasks/fleet-tasks-api.module';
 import { FleetSessionGitApiModule } from './fleet/session-git/fleet-session-git-api.module';
 import { FleetVirtualApiModule } from './fleet/virtual/fleet-virtual-api.module';
+import { FleetCloudApiModule } from './fleet/cloud/fleet-cloud-api.module';
 import { FleetUsageApiModule } from './fleet/usage/fleet-usage-api.module';
 import { FleetPortsApiModule } from './fleet/ports/fleet-ports-api.module';
 import { FleetLogsApiModule } from './fleet/logs/fleet-logs-api.module';
@@ -351,6 +352,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // on a computer of the Fleet: the routes, the host-facing token mint and
         // progress, and the reconcile fallback. Dark unless FLEET_VIRTUAL_ENABLED.
         FleetVirtualApiModule,
+        // Cloud computers (FL-17) — machines created at a cloud provider through a
+        // machine-provider plugin: providers, options, create / power / destroy,
+        // and the reconcile + bootstrap-watch fallbacks. Dark unless FLEET_CLOUD_ENABLED.
+        FleetCloudApiModule,
         // Usage & cost on the fleet (FL-20) — the opt-in transcript scan's dispatcher,
         // the report ingest (a job-completion listener), and /api/fleet/usage.
         // Dark unless FLEET_USAGE_SCAN_ENABLED.

@@ -71,3 +71,5 @@ With `taskBranchCleanup: on-merge`, a nightly sweep deletes the remote branches 
 - [Quality Gates](./quality-gates.md) — the checks a Task branch must pass before it is accepted.
 - [Merge Policy](./merge-policy.md) — whether an Agent may land its own pull request.
 - [Git Operations](./git-operations.md) — how the platform talks to your Git provider.
+
+Sessions on computers start in their own worktree too — see [Session git & actions](./fleet-session-git.md).

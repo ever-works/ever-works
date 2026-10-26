@@ -1,10 +1,19 @@
 import 'server-only';
 import type {
+    FleetAgentActionTemplates,
+    FleetAgentActionTemplatesUpdate,
     FleetCheckoutChangesReply,
     FleetCheckoutPullRequestFacts,
+    FleetOpenPullRequestRequest,
+    FleetOpenPullRequestResponse,
+    FleetPullRequestDraft,
+    FleetSessionActionLedgerResponse,
+    FleetSessionActionSendRequest,
+    FleetSessionActionSendResponse,
+    FleetSessionActionsResponse,
     FleetSessionBranchProposal,
 } from '@ever-works/contracts';
-import { serverFetch } from './server-api';
+import { serverFetch, serverMutation } from './server-api';
 
 // NOTE: no leading `/api` here — `serverFetch`/`serverMutation` prepend
 // `API_URL`, which already ends in `/api` (see `lib/api/fleet.ts`).
@@ -61,5 +70,67 @@ export const fleetSessionGitAPI = {
         return serverFetch<FleetCheckoutPullRequestFacts>(
             `${BASE}/checkouts/${encodeURIComponent(checkoutId)}/pull-request`,
         );
+    },
+
+    // ─── P2: actions and the platform-side pull request ───
+
+    actions: async (sessionId: string) => {
+        return serverFetch<FleetSessionActionsResponse>(`${BASE}/sessions/${encodeURIComponent(sessionId)}/actions`);
+    },
+
+    sendAction: async (sessionId: string, body: FleetSessionActionSendRequest) => {
+        return serverMutation<FleetSessionActionSendResponse>({
+            endpoint: `${BASE}/sessions/${encodeURIComponent(sessionId)}/actions`,
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    ledger: async (sessionId: string) => {
+        return serverFetch<FleetSessionActionLedgerResponse>(
+            `${BASE}/sessions/${encodeURIComponent(sessionId)}/actions/ledger`,
+        );
+    },
+
+    resendAction: async (sessionId: string, ledgerId: string, prompt?: string) => {
+        return serverMutation<FleetSessionActionSendResponse>({
+            endpoint: `${BASE}/sessions/${encodeURIComponent(sessionId)}/actions/${encodeURIComponent(ledgerId)}/resend`,
+            data: prompt ? { prompt } : {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    openPullRequest: async (checkoutId: string, body: FleetOpenPullRequestRequest) => {
+        return serverMutation<FleetOpenPullRequestResponse>({
+            endpoint: `${BASE}/checkouts/${encodeURIComponent(checkoutId)}/pull-request`,
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    pullRequestDraft: async (checkoutId: string) => {
+        return serverFetch<FleetPullRequestDraft>(
+            `${BASE}/checkouts/${encodeURIComponent(checkoutId)}/pull-request/draft`,
+        );
+    },
+
+    // ─── P3: the Agent's own templates (the instructions editor) ───
+
+    agentTemplates: async (agentId: string) => {
+        return serverFetch<FleetAgentActionTemplates>(
+            `${BASE}/agents/${encodeURIComponent(agentId)}/action-templates`,
+        );
+    },
+
+    saveAgentTemplates: async (agentId: string, body: FleetAgentActionTemplatesUpdate) => {
+        return serverMutation<FleetAgentActionTemplates>({
+            endpoint: `${BASE}/agents/${encodeURIComponent(agentId)}/action-templates`,
+            data: body,
+            method: 'PUT',
+            wrapInData: false,
+        });
     },
 };

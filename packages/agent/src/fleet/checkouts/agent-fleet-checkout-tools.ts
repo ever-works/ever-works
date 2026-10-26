@@ -187,7 +187,10 @@ export function buildFleetCheckoutTools(args: {
                 'Move a checkout to the bin (the folder is not touched). Answers confirmation_required first; repeat with confirm: true.',
             parameters: {
                 type: 'object',
-                properties: { checkoutId, confirm: { type: 'boolean' } },
+                properties: {
+                    checkoutId,
+                    confirm: { type: 'boolean', description: 'The user confirmed moving this checkout to the bin.' },
+                },
                 required: ['checkoutId'],
             },
             invoke: async (raw) => {
@@ -210,7 +213,7 @@ export function buildFleetCheckoutTools(args: {
                 properties: {
                     checkoutId,
                     mode: { type: 'string', description: 'delete or forget.' },
-                    confirm: { type: 'boolean' },
+                    confirm: { type: 'boolean', description: 'The user confirmed this delete or forget.' },
                     confirmName: { type: 'string', description: 'The checkout’s folder name, typed by the user.' },
                 },
                 required: ['checkoutId'],

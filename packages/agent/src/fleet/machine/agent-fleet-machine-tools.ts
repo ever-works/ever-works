@@ -14,6 +14,7 @@ import {
     isFleetServiceName,
     isFleetServiceScope,
     type FleetLinkError,
+    type FleetRunValidation,
 } from '@ever-works/contracts';
 import type { TaskToolDescriptor } from '../../tasks-domain/agent-task-tools';
 import type { AgentProposalToolSource } from '../../agents/agent-domain-tool-sources';
@@ -380,7 +381,11 @@ export function buildFleetMachineTools(args: {
             const a = (raw ?? {}) as Record<string, unknown>;
             if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
             const validated = validateFleetRunRequest(a.request);
-            if (!validated.ok) return invalid(validated.field, validated.hint);
+            if (!validated.ok) {
+                // `strictNullChecks: false` here: `!validated.ok` does not narrow the union.
+                const refused = validated as Extract<FleetRunValidation, { ok: false }>;
+                return invalid(refused.field, refused.hint);
+            }
             // A proposal is stored: it must never carry a secret (FR-29).
             if (validated.request.env.some((variable) => variable.value !== '')) {
                 return invalid('env', 'an Agent passes environment variable names only; the owner sets the values');

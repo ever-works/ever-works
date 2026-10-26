@@ -1,5 +1,8 @@
 import {
     fleetGitLineFreshness,
+    type FleetSessionActionAvailability,
+    type FleetSessionActionId,
+    type FleetSessionActionLedgerEntry,
     type FleetCheckoutChangedFile,
     type FleetGitLine,
     type FleetGitLinePullRequest,
@@ -144,4 +147,45 @@ export function minutesSince(iso: string | null | undefined, now: number): numbe
     const at = Date.parse(iso);
     if (!Number.isFinite(at)) return null;
     return Math.max(1, Math.round((now - at) / 60_000));
+}
+
+/** An action's `fleet.sessionGit.actions.labels.*` key (the ids are camelCase already). */
+export function actionLabelKey(id: FleetSessionActionId, _update?: { number: number } | null): string {
+    return id;
+}
+
+/** The actions the menu lists: the offered ones, in the platform's order (spec FR-15 — hidden ones never show). */
+export function menuActions(actions: readonly FleetSessionActionAvailability[]): FleetSessionActionAvailability[] {
+    return actions.filter((action) => action.available);
+}
+
+/** How a ledger row's cost reads (spec FR-21): unknown until the usage scan, "session total only" for owner sessions. */
+export function ledgerCostText(
+    entry: Pick<FleetSessionActionLedgerEntry, 'tokens' | 'costCents' | 'costScope'>,
+): { kind: 'unknown' } | { kind: 'sessionTotal' } | { kind: 'known'; tokens: string; cost: string } {
+    if (entry.costScope === 'session-total') return { kind: 'sessionTotal' };
+    if (entry.tokens === null || entry.costCents === null) return { kind: 'unknown' };
+    const tokens = entry.tokens >= 1000 ? `${(entry.tokens / 1000).toFixed(1)}k` : String(entry.tokens);
+    return { kind: 'known', tokens, cost: `$${(entry.costCents / 100).toFixed(2)}` };
+}
+
+/** A hidden reason → its `fleet.sessionGit.actions.reasons.*` key (`not-in-checkout` → `notInCheckout`). */
+export function hiddenReasonKey(reason: string): string {
+    return reason.replace(/-([a-z])/g, (_match, letter: string) => letter.toUpperCase());
+}
+
+/**
+ * May a worktree be cleaned up (spec FR-25)? A worktree that is there, whose
+ * pull request is merged or closed, and that no live session uses. The
+ * platform checks it again (`?cleanUp=1`); this only decides whether the
+ * button shows.
+ */
+export function canCleanUp(input: {
+    kind: string;
+    state: string;
+    pr: Pick<FleetGitLinePullRequest, 'state'> | null | undefined;
+    sessionLive: boolean;
+}): boolean {
+    if (input.kind !== 'worktree' || input.state !== 'ready' || input.sessionLive) return false;
+    return input.pr?.state === 'merged' || input.pr?.state === 'closed';
 }

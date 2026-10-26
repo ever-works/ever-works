@@ -115,7 +115,7 @@ export function SessionsBoardClient({
                         .map((move) =>
                             t('board.moved', {
                                 title: titles.get(move.id) ?? '',
-                                column: t(`board.${COLUMN_KEYS[move.to].title}`),
+                                column: t(`board.${COLUMN_KEYS[move.to].title}` as Parameters<typeof t>[0]),
                             }),
                         )
                         .join(' '),
@@ -311,10 +311,10 @@ export function SessionsBoardClient({
                                 id={`fleet-sessions-column-${column}`}
                                 className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
                             >
-                                {t(`board.${COLUMN_KEYS[column].title}`)} ({counts?.[column] ?? 0})
+                                {t(`board.${COLUMN_KEYS[column].title}` as Parameters<typeof t>[0])} ({counts?.[column] ?? 0})
                             </h3>
                             {shownBoard.columns[column].length === 0 ? (
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t(`board.${COLUMN_KEYS[column].empty}`)}</p>
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t(`board.${COLUMN_KEYS[column].empty}` as Parameters<typeof t>[0])}</p>
                             ) : (
                                 <div className="space-y-2">{shownBoard.columns[column].map(card)}</div>
                             )}

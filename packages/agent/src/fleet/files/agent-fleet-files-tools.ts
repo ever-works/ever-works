@@ -153,12 +153,30 @@ function refusal(err: unknown): ToolError {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const NODE_ID = { type: 'string', description: 'The computer (its id, from list_fleet_nodes).' };
-const ROOT = { type: 'string', description: 'A root id from fleet_files_roots.' };
+const NODE_ID = {
+    type: 'string',
+    description: 'The computer (its id, from list_fleet_nodes).',
+} as const;
+const ROOT = { type: 'string', description: 'A root id from fleet_files_roots.' } as const;
 const PATH = {
     type: 'string',
     description: `A folder under the root, "/"-separated, e.g. "src/server" (empty for the root itself; at most ${FLEET_FILES_PATH_MAX_LENGTH} characters).`,
-};
+} as const;
+/** fleet_files_copy's destination: a nested object schema, hoisted like the schedule tools' CADENCE_SCHEMA. */
+const COPY_TO = {
+    type: 'object',
+    description:
+        'Where to copy to: the destination computer, one of its roots and a folder under it.',
+    properties: {
+        nodeId: { type: 'string', description: 'The destination computer.' },
+        root: {
+            type: 'string',
+            description: 'A root id of the destination (its fleet_files_roots).',
+        },
+        path: PATH,
+    },
+    required: ['nodeId', 'root'],
+} as const;
 
 function location(a: {
     nodeId?: unknown;
@@ -307,18 +325,7 @@ export function buildFleetFilesTools(args: {
                     items: { type: 'string' },
                     description: 'Names of files or folders in that folder.',
                 },
-                to: {
-                    type: 'object',
-                    properties: {
-                        nodeId: { type: 'string', description: 'The destination computer.' },
-                        root: {
-                            type: 'string',
-                            description: 'A root id of the destination (its fleet_files_roots).',
-                        },
-                        path: PATH,
-                    },
-                    required: ['nodeId', 'root'],
-                },
+                to: COPY_TO,
                 replace: {
                     type: 'boolean',
                     description:

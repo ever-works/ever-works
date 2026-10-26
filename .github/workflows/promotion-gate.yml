@@ -229,7 +229,10 @@ jobs:
   node-contract:
     name: node contract must hold for the commit being promoted
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    # 20 → 45: on a busy pool the setup steps alone took 9 min, and the api
+    # specs compile the agent package from source on a cold ts-jest cache
+    # (261 s locally with 3 workers), so 20 min cancelled a passing run (#2892).
+    timeout-minutes: 45
 
     permissions:
       contents: read
@@ -268,8 +271,16 @@ jobs:
       - name: Contracts — fleet wire types and the package inventory guard
         run: pnpm --filter @ever-works/contracts test
 
+      # An 8 GiB heap per worker: these specs load the agent package from SOURCE
+      # through ts-jest, and since the 10-21 build sprint
+      # `node-contract.lifecycle.spec.ts` alone outgrows Node's default heap
+      # ("JavaScript heap out of memory", PR #2892). One worker per suite (3),
+      # 24 GiB at most, inside the x64-4 runner's 36 GiB limit; a single worker
+      # did not finish within 10 min on a busy pool.
       - name: Platform side — the DTOs still accept what a deployed node sends
-        run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        run: pnpm --filter ever-works-api exec jest --maxWorkers=3 --testPathPattern="fleet/__tests__/node-contract"
 
       # `apps/node` is the ONE exception to the note above. Its vitest resolves
       # `@ever-works/contracts` through the package ENTRY, not through source,

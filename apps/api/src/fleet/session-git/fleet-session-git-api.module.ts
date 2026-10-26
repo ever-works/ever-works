@@ -1,7 +1,9 @@
 import { Global, Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { FacadesModule } from '@ever-works/agent/facades';
 import {
+    FLEET_SESSION_PR_FACTS,
     FleetCheckoutsModule,
     FleetModule,
     FleetSessionGitModule,
@@ -12,6 +14,8 @@ import { FleetApiModule } from '../fleet.module';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetSessionsEnabledGuard } from '../sessions/fleet-sessions-enabled.guard';
 import { FleetPrEnrichmentService } from './fleet-pr-enrichment.service';
+import { FleetPullRequestService } from './fleet-pull-request.service';
+import { FleetSessionActionsController } from './fleet-session-actions.controller';
 import { FleetSessionGitController } from './fleet-session-git.controller';
 import { FleetSessionGitCronService } from './fleet-session-git-cron.service';
 
@@ -40,16 +44,21 @@ import { FleetSessionGitCronService } from './fleet-session-git-cron.service';
         FleetSessionGitModule,
         FleetApiModule,
         FacadesModule,
+        // P2: the Agent (its "may open pull requests") and its Run (the Task it works on).
+        DatabaseModule,
     ],
-    controllers: [FleetSessionGitController],
+    controllers: [FleetSessionGitController, FleetSessionActionsController],
     providers: [
         FleetPrEnrichmentService,
+        // P2: the relevance rules read the enrichment's facts through the agent-side port.
+        { provide: FLEET_SESSION_PR_FACTS, useExisting: FleetPrEnrichmentService },
+        FleetPullRequestService,
         FleetSessionGitCronService,
         DistributedTaskLockService,
         FleetEnabledGuard,
         FleetSessionsEnabledGuard,
         FleetCheckoutsEnabledGuard,
     ],
-    exports: [FleetSessionGitModule, FleetPrEnrichmentService],
+    exports: [FleetSessionGitModule, FleetPrEnrichmentService, FLEET_SESSION_PR_FACTS, FleetPullRequestService],
 })
 export class FleetSessionGitApiModule {}

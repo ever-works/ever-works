@@ -16,6 +16,7 @@ import {
     type CreateActivityLogDto,
 } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
+import { readAgentFleetBlock } from '../fleet/session-git/agent-fleet-block';
 
 /**
  * The five canonical Agent files (architecture/agent-yml-manifest-schema.md
@@ -123,6 +124,7 @@ export class AgentFileService {
         this.assertValidName(name);
         this.assertSize(body);
         assertNoSecrets(body, `Agent file ${name}`);
+        this.assertFleetBlock(name, body);
 
         const agent = await this.requireOwned(userId, agentId);
         const actor = this.activityActor(agent, args.actor, args.runId);
@@ -249,6 +251,7 @@ export class AgentFileService {
         this.assertValidName(name);
         this.assertSize(body);
         assertNoSecrets(body, `Agent file ${name}`);
+        this.assertFleetBlock(name, body);
         const agent = await this.requireOwned(userId, agentId);
         if (expectedHash !== undefined && (agent.contentHash ?? '') !== expectedHash) {
             throw new BadRequestException(
@@ -289,6 +292,18 @@ export class AgentFileService {
             fields: { actorKind: 'agent', actorAgentId: agent.id },
             details: isUuid(runId) ? { runId } : {},
         };
+    }
+
+    /**
+     * FL-06 (spec FR-13, T-02): `agent.yml`'s optional `fleet` block — the
+     * branch prefix and the action templates — must be well formed when it is
+     * there (an action id that is not one of the seven is refused with the
+     * field named). The rest of the file is the person's; it is not judged.
+     */
+    private assertFleetBlock(name: AgentFileName, body: string): void {
+        if (name !== 'agent.yml') return;
+        const { error } = readAgentFleetBlock(body);
+        if (error) throw new BadRequestException(`agent.yml ${error.field}: ${error.message}`);
     }
 
     private assertValidName(name: string): asserts name is AgentFileName {

@@ -298,6 +298,12 @@ export const FLEET_RUN_TOKEN_ROUTES: readonly FleetRunTokenRoute[] = Object.free
 	{ method: 'GET', pathPattern: '/api/fleet/runner-status' },
 	{ method: 'GET', pathPattern: '/api/fleet/execution-preferences' },
 	{ method: 'GET', pathPattern: '/api/fleet/agents/{agentId}/node-affinity' },
+	// Session git & actions (FL-06 FR-18): an Agent session asks the platform to
+	// open or update the pull request of ITS OWN checkout. The route refuses a
+	// checkout that is not the token's session's, and the Agent's "may open pull
+	// requests" permission applies; it never merges anything.
+	{ method: 'GET', pathPattern: '/api/fleet/checkouts/{id}/pull-request' },
+	{ method: 'POST', pathPattern: '/api/fleet/checkouts/{id}/pull-request' },
 
 	// Agents — reads, plus cancel and pause (the safe direction).
 	{ method: 'GET', pathPattern: '/api/agents' },

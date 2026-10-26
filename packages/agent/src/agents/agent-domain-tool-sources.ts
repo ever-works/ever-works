@@ -12,12 +12,15 @@ import type { MeetingRepository } from '../meetings/meeting.repository';
 import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
+import type { FleetCloudService } from '../fleet/cloud/fleet-cloud.service';
 import type { FleetUsageViewService } from '../fleet/usage/fleet-usage-view.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
 import type { FleetNodeHealthService } from '../fleet/fleet-node-health.service';
 import type { FleetCheckoutService } from '../fleet/checkouts/fleet-checkout.service';
+import type { FleetSessionActionService } from '../fleet/session-git/fleet-session-action.service';
+import type { FleetSessionPullRequestOpener } from '../fleet/session-git/agent-fleet-session-git-tools';
 import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.service';
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
@@ -105,7 +108,12 @@ export interface AgentMeetingToolSource {
 }
 
 export interface AgentFleetToolSource {
-    service: Pick<FleetService, 'listForUser'>;
+    /**
+     * `listForUser` backs `list_fleet_nodes`; the visible reads back FL-19's
+     * `fleet_nodes_list|get` (`buildFleetCoreTools`). The API binds the whole
+     * `FleetService`.
+     */
+    service: Pick<FleetService, 'listForUser' | 'listVisibleForUser' | 'getVisibleForUser'>;
     /**
      * Servers and ports (FL-10) — `fleet_ports_list` / `fleet_ports_open`.
      * Optional: unbound (a context without the API's node link), the two tools
@@ -124,6 +132,11 @@ export interface AgentFleetToolSource {
      * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
      */
     virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
+    /**
+     * Cloud computers (FL-17) — backs `fleet_cloud_*`. Optional: unbound (or
+     * `FLEET_CLOUD_ENABLED` off), those tools are simply not offered.
+     */
+    cloud?: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'>;
     /**
      * Usage & cost on the fleet (FL-20) — backs the read-only `fleet_usage_get`.
      * Optional: unbound (or `FLEET_USAGE_SCAN_ENABLED` off), it is not offered.
@@ -165,6 +178,18 @@ export interface AgentFleetToolSource {
             FleetCheckoutService,
             'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
         >;
+    };
+    /**
+     * Session git & actions (FL-06 P3, spec FR-26) — when bound, the
+     * `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` and
+     * `fleet_checkouts_open_pull_request` tools are offered
+     * (`buildFleetSessionGitTools`), each act checked against the Node's
+     * audience for the Agent's owner. The pull-request opener is the API's.
+     */
+    sessionGit?: {
+        actions: Pick<FleetSessionActionService, 'list' | 'send'>;
+        checkouts?: Pick<FleetCheckoutService, 'changes'>;
+        pullRequests?: FleetSessionPullRequestOpener;
     };
     /**
      * Logs on computers (FL-08) — when bound, the read-only

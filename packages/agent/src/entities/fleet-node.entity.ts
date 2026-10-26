@@ -13,6 +13,7 @@ import type {
     FleetNodeOrigin,
     FleetNodeVirtualKind,
     FleetVirtualMeta,
+    FleetCloudMeta,
 } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
@@ -107,6 +108,9 @@ export { COMPUTER_CONTROL_POLICIES as FLEET_NODE_CONTROL_POLICIES } from '@ever-
 // Virtual computers (FL-16): the hub nests children under their host and the
 // per-host limit counts them, both by this column.
 @Index('idx_fleet_nodes_host', ['hostNodeId'])
+// Cloud computers (FL-17): one Node per provider machine. A plain unique index:
+// NULLs never collide on Postgres or SQLite, so every other Node is unaffected.
+@Index('idx_fleet_nodes_provider_machine', ['providerPluginId', 'providerMachineRef'], { unique: true })
 export class FleetNode {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -164,6 +168,35 @@ export class FleetNode {
      */
     @Column({ type: 'simple-json', nullable: true })
     virtualMeta?: FleetVirtualMeta | null;
+
+    /**
+     * Cloud computers (FL-17, CONTRACTS §4.1, R-15, R-35) — the
+     * `machine-provider` plugin that created this Node; null for every machine
+     * that was not created at a cloud provider. Core code never branches on its
+     * value (it resolves the plugin through the facade by capability).
+     * Migration: `1796170000000-AddFleetNodeProviderFields`.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    providerPluginId?: string | null;
+
+    /**
+     * Cloud computers (FL-17) — the provider's own id for the machine, written
+     * when the provider accepted the create; null before that and for every
+     * other Node. Unique with {@link providerPluginId} (reconciliation finds a
+     * row by it, and a machine is never two Nodes).
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    providerMachineRef?: string | null;
+
+    /**
+     * Cloud computers (FL-17, CONTRACTS §4.1 `providerMeta`) — region, size,
+     * hourly rate, created at, the power timeline, the idle policy and the cost
+     * snapshot (`FleetCloudMeta`). Written by `FleetCloudService` only. Never a
+     * provider token, an enrolment token, a password, a key or a VPN auth key.
+     * `simple-json` in a `text` column like {@link virtualMeta}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    providerMeta?: FleetCloudMeta | null;
 
     /**
      * sha256 hex of the current credential — the one-time enrollment

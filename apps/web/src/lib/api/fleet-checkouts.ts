@@ -99,9 +99,10 @@ export const fleetCheckoutsAPI = {
         });
     },
 
-    remove: async (id: string, body: FleetCheckoutDeleteRequest) => {
+    remove: async (id: string, body: FleetCheckoutDeleteRequest, options: { cleanUp?: boolean } = {}) => {
         return serverMutation<FleetCheckoutView | { forgotten: true; id: string }>({
-            endpoint: `${BASE}/checkouts/${encodeURIComponent(id)}`,
+            // FL-06: `?cleanUp=1` applies the Clean up gate first (worktree, PR merged/closed, no live session).
+            endpoint: `${BASE}/checkouts/${encodeURIComponent(id)}${options.cleanUp ? '?cleanUp=1' : ''}`,
             data: body,
             method: 'DELETE',
             wrapInData: false,

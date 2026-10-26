@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { AgentApprovalsModule } from '@ever-works/agent/agent-approvals';
+import { AgentsModule as AgentAgentsModule } from '@ever-works/agent/agents';
 import { DatabaseModule } from '@ever-works/agent/database';
 import {
     FLEET_HELD_CALL_FILER,
@@ -36,7 +37,15 @@ import { FleetToolsGateService } from './fleet-tools-gate.service';
  */
 @Global()
 @Module({
-    imports: [AgentFleetModule, DatabaseModule, SafetyModule, PolicyModule, AgentApprovalsModule],
+    // `AgentAgentsModule` exports `AgentRepository`, which `FleetToolsGateService` reads (as `FleetApiModule` imports it).
+    imports: [
+        AgentFleetModule,
+        AgentAgentsModule,
+        DatabaseModule,
+        SafetyModule,
+        PolicyModule,
+        AgentApprovalsModule,
+    ],
     controllers: [FleetToolsController],
     providers: [
         FleetStatusService,

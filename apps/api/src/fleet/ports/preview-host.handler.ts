@@ -9,7 +9,11 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import { config } from '@ever-works/agent/config';
-import { FleetNodeRepository, FleetPortTunnelService } from '@ever-works/agent/fleet';
+import {
+    FleetNodeRepository,
+    FleetPortTunnelService,
+    type FleetPortTunnelAuthorization,
+} from '@ever-works/agent/fleet';
 import {
     filterFleetPortTunnelHeaders,
     FLEET_PORT_TUNNEL_COOKIE,
@@ -82,6 +86,16 @@ function cookie(name: string, value: string, maxAgeSec: number): string {
 
 async function* emptyBody(): AsyncIterable<Buffer> {
     // a request without a body
+}
+
+/**
+ * Why a request was refused. This app compiles with `strictNullChecks: false`, under which
+ * `!decision.ok` does not narrow the authorization union, so the refusal is read through this.
+ */
+function refusalOf(
+    decision: FleetPortTunnelAuthorization,
+): Extract<FleetPortTunnelAuthorization, { ok: false }>['why'] {
+    return (decision as Extract<FleetPortTunnelAuthorization, { ok: false }>).why;
 }
 
 /** Answer an upgrade we will not pass through, then drop the socket. */
@@ -172,7 +186,7 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
             const userId = this.tokens.redeemHandoff(handoff, tunnelId);
             const row = userId ? await this.tunnels.authorizeRequest(tunnelId, userId) : null;
             if (!userId || !row || !row.ok) {
-                return this.page(res, row && !row.ok && row.why === 'ended' ? 'ended' : 'signIn');
+                return this.page(res, row && !row.ok && refusalOf(row) === 'ended' ? 'ended' : 'signIn');
             }
             const endsAt = fleetPortTunnelEndsAt(row.tunnel.openedAt);
             const value = this.tokens.mintCookie(tunnelId, userId, endsAt);
@@ -195,8 +209,9 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
         if (!userId) return this.page(res, 'signIn');
         const decision = await this.tunnels.authorizeRequest(tunnelId, userId);
         if (!decision.ok) {
-            if (decision.why === 'off') return this.page(res, 'notFound');
-            if (decision.why === 'not-yours') return this.page(res, 'notYours');
+            const why = refusalOf(decision);
+            if (why === 'off') return this.page(res, 'notFound');
+            if (why === 'not-yours') return this.page(res, 'notYours');
             return this.page(res, 'ended', { computer: await this.computerOf(tunnelId) });
         }
         const tunnel = decision.tunnel;
@@ -360,7 +375,7 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
         const userId = this.tokens.readCookie(cookies.get(fleetPortTunnelAuthCookieName(tunnelId)), tunnelId);
         if (!userId) return refuseUpgrade(socket, 401);
         const decision = await this.tunnels.authorizeRequest(tunnelId, userId);
-        if (!decision.ok) return refuseUpgrade(socket, decision.why === 'not-yours' ? 403 : 404);
+        if (!decision.ok) return refuseUpgrade(socket, refusalOf(decision) === 'not-yours' ? 403 : 404);
         const tunnel = decision.tunnel;
 
         const headers = filterFleetPortTunnelHeaders(

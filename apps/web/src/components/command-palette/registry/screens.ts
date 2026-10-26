@@ -482,6 +482,44 @@ export function fleetVirtualScreens(
     return screens;
 }
 
+/**
+ * Cloud computers (FL-17, spec §5.8) — "New cloud computer" (the Computers tab
+ * with the dialog open) and, for every cloud computer the viewer may see,
+ * "Power off <name>" or "Power on <name>", opening its page where the act and
+ * its confirmation (with the billing sentence) live. Only while
+ * `FLEET_CLOUD_ENABLED` is on.
+ */
+export function fleetCloudScreens(
+    computers: ReadonlyArray<{ id: string; name: string; cloudPowerState?: string }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    const screens: PaletteScreen[] = [
+        {
+            id: 'fleet.cloud.new',
+            href: `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=cloud`,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.cloud.palette.newCloud'),
+            breadcrumb: fleet,
+        },
+    ];
+    for (const computer of computers) {
+        const running = computer.cloudPowerState === 'running';
+        if (!running && computer.cloudPowerState !== 'off') continue;
+        screens.push({
+            id: `fleet.cloud.${computer.id}.${running ? 'off' : 'on'}`,
+            href: ROUTES.DASHBOARD_FLEET_COMPUTER(computer.id),
+            icon: Monitor,
+            title: (t: PaletteTranslator) =>
+                running
+                    ? t('fleet.cloud.palette.powerOff', { name: computer.name })
+                    : t('fleet.cloud.palette.powerOn', { name: computer.name }),
+            breadcrumb: fleet,
+        });
+    }
+    return screens;
+}
+
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {
     /** Fleet hub (FL-01): add the hub's screens after Teams. */

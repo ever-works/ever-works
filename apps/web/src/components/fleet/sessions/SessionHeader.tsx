@@ -36,6 +36,7 @@ export function SessionHeader({
     onShortcuts,
     gitSlot,
     attentionSlot,
+    actionsSlot,
 }: {
     session: FleetSessionView;
     nodeName: string;
@@ -52,6 +53,8 @@ export function SessionHeader({
     onShortcuts: () => void;
     gitSlot?: ReactNode;
     attentionSlot?: ReactNode;
+    /** FL-06 (spec §5.2): **Actions ▾**, beside End. */
+    actionsSlot?: ReactNode;
 }) {
     const t = useTranslations('fleet.sessions');
     const glyph = sessionStateGlyph(session.state);
@@ -143,6 +146,7 @@ export function SessionHeader({
                             {t('detail.watchOnly')}
                         </Button>
                     )}
+                    {actionsSlot}
                     <Button size="sm" variant="secondary" onClick={onRename} data-testid="fleet-session-rename">
                         {t('detail.rename')}
                     </Button>

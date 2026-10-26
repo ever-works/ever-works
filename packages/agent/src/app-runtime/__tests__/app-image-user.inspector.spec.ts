@@ -75,6 +75,27 @@ describe('the credential only ever reaches its own registry', () => {
         expect(matchingCredential({ ...PULL, password: '' }, 'ghcr.io', 'ghcr.io')).toBeNull();
     });
 
+    it('reads the registry host before the first slash, in linear time (CodeQL #282)', () => {
+        expect(
+            matchingCredential(
+                { ...PULL, server: 'https://ghcr.io/ever-works/app' },
+                'ghcr.io',
+                'ghcr.io',
+            ),
+        ).not.toBeNull();
+        expect(
+            matchingCredential(
+                { ...PULL, server: 'ghcr.io.evil.example/ghcr.io' },
+                'ghcr.io',
+                'ghcr.io',
+            ),
+        ).toBeNull();
+        const hostile = `/${'/'.repeat(100_000)}x`;
+        const started = Date.now();
+        expect(matchingCredential({ ...PULL, server: hostile }, 'ghcr.io', 'ghcr.io')).toBeNull();
+        expect(Date.now() - started).toBeLessThan(1_000);
+    });
+
     it('trusts a token realm on the registry itself or Docker Hub auth, never a named third host', () => {
         expect(trustedRealm('https://ghcr.io/token', 'ghcr.io', 'ghcr.io')).toBe(true);
         expect(

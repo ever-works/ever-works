@@ -20,6 +20,8 @@ export interface PaletteFleetComputer {
     hostNodeId?: string;
     /** Virtual computers (FL-16): its state, to offer Start or Stop. */
     virtualState?: string;
+    /** Cloud computers (FL-17): its power at the provider, to offer Power off or Power on. */
+    cloudPowerState?: string;
 }
 
 /**
@@ -57,6 +59,8 @@ export function useFleetPaletteComputers(open: boolean, enabled: boolean): Palet
                                   // FL-16: a virtual computer carries its host and state.
                                   if (node.hostNodeId) base.hostNodeId = node.hostNodeId;
                                   if (node.virtual?.state) base.virtualState = node.virtual.state;
+                                  // FL-17: a cloud computer carries its power state (no act while one is pending).
+                                  if (node.cloud && !node.cloud.pending) base.cloudPowerState = node.cloud.powerState;
                                   return base;
                               })
                         : [],

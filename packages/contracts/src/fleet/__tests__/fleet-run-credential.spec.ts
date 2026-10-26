@@ -322,12 +322,30 @@ describe('route list composition', () => {
 		}
 	});
 
-	it('never lists /api/auth or /api/fleet/jobs, and lists no fleet write', () => {
+	it('never lists /api/auth or /api/fleet/jobs, and lists no fleet write but the one FR-18 grants', () => {
+		// The ONE fleet write a run token may reach (FL-06 spec FR-18: an Agent
+		// session opens or updates the pull request of its OWN checkout; it never
+		// merges). `FleetPullRequestService.open` (apps/api) refuses a run token
+		// for any checkout that is not its own session's (`permission_denied`)
+		// and requires the Agent's "may open pull requests" permission, and the
+		// Fleet sessions + checkouts flags gate the route (404 when off). Any
+		// other fleet write in this list fails here.
+		const allowedFleetWrites = new Set(['POST /api/fleet/checkouts/{id}/pull-request']);
 		for (const route of FLEET_RUN_TOKEN_ROUTES) {
 			expect(route.pathPattern.startsWith('/api/auth')).toBe(false);
 			expect(route.pathPattern.startsWith('/api/fleet/jobs')).toBe(false);
-			if (route.pathPattern.startsWith('/api/fleet')) expect(route.method).toBe('GET');
+			if (
+				route.pathPattern.startsWith('/api/fleet') &&
+				!allowedFleetWrites.has(`${route.method} ${route.pathPattern}`)
+			) {
+				expect(route.method, `${route.method} ${route.pathPattern}`).toBe('GET');
+			}
 		}
+		expect(
+			FLEET_RUN_TOKEN_ROUTES.filter(
+				(route) => route.pathPattern.startsWith('/api/fleet') && route.method !== 'GET'
+			).map((route) => `${route.method} ${route.pathPattern}`)
+		).toEqual([...allowedFleetWrites]);
 	});
 
 	it('lists no route twice', () => {

@@ -15,7 +15,7 @@ describe('container isolation (FL-14 P3, spec FR-31, U11, ACC-FL14-20)', () => {
 
 	it('mounts the folder at /workspace and runs the command there, argv only', () => {
 		expect(
-			containerRunArgv({ path: '/srv/checkouts/api/fix', image: 'node:22-bookworm', command: ['bash', '-l'], tty: true })
+			containerRunArgv({ path: '/srv/checkouts/api/fix', image: 'node:26-bookworm', command: ['bash', '-l'], tty: true })
 		).toEqual([
 			'docker',
 			'run',
@@ -26,7 +26,7 @@ describe('container isolation (FL-14 P3, spec FR-31, U11, ACC-FL14-20)', () => {
 			'/srv/checkouts/api/fix:/workspace',
 			'-w',
 			'/workspace',
-			'node:22-bookworm',
+			'node:26-bookworm',
 			'bash',
 			'-l'
 		]);

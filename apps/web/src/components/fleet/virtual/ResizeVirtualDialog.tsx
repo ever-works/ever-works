@@ -8,7 +8,6 @@ import { resizeFleetVirtualAction } from '@/app/actions/fleet/virtual';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -103,11 +102,9 @@ export function ResizeVirtualDialog({
                     </fieldset>
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="ghost">
-                            {t('cancel')}
-                        </Button>
-                    </DialogClose>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {t('cancel')}
+                    </Button>
                     <Button type="button" onClick={apply} disabled={pending || unchanged} data-testid="fleet-virtual-resize-apply">
                         {t('apply')}
                     </Button>
