@@ -37,6 +37,7 @@ import {
 } from './session/actions';
 import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
 import { virtualCommand } from './virtual';
+import { cloudCommand } from './cloud';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -120,4 +121,6 @@ export const fleetCommand = new Command('fleet')
     // Tasks on computers (FL-15 P3): `fleet tasks handoff-options <taskId>`.
     .addCommand(fleetTasksCommand)
     // Virtual computers (FL-16 P3): `fleet virtual list|options|create|start|stop|power|resize|rebuild|destroy`.
-    .addCommand(virtualCommand);
+    .addCommand(virtualCommand)
+    // Cloud computers (FL-17 P3): `fleet cloud providers|options|list|create|power|destroy|usage|idle-policy`.
+    .addCommand(cloudCommand);
