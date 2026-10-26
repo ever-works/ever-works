@@ -7,6 +7,7 @@ import {
     type FleetLinkError,
     type FleetUsagePricesView,
     type FleetUsageRescanResult,
+    type FleetUsageTaskCostsView,
     type FleetUsageView,
 } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
@@ -69,9 +70,25 @@ export async function getFleetUsageAction(input: {
     days?: number;
     node?: string | null;
     model?: string | null;
+    /** P2 — one Agent's work only. */
+    agent?: string | null;
 }): Promise<FleetUsageResult<FleetUsageView>> {
     const days = isFleetUsagePeriodDays(input.days) ? input.days : undefined;
-    return run(() => fleetUsageAPI.view({ days, node: input.node ?? null, model: input.model ?? null }));
+    return run(() =>
+        fleetUsageAPI.view({ days, node: input.node ?? null, model: input.model ?? null, agent: input.agent ?? null }),
+    );
+}
+
+/** P2 — the schedule rows' cost: each recurring Task's newest Run and its 30-day total (own Runs only). */
+export async function getFleetUsageTaskCostsAction(
+    taskIds: string[],
+): Promise<FleetUsageResult<FleetUsageTaskCostsView>> {
+    const ids = taskIds.filter((id) => typeof id === 'string' && id.length > 0).slice(0, 50);
+    if (ids.length === 0) {
+        await ensureAuth();
+        return { ok: true, data: { tasks: [], note: '' } };
+    }
+    return run(() => fleetUsageAPI.taskCosts(ids));
 }
 
 /** The price list in effect and its version history (read-only). */
