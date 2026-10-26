@@ -1988,3 +1988,6 @@ Lists regions and sizes with their current list prices, creates Ubuntu 24.04 dro
 node id, powers them off gracefully and on, destroys them (idempotently), and reads the account's month-to-date
 usage when the token may read billing. DigitalOcean bills a powered-off droplet, and the dialog says so before
 Create. Switched on per deployment by `FLEET_CLOUD_ENABLED`.
+
+Writing a second provider: [Creating a Machine-Provider Plugin](./creating-machine-provider-plugin.md) — the contract,
+the tags reconciliation reads, and what `billsWhileOff` and `usage` mean.
