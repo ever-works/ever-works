@@ -76,3 +76,5 @@ export * from './ports';
 export * from './virtual';
 // Cloud computers (FL-17) — machines created at a cloud provider, their service, sweeps and Agent tools.
 export * from './cloud';
+// Usage & cost on the fleet (FL-20) — the transcript scan's reconciler, dispatcher, view and Agent tool.
+export * from './usage';

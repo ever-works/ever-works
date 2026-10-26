@@ -68,6 +68,7 @@ import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
 import { buildFleetCloudTools } from '../fleet/cloud/agent-fleet-cloud-tools';
+import { buildFleetUsageTools } from '../fleet/usage/agent-fleet-usage-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
@@ -656,6 +657,11 @@ export class AgentToolService {
                         proposals: sources.proposals ?? null,
                     }),
                 );
+            }
+            // Usage & cost on the fleet (FL-20): `fleet_usage_get`, read-only, as the Agent's owner.
+            if (fleet.usage) {
+                const usage = fleet.usage;
+                add('fleet-usage', () => buildFleetUsageTools({ userId: agent.userId, service: usage }));
             }
             // Computer health (FL-03): the read-only health tools, when bound.
             if (fleet.health) {

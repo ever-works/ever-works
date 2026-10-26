@@ -25,6 +25,8 @@ import { CleanUpButton } from './CleanUpButton';
 import { PrPill } from './PrPill';
 import { canCleanUp } from './session-git.shared';
 import { SessionGitLine } from './SessionGitLine';
+import { SessionCostChip } from './SessionCostChip';
+import { sessionCostChipModel } from '../usage/usage.shared';
 
 /**
  * The footer slots other epics fill (CONTRACTS §4.8, R-22), in their order:
@@ -218,7 +220,12 @@ export function SessionCard({
                         {t(`card.${elapsed.key}`, { span: elapsed.span })}
                     </span>
                 )}
-                {slots?.cost && <span data-slot="cost">{slots.cost}</span>}
+                {/* FL-20 (spec FR-10): the session's model work at list price fills the cost slot. */}
+                {(slots?.cost || sessionCostChipModel(session)) && (
+                    <span data-slot="cost">
+                        {slots?.cost ?? <SessionCostChip costCents={session.costCents} tokens={session.tokens} />}
+                    </span>
+                )}
                 {/* FL-06 (spec FR-25, S11): Clean up once the pull request is merged or closed. */}
                 {slots?.cleanUp ? (
                     <span data-slot="cleanUp">{slots.cleanUp}</span>

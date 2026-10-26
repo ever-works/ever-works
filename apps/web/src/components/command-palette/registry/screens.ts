@@ -520,6 +520,37 @@ export function fleetCloudScreens(
     return screens;
 }
 
+/**
+ * Usage & cost on the fleet (FL-20 P2, spec §5.6) — "Fleet usage" (the hub's
+ * Usage tab) and "Usage on <computer>" (the tab filtered to it) for every
+ * computer the viewer may see. Only while `FLEET_USAGE_SCAN_ENABLED` is on.
+ */
+export function fleetUsageScreens(
+    computers: ReadonlyArray<{ id: string; name: string }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    const screens: PaletteScreen[] = [
+        {
+            id: 'fleet.usage',
+            href: ROUTES.DASHBOARD_FLEET_USAGE,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.usage.palette.usage'),
+            breadcrumb: fleet,
+        },
+    ];
+    for (const computer of computers) {
+        screens.push({
+            id: `fleet.usage.${computer.id}`,
+            href: `${ROUTES.DASHBOARD_FLEET_USAGE}?node=${encodeURIComponent(computer.id)}`,
+            icon: Monitor,
+            title: (t: PaletteTranslator) => t('fleet.usage.palette.usageOn', { name: computer.name }),
+            breadcrumb: fleet,
+        });
+    }
+    return screens;
+}
+
 /** What decides which screens exist beyond the fixed list. */
 export interface ScreensForOptions {
     /** Fleet hub (FL-01): add the hub's screens after Teams. */

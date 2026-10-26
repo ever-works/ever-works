@@ -161,6 +161,7 @@ import { FleetCommand } from '../entities/fleet-command.entity';
 import { FleetCommandRun } from '../entities/fleet-command-run.entity';
 import { FleetPortTunnel } from '../entities/fleet-port-tunnel.entity';
 import { FleetCheckout } from '../entities/fleet-checkout.entity';
+import { FleetUsageSample } from '../entities/fleet-usage-sample.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { ModelAccount } from '../entities/model-account.entity';
 import { ModelPolicy } from '../entities/model-policy.entity';
@@ -455,6 +456,9 @@ export const ENTITIES = [
     // Checkouts on computers (FL-14) — clones and worktrees on a Node; one
     // row per (node, path).
     FleetCheckout,
+    // Usage & cost on the fleet (FL-20) — one computer's tokens per model
+    // per hour per session-or-other, from the node's transcript scan.
+    FleetUsageSample,
     // Model accounts (AW-16) — several credentials per AI provider, in
     // order, and the workspace / Agent / schedule model ladder.
     ModelAccount,

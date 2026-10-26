@@ -7,6 +7,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { formatCents, formatTokens } from './runs.shared';
+import { RunReceiptFleetCostLine } from './RunReceiptFleetCostLine';
 
 /**
  * Run receipt (AW-09) — the itemised account of one run, as plain blocks in
@@ -134,6 +135,8 @@ export function RunReceiptView({
                 {!splitReported && (
                     <p className="text-[11px] text-text-muted">{t('tokenSplitNotReported')}</p>
                 )}
+                {/* FL-20 (spec FR-11): model work on a computer, at list price, when the Run has any. */}
+                <RunReceiptFleetCostLine usage={receipt.fleetUsage} />
                 {cost.detailRetained ? (
                     cost.lines.length > 0 && (
                         <ul className="divide-y divide-border/60 dark:divide-border-dark/60 rounded-md border border-border/60 dark:border-border-dark/60">
