@@ -53,8 +53,15 @@ export interface ModelListPricing {
 	model: string;
 }
 
-/** What may follow a listed id and still be the same model: a release date, `-latest`, a pin or a context tag. */
-const RELEASE_SUFFIX = /^(?:-\d{8}|-\d{4}-\d{2}-\d{2}|-latest|@\S*|\[[^\]]*\])(?:@\S*|\[[^\]]*\])?$/;
+/**
+ * What may follow a listed id and still be the same model: a release date, `-latest`, a pin or a context tag.
+ * Each piece's character class excludes the next piece's opening character, so the pattern cannot backtrack
+ * (and the suffix is length-bounded before it is tested).
+ */
+const RELEASE_SUFFIX = /^(?:-\d{8}|-\d{4}-\d{2}-\d{2}|-latest|@[^@[\]\s]*|\[[^[\]]*\])(?:@[^@[\]\s]*|\[[^[\]]*\])?$/;
+
+/** Longest suffix tested (a date plus a pin plus a context tag is well under it). */
+const RELEASE_SUFFIX_MAX_CHARS = 64;
 
 /** The entry an id matches in one version (longest match wins), or null — never a guess. */
 export function findModelListPriceEntry(
@@ -62,13 +69,16 @@ export function findModelListPriceEntry(
 	modelId: string
 ): ModelListPriceEntry | null {
 	const id = modelId.trim().toLowerCase();
-	if (!id) return null;
+	if (!id || id.length > 200) return null;
 	let best: ModelListPriceEntry | null = null;
 	let bestLength = -1;
 	for (const entry of version.entries) {
 		for (const candidate of entry.match) {
 			const key = candidate.toLowerCase();
-			const hit = id === key || (id.startsWith(key) && RELEASE_SUFFIX.test(id.slice(key.length)));
+			const rest = id.slice(key.length);
+			const hit =
+				id === key ||
+				(id.startsWith(key) && rest.length <= RELEASE_SUFFIX_MAX_CHARS && RELEASE_SUFFIX.test(rest));
 			if (hit && key.length > bestLength) {
 				best = entry;
 				bestLength = key.length;
