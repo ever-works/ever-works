@@ -77,6 +77,145 @@ export interface AppStatusView {
     currentDeployment: { id: string; state: string; phase?: string } | null;
     /** Recent runtime operations, newest first (lane aw-deploy-3); absent on an older API. */
     ops?: AppStatusOpView[];
+    /** Lane aw-ops — the published hosts of the live Deployment. */
+    hosts?: { primary: string | null; extra: string[] };
+    /** Lane aw-ops — the worker's last observation of the cluster (FR-46); `null` before one. */
+    snapshot?: AppStatusSnapshotView | null;
+    /** Lane aw-ops — ops queued from the Deploy tab in the last 5 minutes; absent on an older API. */
+    requests?: AppStatusRequestView[];
+    /** Lane aw-ops — the live Deployment's latest smoke checks; absent on an older API. */
+    smoke?: AppSmokeView | null;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Lane aw-ops (2026-10-27) — the live App's operations (plan §9.1, §10.2)
+ * -------------------------------------------------------------------------- */
+
+/** One component of the snapshot (`AppComponentStatus`). */
+export interface AppComponentStatusView {
+    name: string;
+    role: 'web' | 'worker';
+    desired: number;
+    ready: number;
+    restarts: number;
+    lastTerminationReason?: string;
+    oomKilledAt?: string | null;
+}
+
+/** One job's last run (`AppJobResult`), as the snapshot carries it. */
+export interface AppJobRunView {
+    name: string;
+    when: 'pre-deploy' | 'first-deploy' | 'post-deploy';
+    runName: string;
+    status: 'succeeded' | 'failed' | 'timeout' | 'running';
+    startedAt: string;
+    completedAt?: string;
+    exitCode?: number;
+}
+
+/** `GET app-status`'s `snapshot` (`AppStatusSnapshot`, plan §3.1) — names, counts and times. */
+export interface AppStatusSnapshotView {
+    observedAt: string;
+    components: AppComponentStatusView[];
+    jobs: Array<{ name: string; last?: AppJobRunView }>;
+    cron: Array<{
+        name: string;
+        lastScheduleAt?: string;
+        lastSuccessAt?: string;
+        lastResult?: string;
+    }>;
+    isolationEnforced: boolean | null;
+}
+
+/** One smoke check — never a response excerpt. */
+export interface AppSmokeCheckView {
+    name: string;
+    status: 'passed' | 'failed' | 'skipped';
+    httpStatus?: number;
+    latencyMs?: number;
+    failedExpectation?: string;
+    classification?: string;
+}
+
+/** The live Deployment's smoke result. */
+export interface AppSmokeView {
+    deploymentId: string;
+    observedAt: string | null;
+    inCluster: AppSmokeCheckView[];
+    public: AppSmokeCheckView[];
+    hairpin: AppSmokeCheckView | null;
+}
+
+/** The ops the Deploy tab queues. */
+export type AppOpsRequestKind = 'status-refresh' | 'logs' | 'job-run' | 'smoke';
+
+/** One `requests[]` entry of `GET app-status`. */
+export interface AppStatusRequestView {
+    requestId: string;
+    op: string;
+    state: 'queued' | 'running' | 'done' | 'failed';
+    at: string;
+    code?: string;
+    jobName?: string;
+}
+
+/** The `202` a queued op answers. */
+export interface AppOpsAcceptedView {
+    status: 'accepted';
+    op: AppOpsRequestKind;
+    requestId: string;
+    dispatched: boolean;
+}
+
+/** `POST app-logs`'s body. */
+export interface AppLogsRequestInput {
+    component?: string;
+    job?: string;
+    deploymentId?: string;
+    previous?: boolean;
+    lines?: number;
+}
+
+/** A redacted log tail (`AppLogTail`, FR-48). */
+export interface AppLogTailView {
+    containers: Array<{ pod: string; container: string; lines: string[]; truncated: boolean }>;
+    redactedNames: string[];
+    fetchedAt: string;
+}
+
+/** `GET app-logs/:requestId`. */
+export interface AppLogsReadView {
+    requestId: string;
+    status: 'pending' | 'ready' | 'failed';
+    tail?: AppLogTailView;
+    code?: string;
+}
+
+/** One row of `GET app-deployments`. */
+export interface AppDeploymentHistoryView {
+    id: string;
+    state: string;
+    trigger: string | null;
+    buildId: string | null;
+    commitSha: string | null;
+    imageDigest: string | null;
+    createdAt: string | null;
+    completedAt: string | null;
+    current: boolean;
+    code: string | null;
+    smoke: { passed: number; failed: number; observedAt: string | null } | null;
+}
+
+/** What every browser call to the App runtime BFF answers. */
+export interface AppOpsResult<T> {
+    ok: boolean;
+    /** The HTTP status; `0` for a transport fault. */
+    status: number;
+    data?: T;
+    code?: string;
+    message?: string;
+    /** A `429`'s wait, in whole seconds. */
+    retryAfterSeconds?: number;
 }
 
 /** One `GET app-status` `ops` entry — ids, states and timestamps only. */
