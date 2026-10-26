@@ -38,3 +38,6 @@ export * from './fleet-tools.types.js';
 export * from './fleet-task-handoff.types.js';
 export * from './fleet-virtual.types.js';
 export * from './fleet-cloud.types.js';
+export * from './fleet-desktop.types.js';
+export * from './fleet-desktop-tiles.codec.js';
+export * from './fleet-helper.types.js';

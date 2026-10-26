@@ -137,7 +137,21 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	// Cloud computers (FL-17, CONTRACTS §7).
 	'node.cloud.create',
 	'node.cloud.power',
-	'node.cloud.destroy'
+	'node.cloud.destroy',
+	// Desktop view & control (FL-07, CONTRACTS §7).
+	'node.desktop.view',
+	'node.desktop.display.set',
+	'node.desktop.display.add',
+	'node.desktop.display.remove',
+	'node.desktop.control.take',
+	'node.desktop.control.release',
+	'node.desktop.control.request',
+	'node.desktop.recording.start',
+	'node.desktop.recording.stop',
+	'node.desktop.recording.delete',
+	'node.helper.admit',
+	'node.helper.revoke',
+	'node.helper.verify-failed'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */

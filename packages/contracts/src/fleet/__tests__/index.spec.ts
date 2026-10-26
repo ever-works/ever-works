@@ -1397,6 +1397,86 @@ const CLOUD_EXPORTS = [
 	'fleetCloudDestroySummary'
 ] as const;
 
+// Desktop view & control (FL-07): three NEW modules, each a group here and a row in the witness table.
+const DESKTOP_EXPORTS = [
+	'FLEET_SCREEN_SOURCES',
+	'isFleetScreenSource',
+	'FLEET_SCREEN_DESKTOP_CAPABILITY',
+	'FLEET_HELPER_SCREEN_CAPABILITY',
+	'FLEET_SCREEN_BROWSER_CAPABILITY',
+	'FLEET_HELPER_TRUST_LEVELS',
+	'isFleetHelperTrust',
+	'normalizeFleetHelperTrust',
+	'FLEET_HELPER_TRUST_MAX_LENGTH',
+	'FLEET_DESKTOP_REASONS',
+	'isFleetDesktopReason',
+	'FLEET_DESKTOP_WATCH_REASONS',
+	'FLEET_DESKTOP_MAX_REASONS',
+	'normalizeFleetDesktopReasons',
+	'FLEET_DESKTOP_REASON_FIXES',
+	'fleetDesktopReasonHint',
+	'FLEET_DESKTOP_BLOCKERS',
+	'isFleetDesktopBlocker',
+	'FLEET_DESKTOP_BLOCKER_CODES',
+	'resolveFleetDesktopBlocker',
+	'FLEET_DISPLAY_ID_MAX_LENGTH',
+	'FLEET_DISPLAY_NAME_MAX_LENGTH',
+	'FLEET_DESKTOP_MAX_DISPLAYS',
+	'FLEET_DISPLAY_MIN_SCALE',
+	'FLEET_DISPLAY_MAX_SCALE',
+	'isFleetDisplayId',
+	'normalizeFleetDisplay',
+	'normalizeFleetDisplays',
+	'pickFleetDisplay',
+	'FLEET_HELPER_FINGERPRINT_PREFIX_LENGTH',
+	'FLEET_HELPER_VERSION_MAX_LENGTH',
+	'normalizeFleetHelperStatus',
+	'isFleetDesktopQuality',
+	'isFleetDesktopViewId',
+	'FLEET_DESKTOP_VIEWS_PER_NODE',
+	'FLEET_DESKTOP_VIEWS_PER_ORGANIZATION',
+	'FLEET_DESKTOP_VIEW_CEILING_MS',
+	'FLEET_DESKTOP_OPEN_RATE_LIMIT',
+	'FLEET_DESKTOP_TILE_SIZE',
+	'FLEET_DESKTOP_MAX_PUBLISH_BYTES',
+	'FLEET_DESKTOP_DISPLAY_CHANGE_MS',
+	'FLEET_DESKTOP_RELEASE_ALL_MS',
+	'FLEET_DESKTOP_MESSAGES',
+	'readFleetDesktopSourceParams',
+	'fleetDesktopWatermark',
+	'FLEET_DESKTOP_MAX_DIMENSION'
+] as const;
+
+const DESKTOP_TILES_EXPORTS = [
+	'FLEET_DESKTOP_TILES_HEADER_BYTES',
+	'FLEET_DESKTOP_TILE_HEADER_BYTES',
+	'FLEET_DESKTOP_MAX_TILES',
+	'encodeDesktopTiles',
+	'decodeDesktopTiles'
+] as const;
+
+const HELPER_EXPORTS = [
+	'FLEET_HELPER_TARGETS',
+	'isFleetHelperTarget',
+	'fleetHelperTarget',
+	'fleetHelperFileName',
+	'isFleetSha256Hex',
+	'fleetHelperFingerprintPrefix',
+	'formatFleetHelperFingerprint',
+	'FLEET_HELPER_ADMIT_WORD',
+	'parseFleetHelperManifest',
+	'fleetHelperManifestPublishes',
+	'FLEET_HELPER_ADMISSION_LEVELS',
+	'parseFleetHelperPolicyRecord',
+	'FLEET_HELPER_EVENT_KINDS',
+	'isFleetHelperEventKind',
+	'FLEET_HELPER_MAX_EVENTS',
+	'normalizeFleetHelperEvent',
+	'normalizeFleetHelperEvents',
+	'fleetHelperEventAuditAction',
+	'FLEET_HELPER_SEEN_EVENT_IDS'
+] as const;
+
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
@@ -1438,7 +1518,10 @@ const ALL_EXPORTS = [
 	...TOOLS_EXPORTS,
 	...TASK_HANDOFF_EXPORTS,
 	...VIRTUAL_EXPORTS,
-	...CLOUD_EXPORTS
+	...CLOUD_EXPORTS,
+	...DESKTOP_EXPORTS,
+	...DESKTOP_TILES_EXPORTS,
+	...HELPER_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -1915,7 +1998,39 @@ const FUNCTION_EXPORTS = [
 	'fleetCloudPriceSentence',
 	'fleetCloudCreateSummary',
 	'fleetCloudPowerOffSummary',
-	'fleetCloudDestroySummary'
+	'fleetCloudDestroySummary',
+	'isFleetScreenSource',
+	'isFleetHelperTrust',
+	'normalizeFleetHelperTrust',
+	'isFleetDesktopReason',
+	'normalizeFleetDesktopReasons',
+	'fleetDesktopReasonHint',
+	'isFleetDesktopBlocker',
+	'resolveFleetDesktopBlocker',
+	'isFleetDisplayId',
+	'normalizeFleetDisplay',
+	'normalizeFleetDisplays',
+	'pickFleetDisplay',
+	'normalizeFleetHelperStatus',
+	'isFleetDesktopQuality',
+	'isFleetDesktopViewId',
+	'readFleetDesktopSourceParams',
+	'fleetDesktopWatermark',
+	'encodeDesktopTiles',
+	'decodeDesktopTiles',
+	'isFleetHelperTarget',
+	'fleetHelperTarget',
+	'fleetHelperFileName',
+	'isFleetSha256Hex',
+	'fleetHelperFingerprintPrefix',
+	'formatFleetHelperFingerprint',
+	'parseFleetHelperManifest',
+	'fleetHelperManifestPublishes',
+	'parseFleetHelperPolicyRecord',
+	'isFleetHelperEventKind',
+	'normalizeFleetHelperEvent',
+	'normalizeFleetHelperEvents',
+	'fleetHelperEventAuditAction'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -1930,7 +2045,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1175 runtime symbols', () => {
+	it('exposes exactly these 1245 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2023,7 +2138,10 @@ describe('fleet barrel', () => {
 		// session-status, session-rules, commands, schedules, tools, task-handoff,
 		// virtual, cloud), each a group above and a row in the witness table below,
 		// plus three in existing modules (`SPRINT_EXISTING_MODULE_EXPORTS`).
-		expect(Object.keys(fleet)).toHaveLength(1175);
+		// → 1245 with desktop view & control (FL-07): 70 symbols in three NEW modules
+		// (`fleet-desktop.types.ts`, `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a
+		// group above and a row in the witness table below.
+		expect(Object.keys(fleet)).toHaveLength(1245);
 	});
 
 	it.each([
@@ -2066,7 +2184,10 @@ describe('fleet barrel', () => {
 		['fleet-tools.types.js', 'FLEET_TOOL_FAMILIES'],
 		['fleet-task-handoff.types.js', 'FLEET_HANDOFF_REASONS'],
 		['fleet-virtual.types.js', 'FLEET_NODE_ORIGINS'],
-		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER']
+		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER'],
+		['fleet-desktop.types.js', 'FLEET_DESKTOP_REASONS'],
+		['fleet-desktop-tiles.codec.js', 'encodeDesktopTiles'],
+		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up
