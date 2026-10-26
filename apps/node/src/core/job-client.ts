@@ -14,8 +14,7 @@ import type {
 	FleetRunEnvFileContent,
 	FleetRunEnvFileRequestRef,
 	FleetVirtualEnrollTokenResponse,
-	FleetVirtualPhase,
-	FleetVirtualState,
+	FleetVirtualProgressReport,
 	FleetActionsRunnerPhase,
 	FleetActionsRunnerState,
 	FleetActionsRunnerTokenKind,
@@ -25,6 +24,12 @@ import { FleetClientError, joinUrl, normalizeApiUrl, type FetchLike, type FetchR
 import type { Logger } from './logger';
 import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH } from './types';
 import { extractRunEnvSecretValues } from './workspaces/run-env-files';
+
+/** The fields of a virtual-computer progress report the host fills in (the credential and job ride beside them). */
+export type FleetVirtualProgressFields = Omit<
+	FleetVirtualProgressReport,
+	'nodeId' | 'secret' | 'jobId' | 'leaseGeneration'
+>;
 
 /**
  * HTTP client for the three node-facing fleet-job endpoints:
@@ -455,13 +460,7 @@ export class FleetJobClient {
 	async reportVirtualProgress(
 		childNodeId: string,
 		jobId: string,
-		report: {
-			phase?: FleetVirtualPhase;
-			state?: FleetVirtualState;
-			error?: string | null;
-			image?: { ref: string; digest: string | null } | null;
-			activated?: boolean | null;
-		},
+		report: FleetVirtualProgressFields,
 		leaseGeneration?: number
 	): Promise<void> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret, jobId, ...report };

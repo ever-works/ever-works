@@ -136,7 +136,9 @@ export interface AgentFleetToolSource {
      * Cloud computers (FL-17) — backs `fleet_cloud_*`. Optional: unbound (or
      * `FLEET_CLOUD_ENABLED` off), those tools are simply not offered.
      */
-    cloud?: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'>;
+    cloud?: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'> &
+        // P2: `fleet_cloud_idle_policy` is offered when the binding carries it.
+        Partial<Pick<FleetCloudService, 'previewIdlePolicy'>>;
     /**
      * Actions runners on computers (FL-18) — backs `fleet_runners_*`. Optional:
      * unbound (or `FLEET_ACTIONS_RUNNERS_ENABLED` off), those tools are simply not offered.

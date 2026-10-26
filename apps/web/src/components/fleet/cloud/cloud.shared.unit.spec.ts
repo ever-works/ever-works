@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import type { FleetCloudOptionsView, FleetNodeCloudView } from '@ever-works/contracts';
 import {
     changedPriceOf,
+    cloudActFromQuery,
     cloudDisplayState,
+    cloudIdleState,
+    cloudUsageRows,
+    idleHoursValid,
+    idlePolicyChanged,
+    idlePolicyDraftOf,
+    idlePolicyFromDraft,
     cloudPowerChoice,
     cloudRemoveAvailability,
     createLabelPrice,
@@ -125,5 +132,79 @@ describe('cloud.shared (FL-17)', () => {
         expect(formatSince('2026-10-21T08:00:00.000Z', NOW)).toBe('4 h');
         expect(formatSince('2026-10-18T05:00:00.000Z', NOW)).toBe('3 d 7 h');
         expect(formatSince(null, NOW)).toBeNull();
+    });
+});
+
+/** Cloud computers (FL-17 P2, T-26) — the idle policy editor, the idle line and the usage table. */
+describe('cloud computers P2 (idle policy and usage)', () => {
+    it('starts the editor from the stored policy, or the default tell me after 3 h', () => {
+        expect(idlePolicyDraftOf(null)).toEqual({ mode: 'tell-me', hours: '3' });
+        expect(idlePolicyDraftOf({ mode: 'power-off', afterHours: 12 })).toEqual({ mode: 'power-off', hours: '12' });
+        expect(idlePolicyDraftOf({ mode: 'power-off', afterHours: 500 })).toEqual({ mode: 'power-off', hours: '72' });
+    });
+
+    it('clamps the hours to whole numbers from 1 to 72 on save', () => {
+        expect(idlePolicyFromDraft({ mode: 'tell-me', hours: '0' })).toEqual({ mode: 'tell-me', afterHours: 1 });
+        expect(idlePolicyFromDraft({ mode: 'tell-me', hours: '99' })).toEqual({ mode: 'tell-me', afterHours: 72 });
+        expect(idlePolicyFromDraft({ mode: 'power-off', hours: '2.6' })).toEqual({ mode: 'power-off', afterHours: 3 });
+        expect(idlePolicyFromDraft({ mode: 'nothing', hours: '' })).toEqual({ mode: 'nothing', afterHours: 3 });
+        expect(idleHoursValid('1')).toBe(true);
+        expect(idleHoursValid('72')).toBe(true);
+        expect(idleHoursValid('0')).toBe(false);
+        expect(idleHoursValid('73')).toBe(false);
+        expect(idleHoursValid('2.5')).toBe(false);
+        expect(idleHoursValid('')).toBe(false);
+    });
+
+    it('knows whether Save changes anything', () => {
+        const stored = { mode: 'tell-me' as const, afterHours: 3 };
+        expect(idlePolicyChanged(stored, { mode: 'tell-me', hours: '3' })).toBe(false);
+        expect(idlePolicyChanged(stored, { mode: 'tell-me', hours: '4' })).toBe(true);
+        expect(idlePolicyChanged(stored, { mode: 'nothing', hours: '3' })).toBe(true);
+        expect(idlePolicyChanged({ mode: 'nothing', afterHours: 3 }, { mode: 'nothing', hours: '9' })).toBe(false);
+    });
+
+    it('reads idle and powered-off-by-policy from the block', () => {
+        expect(cloudIdleState(cloud({ idleWindowReached: true, idleSince: '2026-10-21T08:00:00.000Z' }))).toBe('idle');
+        expect(cloudIdleState(cloud({ idleWindowReached: false, idleSince: '2026-10-21T08:00:00.000Z' }))).toBeNull();
+        expect(
+            cloudIdleState(cloud({ powerState: 'off', poweredOffByPolicyAt: '2026-10-21T11:00:00.000Z' })),
+        ).toBe('poweredOffByPolicy');
+        expect(
+            cloudIdleState(cloud({ powerState: 'off', pending: 'starting', poweredOffByPolicyAt: '2026-10-21T11:00:00.000Z' })),
+        ).toBeNull();
+    });
+
+    it('orders the usage table: live by this month, then destroyed this month, newest first', () => {
+        const row = (name: string, monthToDateCents: number, destroyedAt: string | null = null) => ({
+            nodeId: name,
+            name,
+            providerName: 'Provider',
+            regionId: 'nyc3',
+            sizeLabel: '2 CPU',
+            hourlyCents: destroyedAt ? 0 : 3.6,
+            monthToDateCents,
+            sinceCreatedCents: monthToDateCents,
+            state: destroyedAt ? ('gone' as const) : ('running' as const),
+            destroyedAt,
+        });
+        const rows = cloudUsageRows({
+            machines: [
+                row('a', 100),
+                row('old', 50, '2026-10-02T00:00:00.000Z'),
+                row('b', 900),
+                row('new', 10, '2026-10-12T00:00:00.000Z'),
+            ],
+        });
+        expect(rows.map((entry) => entry.name)).toEqual(['b', 'a', 'new', 'old']);
+        expect(cloudUsageRows(null)).toEqual([]);
+    });
+
+    it('opens an act from a needs-a-look link', () => {
+        expect(cloudActFromQuery('power-off')).toBe('off');
+        expect(cloudActFromQuery('power-on')).toBe('on');
+        expect(cloudActFromQuery('destroy')).toBe('destroy');
+        expect(cloudActFromQuery('remove')).toBeNull();
+        expect(cloudActFromQuery(null)).toBeNull();
     });
 });

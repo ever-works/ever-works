@@ -11,6 +11,7 @@ import {
 	EXIT_FAILURE,
 	EXIT_NOT_ENROLLED,
 	EXIT_OK,
+	EXIT_USAGE,
 	parseIntervalSeconds,
 	runCli,
 	startLanesAfterAcceptedHeartbeat,
@@ -204,7 +205,8 @@ describe('ever-works-node enroll', () => {
 
 	it('fails when a required flag is missing, and writes nothing', async () => {
 		const missingToken = harness({ fetchFn: enrollOk });
-		expect(await runCli(['enroll', '--api-url', 'https://api.ever.works'], missingToken.deps)).toBe(EXIT_FAILURE);
+		// Neither --token nor --token-file: a command line that cannot run as written (FL-16 P1, `EXIT_USAGE`).
+		expect(await runCli(['enroll', '--api-url', 'https://api.ever.works'], missingToken.deps)).toBe(EXIT_USAGE);
 		expect(missingToken.files.size).toBe(0);
 
 		const missingUrl = harness({ fetchFn: enrollOk });

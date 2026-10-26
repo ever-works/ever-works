@@ -1,4 +1,7 @@
 import {
+    FLEET_CLOUD_IDLE_MAX_HOURS,
+    FLEET_CLOUD_IDLE_MIN_HOURS,
+    isFleetCloudIdlePolicyMode,
     isFleetCloudName,
     isFleetCloudPowerAction,
     normalizeFleetCloudSoftware,
@@ -13,7 +16,10 @@ import type { FleetCloudService } from './fleet-cloud.service';
  * Cloud computers (FL-17, plan §9, spec FR-33, FR-34, S9) — the Agent tools,
  * named after the API segment (CONTRACTS §11.3): `fleet_cloud_list`,
  * `fleet_cloud_options`, `fleet_cloud_usage` (read-only), `fleet_cloud_create`,
- * `fleet_cloud_power`, `fleet_cloud_destroy` (destructive).
+ * `fleet_cloud_power`, `fleet_cloud_destroy` (destructive) and, from P2,
+ * `fleet_cloud_idle_policy` (class `plain`, not destructive — but it decides
+ * when the platform powers a billed machine off, so an Agent's change is held
+ * for the owner's approval like the other acts; lane decision 13).
  *
  * Every call runs the SAME chain a person's click runs (`FleetCloudService`)
  * with the Agent as the caller (`agent:<id>`): the kill switch, the request
@@ -45,16 +51,17 @@ export const FLEET_CLOUD_TOOL_ANNOTATIONS: Readonly<
     fleet_cloud_create: { destructive: true, confirmationClass: 'confirm' },
     fleet_cloud_power: { destructive: true, confirmationClass: 'confirm' },
     fleet_cloud_destroy: { destructive: true, confirmationClass: 'confirm-destructive' },
+    fleet_cloud_idle_policy: { destructive: false, confirmationClass: 'plain' },
 };
 
 /** What a held act stores so a person's approval can run exactly it (no model-authored free text). */
 export interface FleetCloudActionProposalPayload {
     kind: typeof FLEET_CLOUD_ACTION_PROPOSAL_KIND;
-    verb: 'create' | 'power' | 'destroy';
+    verb: 'create' | 'power' | 'destroy' | 'idle-policy';
     agentId: string;
     /** power / destroy: the cloud computer. */
     nodeId?: string;
-    /** create: providerPluginId, name, regionId, sizeId, software, acknowledgedPriceCents. power: action. destroy: name. */
+    /** create: providerPluginId, name, regionId, sizeId, software, acknowledgedPriceCents. power: action. destroy: name. idle-policy: mode, afterHours. */
     args: Record<string, unknown>;
 }
 
@@ -76,7 +83,8 @@ export function buildFleetCloudTools(args: {
     userId: string;
     agentId: string;
     runId: string | null;
-    service: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'>;
+    service: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'> &
+        Partial<Pick<FleetCloudService, 'previewIdlePolicy'>>;
     /** The approval seam for held acts; null = held acts are refused (fail closed). */
     proposals: AgentProposalToolSource | null;
 }): TaskToolDescriptor[] {
@@ -292,6 +300,53 @@ export function buildFleetCloudTools(args: {
             }
         },
     } as TaskToolDescriptor);
+
+    const preview = args.service.previewIdlePolicy?.bind(args.service);
+    if (preview) {
+        out.push({
+            name: 'fleet_cloud_idle_policy',
+            description: `Set when one of the owner’s cloud computers counts as forgotten: mode nothing, tell-me (the default, after 3 h) or power-off, after ${FLEET_CLOUD_IDLE_MIN_HOURS}–${FLEET_CLOUD_IDLE_MAX_HOURS} hours of idleness (no session working, no job running, CPU under 5 %). Held for the owner’s approval. Ever Works never destroys a cloud computer on its own.`,
+            parameters: {
+                type: 'object',
+                properties: {
+                    nodeId: { type: 'string', description: 'The cloud computer (Fleet node id).' },
+                    mode: { type: 'string', description: 'nothing, tell-me or power-off.' },
+                    afterHours: {
+                        type: 'number',
+                        description: `Whole hours of idleness before the policy acts (${FLEET_CLOUD_IDLE_MIN_HOURS}–${FLEET_CLOUD_IDLE_MAX_HOURS}).`,
+                    },
+                },
+                required: ['nodeId', 'mode', 'afterHours'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as Record<string, unknown>;
+                if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+                if (!isFleetCloudIdlePolicyMode(a.mode)) return invalid('mode', 'mode must be nothing, tell-me or power-off');
+                const hours = a.afterHours;
+                if (
+                    typeof hours !== 'number' ||
+                    !Number.isInteger(hours) ||
+                    hours < FLEET_CLOUD_IDLE_MIN_HOURS ||
+                    hours > FLEET_CLOUD_IDLE_MAX_HOURS
+                ) {
+                    return invalid(
+                        'afterHours',
+                        `afterHours must be a whole number from ${FLEET_CLOUD_IDLE_MIN_HOURS} to ${FLEET_CLOUD_IDLE_MAX_HOURS}`,
+                    );
+                }
+                try {
+                    // Every gate (existence, the `machines` audience, the values) without a write.
+                    const checked = await preview(caller, a.nodeId, { mode: a.mode, afterHours: hours });
+                    return hold(
+                        { verb: 'idle-policy', nodeId: checked.nodeId, args: { mode: a.mode, afterHours: hours } },
+                        checked.summary,
+                    );
+                } catch (error) {
+                    return toolError(error);
+                }
+            },
+        } as TaskToolDescriptor);
+    }
 
     return out;
 }

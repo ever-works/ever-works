@@ -326,9 +326,10 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
                 createRemoteProxy(apiClient, 'FleetVirtualReconcileService'),
             inject: [TriggerInternalApiClient],
         },
-        // Cloud computers (FL-17) — the fleet-cloud-reconcile and
-        // fleet-cloud-bootstrap-watch crons call the two sweeps over the internal
-        // RPC channel; the repositories and the provider facade live API-side.
+        // Cloud computers (FL-17) — the fleet-cloud-reconcile,
+        // fleet-cloud-bootstrap-watch and (P2) fleet-cloud-usage / fleet-cloud-idle
+        // crons call the four sweeps over the internal RPC channel; the
+        // repositories and the provider facade live API-side.
         {
             provide: FleetCloudSweepService,
             useFactory: (apiClient: TriggerInternalApiClient) =>

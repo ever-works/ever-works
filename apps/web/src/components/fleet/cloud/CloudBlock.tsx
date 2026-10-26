@@ -1,13 +1,20 @@
 'use client';
 
+import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Cloud } from 'lucide-react';
+import { toast } from 'sonner';
 import type { FleetNodeCloudView } from '@ever-works/contracts';
+import { useRouter } from '@/i18n/navigation';
+import { Button } from '@/components/ui/button';
+import { keepFleetCloudRunningAction } from '@/app/actions/fleet/cloud';
 import type { FleetOverviewBlockProps } from '../registry';
+import { IdlePolicyEditor } from './IdlePolicyEditor';
 import {
     CLOUD_PHASE_KEYS,
     CLOUD_PROGRESS,
     cloudDisplayState,
+    cloudIdleState,
     formatMemory,
     formatSince,
     hourly,
@@ -57,12 +64,32 @@ function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloud
  * (asking the provider → booting → installing → enrolling → online). Renders
  * nothing on a computer that is not a cloud computer. The power and destroy
  * acts are the header actions (`CloudComputerActions`).
+ *
+ * P2 (spec S6, S7, §5.3, §5.6): "idle for N h" with **Keep running** once the
+ * idle window reached the policy's hours, "powered off by the idle policy"
+ * after it acted, and the policy line's **Change** opening the idle policy
+ * editor in place.
  */
 export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
     const t = useTranslations('fleet.cloud');
+    const router = useRouter();
+    const [editing, setEditing] = useState(false);
+    const [keeping, startKeeping] = useTransition();
     const node = nodes.length === 1 ? nodes[0] : null;
     const cloud = node?.cloud ?? null;
     if (!node || !cloud) return null;
+    // P2: the owner changes the policy here (spec §5.3 "[Change]"); the server
+    // decides the `machines` audience again for anyone else.
+    const canEdit = !node.viewerRole || node.viewerRole === 'owner';
+    const idle = cloudIdleState(cloud);
+    const keepRunning = () =>
+        startKeeping(async () => {
+            const result = await keepFleetCloudRunningAction(node.id);
+            if (result.ok) {
+                toast.success(t('block.keptRunning', { name: node.name }));
+                router.refresh();
+            } else toast.error(result.error.hint || t('idlePolicy.failed'));
+        });
     const state = cloudDisplayState(node, cloud);
     const currency = cloud.currency;
     const live = state !== 'gone' && state !== 'failed';
@@ -131,10 +158,52 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
             <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
                 {t('block.disclaimer', { provider: cloud.providerName })}
             </p>
-            {live ? (
-                <p className="mt-1 text-xs" data-testid="fleet-cloud-block-idle">
-                    {t('block.idlePolicy', { policy })}
+            {live && idle === 'idle' ? (
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-cloud-block-idle-for">
+                    <span>{t('block.idleFor', { duration: formatSince(cloud.idleSince) ?? '' })}</span>
+                    {canEdit ? (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={keepRunning}
+                            loading={keeping}
+                            data-testid="fleet-cloud-keep-running"
+                        >
+                            {t('block.keepRunning')}
+                        </Button>
+                    ) : null}
                 </p>
+            ) : null}
+            {live && idle === 'poweredOffByPolicy' ? (
+                <p className="mt-1 text-xs" data-testid="fleet-cloud-block-powered-off-by-policy">
+                    {t('block.poweredOffByPolicy', {
+                        duration: formatSince(cloud.poweredOffByPolicyAt) ?? '',
+                        hours: cloud.idlePolicy.afterHours,
+                    })}
+                </p>
+            ) : null}
+            {live ? (
+                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-cloud-block-idle">
+                    <span>{t('block.idlePolicy', { policy })}</span>
+                    {canEdit && !editing ? (
+                        <button
+                            type="button"
+                            className="underline underline-offset-2 hover:text-text dark:hover:text-text-dark focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded"
+                            onClick={() => setEditing(true)}
+                            data-testid="fleet-cloud-idle-change"
+                        >
+                            {t('block.changeIdlePolicy')}
+                        </button>
+                    ) : null}
+                </p>
+            ) : null}
+            {live && editing ? (
+                <IdlePolicyEditor
+                    nodeId={node.id}
+                    name={node.name}
+                    policy={cloud.idlePolicy}
+                    onDone={() => setEditing(false)}
+                />
             ) : null}
             {cloud.ipv4 ? (
                 <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">

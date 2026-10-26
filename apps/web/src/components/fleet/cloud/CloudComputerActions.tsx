@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { FleetLinkError } from '@ever-works/contracts';
@@ -11,7 +12,7 @@ import { destroyFleetCloudAction, fleetCloudPowerAction } from '@/app/actions/fl
 import { ConfirmActionDialog } from '../machine/ConfirmActionDialog';
 import type { ConfirmDialogModel } from '../machine/machine-actions.shared';
 import type { FleetComputerActionProps } from '../registry';
-import { cloudDisplayState, cloudPowerChoice, hourly, money } from './cloud.shared';
+import { cloudActFromQuery, cloudDisplayState, cloudPowerChoice, hourly, money } from './cloud.shared';
 
 /**
  * Cloud computers (FL-17, spec §5.3 – §5.5, FR-16 – FR-20, S10) — a cloud
@@ -28,7 +29,24 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
     const router = useRouter();
     const [dialog, setDialog] = useState<{ act: 'off' | 'on' | 'destroy'; model: ConfirmDialogModel } | null>(null);
     const [pending, startTransition] = useTransition();
+    const params = useSearchParams();
+    const opened = useRef(false);
+    const openPowerRef = useRef<((act: 'off' | 'on') => void) | null>(null);
+    const openDestroyRef = useRef<(() => void) | null>(null);
     const cloud = node.cloud;
+    // P2: a "needs a look" item links here with `?cloud=power-off|power-on|destroy`
+    // (spec §5.7): open that act's confirmation once, when it is offered now.
+    const requested = cloudActFromQuery(params?.get('cloud'));
+    useEffect(() => {
+        if (opened.current || !requested || !cloud || !allowed) return;
+        opened.current = true;
+        const state = cloudDisplayState(node, cloud);
+        if (requested === 'destroy') {
+            if (state !== 'destroying' && state !== 'creating') openDestroyRef.current?.();
+            return;
+        }
+        if (cloudPowerChoice(state) === requested) openPowerRef.current?.(requested);
+    }, [requested, cloud, allowed, node]);
     if (!cloud) return null;
     const state = cloudDisplayState(node, cloud);
     const power = cloudPowerChoice(state);
@@ -94,6 +112,9 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
             },
         });
     };
+
+    openPowerRef.current = openPower;
+    openDestroyRef.current = openDestroy;
 
     return (
         <div className="flex items-center gap-2" data-testid="fleet-cloud-actions">

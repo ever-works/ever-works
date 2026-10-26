@@ -718,9 +718,9 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		alwaysHeld: true
 	}),
 
-	// ── cloud (FL-17) ── P1 shipped: providers, create, power, destroy, usage. A create, a power
-	// change and a destroy are held for the owner's approval by the Agent tools
-	// (`agent-fleet-cloud-tools.ts`); the idle policy arrives with P2.
+	// ── cloud (FL-17) ── P1 shipped providers, create, power, destroy, usage; P2 the idle policy
+	// (`PUT` answers the same as `PATCH`). A create, a power change and a destroy are held for the
+	// owner's approval by the Agent tools (`agent-fleet-cloud-tools.ts`).
 	read('fleet_cloud_list', 'view', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/cloud'),
@@ -759,7 +759,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		waitable: true,
 		alwaysHeld: true
 	}),
-	act('fleet_cloud_idle_policy', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'planned', plain('machine.admin'), {
+	act('fleet_cloud_idle_policy', 'machines', 'FL-17', 'FLEET_CLOUD_ENABLED', 'live', plain('machine.admin'), {
 		phase: 'P3',
 		route: PATCH('/api/fleet/cloud/{id}/idle-policy'),
 		cli: 'fleet cloud idle-policy'

@@ -34,6 +34,9 @@ export * from './fleet-virtual-reconcile.task';
 // Cloud computers (FL-17) — mark machines gone at their provider; settle creates and power acts in flight.
 export * from './fleet-cloud-reconcile.task';
 export * from './fleet-cloud-bootstrap-watch.task';
+// Cloud computers (FL-17 P2) — cost snapshots every 10 minutes; the idle policy (never destroys).
+export * from './fleet-cloud-usage.task';
+export * from './fleet-cloud-idle.task';
 // Actions runners on computers (FL-18) — refresh runner states from GitHub and the nodes.
 export * from './fleet-runners-poll.task';
 export * from './user-research-rerun-dispatcher.task';
