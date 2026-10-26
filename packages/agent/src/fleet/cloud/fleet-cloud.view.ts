@@ -85,6 +85,7 @@ export function normalizeCloudMeta(value: unknown): FleetCloudMeta | null {
         unenrolledNoticeAt: iso(raw.unenrolledNoticeAt),
         idleNotifiedKey: typeof raw.idleNotifiedKey === 'string' ? raw.idleNotifiedKey.slice(0, 200) : null,
         poweredOffByPolicyAt: iso(raw.poweredOffByPolicyAt),
+        unclaimedAt: iso(raw.unclaimedAt),
     };
 }
 
@@ -166,6 +167,7 @@ export function fleetCloudViewOf(
         goneAt: meta.goneAt ?? null,
         idleWindowReached: idleWindowReached(meta, nowMs),
         poweredOffByPolicyAt: meta.poweredOffByPolicyAt ?? null,
+        unclaimedAt: meta.unclaimedAt ?? null,
         hasMachine,
         removable: fleetCloudRemovable({ hasMachine, meta: { powerState: meta.powerState, phase } }),
     };

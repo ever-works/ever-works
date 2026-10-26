@@ -15484,7 +15484,11 @@
                 "cancel": "Cancel",
                 "create": "Create",
                 "createWithPrice": "Create · {price}/mo",
-                "created": "Creating {name} at {provider}…"
+                "created": "Creating {name} at {provider}…",
+                "signIn": "Sign in with {provider}",
+                "signInFailed": "Sign-in could not start; save a token in the plugin settings instead.",
+                "vpnKey": "Overlay-VPN auth key (optional)",
+                "vpnKeyHint": "Used once by the first-boot script to join your network. Ever Works never stores or shows it again."
             },
             "progress": {
                 "label": "Create progress",
@@ -15523,7 +15527,8 @@
                 "keepRunning": "Keep running",
                 "keptRunning": "{name} keeps running; the idle policy waits its hours again.",
                 "poweredOffByPolicy": "Powered off by the idle policy {duration} ago, after {hours} h idle.",
-                "changeIdlePolicy": "Change"
+                "changeIdlePolicy": "Change",
+                "unclaimed": "Unclaimed — found at {provider} with this Ever Works’ tags {duration} ago; no computer here created it. Destroy it to stop the bill."
             },
             "power": {
                 "off": "Power off",
