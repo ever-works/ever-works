@@ -58,9 +58,12 @@ describe('linkStateOf', () => {
     });
 });
 
+/** What `consentsOf` reads off a node row. */
+type ConsentsNode = Pick<FleetNodeView, 'capabilities' | 'workerState'> & { consents?: unknown };
+
 describe('consents', () => {
     it('takes reported consents at their word', () => {
-        const node = {
+        const node: ConsentsNode = {
             capabilities: ['attended', 'managed'],
             workerState: 'idle',
             consents: consents({ work: true }),
@@ -70,7 +73,7 @@ describe('consents', () => {
     });
 
     it('infers an older daemon’s consents from its tags and never grants manage', () => {
-        const node = { capabilities: ['attended', 'managed'], workerState: 'idle' };
+        const node: ConsentsNode = { capabilities: ['attended', 'managed'], workerState: 'idle' };
         expect(consentsOf(node)).toEqual(consents({ work: true, attend: true }));
         expect(consentsReported(node)).toBe(false);
     });

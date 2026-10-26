@@ -76,6 +76,7 @@ import {
     FleetNodeHealthService,
     FleetSessionSweepService,
     FleetVirtualReconcileService,
+    FleetCloudSweepService,
     FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
@@ -742,6 +743,11 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetVirtualReconcileService?: FleetVirtualReconcileService,
+        // Cloud computers (FL-17) — backs the `fleet-cloud-reconcile` and
+        // `fleet-cloud-bootstrap-watch` crons: the worker proxy calls the
+        // facade's two sweeps only. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetCloudSweepService?: FleetCloudSweepService,
         // Actions runners on computers (FL-18) — backs the `fleet-runners-poll` cron:
         // the worker proxy calls `reconcile()`, the facade's only member.
         // Appended LAST + @Optional() per the arity rule above.
@@ -898,6 +904,17 @@ export class TriggerInternalController implements OnModuleInit {
             // loud "Unknown remote target") when virtual computers are not mounted.
             FleetVirtualReconcileService: this.fleetVirtualReconcileService
                 ? { reconcile: () => this.fleetVirtualReconcileService!.reconcile() }
+                : undefined,
+            // Cloud computers (FL-17) — `fleet-cloud-reconcile` / `fleet-cloud-bootstrap-watch`
+            // call `reconcile()` / `watchBootstrap()` here, and only those:
+            // `FleetCloudSweepService` is a two-member facade over `FleetCloudService`
+            // (whose create / power / destroy must never reach the worker). `undefined`
+            // (a loud "Unknown remote target") when cloud computers are not mounted.
+            FleetCloudSweepService: this.fleetCloudSweepService
+                ? {
+                      reconcile: () => this.fleetCloudSweepService!.reconcile(),
+                      watchBootstrap: () => this.fleetCloudSweepService!.watchBootstrap(),
+                  }
                 : undefined,
             // Actions runners on computers (FL-18) — `fleet-runners-poll` calls
             // `reconcile()` here, and only that: `FleetActionsRunnersPollService` is a

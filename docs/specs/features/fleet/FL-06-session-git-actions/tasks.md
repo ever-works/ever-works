@@ -35,7 +35,7 @@
       constants, `renderActionPrompt`); export from `packages/contracts/src/fleet/index.ts`.
       **Test**: `packages/contracts/src/fleet/__tests__/fleet-session-actions.spec.ts` — placeholder
       matrix, unknown placeholders left verbatim, every default names the placeholders it needs.
-- [ ] **T-02** _(parallel)_. Add the optional `fleet { branchPrefix?, actions? }` block to the
+- [x] **T-02** _(parallel)_. Add the optional `fleet { branchPrefix?, actions? }` block to the
       `agent.yml` schema in `packages/agent/src/agents/types.ts` and its parse/serialise path in
       `packages/agent/src/agents/agent-file.service.ts` (unknown keys still rejected; block optional).
       **Test**: extend `packages/agent/src/agents/__tests__/agent-file.service.spec.ts` — parses, round-trips,
@@ -103,11 +103,11 @@
 
 ## P2.A — Actions service and delivery
 
-- [ ] **T-12**. Create pure `packages/agent/src/fleet/session-action-rules.ts` (`availableActions(ctx)`
+- [x] **T-12**. Create pure `packages/agent/src/fleet/session-action-rules.ts` (`availableActions(ctx)`
       per spec FR-15, incl. merge-policy `protectedBranches` from `packages/agent/src/policy/merge-policy.service.ts`).
       **Test**: `packages/agent/src/fleet/__tests__/session-action-rules.spec.ts` — full truth table;
       shell provider → none; outside checkout → recap only.
-- [ ] **T-13**. Create `packages/agent/src/fleet/fleet-session-action.service.ts` (`list`, `send`:
+- [x] **T-13**. Create `packages/agent/src/fleet/fleet-session-action.service.ts` (`list`, `send`:
       render with the Agent's `agent.yml` override or default → `session.input { source:'action', actionId }` via FL-04's link service → for an Agent session a ledger row in `agent_run_logs`
       (`step: 'fleet.action'`, `level: 'INFO'`) → for both kinds an audit `node.session.input` with
       `details.action` and a redacted 200-char `promptPreview`; owner-session ledger read from those
@@ -116,29 +116,29 @@
       refusal code, ledger + audit per Agent-session send, audit-only ledger for an owner session
       with "session total only" cost, override precedence, delivered/undelivered, resend only when
       undelivered, kill switch.
-- [ ] **T-14**. Extend FL-04's daemon input path to accept `source` and `actionId` on
+- [x] **T-14**. Extend FL-04's daemon input path to accept `source` and `actionId` on
       `session.input` (`apps/node/src/core/sessions/daemon/daemon-protocol.ts`), logging the
       action id, writing prompt + newline to the PTY.
       **Test**: extend `apps/node/src/core/sessions/daemon/__tests__/daemon-protocol.spec.ts` —
       field optional, bytes identical to typed input.
-- [ ] **T-15**. Add `GET/POST /api/fleet/sessions/:id/actions`, `GET …/actions/ledger`,
+- [x] **T-15**. Add `GET/POST /api/fleet/sessions/:id/actions`, `GET …/actions/ledger`,
       `POST …/actions/:ledgerId/resend` to `fleet-session-actions.controller.ts`; DTOs.
       **Test**: extend the controller spec — `invalid` with the hidden rule named, `busy`,
       `limit_exceeded`, `permission_denied` (audience `sessions`), `consent_missing` per kind.
-- [ ] **T-16**. Create `packages/tasks/src/tasks/trigger/fleet-action-undelivered-sweep.task.ts`
+- [x] **T-16**. Create `packages/tasks/src/tasks/trigger/fleet-action-undelivered-sweep.task.ts`
       (every 2 min; Agent-session ledger rows without echo after 5 s → `undelivered`).
       **Test**: `packages/tasks/src/__tests__/fleet-action-undelivered-sweep.task.spec.ts`.
 
 ## P2.B — Pull requests, credential in session
 
-- [ ] **T-17**. Create `packages/agent/src/fleet/fleet-pull-request.service.ts`: Task-bound session →
+- [x] **T-17**. Create `packages/agent/src/fleet/fleet-pull-request.service.ts`: Task-bound session →
       `TaskWorkspaceService.finalizeRemotePush` (`packages/agent/src/tasks-domain/task-workspace.service.ts:1842`);
       free session → new `openForBranch` beside it; update when a PR exists; refuse on default branch
       or unpushed head; `redactSecrets` on title/body; Agent `canOpenPullRequests` and the Node's
       `checkouts` audience checked; never calls merge.
       **Test**: `packages/agent/src/fleet/__tests__/fleet-pull-request.service.spec.ts` — both paths,
       update vs open, each refusal, Task → `in_review` + `prUrl`, body redacted, no merge call (spy).
-- [ ] **T-18**. Add `POST/GET /api/fleet/checkouts/:id/pull-request` accepting a person session or
+- [x] **T-18**. Add `POST/GET /api/fleet/checkouts/:id/pull-request` accepting a person session or
       the run-scoped `ew_run_…` bearer (`apps/api/src/auth/guards/auth-session.guard.ts` path) scoped
       to the token's own session checkout; whitelist the route for the node MCP bridge in
       `apps/mcp/src/openapi-tools/whitelist.ts` as `fleet_checkouts_open_pull_request`.
@@ -151,7 +151,7 @@
       **Test**: `apps/node/src/core/sessions/session-credential-helper.spec.ts` — answers only for
       the covered host/repo and only while leased; owner sessions get no helper; nothing written to
       any git config file.
-- [ ] **T-20**. Web: `SessionActionsMenu.tsx`, `SessionActionSheet.tsx`, `SessionActionsLedger.tsx`,
+- [x] **T-20**. Web: `SessionActionsMenu.tsx`, `SessionActionSheet.tsx`, `SessionActionsLedger.tsx`,
       `OpenPullRequestDialog.tsx`, `session-git.shared.ts` under `apps/web/src/components/fleet/sessions/`;
       wire **Actions ▾** beside **End** on the session detail; keyboard `A`/`D`/`G`/`1`–`7`; BFF
       routes under `apps/web/src/app/api/fleet/sessions/[id]/actions/**` and `.../checkouts/[id]/pull-request/route.ts`.
@@ -161,14 +161,14 @@
       patches `tokens`/`costCents` onto `fleet.action` ledger rows between consecutive marks; the
       ledger shows "unknown" until then.
       **Test**: extend FL-20's attribution spec — two marks split a session's tokens; no marks → untouched.
-- [ ] **T-22**. i18n `fleet.sessionGit.{actions,sheet,pullRequestDialog,ledger}`; extend
+- [x] **T-22**. i18n `fleet.sessionGit.{actions,sheet,pullRequestDialog,ledger}`; extend
       `apps/web/e2e/flow-fleet-session-git.spec.ts` (menu relevance, send → echo → ledger, PR dialog)
       and write `apps/web/e2e/flow-fleet-session-actions-contract.spec.ts`.
       **Test**: green in CI.
 
 ## P3 — Clean up, tools, editor
 
-- [ ] **T-23**. Clean up over FL-14's delete (no new route): add the `cleanUp=1` gate (worktree,
+- [x] **T-23**. Clean up over FL-14's delete (no new route): add the `cleanUp=1` gate (worktree,
       PR merged/closed, no live session → else `invalid` with the rule named) to FL-14's
       `DELETE /api/fleet/checkouts/:id` in `apps/api/src/fleet/fleet-checkouts.controller.ts`, and
       `CleanUpButton.tsx` on FL-05's card and FL-14's `CheckoutRow.tsx` (FL-14's delete preview →
@@ -176,14 +176,14 @@
       **Test**: extend `apps/api/src/fleet/fleet-checkouts.controller.spec.ts` (gating codes; no
       gate without `cleanUp=1`), `CleanUpButton.unit.spec.tsx` (visibility matrix), FL-14 handler
       spec — branch kept.
-- [ ] **T-24**. Tools `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` in
+- [x] **T-24**. Tools `fleet_sessions_actions_list|action`, `fleet_checkouts_changes` in
       `packages/agent/src/fleet/agent-fleet-tools.ts` with §11.3 annotations (Agent Clean up is
       FL-14's `fleet_checkouts_delete` with `cleanUp`); MCP whitelist entries;
       CLI `apps/cli/src/commands/fleet/sessions.ts` (`action`, `changes`, `pull-request`) and a
       `--clean-up` flag on FL-14's `apps/cli/src/commands/fleet/checkouts.ts` `delete`.
       **Test**: `agent-fleet-tools.spec.ts` extended (annotations, audience refusals), CLI command spec
       `apps/cli/src/commands/fleet/__tests__/sessions.spec.ts` (`--json`, exit codes).
-- [ ] **T-25**. `apps/web/src/components/agents/AgentInstructionsEditor.tsx` — **Fleet actions**
+- [x] **T-25**. `apps/web/src/components/agents/AgentInstructionsEditor.tsx` — **Fleet actions**
       section over the `agent.yml` pill: seven template fields with the default beside each, branch
       prefix; writes through the existing agent-file save path.
       **Test**: `AgentInstructionsEditor.unit.spec.tsx` extended — override round-trip, default shown,
@@ -191,12 +191,12 @@
 
 ## P4 — Docs and rollout
 
-- [ ] **T-26**. Write `docs/features/fleet-session-git.md` (git line, worktree default and naming,
+- [x] **T-26**. Write `docs/features/fleet-session-git.md` (git line, worktree default and naming,
       actions and templates, pull requests via the GitHub App, clean up, cost); add to
       `apps/docs/sidebarsPlatform.ts` beside `'features/fleet'` (`:183`); cross-link from
       `docs/features/sessions-and-steering.md` and `docs/features/task-isolation.md`.
       **Test**: docs build has no broken-link warning.
-- [ ] **T-27**. Update `docs/specs/features/fleet/TRACKER.md`; add the §11.2 paths and the
+- [x] **T-27**. Update `docs/specs/features/fleet/TRACKER.md`; add the §11.2 paths and the
       owner-session ledger resolution raised in spec §8b to CONTRACTS in the same PR (the §3.3 and
       §10 entries already landed in CONTRACTS rev 2); run the banned-terms grep over the folder.
       **Test**: grep prints nothing.

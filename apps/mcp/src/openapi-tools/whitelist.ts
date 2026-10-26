@@ -639,6 +639,35 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Session git & actions (5) — FL-06, `apps/api/src/fleet/session-git/`, the same names as the
+	// Agent tools (CONTRACTS §11.3). An action is typed into the session as owner input (the agent
+	// there still asks before acting); the pull request is opened or updated by the platform
+	// through the GitHub App and never merged. Clean up is `fleet_checkouts_delete` with `cleanUp`.
+	{
+		method: 'GET',
+		path: '/api/fleet/sessions/{id}/actions',
+		toolName: 'fleet_sessions_actions_list',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/fleet/sessions/{id}/actions', toolName: 'fleet_sessions_action' },
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}/changes',
+		toolName: 'fleet_checkouts_changes',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/checkouts/{id}/pull-request',
+		toolName: 'fleet_checkouts_pull_request_get',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/checkouts/{id}/pull-request',
+		toolName: 'fleet_checkouts_open_pull_request'
+	},
+
 	// Tasks on computers (3) — FL-15 (CONTRACTS §11.3). The hand-off options for a Task (read-only;
 	// the start itself is `fleet_sessions_start` with `taskId`), and a computer's global git
 	// identity: read, and "Use my Ever Works identity" (class `confirm`: the first call answers
@@ -671,10 +700,10 @@ export const WHITELIST: WhitelistEntry[] = [
 		omitArgs: ['follow']
 	},
 
-	// Files on computers (3) — `apps/api/src/fleet/files/fleet-files.controller.ts`
-	// (FL-11 P1, CONTRACTS §11.3). All read-only: a computer's allowed roots, one
-	// folder's entries (flagged hidden / credential-shaped / link inside the root),
-	// one entry. No MCP tool downloads a file; copy and delete arrive with P2.
+	// Files on computers (5) — `apps/api/src/fleet/files/fleet-files.controller.ts`
+	// (FL-11, CONTRACTS §11.3). Reads (P1): a computer's allowed roots, one folder's
+	// entries (flagged hidden / credential-shaped / link inside the root), one entry.
+	// Acts (P2): copy between computers and delete. No MCP tool downloads a file.
 	// Dark (404) unless the deployment sets FLEET_MACHINE_FACTS_ENABLED.
 	{
 		method: 'GET',
@@ -693,6 +722,20 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/files/stat',
 		toolName: 'fleet_files_stat',
 		annotations: { readOnlyHint: true }
+	},
+	// P2 acts (a person's own client): a copy through Ever Works (skips same-name entries unless
+	// `replace` / `replaceAll`), and a delete that needs `confirmName` (CONTRACTS §2.2).
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/files/copy',
+		toolName: 'fleet_files_copy',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/files/delete',
+		toolName: 'fleet_files_delete',
+		annotations: { destructiveHint: true }
 	},
 
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
@@ -909,6 +952,59 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Cloud computers (FL-17 P1) — machines created at a cloud provider through a machine-provider
+	// plugin, billed to the owner's own provider account. Each route 404s unless FLEET_CLOUD_ENABLED.
+	// Create needs the acknowledged monthly price and `confirm: true` (the 409 carries the price
+	// sentence); destroy needs `confirmName`.
+	{
+		method: 'GET',
+		path: '/api/fleet/cloud',
+		toolName: 'fleet_cloud_list',
+		description:
+			'List the cloud computers (machines created at a cloud provider) with provider, region, size, power state, hourly rate and cost so far, the usage totals (list-price estimates) and the connected providers. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/providers/{plugin}/options',
+		toolName: 'fleet_cloud_options',
+		description:
+			'Regions, sizes with current monthly and hourly list prices, software presets and the connected account for one machine provider ({plugin} from fleet_cloud_list). Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/fleet/cloud/usage',
+		toolName: 'fleet_cloud_usage',
+		description:
+			'What the cloud computers cost: per hour now, this month so far and projected — estimates from list prices, never counted against model-spend budgets. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud',
+		toolName: 'fleet_cloud_create',
+		description:
+			'Create a cloud computer at a provider on the owner’s account (it bills until destroyed). Needs `acknowledgedPriceCents` = the size’s monthly price from fleet_cloud_options (a stale price is refused with the current one) and `confirm: true`; without it the answer is 409 with the price sentence.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud/{id}/power',
+		toolName: 'fleet_cloud_power',
+		description:
+			'Power a cloud computer on or off (`action: on | off`, `confirm: true`; the 409 says whether the provider still bills it while off). Power on is refused while the Fleet is stopped.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/cloud/{id}/destroy',
+		toolName: 'fleet_cloud_destroy',
+		description:
+			'Destroy a cloud computer: the machine and its disk at the provider, then its Fleet registration (job history is kept). Irreversible; needs `confirmName` = its name (the 409 states the cost so far). Refused while a Run or a session is live on it.',
+		annotations: { destructiveHint: true }
+	},
+
 	// Actions runners on computers (FL-18, plan §9, CONTRACTS §11.3) —
 	// `apps/api/src/fleet/runners/fleet-actions-runners.controller.ts`. Same names as the
 	// in-platform Agent tools. Acts satisfy their confirmation class with the request fields
@@ -1030,7 +1126,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/git/identity',
 		toolName: 'fleet_nodes_git_identity_get',
 		description:
-			"The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.",
+			'The git identity (name and email) a fleet computer commits as, read on the machine, and where it comes from. Read-only.',
 		annotations: { readOnlyHint: true }
 	},
 	{

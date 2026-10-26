@@ -18,7 +18,6 @@ import { createFleetVirtualAction, fleetVirtualOptionsAction } from '@/app/actio
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
     DialogFooter,
@@ -140,7 +139,7 @@ export function NewVirtualComputerDialog({
     const containers = systems.filter((entry) => entry.kind === 'container');
     const vms = systems.filter((entry) => entry.kind === 'vm');
     const reason = (option: (typeof hosts)[number]) =>
-        option.reason ? t(`reasons.${VIRTUAL_REASON_KEYS[option.reason]}`, { name: option.name, limit: 4 }) : null;
+        option.reason ? t(`reasons.${VIRTUAL_REASON_KEYS[option.reason]}` as Parameters<typeof t>[0], { name: option.name, limit: 4 }) : null;
 
     return (
         <Dialog open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
@@ -269,11 +268,9 @@ export function NewVirtualComputerDialog({
                 </div>
 
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button type="button" variant="ghost">
-                            {t('create.cancel')}
-                        </Button>
-                    </DialogClose>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        {t('create.cancel')}
+                    </Button>
                     <Button type="button" onClick={create} disabled={!canCreate} data-testid="fleet-virtual-create">
                         {isVm ? t('create.createVm') : t('create.createContainer')}
                     </Button>

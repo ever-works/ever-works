@@ -34,6 +34,8 @@ import {
 } from '@/app/actions/fleet-checkouts';
 import { CopyCommand } from '../link/CopyCommand';
 import { DeleteCheckoutDialog, readDeletePreview, type CheckoutDeletePreview } from './DeleteCheckoutDialog';
+import { CleanUpButton } from '../sessions/CleanUpButton';
+import { canCleanUp } from '../sessions/session-git.shared';
 import { GitLine } from './GitLine';
 import { NewCheckoutDialog } from './NewCheckoutDialog';
 import {
@@ -737,6 +739,15 @@ function CheckoutRow({
                 <span className="text-xs text-text-muted dark:text-text-muted-dark">
                     {t('row.reaperNote', { note: row.reaperNote })}
                 </span>
+            ) : null}
+            {/* FL-06 (spec FR-25, §5.7): Clean up a worktree whose pull request is merged or closed. */}
+            {canCleanUp({
+                kind: row.kind,
+                state: row.state,
+                pr: row.gitLine?.pr,
+                sessionLive: row.busy === 'session',
+            }) ? (
+                <CleanUpButton checkoutId={row.id} branch={row.branch} nodeName={node?.name ?? ''} />
             ) : null}
             <span className="ml-auto flex items-center gap-1">
                 {confirming ? (

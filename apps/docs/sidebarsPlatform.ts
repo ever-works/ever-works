@@ -195,6 +195,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-sessions',
 				// What each session needs from you, answering it anywhere, the Sessions board (FL-05).
 				'features/fleet-session-status',
+				// The branch, the diff, the pull request and one-click actions of a session (FL-06).
+				'features/fleet-session-git',
 				// Git clones and worktrees on those computers (FL-14).
 				'features/fleet-checkouts',
 				// Tasks on computers (FL-15) — the hand-off, the Computer block, GitHub things for me, git identity.
@@ -209,6 +211,7 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-ports',
 				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
 				'features/fleet-virtual-computers',
+				'features/fleet-cloud-computers',
 				// What an Agent, the MCP server and the CLI may do on those computers, and the gates (FL-19).
 				'features/fleet-agent-tools',
 				'features/integrations',

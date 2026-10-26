@@ -290,6 +290,16 @@ export type FleetAuditAction =
 	/** The one-time reveal of a Windows VM's generated password — `revealed: true`, never the value (P2). */
 	| 'node.vm.password.reveal'
 	/**
+	 * Cloud computers (FL-17, CONTRACTS §7) — every row carries
+	 * `family: 'machines'`, the Node as `target`, `requestedBy` (incl.
+	 * `system:idle-policy`), `confirmationClass` and `outcome`, plus the
+	 * provider plugin id, region, size and hourly rate — and, for destroy, the
+	 * final cost. Never the provider token, the enrolment token or a VPN key.
+	 */
+	| 'node.cloud.create'
+	| 'node.cloud.power'
+	| 'node.cloud.destroy'
+	/**
 	 * Actions runners on computers (FL-18, CONTRACTS §7) — one row per runner
 	 * installed (and per start / stop / restart / remove), `family: 'machines'`,
 	 * the runner as `target`, `requestedBy`, `confirmationClass`, `outcome`, plus
@@ -405,6 +415,9 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.vm.resize',
 	'node.vm.rebuild',
 	'node.vm.password.reveal',
+	'node.cloud.create',
+	'node.cloud.power',
+	'node.cloud.destroy',
 	'node.runner.install',
 	'node.runner.start',
 	'node.runner.stop',

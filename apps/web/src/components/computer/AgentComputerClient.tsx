@@ -14,6 +14,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { ComputerBriefOverlay, type ComputerWorkingBrief } from './ComputerBriefOverlay';
 import { ComputerControls } from './ComputerControls';
+import { DesktopPastePanel } from '../fleet/desktop/DesktopPastePanel';
 import {
     ComputerHeldElsewherePrompt,
     ComputerIdleWarningPrompt,
@@ -785,6 +786,17 @@ export function AgentComputerClient({
                                 : undefined
                         }
                     />
+                    {attach.state === 'live' && attach.sessionId ? (
+                        // Files & clipboard (FL-11 P2): paste text into this view's computer
+                        // (opt-in per view, only while controlling; hidden where not offered).
+                        <DesktopPastePanel
+                            nodeId={current.id}
+                            nodeName={current.name}
+                            agentId={agentId}
+                            viewId={attach.sessionId}
+                            controlling={controlling}
+                        />
+                    ) : null}
                 </div>
             </div>
         );

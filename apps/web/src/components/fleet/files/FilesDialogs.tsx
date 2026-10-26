@@ -232,12 +232,15 @@ export function FilesCredentialDialog({
     open,
     names,
     count,
+    copy = false,
     onCancel,
     onConfirm,
 }: {
     open: boolean;
     names: readonly string[];
     count: number;
+    /** P2: the file goes to another computer, not to the browser. */
+    copy?: boolean;
     onCancel(): void;
     onConfirm(): void;
 }) {
@@ -248,11 +251,13 @@ export function FilesCredentialDialog({
             <DialogContent data-testid="fleet-files-credential">
                 <DialogHeader>
                     <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
-                        {count <= 1
-                            ? t('title', { name: first })
-                            : t('titleMany', { count, name: first })}
+                        {copy
+                            ? t('titleCopy', { name: first })
+                            : count <= 1
+                              ? t('title', { name: first })
+                              : t('titleMany', { count, name: first })}
                     </DialogTitle>
-                    <DialogDescription>{t('body')}</DialogDescription>
+                    {!copy && <DialogDescription>{t('body')}</DialogDescription>}
                 </DialogHeader>
                 <DialogFooter>
                     <Button variant="ghost" onClick={onCancel}>

@@ -21,10 +21,14 @@ const FleetMachineFactsFlagContext = createContext<boolean>(false);
 /** Virtual computers (FL-16): `FLEET_VIRTUAL_ENABLED` (with the hub), for "New virtual computer" in the palette. */
 const FleetVirtualFlagContext = createContext<boolean>(false);
 
+/** Cloud computers (FL-17): `FLEET_CLOUD_ENABLED` (with the hub), for "New cloud computer" in the palette. */
+const FleetCloudFlagContext = createContext<boolean>(false);
+
 export function FleetHubFlagProvider({
     enabled,
     machineFacts = false,
     virtual = false,
+    cloud = false,
     children,
 }: {
     enabled: boolean;
@@ -32,12 +36,16 @@ export function FleetHubFlagProvider({
     machineFacts?: boolean;
     /** FL-16: virtual computers are on for this deployment (never without the hub). */
     virtual?: boolean;
+    /** FL-17: cloud computers are on for this deployment (never without the hub). */
+    cloud?: boolean;
     children: ReactNode;
 }) {
     return (
         <FleetHubFlagContext.Provider value={enabled}>
             <FleetMachineFactsFlagContext.Provider value={enabled && machineFacts}>
-                <FleetVirtualFlagContext.Provider value={enabled && virtual}>{children}</FleetVirtualFlagContext.Provider>
+                <FleetVirtualFlagContext.Provider value={enabled && virtual}>
+                    <FleetCloudFlagContext.Provider value={enabled && cloud}>{children}</FleetCloudFlagContext.Provider>
+                </FleetVirtualFlagContext.Provider>
             </FleetMachineFactsFlagContext.Provider>
         </FleetHubFlagContext.Provider>
     );
@@ -56,4 +64,9 @@ export function useFleetMachineFactsEnabled(): boolean {
 /** True when the hub and `FLEET_VIRTUAL_ENABLED` are both on (FL-16). */
 export function useFleetVirtualEnabled(): boolean {
     return useContext(FleetVirtualFlagContext);
+}
+
+/** True when the hub and `FLEET_CLOUD_ENABLED` are both on (FL-17). */
+export function useFleetCloudEnabled(): boolean {
+    return useContext(FleetCloudFlagContext);
 }

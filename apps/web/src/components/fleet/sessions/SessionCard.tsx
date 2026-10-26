@@ -3,7 +3,7 @@
 import { useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Bot, Folder, TerminalSquare } from 'lucide-react';
-import type { FleetSessionView } from '@ever-works/contracts';
+import { isFleetSessionLive, type FleetSessionView } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
@@ -21,7 +21,9 @@ import {
 import { SessionStateGlyph } from './SessionStateGlyph';
 import { SessionAttentionBox } from './SessionAttentionBox';
 import { SessionTaskChip } from '../tasks/SessionTaskChip';
+import { CleanUpButton } from './CleanUpButton';
 import { PrPill } from './PrPill';
+import { canCleanUp } from './session-git.shared';
 import { SessionGitLine } from './SessionGitLine';
 
 /**
@@ -217,7 +219,20 @@ export function SessionCard({
                     </span>
                 )}
                 {slots?.cost && <span data-slot="cost">{slots.cost}</span>}
-                {slots?.cleanUp && <span data-slot="cleanUp">{slots.cleanUp}</span>}
+                {/* FL-06 (spec FR-25, S11): Clean up once the pull request is merged or closed. */}
+                {slots?.cleanUp ? (
+                    <span data-slot="cleanUp">{slots.cleanUp}</span>
+                ) : session.git &&
+                  canCleanUp({
+                      kind: session.git.kind,
+                      state: session.git.state,
+                      pr: session.git.gitLine?.pr,
+                      sessionLive: isFleetSessionLive(session.state),
+                  }) ? (
+                    <span data-slot="cleanUp">
+                        <CleanUpButton checkoutId={session.git.checkoutId} branch={session.git.branch} nodeName={nodeName} />
+                    </span>
+                ) : null}
                 {source === 'fromScreen' && body.kind !== 'attention' && <span>{t('card.fromScreen')}</span>}
                 {session.agentRunId && (
                     <Link

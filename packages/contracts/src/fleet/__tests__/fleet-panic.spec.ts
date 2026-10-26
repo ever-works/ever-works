@@ -74,6 +74,16 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.session.end',
 	'node.session.recording.start',
 	'node.session.recording.stop',
+	// Session git & actions (FL-06, CONTRACTS §7).
+	'node.session.action',
+	'node.session.pull-request.open',
+	// Schedules on computers (FL-13, CONTRACTS §7).
+	'node.schedule.create',
+	'node.schedule.update',
+	'node.schedule.delete',
+	'node.schedule.run',
+	'node.schedule.pause',
+	'node.schedule.resume',
 	// Logs on computers (FL-08, CONTRACTS §7).
 	'node.logs.read',
 	'node.logs.follow',
@@ -124,6 +134,10 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.vm.resize',
 	'node.vm.rebuild',
 	'node.vm.password.reveal',
+	// Cloud computers (FL-17, CONTRACTS §7).
+	'node.cloud.create',
+	'node.cloud.power',
+	'node.cloud.destroy',
 	// Actions runners on computers (FL-18, CONTRACTS §7).
 	'node.runner.install',
 	'node.runner.start',

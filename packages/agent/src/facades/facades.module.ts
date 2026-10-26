@@ -28,6 +28,7 @@ import { TerminalStreamFacadeService } from './terminal-stream.facade';
 import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
+import { MachineProviderFacadeService } from './machine-provider.facade';
 import { PlaybookCatalogFacadeService } from './playbook-catalog.facade';
 import { ConnectionScopesFacadeService } from './connection-scopes.facade';
 import { AppRuntimeFacadeService } from './app-runtime.facade';
@@ -96,6 +97,12 @@ const FACADES = [
     // global PluginRegistryService; constructing it does nothing, and only the
     // statistics module (absent unless `EVER_STATS_ENABLED=true`) ever calls it.
     StatsSinkFacadeService,
+    // Cloud computers (FL-17, CONTRACTS R-15) — the machine-provider facade:
+    // options with list prices, create / power / destroy, reads for the
+    // reconcile. Depends only on the global PluginRegistryService and
+    // PluginSettingsService, so it resolves in this module; consumed by
+    // `FleetCloudService` (packages/agent/src/fleet/cloud).
+    MachineProviderFacadeService,
     // Actions runners on computers (FL-18, CONTRACTS R-14) — the `actions-runners`
     // facade: holds the GitHub App credential, resolves the person's installation
     // for a target and mints a token narrowed to one permission per call. Depends

@@ -160,7 +160,34 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_virtual_power: 'starts and stops a virtual computer',
 	fleet_virtual_destroy: 'destructive: destroys a virtual computer',
 	// FL-05 P2: typing an answer into a person's session prompt.
-	fleet_sessions_answer: "answers a prompt in a person's session"
+	fleet_sessions_answer: "answers a prompt in a person's session",
+	// The 10-21 build sprint's tools that landed without a run-token decision (deny-by-omission
+	// already refused them; named here so the refusal is a decision). FL-06 session actions.
+	fleet_sessions_actions_list: "a person's session action ledger",
+	fleet_sessions_action: "types an action prompt into a person's session",
+	fleet_checkouts_changes: "the uncommitted diff of a person's checkout",
+	// Inbound triggers: a trigger starts runs later (configuration a later run inherits).
+	inbound_triggers_github_for_me: 'creates an inbound trigger that starts runs',
+	// FL-11 P2 files: writes on a computer.
+	fleet_files_copy: "writes files on a person's computer",
+	fleet_files_delete: "destructive: deletes files on a person's computer",
+	// FL-13 schedules: a schedule runs commands on a computer on its own clock.
+	fleet_schedules_list: "a person's schedules on their computers",
+	fleet_schedules_get: "a person's schedules on their computers",
+	fleet_schedules_runs: "a person's schedule history and its output",
+	fleet_schedules_create: 'schedules commands on a computer',
+	fleet_schedules_update: 'changes what a schedule runs',
+	fleet_schedules_delete: "destructive: deletes a person's schedule",
+	fleet_schedules_run: 'runs a schedule now',
+	fleet_schedules_pause: "changes a person's schedule",
+	fleet_schedules_resume: 'resumes scheduled commands',
+	// FL-17 cloud computers: spend.
+	fleet_cloud_list: "a person's cloud computers",
+	fleet_cloud_options: "a person's provider choices",
+	fleet_cloud_usage: "a person's cloud spend",
+	fleet_cloud_create: 'creates a cloud computer (spend)',
+	fleet_cloud_power: 'starts and stops a cloud computer',
+	fleet_cloud_destroy: 'destructive: destroys a cloud computer'
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */
@@ -228,8 +255,13 @@ describe('fleet-run token surface vs. the MCP whitelist', () => {
 	});
 
 	it('grants fleet READS, so a run can see the fleet it is part of', () => {
+		// Every fleet read that is not deliberately refused above (a person's sessions,
+		// checkouts, logs, schedules … on their own computers are refused by name).
 		const fleetReads = WHITELIST.filter(
-			(entry) => entry.path.startsWith('/api/fleet') && entry.method.toUpperCase() === 'GET'
+			(entry) =>
+				entry.path.startsWith('/api/fleet') &&
+				entry.method.toUpperCase() === 'GET' &&
+				!(entry.toolName !== undefined && entry.toolName in REFUSED_FOR_RUN_TOKENS)
 		);
 		expect(fleetReads.length).toBeGreaterThan(0);
 		for (const entry of fleetReads) {

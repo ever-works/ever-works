@@ -31,6 +31,9 @@ export * from './fleet-checkout-reconcile.task';
 export * from './fleet-checkout-bin-purge.task';
 // Virtual computers (FL-16) — mark children whose machine is gone and guests that never enrolled.
 export * from './fleet-virtual-reconcile.task';
+// Cloud computers (FL-17) — mark machines gone at their provider; settle creates and power acts in flight.
+export * from './fleet-cloud-reconcile.task';
+export * from './fleet-cloud-bootstrap-watch.task';
 // Actions runners on computers (FL-18) — refresh runner states from GitHub and the nodes.
 export * from './fleet-runners-poll.task';
 export * from './user-research-rerun-dispatcher.task';

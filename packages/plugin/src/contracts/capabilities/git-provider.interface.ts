@@ -990,6 +990,19 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		token: string
 	): Promise<{ id: number; body: string }>;
 	closePullRequest?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequest>;
+	/**
+	 * Change an open pull request's title and/or body (FL-06 spec FR-16: "Update
+	 * the pull request #n" rewrites it instead of opening a second one). Never
+	 * its state, base or head — and never a merge. OPTIONAL: a provider without
+	 * it is refused as unsupported.
+	 */
+	updatePullRequest?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		changes: { readonly title?: string; readonly body?: string },
+		token: string
+	): Promise<GitPullRequest>;
 
 	// Utility
 	repositoryExists?(owner: string, repo: string, token: string): Promise<boolean>;

@@ -84,6 +84,8 @@ export function ComputerActionsMenu({
     flags?: FleetFeatureFlags;
 }) {
     const t = useTranslations('fleet.computer.menu');
+    // Cloud computers (FL-17, CONTRACTS R-36): the reason Remove is disabled.
+    const tCloud = useTranslations('fleet.cloud');
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [renaming, setRenaming] = useState(false);
@@ -421,7 +423,10 @@ export function ComputerActionsMenu({
                             <Trash2 className={iconClass} aria-hidden="true" />,
                             t('remove'),
                             openRemove,
-                            lifecycleDenied,
+                            // FL-17 (R-36): a cloud computer is destroyed, not removed, while its
+                            // machine may still bill — the server refuses it too.
+                            lifecycleDenied ??
+                                (node.cloud && !node.cloud.removable ? tCloud('removeUnavailable.line') : null),
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>

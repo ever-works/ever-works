@@ -132,6 +132,7 @@ export function buildFleetVirtualTools(args: {
             properties: {
                 hostNodeId: { type: 'string', description: 'Optional: the host computer (Fleet node id).' },
             },
+            required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { hostNodeId?: unknown };
@@ -158,6 +159,7 @@ export function buildFleetVirtualTools(args: {
                     description: 'ubuntu-26.04, ubuntu-24.04, debian-13, fedora, alpine or arch (default ubuntu-26.04).',
                 },
             },
+            required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { systemId?: unknown };

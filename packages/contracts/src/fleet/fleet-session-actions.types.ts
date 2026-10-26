@@ -843,3 +843,28 @@ export interface FleetPullRequestDraft {
 	pushed: boolean;
 	existing: FleetGitLinePullRequest | null;
 }
+
+// ─── The Agent's own templates (spec FR-13, FR-27, S12; P3) ─────────────────
+
+/** `GET /api/fleet/agents/:agentId/action-templates` — the editor's Fleet actions section. */
+export interface FleetAgentActionTemplates {
+	agentId: string;
+	agentName: string;
+	/** The Agent's prefix override (null: the default — its slug). */
+	branchPrefix: { value: string | null; default: string };
+	/** Each action: the Agent's own text (null: the platform default) beside the default. */
+	actions: Record<FleetSessionActionId, { value: string | null; default: string }>;
+	/** Why the `fleet` block could not be read (it is then shown as all defaults), or null. */
+	error: string | null;
+	/** The whole `agent.yml` after a write (the editor's buffer), and its etag. */
+	agentYml: string;
+	hash: string;
+}
+
+/** `PUT /api/fleet/agents/:agentId/action-templates` — an empty text clears the override. */
+export interface FleetAgentActionTemplatesUpdate {
+	branchPrefix?: string | null;
+	actions?: Partial<Record<FleetSessionActionId, string | null>>;
+	/** The editor's last-known etag: a concurrent edit is refused, never overwritten. */
+	expectedHash?: string;
+}

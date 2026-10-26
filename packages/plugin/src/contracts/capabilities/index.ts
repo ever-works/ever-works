@@ -135,6 +135,14 @@ export * from './stats-sink.interface.js';
 // context and guard. Additive: a plugin that never declares it compiles and
 // behaves exactly as before.
 export * from './domain-event-subscriber.interface.js';
+// Cloud computers (FL-17, CONTRACTS R-15) — the `machine-provider` capability:
+// `IMachineProviderPlugin` (options with list prices, create with the
+// platform's bootstrap and tags, power, destroy, getMachine, listTagged and the
+// optional provider-side usage), its shapes, `MachineProviderError` and the
+// guard. Additive: the capability constant and the `machine-provider` category
+// are appended last in the same change; a plugin that never declares it
+// compiles and behaves exactly as before.
+export * from './machine-provider.interface.js';
 // Actions runners on computers (FL-18, CONTRACTS R-14) — the `actions-runners` capability:
 // GitHub's self-hosted runner API through the Ever Works GitHub App, a token per call.
 export * from './actions-runners.interface.js';

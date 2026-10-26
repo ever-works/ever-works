@@ -148,6 +148,15 @@ export const PLUGIN_CAPABILITIES = {
 	// every existing constant keeps its value and its position; no category is
 	// added (a subscriber plugin keeps the category of what it otherwise is).
 	DOMAIN_EVENT_SUBSCRIBER: 'domain-event-subscriber',
+	// Cloud computers (FL-17, CONTRACTS R-15) — plugins that create, power and
+	// destroy machines at a cloud provider on the owner's own account and say
+	// what they cost (`IMachineProviderPlugin`). The first plugin ships under
+	// `packages/plugins/`. Consumed only through
+	// `MachineProviderFacadeService`; see
+	// `capabilities/machine-provider.interface.ts`. Appended **last**, so every
+	// existing constant keeps its value and its position, and landed in the same
+	// change as the `machine-provider` category in `plugin-manifest.types.ts`.
+	MACHINE_PROVIDER: 'machine-provider',
 	// Actions runners on computers (FL-18, CONTRACTS R-14) — GitHub's self-hosted
 	// runner API through the Ever Works GitHub App (`github-actions-runners`),
 	// consumed only through `ActionsRunnersFacadeService`; see

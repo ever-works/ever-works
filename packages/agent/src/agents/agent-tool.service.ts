@@ -67,6 +67,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-tools';
 import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
+import { buildFleetCloudTools } from '../fleet/cloud/agent-fleet-cloud-tools';
 import { buildFleetRunnersTools } from '../fleet/runners/agent-fleet-runners-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
@@ -74,6 +75,7 @@ import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-to
 import { buildFleetScheduleTools } from '../fleet/schedules/agent-fleet-schedule-tools';
 import { buildFleetHealthTools } from '../fleet/agent-fleet-health-tools';
 import { buildFleetCheckoutTools } from '../fleet/checkouts/agent-fleet-checkout-tools';
+import { buildFleetSessionGitTools } from '../fleet/session-git/agent-fleet-session-git-tools';
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
@@ -639,6 +641,23 @@ export class AgentToolService {
                     }),
                 );
             }
+            // Cloud computers (FL-17): list / options / usage read-only; a create, a
+            // power change and a destroy are held for the owner's approval (spec S9).
+            if (fleet.cloud) {
+                const cloud = fleet.cloud;
+                add('fleet-cloud', () =>
+                    buildFleetCloudTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: cloud,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
+            }
             // Actions runners (FL-18): list read-only; an install, a stop, a restart and a
             // remove are held for the owner's approval (spec S8); a start runs at once.
             if (fleet.runners) {
@@ -677,6 +696,20 @@ export class AgentToolService {
                         userId: agent.userId,
                         agentId: agent.id,
                         service: checkouts.service,
+                    }),
+                );
+            }
+            // Session git & actions (FL-06 P3): the action, Changes and pull-request
+            // tools, when bound (and only while FLEET_SESSIONS_ENABLED is on).
+            if (fleet.sessionGit) {
+                const sessionGit = fleet.sessionGit;
+                add('fleet-session-git', () =>
+                    buildFleetSessionGitTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        actions: sessionGit.actions,
+                        checkouts: sessionGit.checkouts ?? null,
+                        pullRequests: sessionGit.pullRequests ?? null,
                     }),
                 );
             }
@@ -721,6 +754,12 @@ export class AgentToolService {
                         agentId: agent.id,
                         userId: agent.userId,
                         reader: files.reader,
+                        // P2: copy and delete are held for the owner's approval.
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        proposals: sources.proposals ?? null,
                     }),
                 );
             }
@@ -946,7 +985,9 @@ export class AgentToolService {
         // assembly annotated, with the no-credits sentence, its results secret-scanned
         // and its refusals typed. Anything else (and the legacy `list_fleet_nodes`) is
         // returned untouched.
-        return out.map((tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor);
+        return out.map(
+            (tool) => decorateFleetTool(tool as TaskToolDescriptor) as AgentToolDescriptor,
+        );
     }
 
     /**

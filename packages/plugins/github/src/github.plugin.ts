@@ -605,6 +605,17 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		return this.apiService.closePullRequest(owner, repo, prNumber, token, settings.apiBaseUrl);
 	}
 
+	async updatePullRequest(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		changes: { readonly title?: string; readonly body?: string },
+		token: string
+	): Promise<GitPullRequest> {
+		const settings = await this.getSettings();
+		return this.apiService.updatePullRequest(owner, repo, prNumber, changes, token, settings.apiBaseUrl);
+	}
+
 	// Local git operations (via GitOperations)
 
 	async cloneOrPull(options: GitCloneOptions): Promise<string> {

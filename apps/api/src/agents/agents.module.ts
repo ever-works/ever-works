@@ -128,10 +128,12 @@ import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import {
     FleetCommandService,
     FleetScheduleService,
+    FleetSessionActionService,
     FleetJobService,
     FleetKillSwitchService,
     FleetMachineActionsService,
     FleetVirtualService,
+    FleetCloudService,
     FleetActionsRunnersService,
     FleetModule,
     FleetPortsService,
@@ -149,6 +151,7 @@ import {
     type FleetStatusReaderPort,
     type FleetWakeToolPort,
 } from '@ever-works/agent/fleet';
+import { FleetPullRequestService } from '../fleet/session-git/fleet-pull-request.service';
 import { config } from '@ever-works/agent/config';
 // Tasks on computers (FL-15 P3) — the hand-off options reader behind `fleet_tasks_handoff_options`
 // (global through FleetTasksApiModule; optional below).
@@ -2185,6 +2188,16 @@ async function assertRealWriteTarget(
                 // LAST (positional), optional: unbound (or FLEET_COMMANDS_ENABLED off) the
                 // tools are not offered; create/update/delete/run only ever file an approval.
                 { token: FleetScheduleService, optional: true },
+                // Session git & actions (FL-06 P3) — backs `fleet_sessions_actions_list|action`,
+                // `fleet_checkouts_changes` and `fleet_checkouts_open_pull_request`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_SESSIONS_ENABLED off) the
+                // tools are not offered.
+                { token: FleetSessionActionService, optional: true },
+                { token: FleetPullRequestService, optional: true },
+                // Cloud computers (FL-17) — backs `fleet_cloud_*`. APPENDED LAST
+                // (positional), optional: unbound (or FLEET_CLOUD_ENABLED off) the six
+                // tools are not offered; create / power / destroy only ever file an approval.
+                { token: FleetCloudService, optional: true },
                 // Actions runners on computers (FL-18) — backs `fleet_runners_*`. APPENDED
                 // LAST (positional), optional: unbound (or FLEET_ACTIONS_RUNNERS_ENABLED off)
                 // the tools are not offered; install / stop / restart / remove only ever file
@@ -2229,6 +2242,9 @@ async function assertRealWriteTarget(
                 fleetGitIdentity?: FleetGitIdentityService | null,
                 fleetWake?: FleetWakeToolPort | null,
                 fleetSchedules?: FleetScheduleService | null,
+                fleetSessionActions?: FleetSessionActionService | null,
+                fleetPullRequests?: FleetPullRequestService | null,
+                fleetCloud?: FleetCloudService | null,
                 fleetRunners?: FleetActionsRunnersService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
@@ -2277,6 +2293,16 @@ async function assertRealWriteTarget(
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
                     ...(fleetRunners && config.fleet.isActionsRunnersEnabled() ? { runners: fleetRunners } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
+                    ...(fleetSessionActions && config.fleet.isSessionsEnabled()
+                        ? {
+                              sessionGit: {
+                                  actions: fleetSessionActions,
+                                  ...(checkouts ? { checkouts } : {}),
+                                  ...(fleetPullRequests ? { pullRequests: fleetPullRequests } : {}),
+                              },
+                          }
+                        : {}),
+                    ...(fleetCloud && config.fleet.isCloudEnabled() ? { cloud: fleetCloud } : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }

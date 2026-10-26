@@ -421,3 +421,139 @@ describe('FleetFilesTransferService — upload', () => {
         expect(after).toBeGreaterThan(sentBytes);
     });
 });
+
+describe('FleetFilesTransferService — copy (P2, FR-24…FR-29)', () => {
+    const DEST = '33333333-3333-4333-8333-333333333333';
+
+    function copySetup(options: { credential?: boolean } = {}) {
+        const source = fakeChannel((type, params) =>
+            params.dryRun === true
+                ? {
+                      result: {
+                          accepted: { entries: 1, bytes: 5, single: true },
+                          credentialShaped: options.credential ? ['.env'] : [],
+                          credentialShapedCount: options.credential ? 1 : 0,
+                      },
+                  }
+                : { result: { operationId: 'op-a', accepted: { entries: 1, bytes: 5 } } },
+        );
+        const destination = fakeChannel(() => ({
+            result: { operationId: 'op-b', accepted: true },
+        }));
+        let opened = 0;
+        const link = {
+            openChannel: jest.fn(
+                async (input: { nodeId: string; events?: FleetLinkChannelEvents }) => {
+                    opened += 1;
+                    const target = opened === 1 ? source : destination;
+                    target.bind(input.events ?? {});
+                    return target.channel;
+                },
+            ),
+        };
+        const files = { record: jest.fn(async () => undefined) } as unknown as FleetFilesService;
+        const nodes = {
+            findById: jest.fn(async (id: string) =>
+                id === DEST ? { id: DEST, userId: 'owner-1', name: 'build-02' } : NODE,
+            ),
+        };
+        const transfers = new FleetFilesTransferService(
+            files,
+            { getVisibleForUser: jest.fn(async () => ({ view: {}, role: 'owner' })) } as never,
+            nodes as never,
+            link as never,
+            { track: jest.fn(), requestCancel: jest.fn() } as never,
+        );
+        return { transfers, source, destination, link, files };
+    }
+
+    const input = {
+        root: ROOT,
+        path: 'dist',
+        entries: ['app.js'],
+        to: { nodeId: DEST, root: ROOT, path: '' },
+    };
+
+    it('refuses the same folder before anything opens (U10)', async () => {
+        const { transfers, link } = copySetup();
+        await expect(
+            transfers.copy({ kind: 'user', userId: 'owner-1' }, NODE.id, {
+                ...input,
+                to: { nodeId: NODE.id, root: ROOT, path: 'dist' },
+            }),
+        ).rejects.toMatchObject({
+            linkError: { code: 'invalid', hint: 'Source and destination are the same folder' },
+        });
+        expect(link.openChannel).not.toHaveBeenCalled();
+    });
+
+    it('forwards the source frames unchanged and the destination credit back (FR-24, FR-25)', async () => {
+        const { transfers, source, destination, files } = copySetup();
+        await expect(
+            transfers.copy({ kind: 'user', userId: 'owner-1' }, NODE.id, input),
+        ).resolves.toMatchObject({
+            operationId: 'op-a',
+        });
+        const frame = header('app.js', 5);
+        source.emit.binary(FLEET_LINK_FRAME_KINDS.DATA, frame);
+        source.emit.binary(FLEET_LINK_FRAME_KINDS.DATA, bytes('hello'));
+        source.emit.binary(FLEET_LINK_FRAME_KINDS.END, new Uint8Array(0));
+        const forwarded = destination.sent.filter(
+            (sent) => sent.kind === FLEET_LINK_FRAME_KINDS.DATA,
+        );
+        expect(forwarded).toHaveLength(2);
+        expect(Buffer.from(forwarded[0].payload)).toEqual(Buffer.from(frame));
+        expect(destination.sent.some((sent) => sent.kind === FLEET_LINK_FRAME_KINDS.END)).toBe(
+            true,
+        );
+        // The source hears credit only as the destination writes.
+        expect(source.sent.filter((sent) => sent.kind === FLEET_LINK_FRAME_KINDS.ACK)).toHaveLength(
+            0,
+        );
+        destination.emit.binary(FLEET_LINK_FRAME_KINDS.ACK, encodeFleetLinkAck(frame.byteLength)!);
+        expect(source.sent.filter((sent) => sent.kind === FLEET_LINK_FRAME_KINDS.ACK)).toHaveLength(
+            1,
+        );
+        destination.emit.json({
+            type: 'files.unpacked',
+            entries: 1,
+            bytes: 5,
+            replaced: 0,
+            skipped: 0,
+        });
+        await settle();
+        // One row on each computer, each naming the other (FR-27).
+        const rows = (files.record as jest.Mock).mock.calls.filter(
+            (call) => call[0] === 'node.files.copy',
+        );
+        expect(rows.map((call) => call[2]).sort()).toEqual([NODE.id, DEST].sort());
+        expect(rows.find((call) => call[2] === NODE.id)![4]).toMatchObject({
+            peerNodeId: DEST,
+            outcome: 'done',
+        });
+    });
+
+    it('closes the source when the destination fails, leaving nothing partial there (U9)', async () => {
+        const { transfers, source, destination } = copySetup();
+        await transfers.copy({ kind: 'user', userId: 'owner-1' }, NODE.id, input);
+        destination.emit.close('operation_failed', 'disk full');
+        expect(source.channel.close).toHaveBeenCalled();
+    });
+
+    it('asks a person to confirm a credential-shaped file and refuses an Agent (FR-17)', async () => {
+        const person = copySetup({ credential: true });
+        await expect(
+            person.transfers.copy({ kind: 'user', userId: 'owner-1' }, NODE.id, input),
+        ).rejects.toMatchObject({
+            linkError: { code: 'confirmation_required' },
+        });
+        const agent = copySetup({ credential: true });
+        await expect(
+            agent.transfers.copy(
+                { kind: 'agent', agentId: 'a1', ownerUserId: 'owner-1' },
+                NODE.id,
+                input,
+            ),
+        ).rejects.toMatchObject({ linkError: { code: 'permission_denied' } });
+    });
+});

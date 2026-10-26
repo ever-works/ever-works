@@ -54,6 +54,7 @@ import {
     FleetNodeHealthService,
     FleetSessionSweepService,
     FleetVirtualReconcileService,
+    FleetCloudSweepService,
     FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
@@ -323,6 +324,15 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
             provide: FleetVirtualReconcileService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'FleetVirtualReconcileService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Cloud computers (FL-17) — the fleet-cloud-reconcile and
+        // fleet-cloud-bootstrap-watch crons call the two sweeps over the internal
+        // RPC channel; the repositories and the provider facade live API-side.
+        {
+            provide: FleetCloudSweepService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetCloudSweepService'),
             inject: [TriggerInternalApiClient],
         },
         // Actions runners on computers (FL-18) — the fleet-runners-poll cron calls
@@ -653,6 +663,7 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         FleetSessionSweepService,
         FleetCheckoutReconcileService,
         FleetVirtualReconcileService,
+        FleetCloudSweepService,
         FleetActionsRunnersPollService,
         TaskGateRunnerService,
         TaskGateJudgeService,

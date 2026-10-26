@@ -42,7 +42,7 @@ function ChangedFileRow({ file }: { file: FleetCheckoutChangedFile }) {
                     {file.previousPath ? `${file.previousPath} → ${file.path}` : file.path}
                 </span>
                 <span className="shrink-0 text-[10px] text-text-muted dark:text-text-muted-dark">
-                    {t(`status.${changedFileStatusKey(file.status)}`)}
+                    {t(`status.${changedFileStatusKey(file.status)}` as Parameters<typeof t>[0])}
                 </span>
                 {file.binary ? (
                     <span className="shrink-0 text-[10px] text-text-muted dark:text-text-muted-dark">{t('binary')}</span>

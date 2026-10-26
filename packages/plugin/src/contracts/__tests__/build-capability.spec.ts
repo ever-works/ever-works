@@ -166,9 +166,12 @@ const LATER_CAPABILITIES: readonly string[] = [
 	'identity-provider',
 	'apps-tier',
 	'domain-event-subscriber',
+	// FL-17 (cloud computers).
+	'machine-provider',
+	// FL-18 (Actions runners on computers) — appends a capability, no category.
 	'actions-runners'
 ];
-const LATER_CATEGORIES: readonly PluginCategory[] = ['identity'];
+const LATER_CATEGORIES: readonly PluginCategory[] = ['identity', 'machine-provider'];
 
 /** The four strategies of Resolution R-13, in the plan's order (plan §4.1:585–589). */
 const EVERY_STRATEGY: readonly BuildStrategy[] = ['dockerfile', 'image', 'auto', 'none'];

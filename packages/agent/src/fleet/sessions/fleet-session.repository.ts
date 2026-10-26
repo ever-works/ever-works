@@ -121,6 +121,12 @@ export class FleetSessionRepository {
             .getMany();
     }
 
+    /** FL-06 (spec FR-18): the Agent session a Run belongs to (a run token names its Run). */
+    async findByAgentRunId(agentRunId: string): Promise<FleetSession | null> {
+        if (typeof agentRunId !== 'string' || !/^[0-9a-f-]{36}$/i.test(agentRunId)) return null;
+        return this.repository.findOne({ where: { agentRunId } });
+    }
+
     /** FL-06 (spec FR-25): is a live session working in this checkout (Clean up waits for it)? */
     async countLiveInCheckout(checkoutId: string): Promise<number> {
         return this.repository.count({ where: { checkoutId, state: Not('ended') } });

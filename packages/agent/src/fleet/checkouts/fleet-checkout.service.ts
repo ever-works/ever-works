@@ -778,6 +778,11 @@ export class FleetCheckoutService {
                 throw fleetCheckoutError('invalid', 'Clean up waits until the pull request is merged or closed', {
                     rule: 'pull-request',
                 });
+            // FL-06 (spec FR-25): and only once no live session uses it.
+            if (this.sessions && (await this.sessions.countLiveInCheckout(checkout.id)) > 0)
+                throw fleetCheckoutError('invalid', 'Clean up waits until no session works in this worktree', {
+                    rule: 'live-session',
+                });
         }
         if (mode === 'delete' && isCheckoutFolderRemoved(checkout)) return this.view(checkout, actor);
         const name = fleetCheckoutName(checkout.path);
