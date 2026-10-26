@@ -23,6 +23,13 @@ export interface UsageLineReadResult {
 	oversize: number;
 	/** Bytes consumed (nextOffset - start offset). */
 	bytesRead: number;
+	/**
+	 * The read stopped in the middle of an over-long line: `nextOffset` is past
+	 * what was read of it, and the next call must pass `startSkipping` so the
+	 * rest of that line is discarded too (a line longer than the budget would
+	 * otherwise never be passed).
+	 */
+	skipping: boolean;
 }
 
 export interface UsageLineReadOptions {
@@ -34,6 +41,8 @@ export interface UsageLineReadOptions {
 	chunkBytes?: number;
 	/** Stop early (the job was aborted). */
 	signal?: AbortSignal;
+	/** The previous call stopped inside an over-long line: discard up to the next newline first. */
+	startSkipping?: boolean;
 }
 
 /** One MiB: no usage line is anywhere near it; a longer line is a tool output. */
@@ -55,7 +64,7 @@ export async function readUsageLines(
 	let committed = start;
 	let pending: Buffer[] = [];
 	let pendingBytes = 0;
-	let skipping = false;
+	let skipping = options.startSkipping === true;
 	let lines = 0;
 	let oversize = 0;
 	while (position < end) {
@@ -97,5 +106,10 @@ export async function readUsageLines(
 		}
 		position += chunk.length;
 	}
-	return { nextOffset: committed, lines, oversize, bytesRead: committed - start };
+	if (skipping) {
+		// Inside an over-long line: what was read of it is consumed, never parsed.
+		committed = Math.max(committed, position);
+		return { nextOffset: committed, lines, oversize, bytesRead: committed - start, skipping: true };
+	}
+	return { nextOffset: committed, lines, oversize, bytesRead: committed - start, skipping: false };
 }
