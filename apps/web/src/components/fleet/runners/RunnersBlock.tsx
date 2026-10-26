@@ -70,10 +70,13 @@ export default function RunnersBlock({ nodes }: FleetOverviewBlockProps) {
         FLEET_ACTIONS_RUNNERS_OPEN_REFRESH_MS,
     );
     const switchedOff = !data && error?.code === 'not_found';
+    // Only once the list answered: a deployment with runners off is never asked twice.
+    const listed = data !== null;
 
-    // Whether the computer can host runners, for the Install button's state (FR-1).
+    // Whether the computer can host runners, for the Install button's state (FR-1);
+    // read again after an install or an act, not on every refresh.
     useEffect(() => {
-        if (!nodeId || !allowed || switchedOff) return;
+        if (!nodeId || !allowed || !listed) return;
         let live = true;
         void fleetActionsRunnerOptionsAction(nodeId).then((result) => {
             if (live) setOptions(result.ok ? result.data : null);
@@ -81,7 +84,7 @@ export default function RunnersBlock({ nodes }: FleetOverviewBlockProps) {
         return () => {
             live = false;
         };
-    }, [nodeId, allowed, switchedOff, optionsKey]);
+    }, [nodeId, allowed, listed, optionsKey]);
 
     if (!node || switchedOff) return null;
 
