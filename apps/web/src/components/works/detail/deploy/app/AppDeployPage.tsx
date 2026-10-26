@@ -14,6 +14,9 @@ import { AppLicenseCard } from './AppLicenseCard';
 import { AppEnvironmentCard } from './AppEnvironmentCard';
 import { AppDependenciesCard } from './AppDependenciesCard';
 import { AppLifecycleActions } from './AppLifecycleActions';
+import { AppLiveCard } from './AppLiveCard';
+import { AppHistoryTable } from './AppHistoryTable';
+import { useAppStatusPoll } from './useAppStatusPoll';
 
 const STATE_LEAF = {
     'not-deployed': 'notDeployed',
@@ -57,7 +60,7 @@ export interface AppDeployPageProps {
 export function AppDeployPage({
     work,
     initialTarget,
-    status,
+    status: initialStatus,
     canEdit,
     isOwner,
 }: AppDeployPageProps) {
@@ -66,6 +69,16 @@ export function AppDeployPage({
     const [target, setTarget] = useState<AppTargetView>(initialTarget);
     const [connectOpen, setConnectOpen] = useState(false);
     const router = useRouter();
+    // Lane aw-ops (T38) — the status is polled through the `app-status` BFF route (3 s while
+    // something runs, 30 s otherwise), so the tab follows a Deployment without a reload. A `null`
+    // initial status (the route is not on this API) is never polled into existence.
+    const { status: polledStatus, reload } = useAppStatusPoll(work.id, initialStatus);
+    const status = initialStatus ? polledStatus : null;
+    const afterAction = () => {
+        void reload();
+        router.refresh();
+    };
+    const historyKey = `${status?.currentDeployment?.id ?? ''}:${status?.currentDeployment?.state ?? ''}:${status?.state ?? ''}`;
 
     const running = status && status.state !== 'not-deployed';
     const stateLine = running
@@ -126,6 +139,12 @@ export function AppDeployPage({
                 )}
             </div>
 
+            {/* Lane aw-ops (APW-06 T38, spec §6.3) — what is running now: components, smoke
+                results, jobs (Logs / Run now), scheduled calls, Refresh and Run smoke checks. */}
+            {status && (status.state !== 'not-deployed' || status.snapshot) && (
+                <AppLiveCard workId={work.id} status={status} canEdit={canEdit} onReload={reload} />
+            )}
+
             <AppTargetCard
                 key={`${target.target}-${target.clusterCheckedAt ?? ''}`}
                 workId={work.id}
@@ -160,8 +179,13 @@ export function AppDeployPage({
                     work={{ id: work.id, slug: work.slug }}
                     status={status}
                     isOwner={isOwner}
-                    onChanged={() => router.refresh()}
+                    onChanged={afterAction}
                 />
+            )}
+
+            {/* Lane aw-ops (APW-06 T39) — the Deployment history; viewers see it too (S28). */}
+            {status && target.target !== 'none' && (
+                <AppHistoryTable workId={work.id} refreshKey={historyKey} />
             )}
 
             <p className="flex items-center gap-2 text-sm text-text-secondary dark:text-text-secondary-dark">
