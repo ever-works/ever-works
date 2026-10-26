@@ -389,13 +389,13 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
                         <Button
                             type="button"
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => socketRef.current?.refresh()}
                             aria-label={t('refresh')}
                         >
                             <RefreshCw className="h-4 w-4" aria-hidden="true" />
                         </Button>
-                        <Button type="button" size="sm" variant="outline" onClick={end} data-testid="desktop-end">
+                        <Button type="button" size="sm" variant="secondary" onClick={end} data-testid="desktop-end">
                             <X className="mr-1 h-4 w-4" aria-hidden="true" />
                             {t('end')}
                         </Button>

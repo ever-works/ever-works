@@ -18,7 +18,7 @@ import { readSessionError, type SessionErrorRead } from '../sessions/sessions.sh
  */
 
 /** The i18n leaf (camelCase, under `fleet.desktop.unavailable`) of each blocker. */
-export const DESKTOP_BLOCKER_KEYS: Readonly<Record<FleetDesktopBlocker, string>> = {
+export const DESKTOP_BLOCKER_KEYS = {
     'kill-switch': 'killSwitch',
     'kind-unsupported': 'kindUnsupported',
     offline: 'offline',
@@ -31,7 +31,7 @@ export const DESKTOP_BLOCKER_KEYS: Readonly<Record<FleetDesktopBlocker, string>>
     'no-display-session': 'noDisplaySession',
     'permission-screen-recording': 'permissionScreenRecording',
     'link-unavailable': 'linkUnavailable',
-};
+} as const satisfies Readonly<Record<FleetDesktopBlocker, string>>;
 
 /** The command a blocker's card offers to copy (run on the machine), or null. */
 export function desktopBlockerCommand(blocker: FleetDesktopBlocker): string | null {

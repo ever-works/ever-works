@@ -79,7 +79,7 @@ export function DesktopUnavailableCard({
             {command ? (
                 <div className="flex w-full items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 font-mono text-sm">
                     <code data-testid="desktop-unavailable-command">{command}</code>
-                    <Button type="button" size="sm" variant="outline" onClick={copy}>
+                    <Button type="button" size="sm" variant="secondary" onClick={copy}>
                         {copied ? t('copied') : t('copy')}
                     </Button>
                 </div>
@@ -94,7 +94,7 @@ export function DesktopUnavailableCard({
                 <p className="text-sm text-muted-foreground">{t('browserStill')}</p>
             ) : null}
             {onRetry && desktopBlockerRetries(blocker) ? (
-                <Button type="button" variant="outline" onClick={onRetry}>
+                <Button type="button" variant="secondary" onClick={onRetry}>
                     {t('tryAgain')}
                 </Button>
             ) : null}
