@@ -1983,6 +1983,8 @@ first-boot script and keeps no password or key for any machine.
 | --------------- | ----- | -------------------------------------------------------------------------------------------------------- |
 | `apiToken`      | user  | Secret. A DigitalOcean personal access token with read and write scope; never returned after it is saved |
 | `defaultRegion` | user  | The region the New cloud computer dialog selects first (`nyc3`, `fra1`, …)                               |
+| `clientId`      | admin | Operator only, env `DIGITALOCEAN_OAUTH_CLIENT_ID`: the OAuth application that offers Sign in             |
+| `clientSecret`  | admin | Operator only, secret, env `DIGITALOCEAN_OAUTH_CLIENT_SECRET`; with both set the plugin adds `oauth`     |
 
 Lists regions and sizes with their current list prices, creates Ubuntu 24.04 droplets tagged with the Fleet
 node id, powers them off gracefully and on, destroys them (idempotently), and reads the account's month-to-date
