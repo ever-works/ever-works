@@ -13,6 +13,7 @@ import type { FleetService } from '../fleet/fleet.service';
 import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-actions.service';
 import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
 import type { FleetCloudService } from '../fleet/cloud/fleet-cloud.service';
+import type { FleetUsageViewService } from '../fleet/usage/fleet-usage-view.service';
 import type { FleetActionsRunnersService } from '../fleet/runners/fleet-actions-runners.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
@@ -139,6 +140,11 @@ export interface AgentFleetToolSource {
     cloud?: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'> &
         // P2: `fleet_cloud_idle_policy` is offered when the binding carries it.
         Partial<Pick<FleetCloudService, 'previewIdlePolicy'>>;
+    /**
+     * Usage & cost on the fleet (FL-20) — backs the read-only `fleet_usage_get`.
+     * Optional: unbound (or `FLEET_USAGE_SCAN_ENABLED` off), it is not offered.
+     */
+    usage?: Pick<FleetUsageViewService, 'view'>;
     /**
      * Actions runners on computers (FL-18) — backs `fleet_runners_*`. Optional:
      * unbound (or `FLEET_ACTIONS_RUNNERS_ENABLED` off), those tools are simply not offered.

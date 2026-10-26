@@ -90,6 +90,10 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 // `logsPurgedAt IS NULL AND finishedAt < cutoff`, oldest first. Migration:
 // `1795162100000-AddAgentRunLogsPurgedAt`.
 @Index('idx_agent_runs_logs_purge', ['logsPurgedAt', 'finishedAt'])
+// Usage & cost on the fleet (FL-20, R-13) — a Task run found by its CLI session
+// id when the node's transcript scan reports it. Migration:
+// `1796200000000-AddFleetSessionUsage`.
+@Index('idx_agent_runs_cli_session', ['cliSessionId'])
 export class AgentRun {
     @PrimaryGeneratedColumn('uuid')
     id: string;

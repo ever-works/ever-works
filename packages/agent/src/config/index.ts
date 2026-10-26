@@ -859,6 +859,21 @@ export const config = {
             return raw ? raw : null;
         },
         /**
+         * Usage & cost on the fleet (FL-20, CONTRACTS §9) —
+         * `FLEET_USAGE_SCAN_ENABLED`. Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every `/api/fleet/usage/**`
+         * route answers 404, the dispatcher enqueues no `usage-scan`, a report
+         * that still arrives is not ingested, and the session chip / receipt
+         * line / Usage tab are hidden. Read per call: flipping it needs no
+         * restart. Node-side there is no flag, only the `--usage-scan` consent.
+         */
+        isUsageScanEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_USAGE_SCAN_ENABLED === 'true'
+            );
+        },
+        /**
          * Actions runners on computers (FL-18, CONTRACTS §9) —
          * `FLEET_ACTIONS_RUNNERS_ENABLED`. Off unless set to `true`, and never
          * without `FLEET_ENABLED`: with it off every `/api/fleet/nodes/:id/runners/**`

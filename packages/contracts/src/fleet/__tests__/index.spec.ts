@@ -1396,13 +1396,7 @@ const CLOUD_EXPORTS = [
 	'fleetCloudPriceSentence',
 	'fleetCloudCreateSummary',
 	'fleetCloudPowerOffSummary',
-	'fleetCloudDestroySummary',
-	// FL-17 P2 (cost job, idle policy) — same module.
-	'FLEET_CLOUD_BUSY_SESSION_STATES',
-	'FLEET_CLOUD_IDLE_REQUESTER',
-	'FLEET_CLOUD_USAGE_FRESH_MS',
-	'fleetCloudIdleAttentionKey',
-	'fleetCloudIdleHours'
+	'fleetCloudDestroySummary'
 ] as const;
 
 /** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
@@ -1460,6 +1454,59 @@ const ACTIONS_RUNNERS_EXPORTS = [
 	'fleetActionsRunnerLogSourceId'
 ] as const;
 
+/** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
+const USAGE_EXPORTS = [
+	'FLEET_USAGE_PROVIDERS',
+	'isFleetUsageProvider',
+	'FLEET_USAGE_SCAN_CAPABILITY',
+	'FLEET_USAGE_SCAN_INTERVAL_MS',
+	'FLEET_USAGE_SCAN_CRON',
+	'FLEET_USAGE_REPORT_MAX_ROWS',
+	'FLEET_USAGE_REPORT_MAX_BYTES',
+	'FLEET_USAGE_PERIODS',
+	'isFleetUsagePeriodDays',
+	'FLEET_USAGE_DEFAULT_PERIOD',
+	'FLEET_USAGE_PAYER_NOTE',
+	'FLEET_USAGE_PRIVACY_SENTENCE',
+	'fleetUsageOptInHint',
+	'FLEET_USAGE_ZERO_TOKENS',
+	'FLEET_USAGE_OTHER_FOLDER_PREFIX',
+	'FLEET_USAGE_MAX_MODEL_CHARS',
+	'FLEET_USAGE_MAX_SESSION_ID_CHARS',
+	'FLEET_USAGE_MAX_FOLDER_CHARS',
+	'FLEET_USAGE_MAX_TOKENS',
+	'isFleetUsageModelId',
+	'isFleetUsageProviderSessionId',
+	'isFleetUsageFolderBucket',
+	'isFleetUsageOtherFolder',
+	'fleetUsageHourStart',
+	'normalizeFleetUsageTokens',
+	'normalizeFleetUsageRow',
+	'normalizeFleetUsageReport',
+	'normalizeFleetUsageScanPayload',
+	'maxFleetUsageTokens',
+	'addFleetUsageTokens',
+	'totalFleetUsageTokens',
+	'parseFleetSessionUsage',
+	'formatFleetUsageCents',
+	'formatFleetUsageTokens'
+] as const;
+
+/** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
+const CLOUD_P2_EXPORTS = [
+	'FLEET_CLOUD_BUSY_SESSION_STATES',
+	'FLEET_CLOUD_IDLE_REQUESTER',
+	'FLEET_CLOUD_USAGE_FRESH_MS',
+	'fleetCloudIdleAttentionKey',
+	'fleetCloudIdleHours'
+] as const;
+
+const MODEL_LIST_PRICES_EXPORTS = [
+	'MODEL_TOKEN_CLASSES',
+	'findModelListPriceEntry',
+	'priceModelTokensCents'
+] as const;
+
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
 	...CREDENTIAL_EXPORTS,
@@ -1502,6 +1549,9 @@ const ALL_EXPORTS = [
 	...TASK_HANDOFF_EXPORTS,
 	...VIRTUAL_EXPORTS,
 	...CLOUD_EXPORTS,
+	...USAGE_EXPORTS,
+	...MODEL_LIST_PRICES_EXPORTS,
+	...CLOUD_P2_EXPORTS,
 	...ACTIONS_RUNNERS_EXPORTS
 ];
 
@@ -1981,6 +2031,26 @@ const FUNCTION_EXPORTS = [
 	'fleetCloudCreateSummary',
 	'fleetCloudPowerOffSummary',
 	'fleetCloudDestroySummary',
+	'isFleetUsageProvider',
+	'isFleetUsagePeriodDays',
+	'fleetUsageOptInHint',
+	'isFleetUsageModelId',
+	'isFleetUsageProviderSessionId',
+	'isFleetUsageFolderBucket',
+	'isFleetUsageOtherFolder',
+	'fleetUsageHourStart',
+	'normalizeFleetUsageTokens',
+	'normalizeFleetUsageRow',
+	'normalizeFleetUsageReport',
+	'normalizeFleetUsageScanPayload',
+	'maxFleetUsageTokens',
+	'addFleetUsageTokens',
+	'totalFleetUsageTokens',
+	'parseFleetSessionUsage',
+	'formatFleetUsageCents',
+	'formatFleetUsageTokens',
+	'findModelListPriceEntry',
+	'priceModelTokensCents',
 	// Actions runners on computers (FL-18).
 	'isFleetActionsRunnerScope',
 	'isFleetActionsRunnerMode',
@@ -2120,11 +2190,13 @@ describe('fleet barrel', () => {
 		// session-status, session-rules, commands, schedules, tools, task-handoff,
 		// virtual, cloud), each a group above and a row in the witness table below,
 		// plus three in existing modules (`SPRINT_EXISTING_MODULE_EXPORTS`).
-		// → 1227 with FL-18 (Actions runners on computers): the fifty-one symbols of
-		// `fleet-actions-runners.types.ts` — a NEW module, so the witness table gains a
-		// row — and `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
-		// → 1232 with FL-17 P2: five symbols more in `fleet-cloud.types.ts` (the cost job, the idle policy).
-		expect(Object.keys(fleet)).toHaveLength(1232);
+		// → +37 with FL-20 (usage & cost): thirty-four symbols of `fleet-usage.types.ts`
+		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
+		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
+		// → +52 with FL-18 (Actions runners on computers): the fifty-one symbols of
+		// `fleet-actions-runners.types.ts` — a NEW module, one row below — and
+		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 52);
 	});
 
 	it.each([
@@ -2168,6 +2240,8 @@ describe('fleet barrel', () => {
 		['fleet-task-handoff.types.js', 'FLEET_HANDOFF_REASONS'],
 		['fleet-virtual.types.js', 'FLEET_NODE_ORIGINS'],
 		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER'],
+		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
+		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES'],
 		['fleet-actions-runners.types.js', 'FLEET_ACTIONS_RUNNER_CAPABILITY']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing

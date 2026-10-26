@@ -161,6 +161,7 @@ import { FleetCommand } from '../entities/fleet-command.entity';
 import { FleetCommandRun } from '../entities/fleet-command-run.entity';
 import { FleetPortTunnel } from '../entities/fleet-port-tunnel.entity';
 import { FleetCheckout } from '../entities/fleet-checkout.entity';
+import { FleetUsageSample } from '../entities/fleet-usage-sample.entity';
 import { FleetActionsRunner } from '../entities/fleet-actions-runner.entity';
 import { NodeAgentProfile } from '../entities/node-agent-profile.entity';
 import { ModelAccount } from '../entities/model-account.entity';
@@ -456,6 +457,9 @@ export const ENTITIES = [
     // Checkouts on computers (FL-14) — clones and worktrees on a Node; one
     // row per (node, path).
     FleetCheckout,
+    // Usage & cost on the fleet (FL-20) — one computer's tokens per model
+    // per hour per session-or-other, from the node's transcript scan.
+    FleetUsageSample,
     // Actions runners on computers (FL-18) — GitHub Actions self-hosted runners
     // on a Node; one row per runner (CONTRACTS §4.11).
     FleetActionsRunner,
