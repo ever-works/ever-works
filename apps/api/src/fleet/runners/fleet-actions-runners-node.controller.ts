@@ -94,6 +94,7 @@ export class FleetActionsRunnersNodeController {
         if (body.runnerVersion !== undefined) report.runnerVersion = body.runnerVersion;
         if (body.serviceUnit !== undefined) report.serviceUnit = body.serviceUnit;
         if (body.githubRunnerId !== undefined) report.githubRunnerId = body.githubRunnerId;
+        if (body.deregistered !== undefined) report.deregistered = body.deregistered;
         const accepted = await this.runners.reportProgress(runnerId, report);
         if (!accepted) throw new UnauthorizedException(FLEET_NODE_UNAUTHORIZED_MESSAGE);
         return { ok: true };

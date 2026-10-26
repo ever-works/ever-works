@@ -117,15 +117,20 @@ export function extractArgs(platform: string, archive: string, into: string, env
 	return { command: 'tar', args: ['-xzf', archive, '-C', into] };
 }
 
-/** Extract a VERIFIED archive into the runner's folder, then delete the archive. */
+/**
+ * Extract a VERIFIED archive into the runner's folder, then delete the archive —
+ * unless `keepArchive` (an install of several runners extracts one verified
+ * archive into each folder and deletes it after the last).
+ */
 export async function extractRunnerArchive(
 	deps: Pick<RunnerHostDeps, 'exec' | 'platform'>,
 	archive: string,
-	into: string
+	into: string,
+	options: { keepArchive?: boolean } = {}
 ): Promise<void> {
 	const { command, args } = extractArgs(deps.platform, archive, into);
 	const result = await deps.exec({ command, args, timeoutMs: EXTRACT_TIMEOUT_MS });
-	await rm(archive, { force: true }).catch(() => undefined);
+	if (options.keepArchive !== true) await rm(archive, { force: true }).catch(() => undefined);
 	if (result.spawnError) throw new RunnerHostError('tar was not found on this computer; nothing was installed');
 	if (result.code !== 0) throw new RunnerHostError(`could not extract the runner: ${firstOutputLine(result, 'tar failed')}`);
 }

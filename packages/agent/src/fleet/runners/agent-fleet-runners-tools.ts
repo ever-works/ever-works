@@ -136,6 +136,7 @@ export function buildFleetRunnersTools(args: {
             properties: {
                 nodeId: { type: 'string', description: 'Optional: the computer (Fleet node id).' },
             },
+            required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };

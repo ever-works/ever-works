@@ -608,6 +608,13 @@ export class FleetActionsRunnersService {
             patch.state = 'removed';
             patch.removedAt = now;
             patch.phase = null;
+            // FR-16: the runner could not deregister itself (its folder was gone, `config
+            // remove` failed) — the platform deletes it at GitHub by its id. Best-effort:
+            // the row is removed either way, and the refresh names a runner GitHub still
+            // lists that no row holds.
+            if (report.deregistered !== true && held.job.kind === 'runner-control') {
+                await this.deregisterAtGitHub(runner);
+            }
         } else if (state === 'failed') {
             patch.state = 'failed';
         } else if (state === 'idle' || state === 'offline' || state === 'stopped') {
@@ -650,6 +657,20 @@ export class FleetActionsRunnersService {
         // Removed rows past their 30 days (the audit rows keep the history).
         await this.runners.purgeRemovedBefore(new Date(Date.now() - 30 * 24 * 60 * 60_000)).catch(() => 0);
         return { owners: owners.length, runners, changed };
+    }
+
+    /** Delete a runner at GitHub by its id (the remove fallback, FR-16). Never throws. */
+    private async deregisterAtGitHub(runner: FleetActionsRunner): Promise<void> {
+        const githubRunnerId = githubRunnerIdOf(runner.githubRunnerId);
+        if (githubRunnerId === null || !this.facade) return;
+        try {
+            const resolved = await this.facade.resolveTarget(runner.ownerUserId, runner.scope, runner.target);
+            await this.facade.deleteRunner(runner.ownerUserId, resolved, githubRunnerId);
+        } catch (error) {
+            this.logger.warn(
+                `actions runner ${runner.id}: GitHub runner ${githubRunnerId} not deleted (${error instanceof Error ? error.message.split(/\r?\n/)[0] : String(error)})`,
+            );
+        }
     }
 
     /** A page's read: refresh this computer's runners at most every 30 s, without making the page wait. */

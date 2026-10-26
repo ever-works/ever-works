@@ -623,6 +623,12 @@ export interface FleetActionsRunnerProgressReport {
 	runnerVersion?: string | null;
 	serviceUnit?: string | null;
 	githubRunnerId?: number | null;
+	/**
+	 * A remove reported `removed`: whether the runner deregistered itself at GitHub
+	 * (`config remove` with the remove token). False → the platform deletes it at
+	 * GitHub by its id (FR-16).
+	 */
+	deregistered?: boolean;
 }
 
 // ─── Link verbs (CONTRACTS §3.3 `runner.*` on the `machine` channel) ────────

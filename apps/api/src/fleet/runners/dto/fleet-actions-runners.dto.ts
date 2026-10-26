@@ -165,4 +165,12 @@ export class FleetActionsRunnerProgressDto extends FleetActionsRunnerNodeJobDto 
     @IsInt()
     @Min(1)
     githubRunnerId?: number | null;
+
+    @ApiProperty({
+        required: false,
+        description: 'A remove: whether the runner deregistered itself at GitHub (false → the platform deletes it by its id).',
+    })
+    @IsOptional()
+    @IsBoolean()
+    deregistered?: boolean;
 }

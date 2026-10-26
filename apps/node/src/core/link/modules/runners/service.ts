@@ -167,8 +167,12 @@ export async function controlRunnerService(
 	}
 }
 
-/** Uninstall the service (Linux / macOS `svc.sh uninstall`; Windows: `config remove` does it). Best-effort. */
-export async function uninstallRunnerService(deps: RunnerHostDeps, dir: string): Promise<void> {
+/**
+ * Uninstall the service (Linux / macOS `svc.sh uninstall`; Windows: `config remove`
+ * does it, and `sc.exe delete` takes back a service it left — 1060 "no such service"
+ * is the state asked for). Best-effort on Windows and macOS.
+ */
+export async function uninstallRunnerService(deps: RunnerHostDeps, dir: string, meta?: RunnerMeta | null): Promise<void> {
 	const manager = runnerServiceManagerFor(deps.platform, deps.hasSystemd());
 	if (manager === 'systemd') {
 		await sudoRun(deps, dir, [join(dir, 'svc.sh'), 'stop']).catch(() => undefined);
@@ -178,6 +182,10 @@ export async function uninstallRunnerService(deps: RunnerHostDeps, dir: string):
 			const { command, args } = runnerScriptCommand(deps.platform, dir, 'svc', [verb]);
 			await deps.exec({ command, args, cwd: dir, timeoutMs: SERVICE_TIMEOUT_MS }).catch(() => undefined);
 		}
+	} else if (manager === 'windows' && meta) {
+		const name = (await serviceNameOf(deps, meta).catch(() => null)) ?? defaultRunnerServiceName(meta, deps.platform);
+		await deps.exec({ command: 'sc.exe', args: ['stop', name], timeoutMs: SERVICE_TIMEOUT_MS }).catch(() => undefined);
+		await deps.exec({ command: 'sc.exe', args: ['delete', name], timeoutMs: SERVICE_TIMEOUT_MS }).catch(() => undefined);
 	}
 }
 
