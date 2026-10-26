@@ -491,6 +491,20 @@ export interface FleetDesktopOpenResult {
 	fellBack: boolean;
 }
 
+/** `GET …/desktop/screenshot` — one Steady-width keyframe (FR-30; the read-only Agent tool's answer). */
+export interface FleetDesktopScreenshot {
+	nodeId: string;
+	displayId: string | null;
+	width: number;
+	height: number;
+	mime: 'image/jpeg' | 'image/png' | 'image/webp';
+	/** Canonical base64 of the picture. */
+	data: string;
+	/** Size of the picture in bytes (the receipt shows it). */
+	bytes: number;
+	takenAt: string;
+}
+
 /** Body of `POST …/desktop/views/:viewId/attach-token` (a reconnect of the same view). */
 export interface FleetDesktopAttachRequest {
 	role?: 'viewer' | 'driver';
