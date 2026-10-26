@@ -1435,6 +1435,15 @@ const USAGE_EXPORTS = [
 	'formatFleetUsageTokens'
 ] as const;
 
+/** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
+const CLOUD_P2_EXPORTS = [
+	'FLEET_CLOUD_BUSY_SESSION_STATES',
+	'FLEET_CLOUD_IDLE_REQUESTER',
+	'FLEET_CLOUD_USAGE_FRESH_MS',
+	'fleetCloudIdleAttentionKey',
+	'fleetCloudIdleHours'
+] as const;
+
 const MODEL_LIST_PRICES_EXPORTS = [
 	'MODEL_TOKEN_CLASSES',
 	'findModelListPriceEntry',
@@ -1484,7 +1493,8 @@ const ALL_EXPORTS = [
 	...VIRTUAL_EXPORTS,
 	...CLOUD_EXPORTS,
 	...USAGE_EXPORTS,
-	...MODEL_LIST_PRICES_EXPORTS
+	...MODEL_LIST_PRICES_EXPORTS,
+	...CLOUD_P2_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -2091,7 +2101,8 @@ describe('fleet barrel', () => {
 		// plus three in existing modules (`SPRINT_EXISTING_MODULE_EXPORTS`).
 		// → +37 with FL-20 (usage & cost): thirty-four symbols of `fleet-usage.types.ts`
 		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37);
+		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5);
 	});
 
 	it.each([
