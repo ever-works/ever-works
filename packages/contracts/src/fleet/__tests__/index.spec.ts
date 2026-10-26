@@ -1396,7 +1396,13 @@ const CLOUD_EXPORTS = [
 	'fleetCloudPriceSentence',
 	'fleetCloudCreateSummary',
 	'fleetCloudPowerOffSummary',
-	'fleetCloudDestroySummary'
+	'fleetCloudDestroySummary',
+	// FL-17 P2 (cost job, idle policy) — same module.
+	'FLEET_CLOUD_BUSY_SESSION_STATES',
+	'FLEET_CLOUD_IDLE_REQUESTER',
+	'FLEET_CLOUD_USAGE_FRESH_MS',
+	'fleetCloudIdleAttentionKey',
+	'fleetCloudIdleHours'
 ] as const;
 
 /** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
@@ -2117,7 +2123,8 @@ describe('fleet barrel', () => {
 		// → 1227 with FL-18 (Actions runners on computers): the fifty-one symbols of
 		// `fleet-actions-runners.types.ts` — a NEW module, so the witness table gains a
 		// row — and `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
-		expect(Object.keys(fleet)).toHaveLength(1227);
+		// → 1232 with FL-17 P2: five symbols more in `fleet-cloud.types.ts` (the cost job, the idle policy).
+		expect(Object.keys(fleet)).toHaveLength(1232);
 	});
 
 	it.each([
