@@ -85,13 +85,23 @@ export default async function DeployPage({ params }: DeployPageParams) {
             appRuntimeAPI.getAppStatus(id).catch(() => null),
         ]);
         return (
-            <AppDeployPage
-                work={{ id: work.id, slug: work.slug, name: work.name }}
-                initialTarget={appTarget}
-                status={appStatus}
-                canEdit={canDeploy(work.userRole)}
-                isOwner={isOwner(work.userRole)}
-            />
+            <div className="space-y-4">
+                <AppDeployPage
+                    work={{ id: work.id, slug: work.slug, name: work.name }}
+                    initialTarget={appTarget}
+                    status={appStatus}
+                    canEdit={canDeploy(work.userRole)}
+                    isOwner={isOwner(work.userRole)}
+                />
+                {/*
+                 * APW-06 T64 (lane aw-ops) — the managed subdomain and the custom domains of an
+                 * App. Both cards call `/api/deploy/works/:id/subdomain` and `…/domains`, whose
+                 * kind-`app` branch the API already serves (C43); they rendered only on the
+                 * website path until now. Shown once the App has somewhere to run.
+                 */}
+                {appTarget.target !== 'none' && <SubdomainManagement work={work} />}
+                {appTarget.target !== 'none' && <DomainManagement work={work} />}
+            </div>
         );
     }
 

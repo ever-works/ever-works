@@ -23,6 +23,39 @@ export type { AppEnvListResponse, AppEnvPatchResponse, AppEnvPatchResultItem, Ap
 /** The code an action answers when the route is not deployed on this API (`404`). */
 export const APP_ENV_ROUTE_UNAVAILABLE = 'route_unavailable';
 
+/**
+ * Lane aw-ops (APW-07 T28) — one line of a `.env` import preview
+ * (`POST /api/works/:id/app-env/import-preview`). A name, a line and an action: never a value.
+ */
+export interface AppEnvImportPreviewLineView {
+    line: number;
+    name: string | null;
+    action: 'add' | 'replace' | 'remove' | 'skipped' | 'refused';
+    code: string | null;
+    message: string | null;
+}
+
+/** The whole preview: per line, the names that would change, and FR-28's ceiling when exceeded. */
+export interface AppEnvImportPreviewView {
+    workId: string;
+    lines: AppEnvImportPreviewLineView[];
+    changes: { add: string[]; replace: string[]; remove: string[] };
+    refused: number;
+    limits: { code: string; message: string } | null;
+    undeclared: string[];
+}
+
+/** Lane aw-ops (APW-07 T24) — `POST /api/works/:id/app-env/:name/rotate`: a version, never the value. */
+export interface AppEnvRotateView {
+    workId: string;
+    name: string;
+    version: number;
+    entries: AppEnvVariableView[];
+}
+
+/** The `.env` paste the browser may send (FR-28's 1 MiB ceiling, checked again by the API). */
+export const APP_ENV_IMPORT_MAX_BYTES = 1024 * 1024;
+
 /** One action's answer. */
 export interface AppEnvActionResult<T> {
     success: boolean;

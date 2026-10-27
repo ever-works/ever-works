@@ -40,6 +40,11 @@ import { defaultStdinRunner } from './link/modules/virtual/host';
 import { defaultVirtualStateFs, VirtualState } from './link/modules/virtual/state';
 import type { SecretStore } from './secret-store';
 import { kvmUsable, WindowsPasswordStore } from './link/modules/virtual/windows';
+import { createRunnerExecutors } from './executors/runners';
+import { createRunnersModule } from './link/modules/runners';
+import { defaultRunnerExec, type RunnerHostDeps } from './link/modules/runners/host';
+import { listRunnerLogSources, newestRunnerDiagLog } from './link/modules/runners/logs';
+import { RunnerState } from './link/modules/runners/state';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -78,6 +83,10 @@ import {
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
 import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
 import { createClipLinkModule, PasteTargets } from './link/modules/clip';
+import { createDesktopHelperTagsModule, createDesktopSourceOpener } from './link/modules/desktop/desktop-source';
+import { DesktopHelperHost } from './screen/desktop-helper-backend';
+import type { HelperSpawner } from './screen/helper/helper-process';
+import { createHelperFs, type HelperFs, type HelperPaths } from './screen/helper/helper-trust';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
@@ -110,6 +119,7 @@ import { SessionHookOverlay } from './sessions/hook-overlay';
 import { SessionStatusPipeline } from './sessions/session-status';
 import { spawn as spawnProcess } from 'node:child_process';
 import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
+import { existsSync } from 'node:fs';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -708,6 +718,16 @@ export interface CreateNodeRuntimeOptions {
 	/** Test seam: the filesystem the scan reads through. */
 	usageFs?: UsageFs;
 	/**
+	 * Actions runners on computers (FL-18) — the node's runners folder
+	 * (`<config dir>/actions-runners`, owner-only). With it, the `runners` link
+	 * module (`runner.list`, `runner.status`, the `actions-runner` tag under
+	 * `--work` where a service manager exists), the runners' diagnostic logs as
+	 * FL-08 sources and the management lane's `runner-install` /
+	 * `runner-control` executors are composed. Absent (the desktop shell, tests,
+	 * embedders): none is.
+	 */
+	runnersDataDir?: string;
+	/**
 	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
 	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
 	 * embedder without self-update leaves it unset and the field is absent.
@@ -771,6 +791,16 @@ export interface CreateNodeRuntimeOptions {
 	filesRoots?: readonly string[];
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
+	/**
+	 * Desktop view & control (FL-07) — the screen helper's admission record,
+	 * event log and install path (beside the config). With them and `--attend`,
+	 * the `desktop` family serves the Desktop source and the heartbeat reports
+	 * the helper. Absent: the Desktop source is refused `unsupported_on_node`.
+	 */
+	screenHelperPaths?: HelperPaths;
+	/** Desktop view & control (FL-07) — the helper's filesystem and spawner (tests inject fakes). */
+	screenHelperFs?: HelperFs;
+	screenHelperSpawner?: HelperSpawner;
 	/**
 	 * Checkouts on computers (FL-14) — where the node-local checkout registry
 	 * lives (`checkouts.json` beside the config). Absent (the desktop shell,
@@ -1084,6 +1114,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// the standard log directories, ready checkouts (FL-14's registry), the
 	// workspace root and the `--files-root` folders, never the home directory.
 	let logsLinkModule: NodeModule | null = null;
+	// Actions runners on computers (FL-18): the runners folder, read by the logs
+	// module (`runner:<name>` sources) and the `runners` module below.
+	const runnerState = options.runnersDataDir ? new RunnerState(options.runnersDataDir) : null;
 	if (consents.manage) {
 		const platform = io.environment.platform;
 		const homedir = osHomedir();
@@ -1107,6 +1140,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		logsLinkModule = createLogsLinkModule({
 			io: logIo,
 			nodeName: config.name?.trim() || 'this computer',
+			// FL-18 (FR-18): each Actions runner's newest diagnostic log, `runner:<name>`.
+			...(runnerState
+				? {
+						runners: {
+							sources: () => listRunnerLogSources(runnerState),
+							logPath: (name: string) => newestRunnerDiagLog(runnerState, name)
+						}
+					}
+				: {}),
 			roots: async () => {
 				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
 				const resolved = await resolveCanonicalAllowedRoots(
@@ -1168,6 +1210,26 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const clipLinkModule = consents.attend
 		? createClipLinkModule({ targets: pasteTargets, nodeName: config.name?.trim() || 'this computer' })
 		: null;
+	// Desktop view & control (FL-07): the native screen helper behind the
+	// Desktop source, under --attend only. Verified against the owner's
+	// admission record before every start; its facts ride the heartbeat.
+	const desktopHelper =
+		consents.attend && options.screenHelperPaths
+			? new DesktopHelperHost({
+					paths: options.screenHelperPaths,
+					fs:
+						options.screenHelperFs ??
+						createHelperFs({
+							platform: io.environment.platform,
+							...(options.restrictFile ? { restrict: options.restrictFile } : {})
+						}),
+					platform: io.environment.platform,
+					env: options.env ?? process.env,
+					...(options.screenHelperSpawner ? { spawner: options.screenHelperSpawner } : {}),
+					logger: io.logger
+				})
+			: null;
+	if (desktopHelper) void desktopHelper.refresh();
 	// Schedules on computers (FL-13): the `schedule` family and the machine's own
 	// timer loop, for a process started with --manage. The loop starts now —
 	// independent of the link (FR-12) — and follows the kill switch once a
@@ -1269,13 +1331,57 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				passwords: virtualPasswords
 			})
 		: null;
+	// Actions runners on computers (FL-18): what the `runners` module and the
+	// management lane's runner executors share — the runners folder, the child
+	// process runner (the ONE way a registration token reaches a runner: its
+	// environment), this machine's service manager and privileges.
+	let runnerUser = 'this user';
+	try {
+		runnerUser = osUserInfo().username || runnerUser;
+	} catch {
+		// no passwd entry: the sudoers hint names no account
+	}
+	let runnerElevated: Promise<boolean> | null = null;
+	const runnerHostDeps: RunnerHostDeps | null = runnerState
+		? {
+				state: runnerState,
+				exec: defaultRunnerExec,
+				// Built lazily: the shared job client exists once the lanes do.
+				client: () => jobClientFor(),
+				platform: io.environment.platform,
+				arch: io.environment.arch,
+				user: runnerUser,
+				isRoot: () => typeof process.getuid === 'function' && process.getuid() === 0,
+				isElevated: () => {
+					if (!runnerElevated) {
+						runnerElevated =
+							io.environment.platform === 'win32'
+								? createMachineCommandRunner()
+										.run('net', ['session'], { timeoutMs: 5_000 })
+										.then((result) => result.code === 0)
+										.catch(() => false)
+								: Promise.resolve(typeof process.getuid === 'function' && process.getuid() === 0);
+					}
+					return runnerElevated;
+				},
+				hasSystemd: () => io.environment.platform === 'linux' && existsSync('/run/systemd/system'),
+				fetch: globalThis.fetch.bind(globalThis),
+				sleep: abortableSleep,
+				now: io.now ?? Date.now,
+				logger: io.logger,
+				nodeName: config.name?.trim() || 'this computer'
+			}
+		: null;
+	const runnersModule = runnerHostDeps ? createRunnersModule(runnerHostDeps) : null;
 	const linkModules = composeNodeLinkModules({
 		extra: [
 			healthLinkModule,
 			...(logsLinkModule ? [logsLinkModule] : []),
 			...(filesLinkModule ? [filesLinkModule] : []),
 			...(clipLinkModule ? [clipLinkModule] : []),
+			...(desktopHelper ? [createDesktopHelperTagsModule(desktopHelper)] : []),
 			...(virtualModule ? [virtualModule] : []),
+			...(runnersModule ? [runnersModule] : []),
 			...(options.linkModules ?? [])
 		],
 		...(sessions ? { session: sessions.module } : {}),
@@ -1301,7 +1407,16 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				}
 			: {}),
 		...(scheduleModule ? { schedule: scheduleModule } : {}),
-		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
+		...(portsModule ? { ports: portsModule } : {}),
+		// The `desktop` family's sources: FL-10's preview browser, FL-07's Desktop.
+		...(portsModule || desktopHelper
+			? {
+					desktopSources: {
+						...(portsModule ? { preview: portsModule.previewSource } : {}),
+						...(desktopHelper ? { desktop: createDesktopSourceOpener({ host: desktopHelper }) } : {})
+					}
+				}
+			: {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
 		// FL-09 — services and processes (their verbs need --manage on this machine).
@@ -1368,6 +1483,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
 	// Schedules on computers (FL-13): the zone this machine's schedules fire in.
 	telemetry.timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+	// Desktop view & control (FL-07): the helper re-verified, its facts reported.
+	if (desktopHelper) {
+		telemetry.desktop = async () => {
+			await desktopHelper.refresh();
+			return desktopHelper.report();
+		};
+	}
 	// The management lane (CONTRACTS R-34): which of its kinds this process may
 	// lease, and every kind it owns — the work lane below never leases those.
 	const virtualExecutors: ManagementLaneExecutor[] = virtualState
@@ -1414,7 +1536,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					logger: io.logger
 				})
 			: [];
-	const laneExecutors = [...virtualExecutors, ...usageExecutors];
+	// Actions runners on computers (FL-18): `runner-install` / `runner-control`,
+	// leased only under `--work` (the plan filters on the consent).
+	const runnerExecutors: ManagementLaneExecutor[] = runnerHostDeps ? createRunnerExecutors(runnerHostDeps) : [];
+	const laneExecutors = [...virtualExecutors, ...usageExecutors, ...runnerExecutors];
 	const managementPlan = planManagementLane(
 		consents,
 		options.managementLane ?? (laneExecutors.length > 0 ? { executors: laneExecutors } : undefined)

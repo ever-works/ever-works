@@ -134,8 +134,18 @@ export interface AppsTierPolicy {
         limitRange: AppLimitRangeInput;
     };
     ingress(): { className: string; controllerNamespace: string; edgeTlsMode: 'edge' };
-    /** Added (requested by APW-10 `plan.md` §5.5): owner eligibility for the tier; reasons are APW-10's codes. */
-    eligibility(userId: string): Promise<{ eligible: boolean; reasons: string[] }>;
+    /**
+     * Added (requested by APW-10 `plan.md` §5.5): owner eligibility for the tier; reasons are APW-10's codes.
+     *
+     * `opts.workId` (additive, lane aw-safety 2026-10-26): the Work being deployed, so the per-owner cap
+     * (`capReached`) can count the owner's OTHER App Works on the tier — a redeploy of one of them is
+     * never refused. Without it the cap is not evaluated. `counted` / `max` are optional extras an
+     * implementation may answer with (the counted Works' slugs, the configured cap).
+     */
+    eligibility(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible: boolean; reasons: string[]; counted?: string[]; max?: number }>;
 }
 
 /** DI token for {@link AppsTierPolicy} — a single definition, bound once (`plan.md` §9.8:1519–1521). */

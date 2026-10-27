@@ -1,0 +1,40 @@
+[package]
+name = "ever-works-screen"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+description = "Ever Works native screen helper: captures one display of the machine for the node (FL-07)."
+
+[[bin]]
+name = "ever-works-screen"
+path = "src/main.rs"
+
+[dependencies]
+jpeg-encoder = "0.6"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+x11rb = { version = "0.13", features = ["randr", "xfixes"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "=0.61.2", features = [
+	"Win32_Foundation",
+	"Win32_Graphics_Gdi",
+	"Win32_System_RemoteDesktop",
+	"Win32_System_StationsAndDesktops",
+	"Win32_System_Threading",
+	"Win32_UI_HiDpi",
+	"Win32_UI_WindowsAndMessaging"
+] }
+
+[profile.release]
+codegen-units = 1
+incremental = false
+lto = "thin"
+panic = "abort"
+strip = "symbols"
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

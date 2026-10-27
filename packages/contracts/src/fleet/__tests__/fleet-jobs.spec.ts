@@ -193,7 +193,7 @@ describe('isFleetJobTerminal / isFleetJobActive', () => {
 });
 
 describe('FLEET_JOB_KINDS', () => {
-	it('lists the three executors, the live-view session, the Agent session (FL-04 P2), the VM jobs (FL-16) and the usage scan (FL-20)', () => {
+	it('lists the three executors, the live-view session, the Agent session (FL-04 P2), the VM jobs (FL-16), the usage scan (FL-20) and the runner jobs (FL-18)', () => {
 		expect(FLEET_JOB_KINDS).toEqual([
 			'acceptance-checks',
 			'agent-task',
@@ -202,13 +202,15 @@ describe('FLEET_JOB_KINDS', () => {
 			'agent-session',
 			'vm-create',
 			'vm-control',
-			'usage-scan'
+			'usage-scan',
+			'runner-install',
+			'runner-control'
 		]);
 	});
 
-	it('has exactly eight unique members', () => {
-		expect(FLEET_JOB_KINDS).toHaveLength(8);
-		expect(new Set(FLEET_JOB_KINDS).size).toBe(8);
+	it('has exactly ten unique members', () => {
+		expect(FLEET_JOB_KINDS).toHaveLength(10);
+		expect(new Set(FLEET_JOB_KINDS).size).toBe(10);
 	});
 });
 
@@ -935,7 +937,9 @@ describe('clampQueuedMaxAgeSec (queue SLA, self-build slice S)', () => {
 			'agent-session': 7_200,
 			'vm-create': 7_200,
 			'vm-control': 7_200,
-			'usage-scan': 7_200
+			'usage-scan': 7_200,
+			'runner-install': 7_200,
+			'runner-control': 7_200
 		});
 		for (const kind of FLEET_JOB_KINDS) {
 			expect(clampQueuedMaxAgeSec(kind)).toBe(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind]);

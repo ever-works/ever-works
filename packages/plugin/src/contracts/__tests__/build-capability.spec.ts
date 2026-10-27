@@ -167,7 +167,9 @@ const LATER_CAPABILITIES: readonly string[] = [
 	'apps-tier',
 	'domain-event-subscriber',
 	// FL-17 (cloud computers).
-	'machine-provider'
+	'machine-provider',
+	// FL-18 (Actions runners on computers) — appends a capability, no category.
+	'actions-runners'
 ];
 const LATER_CATEGORIES: readonly PluginCategory[] = ['identity', 'machine-provider'];
 

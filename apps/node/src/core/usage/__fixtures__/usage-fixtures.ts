@@ -43,7 +43,12 @@ export function claudeLine(input: {
 			model: input.model ?? 'claude-sonnet-4-5-20250929',
 			content: [
 				{ type: 'text', text: 'OUTPUT-here-is-the-refactored-code' },
-				{ type: 'tool_use', id: 'toolu_1', name: 'Bash', input: { command: 'echo sk-ant-api03-FAKEFAKEFAKEFAKE' } }
+				{
+					type: 'tool_use',
+					id: 'toolu_1',
+					name: 'Bash',
+					input: { command: 'echo sk-ant-api03-FAKEFAKEFAKEFAKE' }
+				}
 			],
 			stop_reason: 'end_turn',
 			usage: {

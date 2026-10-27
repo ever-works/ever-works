@@ -214,6 +214,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-cloud-computers',
 				// What the model work on those computers would cost at list price (FL-20).
 				'features/fleet-usage',
+				// GitHub Actions self-hosted runners installed on computers of the Fleet (FL-18).
+				'features/fleet-actions-runners',
 				// What an Agent, the MCP server and the CLI may do on those computers, and the gates (FL-19).
 				'features/fleet-agent-tools',
 				'features/integrations',
@@ -450,7 +452,8 @@ const sidebars: SidebarsConfig = {
 						'plugin-system/creating-content-extractor-plugin',
 						'plugin-system/creating-pipeline-plugin',
 						'plugin-system/creating-deployment-plugin',
-						'plugin-system/creating-data-source-plugin'
+						'plugin-system/creating-data-source-plugin',
+						'plugin-system/creating-machine-provider-plugin'
 					]
 				},
 				'plugin-system/built-in-plugins',

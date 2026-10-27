@@ -57,6 +57,19 @@ export interface AppTargetCardProps {
  * radio group, so `↑`/`↓` move between the targets and a disabled one is
  * skipped but still announced with its reason.
  */
+/** The FR-35 reasons the web has copy for (lane aw-safety); anything else is shown by code. */
+const APPS_TIER_REASON_KEYS = new Set([
+    'emailUnverified',
+    'planRequired',
+    'ownerQuarantined',
+    'capReached',
+    'eligibilityUnavailable',
+]);
+
+function appsTierReasonText(t: (key: string, values?: Record<string, string>) => string, reason: string) {
+    return APPS_TIER_REASON_KEYS.has(reason) ? t(reason) : t('unknown', { reason });
+}
+
 export function AppTargetCard({
     workId,
     target,
@@ -76,9 +89,20 @@ export function AppTargetCard({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Lane aw-safety (2026-10-26): the tier names WHY (APW-10 FR-35 reason codes), so the line
+    // says it — "verify your email", "a paid plan", … — after the generic one.
+    const tEligibility = useTranslations('dashboard.workDetail.appsTierEligibility.reasons');
+    const managedReasons = (target.eligibility?.managed?.reasons ?? [])
+        .map((reason) =>
+            appsTierReasonText(
+                tEligibility as unknown as (key: string, values?: Record<string, string>) => string,
+                String(reason),
+            ),
+        )
+        .join(' ');
     const managedReason =
         target.eligibility?.managed && target.eligibility.managed.eligible === false
-            ? t('everWorksApps.ineligible')
+            ? `${t('everWorksApps.ineligible')}${managedReasons ? ` ${managedReasons}` : ''}`
             : t('everWorksApps.unavailable');
 
     const isDisabled = (choice: AppDeployTargetChoice) =>

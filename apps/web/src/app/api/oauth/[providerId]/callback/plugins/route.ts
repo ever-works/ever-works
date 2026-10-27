@@ -7,6 +7,7 @@ import { isValidRedirectUrl } from '@/lib/utils';
 import { getLocale } from 'next-intl/server';
 import { NextRequest } from 'next/server';
 import { appendQueryParams, getOAuthRouteErrorCode } from '../../../callback-errors';
+import { isSignInMachineProvider } from './machine-provider-sign-in';
 
 export async function GET(
     request: NextRequest,
@@ -64,7 +65,13 @@ export async function GET(
     // server-to-server API path inside `oauthAPI.connectCallback`, so an
     // unrecognized/crafted value must not reach the backend. Mirrors the main
     // OAuth callback handler's enum check.
-    if (!Object.values(OAuthProvider).includes(providerId as OAuthProvider)) {
+    // Cloud computers (FL-17 P3, spec FR-31): a machine-provider plugin the
+    // signed-in owner may use and that offers "Sign in" is accepted too — read
+    // from the API's own provider list, never from the route segment alone.
+    const known =
+        Object.values(OAuthProvider).includes(providerId as OAuthProvider) ||
+        (await isSignInMachineProvider(providerId));
+    if (!known) {
         return redirect({
             locale,
             href: appendQueryParams(defaultPath, {

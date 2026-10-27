@@ -71,7 +71,7 @@ in `usage/state.json` beside the node's config, readable by the node's user only
 - **Each record is counted once.** Re-reading the same files, a resumed session copying old lines, or a lost
   acknowledgement never double counts; deleting a record file never subtracts.
 - A report carries **hourly totals** per session, model and folder, at most 500 rows; a big first scan (a year of
-  records) catches up over several scans — the computer shows *catching up · 42 % scanned* meanwhile.
+  records) catches up over several scans — the computer shows _catching up · 42 % scanned_ meanwhile.
 - Records are bucketed by **their own** time, not the time of the scan.
 
 ## Where the numbers show up
@@ -80,15 +80,15 @@ in `usage/state.json` beside the node's config, readable by the node's user only
   model has no list price.
 - **Session detail** — `GET /api/fleet/sessions/:id` carries `tokens` (by model and class, requests, first and last
   activity), `costCents` and `priceListVersion`.
-- **Run receipt** — a line in the cost block: *Model work on build-01 · $0.42 at list price (v1) · 61 k in · 9 k out ·
-  212 k cache*, then the sentence.
+- **Run receipt** — a line in the cost block: _Model work on build-01 · $0.42 at list price (v1) · 61 k in · 9 k out ·
+  212 k cache_, then the sentence.
 - **Run cost and Budgets** — the Run's `costCents` includes it, and the Agent's Budget sees it through one
   non-debiting usage row per Run (`fleet-node:claude-code` / `fleet-node:codex`), exactly like a headless fleet run's
   own reported cost. When a headless run already reported a cost for the same session, only the difference is added.
-- **Computer page** — the Overview's usage line: *Usage 7 d · $22.10 · scan on · last scan 4 min ago*, or the opt-in
-  command when the scan is off, or *update the node* when it is too old.
+- **Computer page** — the Overview's usage line: _Usage 7 d · $22.10 · scan on · last scan 4 min ago_, or the opt-in
+  command when the scan is off, or _update the node_ when it is too old.
 - **Agent tool, MCP, CLI** — `fleet_usage_get { days?, node?, model? }` and `ever-works fleet usage [--days 1|7|30|90]
-  [--on <computer>] [--model <id>] [--json]` return the same object, read-only, with the sentence in `note`.
+[--on <computer>] [--model <id>] [--json]` return the same object, read-only, with the sentence in `note`.
 
 ## The Usage tab
 
@@ -96,25 +96,40 @@ in `usage/state.json` beside the node's config, readable by the node's user only
 (keys `1`–`4`), then
 
 - the totals line — cost at list price, tokens, requests and the top model — with the sentence above right beneath it,
-  and *excludes N requests on unknown models* when some model has no list price;
+  and _excludes N requests on unknown models_ when some model has no list price;
 - **By model** and **By computer** — click a model or a computer to filter the tab to it. Each computer shows its last
-  scan (*scanned 4 min ago*); an **offline** one keeps its numbers and its age (*offline · scanned 2 d ago*); one with
+  scan (_scanned 4 min ago_); an **offline** one keeps its numbers and its age (_offline · scanned 2 d ago_); one with
   the scan off shows the opt-in command instead of numbers. The owner can ask an online computer to **Scan now**;
-- **Busiest checkouts** — the known checkouts and shared folders that cost most (*other folders* for the rest), each
+- **Busiest checkouts** — the known checkouts and shared folders that cost most (_other folders_ for the rest), each
   opening the computer's Checkouts tab;
 - **Sessions** — per Agent, your own sessions, and **other (not started from Ever Works)**;
-- *catching up · 42 % scanned on build-01* while a first scan drains a large backlog.
+- _catching up · 42 % scanned on build-01_ while a first scan drains a large backlog.
 
 With no computer reporting yet the tab says so, with the command and what the scan reads. The palette has **Fleet
 usage** and **Usage on <computer>**.
+
+### Export and the price list
+
+- **Export CSV** on the tab downloads what is on screen — one row per model, computer, busiest checkout and Agent,
+  a total and the sentence above as the last row; an unknown model's price cell is empty, never 0. The CLI prints the
+  same text with `ever-works fleet usage --csv`.
+- **Price list** at the foot of the tab lists every published version with the date it took effect and the per-model
+  rates of the one in effect (per million tokens: input, output, cache read, cache write). When a period mixes
+  versions the tab says so — _priced at model list prices v1; v2 in effect since …_.
+
+## In your digest
+
+With a daily or weekly digest switched on, a **Your computers** section says what your machines ran in the window —
+_Your machines ran $4.20 of model work yesterday at list price · 212 requests on 2 computers_ — with the sentence
+above. It never makes a quiet digest send on its own.
 
 ## On the Agent's Budgets tab and the schedule rows
 
 - An Agent's **Budgets** tab lists, per computer, what its sessions and Task runs there would cost over the last 30
   days at list price. The Budget figure above it already includes that work (the non-debiting rows described above);
   the rows say where it came from.
-- On a computer's **Schedules** tab, an Agent-session schedule (a pinned recurring Task) shows *last run $0.42 · 30 d
-  $6.10 · list* (`GET /api/fleet/usage/tasks?ids=…`, your own Runs only).
+- On a computer's **Schedules** tab, an Agent-session schedule (a pinned recurring Task) shows _last run $0.42 · 30 d
+  $6.10 · list_ (`GET /api/fleet/usage/tasks?ids=…`, your own Runs only).
 
 ## Sessions not started from Ever Works
 
@@ -122,7 +137,7 @@ A session someone opened at the computer's keyboard has no Ever Works session or
 **other** on that computer: counted in the computer's totals, never turned into a Run, never naming an Agent. If a
 session with that CLI session id appears later (a late sync), it claims those tokens on the next report. Other
 sessions are shown to the computer's **owner only**; an Organization member who may see the computer sees that
-total as *not shown*.
+total as _not shown_.
 
 ## List prices
 
@@ -133,14 +148,14 @@ version it was priced at; a new version never re-prices old figures. A model the
 
 ## Errors
 
-| Code                  | When                                               | Hint                                                          |
-| --------------------- | -------------------------------------------------- | ------------------------------------------------------------- |
-| `consent_missing`     | the computer's owner has not switched the scan on  | ``Usage scan is off — run `ever-works-node start --usage-scan` on build-01`` |
-| `unsupported_on_node` | the node is too old, or has no record folder       | update the node on that computer                              |
-| `unreachable`         | a rescan of an offline computer                    | the numbers shown are from its last scan                      |
-| `kill_switch`         | a rescan while the Fleet is stopped                | clear it under Settings → Fleet                               |
-| `permission_denied`   | a rescan by someone who is not the owner           | —                                                             |
-| `invalid`             | `days` is not 1, 7, 30 or 90                        | —                                                             |
+| Code                  | When                                              | Hint                                                                         |
+| --------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `consent_missing`     | the computer's owner has not switched the scan on | ``Usage scan is off — run `ever-works-node start --usage-scan` on build-01`` |
+| `unsupported_on_node` | the node is too old, or has no record folder      | update the node on that computer                                             |
+| `unreachable`         | a rescan of an offline computer                   | the numbers shown are from its last scan                                     |
+| `kill_switch`         | a rescan while the Fleet is stopped               | clear it under Settings → Fleet                                              |
+| `permission_denied`   | a rescan by someone who is not the owner          | —                                                                            |
+| `invalid`             | `days` is not 1, 7, 30 or 90                      | —                                                                            |
 
 While the kill switch is on, nodes lease no jobs, so scans pause too; stored numbers stay visible with their age.
 The scan itself writes no audit row — it only reads.

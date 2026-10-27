@@ -77,6 +77,7 @@ import {
     FleetSessionSweepService,
     FleetVirtualReconcileService,
     FleetCloudSweepService,
+    FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
@@ -137,6 +138,10 @@ import {
     AppDeployDispatchRelay,
     AppDeployRequestService,
     AppRuntimeEventRelayService,
+    // APW-06 T58 / §9.8 (lane aw-safety) — the deletion's completion edge (`finishDeletion`).
+    AppRuntimeDeletionService,
+    // APW-10 T27 / APW-06 T45 (lane aw-safety) — the worker's tier-eligibility re-check.
+    AppsTierEligibilityService,
 } from '@ever-works/agent/app-runtime';
 // APW-06 T71 (A0.7) — the runtime-state row and the env source the isolated App runtime worker
 // proxies by name (plan §6.4). Both read or write rows, so neither can be local in the worker.
@@ -748,6 +753,22 @@ export class TriggerInternalController implements OnModuleInit {
         // sweeps only. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetCloudSweepService?: FleetCloudSweepService,
+        // Actions runners on computers (FL-18) — backs the `fleet-runners-poll` cron:
+        // the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetActionsRunnersPollService?: FleetActionsRunnersPollService,
+        // APW-06 T58 / §9.8 (lane aw-safety, 2026-10-26) — the completion edge of an App Work's
+        // deletion: the isolated worker's `APP_WORK_DELETION_COMPLETION` dials
+        // `AppRuntimeDeletionService.finishDeletion` here (provided by the `@Global()`
+        // `AppRuntimePortsModule`). Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly appRuntimeDeletionService?: AppRuntimeDeletionService,
+        // APW-10 T27 / APW-06 T45 (lane aw-safety, 2026-10-26) — the worker's re-check of the
+        // managed tier's eligibility (`ConfigAppsTierPolicy` in `TriggerAppRuntimeModule`).
+        // Provided by the `@Global()` `AppsTierPolicyBindingModule`. Appended LAST + `@Optional()`.
+        @Optional()
+        private readonly appsTierEligibilityService?: AppsTierEligibilityService,
     ) {}
 
     onModuleInit() {
@@ -914,6 +935,13 @@ export class TriggerInternalController implements OnModuleInit {
                       evaluateIdle: () => this.fleetCloudSweepService!.evaluateIdle(),
                   }
                 : undefined,
+            // Actions runners on computers (FL-18) — `fleet-runners-poll` calls
+            // `reconcile()` here, and only that: `FleetActionsRunnersPollService` is a
+            // one-member facade over `FleetActionsRunnersService` (whose install /
+            // control / token mint must never reach the worker).
+            FleetActionsRunnersPollService: this.fleetActionsRunnersPollService
+                ? { reconcile: () => this.fleetActionsRunnersPollService!.reconcile() }
+                : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here
             // (allow-list auto-derived).
@@ -1076,6 +1104,38 @@ export class TriggerInternalController implements OnModuleInit {
                 ? { read: (workId: string) => this.appBuildPullTokenReader!.read(String(workId)) }
                 : undefined,
             AppDeployRequestService: this.appDeployRequestService,
+            // APW-06 T58 / §9.8 (lane aw-safety) — a ONE-member facade (the `PluginAllowlistReader`
+            // precedent): the worker may finish a deletion and nothing else — never
+            // `requestDeletion` (that is the owner's, through `deleteWork`) and never the op
+            // handler. The completion behind it refuses unless the runtime-state row records a
+            // deletion the owner asked for (`AppWorkDeletionCompletionService`). The report is
+            // rebuilt by `finishDeletion` (kinds, names and codes only) before anyone reads it.
+            AppRuntimeDeletionService: this.appRuntimeDeletionService
+                ? {
+                      finishDeletion: (workId: string, report?: unknown) =>
+                          this.appRuntimeDeletionService!.finishDeletion(
+                              String(workId),
+                              report && typeof report === 'object'
+                                  ? (report as Parameters<
+                                        AppRuntimeDeletionService['finishDeletion']
+                                    >[1])
+                                  : undefined,
+                          ),
+                  }
+                : undefined,
+            // APW-10 T27 / APW-06 T45 (lane aw-safety) — a ONE-member facade: the worker may ask
+            // whether an account may run an App on the managed tier, and nothing else.
+            AppsTierEligibilityService: this.appsTierEligibilityService
+                ? {
+                      evaluate: (userId: string, opts?: { workId?: unknown }) =>
+                          this.appsTierEligibilityService!.evaluate(String(userId ?? ''), {
+                              workId:
+                                  typeof opts?.workId === 'string' && opts.workId
+                                      ? opts.workId
+                                      : null,
+                          }),
+                  }
+                : undefined,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

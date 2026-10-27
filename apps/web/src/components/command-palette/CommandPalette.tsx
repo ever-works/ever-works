@@ -45,6 +45,8 @@ import {
     fleetVirtualScreens,
     fleetCloudScreens,
     fleetUsageScreens,
+    fleetRunnersScreens,
+    fleetActionsJobsScreens,
     screensFor,
 } from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
@@ -54,6 +56,7 @@ import {
     useFleetVirtualEnabled,
     useFleetCloudEnabled,
     useFleetUsageEnabled,
+    useFleetActionsRunnersEnabled,
 } from '@/components/fleet/FleetHubFlagProvider';
 import { useFleetPaletteSessions } from './hooks/use-fleet-palette-sessions';
 import { paletteSessionsFrom } from './registry/palette-sessions';
@@ -270,6 +273,7 @@ export function CommandPalette({
     const fleetVirtualEnabled = useFleetVirtualEnabled();
     const fleetCloudEnabled = useFleetCloudEnabled();
     const fleetUsageEnabled = useFleetUsageEnabled();
+    const fleetActionsRunnersEnabled = useFleetActionsRunnersEnabled();
     // …and "Go to computer <name>" for each computer the viewer may see (FR-33).
     const fleetComputers = useFleetPaletteComputers(open, fleetHubEnabled);
     // FL-05 (FR-46): the sessions waiting on the person open the empty palette.
@@ -292,6 +296,10 @@ export function CommandPalette({
             ...fleetCloudScreens(fleetComputers, fleetCloudEnabled),
             // Usage & cost (FL-20): "Fleet usage", "Usage on <name>".
             ...fleetUsageScreens(fleetComputers, fleetUsageEnabled),
+            // Actions runners (FL-18): "Install Actions runners on <name>".
+            ...fleetRunnersScreens(fleetComputers, fleetActionsRunnersEnabled),
+            // Actions jobs (FL-18 P2): "Actions jobs" — the hub's panel.
+            ...fleetActionsJobsScreens(fleetActionsRunnersEnabled),
         ],
         [
             appPath,
@@ -300,6 +308,7 @@ export function CommandPalette({
             fleetVirtualEnabled,
             fleetCloudEnabled,
             fleetUsageEnabled,
+            fleetActionsRunnersEnabled,
             fleetComputers,
         ],
     );

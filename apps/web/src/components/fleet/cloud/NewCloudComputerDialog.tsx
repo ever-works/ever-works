@@ -13,6 +13,7 @@ import {
     type FleetLinkError,
 } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
+import { connectOAuthProvider } from '@/app/actions/dashboard/oauth';
 import { ROUTES } from '@/lib/constants';
 import {
     createFleetCloudAction,
@@ -77,6 +78,10 @@ export function NewCloudComputerDialog({
     const [error, setError] = useState<FleetLinkError | null>(null);
     const [priceChanged, setPriceChanged] = useState<number | null>(null);
     const [reloadKey, setReloadKey] = useState(0);
+    // P3 (FR-32): the overlay-VPN client's one-time key — in this dialog's memory
+    // only, sent once with Create, never echoed back.
+    const [vpnAuthKey, setVpnAuthKey] = useState('');
+    const [signingIn, setSigningIn] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     // The providers, once per opening.
@@ -88,6 +93,7 @@ export function NewCloudComputerDialog({
         setError(null);
         setPriceChanged(null);
         setProviders(null);
+        setVpnAuthKey('');
         void listFleetCloudProvidersAction().then((result) => {
             if (!live) return;
             const list = result.ok ? result.data.providers : [];
@@ -165,8 +171,10 @@ export function NewCloudComputerDialog({
                 software: form.software,
                 acknowledgedPriceCents: size.priceMonthlyCents,
                 confirm: true,
+                ...(form.software.includes('overlay-vpn') && vpnAuthKey.trim() ? { vpnAuthKey: vpnAuthKey.trim() } : {}),
             });
             if (result.ok) {
+                setVpnAuthKey('');
                 toast.success(t('create.created', { name: form.name, provider: options.providerName }));
                 onCreated?.(result.data);
                 onClose();
@@ -184,6 +192,38 @@ export function NewCloudComputerDialog({
     };
 
     const empty = providers !== null && configured.length === 0;
+    // P3 (FR-31): providers the owner can sign in to instead of pasting a token.
+    const signInable = (providers ?? []).filter((entry) => !entry.configured && entry.oauthAvailable);
+
+    const signIn = (pluginId: string) => {
+        setSigningIn(pluginId);
+        void connectOAuthProvider(pluginId, `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=cloud`).then((result) => {
+            if (result.success && 'url' in result && typeof result.url === 'string') {
+                window.location.assign(result.url);
+                return;
+            }
+            setSigningIn(null);
+            toast.error(t('create.signInFailed'));
+        });
+    };
+
+    const signInButtons =
+        signInable.length > 0 ? (
+            <div className="flex flex-wrap gap-2" data-testid="fleet-cloud-sign-in">
+                {signInable.map((entry) => (
+                    <Button
+                        key={entry.pluginId}
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => signIn(entry.pluginId)}
+                        loading={signingIn === entry.pluginId}
+                        data-testid={`fleet-cloud-sign-in-${entry.pluginId}`}
+                    >
+                        {t('create.signIn', { provider: entry.providerName })}
+                    </Button>
+                ))}
+            </div>
+        ) : null;
 
     return (
         <Dialog open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
@@ -196,6 +236,7 @@ export function NewCloudComputerDialog({
                 {empty ? (
                     <div className="flex flex-col gap-3 text-sm" data-testid="fleet-cloud-empty">
                         <p>{t('create.empty')}</p>
+                        {signInButtons}
                         <Link href={ROUTES.DASHBOARD_PLUGINS} className="text-primary underline">
                             {t('create.openPlugins')}
                         </Link>
@@ -223,6 +264,7 @@ export function NewCloudComputerDialog({
                                 </span>
                             ) : null}
                         </label>
+                        {signInButtons}
 
                         <label className="flex flex-col gap-1">
                             <span className="font-medium">{t('create.name')}</span>
@@ -312,6 +354,25 @@ export function NewCloudComputerDialog({
                                 ))}
                             </div>
                         </fieldset>
+
+                        {form.software.includes('overlay-vpn') ? (
+                            <label className="flex flex-col gap-1">
+                                <span className="font-medium">{t('create.vpnKey')}</span>
+                                <input
+                                    className={FIELD}
+                                    type="password"
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    value={vpnAuthKey}
+                                    onChange={(event) => setVpnAuthKey(event.target.value)}
+                                    maxLength={200}
+                                    data-testid="fleet-cloud-vpn-key"
+                                />
+                                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('create.vpnKeyHint')}
+                                </span>
+                            </label>
+                        ) : null}
 
                         {priceChanged !== null ? (
                             <p

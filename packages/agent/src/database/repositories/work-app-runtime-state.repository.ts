@@ -118,6 +118,58 @@ export class WorkAppRuntimeStateRepository implements WorkAppRuntimeStatePort {
      * person can see, including ones that have never been deployed, and writing
      * a row per rendered tile would turn a read into a write storm.
      */
+    /**
+     * APW-06 T45 / plan §9.5 (lane aw-safety, 2026-10-26) — how many of one owner's App Works
+     * OCCUPY Ever Works Apps, for the per-owner cap (`EVER_WORKS_APPS_MAX_PER_USER`).
+     *
+     * Counted: the owner's `app` Works whose row is on `ever-works-apps`, not removed
+     * (`removedAt IS NULL`), and holding something on the tier — a Deployment recorded, a namespace
+     * recorded, or the deploy lock (a first Deployment in flight). Paused Apps count (their data
+     * and dependencies are still there); removed ones do not; a Work merely pointed at the tier
+     * with nothing deployed does not. `excludeWorkId` — the Work being deployed — is never counted
+     * against itself, so a redeploy is never refused.
+     *
+     * Two reads instead of a join, so the query is the same on Postgres and SQLite.
+     *
+     * @returns the count and the counted Works' slugs (names only).
+     */
+    async countManagedForOwner(
+        ownerUserId: string,
+        opts: { excludeWorkId?: string | null } = {},
+    ): Promise<{ count: number; names: string[] }> {
+        const owner = typeof ownerUserId === 'string' ? ownerUserId.trim() : '';
+        if (!owner) {
+            return { count: 0, names: [] };
+        }
+        const works = await this.works
+            .createQueryBuilder('work')
+            .select(['work.id', 'work.slug'])
+            .where('work.userId = :owner', { owner })
+            .andWhere('work.kind = :kind', { kind: 'app' })
+            .getMany();
+        const exclude = opts.excludeWorkId ? String(opts.excludeWorkId) : null;
+        const slugById = new Map(
+            works.filter((work) => work.id !== exclude).map((work) => [work.id, work.slug]),
+        );
+        const ids = [...slugById.keys()];
+        if (ids.length === 0) {
+            return { count: 0, names: [] };
+        }
+        const rows = await this.repository
+            .createQueryBuilder('state')
+            .where('state.workId IN (:...ids)', { ids })
+            .andWhere('state.target = :target', { target: 'ever-works-apps' })
+            .andWhere('state.removedAt IS NULL')
+            .andWhere(
+                '(state.currentDeploymentId IS NOT NULL OR state.namespace IS NOT NULL OR state.deployLockId IS NOT NULL)',
+            )
+            .getMany();
+        return {
+            count: rows.length,
+            names: rows.map((row) => String(slugById.get(row.workId) ?? row.workId)),
+        };
+    }
+
     async findStateForWorks(workIds: string[]): Promise<Map<string, WorkAppRuntimeState>> {
         const ids = [...new Set((workIds ?? []).filter(Boolean))];
         if (ids.length === 0) {
@@ -495,6 +547,53 @@ export class WorkAppRuntimeStateRepository implements WorkAppRuntimeStatePort {
             .where('workId = :workId', { workId })
             .andWhere('deletionRequestedAt IS NULL')
             .andWhere('deployLockId IS NULL')
+            .execute();
+
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
+     * Lane aw-safety (2026-10-26) — undo a deletion claim whose dispatch could not be made, so the
+     * Work does not read **Deleting…** with nothing running the removal. Only a claim no attempt
+     * has run under is released (`deletionAttempts = 0`): once the op has touched the cluster the
+     * claim is the record of that, and it stays.
+     *
+     * @returns `true` when a claim was released.
+     */
+    async releaseDeletionClaim(workId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppRuntimeState)
+            .set({
+                deletionRequestedAt: null,
+                deletionDeleteData: null,
+                deletionRequestedByUserId: null,
+            })
+            .where('workId = :workId', { workId })
+            .andWhere('deletionRequestedAt IS NOT NULL')
+            .andWhere('deletionAttempts = 0')
+            .execute();
+
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
+     * Lane aw-safety (2026-10-26) — the atomic re-claim of a STALE deletion claim (older than
+     * `staleBefore`): the op was lost, the worker died, or the completion never arrived, and the
+     * Work still exists. Compare-and-set on `deletionRequestedAt`, so of two repeated deletes only
+     * one wins and dispatches. The member's `deletionDeleteData` decision is kept as it was
+     * claimed; the attempt counter restarts with the fresh op.
+     *
+     * @returns `true` when this call won the re-claim and owns the dispatch.
+     */
+    async reclaimStaleDeletion(workId: string, staleBefore: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppRuntimeState)
+            .set({ deletionRequestedAt: new Date(), deletionAttempts: 0 })
+            .where('workId = :workId', { workId })
+            .andWhere('deletionRequestedAt IS NOT NULL')
+            .andWhere('deletionRequestedAt < :staleBefore', { staleBefore })
             .execute();
 
         return (result.affected ?? 0) === 1;

@@ -138,8 +138,9 @@ export class FleetCloudController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetCloudCreateResponse> {
         refuseMachinePrincipalAction(auth, req, 'create a cloud computer', REFUSAL_WHY);
-        // `vpnAuthKey` is deliberately not forwarded in this phase (the overlay-VPN
-        // preset arrives in P3) and is never echoed: the response type has no field for it.
+        // P3 (FR-32): `vpnAuthKey` goes to the service, which hands it to the first-boot
+        // script once; it is never echoed (the response type has no field for it), stored,
+        // logged or audited.
         return this.cloud.create(
             { kind: 'user', userId: auth.userId },
             {
@@ -150,6 +151,7 @@ export class FleetCloudController {
                 software: body.software,
                 acknowledgedPriceCents: body.acknowledgedPriceCents,
                 organizationId: body.organizationId ?? null,
+                ...(typeof body.vpnAuthKey === 'string' && body.vpnAuthKey ? { vpnAuthKey: body.vpnAuthKey } : {}),
                 fields: cloudConfirmFields(body),
             },
         );

@@ -29,7 +29,9 @@ export default async function AgentBudgetsPage({ params }: { params: Params }) {
     }));
 
     // FL-20 P2 (spec FR-14, FR-15): the Agent's fleet work per computer, at list price.
-    const fleetUsage = readFleetFeatureFlags(['FLEET_USAGE_SCAN_ENABLED'] as const).FLEET_USAGE_SCAN_ENABLED === true;
+    const fleetUsage =
+        readFleetFeatureFlags(['FLEET_USAGE_SCAN_ENABLED'] as const).FLEET_USAGE_SCAN_ENABLED ===
+        true;
 
     return (
         <>

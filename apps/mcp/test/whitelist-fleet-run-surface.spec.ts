@@ -128,6 +128,12 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_ports_list: 'what a computer listens on',
 	fleet_ports_open: 'opens a page on a computer',
 	fleet_ports_preview_close: "closes a person's preview tunnel",
+	// Actions runners (FL-18): a runner registers a computer with a repository and then runs that
+	// repository's workflows there — never a run token's to see or change.
+	fleet_runners_list: "the Actions runners on a person's computers and the repositories they serve",
+	fleet_runners_install: 'registers a computer as a runner for a repository',
+	fleet_runners_action: 'starts or stops an Actions runner on a computer',
+	fleet_runners_remove: 'destructive: removes an Actions runner',
 	// FL-19 P1 — the catalogue's reads: machine state of every computer the owner has.
 	fleet_status: "the owner's whole fleet at a glance",
 	fleet_nodes_health: "a computer's health",
@@ -190,7 +196,13 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_cloud_destroy: 'destructive: destroys a cloud computer',
 	fleet_cloud_idle_policy: 'decides when a cloud computer is powered off (spend)',
 	// FL-20 usage & cost: a person's model spend across their computers.
-	fleet_usage_get: "a person's model usage and cost across their computers"
+	fleet_usage_get: "a person's model usage and cost across their computers",
+	// FL-18 P2 Actions jobs: a person's CI across their repositories, and cancelling it.
+	fleet_runners_jobs: "a person's queued and running CI jobs across their repositories",
+	fleet_runners_cancel_run: "cancels a whole workflow run of a person's repository",
+	// FL-07 desktop view & control: the `desktop` family (watching and controlling a person's
+	// screen) is never reachable with a run token — not even the read of its displays.
+	fleet_desktop_displays: "the displays of a person's computer (the desktop view family)"
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

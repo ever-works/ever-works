@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { useTranslations } from 'next-intl';
-import { deleteWork, getAppDeleteTarget } from '@/app/actions/dashboard';
+import { deleteWork, getAppDeleteTarget, getAppDeletionPreview } from '@/app/actions/dashboard';
+import type { AppDeletionPreviewEntry, AppDeletionPreviewResponse } from '@/lib/api/work';
 import { ROUTES } from '@/lib/constants';
 import {
     Dialog,
@@ -117,6 +118,28 @@ export function DeleteComponent({ work }: { work: Work }) {
         };
     }, [showDeleteDialog, isAppWork, appTarget, work.id]);
 
+    // APW-06 T59 (lane aw-safety, 2026-10-26) — what deleting removes, keeps and (with stored
+    // data) destroys, read once when the dialog opens for an App Work. `undefined` = loading,
+    // `null` = the read failed (the dialog says so rather than listing nothing).
+    const [appPreview, setAppPreview] = useState<AppDeletionPreviewResponse | null | undefined>(
+        undefined,
+    );
+    useEffect(() => {
+        if (!showDeleteDialog || !isAppWork || appPreview !== undefined) {
+            return;
+        }
+        let cancelled = false;
+        void getAppDeletionPreview(work.id).then((result) => {
+            if (cancelled) {
+                return;
+            }
+            setAppPreview(result.success && result.preview ? result.preview : null);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [showDeleteDialog, isAppWork, appPreview, work.id]);
+
     const appOffersStoredData = isAppWork && appTarget !== null && appTarget !== 'none';
     const appTargetLabel =
         appTarget === 'ever-works-apps'
@@ -144,6 +167,7 @@ export function DeleteComponent({ work }: { work: Work }) {
         setAppForkTyped('');
         setAppStoredDataChecked(false);
         setAppStoredDataTyped('');
+        setAppPreview(undefined);
         setDeleteOptions({
             delete_data_repository: false,
             delete_markdown_repository: false,
@@ -181,7 +205,22 @@ export function DeleteComponent({ work }: { work: Work }) {
         });
     };
 
-    const isDeleteDisabled = confirmationName !== work.name || isPending;
+    // A running Deployment makes the server refuse the delete (`409 app_deploy_in_progress`), so
+    // the button says so up front instead of letting the member type the name for nothing.
+    const appDeployInProgress = isAppWork && appPreview?.deployInProgress === true;
+    const isDeleteDisabled = confirmationName !== work.name || isPending || appDeployInProgress;
+    const entryLabel = (entry: AppDeletionPreviewEntry): string => {
+        if (entry.kind === 'Component' && entry.name) {
+            return t('deleteAppPreviewComponent', { name: entry.name });
+        }
+        if (entry.kind === 'DnsRecord') {
+            return t('deleteAppPreviewManagedDns');
+        }
+        const base = entry.label ? `${entry.label} (${entry.kind})` : (entry.name ?? entry.kind);
+        return typeof entry.sizeGiB === 'number'
+            ? `${base} - ${t('deleteAppPreviewSize', { size: entry.sizeGiB })}`
+            : base;
+    };
     const isGenerating = work.generateStatus?.status === GenerateStatusType.GENERATING;
 
     return (
@@ -239,6 +278,75 @@ export function DeleteComponent({ work }: { work: Work }) {
                             <p className="rounded-lg border border-card-border dark:border-border-secondary-dark px-4 py-3 text-xs text-text-secondary dark:text-text-secondary-dark">
                                 {t('deleteAppWorkloadsNote', { target: appTargetLabel })}
                             </p>
+                        )}
+
+                        {/* APW-06 T59 (lane aw-safety) — what the delete will do to the
+                            running App, from `GET /api/works/:id/app-deletion-preview`. */}
+                        {isAppWork && (
+                            <div
+                                className="rounded-lg border border-card-border dark:border-border-secondary-dark px-4 py-3 space-y-3 text-xs text-text-secondary dark:text-text-secondary-dark"
+                                data-testid="app-delete-preview"
+                                aria-live="polite"
+                            >
+                                <p className="font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                    {t('deleteAppPreviewTitle')}
+                                </p>
+                                {appPreview === undefined && <p>{t('deleteAppPreviewLoading')}</p>}
+                                {appPreview === null && <p>{t('deleteAppPreviewUnavailable')}</p>}
+                                {appPreview && appPreview.deployInProgress && (
+                                    <p
+                                        role="alert"
+                                        className="text-red-700 dark:text-red-300"
+                                        data-testid="app-delete-preview-deploying"
+                                    >
+                                        {t('deleteAppPreviewDeployInProgress')}
+                                    </p>
+                                )}
+                                {appPreview && appPreview.deleting && (
+                                    <p data-testid="app-delete-preview-deleting">
+                                        {t('deleteAppPreviewDeleting')}
+                                    </p>
+                                )}
+                                {appPreview && appPreview.stateUnreadable && (
+                                    <p>{t('deleteAppPreviewUnavailable')}</p>
+                                )}
+                                {appPreview && !appPreview.stateUnreadable && !appPreview.deployed && (
+                                    <p>{t('deleteAppPreviewNothingDeployed')}</p>
+                                )}
+                                {appPreview && appPreview.removes.length > 0 && (
+                                    <div>
+                                        <p className="font-medium text-text dark:text-text-dark">
+                                            {t('deleteAppPreviewRemoves', { target: appTargetLabel })}
+                                        </p>
+                                        <ul className="list-disc pl-5" data-testid="app-delete-preview-removes">
+                                            {appPreview.removes.map((entry, index) => (
+                                                <li key={`r-${entry.kind}-${entry.name ?? entry.label ?? index}`}>
+                                                    {entryLabel(entry)}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {appPreview && appPreview.keeps.length > 0 && (
+                                    <div>
+                                        <p className="font-medium text-text dark:text-text-dark">
+                                            {appStoredDataSatisfied
+                                                ? t('deleteAppPreviewDestroysWithData')
+                                                : t('deleteAppPreviewKeeps')}
+                                        </p>
+                                        <ul className="list-disc pl-5" data-testid="app-delete-preview-keeps">
+                                            {(appStoredDataSatisfied
+                                                ? appPreview.destroysWithData
+                                                : appPreview.keeps
+                                            ).map((entry, index) => (
+                                                <li key={`k-${entry.kind}-${entry.name ?? entry.label ?? index}`}>
+                                                    {entryLabel(entry)}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {/* APW-01 T39 — the App Work's own delete surface. */}

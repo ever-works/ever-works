@@ -532,7 +532,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/works/:id/app-deletion-preview',
         wrapper: 'getAppDeletionPreview',
-        shipped: false,
+        // Shipped 2026-10-26 (lane aw-safety): `AppWorkDeletionController`, owner only.
+        shipped: true,
     },
     {
         id: '06-15',
@@ -1340,7 +1341,11 @@ export function putAppTargetKubeconfig(
     return rawApi(request, 'POST', `/api/works/${seg(input.workId)}/app-target/kubeconfig`, input);
 }
 
-/** **Unshipped / contract-only** (APW-06): `GET /api/works/:id/app-deletion-preview` (R-15). */
+/**
+ * APW-06 T59: `GET /api/works/:id/app-deletion-preview` (R-15) — shipped 2026-10-26 (lane aw-safety,
+ * `apps/api/src/app-works/app-work-deletion.controller.ts`, owner only). Answers
+ * `{ target, deployed, deleting, stateUnreadable, deployInProgress, removes, keeps, destroysWithData }`.
+ */
 export function getAppDeletionPreview(
     request: APIRequestContext,
     input: WorkScopedInput,

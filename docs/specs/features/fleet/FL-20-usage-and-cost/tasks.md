@@ -94,7 +94,7 @@
 
 ## P3 — Digest, export, versions
 
-- [ ] **T-28**. Daily digest line via the existing digest service (`packages/agent/src/digest/`); export CSV from the tab; price-list version history panel.
+- [x] **T-28**. Daily digest line via the existing digest service (`packages/agent/src/digest/`); export CSV from the tab; price-list version history panel.
       **Test**: digest spec; export snapshot.
 
 ## Docs and rollout
@@ -120,6 +120,12 @@
 - T-25: the tab components live in `UsagePanel.tsx` + `UsageBlocks.tsx` (+ `usage-tab.shared.ts`); keys 1–4 switch periods.
 - T-26: `AgentFleetUsageRows.tsx` reads `GET /api/fleet/usage?agent=&days=30`; the Budget figure already counts the work.
 - T-27: `ScheduleUsageCost.tsx` on the Agent-session rows of `SchedulesPanel.tsx`, from `GET /api/fleet/usage/tasks?ids=`.
+
+## P3 notes (lane O1, 2026-10-27)
+
+- T-28: the digest line comes through an optional `DIGEST_FLEET_USAGE_READER` port (bound in `FleetUsageApiModule`)
+  and never un-quiets a digest; the CSV is built from the on-screen `FleetUsageView` by contracts' `fleetUsageCsv`
+  (also `ever-works fleet usage --csv`); the price-list history is a panel over `GET /api/fleet/usage/prices`.
 
 ## Definition of done
 

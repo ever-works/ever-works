@@ -93,6 +93,8 @@ export * from './ports';
 export * from './default-ports';
 export * from './worker-context';
 export * from './app-runtime-deletion.service';
+// Lane aw-safety (2026-10-26) — the API's guarded APP_WORK_DELETION_COMPLETION (built by apps/api's ports module).
+export * from './app-work-deletion-completion.service';
 export * from './app-verification-target.service';
 export * from './app-license-gate';
 export * from './app-deploy-preconditions.service';
@@ -133,6 +135,14 @@ export * from './app-runtime-worker.adapters';
 // APW-10's minimal `AppsTierPolicy` — moved out of this folder for Resolution R-5 (it reads the
 // managed-tier ceiling; nothing under `app-runtime/` may), re-exported so importers are unchanged.
 export * from '../apps-tier/config-apps-tier-policy';
+// Lane aw-safety (2026-10-26) — APW-10 T27 / APW-06 T45: the facts behind `eligibility()`.
+export * from '../apps-tier/apps-tier-eligibility.port';
+export {
+    APPS_MANAGED_REQUIRE_PAID_PLAN_ENV,
+    APPS_TIER_PLAN_READER,
+    AppsTierEligibilityService,
+    type AppsTierPlanReader,
+} from '../apps-tier/apps-tier-eligibility.service';
 export * from './app-build-succeeded.listener';
 // APW-06 T33 / T31 (lane aw-deploy-2) — the app-target/app-status service and the cluster-op gate.
 export * from './app-target.service';
