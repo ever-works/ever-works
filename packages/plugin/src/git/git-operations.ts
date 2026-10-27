@@ -54,6 +54,46 @@ export const http = {
 		} as Parameters<typeof nodeHttp.request>[0])
 };
 
+/**
+ * How long one stretch of isomorphic-git work may hold the event loop before it is made to hand it back.
+ *
+ * isomorphic-git (1.37) collects the whole packfile into one buffer and then indexes it — inflating every
+ * object, resolving every delta, hashing every result — in loops whose only `await`s resolve at once. Those
+ * are microtasks: they never let the event loop reach a timer, a socket or an HTTP request. A clone or pull
+ * of a large repository therefore froze the whole process for as long as the indexing took. In the API that
+ * meant `/api/health/live` went unanswered and the kubelet killed the pod (see `cloneOrPullRequests` in the
+ * agent's git facade), and a workspace backup walking every Work's data repository stopped heartbeating
+ * mid-domain and was failed as `stalled`.
+ *
+ * isomorphic-git `await`s its `onProgress` callback once per percent of the pack and once per file it checks
+ * out, so a callback that yields to the macrotask queue breaks those loops into slices. Thirty seconds of
+ * indexing becomes ~two hundred short stretches with the event loop running in between; nothing about the
+ * git operation itself changes. The fs-backed `await`s these operations already make interleave other work
+ * in exactly the same way, so this adds no new kind of interleaving.
+ */
+const GIT_EVENT_LOOP_SLICE_MS = (() => {
+	const configured = Number(process.env.GIT_EVENT_LOOP_SLICE_MS ?? 50);
+	return Number.isFinite(configured) && configured >= 0 ? configured : 50;
+})();
+
+let lastEventLoopYield = Date.now();
+
+/**
+ * The `onProgress` passed to every clone, pull and fetch: hand the event loop back once the current stretch
+ * of git work has held it for {@link GIT_EVENT_LOOP_SLICE_MS}, and return at once otherwise.
+ *
+ * `setImmediate` rather than `setTimeout(0)`: it runs right after the poll phase, so pending I/O — a probe,
+ * a heartbeat's query result, another request — is served before the git work resumes, without the 1 ms
+ * floor a timer would add to each of the hundreds of calls. Exported so the slicing can be proved directly.
+ */
+export async function yieldToEventLoop(): Promise<void> {
+	if (Date.now() - lastEventLoopYield < GIT_EVENT_LOOP_SLICE_MS) {
+		return;
+	}
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	lastEventLoopYield = Date.now();
+}
+
 const DEFAULT_BRANCHES = ['main', 'master'] as const;
 
 function slugifyText(text: string): string {
@@ -238,6 +278,8 @@ export class GitOperations implements IGitOperations {
 		try {
 			await git.clone({
 				onAuth: () => auth,
+				// Keeps a large pack's indexing from freezing the event loop; see `yieldToEventLoop`.
+				onProgress: yieldToEventLoop,
 				fs,
 				http,
 				dir,
@@ -276,6 +318,7 @@ export class GitOperations implements IGitOperations {
 
 		await git.pull({
 			onAuth: () => auth,
+			onProgress: yieldToEventLoop,
 			fs,
 			http,
 			dir,
@@ -543,7 +586,8 @@ export class GitOperations implements IGitOperations {
 			url,
 			ref: branch,
 			singleBranch: true,
-			onAuth: () => auth
+			onAuth: () => auth,
+			onProgress: yieldToEventLoop
 		});
 
 		return dir;
@@ -615,6 +659,7 @@ export class GitOperations implements IGitOperations {
 		const auth = this.getAuth(token);
 		await git.fetch({
 			onAuth: () => auth,
+			onProgress: yieldToEventLoop,
 			fs,
 			http,
 			dir,
@@ -660,6 +705,7 @@ export class GitOperations implements IGitOperations {
 		try {
 			const result = await git.fetch({
 				onAuth: () => auth,
+				onProgress: yieldToEventLoop,
 				fs,
 				http,
 				dir,
