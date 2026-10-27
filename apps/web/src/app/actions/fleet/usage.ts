@@ -75,7 +75,12 @@ export async function getFleetUsageAction(input: {
 }): Promise<FleetUsageResult<FleetUsageView>> {
     const days = isFleetUsagePeriodDays(input.days) ? input.days : undefined;
     return run(() =>
-        fleetUsageAPI.view({ days, node: input.node ?? null, model: input.model ?? null, agent: input.agent ?? null }),
+        fleetUsageAPI.view({
+            days,
+            node: input.node ?? null,
+            model: input.model ?? null,
+            agent: input.agent ?? null,
+        }),
     );
 }
 
@@ -97,6 +102,8 @@ export async function getFleetUsagePricesAction(): Promise<FleetUsageResult<Flee
 }
 
 /** Ask one computer to scan now (owner only; `unreachable`, `consent_missing`, `kill_switch`). */
-export async function rescanFleetUsageAction(nodeId: string): Promise<FleetUsageResult<FleetUsageRescanResult>> {
+export async function rescanFleetUsageAction(
+    nodeId: string,
+): Promise<FleetUsageResult<FleetUsageRescanResult>> {
     return run(() => fleetUsageAPI.rescan(nodeId));
 }
