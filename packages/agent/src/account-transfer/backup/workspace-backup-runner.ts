@@ -1101,8 +1101,10 @@ export class WorkspaceBackupRunner {
 
                 // Before the read, not only after it: the read is the slow
                 // part, and the report that matters is the one that says the
-                // run reached it.
-                await context.heartbeat();
+                // run reached it. Best effort — a heartbeat write that fails
+                // once must not cost the rest of the content pass; the
+                // keepalive tries again in a moment.
+                await context.heartbeat().catch(() => undefined);
 
                 let content: BackupWorkContent;
                 try {
@@ -1140,6 +1142,12 @@ export class WorkspaceBackupRunner {
                         sha256: entry.sha256,
                     });
                     records += entry.records;
+                    if (entry.error !== undefined) {
+                        // The file was closed short of its rows. Its count
+                        // still matches its lines, but the Work's content is
+                        // not whole, and the domain must not say it is.
+                        degraded = true;
+                    }
                 }
 
                 // The two singletons are objects, not row sets, so they are
@@ -1159,7 +1167,9 @@ export class WorkspaceBackupRunner {
                     files.push({ name: entry.name, records: 0, sha256: entry.sha256 });
                 }
 
-                await context.heartbeat();
+                // Best effort, like the report before the read: one failed
+                // progress write is not a reason to stop reading Works.
+                await context.heartbeat().catch(() => undefined);
             }
         } catch (error) {
             if (writer.abortReason) {
@@ -1368,7 +1378,9 @@ async function* toAsyncIterable(
         yield row;
         written += 1;
         if (heartbeat && written % CONTENT_HEARTBEAT_EVERY_ROWS === 0) {
-            await heartbeat();
+            // Best effort: a failed progress write must never cut the file
+            // it is reporting on short.
+            await heartbeat().catch(() => undefined);
         }
     }
 }

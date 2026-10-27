@@ -525,6 +525,37 @@ describe('the Works content pass — one data repo per Work', () => {
         expect(domain.files.some((file) => file.name.includes('/content/'))).toBe(false);
     }, 30_000);
 
+    it('never cuts a Work’s content short because a progress write failed', async () => {
+        const ITEMS = 2_000;
+        const content = source(async (slug) => ({
+            ...EMPTY_BACKUP_WORK_CONTENT,
+            items: Array.from({ length: ITEMS }, (_, i) => ({ slug: `${slug}-${i}`, n: i })),
+        }));
+        const h = harness(tablesWith(2), { workContent: content });
+        // Every progress write inside the Works domain fails (the
+        // domain-boundary reports, which carry `currentDomain`, still land).
+        let current = '';
+        h.repository.heartbeat.mockImplementation(async (_id: string, patch: Row) => {
+            if (typeof patch.currentDomain === 'string') {
+                current = patch.currentDomain;
+                h.events.push({ kind: 'domain', domain: current, at: Date.now() });
+                return true;
+            }
+            if (current === 'works') throw new Error('heartbeat write failed');
+            return true;
+        });
+
+        const result = await run(h, { heartbeatIntervalMs: 0, keepaliveIntervalMs: 3_600_000 });
+
+        expect(result.status).toBe('ready');
+        const domain = worksDomain(h.terminal());
+        expect(domain.status).toBe('complete');
+        for (const slug of ['work-0', 'work-1']) {
+            const lines = await linesOf(h.archive(), `data/works/content/${slug}/items.jsonl`);
+            expect(lines).toHaveLength(ITEMS);
+        }
+    }, 30_000);
+
     it('stops the keepalive when the run ends, so nothing reports a settled backup alive', async () => {
         const content = source(async () => EMPTY_BACKUP_WORK_CONTENT);
         const h = harness(tablesWith(1), { workContent: content });
