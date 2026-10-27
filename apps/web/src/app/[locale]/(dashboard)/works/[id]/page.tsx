@@ -12,6 +12,8 @@ import { AppUpstreamCard } from '@/components/works/app/AppUpstreamCard';
 import { AppSourceStatusCard } from '@/components/works/app/AppSourceStatusCard';
 import { AppWorkOverviewCard } from '@/components/works/app/AppWorkOverviewCard';
 import { AppBuildsOverviewCard } from '@/components/works/app/builds/AppBuildsOverviewCard';
+import { AppProvisioningCard } from '@/components/works/app/AppProvisioningCard';
+import { appProvisioningAPI } from '@/lib/api/app-provisioning';
 import { workAppSpecAPI } from '@/lib/api/work-app-spec';
 import { listLatestAppBuilds } from '@/lib/api/app-builds';
 import { canEdit } from '@/lib/permissions';
@@ -94,12 +96,14 @@ export default async function WorkOverviewPage({ params }: Params) {
     // APW-01 T24 / APW-05 T28 — the rest of the App Work's Overview: the App
     // spec state and the latest Builds. Both reads fail soft (a missing route or
     // a fresh Work answers `null`), and neither is asked for any other kind.
-    const [appSpec, appBuilds] = isApp
+    // APW-04 T25 — the provisioning card's first read, same fail-soft posture.
+    const [appSpec, appBuilds, appProvisioning] = isApp
         ? await Promise.all([
               workAppSpecAPI.get(id).catch(() => null),
               listLatestAppBuilds(id).catch(() => null),
+              appProvisioningAPI.get(id).catch(() => null),
           ])
-        : [null, null];
+        : [null, null, null];
 
     // An App Work has nothing to generate, so the generation status card —
     // which would read "not generated yet" forever — is replaced by the App
@@ -145,6 +149,12 @@ export default async function WorkOverviewPage({ params }: Params) {
                         canEdit={canEdit(work.userRole)}
                     />
                 </div>
+            )}
+
+            {/* APW-04 T25 — the provisioning Task's summary, actions and the
+                upstream-broke banner. Renders nothing when the read failed. */}
+            {isApp && appProvisioning && (
+                <AppProvisioningCard workId={id} initialState={appProvisioning} />
             )}
 
             <WorkStats
