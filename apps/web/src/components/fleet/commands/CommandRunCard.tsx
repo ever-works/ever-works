@@ -23,7 +23,13 @@ const TONE_CLASS: Record<'neutral' | 'success' | 'danger' | 'warning', string> =
  * why while it runs or when the computer kept none, and the refusal — "the
  * full output is on build-02, which is offline" — shown under the card).
  */
-export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunView; focused?: boolean }) {
+export function CommandRunCard({
+    run,
+    focused = false,
+}: {
+    run: FleetCommandRunView;
+    focused?: boolean;
+}) {
     const t = useTranslations('fleet.commands.card');
     const [expanded, setExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -81,8 +87,13 @@ export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunV
             tabIndex={0}
         >
             <header className="mb-2 flex items-baseline justify-between gap-3">
-                <h3 className="truncate text-sm font-semibold text-text dark:text-text-dark">{name}</h3>
-                <span className={`shrink-0 text-xs ${TONE_CLASS[end.tone]}`} data-testid="fleet-command-card-end">
+                <h3 className="truncate text-sm font-semibold text-text dark:text-text-dark">
+                    {name}
+                </h3>
+                <span
+                    className={`shrink-0 text-xs ${TONE_CLASS[end.tone]}`}
+                    data-testid="fleet-command-card-end"
+                >
                     {t(end.key, end.values)}
                 </span>
             </header>
@@ -92,7 +103,13 @@ export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunV
                 }`}
                 data-testid="fleet-command-card-output"
             >
-                {hasOutput ? text.head : <span className="text-text-muted dark:text-text-muted-dark">{t('noOutput')}</span>}
+                {hasOutput ? (
+                    text.head
+                ) : (
+                    <span className="text-text-muted dark:text-text-muted-dark">
+                        {t('noOutput')}
+                    </span>
+                )}
                 {text.truncated && (
                     <span className="my-1 block text-center text-text-muted dark:text-text-muted-dark">
                         {`… ${t('truncated')} …`}
@@ -109,7 +126,12 @@ export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunV
                 <Button variant="ghost" size="sm" onClick={() => setExpanded((value) => !value)}>
                     {expanded ? t('collapse') : t('expand')}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => void onCopy()} disabled={!hasOutput}>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void onCopy()}
+                    disabled={!hasOutput}
+                >
                     {copied ? t('copied') : t('copy')}
                 </Button>
                 <Button
@@ -130,7 +152,11 @@ export function CommandRunCard({ run, focused = false }: { run: FleetCommandRunV
                 </Button>
             </footer>
             {fullError && (
-                <p role="alert" className="mt-1 text-xs text-danger" data-testid="fleet-command-card-full-output-error">
+                <p
+                    role="alert"
+                    className="mt-1 text-xs text-danger"
+                    data-testid="fleet-command-card-full-output-error"
+                >
                     {fullError}
                 </p>
             )}

@@ -148,8 +148,16 @@ export class FleetCommandService implements OnModuleDestroy {
      * once (`202`): runnable computers read `running`, refused ones `failed`
      * with their refusal; output then fills the rows as it arrives.
      */
-    async run(actor: FleetCommandActor, request: FleetCommandRunRequest): Promise<FleetCommandView> {
-        const shape: FleetCommandRequestShape = { command: '', nodeIds: [], cwd: null, timeoutSec: 0 };
+    async run(
+        actor: FleetCommandActor,
+        request: FleetCommandRunRequest,
+    ): Promise<FleetCommandView> {
+        const shape: FleetCommandRequestShape = {
+            command: '',
+            nodeIds: [],
+            cwd: null,
+            timeoutSec: 0,
+        };
         const invalid = checkFleetCommandRequest(request ?? {}, shape);
         if (invalid) throw fleetCommandError(invalid.code, invalid.hint, invalid.details);
 
@@ -244,10 +252,11 @@ export class FleetCommandService implements OnModuleDestroy {
                 continue;
             }
             // In the background: the API answers now; the cards fill as the machines answer.
-            void this.dispatch(command, row, target.node, actor, shape.command).catch((error: unknown) =>
-                this.logger.warn(
-                    `command run ${row.id} on node ${row.nodeId} failed to dispatch: ${describe(error)}`,
-                ),
+            void this.dispatch(command, row, target.node, actor, shape.command).catch(
+                (error: unknown) =>
+                    this.logger.warn(
+                        `command run ${row.id} on node ${row.nodeId} failed to dispatch: ${describe(error)}`,
+                    ),
             );
         }
         return toFleetCommandView(command, rows, names, now, (nodeId) => this.isConnected(nodeId));
@@ -293,7 +302,10 @@ export class FleetCommandService implements OnModuleDestroy {
                 confirmationClass: 'plain',
             });
         }
-        return this.view({ ...command, state: 'cancelled' }, await this.commands.findRuns(command.id));
+        return this.view(
+            { ...command, state: 'cancelled' },
+            await this.commands.findRuns(command.id),
+        );
     }
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -330,7 +342,9 @@ export class FleetCommandService implements OnModuleDestroy {
         for (const command of commands) {
             const swept = await this.sweepStale(command, byCommand.get(command.id) ?? []);
             views.push(
-                toFleetCommandView(command, swept, names, now, (nodeId) => this.isConnected(nodeId)),
+                toFleetCommandView(command, swept, names, now, (nodeId) =>
+                    this.isConnected(nodeId),
+                ),
             );
         }
         return { commands: views };
@@ -380,12 +394,20 @@ export class FleetCommandService implements OnModuleDestroy {
             typeof runId === 'string' && /^[0-9a-f-]{36}$/i.test(runId)
                 ? await this.commands.findRun(runId)
                 : null;
-        if (!run || run.commandId !== command.id) throw fleetCommandError('not_found', 'no such run');
+        if (!run || run.commandId !== command.id)
+            throw fleetCommandError('not_found', 'no such run');
         const node = await this.nodes.findById(run.nodeId);
         const nodeName = node?.name ?? 'the computer';
-        if (!node) throw fleetCommandError('not_found', 'that computer was removed; its output went with it');
+        if (!node)
+            throw fleetCommandError(
+                'not_found',
+                'that computer was removed; its output went with it',
+            );
         if (!run.outputRef) {
-            throw fleetCommandError('not_found', `${nodeName} did not keep the full output of this run`);
+            throw fleetCommandError(
+                'not_found',
+                `${nodeName} did not keep the full output of this run`,
+            );
         }
         if (!this.isConnected(node.id)) {
             const ago = describeFleetCommandAgo(node.lastHeartbeatAt ?? null, this.now());
@@ -411,7 +433,11 @@ export class FleetCommandService implements OnModuleDestroy {
             nodeIds.map(async (nodeId): Promise<ResolvedTarget> => {
                 let node: FleetNode;
                 try {
-                    ({ node } = await this.access.resolveForFamily(nodeId, actor.userId, 'commands'));
+                    ({ node } = await this.access.resolveForFamily(
+                        nodeId,
+                        actor.userId,
+                        'commands',
+                    ));
                 } catch (error) {
                     const typed = readFleetCommandError(error);
                     if (typed?.code === 'permission_denied') {
@@ -421,7 +447,11 @@ export class FleetCommandService implements OnModuleDestroy {
                             return {
                                 nodeId: visible.id,
                                 node: visible,
-                                refusal: { code: 'permission_denied', hint: typed.hint, details: typed.details },
+                                refusal: {
+                                    code: 'permission_denied',
+                                    hint: typed.hint,
+                                    details: typed.details,
+                                },
                             };
                         }
                     }
@@ -552,14 +582,18 @@ export class FleetCommandService implements OnModuleDestroy {
                     if (live.ended) return;
                     live.exitCode = code;
                     void this.finishFromNode(live).catch((error: unknown) =>
-                        this.logger.warn(`command run ${live.runId} could not be ended: ${describe(error)}`),
+                        this.logger.warn(
+                            `command run ${live.runId} could not be ended: ${describe(error)}`,
+                        ),
                     );
                 }),
             closed: (reason, hint) =>
                 guard('closed', () => {
                     if (live.ended || live.exitCode !== undefined) return;
                     void this.finishClosed(live, reason, hint).catch((error: unknown) =>
-                        this.logger.warn(`command run ${live.runId} could not be ended: ${describe(error)}`),
+                        this.logger.warn(
+                            `command run ${live.runId} could not be ended: ${describe(error)}`,
+                        ),
                     );
                 }),
             resumed: () => guard('resumed', () => this.markDirty(live)),
@@ -578,18 +612,31 @@ export class FleetCommandService implements OnModuleDestroy {
             final?.reason === 'shell-failed'
                 ? { code: 'operation_failed', hint: final.detail ?? 'the shell could not start' }
                 : null;
-        await this.finish(live, { status: end.status, failedReason: end.failedReason, exitCode, error });
+        await this.finish(live, {
+            status: end.status,
+            failedReason: end.failedReason,
+            exitCode,
+            error,
+        });
     }
 
     /** The channel closed without an exit: the link was lost, the consent withdrawn, or the machine quit. */
     private async finishClosed(live: LiveRun, reason: string, hint?: string): Promise<void> {
         if (reason === 'resume_failed' || reason === 'unreachable') {
-            await this.finish(live, { status: 'failed', failedReason: 'link-lost', exitCode: null, error: null });
+            await this.finish(live, {
+                status: 'failed',
+                failedReason: 'link-lost',
+                exitCode: null,
+                error: null,
+            });
             return;
         }
         const error: FleetLinkError =
             reason === 'normal'
-                ? { code: 'operation_failed', hint: `${live.node.name} ended the command without an exit code` }
+                ? {
+                      code: 'operation_failed',
+                      hint: `${live.node.name} ended the command without an exit code`,
+                  }
                 : {
                       code: readCloseCode(reason),
                       hint: hint ?? `the connection to ${live.node.name} closed (${reason})`,
@@ -673,16 +720,25 @@ export class FleetCommandService implements OnModuleDestroy {
     ): Promise<FleetCommandRun[]> {
         const now = this.now();
         const deadline =
-            command.timeoutSec * 1000 + FLEET_COMMAND_KILL_GRACE_MS + FLEET_COMMAND_LINK_LOST_GRACE_MS;
+            command.timeoutSec * 1000 +
+            FLEET_COMMAND_KILL_GRACE_MS +
+            FLEET_COMMAND_LINK_LOST_GRACE_MS;
         let changed = false;
         for (const run of runs) {
             if (run.status !== 'running') continue;
             const started =
-                run.startedAt instanceof Date ? run.startedAt.getTime() : Date.parse(String(run.startedAt));
+                run.startedAt instanceof Date
+                    ? run.startedAt.getTime()
+                    : Date.parse(String(run.startedAt));
             if (!Number.isFinite(started) || now - started <= deadline) continue;
             const live = this.live.get(run.id);
             if (live) {
-                await this.finish(live, { status: 'failed', failedReason: 'link-lost', exitCode: null, error: null });
+                await this.finish(live, {
+                    status: 'failed',
+                    failedReason: 'link-lost',
+                    exitCode: null,
+                    error: null,
+                });
                 changed = true;
                 continue;
             }
@@ -738,14 +794,19 @@ export class FleetCommandService implements OnModuleDestroy {
     /** The person's own Command (spec §8b default: each caller sees only the Commands they ran). */
     private async resolve(id: string, actor: FleetCommandActor): Promise<FleetCommand> {
         const command =
-            typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? await this.commands.findCommand(id) : null;
-        if (!command || command.userId !== actor.userId) throw fleetCommandError('not_found', 'no such command');
+            typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)
+                ? await this.commands.findCommand(id)
+                : null;
+        if (!command || command.userId !== actor.userId)
+            throw fleetCommandError('not_found', 'no such command');
         return command;
     }
 
     private async view(command: FleetCommand, runs: FleetCommandRun[]): Promise<FleetCommandView> {
         const names = await this.namesFor(runs.map((run) => run.nodeId));
-        return toFleetCommandView(command, runs, names, this.now(), (nodeId) => this.isConnected(nodeId));
+        return toFleetCommandView(command, runs, names, this.now(), (nodeId) =>
+            this.isConnected(nodeId),
+        );
     }
 
     private async namesFor(nodeIds: readonly string[]): Promise<Map<string, string>> {
@@ -765,7 +826,8 @@ export class FleetCommandService implements OnModuleDestroy {
     }
 
     private requireNode(): FleetCommandNodePort {
-        if (!this.node) throw fleetCommandError('unreachable', 'this deployment does not reach computers');
+        if (!this.node)
+            throw fleetCommandError('unreachable', 'this deployment does not reach computers');
         return this.node;
     }
 

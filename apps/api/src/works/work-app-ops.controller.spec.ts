@@ -50,11 +50,20 @@ describe('WorkAppOpsController', () => {
             }),
         };
         const accepted = (op: string) =>
-            jest.fn(async () => ({ ok: true, httpStatus: 202, op, requestId: REQUEST_ID, dispatched: true }));
+            jest.fn(async () => ({
+                ok: true,
+                httpStatus: 202,
+                op,
+                requestId: REQUEST_ID,
+                dispatched: true,
+            }));
         const targets = {
             refreshStatus: accepted('status-refresh'),
             requestLogs: accepted('logs'),
-            readLogs: jest.fn(async () => ({ ok: true, body: { requestId: REQUEST_ID, status: 'pending' } })),
+            readLogs: jest.fn(async () => ({
+                ok: true,
+                body: { requestId: REQUEST_ID, status: 'pending' },
+            })),
             runJob: accepted('job-run'),
             runSmoke: accepted('smoke'),
             listDeployments: jest.fn(async () => [{ id: 'd-1', state: 'READY' }]),
@@ -62,7 +71,11 @@ describe('WorkAppOpsController', () => {
         const activity = { log: jest.fn(async () => undefined) };
         const response = { status: jest.fn(), setHeader: jest.fn() };
         return {
-            controller: new WorkAppOpsController(ownership as never, targets as never, activity as never),
+            controller: new WorkAppOpsController(
+                ownership as never,
+                targets as never,
+                activity as never,
+            ),
             ownership,
             targets,
             activity,
@@ -75,12 +88,15 @@ describe('WorkAppOpsController', () => {
         refresh: () => c.refreshStatus(auth, WORK_ID, response as never),
         logs: () => c.requestLogs(auth, WORK_ID, { component: 'web' }, response as never),
         readLogs: () => c.readLogs(auth, WORK_ID, REQUEST_ID),
-        job: () => c.runJob(auth, WORK_ID, 'migrate', { confirmFirstDeploy: true }, response as never),
+        job: () =>
+            c.runJob(auth, WORK_ID, 'migrate', { confirmFirstDeploy: true }, response as never),
         smoke: () => c.runSmoke(auth, WORK_ID, response as never),
         history: () => c.listDeployments(auth, WORK_ID),
     });
 
-    async function statusOf(call: () => Promise<unknown>): Promise<{ status: number; body: unknown }> {
+    async function statusOf(
+        call: () => Promise<unknown>,
+    ): Promise<{ status: number; body: unknown }> {
         try {
             await call();
             return { status: 200, body: null };
@@ -120,7 +136,9 @@ describe('WorkAppOpsController', () => {
         }
         expect(targets.refreshStatus).not.toHaveBeenCalled();
         expect(targets.readLogs).not.toHaveBeenCalled();
-        await expect(all.history()).resolves.toEqual({ deployments: [{ id: 'd-1', state: 'READY' }] });
+        await expect(all.history()).resolves.toEqual({
+            deployments: [{ id: 'd-1', state: 'READY' }],
+        });
     });
 
     it('checks the kind only after access: a visible non-App Work is 404 notAppWork', async () => {
@@ -143,7 +161,9 @@ describe('WorkAppOpsController', () => {
         await expect(all.job()).resolves.toMatchObject({ op: 'job-run' });
         await expect(all.smoke()).resolves.toMatchObject({ op: 'smoke' });
         expect(response.status).toHaveBeenCalledWith(HttpStatus.ACCEPTED);
-        expect(targets.runJob).toHaveBeenCalledWith(WORK_ID, 'u-1', 'migrate', { confirmFirstDeploy: true });
+        expect(targets.runJob).toHaveBeenCalledWith(WORK_ID, 'u-1', 'migrate', {
+            confirmFirstDeploy: true,
+        });
         await expect(all.readLogs()).resolves.toEqual({ requestId: REQUEST_ID, status: 'pending' });
     });
 
@@ -151,12 +171,24 @@ describe('WorkAppOpsController', () => {
         const { controller, response, targets } = build();
         targets.refreshStatus.mockResolvedValueOnce({
             ok: false,
-            refusal: { httpStatus: 429, code: 'refresh_too_soon', message: 'wait', retryAfterSeconds: 9 },
+            refusal: {
+                httpStatus: 429,
+                code: 'refresh_too_soon',
+                message: 'wait',
+                retryAfterSeconds: 9,
+            },
         } as never);
-        const answer = await statusOf(() => controller.refreshStatus(auth, WORK_ID, response as never));
+        const answer = await statusOf(() =>
+            controller.refreshStatus(auth, WORK_ID, response as never),
+        );
         expect(answer).toEqual({
             status: 429,
-            body: { status: 'error', code: 'refresh_too_soon', message: 'wait', retryAfterSeconds: 9 },
+            body: {
+                status: 'error',
+                code: 'refresh_too_soon',
+                message: 'wait',
+                retryAfterSeconds: 9,
+            },
         });
         expect(response.setHeader).toHaveBeenCalledWith('Retry-After', '9');
 
@@ -164,7 +196,9 @@ describe('WorkAppOpsController', () => {
             ok: false,
             refusal: { httpStatus: 404, code: 'logs_request_not_found', message: 'gone' },
         } as never);
-        await expect(statusOf(() => controller.readLogs(auth, WORK_ID, REQUEST_ID))).resolves.toMatchObject({
+        await expect(
+            statusOf(() => controller.readLogs(auth, WORK_ID, REQUEST_ID)),
+        ).resolves.toMatchObject({
             status: 404,
             body: { code: 'logs_request_not_found' },
         });
@@ -172,7 +206,13 @@ describe('WorkAppOpsController', () => {
 
     it('records one Activity row per job or smoke request — names and ids, no value', async () => {
         const { controller, response, activity } = build();
-        await controller.runJob(auth, WORK_ID, 'migrate', { confirmFirstDeploy: true }, response as never);
+        await controller.runJob(
+            auth,
+            WORK_ID,
+            'migrate',
+            { confirmFirstDeploy: true },
+            response as never,
+        );
         await controller.runSmoke(auth, WORK_ID, response as never);
         await controller.refreshStatus(auth, WORK_ID, response as never);
         await controller.requestLogs(auth, WORK_ID, { job: 'migrate' }, response as never);
@@ -200,7 +240,9 @@ describe('WorkAppOpsController', () => {
             ok: false,
             refusal: { httpStatus: 422, code: 'job_confirmation_required', message: 'confirm' },
         } as never);
-        const answer = await statusOf(() => controller.runJob(auth, WORK_ID, 'migrate', {}, response as never));
+        const answer = await statusOf(() =>
+            controller.runJob(auth, WORK_ID, 'migrate', {}, response as never),
+        );
         expect(answer.status).toBe(422);
         expect(activity.log).not.toHaveBeenCalled();
     });

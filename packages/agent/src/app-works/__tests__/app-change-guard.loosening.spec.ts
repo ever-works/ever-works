@@ -80,7 +80,9 @@ describe('loosenedSpecSwitches', () => {
             { enabled: false, schedule: '0 6 * * 1', mode: 'merge' },
             { enabled: true, schedule: '0 7 * * 1', mode: 'merge' },
         ]) {
-            expect(loosenedSpecSwitches(BASE, withSpec({ upstreamSync }))).toEqual(['upstreamSync']);
+            expect(loosenedSpecSwitches(BASE, withSpec({ upstreamSync }))).toEqual([
+                'upstreamSync',
+            ]);
         }
     });
 
@@ -105,7 +107,9 @@ describe('loosenedSpecSwitches', () => {
 
     it('compares a missing base against the defaults (both switches off)', () => {
         expect(
-            loosenedSpecSwitches(null, { provisioning: { autoReprovision: true } } as unknown as AppSpec),
+            loosenedSpecSwitches(null, {
+                provisioning: { autoReprovision: true },
+            } as unknown as AppSpec),
         ).toEqual(['provisioning.autoReprovision']);
     });
 });
@@ -126,7 +130,9 @@ describe('AppChangeGuard rule 4 — the loosening switches', () => {
 
     it('refuses an agent switching on upstream pull requests', () => {
         const verdict = judgeSpec(
-            withSpec({ upstreamPullRequests: { enabled: true, requireApproval: true, maxOpen: 3 } }),
+            withSpec({
+                upstreamPullRequests: { enabled: true, requireApproval: true, maxOpen: 3 },
+            }),
         );
         expect(verdict.allowed).toBe(false);
         expect(verdict.message).toMatch(/switches on upstreamPullRequests\.enabled/);
@@ -134,7 +140,9 @@ describe('AppChangeGuard rule 4 — the loosening switches', () => {
 
     it('refuses an agent re-pointing the upstream sync', () => {
         const verdict = judgeSpec(
-            withSpec({ upstreamSync: { enabled: true, schedule: '0 6 * * 1', mode: 'merge', branch: 'x' } }),
+            withSpec({
+                upstreamSync: { enabled: true, schedule: '0 6 * * 1', mode: 'merge', branch: 'x' },
+            }),
         );
         expect(verdict.allowed).toBe(false);
         expect(verdict.message).toMatch(/changes upstreamSync/);
@@ -171,7 +179,10 @@ describe('AppChangeGuard — agents.requireHumanMergePaths on an allowed verdict
             ]),
         });
         expect(verdict.allowed).toBe(true);
-        expect(verdict.humanMergePaths).toEqual(['db/migrations/001-init.sql', 'db/migrations/002.sql']);
+        expect(verdict.humanMergePaths).toEqual([
+            'db/migrations/001-init.sql',
+            'db/migrations/002.sql',
+        ]);
     });
 
     it('leaves the verdict exactly as it was when nothing matches', () => {

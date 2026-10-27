@@ -21,7 +21,13 @@ import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { sessionsClient } from './sessions.client';
 import { SessionWhereStep, type SessionWhereChoice } from './SessionWhereStep';
 
@@ -85,7 +91,9 @@ export function SessionStartDialog({
     const [who, setWho] = useState<FleetSessionKind>(
         initialKind ?? (ownerAllowed || !agentAllowed ? 'owner' : 'agent'),
     );
-    const [provider, setProvider] = useState<FleetSessionStartableProvider>(() => defaultProvider(node));
+    const [provider, setProvider] = useState<FleetSessionStartableProvider>(() =>
+        defaultProvider(node),
+    );
     const [cwd, setCwd] = useState('');
     const [title, setTitle] = useState('');
     const [firstMessage, setFirstMessage] = useState('');
@@ -152,7 +160,8 @@ export function SessionStartDialog({
         (who === 'owner' ? ownerAllowed : agentAllowed) &&
         agentReady &&
         !pending &&
-        (where.mode !== 'folder' || (cwd.trim().length > 0 && cwd.length <= FLEET_SESSION_CWD_MAX_LENGTH)) &&
+        (where.mode !== 'folder' ||
+            (cwd.trim().length > 0 && cwd.length <= FLEET_SESSION_CWD_MAX_LENGTH)) &&
         providerInstalled(node, provider);
 
     /**
@@ -193,7 +202,9 @@ export function SessionStartDialog({
         if (view.state !== 'ready') {
             setError({
                 code: 'operation_failed',
-                hint: view.lastCommand?.stderrHead ?? t('start.checkoutNotReady', { state: view.state }),
+                hint:
+                    view.lastCommand?.stderrHead ??
+                    t('start.checkoutNotReady', { state: view.state }),
                 details: {},
                 status: 0,
             });
@@ -283,7 +294,10 @@ export function SessionStartDialog({
                                 </p>
                             )}
                             {!agentAllowed && (
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark" role="status">
+                                <p
+                                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                                    role="status"
+                                >
                                     {t('states.consentWork')}
                                 </p>
                             )}
@@ -293,7 +307,9 @@ export function SessionStartDialog({
                                         {t('start.agentPick')}
                                     </span>
                                     {agents !== null && agents.length === 0 ? (
-                                        <span className="block text-xs text-warning">{t('start.noAgents')}</span>
+                                        <span className="block text-xs text-warning">
+                                            {t('start.noAgents')}
+                                        </span>
                                     ) : (
                                         <select
                                             value={agentId}
@@ -325,7 +341,8 @@ export function SessionStartDialog({
                             <div className="grid gap-2 sm:grid-cols-3" role="radiogroup">
                                 {SESSION_DIALOG_PROVIDERS.map((option) => {
                                     const installed = providerInstalled(node, option);
-                                    const forAgent = who !== 'agent' || isFleetAgentSessionProvider(option);
+                                    const forAgent =
+                                        who !== 'agent' || isFleetAgentSessionProvider(option);
                                     const usable = installed && forAgent;
                                     return (
                                         <button
@@ -342,7 +359,9 @@ export function SessionStartDialog({
                                                 {t(`providers.${providerKey(option)}`)}
                                                 {!installed && (
                                                     <span className="block text-xs text-text-muted dark:text-text-muted-dark">
-                                                        {t('start.notInstalled', { node: node.name })}
+                                                        {t('start.notInstalled', {
+                                                            node: node.name,
+                                                        })}
                                                     </span>
                                                 )}
                                                 {installed && !forAgent && (
@@ -385,7 +404,9 @@ export function SessionStartDialog({
                                     aria-invalid={field === 'cwd'}
                                     className={cn(
                                         'w-full rounded-md border bg-transparent px-3 py-2 font-mono text-sm',
-                                        field === 'cwd' ? 'border-danger' : 'border-border dark:border-border-dark',
+                                        field === 'cwd'
+                                            ? 'border-danger'
+                                            : 'border-border dark:border-border-dark',
                                     )}
                                     data-testid="fleet-session-start-cwd"
                                 />
@@ -415,7 +436,9 @@ export function SessionStartDialog({
                         </fieldset>
 
                         <label className="block space-y-1 text-sm">
-                            <span className="text-text-muted dark:text-text-muted-dark">{t('start.sessionTitle')}</span>
+                            <span className="text-text-muted dark:text-text-muted-dark">
+                                {t('start.sessionTitle')}
+                            </span>
                             <input
                                 value={title}
                                 onChange={(event) => setTitle(event.target.value)}
@@ -428,7 +451,9 @@ export function SessionStartDialog({
 
                         {agentCli && (
                             <label className="block space-y-1 text-sm">
-                                <span className="text-text-muted dark:text-text-muted-dark">{t('start.firstMessage')}</span>
+                                <span className="text-text-muted dark:text-text-muted-dark">
+                                    {t('start.firstMessage')}
+                                </span>
                                 <textarea
                                     value={firstMessage}
                                     onChange={(event) => setFirstMessage(event.target.value)}
@@ -452,12 +477,21 @@ export function SessionStartDialog({
                             </label>
                         )}
 
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-session-start-cost">
+                        <p
+                            className="text-xs text-text-muted dark:text-text-muted-dark"
+                            data-testid="fleet-session-start-cost"
+                        >
                             {who === 'agent'
-                                ? t('start.costAgent', { agent: agentName || t('kinds.agent'), node: node.name })
+                                ? t('start.costAgent', {
+                                      agent: agentName || t('kinds.agent'),
+                                      node: node.name,
+                                  })
                                 : provider === 'shell'
                                   ? t('start.costShell', { node: node.name })
-                                  : t('start.costOwner', { provider: providerName, node: node.name })}
+                                  : t('start.costOwner', {
+                                        provider: providerName,
+                                        node: node.name,
+                                    })}
                         </p>
                         {who === 'agent' && (
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
@@ -466,17 +500,30 @@ export function SessionStartDialog({
                         )}
 
                         {error && (
-                            <p role="alert" className="text-sm text-danger" data-testid="fleet-session-start-error">
+                            <p
+                                role="alert"
+                                className="text-sm text-danger"
+                                data-testid="fleet-session-start-error"
+                            >
                                 {error.hint ?? t('start.failed')}
                             </p>
                         )}
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             {t('start.cancel')}
                         </Button>
-                        <Button type="submit" disabled={!canSubmit} data-testid="fleet-session-start-submit">
+                        <Button
+                            type="submit"
+                            disabled={!canSubmit}
+                            data-testid="fleet-session-start-submit"
+                        >
                             {creatingCheckout
                                 ? t('start.creatingCheckout', { node: node.name })
                                 : pending

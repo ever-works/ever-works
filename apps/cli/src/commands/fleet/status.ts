@@ -23,7 +23,11 @@ function statusColour(status: string): string {
 
 export function printFleetStatus(view: FleetStatusView): void {
     if (view.killSwitch.stopped) {
-        console.log(chalk.red(`■ All computers are stopped${view.killSwitch.reason ? ` — ${view.killSwitch.reason}` : ''}`));
+        console.log(
+            chalk.red(
+                `■ All computers are stopped${view.killSwitch.reason ? ` — ${view.killSwitch.reason}` : ''}`,
+            ),
+        );
     } else if (view.killSwitch.unverified) {
         console.log(chalk.yellow('? The fleet stop switch could not be read'));
     }
@@ -50,16 +54,28 @@ export function printFleetStatus(view: FleetStatusView): void {
         console.log(chalk.bold('Needs a look'));
         const names = new Map(view.computers.map((computer) => [computer.id, computer.name]));
         for (const item of view.needsALook) {
-            const mark = item.severity === 'critical' ? chalk.red('●') : item.severity === 'warn' ? chalk.yellow('●') : chalk.gray('●');
-            console.log(`${mark} ${names.get(item.nodeId) ?? item.nodeId}: ${item.title} ${chalk.gray(item.detail)}`);
+            const mark =
+                item.severity === 'critical'
+                    ? chalk.red('●')
+                    : item.severity === 'warn'
+                      ? chalk.yellow('●')
+                      : chalk.gray('●');
+            console.log(
+                `${mark} ${names.get(item.nodeId) ?? item.nodeId}: ${item.title} ${chalk.gray(item.detail)}`,
+            );
         }
     }
-    if (view.needsALookPartial) console.log(chalk.gray('(some checks did not answer; the list may be incomplete)'));
+    if (view.needsALookPartial)
+        console.log(chalk.gray('(some checks did not answer; the list may be incomplete)'));
 }
 
 export const statusCommand = new Command('status')
     .description('How is my fleet: computers, what needs a look, the stop switch')
     .option('--json', 'Machine-readable output: { ok, data }')
     .action(async (options: { json?: boolean }) => {
-        await runFleetVerb<FleetStatusView>(options.json === true, { method: 'GET', path: '/fleet/status' }, printFleetStatus);
+        await runFleetVerb<FleetStatusView>(
+            options.json === true,
+            { method: 'GET', path: '/fleet/status' },
+            printFleetStatus,
+        );
     });

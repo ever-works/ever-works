@@ -22,15 +22,21 @@ describe('FleetSessionLinkListener', () => {
         handlers = new Map();
         order = [];
         const registry = {
-            onNodeControl: jest.fn((type: string, handler: (nodeId: string, message: Record<string, unknown>) => void) => {
-                handlers.set(type, handler);
-                return () => handlers.delete(type);
-            }),
+            onNodeControl: jest.fn(
+                (
+                    type: string,
+                    handler: (nodeId: string, message: Record<string, unknown>) => void,
+                ) => {
+                    handlers.set(type, handler);
+                    return () => handlers.delete(type);
+                },
+            ),
         };
         sessions = {
             applyNodeEvent: jest.fn(async (_nodeId: string, message: { event: string }) => {
                 // The first report is slow: a later one must still wait for it.
-                if (message.event === 'started') await new Promise((resolve) => setTimeout(resolve, 20));
+                if (message.event === 'started')
+                    await new Promise((resolve) => setTimeout(resolve, 20));
                 order.push(message.event);
             }),
             reconcileList: jest.fn(async () => {
@@ -56,7 +62,11 @@ describe('FleetSessionLinkListener', () => {
     });
 
     it("applies one node's reports in arrival order", async () => {
-        handlers.get('session.event')!(NODE, { type: 'session.event', sessionId: SESSION, event: 'started' });
+        handlers.get('session.event')!(NODE, {
+            type: 'session.event',
+            sessionId: SESSION,
+            event: 'started',
+        });
         handlers.get('session.event')!(NODE, {
             type: 'session.event',
             sessionId: SESSION,
@@ -73,10 +83,18 @@ describe('FleetSessionLinkListener', () => {
     });
 
     it('drops a malformed report and everything while sessions are off', async () => {
-        handlers.get('session.event')!(NODE, { type: 'session.event', sessionId: 'bad id!', event: 'started' });
+        handlers.get('session.event')!(NODE, {
+            type: 'session.event',
+            sessionId: 'bad id!',
+            event: 'started',
+        });
         handlers.get('session.list')!(NODE, { type: 'session.list', sessions: 'nope' });
         process.env.FLEET_SESSIONS_ENABLED = 'false';
-        handlers.get('session.event')!(NODE, { type: 'session.event', sessionId: SESSION, event: 'started' });
+        handlers.get('session.event')!(NODE, {
+            type: 'session.event',
+            sessionId: SESSION,
+            event: 'started',
+        });
         await listener.idle();
         expect(sessions.applyNodeEvent).not.toHaveBeenCalled();
         expect(sessions.reconcileList).not.toHaveBeenCalled();
@@ -84,8 +102,17 @@ describe('FleetSessionLinkListener', () => {
 
     it('keeps going after a report fails', async () => {
         sessions.applyNodeEvent.mockRejectedValueOnce(new Error('db down'));
-        handlers.get('session.event')!(NODE, { type: 'session.event', sessionId: SESSION, event: 'activity' });
-        handlers.get('session.event')!(NODE, { type: 'session.event', sessionId: SESSION, event: 'title', title: 't' });
+        handlers.get('session.event')!(NODE, {
+            type: 'session.event',
+            sessionId: SESSION,
+            event: 'activity',
+        });
+        handlers.get('session.event')!(NODE, {
+            type: 'session.event',
+            sessionId: SESSION,
+            event: 'title',
+            title: 't',
+        });
         await listener.idle();
         expect(sessions.applyNodeEvent).toHaveBeenCalledTimes(2);
         expect(order).toEqual(['title']);

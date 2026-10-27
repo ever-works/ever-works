@@ -69,7 +69,8 @@ export function AppDependencyConfigureDialog({
     const fields = chosen?.promptFields ?? [];
     const minSize = entry.sizeGiB ?? 1;
     const sizeNumber = size.trim() === '' ? null : Number(size);
-    const sizeInvalid = sizeNumber !== null && (!Number.isInteger(sizeNumber) || sizeNumber < minSize);
+    const sizeInvalid =
+        sizeNumber !== null && (!Number.isInteger(sizeNumber) || sizeNumber < minSize);
     const missingRequired = fields.some(
         (field) => field.required && !field.set && !(values[field.key] ?? '').trim(),
     );
@@ -88,7 +89,9 @@ export function AppDependencyConfigureDialog({
             const result = await configureAppDependencyAction(workId, entry.kind, {
                 ...(provider !== entry.provider.providerId ? { providerId: provider } : {}),
                 ...(Object.keys(config).length > 0 ? { config } : {}),
-                ...(sizeNumber !== null && sizeNumber !== entry.sizeGiB ? { sizeGiB: sizeNumber } : {}),
+                ...(sizeNumber !== null && sizeNumber !== entry.sizeGiB
+                    ? { sizeGiB: sizeNumber }
+                    : {}),
             });
             if (result.success) {
                 toast.success(t('saved', { kind: kindLabel }));
@@ -98,9 +101,15 @@ export function AppDependencyConfigureDialog({
                 return;
             }
             const leaf = result.code
-                ? (CONFIGURE_REFUSALS as Readonly<Record<string, ConfigureRefusalLeaf>>)[result.code]
+                ? (CONFIGURE_REFUSALS as Readonly<Record<string, ConfigureRefusalLeaf>>)[
+                      result.code
+                  ]
                 : undefined;
-            setMessage(leaf ? t(`refusals.${leaf}`) : t('failed', { reason: result.error ?? result.code ?? '' }));
+            setMessage(
+                leaf
+                    ? t(`refusals.${leaf}`)
+                    : t('failed', { reason: result.error ?? result.code ?? '' }),
+            );
         } finally {
             inFlight.current = false;
             setPending(false);
@@ -126,7 +135,9 @@ export function AppDependencyConfigureDialog({
 
                     {providers.length > 1 && (
                         <label htmlFor={providerId} className="block space-y-1 text-sm">
-                            <span className="block text-xs text-text-secondary">{t('provider')}</span>
+                            <span className="block text-xs text-text-secondary">
+                                {t('provider')}
+                            </span>
                             <select
                                 id={providerId}
                                 className="w-full rounded-md border border-card-border bg-transparent px-2 py-1.5 dark:border-white/9"
@@ -154,7 +165,9 @@ export function AppDependencyConfigureDialog({
                             required={field.required}
                             stored={field.set}
                             value={values[field.key] ?? ''}
-                            onChange={(value) => setValues((previous) => ({ ...previous, [field.key]: value }))}
+                            onChange={(value) =>
+                                setValues((previous) => ({ ...previous, [field.key]: value }))
+                            }
                         />
                     ))}
 
@@ -170,7 +183,9 @@ export function AppDependencyConfigureDialog({
                             data-testid="app-dependency-configure-size"
                         />
                         <span className="block text-xs text-text-muted">
-                            {entry.sizeGiB ? t('sizeGrowOnly', { size: entry.sizeGiB }) : t('sizeHint')}
+                            {entry.sizeGiB
+                                ? t('sizeGrowOnly', { size: entry.sizeGiB })
+                                : t('sizeHint')}
                         </span>
                         {sizeInvalid && (
                             <span className="block text-xs text-red-600 dark:text-red-400">
@@ -180,7 +195,11 @@ export function AppDependencyConfigureDialog({
                     </label>
 
                     {message && (
-                        <p className="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="app-dependency-configure-error">
+                        <p
+                            className="text-sm text-red-600 dark:text-red-400"
+                            role="alert"
+                            data-testid="app-dependency-configure-error"
+                        >
                             {message}
                         </p>
                     )}
@@ -223,7 +242,11 @@ function ConfigField({
     const t = useTranslations('dashboard.workDetail.appDeploy.dependencies.configure');
     const id = useId();
     return (
-        <label htmlFor={id} className="block space-y-1 text-sm" data-testid="app-dependency-configure-field">
+        <label
+            htmlFor={id}
+            className="block space-y-1 text-sm"
+            data-testid="app-dependency-configure-field"
+        >
             <span className="block text-xs text-text-secondary">
                 {label}
                 {required ? ` · ${t('required')}` : ''}
@@ -236,7 +259,9 @@ function ConfigField({
                 onChange={(event) => onChange(event.target.value)}
             />
             {stored && (
-                <span className="block text-xs text-text-muted">{secret ? t('secretStored') : t('stored')}</span>
+                <span className="block text-xs text-text-muted">
+                    {secret ? t('secretStored') : t('stored')}
+                </span>
             )}
         </label>
     );

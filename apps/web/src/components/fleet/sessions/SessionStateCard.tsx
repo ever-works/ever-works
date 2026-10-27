@@ -32,10 +32,17 @@ export function SessionStateCard({
         'rounded-xl border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark p-4 flex gap-3';
     if (card.kind === 'consent-missing') {
         return (
-            <div role="status" className={frame} data-testid="fleet-sessions-card" data-card="consent-missing">
+            <div
+                role="status"
+                className={frame}
+                data-testid="fleet-sessions-card"
+                data-card="consent-missing"
+            >
                 <ShieldOff className="w-5 h-5 shrink-0 text-warning" aria-hidden="true" />
                 <div className="space-y-2 min-w-0">
-                    <p className="text-sm font-medium text-text dark:text-text-dark">{t('states.consentManage')}</p>
+                    <p className="text-sm font-medium text-text dark:text-text-dark">
+                        {t('states.consentManage')}
+                    </p>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
                         {t('states.consentCommand', { node: nodeName })}
                     </p>
@@ -46,7 +53,12 @@ export function SessionStateCard({
     }
     if (card.kind === 'daemon-down') {
         return (
-            <div role="status" className={frame} data-testid="fleet-sessions-card" data-card="daemon-down">
+            <div
+                role="status"
+                className={frame}
+                data-testid="fleet-sessions-card"
+                data-card="daemon-down"
+            >
                 <PlugZap className="w-5 h-5 shrink-0 text-danger" aria-hidden="true" />
                 <div className="space-y-2 min-w-0">
                     <p className="text-sm font-medium text-text dark:text-text-dark">
@@ -58,7 +70,12 @@ export function SessionStateCard({
                         {t('states.daemonDownBody', { node: nodeName })}
                     </p>
                     {onRetry && (
-                        <Button size="sm" variant="secondary" onClick={onRetry} data-testid="fleet-sessions-retry">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={onRetry}
+                            data-testid="fleet-sessions-retry"
+                        >
                             {t('states.retry')}
                         </Button>
                     )}
@@ -69,8 +86,16 @@ export function SessionStateCard({
     if (card.kind === 'offline') {
         const relative = relativeTime(card.lastSeen, new Date(), locale);
         return (
-            <div role="status" className={frame} data-testid="fleet-sessions-card" data-card="offline">
-                <WifiOff className="w-5 h-5 shrink-0 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
+            <div
+                role="status"
+                className={frame}
+                data-testid="fleet-sessions-card"
+                data-card="offline"
+            >
+                <WifiOff
+                    className="w-5 h-5 shrink-0 text-text-muted dark:text-text-muted-dark"
+                    aria-hidden="true"
+                />
                 <p className="text-sm text-text dark:text-text-dark">
                     {relative
                         ? t('states.offline', { node: nodeName, relative })

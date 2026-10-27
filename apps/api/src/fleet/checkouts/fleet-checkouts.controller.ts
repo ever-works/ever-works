@@ -46,7 +46,9 @@ function actorOf(auth: AuthenticatedUser): FleetCheckoutActor {
     return { userId: auth.userId };
 }
 
-function listQuery(query: ListFleetCheckoutsQueryDto): FleetCheckoutListQuery & { nodeId?: string } {
+function listQuery(
+    query: ListFleetCheckoutsQueryDto,
+): FleetCheckoutListQuery & { nodeId?: string } {
     const out: FleetCheckoutListQuery & { nodeId?: string } = {};
     if (query.nodeId) out.nodeId = query.nodeId;
     if (query.workId) out.workId = query.workId;
@@ -174,7 +176,10 @@ export class FleetCheckoutsController {
     ): Promise<FleetCheckoutCreateResponse> {
         const source =
             body.source.kind === 'worktree'
-                ? { kind: 'worktree' as const, parentCheckoutId: body.source.parentCheckoutId ?? '' }
+                ? {
+                      kind: 'worktree' as const,
+                      parentCheckoutId: body.source.parentCheckoutId ?? '',
+                  }
                 : { kind: 'clone' as const, repoUrl: body.source.repoUrl ?? '' };
         return this.checkouts.create(actorOf(auth), {
             nodeId: body.nodeId,

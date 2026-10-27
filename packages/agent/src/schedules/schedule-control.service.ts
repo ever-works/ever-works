@@ -300,9 +300,12 @@ export class ScheduleControlService {
 
         switch (parsed.sourceType) {
             case 'node_schedule':
-                await this.require(this.nodeSchedules, 'schedules on computers').pause(parsed.ownerKey, {
-                    userId: ctx.userId,
-                });
+                await this.require(this.nodeSchedules, 'schedules on computers').pause(
+                    parsed.ownerKey,
+                    {
+                        userId: ctx.userId,
+                    },
+                );
                 break;
             case 'recurring_task':
                 await this.require(this.tasks, 'recurring tasks').pauseRecurrence(
@@ -352,9 +355,12 @@ export class ScheduleControlService {
 
         switch (parsed.sourceType) {
             case 'node_schedule':
-                await this.require(this.nodeSchedules, 'schedules on computers').resume(parsed.ownerKey, {
-                    userId: ctx.userId,
-                });
+                await this.require(this.nodeSchedules, 'schedules on computers').resume(
+                    parsed.ownerKey,
+                    {
+                        userId: ctx.userId,
+                    },
+                );
                 break;
             case 'recurring_task':
                 await this.require(this.tasks, 'recurring tasks').resumeRecurrence(

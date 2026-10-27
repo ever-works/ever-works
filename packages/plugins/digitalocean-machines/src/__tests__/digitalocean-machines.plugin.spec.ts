@@ -59,7 +59,8 @@ describe('DigitalOceanMachinesPlugin (FL-17)', () => {
 				regionId: 'nyc3',
 				sizeId: 's-2vcpu-4gb',
 				bootstrapScript: '#cloud-config\nruncmd: []\n',
-				publicKey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl ever-works-throwaway',
+				publicKey:
+					'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl ever-works-throwaway',
 				tags: ['ever-works', 'ever-works-node:0f8fad5b-d9cb-469f-a165-70867728950e']
 			},
 			settings
@@ -115,10 +116,18 @@ describe('DigitalOceanMachinesPlugin (FL-17)', () => {
 	it('destroys idempotently and reports a forgotten droplet as gone', async () => {
 		const { fake, provider } = plugin();
 		const { machineRef } = await provider.create(
-			{ name: 'a2', regionId: 'nyc3', sizeId: 's-1vcpu-2gb', bootstrapScript: '#cloud-config\n', tags: ['ever-works'] },
+			{
+				name: 'a2',
+				regionId: 'nyc3',
+				sizeId: 's-1vcpu-2gb',
+				bootstrapScript: '#cloud-config\n',
+				tags: ['ever-works']
+			},
 			settings
 		);
-		expect((await provider.listTagged('ever-works', settings)).map((machine) => machine.machineRef)).toEqual([machineRef]);
+		expect((await provider.listTagged('ever-works', settings)).map((machine) => machine.machineRef)).toEqual([
+			machineRef
+		]);
 		await provider.destroy(machineRef, settings);
 		await expect(provider.destroy(machineRef, settings)).resolves.toBeUndefined();
 		expect((await provider.getMachine(machineRef, settings)).state).toBe('gone');
@@ -135,14 +144,17 @@ describe('DigitalOceanMachinesPlugin (FL-17)', () => {
 		await expect(provider.listOptions({})).rejects.toMatchObject({ code: 'unauthorized' });
 		const wrong = await provider.listOptions({ apiToken: 'wrong-token-value' }).catch((caught: unknown) => caught);
 		expect((wrong as { code: string }).code).toBe('unauthorized');
-		expect(JSON.stringify({ message: (wrong as Error).message, hint: (wrong as { hint: string }).hint })).not.toContain(
-			'wrong-token-value'
-		);
+		expect(
+			JSON.stringify({ message: (wrong as Error).message, hint: (wrong as { hint: string }).hint })
+		).not.toContain('wrong-token-value');
 	});
 
 	it('validates a connection by reading the account', async () => {
 		const { provider } = plugin();
-		expect(await provider.validateConnection(settings)).toEqual({ success: true, message: 'Connected to DigitalOcean as acme' });
+		expect(await provider.validateConnection(settings)).toEqual({
+			success: true,
+			message: 'Connected to DigitalOcean as acme'
+		});
 		expect((await provider.validateConnection({ apiToken: 'nope' })).success).toBe(false);
 	});
 
@@ -186,6 +198,8 @@ describe('DigitalOceanApi', () => {
 			throw error;
 		}) as unknown as typeof fetch;
 		const api = new DigitalOceanApi(TOKEN, fetchImpl, 'https://fake.test');
-		await expect(api.request({ method: 'GET', path: '/v2/account' })).rejects.toMatchObject({ code: 'unavailable' });
+		await expect(api.request({ method: 'GET', path: '/v2/account' })).rejects.toMatchObject({
+			code: 'unavailable'
+		});
 	});
 });

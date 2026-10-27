@@ -2908,8 +2908,12 @@ describe('workflowReleaseCovers (T46, pure)', () => {
     });
 
     it('refuses another head, a new path, more paths than counted, or an incomplete compare', () => {
-        expect(workflowReleaseCovers(base, SHA_A, changes(['.github/workflows/a.yml']))).toBe(false);
-        expect(workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/b.yml']))).toBe(false);
+        expect(workflowReleaseCovers(base, SHA_A, changes(['.github/workflows/a.yml']))).toBe(
+            false,
+        );
+        expect(workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/b.yml']))).toBe(
+            false,
+        );
         expect(
             workflowReleaseCovers(base, SHA_B, {
                 paths: ['.github/workflows/a.yml'],
@@ -2917,16 +2921,16 @@ describe('workflowReleaseCovers (T46, pure)', () => {
                 complete: true,
             }),
         ).toBe(false);
-        expect(workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/a.yml'], false))).toBe(
-            false,
-        );
+        expect(
+            workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/a.yml'], false)),
+        ).toBe(false);
     });
 
     it('lets a release made on an incomplete compare cover that same head only', () => {
         const unproven = { ...base, complete: false, paths: [], pathCount: 0 };
-        expect(workflowReleaseCovers(unproven, SHA_B, changes(['x/.github/workflows/z.yml'], false))).toBe(
-            true,
-        );
+        expect(
+            workflowReleaseCovers(unproven, SHA_B, changes(['x/.github/workflows/z.yml'], false)),
+        ).toBe(true);
         expect(workflowReleaseCovers(unproven, SHA_A, changes([], false))).toBe(false);
     });
 

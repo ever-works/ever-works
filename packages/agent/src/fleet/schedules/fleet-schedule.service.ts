@@ -140,7 +140,10 @@ export class FleetScheduleService {
     // ─── Create ────────────────────────────────────────────────────────────
 
     /** Create a Command schedule on one computer (spec S1, FR-5 … FR-9, FR-25). */
-    async create(actor: FleetScheduleActor, request: FleetScheduleCreateRequest): Promise<FleetScheduleView> {
+    async create(
+        actor: FleetScheduleActor,
+        request: FleetScheduleCreateRequest,
+    ): Promise<FleetScheduleView> {
         const shape: FleetScheduleShape = {
             name: '',
             nodeId: '',
@@ -157,7 +160,10 @@ export class FleetScheduleService {
         this.assertRate(actor.userId);
         const node = await this.resolveNode(shape.nodeId, actor);
         await this.assertNotStopped('new schedules cannot be created while the kill switch is on');
-        const limit = checkFleetSchedulesPerNode(await this.schedules.countLiveForNode(node.id), node.name);
+        const limit = checkFleetSchedulesPerNode(
+            await this.schedules.countLiveForNode(node.id),
+            node.name,
+        );
         if (limit) throw fleetCommandError(limit.code, limit.hint, limit.details);
 
         if (request.confirm !== true) {
@@ -221,7 +227,8 @@ export class FleetScheduleService {
             changed,
         );
         if (invalid) throw fleetCommandError(invalid.code, invalid.hint, invalid.details);
-        if (changed.length === 0) return this.viewOf(command, await this.nodes.findById(before.nodeId));
+        if (changed.length === 0)
+            return this.viewOf(command, await this.nodes.findById(before.nodeId));
         if (changed.includes('command') && redactSecrets(after.command).redactions > 0) {
             const refusal = fleetScheduleSecretRefusal();
             throw fleetCommandError(refusal.code, refusal.hint, refusal.details);
@@ -234,7 +241,10 @@ export class FleetScheduleService {
         if (current) await this.resolveNode(current.id, actor);
         const target = moving ? await this.resolveNode(after.nodeId, actor) : current;
         if (moving && target) {
-            const limit = checkFleetSchedulesPerNode(await this.schedules.countLiveForNode(target.id), target.name);
+            const limit = checkFleetSchedulesPerNode(
+                await this.schedules.countLiveForNode(target.id),
+                target.name,
+            );
             if (limit) throw fleetCommandError(limit.code, limit.hint, limit.details);
         }
         const needsConfirm = moving || changed.includes('command') || changed.includes('cwd');
@@ -287,7 +297,11 @@ export class FleetScheduleService {
      * on the machine (the next sync leaves it out, so the machine deletes its
      * cached copy) and keeps the history readable for 30 days.
      */
-    async remove(id: string, actor: FleetScheduleActor, confirm: boolean): Promise<FleetScheduleView> {
+    async remove(
+        id: string,
+        actor: FleetScheduleActor,
+        confirm: boolean,
+    ): Promise<FleetScheduleView> {
         const command = await this.resolveOwn(id, actor);
         const node = await this.nodes.findById(this.nodeIdOf(command));
         if (command.deletedAt) return this.viewOf(command, node);
@@ -309,9 +323,16 @@ export class FleetScheduleService {
             syncGeneration: generation,
         });
         this.refusals.delete(command.id);
-        await this.record('node.schedule.delete', actor, node ?? { id: nodeId, userId: command.userId }, command.id, 'confirm', {
-            outcome: 'deleted',
-        });
+        await this.record(
+            'node.schedule.delete',
+            actor,
+            node ?? { id: nodeId, userId: command.userId },
+            command.id,
+            'confirm',
+            {
+                outcome: 'deleted',
+            },
+        );
         this.syncInBackground(nodeId);
         return this.viewOf({ ...command, deletedAt: now, enabled: false }, node);
     }
@@ -350,7 +371,11 @@ export class FleetScheduleService {
         const nodeId = this.nodeIdOf(command);
         const generation = (await this.maxGeneration(nodeId)) + 1;
         const next = node
-            ? nextFleetScheduleFire(storedFleetScheduleCadence(command), node.timeZone ?? null, this.now())
+            ? nextFleetScheduleFire(
+                  storedFleetScheduleCadence(command),
+                  node.timeZone ?? null,
+                  this.now(),
+              )
             : null;
         await this.schedules.update(command.id, {
             enabled: true,
@@ -359,10 +384,17 @@ export class FleetScheduleService {
             nextRunAt: next === null ? null : new Date(next),
             syncGeneration: generation,
         });
-        await this.record('node.schedule.resume', actor, node ?? { id: nodeId, userId: command.userId }, command.id, 'plain', {
-            outcome: 'resumed',
-            wasPausedFor: command.pausedReason ?? 'user',
-        });
+        await this.record(
+            'node.schedule.resume',
+            actor,
+            node ?? { id: nodeId, userId: command.userId },
+            command.id,
+            'plain',
+            {
+                outcome: 'resumed',
+                wasPausedFor: command.pausedReason ?? 'user',
+            },
+        );
         this.syncInBackground(nodeId);
         const fresh = await this.schedules.find(command.id);
         return this.viewOf(fresh ?? command, node);
@@ -454,9 +486,15 @@ export class FleetScheduleService {
         this.assertEnabled();
         const node = await this.resolveNode(nodeId, actor);
         const breakerAt = Date.parse(breakerAtIso);
-        if (!Number.isFinite(breakerAt)) throw fleetCommandError('invalid', 'breakerAt is not an instant', { field: 'breakerAt' });
+        if (!Number.isFinite(breakerAt))
+            throw fleetCommandError('invalid', 'breakerAt is not an instant', {
+                field: 'breakerAt',
+            });
         if (this.now() - breakerAt > FLEET_SCHEDULE_BREAKER_UNDO_MS) {
-            throw fleetCommandError('invalid', 'the 15 minutes to undo it have passed; resume the schedules one by one');
+            throw fleetCommandError(
+                'invalid',
+                'the 15 minutes to undo it have passed; resume the schedules one by one',
+            );
         }
         const rows = (await this.schedules.listForNode(node.id)).filter(
             (row) =>
@@ -467,7 +505,11 @@ export class FleetScheduleService {
         );
         const generation = (await this.maxGeneration(node.id)) + 1;
         for (const row of rows) {
-            const next = nextFleetScheduleFire(storedFleetScheduleCadence(row), node.timeZone ?? null, this.now());
+            const next = nextFleetScheduleFire(
+                storedFleetScheduleCadence(row),
+                node.timeZone ?? null,
+                this.now(),
+            );
             await this.schedules.update(row.id, {
                 enabled: true,
                 pausedAt: null,
@@ -495,22 +537,38 @@ export class FleetScheduleService {
         id: string,
         actor: FleetScheduleActor,
         confirm: boolean,
-    ): Promise<{ runId: string; startedAt: string; nextRunAt: string | null; view: FleetScheduleView }> {
+    ): Promise<{
+        runId: string;
+        startedAt: string;
+        nextRunAt: string | null;
+        view: FleetScheduleView;
+    }> {
         this.assertEnabled();
         const command = await this.resolveOwn(id, actor);
         if (command.deletedAt) throw fleetCommandError('not_found', 'this schedule was deleted');
         const node = await this.nodes.findById(this.nodeIdOf(command));
-        if (!node) throw fleetCommandError('not_found', 'the computer of this schedule was removed; move it first');
+        if (!node)
+            throw fleetCommandError(
+                'not_found',
+                'the computer of this schedule was removed; move it first',
+            );
         await this.resolveNode(node.id, actor);
         await this.assertNotStopped();
         const consents = this.consentsOf(node);
         if (!consents.manage) {
-            throw fleetCommandError('consent_missing', `start the node with --manage on ${node.name}`, {
-                consent: 'manage',
-            });
+            throw fleetCommandError(
+                'consent_missing',
+                `start the node with --manage on ${node.name}`,
+                {
+                    consent: 'manage',
+                },
+            );
         }
         if (!this.isConnected(node.id)) {
-            throw fleetCommandError('unreachable', `${node.name} is offline — Run now needs it online`);
+            throw fleetCommandError(
+                'unreachable',
+                `${node.name} is offline — Run now needs it online`,
+            );
         }
         const recent = await this.schedules.findRuns(command.id, 1);
         if (recent[0]?.status === 'running' && this.isStillRunning(recent[0])) {
@@ -519,7 +577,11 @@ export class FleetScheduleService {
         if (confirm !== true) throw this.confirmation('run', this.shapeOf(command), node);
 
         const runId = randomUUID();
-        const started = await this.requireNode().runNow(node.id, { id: command.id, runId }, this.caller(actor));
+        const started = await this.requireNode().runNow(
+            node.id,
+            { id: command.id, runId },
+            this.caller(actor),
+        );
         const startedAt = parseInstant(started.startedAt) ?? new Date(this.now());
         await this.schedules.saveRun({
             id: runId,
@@ -540,7 +602,10 @@ export class FleetScheduleService {
             outputRef: null,
             scheduledFor: null,
         });
-        await this.record('node.schedule.run', actor, node, command.id, 'confirm', { outcome: 'started', runId });
+        await this.record('node.schedule.run', actor, node, command.id, 'confirm', {
+            outcome: 'started',
+            runId,
+        });
         const view = await this.viewOf(command, node, await this.schedules.findRuns(command.id, 8));
         return { runId, startedAt: startedAt.toISOString(), nextRunAt: view.nextRunAt, view };
     }
@@ -581,11 +646,18 @@ export class FleetScheduleService {
     }
 
     /** One schedule's history, newest first (spec S6, FR-20: the last 30). */
-    async runs(id: string, actor: FleetScheduleActor, limit: number = FLEET_SCHEDULE_HISTORY): Promise<FleetCommandRunView[]> {
+    async runs(
+        id: string,
+        actor: FleetScheduleActor,
+        limit: number = FLEET_SCHEDULE_HISTORY,
+    ): Promise<FleetCommandRunView[]> {
         const command = await this.resolveOwn(id, actor);
         const nodeId = this.nodeIdOf(command);
         const node = await this.nodes.findById(nodeId);
-        const runs = await this.schedules.findRuns(command.id, Math.min(FLEET_SCHEDULE_HISTORY, limit));
+        const runs = await this.schedules.findRuns(
+            command.id,
+            Math.min(FLEET_SCHEDULE_HISTORY, limit),
+        );
         const now = this.now();
         const linkUp = this.isConnected(nodeId);
         return runs.map((run) => toFleetScheduleRunView(run, node?.name ?? null, now, linkUp));
@@ -625,7 +697,11 @@ export class FleetScheduleService {
             }));
         const generation = rows.reduce((max, row) => Math.max(max, row.syncGeneration ?? 0), 0);
         try {
-            const result = await this.node.sync(nodeId, { generation, definitions }, { kind: 'system', job: 'fleet-schedule-sync' });
+            const result = await this.node.sync(
+                nodeId,
+                { generation, definitions },
+                { kind: 'system', job: 'fleet-schedule-sync' },
+            );
             this.unsupported.delete(nodeId);
             await this.schedules.markSynced(
                 rows.map((row) => row.id),
@@ -645,7 +721,9 @@ export class FleetScheduleService {
         } catch (error) {
             const typed = readFleetCommandError(error);
             if (typed?.code === 'unsupported_on_node') this.unsupported.add(nodeId);
-            this.logger.debug(`schedule.sync to node ${nodeId} skipped: ${typed?.code ?? describe(error)}`);
+            this.logger.debug(
+                `schedule.sync to node ${nodeId} skipped: ${typed?.code ?? describe(error)}`,
+            );
         }
     }
 
@@ -665,12 +743,17 @@ export class FleetScheduleService {
             if (rows.length === 0) return { runs: 0, paused: 0 };
             const byId = new Map(rows.map((row) => [row.id, row]));
             const watermark = await this.schedules.latestEndedAtForNode(key, [...byId.keys()]);
-            let since = watermark ? new Date(watermark.getTime() - SINCE_OVERLAP_MS).toISOString() : null;
+            let since = watermark
+                ? new Date(watermark.getTime() - SINCE_OVERLAP_MS).toISOString()
+                : null;
             const node = await this.nodes.findById(key);
             const touched = new Set<string>();
             let count = 0;
             for (let page = 0; page < MAX_RUN_PAGES; page += 1) {
-                const result = await this.node.runs(key, since, { kind: 'system', job: 'fleet-schedule-reconcile' });
+                const result = await this.node.runs(key, since, {
+                    kind: 'system',
+                    job: 'fleet-schedule-reconcile',
+                });
                 let latest: string | null = since;
                 for (const report of result.runs) {
                     const command = byId.get(report.scheduleId);
@@ -680,7 +763,8 @@ export class FleetScheduleService {
                         count += 1;
                         touched.add(command.id);
                     }
-                    if (report.endedAt && (!latest || report.endedAt > latest)) latest = report.endedAt;
+                    if (report.endedAt && (!latest || report.endedAt > latest))
+                        latest = report.endedAt;
                 }
                 if (!result.more || latest === since) break;
                 since = latest;
@@ -757,7 +841,9 @@ export class FleetScheduleService {
                     exitCode: report.exitCode,
                     trigger: report.trigger,
                     durationMs:
-                        endedAt !== null ? Math.max(0, endedAt.getTime() - startedAt.getTime()) : null,
+                        endedAt !== null
+                            ? Math.max(0, endedAt.getTime() - startedAt.getTime())
+                            : null,
                     truncated: report.truncated,
                 },
             });
@@ -772,9 +858,9 @@ export class FleetScheduleService {
     ): Promise<boolean> {
         const fresh = await this.schedules.find(command.id);
         if (!fresh || fresh.deletedAt || fresh.pausedAt || fresh.enabled === false) return false;
-        const runs = (await this.schedules.findRuns(fresh.id, FLEET_SCHEDULE_FAILURE_PAUSE + 4)).filter(
-            isCountedFleetScheduleRun,
-        );
+        const runs = (
+            await this.schedules.findRuns(fresh.id, FLEET_SCHEDULE_FAILURE_PAUSE + 4)
+        ).filter(isCountedFleetScheduleRun);
         const streak = fleetScheduleFailureStreak(runs as Array<{ status: FleetCommandRunStatus }>);
         if (streak < FLEET_SCHEDULE_FAILURE_PAUSE) return false;
         await this.applyPause(fresh, node, 'failures', null);
@@ -785,7 +871,9 @@ export class FleetScheduleService {
                 body: `Open it under Fleet → ${computer} → Schedules to read the last runs, then resume it when it is fixed.`,
             });
         } catch (error) {
-            this.logger.debug(`schedule failure notice for ${fresh.id} not filed: ${describe(error)}`);
+            this.logger.debug(
+                `schedule failure notice for ${fresh.id} not filed: ${describe(error)}`,
+            );
         }
         return true;
     }
@@ -808,7 +896,9 @@ export class FleetScheduleService {
         for (const nodeId of nodeIds) {
             if (!this.isConnected(nodeId)) continue;
             summary.nodes += 1;
-            const rows = await this.schedules.listForNode(nodeId, { includeDeleted: true }).catch(() => []);
+            const rows = await this.schedules
+                .listForNode(nodeId, { includeDeleted: true })
+                .catch(() => []);
             if (rows.some((row) => (row.syncGeneration ?? 0) > (row.syncedGeneration ?? 0))) {
                 await this.syncNode(nodeId);
                 summary.synced += 1;
@@ -828,7 +918,9 @@ export class FleetScheduleService {
             await this.syncNode(nodeId);
             await this.reconcileNode(nodeId);
         } catch (error) {
-            this.logger.debug(`schedule link-open pass for node ${nodeId} skipped: ${describe(error)}`);
+            this.logger.debug(
+                `schedule link-open pass for node ${nodeId} skipped: ${describe(error)}`,
+            );
         }
     }
 
@@ -840,7 +932,8 @@ export class FleetScheduleService {
      * off a schedule is as unknown as a missing one (the 404 the guard answers).
      */
     private assertEnabled(): void {
-        if (!config.fleet.isCommandsEnabled()) throw fleetCommandError('not_found', 'no such schedule');
+        if (!config.fleet.isCommandsEnabled())
+            throw fleetCommandError('not_found', 'no such schedule');
     }
 
     private async applyPause(
@@ -859,7 +952,10 @@ export class FleetScheduleService {
         });
         const target = node ?? { id: nodeId, userId: command.userId };
         if (actor) {
-            await this.record('node.schedule.pause', actor, target, command.id, 'plain', { outcome: 'paused', reason });
+            await this.record('node.schedule.pause', actor, target, command.id, 'plain', {
+                outcome: 'paused',
+                reason,
+            });
         } else if (this.audit) {
             await this.audit.tryRecord({
                 action: 'node.schedule.pause',
@@ -870,7 +966,8 @@ export class FleetScheduleService {
                     family: 'schedules',
                     target: command.id,
                     nodeId,
-                    requestedBy: reason === 'failures' ? 'system:failure-streak' : `system:${reason}`,
+                    requestedBy:
+                        reason === 'failures' ? 'system:failure-streak' : `system:${reason}`,
                     confirmationClass: 'plain',
                     outcome: 'paused',
                     reason,
@@ -883,8 +980,11 @@ export class FleetScheduleService {
     /** The person's own schedule (spec §8b default: a schedule is its author's). */
     private async resolveOwn(id: string, actor: FleetScheduleActor): Promise<FleetCommand> {
         const command =
-            typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) ? await this.schedules.find(id) : null;
-        if (!command || command.userId !== actor.userId) throw fleetCommandError('not_found', 'no such schedule');
+            typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)
+                ? await this.schedules.find(id)
+                : null;
+        if (!command || command.userId !== actor.userId)
+            throw fleetCommandError('not_found', 'no such schedule');
         if (command.deletedAt) {
             const age = this.now() - toMs(command.deletedAt);
             if (age > FLEET_SCHEDULE_DELETED_RETENTION_DAYS * 86_400_000) {
@@ -906,7 +1006,11 @@ export class FleetScheduleService {
             }
             throw fleetCommandError('not_found', 'no such computer', { nodeId });
         }
-        const refusal = fleetScheduleNodeRefusal({ name: node.name, kind: node.kind, status: node.status });
+        const refusal = fleetScheduleNodeRefusal({
+            name: node.name,
+            kind: node.kind,
+            status: node.status,
+        });
         if (refusal) throw fleetCommandError(refusal.code, refusal.hint, refusal.details);
         return node;
     }
@@ -930,7 +1034,9 @@ export class FleetScheduleService {
             folder: shape.cwd ?? '~',
             cadenceHuman: describeFleetScheduleCadence(shape.cadence),
             nodeTimeZone: zone,
-            next: previewFleetScheduleFires(shape.cadence, zone, this.now(), 3).map((ms) => new Date(ms).toISOString()),
+            next: previewFleetScheduleFires(shape.cadence, zone, this.now(), 3).map((ms) =>
+                new Date(ms).toISOString(),
+            ),
             sentence: FLEET_SCHEDULE_SANDBOX_SENTENCE,
             ...extra,
         };
@@ -973,7 +1079,8 @@ export class FleetScheduleService {
         node: FleetNode | null,
         runs?: readonly FleetCommandRun[],
     ): Promise<FleetScheduleView> {
-        const history = runs ?? (await this.schedules.findRuns(command.id, FLEET_SCHEDULE_FAILURE_PAUSE + 4));
+        const history =
+            runs ?? (await this.schedules.findRuns(command.id, FLEET_SCHEDULE_FAILURE_PAUSE + 4));
         return this.buildView(command, node, history);
     }
 
@@ -989,10 +1096,16 @@ export class FleetScheduleService {
             rows.map((row) => row.id),
             FLEET_SCHEDULE_FAILURE_PAUSE + 4,
         );
-        return rows.map((row) => this.buildView(row, nodes.get(this.nodeIdOf(row)) ?? null, runs.get(row.id) ?? []));
+        return rows.map((row) =>
+            this.buildView(row, nodes.get(this.nodeIdOf(row)) ?? null, runs.get(row.id) ?? []),
+        );
     }
 
-    private buildView(command: FleetCommand, node: FleetNode | null, runs: readonly FleetCommandRun[]): FleetScheduleView {
+    private buildView(
+        command: FleetCommand,
+        node: FleetNode | null,
+        runs: readonly FleetCommandRun[],
+    ): FleetScheduleView {
         const nodeId = this.nodeIdOf(command);
         const unsupported = this.unsupported.has(nodeId);
         return toFleetScheduleView({
@@ -1026,7 +1139,10 @@ export class FleetScheduleService {
     /** A `running` row older than the cap plus the link-lost grace is not running any more. */
     private isStillRunning(run: FleetCommandRun): boolean {
         const started = toMs(run.startedAt);
-        return Number.isFinite(started) && this.now() - started < (FLEET_SCHEDULE_RUN_CAP_SEC + 600) * 1000;
+        return (
+            Number.isFinite(started) &&
+            this.now() - started < (FLEET_SCHEDULE_RUN_CAP_SEC + 600) * 1000
+        );
     }
 
     private isConnected(nodeId: string): boolean {
@@ -1034,7 +1150,8 @@ export class FleetScheduleService {
     }
 
     private requireNode(): FleetScheduleNodePort {
-        if (!this.node) throw fleetCommandError('unreachable', 'this deployment does not reach computers');
+        if (!this.node)
+            throw fleetCommandError('unreachable', 'this deployment does not reach computers');
         return this.node;
     }
 

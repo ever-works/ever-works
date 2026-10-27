@@ -42,7 +42,12 @@ describe('integration keys — vocabulary v1', () => {
 	});
 
 	it('the Ever Gauzy preset is every scope except the opt-in org:write, email:write, merges:decide and decisions:individual', () => {
-		expect(INTEGRATION_OPT_IN_SCOPES).toEqual(['org:write', 'email:write', 'merges:decide', 'decisions:individual']);
+		expect(INTEGRATION_OPT_IN_SCOPES).toEqual([
+			'org:write',
+			'email:write',
+			'merges:decide',
+			'decisions:individual'
+		]);
 		expect(EVER_GAUZY_PRESET_SCOPES).toHaveLength(INTEGRATION_SCOPES.length - 4);
 		expect(EVER_GAUZY_PRESET_SCOPES).not.toContain('org:write');
 		expect(EVER_GAUZY_PRESET_SCOPES).not.toContain('email:write');

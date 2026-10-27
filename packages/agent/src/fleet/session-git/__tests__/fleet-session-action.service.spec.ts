@@ -80,7 +80,10 @@ function build(options: { typeAction?: jest.Mock; row?: Record<string, unknown> 
     const audit = { record: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
     const service = new FleetSessionActionService(
         {
-            resolve: jest.fn().mockResolvedValue({ session: row, node: { id: 'node-1', userId: 'user-1', name: 'build-01' } }),
+            resolve: jest.fn().mockResolvedValue({
+                session: row,
+                node: { id: 'node-1', userId: 'user-1', name: 'build-01' },
+            }),
             typeAction,
             isReachable: jest.fn().mockReturnValue(true),
         } as never,
@@ -96,38 +99,86 @@ function build(options: { typeAction?: jest.Mock; row?: Record<string, unknown> 
 describe('FleetSessionActionService.send (FL-06)', () => {
     it('types the prompt as one line + Enter and writes a delivered ledger row and one audit row', async () => {
         const { service, typeAction, logs, audit } = build();
-        const result = await service.send(SESSION_ID, { userId: 'user-1' }, { actionId: 'commit', prompt: 'Commit\nnow' });
+        const result = await service.send(
+            SESSION_ID,
+            { userId: 'user-1' },
+            { actionId: 'commit', prompt: 'Commit\nnow' },
+        );
         expect(result.delivery).toBe('delivered');
-        expect(typeAction).toHaveBeenCalledWith(expect.anything(), { userId: 'user-1' }, 'Commit now\r', expect.objectContaining({ actionId: 'commit' }));
+        expect(typeAction).toHaveBeenCalledWith(
+            expect.anything(),
+            { userId: 'user-1' },
+            'Commit now\r',
+            expect.objectContaining({ actionId: 'commit' }),
+        );
         const meta = logs.update.mock.calls[0][1].metadata as Record<string, unknown>;
         expect(meta.deliveredAt).toEqual(expect.any(String));
         expect(JSON.stringify(logs.save.mock.calls[0][0])).not.toContain('Commit now');
         expect(audit.record).toHaveBeenCalledWith(
-            expect.objectContaining({ action: 'node.session.action', details: expect.objectContaining({ action: 'commit', delivery: 'delivered' }) }),
+            expect.objectContaining({
+                action: 'node.session.action',
+                details: expect.objectContaining({ action: 'commit', delivery: 'delivered' }),
+            }),
         );
     });
 
     it('refuses a hidden action with invalid naming the rule (U5)', async () => {
         const { service } = build();
-        expect((await refusal(service.send(SESSION_ID, { userId: 'user-1' }, { actionId: 'fixComments', prompt: 'x' })))?.details?.rule).toBe('no-open-pull-request');
+        expect(
+            (
+                await refusal(
+                    service.send(
+                        SESSION_ID,
+                        { userId: 'user-1' },
+                        { actionId: 'fixComments', prompt: 'x' },
+                    ),
+                )
+            )?.details?.rule,
+        ).toBe('no-open-pull-request');
     });
 
     it('refuses a second send within 2 s with busy naming who sent the first (U14)', async () => {
         const { service } = build();
         await service.send(SESSION_ID, { userId: 'user-1' }, { actionId: 'commit', prompt: 'one' });
-        expect((await refusal(service.send(SESSION_ID, { userId: 'user-2' }, { actionId: 'recap', prompt: 'two' })))?.code).toBe('busy');
+        expect(
+            (
+                await refusal(
+                    service.send(
+                        SESSION_ID,
+                        { userId: 'user-2' },
+                        { actionId: 'recap', prompt: 'two' },
+                    ),
+                )
+            )?.code,
+        ).toBe('busy');
     });
 
     it('marks a send the computer could not confirm as not delivered, never retried (U13)', async () => {
         const unreachable = fleetSessionError('unreachable', 'the computer is not connected');
         const { service, logs } = build({ typeAction: jest.fn().mockRejectedValue(unreachable) });
-        const result = await service.send(SESSION_ID, { userId: 'user-1' }, { actionId: 'recap', prompt: 'Recap' });
+        const result = await service.send(
+            SESSION_ID,
+            { userId: 'user-1' },
+            { actionId: 'recap', prompt: 'Recap' },
+        );
         expect(result.delivery).toBe('undelivered');
-        expect((logs.update.mock.calls[0][1].metadata as Record<string, unknown>).undelivered).toBe(true);
+        expect((logs.update.mock.calls[0][1].metadata as Record<string, unknown>).undelivered).toBe(
+            true,
+        );
     });
 
     it('opens the pull request of an owner session from the dialog, never from a prompt (FR-18)', async () => {
         const { service } = build({ row: session({ kind: 'owner', agentRunId: null }) });
-        expect((await refusal(service.send(SESSION_ID, { userId: 'user-1' }, { actionId: 'pullRequest', prompt: 'x' })))?.details?.rule).toBe('owner-dialog');
+        expect(
+            (
+                await refusal(
+                    service.send(
+                        SESSION_ID,
+                        { userId: 'user-1' },
+                        { actionId: 'pullRequest', prompt: 'x' },
+                    ),
+                )
+            )?.details?.rule,
+        ).toBe('owner-dialog');
     });
 });

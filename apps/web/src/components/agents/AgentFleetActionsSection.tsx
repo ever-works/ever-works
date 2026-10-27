@@ -9,7 +9,10 @@ import {
     type FleetAgentActionTemplates,
     type FleetSessionActionId,
 } from '@ever-works/contracts';
-import { getAgentActionTemplatesAction, saveAgentActionTemplatesAction } from '@/app/actions/fleet-session-git';
+import {
+    getAgentActionTemplatesAction,
+    saveAgentActionTemplatesAction,
+} from '@/app/actions/fleet-session-git';
 import { Button } from '@/components/ui/button';
 
 /**
@@ -37,7 +40,9 @@ export function AgentFleetActionsSection({
     const t = useTranslations('fleet.sessionGit.instructions');
     const tLabels = useTranslations('fleet.sessionGit.actions.labels');
     const [data, setData] = useState<FleetAgentActionTemplates | null>(null);
-    const [values, setValues] = useState<Record<FleetSessionActionId, string>>({} as Record<FleetSessionActionId, string>);
+    const [values, setValues] = useState<Record<FleetSessionActionId, string>>(
+        {} as Record<FleetSessionActionId, string>,
+    );
     const [prefix, setPrefix] = useState('');
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -49,7 +54,8 @@ export function AgentFleetActionsSection({
             setData(result.data);
             setPrefix(result.data.branchPrefix.value ?? '');
             const next = {} as Record<FleetSessionActionId, string>;
-            for (const id of FLEET_SESSION_ACTION_IDS) next[id] = result.data.actions[id].value ?? '';
+            for (const id of FLEET_SESSION_ACTION_IDS)
+                next[id] = result.data.actions[id].value ?? '';
             setValues(next);
         });
         return () => {
@@ -62,7 +68,8 @@ export function AgentFleetActionsSection({
         setBusy(true);
         setMessage(null);
         const actions: Partial<Record<FleetSessionActionId, string | null>> = {};
-        for (const id of FLEET_SESSION_ACTION_IDS) actions[id] = values[id]?.trim() ? values[id] : null;
+        for (const id of FLEET_SESSION_ACTION_IDS)
+            actions[id] = values[id]?.trim() ? values[id] : null;
         const result = await saveAgentActionTemplatesAction(agentId, {
             branchPrefix: prefix.trim() || null,
             actions,
@@ -84,9 +91,15 @@ export function AgentFleetActionsSection({
             data-testid="agent-fleet-actions-section"
         >
             <header className="space-y-1">
-                <h2 className="text-sm font-semibold text-text dark:text-text-dark">{t('title')}</h2>
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('intro', { agent: data.agentName })}</p>
-                {data.error ? <p className="text-xs text-warning">{t('blockError', { error: data.error })}</p> : null}
+                <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('title')}
+                </h2>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('intro', { agent: data.agentName })}
+                </p>
+                {data.error ? (
+                    <p className="text-xs text-warning">{t('blockError', { error: data.error })}</p>
+                ) : null}
             </header>
             <label className="block space-y-1 text-sm">
                 <span className="text-text-muted dark:text-text-muted-dark">{t('prefix')}</span>
@@ -108,10 +121,17 @@ export function AgentFleetActionsSection({
                 return (
                     <div key={id} className="grid gap-2 md:grid-cols-2">
                         <label className="block space-y-1 text-sm">
-                            <span className="text-text-muted dark:text-text-muted-dark">{tLabels(id)}</span>
+                            <span className="text-text-muted dark:text-text-muted-dark">
+                                {tLabels(id)}
+                            </span>
                             <textarea
                                 value={value}
-                                onChange={(event) => setValues((current) => ({ ...current, [id]: event.target.value }))}
+                                onChange={(event) =>
+                                    setValues((current) => ({
+                                        ...current,
+                                        [id]: event.target.value,
+                                    }))
+                                }
                                 placeholder={t('usesDefault')}
                                 maxLength={FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH}
                                 rows={3}
@@ -120,7 +140,9 @@ export function AgentFleetActionsSection({
                             />
                             {unknown.length > 0 ? (
                                 <span className="block text-xs text-warning">
-                                    {t('unknownPlaceholders', { names: unknown.map((name) => `{${name}}`).join(', ') })}
+                                    {t('unknownPlaceholders', {
+                                        names: unknown.map((name) => `{${name}}`).join(', '),
+                                    })}
                                 </span>
                             ) : null}
                         </label>
@@ -134,12 +156,24 @@ export function AgentFleetActionsSection({
                 );
             })}
             <div className="flex items-center gap-3">
-                <Button size="sm" onClick={() => void save()} disabled={busy} data-testid="agent-fleet-actions-save">
+                <Button
+                    size="sm"
+                    onClick={() => void save()}
+                    disabled={busy}
+                    data-testid="agent-fleet-actions-save"
+                >
                     {busy ? t('saving') : t('save')}
                 </Button>
-                <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('placeholders')}</span>
+                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('placeholders')}
+                </span>
                 {message ? (
-                    <span className={message.tone === 'ok' ? 'text-xs text-success' : 'text-xs text-danger'} role="status">
+                    <span
+                        className={
+                            message.tone === 'ok' ? 'text-xs text-success' : 'text-xs text-danger'
+                        }
+                        role="status"
+                    >
                         {message.text}
                     </span>
                 ) : null}

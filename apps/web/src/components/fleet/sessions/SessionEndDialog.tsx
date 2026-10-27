@@ -4,7 +4,14 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { FleetSessionView } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { sessionsClient } from './sessions.client';
 import type { SessionErrorRead } from './sessions.shared';
 
@@ -57,21 +64,39 @@ export function SessionEndDialog({
                     </DialogTitle>
                     <DialogDescription>{t('confirm.endBody')}</DialogDescription>
                     {session.kind === 'agent' && agentName && (
-                        <p className="mt-2 text-sm text-text dark:text-text-dark" data-testid="fleet-session-end-run">
+                        <p
+                            className="mt-2 text-sm text-text dark:text-text-dark"
+                            data-testid="fleet-session-end-run"
+                        >
                             {t('confirm.endRun', { agent: agentName })}
                         </p>
                     )}
                 </DialogHeader>
                 {error && (
-                    <p role="alert" className="text-sm text-danger" data-testid="fleet-session-end-error">
-                        {error.hint ? t('actions.failed', { hint: error.hint }) : t('actions.failedGeneric')}
+                    <p
+                        role="alert"
+                        className="text-sm text-danger"
+                        data-testid="fleet-session-end-error"
+                    >
+                        {error.hint
+                            ? t('actions.failed', { hint: error.hint })
+                            : t('actions.failedGeneric')}
                     </p>
                 )}
                 <DialogFooter>
-                    <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+                    <Button
+                        variant="secondary"
+                        onClick={() => onOpenChange(false)}
+                        disabled={pending}
+                    >
                         {t('confirm.cancel')}
                     </Button>
-                    <Button variant="danger" onClick={onEnd} disabled={pending} data-testid="fleet-session-end-confirm">
+                    <Button
+                        variant="danger"
+                        onClick={onEnd}
+                        disabled={pending}
+                        data-testid="fleet-session-end-confirm"
+                    >
                         {pending ? t('confirm.ending') : t('confirm.end')}
                     </Button>
                 </DialogFooter>

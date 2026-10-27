@@ -14,7 +14,9 @@ import { FLEET_EXIT, fleetExitFor } from './fleet-exit';
 export function readFleetCliError(error: unknown): FleetToolErrorBody {
     const response = (error as { response?: { status?: number; data?: unknown } })?.response;
     const data = response?.data as { error?: unknown; message?: unknown } | undefined;
-    const envelope = data?.error as { code?: unknown; hint?: unknown; details?: unknown } | undefined;
+    const envelope = data?.error as
+        | { code?: unknown; hint?: unknown; details?: unknown }
+        | undefined;
     if (envelope && typeof envelope === 'object' && typeof envelope.code === 'string') {
         const body: FleetToolErrorBody = {
             code: envelope.code as FleetToolErrorBody['code'],
@@ -63,7 +65,8 @@ export function emitFleetError(json: boolean, error: FleetToolErrorBody): never 
     }
     process.stderr.write(`${chalk.red(`✗ ${error.code} — ${error.hint}`)}\n`);
     const summary = typeof error.details?.summary === 'string' ? error.details.summary : null;
-    if (error.code === 'confirmation_required' && summary) process.stderr.write(`${chalk.yellow(summary)}\n`);
+    if (error.code === 'confirmation_required' && summary)
+        process.stderr.write(`${chalk.yellow(summary)}\n`);
     const sentence = typeof error.details?.sentence === 'string' ? error.details.sentence : null;
     if (sentence) process.stderr.write(`${chalk.yellow(`⚠ ${sentence}`)}\n`);
     process.exit(fleetExitFor(error.code));
@@ -71,7 +74,11 @@ export function emitFleetError(json: boolean, error: FleetToolErrorBody): never 
 
 /** A usage error: exit 2, the envelope on stdout with `--json`. */
 export function fleetUsage(json: boolean, hint: string, field?: string): never {
-    return emitFleetError(json, { code: 'invalid', hint, ...(field ? { details: { field } } : {}) });
+    return emitFleetError(json, {
+        code: 'invalid',
+        hint,
+        ...(field ? { details: { field } } : {}),
+    });
 }
 
 const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
@@ -93,7 +100,9 @@ export function fleetTable(rows: string[][]): string {
         .map((row) =>
             row
                 .map((cell, index) =>
-                    index === row.length - 1 ? cell : cell + ' '.repeat(widths[index] - visibleLength(cell)),
+                    index === row.length - 1
+                        ? cell
+                        : cell + ' '.repeat(widths[index] - visibleLength(cell)),
                 )
                 .join('  '),
         )
@@ -136,7 +145,15 @@ export function printFleetList(
         return;
     }
     const read = (item: Record<string, unknown>, key: string): unknown =>
-        key.split('.').reduce<unknown>((value, part) => (value && typeof value === 'object' ? (value as Record<string, unknown>)[part] : undefined), item);
+        key
+            .split('.')
+            .reduce<unknown>(
+                (value, part) =>
+                    value && typeof value === 'object'
+                        ? (value as Record<string, unknown>)[part]
+                        : undefined,
+                item,
+            );
     const rows = [columns.map((column) => column.label)];
     for (const item of items) rows.push(columns.map((column) => cellText(read(item, column.key))));
     console.log(fleetTable(rows));

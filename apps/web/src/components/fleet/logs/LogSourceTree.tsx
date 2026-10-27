@@ -43,7 +43,9 @@ export function LogSourceTree({
     const onTreeKey = (event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
         const items = Array.from(
-            event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-log-source]:not([disabled])'),
+            event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                'button[data-log-source]:not([disabled])',
+            ),
         );
         const index = items.findIndex((item) => item === document.activeElement);
         const next = event.key === 'ArrowDown' ? index + 1 : index - 1;
@@ -108,7 +110,9 @@ export function LogSourceTree({
                     <span className="truncate font-mono">{source.label}</span>
                     <span
                         className={`shrink-0 ${
-                            source.failed ? 'text-danger font-medium' : 'text-text-muted dark:text-text-muted-dark'
+                            source.failed
+                                ? 'text-danger font-medium'
+                                : 'text-text-muted dark:text-text-muted-dark'
                         }`}
                     >
                         {source.failed ? `${meta ?? t('sources.failed')} ▲` : meta}

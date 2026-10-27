@@ -736,26 +736,28 @@ export class TasksController {
         // service works in `Date` (the column is a timestamptz). The
         // three states are distinct: absent = untouched, null = clear
         // the schedule, string = (re-)schedule.
-        return this.service.update(
-            auth.userId,
-            id,
-            {
-                ...body,
-                scheduledAt:
-                    body.scheduledAt === undefined
-                        ? undefined
-                        : body.scheduledAt === null
-                          ? null
-                          : new Date(body.scheduledAt),
-                // EW-P2-3 — same three states: absent / null (clear) / ISO string.
-                dueAt: toOptionalDate(body.dueAt),
-                startAt: toOptionalDate(body.startAt),
-            },
-            this.scopeContext.getScope(),
-            // The service re-checks the labels against the row it writes,
-            // closing the read-then-write window above.
-            ...labelOptions,
-        ).catch((error: unknown) => rethrowReservedLabelRefusal(error, auth, req));
+        return this.service
+            .update(
+                auth.userId,
+                id,
+                {
+                    ...body,
+                    scheduledAt:
+                        body.scheduledAt === undefined
+                            ? undefined
+                            : body.scheduledAt === null
+                              ? null
+                              : new Date(body.scheduledAt),
+                    // EW-P2-3 — same three states: absent / null (clear) / ISO string.
+                    dueAt: toOptionalDate(body.dueAt),
+                    startAt: toOptionalDate(body.startAt),
+                },
+                this.scopeContext.getScope(),
+                // The service re-checks the labels against the row it writes,
+                // closing the read-then-write window above.
+                ...labelOptions,
+            )
+            .catch((error: unknown) => rethrowReservedLabelRefusal(error, auth, req));
     }
 
     @Get(':id/subtasks')

@@ -147,7 +147,10 @@ function tokenOf(settings?: PluginSettings): string {
 	const signedIn = settings && typeof settings.oauthAccessToken === 'string' ? settings.oauthAccessToken.trim() : '';
 	const token = apiToken || signedIn;
 	if (!token) {
-		throw new MachineProviderError('unauthorized', 'no DigitalOcean API token is saved; add one in the plugin settings');
+		throw new MachineProviderError(
+			'unauthorized',
+			'no DigitalOcean API token is saved; add one in the plugin settings'
+		);
 	}
 	return token;
 }
@@ -243,7 +246,8 @@ export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlug
 			id: this.id,
 			name: this.name,
 			version: this.version,
-			description: 'Create cloud computers at DigitalOcean that join your Fleet, with the price shown before you create one',
+			description:
+				'Create cloud computers at DigitalOcean that join your Fleet, with the price shown before you create one',
 			category: this.category,
 			capabilities: [...this.capabilities],
 			author: { name: 'Ever Works Team' },
@@ -303,7 +307,8 @@ export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlug
 		const id = typeof account?.uuid === 'string' ? account.uuid : '';
 		if (!id) throw new MachineProviderError('unauthorized', 'DigitalOcean did not say which account signed in');
 		const email = typeof account?.email === 'string' ? account.email : undefined;
-		const team = typeof account?.team?.name === 'string' && account.team.name.trim() ? account.team.name.trim() : undefined;
+		const team =
+			typeof account?.team?.name === 'string' && account.team.name.trim() ? account.team.name.trim() : undefined;
 		const user: { -readonly [K in keyof OAuthUser]: OAuthUser[K] } = { id, username: email ?? id };
 		if (email) user.email = email;
 		if (team) user.name = team;
@@ -410,7 +415,11 @@ export class DigitalOceanMachinesPlugin implements IPlugin, IMachineProviderPlug
 			// public half, and its private half was never kept by anyone.
 			if (keyId !== null) {
 				await api
-					.request({ method: 'DELETE', path: `/v2/account/keys/${encodeURIComponent(String(keyId))}`, accept: [404] })
+					.request({
+						method: 'DELETE',
+						path: `/v2/account/keys/${encodeURIComponent(String(keyId))}`,
+						accept: [404]
+					})
 					.catch(() => undefined);
 			}
 		}

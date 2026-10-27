@@ -98,10 +98,13 @@ export const APP_WORK_DELETION_NOT_STARTED_REASONS = [
     'deploy_in_progress',
 ] as const;
 
-export type AppWorkDeletionNotStartedReason = (typeof APP_WORK_DELETION_NOT_STARTED_REASONS)[number];
+export type AppWorkDeletionNotStartedReason =
+    (typeof APP_WORK_DELETION_NOT_STARTED_REASONS)[number];
 
 /** `true` when a `pending` outcome means the removal was never started (see above). */
-export function isAppWorkDeletionNotStarted(outcome: AppWorkDeletionOutcome | null | undefined): boolean {
+export function isAppWorkDeletionNotStarted(
+    outcome: AppWorkDeletionOutcome | null | undefined,
+): boolean {
     return (
         outcome?.status === 'pending' &&
         typeof outcome.reason === 'string' &&

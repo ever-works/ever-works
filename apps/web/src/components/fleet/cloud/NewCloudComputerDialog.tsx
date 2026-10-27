@@ -135,7 +135,9 @@ export function NewCloudComputerDialog({
     const size = sizes.find((entry) => entry.id === form.sizeId) ?? null;
     const nameValid = isFleetCloudName(form.name);
     const atLimit = Boolean(options && options.limits.used >= options.limits.maxPerOwner);
-    const canCreate = Boolean(options && provider && size && nameValid && !atLimit && !pending && !loading);
+    const canCreate = Boolean(
+        options && provider && size && nameValid && !atLimit && !pending && !loading,
+    );
 
     const sentence =
         options && size
@@ -171,11 +173,15 @@ export function NewCloudComputerDialog({
                 software: form.software,
                 acknowledgedPriceCents: size.priceMonthlyCents,
                 confirm: true,
-                ...(form.software.includes('overlay-vpn') && vpnAuthKey.trim() ? { vpnAuthKey: vpnAuthKey.trim() } : {}),
+                ...(form.software.includes('overlay-vpn') && vpnAuthKey.trim()
+                    ? { vpnAuthKey: vpnAuthKey.trim() }
+                    : {}),
             });
             if (result.ok) {
                 setVpnAuthKey('');
-                toast.success(t('create.created', { name: form.name, provider: options.providerName }));
+                toast.success(
+                    t('create.created', { name: form.name, provider: options.providerName }),
+                );
                 onCreated?.(result.data);
                 onClose();
                 return;
@@ -193,18 +199,22 @@ export function NewCloudComputerDialog({
 
     const empty = providers !== null && configured.length === 0;
     // P3 (FR-31): providers the owner can sign in to instead of pasting a token.
-    const signInable = (providers ?? []).filter((entry) => !entry.configured && entry.oauthAvailable);
+    const signInable = (providers ?? []).filter(
+        (entry) => !entry.configured && entry.oauthAvailable,
+    );
 
     const signIn = (pluginId: string) => {
         setSigningIn(pluginId);
-        void connectOAuthProvider(pluginId, `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=cloud`).then((result) => {
-            if (result.success && 'url' in result && typeof result.url === 'string') {
-                window.location.assign(result.url);
-                return;
-            }
-            setSigningIn(null);
-            toast.error(t('create.signInFailed'));
-        });
+        void connectOAuthProvider(pluginId, `${ROUTES.DASHBOARD_FLEET_COMPUTERS}?add=cloud`).then(
+            (result) => {
+                if (result.success && 'url' in result && typeof result.url === 'string') {
+                    window.location.assign(result.url);
+                    return;
+                }
+                setSigningIn(null);
+                toast.error(t('create.signInFailed'));
+            },
+        );
     };
 
     const signInButtons =
@@ -290,7 +300,10 @@ export function NewCloudComputerDialog({
                                 onChange={(event) =>
                                     setForm((previous) =>
                                         options
-                                            ? withOptionDefaults({ ...previous, regionId: event.target.value }, options)
+                                            ? withOptionDefaults(
+                                                  { ...previous, regionId: event.target.value },
+                                                  options,
+                                              )
                                             : { ...previous, regionId: event.target.value },
                                     )
                                 }
@@ -298,7 +311,11 @@ export function NewCloudComputerDialog({
                                 data-testid="fleet-cloud-region"
                             >
                                 {(options?.regions ?? []).map((region) => (
-                                    <option key={region.id} value={region.id} disabled={!region.available}>
+                                    <option
+                                        key={region.id}
+                                        value={region.id}
+                                        disabled={!region.available}
+                                    >
                                         {region.label}
                                     </option>
                                 ))}
@@ -308,11 +325,20 @@ export function NewCloudComputerDialog({
                         <fieldset className="flex flex-col gap-1" data-testid="fleet-cloud-sizes">
                             <legend className="font-medium">{t('create.size')}</legend>
                             {loading ? (
-                                <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('create.loading')}</span>
+                                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('create.loading')}
+                                </span>
                             ) : null}
-                            <div role="radiogroup" aria-label={t('create.size')} className="flex flex-col gap-1">
+                            <div
+                                role="radiogroup"
+                                aria-label={t('create.size')}
+                                className="flex flex-col gap-1"
+                            >
                                 {sizes.map((entry) => (
-                                    <label key={entry.id} className="inline-flex items-center gap-2">
+                                    <label
+                                        key={entry.id}
+                                        className="inline-flex items-center gap-2"
+                                    >
                                         <input
                                             type="radio"
                                             name="fleet-cloud-size"
@@ -329,8 +355,14 @@ export function NewCloudComputerDialog({
                                         </span>
                                         <span className="tabular-nums">
                                             {t('create.sizePrice', {
-                                                month: money(entry.priceMonthlyCents, options?.currency),
-                                                hour: hourly(entry.priceHourlyCents, options?.currency),
+                                                month: money(
+                                                    entry.priceMonthlyCents,
+                                                    options?.currency,
+                                                ),
+                                                hour: hourly(
+                                                    entry.priceHourlyCents,
+                                                    options?.currency,
+                                                ),
                                             })}
                                         </span>
                                     </label>
@@ -342,14 +374,19 @@ export function NewCloudComputerDialog({
                             <legend className="font-medium">{t('create.software')}</legend>
                             <div className="flex flex-wrap gap-3">
                                 {(options?.software ?? []).map((entry) => (
-                                    <label key={entry.id} className="inline-flex items-center gap-1">
+                                    <label
+                                        key={entry.id}
+                                        className="inline-flex items-center gap-1"
+                                    >
                                         <input
                                             type="checkbox"
                                             checked={form.software.includes(entry.id)}
                                             onChange={() => toggleSoftware(entry.id)}
                                             data-testid={`fleet-cloud-software-${entry.id}`}
                                         />
-                                        {t(`create.softwareNames.${CLOUD_SOFTWARE_KEYS[entry.id]}` as never)}
+                                        {t(
+                                            `create.softwareNames.${CLOUD_SOFTWARE_KEYS[entry.id]}` as never,
+                                        )}
                                     </label>
                                 ))}
                             </div>
@@ -380,7 +417,9 @@ export function NewCloudComputerDialog({
                                 role="status"
                                 data-testid="fleet-cloud-price-changed"
                             >
-                                {t('create.priceChanged', { price: money(priceChanged, options?.currency) })}
+                                {t('create.priceChanged', {
+                                    price: money(priceChanged, options?.currency),
+                                })}
                             </p>
                         ) : null}
                         {sentence ? (
@@ -394,7 +433,10 @@ export function NewCloudComputerDialog({
                         {options ? (
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('create.disclaimer', { provider: options.providerName })}{' '}
-                                {t('create.limit', { used: options.limits.used, max: options.limits.maxPerOwner })}
+                                {t('create.limit', {
+                                    used: options.limits.used,
+                                    max: options.limits.maxPerOwner,
+                                })}
                             </p>
                         ) : null}
                         {loadError ? (
@@ -403,7 +445,11 @@ export function NewCloudComputerDialog({
                             </p>
                         ) : null}
                         {error ? (
-                            <p className="text-sm text-danger" role="alert" data-testid="fleet-cloud-error">
+                            <p
+                                className="text-sm text-danger"
+                                role="alert"
+                                data-testid="fleet-cloud-error"
+                            >
                                 {error.hint || t('create.failed')}
                             </p>
                         ) : null}
@@ -415,9 +461,16 @@ export function NewCloudComputerDialog({
                         {t('create.cancel')}
                     </Button>
                     {!empty ? (
-                        <Button type="button" onClick={create} disabled={!canCreate} data-testid="fleet-cloud-create">
+                        <Button
+                            type="button"
+                            onClick={create}
+                            disabled={!canCreate}
+                            data-testid="fleet-cloud-create"
+                        >
                             {createLabelPrice(size, options?.currency)
-                                ? t('create.createWithPrice', { price: createLabelPrice(size, options?.currency) ?? '' })
+                                ? t('create.createWithPrice', {
+                                      price: createLabelPrice(size, options?.currency) ?? '',
+                                  })
                                 : t('create.create')}
                         </Button>
                     ) : null}

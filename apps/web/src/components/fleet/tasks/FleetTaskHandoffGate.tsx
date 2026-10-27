@@ -11,7 +11,10 @@ import { FleetTaskHandoffProvider } from './handoff-context';
  * computer. One read for the whole board; a failed read leaves it off.
  */
 export async function FleetTaskHandoffGate({ children }: { children: ReactNode }) {
-    const flags = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED', 'FLEET_CHECKOUTS_ENABLED'] as const);
+    const flags = readFleetFeatureFlags([
+        'FLEET_SESSIONS_ENABLED',
+        'FLEET_CHECKOUTS_ENABLED',
+    ] as const);
     let enabled = false;
     if (flags.FLEET_SESSIONS_ENABLED === true && flags.FLEET_CHECKOUTS_ENABLED === true) {
         const nodes = await fleetAPI.listNodes().catch(() => null);

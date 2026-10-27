@@ -1,5 +1,11 @@
 import { bffProxy } from '@/lib/api/bff-proxy';
-import { fleetApiUrl, forwardFleetCall, invalidIdResponse, isUuid, readJsonBody } from '@/lib/api/fleet-commands-bff';
+import {
+    fleetApiUrl,
+    forwardFleetCall,
+    invalidIdResponse,
+    isUuid,
+    readJsonBody,
+} from '@/lib/api/fleet-commands-bff';
 
 type RouteContext = { params: Promise<{ id: string }> };
 

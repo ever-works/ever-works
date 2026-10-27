@@ -49,7 +49,9 @@ interface PresenceEntry {
  * (lane log, owner question).
  */
 @Injectable()
-export class FleetSessionPresenceService implements OnApplicationBootstrap, FleetLinkViewerObserver {
+export class FleetSessionPresenceService
+    implements OnApplicationBootstrap, FleetLinkViewerObserver
+{
     private readonly logger = new Logger(FleetSessionPresenceService.name);
     /** Session row id → viewer handle id → entry. */
     private readonly bySession = new Map<string, Map<string, PresenceEntry>>();

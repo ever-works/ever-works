@@ -33,7 +33,10 @@ export class CreateFleetPortTunnels1796100000000 implements MigrationInterface {
             name: 'idx_fleet_port_tunnels_owner_state',
             columnNames: ['ownerUserId', 'state'],
         }),
-        new TableIndex({ name: 'idx_fleet_port_tunnels_node_state', columnNames: ['nodeId', 'state'] }),
+        new TableIndex({
+            name: 'idx_fleet_port_tunnels_node_state',
+            columnNames: ['nodeId', 'state'],
+        }),
         new TableIndex({ name: 'idx_fleet_port_tunnels_opened', columnNames: ['openedAt'] }),
     ];
 

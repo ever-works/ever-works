@@ -50,7 +50,10 @@ function titleFromBranch(branch: string | null): string {
     const leaf = (branch ?? '').split('/').filter(Boolean).pop() ?? '';
     const words = leaf.replace(/[-_]+/g, ' ').trim();
     if (!words) return '';
-    return (words.charAt(0).toUpperCase() + words.slice(1)).slice(0, FLEET_PULL_REQUEST_TITLE_MAX_LENGTH);
+    return (words.charAt(0).toUpperCase() + words.slice(1)).slice(
+        0,
+        FLEET_PULL_REQUEST_TITLE_MAX_LENGTH,
+    );
 }
 
 /**
@@ -98,21 +101,34 @@ export class FleetPullRequestService {
         caller: FleetPullRequestCaller,
         request: FleetOpenPullRequestRequest,
     ): Promise<FleetOpenPullRequestResponse> {
-        const title = redactSecrets(typeof request?.title === 'string' ? request.title.trim() : '').cleaned;
+        const title = redactSecrets(
+            typeof request?.title === 'string' ? request.title.trim() : '',
+        ).cleaned;
         if (title.length === 0 || title.length > FLEET_PULL_REQUEST_TITLE_MAX_LENGTH) {
-            throw fleetSessionError('invalid', `a title of 1–${FLEET_PULL_REQUEST_TITLE_MAX_LENGTH} characters`, {
-                field: 'title',
-            });
+            throw fleetSessionError(
+                'invalid',
+                `a title of 1–${FLEET_PULL_REQUEST_TITLE_MAX_LENGTH} characters`,
+                {
+                    field: 'title',
+                },
+            );
         }
         const rawBody = typeof request.body === 'string' ? request.body : '';
         if (rawBody.length > FLEET_PULL_REQUEST_BODY_MAX_LENGTH) {
-            throw fleetSessionError('invalid', `a body of at most ${FLEET_PULL_REQUEST_BODY_MAX_LENGTH} characters`, {
-                field: 'body',
-            });
+            throw fleetSessionError(
+                'invalid',
+                `a body of at most ${FLEET_PULL_REQUEST_BODY_MAX_LENGTH} characters`,
+                {
+                    field: 'body',
+                },
+            );
         }
         const body = redactSecrets(rawBody).cleaned;
         if (await this.isStopped()) {
-            throw fleetSessionError('kill_switch', 'Paused by the fleet stop — no new pull request is opened');
+            throw fleetSessionError(
+                'kill_switch',
+                'Paused by the fleet stop — no new pull request is opened',
+            );
         }
         const { row, nodeName } = await this.resolve(checkoutId, caller.userId);
 
@@ -130,23 +146,35 @@ export class FleetPullRequestService {
         } else if (request.sessionId) {
             const named = await this.sessionRows.findById(request.sessionId);
             if (!named || named.checkoutId !== row.id) {
-                throw fleetSessionError('invalid', 'that session does not work in this checkout', { field: 'sessionId' });
+                throw fleetSessionError('invalid', 'that session does not work in this checkout', {
+                    field: 'sessionId',
+                });
             }
             session = named;
         } else {
-            session = (await this.sessionRows.findLiveForNode(row.nodeId)).find((live) => live.checkoutId === row.id) ?? null;
+            session =
+                (await this.sessionRows.findLiveForNode(row.nodeId)).find(
+                    (live) => live.checkoutId === row.id,
+                ) ?? null;
         }
 
         // FR-18, U11: an Agent opens pull requests only with its owner's permission.
-        const agentId = caller.run?.agentId ?? caller.agentId ?? (caller.run ? session?.agentId : null) ?? null;
+        const agentId =
+            caller.run?.agentId ?? caller.agentId ?? (caller.run ? session?.agentId : null) ?? null;
         if (caller.run && !agentId) {
-            throw fleetSessionError('permission_denied', 'only an Agent session may open a pull request this way', {
-                permission: 'canOpenPullRequests',
-            });
+            throw fleetSessionError(
+                'permission_denied',
+                'only an Agent session may open a pull request this way',
+                {
+                    permission: 'canOpenPullRequests',
+                },
+            );
         }
         let agentName: string | null = null;
         if (agentId) {
-            const agent = this.agents ? await this.agents.findById(agentId).catch(() => null) : null;
+            const agent = this.agents
+                ? await this.agents.findById(agentId).catch(() => null)
+                : null;
             agentName = agent?.name ?? null;
             const permissions = (agent?.permissions ?? {}) as unknown as Record<string, unknown>;
             if (!agent || permissions.canOpenPullRequests !== true) {
@@ -161,23 +189,41 @@ export class FleetPullRequestService {
         const line = parseFleetGitLine(row.gitLine ?? null);
         const branch = line?.branch ?? row.branch ?? null;
         const remote = parseFleetRemote(row.remoteUrl ?? null);
-        if (!branch) throw fleetSessionError('invalid', 'the checkout is not on a branch', { rule: 'no-branch' });
-        if (!remote || remote.host !== 'github.com') {
-            throw fleetSessionError('unsupported_on_node', 'pull requests are opened for GitHub repositories', {
-                rule: 'provider',
+        if (!branch)
+            throw fleetSessionError('invalid', 'the checkout is not on a branch', {
+                rule: 'no-branch',
             });
+        if (!remote || remote.host !== 'github.com') {
+            throw fleetSessionError(
+                'unsupported_on_node',
+                'pull requests are opened for GitHub repositories',
+                {
+                    rule: 'provider',
+                },
+            );
         }
         const facts = await this.enrichment.enrich(row, { force: true });
-        if (isFleetSessionOnDefaultBranch({ branch, baseRef: line?.baseRef ?? null, defaultBranch: facts.defaultBranch })) {
-            throw fleetSessionError('invalid', `a pull request is not opened from ${branch}`, { rule: 'default-branch' });
+        if (
+            isFleetSessionOnDefaultBranch({
+                branch,
+                baseRef: line?.baseRef ?? null,
+                defaultBranch: facts.defaultBranch,
+            })
+        ) {
+            throw fleetSessionError('invalid', `a pull request is not opened from ${branch}`, {
+                rule: 'default-branch',
+            });
         }
         const access = await this.enrichment.accessFor(row.userId, remote);
-        const requestedBy = caller.run?.agentId ? `agent:${caller.run.agentId}` : `user:${caller.userId}`;
+        const requestedBy = caller.run?.agentId
+            ? `agent:${caller.run.agentId}`
+            : `user:${caller.userId}`;
 
         let result: { number: number; url: string; state: 'open' | 'draft' | 'merged' | 'closed' };
         let updated = false;
         let taskId: string | null = null;
-        const open = facts.pr && (facts.pr.state === 'open' || facts.pr.state === 'draft') ? facts.pr : null;
+        const open =
+            facts.pr && (facts.pr.state === 'open' || facts.pr.state === 'draft') ? facts.pr : null;
         try {
             if (open) {
                 // FR-16: "Update the pull request #n" — its title and body, never a second one.
@@ -196,8 +242,12 @@ export class FleetPullRequestService {
                 if (task && taskAgentId) {
                     // FR-19: the Task's own tail — records the pull request, moves the Task to In review.
                     taskId = task.id;
-                    const workspace = getOptionalProvider<TaskWorkspaceService>(this.moduleRef, TaskWorkspaceService);
-                    if (!workspace) throw new Error('Task finalize is not available in this deployment');
+                    const workspace = getOptionalProvider<TaskWorkspaceService>(
+                        this.moduleRef,
+                        TaskWorkspaceService,
+                    );
+                    if (!workspace)
+                        throw new Error('Task finalize is not available in this deployment');
                     const outcome = await workspace.finalizeRemotePush({
                         task,
                         userId: caller.userId,
@@ -208,13 +258,20 @@ export class FleetPullRequestService {
                     });
                     if (outcome.outcome !== 'pr-opened' || !outcome.prNumber || !outcome.prUrl) {
                         throw fleetSessionError(
-                            outcome.outcome === 'blocked-by-guard' ? 'permission_denied' : 'operation_failed',
+                            outcome.outcome === 'blocked-by-guard'
+                                ? 'permission_denied'
+                                : 'operation_failed',
                             outcome.outcome === 'conflict'
                                 ? `${branch} does not merge cleanly`
                                 : outcome.outcome === 'no-changes'
                                   ? 'branch is not pushed yet'
                                   : `the pull request was not opened (${outcome.outcome})`,
-                            { outcome: outcome.outcome, ...(outcome.conflictPaths ? { conflictPaths: outcome.conflictPaths } : {}) },
+                            {
+                                outcome: outcome.outcome,
+                                ...(outcome.conflictPaths
+                                    ? { conflictPaths: outcome.conflictPaths }
+                                    : {}),
+                            },
                         );
                     }
                     result = { number: outcome.prNumber, url: outcome.prUrl, state: 'open' };
@@ -237,7 +294,11 @@ export class FleetPullRequestService {
                         },
                         access,
                     );
-                    result = { number: created.number, url: created.url, state: request.draft ? 'draft' : 'open' };
+                    result = {
+                        number: created.number,
+                        url: created.url,
+                        state: request.draft ? 'draft' : 'open',
+                    };
                 }
             }
         } catch (error) {
@@ -245,10 +306,18 @@ export class FleetPullRequestService {
             if (typed) throw error;
             const message = error instanceof Error ? error.message : String(error);
             // GitHub answers 422 for a head that is not on the remote (U10).
-            if (/not\s+(a\s+)?valid|no commits between|head.*(does not exist|invalid)|field.*head/i.test(message)) {
-                throw fleetSessionError('invalid', 'branch is not pushed yet', { rule: 'not-pushed' });
+            if (
+                /not\s+(a\s+)?valid|no commits between|head.*(does not exist|invalid)|field.*head/i.test(
+                    message,
+                )
+            ) {
+                throw fleetSessionError('invalid', 'branch is not pushed yet', {
+                    rule: 'not-pushed',
+                });
             }
-            this.logger.warn(`Pull request for checkout ${row.id} on ${nodeName} failed: ${firstLine(message)}`);
+            this.logger.warn(
+                `Pull request for checkout ${row.id} on ${nodeName} failed: ${firstLine(message)}`,
+            );
             throw fleetSessionError('operation_failed', firstLine(message));
         }
 
@@ -297,7 +366,10 @@ export class FleetPullRequestService {
         return {
             checkoutId: row.id,
             branch,
-            base: facts.baseRef ?? (ownBase && ownBase !== branch ? ownBase : null) ?? facts.defaultBranch,
+            base:
+                facts.baseRef ??
+                (ownBase && ownBase !== branch ? ownBase : null) ??
+                facts.defaultBranch,
             title: titleFromBranch(branch),
             body: '',
             pushed: line !== null && line.ahead !== null,
@@ -307,7 +379,10 @@ export class FleetPullRequestService {
 
     // ─── Internals ─────────────────────────────────────────────────────────
 
-    private async resolve(checkoutId: string, userId: string): Promise<{ row: FleetCheckout; nodeName: string }> {
+    private async resolve(
+        checkoutId: string,
+        userId: string,
+    ): Promise<{ row: FleetCheckout; nodeName: string }> {
         const row = await this.rows.findById(checkoutId);
         if (!row) throw fleetSessionError('not_found', 'no such checkout');
         try {
@@ -315,7 +390,8 @@ export class FleetPullRequestService {
             return { row, nodeName: node.name };
         } catch (error) {
             const typed = readFleetSessionError(error);
-            if (typed?.code === 'permission_denied') throw fleetSessionError(typed.code, typed.hint, typed.details);
+            if (typed?.code === 'permission_denied')
+                throw fleetSessionError(typed.code, typed.hint, typed.details);
             throw fleetSessionError('not_found', 'no such checkout');
         }
     }

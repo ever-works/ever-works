@@ -26,12 +26,19 @@ import {
 const NODE_A = '11111111-1111-4111-8111-111111111111';
 const NODE_B = '22222222-2222-4222-8222-222222222222';
 
-const shape = (): FleetCommandRequestShape => ({ command: '', nodeIds: [], cwd: null, timeoutSec: 0 });
+const shape = (): FleetCommandRequestShape => ({
+    command: '',
+    nodeIds: [],
+    cwd: null,
+    timeoutSec: 0,
+});
 
 describe('checkFleetCommandRequest', () => {
     it('accepts a command on two computers with the defaults', () => {
         const out = shape();
-        expect(checkFleetCommandRequest({ command: 'df -h', nodeIds: [NODE_A, NODE_B] }, out)).toBeNull();
+        expect(
+            checkFleetCommandRequest({ command: 'df -h', nodeIds: [NODE_A, NODE_B] }, out),
+        ).toBeNull();
         expect(out).toEqual({
             command: 'df -h',
             nodeIds: [NODE_A, NODE_B],
@@ -62,14 +69,22 @@ describe('checkFleetCommandRequest', () => {
     });
 
     it('refuses an empty command, an empty target list and a bad id as invalid', () => {
-        expect(checkFleetCommandRequest({ command: '  ', nodeIds: [NODE_A] }, shape())?.code).toBe('invalid');
-        expect(checkFleetCommandRequest({ command: 'ls', nodeIds: [] }, shape())?.code).toBe('invalid');
-        expect(checkFleetCommandRequest({ command: 'ls', nodeIds: ['nope'] }, shape())?.code).toBe('invalid');
+        expect(checkFleetCommandRequest({ command: '  ', nodeIds: [NODE_A] }, shape())?.code).toBe(
+            'invalid',
+        );
+        expect(checkFleetCommandRequest({ command: 'ls', nodeIds: [] }, shape())?.code).toBe(
+            'invalid',
+        );
+        expect(checkFleetCommandRequest({ command: 'ls', nodeIds: ['nope'] }, shape())?.code).toBe(
+            'invalid',
+        );
     });
 
     it('answers limit_exceeded naming the limit (U5)', () => {
         const long = 'x'.repeat(FLEET_COMMAND_MAX_LENGTH + 1);
-        expect(checkFleetCommandRequest({ command: long, nodeIds: [NODE_A] }, shape())).toMatchObject({
+        expect(
+            checkFleetCommandRequest({ command: long, nodeIds: [NODE_A] }, shape()),
+        ).toMatchObject({
             code: 'limit_exceeded',
             details: { limit: FLEET_COMMAND_MAX_LENGTH },
         });
@@ -86,7 +101,10 @@ describe('checkFleetCommandRequest', () => {
                 { command: 'ls', nodeIds: [NODE_A], timeoutSec: FLEET_COMMAND_MAX_TIMEOUT_SEC + 1 },
                 shape(),
             ),
-        ).toMatchObject({ code: 'limit_exceeded', details: { limit: FLEET_COMMAND_MAX_TIMEOUT_SEC } });
+        ).toMatchObject({
+            code: 'limit_exceeded',
+            details: { limit: FLEET_COMMAND_MAX_TIMEOUT_SEC },
+        });
     });
 
     it('takes the exact 8 KiB and 3 600 s bounds', () => {
@@ -107,7 +125,9 @@ describe('checkFleetCommandRequest', () => {
 
 describe('checkFleetCommandAdmission', () => {
     it('refuses under the kill switch first', () => {
-        expect(checkFleetCommandAdmission({ killSwitchOn: true, running: 99, lastMinute: 99 })).toMatchObject({
+        expect(
+            checkFleetCommandAdmission({ killSwitchOn: true, running: 99, lastMinute: 99 }),
+        ).toMatchObject({
             code: 'kill_switch',
             hint: 'clear it under Settings → Fleet',
         });
@@ -128,7 +148,9 @@ describe('checkFleetCommandAdmission', () => {
                 lastMinute: FLEET_COMMAND_RUNS_PER_MINUTE,
             })?.code,
         ).toBe('limit_exceeded');
-        expect(checkFleetCommandAdmission({ killSwitchOn: false, running: 7, lastMinute: 9 })).toBeNull();
+        expect(
+            checkFleetCommandAdmission({ killSwitchOn: false, running: 7, lastMinute: 9 }),
+        ).toBeNull();
     });
 });
 
@@ -147,12 +169,19 @@ describe('fleetCommandTargetRefusal', () => {
 
     it('refuses without --manage with the exact hint (FR-9)', () => {
         expect(
-            fleetCommandTargetRefusal(facts({ consents: { work: true, attend: true, manage: false, usageScan: false } })),
-        ).toMatchObject({ code: 'consent_missing', hint: 'start the node with --manage on build-01' });
+            fleetCommandTargetRefusal(
+                facts({ consents: { work: true, attend: true, manage: false, usageScan: false } }),
+            ),
+        ).toMatchObject({
+            code: 'consent_missing',
+            hint: 'start the node with --manage on build-01',
+        });
     });
 
     it('refuses an offline computer with when it was last seen (FR-3)', () => {
-        expect(fleetCommandTargetRefusal(facts({ linkConnected: false, lastSeenAgo: '2 h' }))).toEqual({
+        expect(
+            fleetCommandTargetRefusal(facts({ linkConnected: false, lastSeenAgo: '2 h' })),
+        ).toEqual({
             code: 'unreachable',
             hint: 'build-01 is offline — last seen 2 h ago',
         });
@@ -160,11 +189,16 @@ describe('fleetCommandTargetRefusal', () => {
 
     it('names a paused computer and refuses a cluster node', () => {
         expect(
-            fleetCommandTargetRefusal(facts({ node: { name: 'build-01', status: 'paused', kind: 'node', platform: null } }))
-                ?.code,
+            fleetCommandTargetRefusal(
+                facts({
+                    node: { name: 'build-01', status: 'paused', kind: 'node', platform: null },
+                }),
+            )?.code,
         ).toBe('busy');
         expect(
-            fleetCommandTargetRefusal(facts({ node: { name: 'k', status: 'online', kind: 'k8s', platform: null } }))?.code,
+            fleetCommandTargetRefusal(
+                facts({ node: { name: 'k', status: 'online', kind: 'k8s', platform: null } }),
+            )?.code,
         ).toBe('unsupported_on_node');
     });
 

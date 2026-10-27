@@ -35,7 +35,11 @@ describe('the three health producers (§9.4:1337-1339)', () => {
     it('notifies the owner that the App is down — urgent, persistent, keyed by the streak', async () => {
         const { producers, created } = adapter();
 
-        await producers.notifyAppUnhealthy({ userId: 'owner-1', workId: 'w-1', failureStreakStartMs: 1700 });
+        await producers.notifyAppUnhealthy({
+            userId: 'owner-1',
+            workId: 'w-1',
+            failureStreakStartMs: 1700,
+        });
 
         expect(created).toEqual([
             expect.objectContaining({
@@ -52,7 +56,11 @@ describe('the three health producers (§9.4:1337-1339)', () => {
     it('sends the recovery notice under the SAME streak handle as the down notice', async () => {
         const { producers, created } = adapter();
 
-        await producers.notifyAppRecovered({ userId: 'owner-1', workId: 'w-1', failureStreakStartMs: 1700 });
+        await producers.notifyAppRecovered({
+            userId: 'owner-1',
+            workId: 'w-1',
+            failureStreakStartMs: 1700,
+        });
 
         expect(created[0]).toMatchObject({
             type: 'success',
@@ -90,7 +98,11 @@ describe('the three health producers (§9.4:1337-1339)', () => {
     it('keeps a dedupe key stable for an unusable handle', async () => {
         const { producers, created } = adapter();
 
-        await producers.notifyAppUnhealthy({ userId: 'u', workId: 'w', failureStreakStartMs: Number.NaN });
+        await producers.notifyAppUnhealthy({
+            userId: 'u',
+            workId: 'w',
+            failureStreakStartMs: Number.NaN,
+        });
 
         expect(created[0].deduplicationKey).toBe('app-unhealthy:w:0');
     });
@@ -98,7 +110,11 @@ describe('the three health producers (§9.4:1337-1339)', () => {
 
 describe('the health events reach Activity', () => {
     it('lets the relay accept the three names the poll really emits', async () => {
-        for (const name of [APP_HEALTH_EVENT_DEGRADED, APP_HEALTH_EVENT_RECOVERED, APP_HEALTH_EVENT_UNREACHABLE]) {
+        for (const name of [
+            APP_HEALTH_EVENT_DEGRADED,
+            APP_HEALTH_EVENT_RECOVERED,
+            APP_HEALTH_EVENT_UNREACHABLE,
+        ]) {
             expect(APP_RUNTIME_RELAYED_EVENTS.has(name)).toBe(true);
         }
         const emitted: Array<[string, unknown]> = [];
@@ -106,15 +122,33 @@ describe('the health events reach Activity', () => {
             emit: (name: string, payload: unknown) => emitted.push([name, payload]),
         } as never);
 
-        await relay.emit({ name: APP_HEALTH_EVENT_DEGRADED, payload: { workId: 'w-1', code: 'down' } });
+        await relay.emit({
+            name: APP_HEALTH_EVENT_DEGRADED,
+            payload: { workId: 'w-1', code: 'down' },
+        });
 
         expect(emitted).toEqual([[APP_HEALTH_EVENT_DEGRADED, { workId: 'w-1', code: 'down' }]]);
     });
 
     it.each([
-        ['onHealthDegraded', 'app.health.degraded', ActivityStatus.FAILED, 'App is unhealthy (down): web'],
-        ['onHealthUnreachable', 'app.health.unreachable', ActivityStatus.FAILED, 'App’s cluster cannot be reached (cluster_unreachable)'],
-        ['onHealthRecovered', 'app.health.recovered', ActivityStatus.COMPLETED, 'App is healthy again (healthy): web'],
+        [
+            'onHealthDegraded',
+            'app.health.degraded',
+            ActivityStatus.FAILED,
+            'App is unhealthy (down): web',
+        ],
+        [
+            'onHealthUnreachable',
+            'app.health.unreachable',
+            ActivityStatus.FAILED,
+            'App’s cluster cannot be reached (cluster_unreachable)',
+        ],
+        [
+            'onHealthRecovered',
+            'app.health.recovered',
+            ActivityStatus.COMPLETED,
+            'App is healthy again (healthy): web',
+        ],
     ] as const)('%s writes one APP_HEALTH row', async (handler, action, status, summary) => {
         const rows: Array<Record<string, unknown>> = [];
         const listener = new AppRuntimeActivityListener({
@@ -125,7 +159,12 @@ describe('the health events reach Activity', () => {
         } as never);
         const payload =
             action === 'app.health.unreachable'
-                ? { workId: 'w-1', userId: 'owner-1', target: 'your-cluster', code: 'cluster_unreachable' }
+                ? {
+                      workId: 'w-1',
+                      userId: 'owner-1',
+                      target: 'your-cluster',
+                      code: 'cluster_unreachable',
+                  }
                 : {
                       workId: 'w-1',
                       userId: 'owner-1',
@@ -134,7 +173,9 @@ describe('the health events reach Activity', () => {
                       names: ['web'],
                   };
 
-        await (listener as unknown as Record<string, (p: unknown) => Promise<void>>)[handler](payload);
+        await (listener as unknown as Record<string, (p: unknown) => Promise<void>>)[handler](
+            payload,
+        );
 
         expect(rows).toEqual([
             expect.objectContaining({
@@ -173,14 +214,20 @@ describe('appHostsRebuildRequester — APW-05 behind T26’s primary-domain chan
             requestRebuild: async () => ({ ok: false as const, code: 'rebuildRateLimited' }),
         }));
 
-        await expect(requester.requestRebuild('w-1', { userId: 'owner-1' })).resolves.toMatchObject({
-            code: 'rate_limited',
-        });
+        await expect(requester.requestRebuild('w-1', { userId: 'owner-1' })).resolves.toMatchObject(
+            {
+                code: 'rate_limited',
+            },
+        );
     });
 
     it('acts as the Work owner when no person asked', async () => {
         const builds = {
-            requestRebuild: jest.fn(async () => ({ ok: true as const, build: { id: 'b-2' }, deduped: true })),
+            requestRebuild: jest.fn(async () => ({
+                ok: true as const,
+                build: { id: 'b-2' },
+                deduped: true,
+            })),
         };
         const requester = appHostsRebuildRequester(() => builds, {
             findById: async () => ({ userId: 'owner-9' }),
@@ -194,6 +241,8 @@ describe('appHostsRebuildRequester — APW-05 behind T26’s primary-domain chan
     it('throws when APW-05 is not in the container — the hosts service then refuses rebuild_unavailable', async () => {
         const requester = appHostsRebuildRequester(() => undefined);
 
-        await expect(requester.requestRebuild('w-1', { userId: 'owner-1' })).rejects.toThrow(/not in this container/);
+        await expect(requester.requestRebuild('w-1', { userId: 'owner-1' })).rejects.toThrow(
+            /not in this container/,
+        );
     });
 });

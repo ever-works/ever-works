@@ -27,9 +27,16 @@ import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
 import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
 import type { FleetDesktopReaderPort } from '../fleet/desktop/agent-fleet-desktop-tools';
-import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
+import type {
+    FleetGitIdentityToolPort,
+    FleetTaskHandoffToolPort,
+} from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
-import type { FleetOperationsToolPort, FleetStatusReaderPort, FleetWakeToolPort } from '../fleet/fleet-status';
+import type {
+    FleetOperationsToolPort,
+    FleetStatusReaderPort,
+    FleetWakeToolPort,
+} from '../fleet/fleet-status';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
@@ -133,7 +140,10 @@ export interface AgentFleetToolSource {
      * Virtual computers (FL-16) — backs `fleet_virtual_*`. Optional: unbound (or
      * `FLEET_VIRTUAL_ENABLED` off), those tools are simply not offered.
      */
-    virtual?: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
+    virtual?: Pick<
+        FleetVirtualService,
+        'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'
+    >;
     /**
      * Cloud computers (FL-17) — backs `fleet_cloud_*`. Optional: unbound (or
      * `FLEET_CLOUD_ENABLED` off), those tools are simply not offered.

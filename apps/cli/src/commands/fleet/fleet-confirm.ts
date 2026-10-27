@@ -28,7 +28,8 @@ export interface FleetConfirmFlags {
 export function fleetConfirmFields(flags: FleetConfirmFlags): FleetConfirmArgs {
     const out: FleetConfirmArgs = {};
     if (flags.yes) out.confirm = true;
-    if (typeof flags.confirmName === 'string' && flags.confirmName.length > 0) out.confirmName = flags.confirmName;
+    if (typeof flags.confirmName === 'string' && flags.confirmName.length > 0)
+        out.confirmName = flags.confirmName;
     if (flags.ackBlastRadius) out.acknowledgeBlastRadius = true;
     if (flags.wait === false) out.wait = false;
     return out;
@@ -43,7 +44,9 @@ export function isInteractive(): boolean {
 export async function askYesNo(question: string): Promise<boolean> {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     try {
-        const answer = await new Promise<string>((resolve) => rl.question(`${question} [y/N] `, resolve));
+        const answer = await new Promise<string>((resolve) =>
+            rl.question(`${question} [y/N] `, resolve),
+        );
         return /^y(es)?$/i.test(answer.trim());
     } finally {
         rl.close();
@@ -62,8 +65,12 @@ export async function confirmInteractively(
     if (json || !isInteractive()) return null;
     const klass = typeof refusal.details?.class === 'string' ? refusal.details.class : 'confirm';
     if (klass === 'confirm-destructive') return null;
-    const summary = typeof refusal.details?.summary === 'string' ? refusal.details.summary : refusal.hint;
-    const sentence = typeof refusal.details?.sentence === 'string' ? ` ${refusal.details.sentence}` : '';
+    const summary =
+        typeof refusal.details?.summary === 'string' ? refusal.details.summary : refusal.hint;
+    const sentence =
+        typeof refusal.details?.sentence === 'string' ? ` ${refusal.details.sentence}` : '';
     if (!(await askYesNo(`${summary}${sentence}`))) return null;
-    return klass === 'blast-radius' ? { confirm: true, acknowledgeBlastRadius: true } : { confirm: true };
+    return klass === 'blast-radius'
+        ? { confirm: true, acknowledgeBlastRadius: true }
+        : { confirm: true };
 }

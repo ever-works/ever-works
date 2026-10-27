@@ -17,9 +17,16 @@ export interface CheckoutDeletePreview {
 }
 
 /** Read the preview out of a `confirmation_required` refusal's details. Pure. */
-export function readDeletePreview(details: Record<string, unknown> | null): CheckoutDeletePreview | null {
+export function readDeletePreview(
+    details: Record<string, unknown> | null,
+): CheckoutDeletePreview | null {
     if (!details) return null;
-    const cls = details.class === 'confirm-destructive' ? 'confirm-destructive' : details.class === 'confirm' ? 'confirm' : null;
+    const cls =
+        details.class === 'confirm-destructive'
+            ? 'confirm-destructive'
+            : details.class === 'confirm'
+              ? 'confirm'
+              : null;
     if (!cls || typeof details.name !== 'string') return null;
     return {
         class: cls,
@@ -88,8 +95,12 @@ export function DeleteCheckoutDialog({
                 <p className="rounded border border-amber-300 bg-amber-50 p-2 text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                     {t('wouldLose', {
                         what: [
-                            preview.uncommitted > 0 ? t('lostFiles', { count: preview.uncommitted }) : null,
-                            preview.unpushedCommits > 0 ? t('lostCommits', { count: preview.unpushedCommits }) : null,
+                            preview.uncommitted > 0
+                                ? t('lostFiles', { count: preview.uncommitted })
+                                : null,
+                            preview.unpushedCommits > 0
+                                ? t('lostCommits', { count: preview.unpushedCommits })
+                                : null,
                         ]
                             .filter((part): part is string => part !== null)
                             .join(t('and')),
@@ -98,7 +109,9 @@ export function DeleteCheckoutDialog({
             ) : null}
             <p>
                 {preview.summary ??
-                    t(mode === 'forget' ? 'forgetSummary' : 'cleanSummary', { path: homeRelativePath(row.path) })}
+                    t(mode === 'forget' ? 'forgetSummary' : 'cleanSummary', {
+                        path: homeRelativePath(row.path),
+                    })}
             </p>
             {destructive ? (
                 <label className="flex flex-col gap-1">

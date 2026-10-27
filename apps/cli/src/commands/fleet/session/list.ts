@@ -43,8 +43,13 @@ export const listCommand = new Command('list')
         try {
             page = (await getHttpClient().get<FleetSessionListResponse>(path)).data;
         } catch (error) {
-            const body = (error as { response?: { data?: { error?: { hint?: string } } } }).response?.data;
-            console.error(chalk.red(`Refused: ${body?.error?.hint ?? (error instanceof Error ? error.message : 'error')}`));
+            const body = (error as { response?: { data?: { error?: { hint?: string } } } }).response
+                ?.data;
+            console.error(
+                chalk.red(
+                    `Refused: ${body?.error?.hint ?? (error instanceof Error ? error.message : 'error')}`,
+                ),
+            );
             process.exit(SESSION_CLI_EXIT.refused);
         }
         if (options.json) {
@@ -56,9 +61,18 @@ export const listCommand = new Command('list')
             process.exit(SESSION_CLI_EXIT.ok);
         }
         for (const session of page.sessions) {
-            const state = session.state === 'ended' ? chalk.gray(session.state.padEnd(9)) : chalk.green(session.state.padEnd(9));
+            const state =
+                session.state === 'ended'
+                    ? chalk.gray(session.state.padEnd(9))
+                    : chalk.green(session.state.padEnd(9));
             console.log(
-                [session.id, state, session.kind.padEnd(5), session.provider.padEnd(11), session.title].join('  '),
+                [
+                    session.id,
+                    state,
+                    session.kind.padEnd(5),
+                    session.provider.padEnd(11),
+                    session.title,
+                ].join('  '),
             );
         }
         process.exit(SESSION_CLI_EXIT.ok);

@@ -81,7 +81,9 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
     const inFlightRequests = (status.requests ?? []).filter(
         (request) => request.state === 'queued' || request.state === 'running',
     );
-    const failedRequests = (status.requests ?? []).filter((request) => request.state === 'failed').slice(0, 3);
+    const failedRequests = (status.requests ?? [])
+        .filter((request) => request.state === 'failed')
+        .slice(0, 3);
 
     const act = async (kind: 'refresh' | 'smoke') => {
         if (inFlight.current) return;
@@ -108,7 +110,9 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
                 ? (ACTION_REFUSALS as Readonly<Record<string, ActionRefusalLeaf>>)[result.code]
                 : undefined;
             toast.error(
-                leaf ? t(`refusals.${leaf}`) : t('actionFailed', { reason: result.message ?? result.code ?? '' }),
+                leaf
+                    ? t(`refusals.${leaf}`)
+                    : t('actionFailed', { reason: result.message ?? result.code ?? '' }),
             );
         } finally {
             inFlight.current = false;
@@ -127,7 +131,10 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
                 <div className="flex items-start gap-2">
                     <Activity className="mt-0.5 h-4 w-4 text-text-secondary" aria-hidden="true" />
                     <div className="space-y-0.5">
-                        <h3 id="app-live-title" className="text-sm font-semibold text-text dark:text-text-dark">
+                        <h3
+                            id="app-live-title"
+                            className="text-sm font-semibold text-text dark:text-text-dark"
+                        >
                             {t('title')}
                         </h3>
                         <p className="text-xs text-text-secondary" data-testid="app-live-observed">
@@ -162,7 +169,13 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
                             onClick={() => void act('smoke')}
                             loading={pending === 'smoke'}
                             disabled={pending !== null || paused || deploying}
-                            title={paused ? t('refusals.paused') : deploying ? t('refusals.deployInProgress') : undefined}
+                            title={
+                                paused
+                                    ? t('refusals.paused')
+                                    : deploying
+                                      ? t('refusals.deployInProgress')
+                                      : undefined
+                            }
                             data-testid="app-live-smoke"
                         >
                             <FlaskConical className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
@@ -181,14 +194,19 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
                     ))}
                     {failedRequests.map((request) => (
                         <li key={request.requestId} className="text-red-700 dark:text-red-400">
-                            {t('requests.failed', { what: requestLabel(request, t), code: request.code ?? '' })}
+                            {t('requests.failed', {
+                                what: requestLabel(request, t),
+                                code: request.code ?? '',
+                            })}
                         </li>
                     ))}
                 </ul>
             )}
 
             <div className="space-y-1.5">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t('components')}</h4>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                    {t('components')}
+                </h4>
                 {snapshot ? (
                     <AppComponentsTable
                         components={components}
@@ -201,13 +219,20 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
             </div>
 
             <div className="space-y-1.5">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t('smoke')}</h4>
-                <AppSmokeResults smoke={status.smoke} isolationEnforced={snapshot?.isolationEnforced ?? null} />
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                    {t('smoke')}
+                </h4>
+                <AppSmokeResults
+                    smoke={status.smoke}
+                    isolationEnforced={snapshot?.isolationEnforced ?? null}
+                />
             </div>
 
             {snapshot && (
                 <div className="space-y-1.5">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t('jobs')}</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                        {t('jobs')}
+                    </h4>
                     <AppJobsList
                         workId={workId}
                         jobs={jobs}
@@ -222,7 +247,9 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
 
             {cron.length > 0 && (
                 <div className="space-y-1.5">
-                    <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t('cron')}</h4>
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                        {t('cron')}
+                    </h4>
                     <AppCronList cron={cron} />
                 </div>
             )}

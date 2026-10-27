@@ -132,7 +132,11 @@ export class UpdateFleetScheduleDto {
     @MaxLength(FLEET_COMMAND_MAX_LENGTH * 8)
     command?: string;
 
-    @ApiProperty({ required: false, nullable: true, description: "`null` or '' = the machine owner's home." })
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description: "`null` or '' = the machine owner's home.",
+    })
     @IsOptional()
     @IsString()
     @MaxLength(FLEET_COMMAND_CWD_MAX_LENGTH * 4)
@@ -159,7 +163,12 @@ export class DeleteFleetScheduleDto {
 
 /** Query for `GET /api/fleet/commands/:id/runs` (a schedule's history: at most 30). */
 export class ListFleetCommandRunsQueryDto {
-    @ApiProperty({ required: false, minimum: 1, maximum: FLEET_SCHEDULE_HISTORY, default: FLEET_SCHEDULE_HISTORY })
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        maximum: FLEET_SCHEDULE_HISTORY,
+        default: FLEET_SCHEDULE_HISTORY,
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()

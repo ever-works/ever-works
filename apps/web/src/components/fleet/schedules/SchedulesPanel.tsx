@@ -68,13 +68,18 @@ export function SchedulesPanel({
         if (!usage || !taskIdsKey) return;
         let cancelled = false;
         void getFleetUsageTaskCostsAction(taskIdsKey.split(',')).then((result) => {
-            if (!cancelled && result.ok) setTaskCosts(new Map(result.data.tasks.map((cost) => [cost.taskId, cost])));
+            if (!cancelled && result.ok)
+                setTaskCosts(new Map(result.data.tasks.map((cost) => [cost.taskId, cost])));
         });
         return () => {
             cancelled = true;
         };
     }, [usage, taskIdsKey]);
-    const [breaker, setBreaker] = useState<{ breakerAt: string; undoUntil: number; count: number } | null>(null);
+    const [breaker, setBreaker] = useState<{
+        breakerAt: string;
+        undoUntil: number;
+        count: number;
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<string | null>(null);
     const [busyId, setBusyId] = useState<string | null>(null);
@@ -82,7 +87,11 @@ export function SchedulesPanel({
     const prefillCommand = search?.get('command') ?? null;
     const [dialog, setDialog] = useState<DialogState | null>(
         prefillCommand
-            ? { mode: 'create', initial: null, prefill: { command: prefillCommand, cwd: search?.get('cwd') ?? undefined } }
+            ? {
+                  mode: 'create',
+                  initial: null,
+                  prefill: { command: prefillCommand, cwd: search?.get('cwd') ?? undefined },
+              }
             : null,
     );
     const viewerZone = useMemo(() => viewerTimeZone(), []);
@@ -115,13 +124,17 @@ export function SchedulesPanel({
         return () => clearInterval(timer);
     }, [busy, load]);
 
-    const act = async (schedule: FleetScheduleView, action: 'run' | 'pause' | 'resume' | 'delete') => {
+    const act = async (
+        schedule: FleetScheduleView,
+        action: 'run' | 'pause' | 'resume' | 'delete',
+    ) => {
         setBusyId(schedule.id);
         setNotice(null);
         const rowId = fleetNodeScheduleRowId(schedule.id);
         try {
             if (action === 'run') {
-                if (!window.confirm(t('confirmRun', { name: schedule.name, computer: node.name }))) return;
+                if (!window.confirm(t('confirmRun', { name: schedule.name, computer: node.name })))
+                    return;
                 const result = await runScheduleNow(rowId, { confirm: true });
                 setNotice(result.ok ? t('runStarted', { name: schedule.name }) : t('errors.run'));
             } else if (action === 'pause') {
@@ -134,7 +147,15 @@ export function SchedulesPanel({
                 const first = await schedulesClient.remove(schedule.id, false);
                 if (!first.ok && first.error.code === 'confirmation_required') {
                     const runCount = Number(first.error.details.runCount ?? 0);
-                    if (!window.confirm(t('confirmDelete', { name: schedule.name, computer: node.name, runs: runCount }))) {
+                    if (
+                        !window.confirm(
+                            t('confirmDelete', {
+                                name: schedule.name,
+                                computer: node.name,
+                                runs: runCount,
+                            }),
+                        )
+                    ) {
                         return;
                     }
                     const second = await schedulesClient.remove(schedule.id, true);
@@ -157,7 +178,8 @@ export function SchedulesPanel({
         if (!first.ok && first.error.code === 'confirmation_required') {
             const count = Number(first.error.details.count ?? 0);
             const running = Number(first.error.details.running ?? 0);
-            if (!window.confirm(t('breaker.confirm', { count, running, computer: node.name }))) return;
+            if (!window.confirm(t('breaker.confirm', { count, running, computer: node.name })))
+                return;
             result = await schedulesClient.pauseAll(node.id, true);
         }
         if (result.ok) {
@@ -177,15 +199,23 @@ export function SchedulesPanel({
         if (!breaker) return;
         const result = await schedulesClient.undoPauseAll(node.id, breaker.breakerAt);
         setBreaker(null);
-        setNotice(result.ok ? t('breaker.undone', { count: result.data.resumed }) : (result.error.hint ?? t('breaker.failed')));
+        setNotice(
+            result.ok
+                ? t('breaker.undone', { count: result.data.resumed })
+                : (result.error.hint ?? t('breaker.failed')),
+        );
         await load();
     };
 
-    const actAgentSession = async (row: AgentSessionScheduleRow, action: 'run' | 'pause' | 'resume') => {
+    const actAgentSession = async (
+        row: AgentSessionScheduleRow,
+        action: 'run' | 'pause' | 'resume',
+    ) => {
         setBusyId(row.id);
         try {
             if (action === 'run') {
-                if (!window.confirm(t('confirmRun', { name: row.name, computer: node.name }))) return;
+                if (!window.confirm(t('confirmRun', { name: row.name, computer: node.name })))
+                    return;
                 const result = await runScheduleNow(row.id);
                 setNotice(result.ok ? t('runStarted', { name: row.name }) : t('errors.run'));
             } else if (action === 'pause') {
@@ -203,7 +233,12 @@ export function SchedulesPanel({
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         const target = event.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+        if (
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT'
+        )
+            return;
         if ((event.key === 'n' || event.key === 'N') && !dialog && supported) {
             event.preventDefault();
             setDialog({ mode: 'create', initial: null, prefill: null });
@@ -212,7 +247,10 @@ export function SchedulesPanel({
 
     if (!supported) {
         return (
-            <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-schedules-unsupported">
+            <p
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-schedules-unsupported"
+            >
                 {t('tab.unsupportedKind')}
             </p>
         );
@@ -236,13 +274,21 @@ export function SchedulesPanel({
                     >
                         {t('breaker.pauseAll')}
                     </Button>
-                    <Button size="sm" onClick={() => setDialog({ mode: 'create', initial: null, prefill: null })} data-testid="fleet-schedules-new">
+                    <Button
+                        size="sm"
+                        onClick={() => setDialog({ mode: 'create', initial: null, prefill: null })}
+                        data-testid="fleet-schedules-new"
+                    >
                         {t('tab.new')}
                     </Button>
                 </div>
             </div>
             {breaker && Date.now() < breaker.undoUntil ? (
-                <p className="flex items-center gap-2 text-xs" role="status" data-testid="fleet-schedules-breaker">
+                <p
+                    className="flex items-center gap-2 text-xs"
+                    role="status"
+                    data-testid="fleet-schedules-breaker"
+                >
                     {t('breaker.done', { count: breaker.count, computer: node.name })}
                     <button type="button" className="underline" onClick={() => void undoPauseAll()}>
                         {t('breaker.undo')}
@@ -250,7 +296,10 @@ export function SchedulesPanel({
                 </p>
             ) : null}
             {!managed ? (
-                <p className="rounded border border-warning/40 bg-warning/10 px-3 py-2 text-xs" role="status">
+                <p
+                    className="rounded border border-warning/40 bg-warning/10 px-3 py-2 text-xs"
+                    role="status"
+                >
                     {t('tab.needsManage', { computer: node.name })}
                 </p>
             ) : null}
@@ -278,19 +327,31 @@ export function SchedulesPanel({
             {rows === null ? (
                 <div className="space-y-2" aria-busy="true">
                     {[0, 1, 2].map((index) => (
-                        <div key={index} className="h-9 animate-pulse rounded bg-surface-secondary dark:bg-surface-secondary-dark" />
+                        <div
+                            key={index}
+                            className="h-9 animate-pulse rounded bg-surface-secondary dark:bg-surface-secondary-dark"
+                        />
                     ))}
                 </div>
             ) : rows.length === 0 ? (
-                <div className="rounded border border-dashed border-border p-4 text-sm dark:border-border-dark" data-testid="fleet-schedules-empty">
+                <div
+                    className="rounded border border-dashed border-border p-4 text-sm dark:border-border-dark"
+                    data-testid="fleet-schedules-empty"
+                >
                     <p className="font-medium">{t('tab.emptyTitle', { computer: node.name })}</p>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('tab.emptyExample')}</p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('tab.emptyExample')}
+                    </p>
                 </div>
             ) : (
                 <ul className="divide-y divide-border rounded border border-border dark:divide-border-dark dark:border-border-dark">
                     {rows.map((schedule) => {
                         const glyph = scheduleRowGlyph(schedule);
-                        const next = twoZoneTime(schedule.nextRunAt, schedule.nodeTimeZone, viewerZone);
+                        const next = twoZoneTime(
+                            schedule.nextRunAt,
+                            schedule.nodeTimeZone,
+                            viewerZone,
+                        );
                         const disabled = busyId === schedule.id;
                         return (
                             <li key={schedule.id} data-testid="fleet-schedule-row">
@@ -299,9 +360,16 @@ export function SchedulesPanel({
                                         type="button"
                                         className="flex min-w-0 flex-1 items-center gap-2 text-left"
                                         aria-expanded={expanded === schedule.id}
-                                        onClick={() => setExpanded(expanded === schedule.id ? null : schedule.id)}
+                                        onClick={() =>
+                                            setExpanded(
+                                                expanded === schedule.id ? null : schedule.id,
+                                            )
+                                        }
                                     >
-                                        <span aria-label={t(`glyphs.${glyph}`)} title={t(`glyphs.${glyph}`)}>
+                                        <span
+                                            aria-label={t(`glyphs.${glyph}`)}
+                                            title={t(`glyphs.${glyph}`)}
+                                        >
                                             {SCHEDULE_GLYPHS[glyph]}
                                         </span>
                                         <span className="font-medium">{schedule.name}</span>
@@ -321,16 +389,26 @@ export function SchedulesPanel({
                                                 ? t('row.running')
                                                 : next
                                                   ? next.viewer
-                                                      ? t('row.nextTwoZones', { computer: next.computer, viewer: next.viewer })
+                                                      ? t('row.nextTwoZones', {
+                                                            computer: next.computer,
+                                                            viewer: next.viewer,
+                                                        })
                                                       : t('row.next', { computer: next.computer })
                                                   : t('row.noNext')}
                                     </span>
                                     {schedule.lastRun ? (
                                         <span className="text-xs">
-                                            {t('row.last', { status: t(`statuses.${runStatusKey(schedule.lastRun.status)}`) })}
+                                            {t('row.last', {
+                                                status: t(
+                                                    `statuses.${runStatusKey(schedule.lastRun.status)}`,
+                                                ),
+                                            })}
                                         </span>
                                     ) : null}
-                                    <span className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-schedule-sync">
+                                    <span
+                                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-schedule-sync"
+                                    >
                                         {schedule.syncState === 'pending'
                                             ? t('sync.pending', { computer: node.name })
                                             : schedule.syncState === 'unsupported'
@@ -343,18 +421,36 @@ export function SchedulesPanel({
                                         <Button
                                             variant="secondary"
                                             size="sm"
-                                            disabled={disabled || !schedule.linkUp || schedule.neverRuns !== null}
-                                            title={!schedule.linkUp ? t('reasons.offline', { computer: node.name }) : undefined}
+                                            disabled={
+                                                disabled ||
+                                                !schedule.linkUp ||
+                                                schedule.neverRuns !== null
+                                            }
+                                            title={
+                                                !schedule.linkUp
+                                                    ? t('reasons.offline', { computer: node.name })
+                                                    : undefined
+                                            }
                                             onClick={() => void act(schedule, 'run')}
                                         >
                                             {t('actions.runNow')}
                                         </Button>
                                         {schedule.enabled ? (
-                                            <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void act(schedule, 'pause')}>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                disabled={disabled}
+                                                onClick={() => void act(schedule, 'pause')}
+                                            >
                                                 {t('actions.pause')}
                                             </Button>
                                         ) : (
-                                            <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void act(schedule, 'resume')}>
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                disabled={disabled}
+                                                onClick={() => void act(schedule, 'resume')}
+                                            >
                                                 {t('actions.resume')}
                                             </Button>
                                         )}
@@ -362,7 +458,13 @@ export function SchedulesPanel({
                                             variant="secondary"
                                             size="sm"
                                             disabled={disabled}
-                                            onClick={() => setDialog({ mode: 'edit', initial: schedule, prefill: null })}
+                                            onClick={() =>
+                                                setDialog({
+                                                    mode: 'edit',
+                                                    initial: schedule,
+                                                    prefill: null,
+                                                })
+                                            }
                                         >
                                             {t('actions.edit')}
                                         </Button>
@@ -370,17 +472,31 @@ export function SchedulesPanel({
                                             variant="secondary"
                                             size="sm"
                                             disabled={disabled}
-                                            onClick={() => setDialog({ mode: 'duplicate', initial: schedule, prefill: null })}
+                                            onClick={() =>
+                                                setDialog({
+                                                    mode: 'duplicate',
+                                                    initial: schedule,
+                                                    prefill: null,
+                                                })
+                                            }
                                         >
                                             {t('actions.duplicate')}
                                         </Button>
-                                        <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void act(schedule, 'delete')}>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            disabled={disabled}
+                                            onClick={() => void act(schedule, 'delete')}
+                                        >
                                             {t('actions.delete')}
                                         </Button>
                                     </div>
                                 </div>
                                 {expanded === schedule.id ? (
-                                    <ScheduleRunHistory schedule={schedule} viewerZone={viewerZone} />
+                                    <ScheduleRunHistory
+                                        schedule={schedule}
+                                        viewerZone={viewerZone}
+                                    />
                                 ) : null}
                             </li>
                         );
@@ -392,14 +508,28 @@ export function SchedulesPanel({
                     <h4 className="text-sm font-medium">{t('agentSessions.title')}</h4>
                     <ul className="divide-y divide-border rounded border border-border dark:divide-border-dark dark:border-border-dark">
                         {agentRows.map((row) => {
-                            const next = twoZoneTime(row.nextRunAt, node.timeZone ?? null, viewerZone);
+                            const next = twoZoneTime(
+                                row.nextRunAt,
+                                node.timeZone ?? null,
+                                viewerZone,
+                            );
                             const disabled = busyId === row.id;
                             return (
-                                <li key={row.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
-                                    <span>{row.paused ? SCHEDULE_GLYPHS.paused : SCHEDULE_GLYPHS.active}</span>
+                                <li
+                                    key={row.id}
+                                    className="flex flex-wrap items-center gap-2 px-3 py-2 text-sm"
+                                >
+                                    <span>
+                                        {row.paused
+                                            ? SCHEDULE_GLYPHS.paused
+                                            : SCHEDULE_GLYPHS.active}
+                                    </span>
                                     <span className="font-medium">{row.name}</span>
                                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                        {t('agentSessions.row', { agent: row.agentName ?? '—', cadence: row.cadenceHuman })}
+                                        {t('agentSessions.row', {
+                                            agent: row.agentName ?? '—',
+                                            cadence: row.cadenceHuman,
+                                        })}
                                     </span>
                                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
                                         {row.paused
@@ -407,25 +537,43 @@ export function SchedulesPanel({
                                             : next
                                               ? t('agentSessions.next', {
                                                     when: next.viewer
-                                                        ? t('row.nextTwoZones', { computer: next.computer, viewer: next.viewer })
+                                                        ? t('row.nextTwoZones', {
+                                                              computer: next.computer,
+                                                              viewer: next.viewer,
+                                                          })
                                                         : next.computer,
                                                 })
                                               : ''}
                                     </span>
-                                    {usage && <ScheduleUsageCost cost={taskCosts.get(row.taskId)} />}
+                                    {usage && (
+                                        <ScheduleUsageCost cost={taskCosts.get(row.taskId)} />
+                                    )}
                                     <div className="flex flex-wrap gap-1">
-                                        <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void actAgentSession(row, 'run')}>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            disabled={disabled}
+                                            onClick={() => void actAgentSession(row, 'run')}
+                                        >
                                             {t('actions.runNow')}
                                         </Button>
                                         <Button
                                             variant="secondary"
                                             size="sm"
                                             disabled={disabled}
-                                            onClick={() => void actAgentSession(row, row.paused ? 'resume' : 'pause')}
+                                            onClick={() =>
+                                                void actAgentSession(
+                                                    row,
+                                                    row.paused ? 'resume' : 'pause',
+                                                )
+                                            }
                                         >
                                             {row.paused ? t('actions.resume') : t('actions.pause')}
                                         </Button>
-                                        <a className="self-center text-xs underline" href={`/tasks/${encodeURIComponent(row.taskId)}`}>
+                                        <a
+                                            className="self-center text-xs underline"
+                                            href={`/tasks/${encodeURIComponent(row.taskId)}`}
+                                        >
                                             {t('agentSessions.openTask')}
                                         </a>
                                     </div>
@@ -433,10 +581,14 @@ export function SchedulesPanel({
                             );
                         })}
                     </ul>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('agentSessions.costNote')}</p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('agentSessions.costNote')}
+                    </p>
                 </section>
             ) : null}
-            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('tab.noCredits')}</p>
+            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                {t('tab.noCredits')}
+            </p>
         </div>
     );
 }

@@ -43,18 +43,30 @@ function make(options: { githubLinked?: boolean; capabilities?: string[] } = {})
         }),
     };
     const nodes = {
-        findById: jest.fn(async () => ({ id: NODE, capabilities: options.capabilities ?? ['git', 'git-push'] })),
+        findById: jest.fn(async () => ({
+            id: NODE,
+            capabilities: options.capabilities ?? ['git', 'git-push'],
+        })),
     };
     const users = {
-        findOne: jest.fn(async () => ({ id: OWNER, displayName: 'Your Name', username: 'you', email: 'you@example.com' })),
+        findOne: jest.fn(async () => ({
+            id: OWNER,
+            displayName: 'Your Name',
+            username: 'you',
+            email: 'you@example.com',
+        })),
     };
     const links = {
         findOne: jest.fn(async () =>
-            options.githubLinked === false ? null : { userId: OWNER, githubUserId: '12345', githubLogin: 'your-login' },
+            options.githubLinked === false
+                ? null
+                : { userId: OWNER, githubUserId: '12345', githubLogin: 'your-login' },
         ),
     };
     const installations = { find: jest.fn(async () => [{ id: 'inst-1', createdByUserId: OWNER }]) };
-    const installationRepos = { find: jest.fn(async () => [{ fullName: 'acme/api' }, { fullName: 'acme/web' }]) };
+    const installationRepos = {
+        find: jest.fn(async () => [{ fullName: 'acme/api' }, { fullName: 'acme/web' }]),
+    };
     const audit = { tryRecord: jest.fn(async () => true) };
     const service = new FleetGitIdentityService(
         nodes as never,
@@ -84,7 +96,10 @@ describe('FleetGitIdentityService.read (FR-12, FR-13)', () => {
         expect(identity.name).toEqual({ set: true, value: 'Your Name' });
         expect(identity.email).toEqual({ set: false });
         expect(identity.helper).toEqual({ present: true, value: 'osxkeychain' });
-        expect(identity.canPushForAgents).toEqual({ ok: true, repositories: ['acme/api', 'acme/web'] });
+        expect(identity.canPushForAgents).toEqual({
+            ok: true,
+            repositories: ['acme/api', 'acme/web'],
+        });
     });
 
     it('shows set / unset only to anyone else', async () => {
@@ -137,7 +152,10 @@ describe('FleetGitIdentityService.set (FR-14, FR-15, S8)', () => {
             },
         ]);
         expect(result.fields).toEqual(['user.name', 'user.email']);
-        const row = (audit.tryRecord.mock.calls[0] as unknown[])[0] as { action: string; details: Record<string, unknown> };
+        const row = (audit.tryRecord.mock.calls[0] as unknown[])[0] as {
+            action: string;
+            details: Record<string, unknown>;
+        };
         expect(row.action).toBe('node.git.identity.set');
         expect(row.details.fields).toEqual(['user.name', 'user.email']);
         expect(JSON.stringify(row)).not.toContain('your-login@users');
@@ -146,12 +164,16 @@ describe('FleetGitIdentityService.set (FR-14, FR-15, S8)', () => {
     it('falls back to the account email without a GitHub link', async () => {
         const { service } = make({ githubLinked: false });
         const error = await refusal(service.set(NODE, { kind: 'user', userId: OWNER }));
-        expect(error?.details).toEqual(expect.objectContaining({ emailSource: 'account', email: 'you@example.com' }));
+        expect(error?.details).toEqual(
+            expect.objectContaining({ emailSource: 'account', email: 'you@example.com' }),
+        );
     });
 
     it('lets only the computer’s owner set it', async () => {
         const { service, requests } = make();
-        const error = await refusal(service.set(NODE, { kind: 'user', userId: MEMBER }, { confirm: true }));
+        const error = await refusal(
+            service.set(NODE, { kind: 'user', userId: MEMBER }, { confirm: true }),
+        );
         expect(error?.code).toBe('permission_denied');
         expect(requests).toHaveLength(0);
     });

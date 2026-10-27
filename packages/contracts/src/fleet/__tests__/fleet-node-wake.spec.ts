@@ -99,12 +99,18 @@ describe('isFleetNodeAsleep', () => {
 	it('is true for an offline row and for a silent one', () => {
 		expect(isFleetNodeAsleep({ status: 'offline', lastHeartbeatAt: null }, NOW, WINDOW)).toBe(true);
 		expect(
-			isFleetNodeAsleep({ status: 'online', lastHeartbeatAt: new Date(NOW - WINDOW - 1).toISOString() }, NOW, WINDOW)
+			isFleetNodeAsleep(
+				{ status: 'online', lastHeartbeatAt: new Date(NOW - WINDOW - 1).toISOString() },
+				NOW,
+				WINDOW
+			)
 		).toBe(true);
 	});
 
 	it('is false for a computer that beat recently, and for one still enrolling', () => {
-		expect(isFleetNodeAsleep({ status: 'online', lastHeartbeatAt: new Date(NOW - 1_000) }, NOW, WINDOW)).toBe(false);
+		expect(isFleetNodeAsleep({ status: 'online', lastHeartbeatAt: new Date(NOW - 1_000) }, NOW, WINDOW)).toBe(
+			false
+		);
 		expect(isFleetNodeAsleep({ status: 'enrolling', lastHeartbeatAt: null }, NOW, WINDOW)).toBe(false);
 	});
 });

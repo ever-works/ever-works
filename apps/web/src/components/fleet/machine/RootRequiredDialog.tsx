@@ -53,14 +53,21 @@ export function RootRequiredDialog({
                     <DialogClose onClose={onClose} />
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
-                            {windows ? t('windowsTitle', { name: machine }) : t('title', { name: machine })}
+                            {windows
+                                ? t('windowsTitle', { name: machine })
+                                : t('title', { name: machine })}
                         </DialogTitle>
                         <DialogDescription>
-                            {windows ? t('windowsBody', { name: machine }) : t('body', { name: machine })}
+                            {windows
+                                ? t('windowsBody', { name: machine })
+                                : t('body', { name: machine })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-3 flex items-center gap-2 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark p-2">
-                        <code className="flex-1 break-all font-mono text-sm" data-testid="fleet-machine-root-command">
+                        <code
+                            className="flex-1 break-all font-mono text-sm"
+                            data-testid="fleet-machine-root-command"
+                        >
                             {model.command}
                         </code>
                         <Button
@@ -71,7 +78,11 @@ export function RootRequiredDialog({
                             aria-label={t('copy')}
                             data-testid="fleet-machine-root-copy"
                         >
-                            {copied ? <Check className="h-4 w-4" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
+                            {copied ? (
+                                <Check className="h-4 w-4" aria-hidden />
+                            ) : (
+                                <Copy className="h-4 w-4" aria-hidden />
+                            )}
                         </Button>
                     </div>
                     <p className="mt-3 text-sm text-text-muted dark:text-text-muted-dark">

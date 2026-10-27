@@ -583,11 +583,16 @@ export class InboxService implements InboxProducer {
      * claim already closed the item and this is a no-op.
      */
     async sessionAttentionCleared(input: InboxSessionAttentionClearedInput): Promise<void> {
-        const row = await this.items.findByFleetSessionAttentionKey(input.userId, input.attentionKey);
+        const row = await this.items.findByFleetSessionAttentionKey(
+            input.userId,
+            input.attentionKey,
+        );
         if (!row || row.status !== 'open') return;
         if (input.reason === 'expired') {
             await this.items.setArchived(row.id, row.userId, true);
-            await this.recordChanged(row.id, 'inbox.item.state_changed', ['status'], { status: 'open' });
+            await this.recordChanged(row.id, 'inbox.item.state_changed', ['status'], {
+                status: 'open',
+            });
             return;
         }
         const claimed = await this.items.markAnswered(row.id, row.userId, {
@@ -717,42 +722,52 @@ export class InboxService implements InboxProducer {
         let restart: InboxReplyRestart = 'none';
         try {
             // FL-05: a session's Decision answers the session, not a Run.
-            if (row.sourceType === 'fleet-session' && (row.kind === 'question' || row.kind === 'approval')) {
-                routed = await this.routeSessionReply(row, userId, option, text, answer.requireReason === true);
-            } else switch (row.kind) {
-                case 'question': {
-                    const outcome = await this.routeQuestionReply(row, userId, composed);
-                    routed = outcome.routed;
-                    runId = outcome.runId;
-                    restart = outcome.restart;
-                    break;
-                }
-                case 'approval': {
-                    routed = await this.routeApprovalReply(row, userId, option);
-                    if (routed === 'approved' || routed === 'rejected') {
-                        // A run that parked to wait for this approval picks
-                        // the decision up; nothing else is restarted.
-                        const handOff = await this.tryResumeLinkedRun(row, userId, composed, {
-                            parkedOnly: true,
-                        });
-                        restart = handOff.restart;
-                        if (handOff.runId) runId = handOff.runId;
+            if (
+                row.sourceType === 'fleet-session' &&
+                (row.kind === 'question' || row.kind === 'approval')
+            ) {
+                routed = await this.routeSessionReply(
+                    row,
+                    userId,
+                    option,
+                    text,
+                    answer.requireReason === true,
+                );
+            } else
+                switch (row.kind) {
+                    case 'question': {
+                        const outcome = await this.routeQuestionReply(row, userId, composed);
+                        routed = outcome.routed;
+                        runId = outcome.runId;
+                        restart = outcome.restart;
+                        break;
                     }
-                    break;
-                }
-                case 'escalation': {
-                    routed = await this.routeEscalationReply(row, userId, composed);
-                    if (routed === 'escalation-resolved') {
-                        const handOff = await this.tryResumeLinkedRun(row, userId, composed);
-                        restart = handOff.restart;
-                        if (handOff.runId) runId = handOff.runId;
+                    case 'approval': {
+                        routed = await this.routeApprovalReply(row, userId, option);
+                        if (routed === 'approved' || routed === 'rejected') {
+                            // A run that parked to wait for this approval picks
+                            // the decision up; nothing else is restarted.
+                            const handOff = await this.tryResumeLinkedRun(row, userId, composed, {
+                                parkedOnly: true,
+                            });
+                            restart = handOff.restart;
+                            if (handOff.runId) runId = handOff.runId;
+                        }
+                        break;
                     }
-                    break;
+                    case 'escalation': {
+                        routed = await this.routeEscalationReply(row, userId, composed);
+                        if (routed === 'escalation-resolved') {
+                            const handOff = await this.tryResumeLinkedRun(row, userId, composed);
+                            restart = handOff.restart;
+                            if (handOff.runId) runId = handOff.runId;
+                        }
+                        break;
+                    }
+                    case 'notice':
+                        routed = 'none';
+                        break;
                 }
-                case 'notice':
-                    routed = 'none';
-                    break;
-            }
         } catch (err) {
             const reopened = await this.items.reopen(id, userId).catch((reopenErr) => {
                 this.logger.warn(

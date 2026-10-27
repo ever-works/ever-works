@@ -887,8 +887,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
     ): Promise<AppWorkDeletionOutcome> {
         const claimedAt = toEpochMs(state?.deletionRequestedAt);
         const now = this.nowMs();
-        const stale =
-            claimedAt !== null && now - claimedAt > APP_WORK_DELETION_STALE_AFTER_MS;
+        const stale = claimedAt !== null && now - claimedAt > APP_WORK_DELETION_STALE_AFTER_MS;
         const store = this.runtimeStates;
 
         if (!stale || !store || typeof store.reclaimStaleDeletion !== 'function') {
@@ -1610,7 +1609,10 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
             return false;
         }
         try {
-            const members = getOptionalProvider<WorkMemberRepository>(this.moduleRef, WorkMemberRepository);
+            const members = getOptionalProvider<WorkMemberRepository>(
+                this.moduleRef,
+                WorkMemberRepository,
+            );
             const member = await members?.findMember(workId, userId);
             return member?.role === WorkMemberRole.OWNER;
         } catch (error) {
@@ -1756,12 +1758,17 @@ class AppWorkDeletionTransientError extends Error {
  * list — so whatever crosses the internal hop (and lands in the owner's notification) can carry
  * nothing a caller added to the object.
  */
-function completionReport(report: AppWorkDeletionCompletionReport): AppWorkDeletionCompletionReport {
+function completionReport(
+    report: AppWorkDeletionCompletionReport,
+): AppWorkDeletionCompletionReport {
     const out: AppWorkDeletionCompletionReport = {};
     const refs = (list?: readonly AppDeletionObjectRef[]) =>
         dedupeRefs(list ?? [])
             .slice(0, 50)
-            .map((ref) => ({ kind: String(ref.kind).slice(0, 80), name: String(ref.name).slice(0, 120) }));
+            .map((ref) => ({
+                kind: String(ref.kind).slice(0, 80),
+                name: String(ref.name).slice(0, 120),
+            }));
     if (report.mayRemain) {
         out.mayRemain = refs(report.mayRemain);
     }

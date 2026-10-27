@@ -18,18 +18,30 @@ export function IdentityLine({ nodeId, nodeName }: { nodeId: string; nodeName: s
     const mark = (ok: boolean) => (ok ? '✓' : '⚠');
 
     if (state.kind === 'loading') {
-        return <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('loading', { node: nodeName })}</p>;
+        return (
+            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                {t('loading', { node: nodeName })}
+            </p>
+        );
     }
     if (state.kind === 'error') {
         return (
-            <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-handoff-identity">
-                {state.code === 'consent_missing' ? t('needsManage', { node: nodeName }) : t('unknown', { node: nodeName })}
+            <p
+                className="text-xs text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-handoff-identity"
+            >
+                {state.code === 'consent_missing'
+                    ? t('needsManage', { node: nodeName })
+                    : t('unknown', { node: nodeName })}
             </p>
         );
     }
     const identity = state.identity;
     return (
-        <div className="flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-handoff-identity">
+        <div
+            className="flex flex-wrap items-center gap-2 text-xs"
+            data-testid="fleet-handoff-identity"
+        >
             <span>
                 {t('summary', {
                     node: nodeName,
@@ -38,7 +50,9 @@ export function IdentityLine({ nodeId, nodeName }: { nodeId: string; nodeName: s
                     push: mark(identity.canPushForAgents.ok),
                 })}
             </span>
-            {fleetGitIdentityIncomplete(identity) && <UseMyIdentityButton nodeId={nodeId} onDone={replace} />}
+            {fleetGitIdentityIncomplete(identity) && (
+                <UseMyIdentityButton nodeId={nodeId} onDone={replace} />
+            )}
         </div>
     );
 }

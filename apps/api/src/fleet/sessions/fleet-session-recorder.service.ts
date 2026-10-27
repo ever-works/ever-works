@@ -6,7 +6,11 @@ import {
     type FleetSessionRecorderPort,
     type FleetSessionRecordingTarget,
 } from '@ever-works/agent/fleet';
-import { FLEET_LINK_FRAME_KINDS, fleetSessionConsentFor, parseFleetSessionNotice } from '@ever-works/contracts';
+import {
+    FLEET_LINK_FRAME_KINDS,
+    fleetSessionConsentFor,
+    parseFleetSessionNotice,
+} from '@ever-works/contracts';
 import { config } from '@ever-works/agent/config';
 import type { FleetLinkChannel } from '../../fleet-link/fleet-link-channel';
 import { FleetLinkRegistry } from '../../fleet-link/fleet-link.registry';
@@ -60,7 +64,9 @@ interface Recording {
  * be a provider cycle and a boot crash.
  */
 @Injectable()
-export class FleetSessionRecorderService implements FleetSessionRecorderPort, OnModuleInit, OnApplicationShutdown {
+export class FleetSessionRecorderService
+    implements FleetSessionRecorderPort, OnModuleInit, OnApplicationShutdown
+{
     private readonly logger = new Logger(FleetSessionRecorderService.name);
     private readonly recordings = new Map<string, Recording>();
     private sweeper: NodeJS.Timeout | null = null;
@@ -99,19 +105,20 @@ export class FleetSessionRecorderService implements FleetSessionRecorderPort, On
         if (!this.registry.isConnected(target.nodeId)) return;
         const existing = this.recordings.get(target.id);
         if (existing && !existing.stopped && (existing.channel?.isOpen || existing.opening)) return;
-        const recording: Recording = existing && !existing.stopped
-            ? existing
-            : {
-                  target,
-                  channel: null,
-                  opening: false,
-                  stopped: false,
-                  seq: -1,
-                  pending: [],
-                  pendingBytes: 0,
-                  timer: null,
-                  flushing: null,
-              };
+        const recording: Recording =
+            existing && !existing.stopped
+                ? existing
+                : {
+                      target,
+                      channel: null,
+                      opening: false,
+                      stopped: false,
+                      seq: -1,
+                      pending: [],
+                      pendingBytes: 0,
+                      timer: null,
+                      flushing: null,
+                  };
         this.recordings.set(target.id, recording);
         void this.open(recording);
     }
@@ -180,7 +187,9 @@ export class FleetSessionRecorderService implements FleetSessionRecorderPort, On
             recording.channel = channel;
             const reply = await channel.request('session.attach', {}, { timeoutMs: 20_000 });
             if ('error' in reply) {
-                this.logger.debug(`session ${target.id}: recorder attach refused: ${reply.error.code}`);
+                this.logger.debug(
+                    `session ${target.id}: recorder attach refused: ${reply.error.code}`,
+                );
                 channel.close('normal');
                 recording.channel = null;
             }
@@ -246,10 +255,17 @@ export class FleetSessionRecorderService implements FleetSessionRecorderPort, On
             const sessions = this.sessions();
             if (!sessions) return;
             for (const row of await sessions.liveRecordingFor(nodeIds)) {
-                this.ensure({ id: row.id, nodeId: row.nodeId, daemonSessionId: row.daemonSessionId, kind: row.kind });
+                this.ensure({
+                    id: row.id,
+                    nodeId: row.nodeId,
+                    daemonSessionId: row.daemonSessionId,
+                    kind: row.kind,
+                });
             }
         } catch (error) {
-            this.logger.debug(`recorder sweep failed: ${error instanceof Error ? error.message : String(error)}`);
+            this.logger.debug(
+                `recorder sweep failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
     }
 }

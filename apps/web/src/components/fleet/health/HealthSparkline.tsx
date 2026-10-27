@@ -30,7 +30,8 @@ export function sparklineSegments(
             return;
         }
         const x = Math.round(index * step * 10) / 10;
-        const y = Math.round((height - (Math.max(0, Math.min(100, value)) / 100) * height) * 10) / 10;
+        const y =
+            Math.round((height - (Math.max(0, Math.min(100, value)) / 100) * height) * 10) / 10;
         current.push(`${x},${y}`);
     });
     if (current.length > 0) segments.push(current.join(' '));
@@ -54,7 +55,9 @@ export interface HealthSparklineProps {
  */
 export function HealthSparkline({ nodeId, points: injected }: HealthSparklineProps) {
     const t = useTranslations('fleet.history');
-    const [points, setPoints] = useState<readonly FleetNodeHealthHistoryPoint[] | null>(injected ?? null);
+    const [points, setPoints] = useState<readonly FleetNodeHealthHistoryPoint[] | null>(
+        injected ?? null,
+    );
 
     useEffect(() => {
         if (injected) return;

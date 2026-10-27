@@ -327,7 +327,18 @@ export function CommandPalette({
                 settled,
                 sessions: paletteSessions,
             }),
-        [t, query, filter, commandContext, commands, screens, recents, response, settled, paletteSessions],
+        [
+            t,
+            query,
+            filter,
+            commandContext,
+            commands,
+            screens,
+            recents,
+            response,
+            settled,
+            paletteSessions,
+        ],
     );
     const rows = useMemo(() => flattenRows(sections), [sections]);
 

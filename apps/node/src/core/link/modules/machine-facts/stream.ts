@@ -34,7 +34,11 @@ export interface StreamRunResult {
 	aborted: boolean;
 }
 
-export type StreamRunner = (command: string, args: readonly string[], options?: StreamRunOptions) => Promise<StreamRunResult>;
+export type StreamRunner = (
+	command: string,
+	args: readonly string[],
+	options?: StreamRunOptions
+) => Promise<StreamRunResult>;
 
 const TAIL_LINES = 200;
 const MAX_LINE = 2_000;
@@ -50,7 +54,12 @@ export function createStreamRunner(baseEnv: NodeJS.ProcessEnv = machineChildEnv(
 			let settled = false;
 			let child: ReturnType<typeof spawn>;
 			try {
-				child = spawn(command, [...args], { shell: false, windowsHide: true, env, stdio: ['ignore', 'pipe', 'pipe'] });
+				child = spawn(command, [...args], {
+					shell: false,
+					windowsHide: true,
+					env,
+					stdio: ['ignore', 'pipe', 'pipe']
+				});
 			} catch (error) {
 				resolve({
 					code: 1,

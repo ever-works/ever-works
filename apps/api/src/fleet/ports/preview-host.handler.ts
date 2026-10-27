@@ -102,7 +102,9 @@ function refusalOf(
 function refuseUpgrade(socket: Duplex, status: number): void {
     if (socket.destroyed) return;
     try {
-        socket.write(`HTTP/1.1 ${status} Refused\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`);
+        socket.write(
+            `HTTP/1.1 ${status} Refused\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`,
+        );
     } catch {
         // gone
     }
@@ -112,7 +114,8 @@ function refuseUpgrade(socket: Duplex, status: number): void {
 @Injectable()
 export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplicationShutdown {
     private readonly logger = new Logger(FleetPreviewHostHandler.name);
-    private upgradeListener: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | null = null;
+    private upgradeListener: ((req: IncomingMessage, socket: Duplex, head: Buffer) => void) | null =
+        null;
 
     constructor(
         private readonly tunnels: FleetPortTunnelService,
@@ -156,7 +159,11 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
         res.end(rendered.html);
     }
 
-    private async handle(req: IncomingMessage, res: ServerResponse, previewHost: string): Promise<void> {
+    private async handle(
+        req: IncomingMessage,
+        res: ServerResponse,
+        previewHost: string,
+    ): Promise<void> {
         if (!config.fleet.isPortTunnelEnabled()) return this.page(res, 'notFound');
         const url = new URL(req.url ?? '/', `https://${previewHost}`);
         const cookies = parseCookies(req.headers.cookie);
@@ -168,7 +175,10 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
             if (match[2] === undefined) {
                 // `/p/<id>` → `/p/<id>/`: relative assets then resolve under the prefix.
                 res.statusCode = 308;
-                res.setHeader('Location', `${FLEET_PORT_TUNNEL_PATH_PREFIX}${tunnelId}/${url.search}`);
+                res.setHeader(
+                    'Location',
+                    `${FLEET_PORT_TUNNEL_PATH_PREFIX}${tunnelId}/${url.search}`,
+                );
                 res.end();
                 return;
             }
@@ -186,7 +196,10 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
             const userId = this.tokens.redeemHandoff(handoff, tunnelId);
             const row = userId ? await this.tunnels.authorizeRequest(tunnelId, userId) : null;
             if (!userId || !row || !row.ok) {
-                return this.page(res, row && !row.ok && refusalOf(row) === 'ended' ? 'ended' : 'signIn');
+                return this.page(
+                    res,
+                    row && !row.ok && refusalOf(row) === 'ended' ? 'ended' : 'signIn',
+                );
             }
             const endsAt = fleetPortTunnelEndsAt(row.tunnel.openedAt);
             const value = this.tokens.mintCookie(tunnelId, userId, endsAt);
@@ -205,7 +218,10 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
             return;
         }
 
-        const userId = this.tokens.readCookie(cookies.get(fleetPortTunnelAuthCookieName(tunnelId)), tunnelId);
+        const userId = this.tokens.readCookie(
+            cookies.get(fleetPortTunnelAuthCookieName(tunnelId)),
+            tunnelId,
+        );
         if (!userId) return this.page(res, 'signIn');
         const decision = await this.tunnels.authorizeRequest(tunnelId, userId);
         if (!decision.ok) {
@@ -224,7 +240,10 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
             FLEET_PORT_TUNNEL_DROPPED_REQUEST_HEADERS,
         );
         delete headers.cookie;
-        const appCookies = stripFleetPortTunnelCookies(req.headers.cookie ?? '', PLATFORM_COOKIE_NAMES);
+        const appCookies = stripFleetPortTunnelCookies(
+            req.headers.cookie ?? '',
+            PLATFORM_COOKIE_NAMES,
+        );
         if (appCookies.length > 0) headers.cookie = appCookies;
 
         const tunnelUrl = fleetPortTunnelUrl(previewHost, tunnel.id);
@@ -269,7 +288,11 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
                     onResponse: (status, upstream) => {
                         const location = upstream.location;
                         if (typeof location === 'string') {
-                            const rewritten = rewriteFleetPortTunnelLocation(location, tunnel.port, tunnelUrl);
+                            const rewritten = rewriteFleetPortTunnelLocation(
+                                location,
+                                tunnel.port,
+                                tunnelUrl,
+                            );
                             if (rewritten === null) {
                                 // U13: a redirect off the tunnelled port is shown, never followed.
                                 this.page(res, 'redirect', { link: location });
@@ -294,8 +317,13 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
                                 : existing !== undefined
                                   ? [String(existing)]
                                   : [];
-                            const maxAge = (fleetPortTunnelEndsAt(tunnel.openedAt).getTime() - Date.now()) / 1000;
-                            res.setHeader('Set-Cookie', [...list, cookie(FLEET_PORT_TUNNEL_COOKIE, tunnel.id, maxAge)]);
+                            const maxAge =
+                                (fleetPortTunnelEndsAt(tunnel.openedAt).getTime() - Date.now()) /
+                                1000;
+                            res.setHeader('Set-Cookie', [
+                                ...list,
+                                cookie(FLEET_PORT_TUNNEL_COOKIE, tunnel.id, maxAge),
+                            ]);
                         }
                         if (method === 'HEAD') res.flushHeaders();
                     },
@@ -372,18 +400,27 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
             tunnelId = sticky;
             path = url.pathname;
         }
-        const userId = this.tokens.readCookie(cookies.get(fleetPortTunnelAuthCookieName(tunnelId)), tunnelId);
+        const userId = this.tokens.readCookie(
+            cookies.get(fleetPortTunnelAuthCookieName(tunnelId)),
+            tunnelId,
+        );
         if (!userId) return refuseUpgrade(socket, 401);
         const decision = await this.tunnels.authorizeRequest(tunnelId, userId);
-        if (!decision.ok) return refuseUpgrade(socket, refusalOf(decision) === 'not-yours' ? 403 : 404);
+        if (!decision.ok)
+            return refuseUpgrade(socket, refusalOf(decision) === 'not-yours' ? 403 : 404);
         const tunnel = decision.tunnel;
 
         const headers = filterFleetPortTunnelHeaders(
             req.headers as Record<string, unknown>,
-            FLEET_PORT_TUNNEL_DROPPED_REQUEST_HEADERS.filter((name) => name !== 'connection' && name !== 'upgrade'),
+            FLEET_PORT_TUNNEL_DROPPED_REQUEST_HEADERS.filter(
+                (name) => name !== 'connection' && name !== 'upgrade',
+            ),
         );
         delete headers.cookie;
-        const appCookies = stripFleetPortTunnelCookies(req.headers.cookie ?? '', PLATFORM_COOKIE_NAMES);
+        const appCookies = stripFleetPortTunnelCookies(
+            req.headers.cookie ?? '',
+            PLATFORM_COOKIE_NAMES,
+        );
         if (appCookies.length > 0) headers.cookie = appCookies;
 
         let bytesIn = 0;
@@ -417,7 +454,12 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
 
         handle = await this.bridge.upgrade(
             {
-                tunnel: { id: tunnel.id, nodeId: tunnel.nodeId, port: tunnel.port, ownerUserId: tunnel.ownerUserId },
+                tunnel: {
+                    id: tunnel.id,
+                    nodeId: tunnel.nodeId,
+                    port: tunnel.port,
+                    ownerUserId: tunnel.ownerUserId,
+                },
                 path,
                 query: url.search.startsWith('?') ? url.search.slice(1) : url.search,
                 headers,
@@ -426,7 +468,9 @@ export class FleetPreviewHostHandler implements OnApplicationBootstrap, OnApplic
                 onAccept: (status, upstream) => {
                     if (ended) return;
                     accepted = true;
-                    const lines = [`HTTP/1.1 ${status === 101 ? '101 Switching Protocols' : `${status} Upgrade`}`];
+                    const lines = [
+                        `HTTP/1.1 ${status === 101 ? '101 Switching Protocols' : `${status} Upgrade`}`,
+                    ];
                     for (const [name, value] of Object.entries(upstream)) {
                         for (const one of Array.isArray(value) ? value : [value]) {
                             if (/[\r\n]/.test(one) || /[\r\n:]/.test(name)) continue;

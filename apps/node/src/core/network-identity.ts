@@ -119,7 +119,9 @@ export function hashFleetNetwork(network: string, prefix: number): string {
  * This machine's primary interface identity, or null when it has none a wake
  * could use (no IPv4 interface with a real hardware address).
  */
-export function resolveNetworkIdentity(interfaces: NetworkInterfaceMap | null | undefined): LocalNetworkIdentity | null {
+export function resolveNetworkIdentity(
+	interfaces: NetworkInterfaceMap | null | undefined
+): LocalNetworkIdentity | null {
 	if (!interfaces) return null;
 	const physical: Candidate[] = [];
 	const virtual: Candidate[] = [];

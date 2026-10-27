@@ -179,7 +179,11 @@ export async function rotateAppEnvAction(
     if (!workIdSchema.safeParse(workId).success) {
         return { success: false, error: 'invalid work id', code: 'invalid_work_id' };
     }
-    if (!nameSchema.safeParse(name).success || typeof confirmName !== 'string' || confirmName.length > 256) {
+    if (
+        !nameSchema.safeParse(name).success ||
+        typeof confirmName !== 'string' ||
+        confirmName.length > 256
+    ) {
         return { success: false, error: 'invalid name', code: 'invalidBody', httpStatus: 400 };
     }
     try {

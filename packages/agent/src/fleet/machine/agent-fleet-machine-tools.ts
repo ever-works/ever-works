@@ -55,7 +55,10 @@ export const FLEET_MACHINE_TOOL_ANNOTATIONS: Readonly<
     fleet_processes_list: { readOnly: true },
     fleet_processes_signal: { destructive: true, confirmationClass: 'confirm' },
     fleet_docker_containers_list: { readOnly: true },
-    fleet_docker_container_action: { destructive: true, confirmationClass: 'confirm | confirm-destructive' },
+    fleet_docker_container_action: {
+        destructive: true,
+        confirmationClass: 'confirm | confirm-destructive',
+    },
     fleet_docker_run: { destructive: false, confirmationClass: 'confirm' },
     fleet_docker_images_list: { readOnly: true },
     fleet_docker_image_action: { destructive: true, confirmationClass: 'confirm' },
@@ -89,7 +92,10 @@ type ToolError = { error: FleetLinkError };
 function toolError(error: unknown): ToolError {
     const known = readFleetMachineError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -122,7 +128,10 @@ export function buildFleetMachineTools(args: {
     const caller = { kind: 'agent' as const, agentId: args.agentId, ownerUserId: args.userId };
     const out: TaskToolDescriptor[] = [];
 
-    const hold = async (payload: Omit<FleetMachineActionProposalPayload, 'kind' | 'agentId'>, title: string) => {
+    const hold = async (
+        payload: Omit<FleetMachineActionProposalPayload, 'kind' | 'agentId'>,
+        title: string,
+    ) => {
         if (!args.proposals) {
             return {
                 error: {
@@ -167,10 +176,13 @@ export function buildFleetMachineTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown; scope?: unknown; find?: unknown };
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             try {
                 return await args.service.listServices(a.nodeId, caller, {
-                    ...(a.scope === 'system' || a.scope === 'user' || a.scope === 'all' ? { scope: a.scope } : {}),
+                    ...(a.scope === 'system' || a.scope === 'user' || a.scope === 'all'
+                        ? { scope: a.scope }
+                        : {}),
                     ...(typeof a.find === 'string' ? { find: a.find } : {}),
                 });
             } catch (error) {
@@ -187,7 +199,10 @@ export function buildFleetMachineTools(args: {
             type: 'object',
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
-                name: { type: 'string', description: 'The service name exactly as fleet_services_list shows it.' },
+                name: {
+                    type: 'string',
+                    description: 'The service name exactly as fleet_services_list shows it.',
+                },
                 action: { type: 'string', description: 'start, stop, restart, enable or disable.' },
                 scope: { type: 'string', description: 'system (default) or user.' },
                 manager: { type: 'string', description: 'macOS only: launchd (default) or brew.' },
@@ -196,13 +211,17 @@ export function buildFleetMachineTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetServiceName(a.name)) return invalid('name', 'that is not a service name Ever Works acts on');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetServiceName(a.name))
+                return invalid('name', 'that is not a service name Ever Works acts on');
             if (!isFleetServiceAction(a.action)) {
                 return invalid('action', 'action must be start, stop, restart, enable or disable');
             }
-            if (a.scope !== undefined && !isFleetServiceScope(a.scope)) return invalid('scope', 'scope must be system or user');
-            if (a.manager !== undefined && !isFleetServiceManager(a.manager)) return invalid('manager', 'unknown manager');
+            if (a.scope !== undefined && !isFleetServiceScope(a.scope))
+                return invalid('scope', 'scope must be system or user');
+            if (a.manager !== undefined && !isFleetServiceManager(a.manager))
+                return invalid('manager', 'unknown manager');
             const input = {
                 name: a.name,
                 action: a.action,
@@ -210,11 +229,20 @@ export function buildFleetMachineTools(args: {
                 ...(isFleetServiceManager(a.manager) ? { manager: a.manager } : {}),
             };
             try {
-                return await args.service.serviceAction(a.nodeId, caller, { ...input, fields: { confirm: true } });
+                return await args.service.serviceAction(a.nodeId, caller, {
+                    ...input,
+                    fields: { confirm: true },
+                });
             } catch (error) {
                 const known = readFleetMachineError(error);
-                if (known?.code === 'confirmation_required' && known.details?.class === 'blast-radius') {
-                    const sentence = typeof known.details.sentence === 'string' ? known.details.sentence : undefined;
+                if (
+                    known?.code === 'confirmation_required' &&
+                    known.details?.class === 'blast-radius'
+                ) {
+                    const sentence =
+                        typeof known.details.sentence === 'string'
+                            ? known.details.sentence
+                            : undefined;
                     return hold(
                         {
                             verb: 'services.action',
@@ -242,13 +270,17 @@ export function buildFleetMachineTools(args: {
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 sort: { type: 'string', description: 'cpu (default) or mem.' },
-                find: { type: 'string', description: 'Optional filter on name, command, owner or pid.' },
+                find: {
+                    type: 'string',
+                    description: 'Optional filter on name, command, owner or pid.',
+                },
             },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown; sort?: unknown; find?: unknown };
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             try {
                 return await args.service.listProcesses(a.nodeId, caller, {
                     ...(a.sort === 'mem' ? { sort: 'mem' as const } : {}),
@@ -275,19 +307,31 @@ export function buildFleetMachineTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             const pid = typeof a.pid === 'string' ? Number(a.pid) : a.pid;
-            if (!isFleetProcessPid(pid)) return invalid('pid', 'pid must be a positive whole number');
+            if (!isFleetProcessPid(pid))
+                return invalid('pid', 'pid must be a positive whole number');
             const signal = a.signal === undefined ? 'TERM' : a.signal;
-            if (!isFleetProcessSignal(signal)) return invalid('signal', 'signal must be TERM or KILL');
+            if (!isFleetProcessSignal(signal))
+                return invalid('signal', 'signal must be TERM or KILL');
             if (signal === 'KILL') {
                 return hold(
-                    { verb: 'processes.signal', nodeId: a.nodeId, args: { pid, signal }, reason: 'kill' },
+                    {
+                        verb: 'processes.signal',
+                        nodeId: a.nodeId,
+                        args: { pid, signal },
+                        reason: 'kill',
+                    },
                     `Send SIGKILL to process ${pid}`,
                 );
             }
             try {
-                return await args.service.signalProcess(a.nodeId, caller, { pid, signal, fields: { confirm: true } });
+                return await args.service.signalProcess(a.nodeId, caller, {
+                    pid,
+                    signal,
+                    fields: { confirm: true },
+                });
             } catch (error) {
                 return toolError(error);
             }
@@ -302,12 +346,15 @@ export function buildFleetMachineTools(args: {
             'List every container on one of the owner’s computers with image, state, ports, Compose project, CPU and memory, and whether Docker is installed and running there. Read-only. Needs `--manage`.',
         parameters: {
             type: 'object',
-            properties: { nodeId: { type: 'string', description: 'The computer (Fleet node id).' } },
+            properties: {
+                nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
+            },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             try {
                 return await args.service.listContainers(a.nodeId, caller);
             } catch (error) {
@@ -324,22 +371,36 @@ export function buildFleetMachineTools(args: {
             type: 'object',
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
-                container: { type: 'string', description: 'The container id or name from fleet_docker_containers_list.' },
+                container: {
+                    type: 'string',
+                    description: 'The container id or name from fleet_docker_containers_list.',
+                },
                 action: { type: 'string', description: 'start, stop, restart or remove.' },
             },
             required: ['nodeId', 'container', 'action'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetContainerRef(a.container)) return invalid('container', 'that is not a container id or name');
-            if (!isFleetContainerAction(a.action)) return invalid('action', 'action must be start, stop, restart or remove');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetContainerRef(a.container))
+                return invalid('container', 'that is not a container id or name');
+            if (!isFleetContainerAction(a.action))
+                return invalid('action', 'action must be start, stop, restart or remove');
             try {
                 if (a.action === 'remove') {
                     const listed = await args.service.listContainers(a.nodeId, caller);
                     const container = a.container;
-                    const found = listed.containers.find((row) => row.id === container.slice(0, 12) || row.name === container);
-                    if (!found) return { error: { code: 'not_found' as const, hint: `${container} is not a container on this computer` } };
+                    const found = listed.containers.find(
+                        (row) => row.id === container.slice(0, 12) || row.name === container,
+                    );
+                    if (!found)
+                        return {
+                            error: {
+                                code: 'not_found' as const,
+                                hint: `${container} is not a container on this computer`,
+                            },
+                        };
                     return hold(
                         {
                             verb: 'docker.container.action',
@@ -379,7 +440,8 @@ export function buildFleetMachineTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             const validated = validateFleetRunRequest(a.request);
             if (!validated.ok) {
                 // `strictNullChecks: false` here: `!validated.ok` does not narrow the union.
@@ -388,7 +450,10 @@ export function buildFleetMachineTools(args: {
             }
             // A proposal is stored: it must never carry a secret (FR-29).
             if (validated.request.env.some((variable) => variable.value !== '')) {
-                return invalid('env', 'an Agent passes environment variable names only; the owner sets the values');
+                return invalid(
+                    'env',
+                    'an Agent passes environment variable names only; the owner sets the values',
+                );
             }
             return hold(
                 {
@@ -408,12 +473,15 @@ export function buildFleetMachineTools(args: {
             'List every image on one of the owner’s computers with tags, size, age and how many containers use it. Read-only. Needs `--manage`.',
         parameters: {
             type: 'object',
-            properties: { nodeId: { type: 'string', description: 'The computer (Fleet node id).' } },
+            properties: {
+                nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
+            },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             try {
                 return await args.service.listImages(a.nodeId, caller);
             } catch (error) {
@@ -432,28 +500,46 @@ export function buildFleetMachineTools(args: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 action: { type: 'string', description: 'pull, remove or prune.' },
                 ref: { type: 'string', description: 'For pull: the image reference (redis:7).' },
-                id: { type: 'string', description: 'For remove: the image id from fleet_docker_images_list.' },
+                id: {
+                    type: 'string',
+                    description: 'For remove: the image id from fleet_docker_images_list.',
+                },
             },
             required: ['nodeId', 'action'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             try {
                 if (a.action === 'pull') {
-                    if (!isFleetImageRef(a.ref)) return invalid('ref', 'that is not an image reference');
-                    return await args.service.pullImage(a.nodeId, caller, { ref: a.ref, fields: { confirm: true } });
+                    if (!isFleetImageRef(a.ref))
+                        return invalid('ref', 'that is not an image reference');
+                    return await args.service.pullImage(a.nodeId, caller, {
+                        ref: a.ref,
+                        fields: { confirm: true },
+                    });
                 }
                 if (a.action === 'remove') {
                     if (!isFleetDockerId(a.id)) return invalid('id', 'that is not an image id');
                     return hold(
-                        { verb: 'docker.image.remove', nodeId: a.nodeId, args: { id: a.id }, reason: 'destructive' },
+                        {
+                            verb: 'docker.image.remove',
+                            nodeId: a.nodeId,
+                            args: { id: a.id },
+                            reason: 'destructive',
+                        },
                         `Remove image ${a.id}`,
                     );
                 }
                 if (a.action === 'prune') {
                     return hold(
-                        { verb: 'docker.image.prune', nodeId: a.nodeId, args: {}, reason: 'destructive' },
+                        {
+                            verb: 'docker.image.prune',
+                            nodeId: a.nodeId,
+                            args: {},
+                            reason: 'destructive',
+                        },
                         'Remove every unused image',
                     );
                 }
@@ -472,12 +558,15 @@ export function buildFleetMachineTools(args: {
             'List the Compose projects on one of the owner’s computers with status, service count and config files (files missing → only Down). Read-only. Needs `--manage`.',
         parameters: {
             type: 'object',
-            properties: { nodeId: { type: 'string', description: 'The computer (Fleet node id).' } },
+            properties: {
+                nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
+            },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
             try {
                 return await args.service.listComposeProjects(a.nodeId, caller);
             } catch (error) {
@@ -494,14 +583,19 @@ export function buildFleetMachineTools(args: {
             type: 'object',
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
-                project: { type: 'string', description: 'The project name from fleet_docker_compose_list.' },
+                project: {
+                    type: 'string',
+                    description: 'The project name from fleet_docker_compose_list.',
+                },
             },
             required: ['nodeId', 'project'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetComposeProject(a.project)) return invalid('project', 'that is not a Compose project name');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetComposeProject(a.project))
+                return invalid('project', 'that is not a Compose project name');
             try {
                 return await args.service.describeComposeProject(a.nodeId, caller, a.project);
             } catch (error) {
@@ -526,9 +620,12 @@ export function buildFleetMachineTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetComposeProject(a.project)) return invalid('project', 'that is not a Compose project name');
-            if (!isFleetComposeAction(a.action)) return invalid('action', 'action must be up, down, restart or pull');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetComposeProject(a.project))
+                return invalid('project', 'that is not a Compose project name');
+            if (!isFleetComposeAction(a.action))
+                return invalid('action', 'action must be up, down, restart or pull');
             if (a.service !== undefined && !isFleetComposeService(a.service)) {
                 return invalid('service', 'that is not a Compose service name');
             }
@@ -536,7 +633,12 @@ export function buildFleetMachineTools(args: {
             try {
                 if (a.action === 'down') {
                     return hold(
-                        { verb: 'compose.action', nodeId: a.nodeId, args: { project: a.project, action: 'down' }, reason: 'destructive' },
+                        {
+                            verb: 'compose.action',
+                            nodeId: a.nodeId,
+                            args: { project: a.project, action: 'down' },
+                            reason: 'destructive',
+                        },
                         `Bring ${a.project} down`,
                     );
                 }

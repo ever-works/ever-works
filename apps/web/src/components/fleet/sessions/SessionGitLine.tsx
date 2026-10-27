@@ -6,7 +6,12 @@ import { cn } from '@/lib/utils/cn';
 import { GitLine } from '../checkouts/GitLine';
 import { relativeTime } from '../fleet-hub.shared';
 import { PrPill } from './PrPill';
-import { folderOf, gitLineAgeTone, sessionGitState, withoutPullRequest } from './session-git.shared';
+import {
+    folderOf,
+    gitLineAgeTone,
+    sessionGitState,
+    withoutPullRequest,
+} from './session-git.shared';
 
 /**
  * Session git & actions (FL-06, spec FR-6, §5.1) — the ONE git line every
@@ -39,7 +44,10 @@ export function SessionGitLine({
     const state = sessionGitState(git);
     if (!git || state === 'none') {
         return (
-            <span className={cn('text-xs text-text-muted dark:text-text-muted-dark', className)} data-testid="fleet-session-git-none">
+            <span
+                className={cn('text-xs text-text-muted dark:text-text-muted-dark', className)}
+                data-testid="fleet-session-git-none"
+            >
                 {t('noCheckout')}
             </span>
         );
@@ -57,8 +65,14 @@ export function SessionGitLine({
             data-testid="fleet-session-git-line"
             data-checkout-id={git.checkoutId}
         >
-            {git.repository ? <span className="font-medium text-text dark:text-text-dark">{git.repository}</span> : null}
-            <span title={line?.isWorktree ? t('worktreeOf', { folder: folderOf(git.path) }) : git.path}>
+            {git.repository ? (
+                <span className="font-medium text-text dark:text-text-dark">{git.repository}</span>
+            ) : null}
+            <span
+                title={
+                    line?.isWorktree ? t('worktreeOf', { folder: folderOf(git.path) }) : git.path
+                }
+            >
                 <GitLine line={withoutPullRequest(line)} branch={git.branch} />
             </span>
             {state === 'missing' ? (
@@ -73,7 +87,9 @@ export function SessionGitLine({
                 <span
                     className={cn(
                         'tabular-nums',
-                        tone === 'stale' ? 'text-amber-600 dark:text-amber-400' : 'text-text-muted dark:text-text-muted-dark',
+                        tone === 'stale'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-text-muted dark:text-text-muted-dark',
                     )}
                     data-testid="fleet-session-git-age"
                     data-tone={tone}

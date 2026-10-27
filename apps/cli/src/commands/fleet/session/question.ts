@@ -28,11 +28,17 @@ export const questionCommand = new Command('question')
         try {
             view = (await getHttpClient().get<FleetSessionView>(`/fleet/sessions/${id}`)).data;
         } catch (error) {
-            const body = (error as { response?: { data?: { error?: { hint?: string } } } }).response?.data;
-            console.error(chalk.red(`Refused: ${body?.error?.hint ?? (error instanceof Error ? error.message : 'error')}`));
+            const body = (error as { response?: { data?: { error?: { hint?: string } } } }).response
+                ?.data;
+            console.error(
+                chalk.red(
+                    `Refused: ${body?.error?.hint ?? (error instanceof Error ? error.message : 'error')}`,
+                ),
+            );
             process.exit(SESSION_CLI_EXIT.refused);
         }
-        const attention = view.attention && view.attention.reason !== 'finished' ? view.attention : null;
+        const attention =
+            view.attention && view.attention.reason !== 'finished' ? view.attention : null;
         if (options.json) {
             process.stdout.write(`${JSON.stringify({ state: view.state, attention }, null, 2)}\n`);
             process.exit(SESSION_CLI_EXIT.ok);
@@ -43,7 +49,9 @@ export const questionCommand = new Command('question')
         }
         console.log(chalk.yellow(`${attention.reason}: ${attention.prompt}`));
         for (const option of attention.options) {
-            console.log(`  ${option.id}  ${option.label}${option.primary ? chalk.gray(' (first)') : ''}`);
+            console.log(
+                `  ${option.id}  ${option.label}${option.primary ? chalk.gray(' (first)') : ''}`,
+            );
         }
         if (attention.allowsText) console.log(chalk.gray('  …or answer with --text "…"'));
         console.log(chalk.gray(`key: ${attention.key}`));

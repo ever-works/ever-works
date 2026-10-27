@@ -67,13 +67,16 @@ export function initialCheckoutChoice(
     task: Pick<FleetHandoffTask, 'repoUrl'> & { branch?: string | null },
 ): HandoffCheckoutChoice {
     if (!step) return task.repoUrl ? { mode: 'clone' } : { mode: 'none' };
-    const onTaskBranch = task.branch ? step.matching.find((row) => row.branch === task.branch) : undefined;
+    const onTaskBranch = task.branch
+        ? step.matching.find((row) => row.branch === task.branch)
+        : undefined;
     if (onTaskBranch) return { mode: 'existing', checkoutId: onTaskBranch.checkoutId };
     const firstMatching = step.matching[0];
     const firstOther = step.others[0];
     switch (step.defaultMode) {
         case 'worktree':
-            if (firstMatching) return { mode: 'worktree', parentCheckoutId: firstMatching.checkoutId };
+            if (firstMatching)
+                return { mode: 'worktree', parentCheckoutId: firstMatching.checkoutId };
             break;
         case 'existing': {
             const existing = firstMatching ?? firstOther;
@@ -157,7 +160,9 @@ export function handoffStartRequest(input: {
 
 /** The candidate the dialog judges computers for. */
 export function selectedAgent(options: FleetTaskHandoffOptions): FleetHandoffCandidateAgent | null {
-    return options.agents.find((agent) => agent.id === options.agentId) ?? options.agents[0] ?? null;
+    return (
+        options.agents.find((agent) => agent.id === options.agentId) ?? options.agents[0] ?? null
+    );
 }
 
 /** How long the dialog waits for the daemon before it says so (spec U9). */

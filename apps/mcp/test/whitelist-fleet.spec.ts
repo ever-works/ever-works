@@ -56,7 +56,9 @@ describe('MCP whitelist ↔ fleet tool catalogue (FL-19)', () => {
 
 	it('exposes every live catalogue act with a route (P2), unless withheld with a reason', () => {
 		const exposed = new Set(fleetEntries.map((entry) => entry.toolName));
-		const missing = FLEET_TOOL_CATALOGUE.filter((entry) => entry.status === 'live' && !entry.readOnly && entry.route)
+		const missing = FLEET_TOOL_CATALOGUE.filter(
+			(entry) => entry.status === 'live' && !entry.readOnly && entry.route
+		)
 			.filter((entry) => !(entry.name in WITHHELD))
 			.filter((entry) => !exposed.has(entry.name))
 			.map((entry) => entry.name);
@@ -86,7 +88,9 @@ describe('MCP whitelist ↔ fleet tool catalogue (FL-19)', () => {
 	});
 
 	it('never exposes enrolment, heartbeat, lease, attach-token or credential routes', () => {
-		expect(fleetEntries.filter((entry) => isFleetToolForbiddenPath(entry.path)).map((entry) => entry.path)).toEqual([]);
+		expect(fleetEntries.filter((entry) => isFleetToolForbiddenPath(entry.path)).map((entry) => entry.path)).toEqual(
+			[]
+		);
 	});
 
 	it('keeps the eight legacy fleet entries', () => {

@@ -58,7 +58,12 @@ export function OperationCard({
             setReconnecting(false);
             setOperation(result.data);
             const message = result.data.progress?.message;
-            if (message) setLines((previous) => (previous[previous.length - 1] === message ? previous : [...previous.slice(-7), message]));
+            if (message)
+                setLines((previous) =>
+                    previous[previous.length - 1] === message
+                        ? previous
+                        : [...previous.slice(-7), message],
+                );
             if (isFleetOperationTerminal(result.data.state)) {
                 doneRef.current?.(result.data);
                 return;
@@ -103,14 +108,21 @@ export function OperationCard({
                               : t('failed', { title, hint: operation?.error?.hint ?? '' })}
                 </span>
                 {state === 'running' && typeof percent === 'number' ? (
-                    <span className="tabular-nums text-text-muted dark:text-text-muted-dark">{percent}%</span>
+                    <span className="tabular-nums text-text-muted dark:text-text-muted-dark">
+                        {percent}%
+                    </span>
                 ) : null}
                 {reconnecting ? (
                     <span className="text-xs text-warning">{t('reconnecting')}</span>
                 ) : null}
                 <span className="ml-auto flex gap-1">
                     {state === 'running' ? (
-                        <Button type="button" size="sm" variant="secondary" onClick={() => void cancelFleetOperationAction(operationId)}>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => void cancelFleetOperationAction(operationId)}
+                        >
                             {t('stop')}
                         </Button>
                     ) : null}

@@ -1087,7 +1087,11 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             await classify('BUSL-1.1', 'amber');
             const controller = controllerWithLicences();
 
-            const answer = await controller.attestLicense({ userId: OWNER_ID, authMethod: 'session' } as never, WORK, {});
+            const answer = await controller.attestLicense(
+                { userId: OWNER_ID, authMethod: 'session' } as never,
+                WORK,
+                {},
+            );
 
             expect(answer.attestation).toMatchObject({
                 userId: OWNER_ID,
@@ -1105,7 +1109,11 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: EDITOR_ID, authMethod: 'session' } as never, WORK, {}),
+                controller.attestLicense(
+                    { userId: EDITOR_ID, authMethod: 'session' } as never,
+                    WORK,
+                    {},
+                ),
             ).rejects.toMatchObject({ response: { code: 'ownerOnly' } });
         });
 
@@ -1114,7 +1122,11 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: OWNER_ID, authMethod: 'session' } as never, WORK, {}),
+                controller.attestLicense(
+                    { userId: OWNER_ID, authMethod: 'session' } as never,
+                    WORK,
+                    {},
+                ),
             ).rejects.toMatchObject({ response: { code: 'attestationNotRequired' } });
         });
 
@@ -1123,10 +1135,14 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: OWNER_ID, authMethod: 'session' } as never, WORK, {
-                    spdx: 'MIT',
-                    class: 'green',
-                }),
+                controller.attestLicense(
+                    { userId: OWNER_ID, authMethod: 'session' } as never,
+                    WORK,
+                    {
+                        spdx: 'MIT',
+                        class: 'green',
+                    },
+                ),
             ).rejects.toMatchObject({ response: { code: 'licenseChanged' } });
         });
 
@@ -1136,7 +1152,11 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: OWNER_ID, authMethod: 'api-key' } as never, WORK, {}),
+                controller.attestLicense(
+                    { userId: OWNER_ID, authMethod: 'api-key' } as never,
+                    WORK,
+                    {},
+                ),
             ).rejects.toMatchObject({ status: 403 });
             await expect(
                 controller.attestLicense(
@@ -1179,7 +1199,11 @@ describe('WorkAppSpecController — the two App-spec routes (APW-03 T15)', () =>
             const controller = controllerWithLicences();
 
             await expect(
-                controller.attestLicense({ userId: STRANGER_ID, authMethod: 'session' } as never, WORK, {}),
+                controller.attestLicense(
+                    { userId: STRANGER_ID, authMethod: 'session' } as never,
+                    WORK,
+                    {},
+                ),
             ).rejects.toMatchObject({ status: 404 });
         });
     });

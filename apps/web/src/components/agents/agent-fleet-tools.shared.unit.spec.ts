@@ -26,7 +26,13 @@ function family(over: Partial<FleetToolsGateFamilyRow>): FleetToolsGateFamilyRow
 }
 
 function view(families: FleetToolsGateFamilyRow[]): FleetToolsGateView {
-    return { agentId: 'a1', agentName: 'Nina', killSwitch: false, families, generatedAt: '2026-10-21T00:00:00Z' };
+    return {
+        agentId: 'a1',
+        agentName: 'Nina',
+        killSwitch: false,
+        families,
+        generatedAt: '2026-10-21T00:00:00Z',
+    };
 }
 
 describe('agentFleetToolsRows', () => {
@@ -57,7 +63,14 @@ describe('agentFleetToolsRows', () => {
             view([
                 family({
                     computers: [
-                        { nodeId: 'n1', name: 'build-01', read: true, act: true, refusedBy: null, hint: null },
+                        {
+                            nodeId: 'n1',
+                            name: 'build-01',
+                            read: true,
+                            act: true,
+                            refusedBy: null,
+                            hint: null,
+                        },
                         {
                             nodeId: 'n2',
                             name: 'build-02',
@@ -70,14 +83,22 @@ describe('agentFleetToolsRows', () => {
                 }),
             ]),
         );
-        expect(row.computers.filter((computer) => !computer.allowed).map((computer) => computer.name)).toEqual(['build-02']);
+        expect(
+            row.computers.filter((computer) => !computer.allowed).map((computer) => computer.name),
+        ).toEqual(['build-02']);
         expect(row.computers[1].href).toContain('/fleet/computers/n2');
     });
 
     it('marks a family with only planned tools as coming soon and drops empty families', () => {
         const rows = agentFleetToolsRows(
             view([
-                family({ family: 'files', tools: [], planned: ['fleet_files_list'], act: null, read: false }),
+                family({
+                    family: 'files',
+                    tools: [],
+                    planned: ['fleet_files_list'],
+                    act: null,
+                    read: false,
+                }),
                 family({ family: 'usage', tools: [], planned: [], act: null }),
             ]),
         );

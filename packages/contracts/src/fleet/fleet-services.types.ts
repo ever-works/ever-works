@@ -161,11 +161,11 @@ export function compareFleetServices(
 }
 
 /** The Services tab's find field: name or description, case-insensitive (FR-2). */
-export function fleetServiceMatchesFind(service: Pick<FleetServiceView, 'name' | 'description'>, find: string): boolean {
+export function fleetServiceMatchesFind(
+	service: Pick<FleetServiceView, 'name' | 'description'>,
+	find: string
+): boolean {
 	const needle = find.trim().toLowerCase();
 	if (!needle) return true;
-	return (
-		service.name.toLowerCase().includes(needle) ||
-		(service.description ?? '').toLowerCase().includes(needle)
-	);
+	return service.name.toLowerCase().includes(needle) || (service.description ?? '').toLowerCase().includes(needle);
 }

@@ -65,7 +65,9 @@ export function NewNodeScheduleDialog({
     const [nodeId, setNodeId] = useState(initial?.nodeId || node.id);
     const [command, setCommand] = useState(initial?.command ?? prefill?.command ?? '');
     const [cwd, setCwd] = useState(initial?.cwd ?? prefill?.cwd ?? '');
-    const [draft, setDraft] = useState<CadenceDraft>(initial ? draftFromCadence(initial.cadence) : DEFAULT_CADENCE_DRAFT);
+    const [draft, setDraft] = useState<CadenceDraft>(
+        initial ? draftFromCadence(initial.cadence) : DEFAULT_CADENCE_DRAFT,
+    );
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [confirmation, setConfirmation] = useState<FleetScheduleConfirmationDetails | null>(null);
@@ -77,7 +79,8 @@ export function NewNodeScheduleDialog({
     const [provider, setProvider] = useState<string>(FLEET_AGENT_SESSION_PROVIDERS[0]);
     const [checkouts, setCheckouts] = useState<Array<{ id: string; label: string }>>([]);
     const [checkoutId, setCheckoutId] = useState('');
-    const [agentConfirmation, setAgentConfirmation] = useState<FleetAgentSessionScheduleConfirmation | null>(null);
+    const [agentConfirmation, setAgentConfirmation] =
+        useState<FleetAgentSessionScheduleConfirmation | null>(null);
     const tn = useTranslations('fleet.schedules');
 
     const target = nodes.find((candidate) => candidate.id === nodeId) ?? node;
@@ -101,7 +104,9 @@ export function NewNodeScheduleDialog({
                 setCheckouts(
                     result.data.data.map((checkout) => ({
                         id: checkout.id,
-                        label: checkout.repository ? `${checkout.repository} · ${checkout.path}` : checkout.path,
+                        label: checkout.repository
+                            ? `${checkout.repository} · ${checkout.path}`
+                            : checkout.path,
                     })),
                 );
             })
@@ -114,7 +119,9 @@ export function NewNodeScheduleDialog({
     const ready =
         name.trim().length > 0 &&
         built.cadence !== null &&
-        (kind === 'agent' ? Boolean(agentId) && prompt.trim().length >= 3 : command.trim().length > 0);
+        (kind === 'agent'
+            ? Boolean(agentId) && prompt.trim().length >= 3
+            : command.trim().length > 0);
 
     const saveAgentSession = async (confirm: boolean) => {
         if (!ready || !built.cadence) return;
@@ -135,8 +142,13 @@ export function NewNodeScheduleDialog({
             onClose();
             return;
         }
-        if (result.error.code === 'confirmation_required' && result.error.details.kind === 'agent-session') {
-            setAgentConfirmation(result.error.details as unknown as FleetAgentSessionScheduleConfirmation);
+        if (
+            result.error.code === 'confirmation_required' &&
+            result.error.details.kind === 'agent-session'
+        ) {
+            setAgentConfirmation(
+                result.error.details as unknown as FleetAgentSessionScheduleConfirmation,
+            );
             return;
         }
         setError(result.error.hint ?? t('failed'));
@@ -182,7 +194,10 @@ export function NewNodeScheduleDialog({
         setError(result.error.hint ?? t('failed'));
     };
 
-    const title = mode === 'edit' ? t('editTitle', { computer: target.name }) : t('title', { computer: target.name });
+    const title =
+        mode === 'edit'
+            ? t('editTitle', { computer: target.name })
+            : t('title', { computer: target.name });
 
     return (
         <div
@@ -195,7 +210,10 @@ export function NewNodeScheduleDialog({
             {agentConfirmation ? (
                 <div className="space-y-2" data-testid="fleet-schedule-agent-confirm">
                     <p className="font-medium">
-                        {t('confirm.create', { name: agentConfirmation.name, computer: agentConfirmation.nodeName })}
+                        {t('confirm.create', {
+                            name: agentConfirmation.name,
+                            computer: agentConfirmation.nodeName,
+                        })}
                     </p>
                     <p className="text-xs">
                         {agentConfirmation.agentName} · {agentConfirmation.cadenceHuman}
@@ -203,32 +221,63 @@ export function NewNodeScheduleDialog({
                     <p className="text-xs" data-testid="fleet-schedule-credential-note">
                         {tn('unattendedCredentialNote', { computer: agentConfirmation.nodeName })}
                     </p>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{tn('agentSessions.costNote')}</p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {tn('agentSessions.costNote')}
+                    </p>
                     <div className="flex justify-end gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => setAgentConfirmation(null)} disabled={busy}>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setAgentConfirmation(null)}
+                            disabled={busy}
+                        >
                             {t('back')}
                         </Button>
-                        <Button size="sm" onClick={() => void saveAgentSession(true)} disabled={busy}>
+                        <Button
+                            size="sm"
+                            onClick={() => void saveAgentSession(true)}
+                            disabled={busy}
+                        >
                             {t('createConfirmed')}
                         </Button>
                     </div>
                 </div>
             ) : confirmation ? (
                 <div className="space-y-2" data-testid="fleet-schedule-confirm">
-                    <p className="font-medium">{t(`confirm.${confirmation.action}`, { name: confirmation.name, computer: confirmation.nodeName })}</p>
+                    <p className="font-medium">
+                        {t(`confirm.${confirmation.action}`, {
+                            name: confirmation.name,
+                            computer: confirmation.nodeName,
+                        })}
+                    </p>
                     <pre className="whitespace-pre-wrap rounded bg-surface-secondary px-2 py-1 font-mono text-xs dark:bg-surface-secondary-dark">
                         {confirmation.command}
                     </pre>
                     <p className="text-xs">
-                        {t('confirmRunsAs', { shell: confirmation.shell, folder: confirmation.folder })}
+                        {t('confirmRunsAs', {
+                            shell: confirmation.shell,
+                            folder: confirmation.folder,
+                        })}
                     </p>
-                    <p className="text-xs">{t('confirmWhen', { cadence: confirmation.cadenceHuman })}</p>
+                    <p className="text-xs">
+                        {t('confirmWhen', { cadence: confirmation.cadenceHuman })}
+                    </p>
                     <p className="text-xs font-medium text-warning">⚠ {t('sandbox')}</p>
                     <div className="flex justify-end gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => setConfirmation(null)} disabled={busy}>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setConfirmation(null)}
+                            disabled={busy}
+                        >
                             {t('back')}
                         </Button>
-                        <Button size="sm" onClick={() => void save(true)} disabled={busy} data-testid="fleet-schedule-confirm-yes">
+                        <Button
+                            size="sm"
+                            onClick={() => void save(true)}
+                            disabled={busy}
+                            data-testid="fleet-schedule-confirm-yes"
+                        >
                             {mode === 'edit' ? t('saveConfirmed') : t('createConfirmed')}
                         </Button>
                     </div>
@@ -255,7 +304,11 @@ export function NewNodeScheduleDialog({
                             data-testid="fleet-schedule-computer"
                         >
                             {nodes.map((candidate) => (
-                                <option key={candidate.id} value={candidate.id} disabled={candidate.kind !== 'node'}>
+                                <option
+                                    key={candidate.id}
+                                    value={candidate.id}
+                                    disabled={candidate.kind !== 'node'}
+                                >
                                     {candidate.name}
                                     {candidate.kind !== 'node' ? ` — ${t('notThisKind')}` : ''}
                                 </option>
@@ -266,14 +319,27 @@ export function NewNodeScheduleDialog({
                         </span>
                     </label>
                     {mode === 'create' ? (
-                        <fieldset className="flex flex-wrap gap-4" data-testid="fleet-schedule-kind">
+                        <fieldset
+                            className="flex flex-wrap gap-4"
+                            data-testid="fleet-schedule-kind"
+                        >
                             <legend className="mb-1 text-xs">{t('runs')}</legend>
                             <label className="inline-flex items-center gap-1">
-                                <input type="radio" name="schedule-kind" checked={kind === 'command'} onChange={() => setKind('command')} />
+                                <input
+                                    type="radio"
+                                    name="schedule-kind"
+                                    checked={kind === 'command'}
+                                    onChange={() => setKind('command')}
+                                />
                                 {t('kindCommand')}
                             </label>
                             <label className="inline-flex items-center gap-1">
-                                <input type="radio" name="schedule-kind" checked={kind === 'agent'} onChange={() => setKind('agent')} />
+                                <input
+                                    type="radio"
+                                    name="schedule-kind"
+                                    checked={kind === 'agent'}
+                                    onChange={() => setKind('agent')}
+                                />
                                 {t('kindAgent')}
                             </label>
                         </fieldset>
@@ -289,9 +355,15 @@ export function NewNodeScheduleDialog({
                                     data-testid="fleet-schedule-agent"
                                 >
                                     {(agents ?? []).map((agent) => (
-                                        <option key={agent.agentId} value={agent.agentId} disabled={!agent.pinned}>
+                                        <option
+                                            key={agent.agentId}
+                                            value={agent.agentId}
+                                            disabled={!agent.pinned}
+                                        >
                                             {agent.name}
-                                            {agent.reason ? ` — ${t(`agentReasons.${agent.reason}`)}` : ''}
+                                            {agent.reason
+                                                ? ` — ${t(`agentReasons.${agent.reason}`)}`
+                                                : ''}
                                         </option>
                                     ))}
                                 </select>
@@ -375,7 +447,9 @@ export function NewNodeScheduleDialog({
                             <select
                                 className="rounded border border-border bg-transparent px-2 py-1 dark:border-border-dark"
                                 value={draft.form}
-                                onChange={(event) => patch({ form: event.target.value as CadenceDraft['form'] })}
+                                onChange={(event) =>
+                                    patch({ form: event.target.value as CadenceDraft['form'] })
+                                }
                                 data-testid="fleet-schedule-form"
                             >
                                 {FORMS.map((form) => (
@@ -392,13 +466,17 @@ export function NewNodeScheduleDialog({
                                         max={59}
                                         className="w-16 rounded border border-border bg-transparent px-2 py-1 dark:border-border-dark"
                                         value={draft.minutes}
-                                        onChange={(event) => patch({ minutes: Number(event.target.value) })}
+                                        onChange={(event) =>
+                                            patch({ minutes: Number(event.target.value) })
+                                        }
                                         data-testid="fleet-schedule-minutes"
                                     />
                                     {tc('minutes')}
                                 </label>
                             ) : null}
-                            {draft.form === 'daily' || draft.form === 'weekdays' || draft.form === 'days' ? (
+                            {draft.form === 'daily' ||
+                            draft.form === 'weekdays' ||
+                            draft.form === 'days' ? (
                                 <label className="inline-flex items-center gap-1">
                                     {tc('at')}
                                     <input
@@ -422,7 +500,11 @@ export function NewNodeScheduleDialog({
                             ) : null}
                         </div>
                         {draft.form === 'days' ? (
-                            <div className="flex flex-wrap gap-1" role="group" aria-label={tc('daysLabel')}>
+                            <div
+                                className="flex flex-wrap gap-1"
+                                role="group"
+                                aria-label={tc('daysLabel')}
+                            >
                                 {DAY_KEYS.map((key, day) => {
                                     const on = draft.days.includes(day);
                                     return (
@@ -433,7 +515,11 @@ export function NewNodeScheduleDialog({
                                             className={`rounded border px-2 py-0.5 text-xs ${on ? 'border-primary bg-primary/10' : 'border-border dark:border-border-dark'}`}
                                             onClick={() =>
                                                 patch({
-                                                    days: on ? draft.days.filter((entry) => entry !== day) : [...draft.days, day],
+                                                    days: on
+                                                        ? draft.days.filter(
+                                                              (entry) => entry !== day,
+                                                          )
+                                                        : [...draft.days, day],
                                                 })
                                             }
                                         >
@@ -448,22 +534,36 @@ export function NewNodeScheduleDialog({
                                 {built.error}
                             </p>
                         ) : (
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-schedule-preview">
+                            <p
+                                className="text-xs text-text-muted dark:text-text-muted-dark"
+                                data-testid="fleet-schedule-preview"
+                            >
                                 {t('next')}{' '}
                                 {preview
                                     .map((entry) =>
-                                        entry.viewer ? t('twoZones', { computer: entry.computer, viewer: entry.viewer }) : entry.computer,
+                                        entry.viewer
+                                            ? t('twoZones', {
+                                                  computer: entry.computer,
+                                                  viewer: entry.viewer,
+                                              })
+                                            : entry.computer,
                                     )
                                     .join(' · ')}
                             </p>
                         )}
                     </fieldset>
                     {kind === 'agent' ? (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">{tn('agentSessions.costNote')}</p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {tn('agentSessions.costNote')}
+                        </p>
                     ) : (
                         <>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('runsAs')}</p>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('noCredits')}</p>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('runsAs')}
+                            </p>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('noCredits')}
+                            </p>
                         </>
                     )}
                     <p className="text-xs font-medium text-warning">⚠ {t('sandbox')}</p>
@@ -478,7 +578,9 @@ export function NewNodeScheduleDialog({
                         </Button>
                         <Button
                             size="sm"
-                            onClick={() => void (kind === 'agent' ? saveAgentSession(false) : save(false))}
+                            onClick={() =>
+                                void (kind === 'agent' ? saveAgentSession(false) : save(false))
+                            }
                             disabled={!ready || busy}
                             data-testid="fleet-schedule-save"
                         >

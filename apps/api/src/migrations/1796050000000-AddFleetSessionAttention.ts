@@ -78,11 +78,15 @@ export class AddFleetSessionAttention1796050000000 implements MigrationInterface
         if (!table) return;
         for (const index of AddFleetSessionAttention1796050000000.INDEXES) {
             const existing = table.indices.find((entry) => entry.name === index.name);
-            if (existing) await queryRunner.dropIndex(AddFleetSessionAttention1796050000000.TABLE, existing);
+            if (existing)
+                await queryRunner.dropIndex(AddFleetSessionAttention1796050000000.TABLE, existing);
         }
         for (const column of [...AddFleetSessionAttention1796050000000.COLUMNS].reverse()) {
             if (table.findColumnByName(column.name)) {
-                await queryRunner.dropColumn(AddFleetSessionAttention1796050000000.TABLE, column.name);
+                await queryRunner.dropColumn(
+                    AddFleetSessionAttention1796050000000.TABLE,
+                    column.name,
+                );
             }
         }
     }

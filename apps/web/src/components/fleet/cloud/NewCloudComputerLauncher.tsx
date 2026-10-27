@@ -19,5 +19,7 @@ export function NewCloudComputerLauncher() {
         setOpen(false);
         router.replace(pathname);
     }, [router, pathname]);
-    return <NewCloudComputerDialog open={open} onClose={close} onCreated={() => router.refresh()} />;
+    return (
+        <NewCloudComputerDialog open={open} onClose={close} onCreated={() => router.refresh()} />
+    );
 }

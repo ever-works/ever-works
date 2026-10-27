@@ -83,7 +83,11 @@ export function ResizeVirtualDialog({
                         </span>
                         {FLEET_VIRTUAL_CPU_CHOICES.map((choice) => (
                             <label key={choice} className="inline-flex items-center gap-1">
-                                <input type="radio" checked={nextCpus === choice} onChange={() => setNextCpus(choice)} />
+                                <input
+                                    type="radio"
+                                    checked={nextCpus === choice}
+                                    onChange={() => setNextCpus(choice)}
+                                />
                                 {choice}
                             </label>
                         ))}
@@ -95,7 +99,11 @@ export function ResizeVirtualDialog({
                         </span>
                         {FLEET_VIRTUAL_MEMORY_GIB_CHOICES.map((choice) => (
                             <label key={choice} className="inline-flex items-center gap-1">
-                                <input type="radio" checked={nextMemory === choice} onChange={() => setNextMemory(choice)} />
+                                <input
+                                    type="radio"
+                                    checked={nextMemory === choice}
+                                    onChange={() => setNextMemory(choice)}
+                                />
                                 {choice} GB
                             </label>
                         ))}
@@ -105,7 +113,12 @@ export function ResizeVirtualDialog({
                     <Button type="button" variant="ghost" onClick={onClose}>
                         {t('cancel')}
                     </Button>
-                    <Button type="button" onClick={apply} disabled={pending || unchanged} data-testid="fleet-virtual-resize-apply">
+                    <Button
+                        type="button"
+                        onClick={apply}
+                        disabled={pending || unchanged}
+                        data-testid="fleet-virtual-resize-apply"
+                    >
                         {t('apply')}
                     </Button>
                 </DialogFooter>

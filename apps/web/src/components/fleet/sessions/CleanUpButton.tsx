@@ -30,13 +30,21 @@ export function CleanUpButton({
     const t = useTranslations('fleet.sessionGit.cleanUp');
     const tErrors = useTranslations('fleet.sessionGit.errorTitles');
     const [busy, setBusy] = useState(false);
-    const [confirm, setConfirm] = useState<{ destructive: boolean; name: string; summary: string | null } | null>(null);
+    const [confirm, setConfirm] = useState<{
+        destructive: boolean;
+        name: string;
+        summary: string | null;
+    } | null>(null);
     const [typed, setTyped] = useState('');
     const [done, setDone] = useState(false);
 
     const run = async (body: { confirm?: boolean; confirmName?: string }) => {
         setBusy(true);
-        const result = await deleteCheckoutAction(checkoutId, { mode: 'delete', ...body }, { cleanUp: true });
+        const result = await deleteCheckoutAction(
+            checkoutId,
+            { mode: 'delete', ...body },
+            { cleanUp: true },
+        );
         setBusy(false);
         if (result.success) {
             setConfirm(null);
@@ -54,12 +62,17 @@ export function CleanUpButton({
             });
             return;
         }
-        toast.error(`${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`);
+        toast.error(
+            `${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`,
+        );
     };
 
     if (done) {
         return (
-            <span className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-clean-up-done">
+            <span
+                className="text-xs text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-clean-up-done"
+            >
                 {t('done', { branch: branch ?? '—' })}
             </span>
         );
@@ -67,8 +80,13 @@ export function CleanUpButton({
     if (confirm) {
         const allowed = !confirm.destructive || typed.trim() === confirm.name;
         return (
-            <span className="inline-flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-clean-up-confirm">
-                <span>{confirm.summary ?? t('confirm', { branch: branch ?? '—', node: nodeName })}</span>
+            <span
+                className="inline-flex flex-wrap items-center gap-2 text-xs"
+                data-testid="fleet-clean-up-confirm"
+            >
+                <span>
+                    {confirm.summary ?? t('confirm', { branch: branch ?? '—', node: nodeName })}
+                </span>
                 {confirm.destructive ? (
                     <input
                         value={typed}
@@ -83,7 +101,9 @@ export function CleanUpButton({
                     variant="danger"
                     disabled={busy || !allowed}
                     onClick={() =>
-                        void run(confirm.destructive ? { confirmName: typed.trim() } : { confirm: true })
+                        void run(
+                            confirm.destructive ? { confirmName: typed.trim() } : { confirm: true },
+                        )
                     }
                     data-testid="fleet-clean-up-confirm-button"
                 >

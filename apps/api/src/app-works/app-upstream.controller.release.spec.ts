@@ -162,7 +162,9 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
             }),
         );
 
-        const refusal = await statusOf(h.controller.syncUpstream(user(EDITOR, 'session'), WORK_ID, {}));
+        const refusal = await statusOf(
+            h.controller.syncUpstream(user(EDITOR, 'session'), WORK_ID, {}),
+        );
 
         expect(refusal.status).toBe(409);
         expect(refusal.body).toMatchObject({
@@ -197,7 +199,9 @@ describe('AppUpstreamSyncDto (APW-02 T46)', () => {
     });
 
     it('refuses a non-boolean flag, a non-sha head, and any other field', async () => {
-        expect(await errorsOf({ confirmWorkflowChanges: 'yes' })).toEqual(['confirmWorkflowChanges']);
+        expect(await errorsOf({ confirmWorkflowChanges: 'yes' })).toEqual([
+            'confirmWorkflowChanges',
+        ]);
         expect(await errorsOf({ workflowHeadSha: 'main; rm -rf' })).toEqual(['workflowHeadSha']);
         expect(await errorsOf({ releasedByUserId: OWNER })).toEqual(['releasedByUserId']);
     });

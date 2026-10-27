@@ -57,7 +57,11 @@ export function SessionRowMenu({
     const restart = async () => {
         const result = await sessionsClient.restart(session.id);
         if (!result.ok) {
-            toast.error(result.error.hint ? t('actions.failed', { hint: result.error.hint }) : t('actions.failedGeneric'));
+            toast.error(
+                result.error.hint
+                    ? t('actions.failed', { hint: result.error.hint })
+                    : t('actions.failedGeneric'),
+            );
             return;
         }
         toast.success(t('actions.restarted'));
@@ -76,18 +80,26 @@ export function SessionRowMenu({
                     <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => router.push(ROUTES.DASHBOARD_FLEET_SESSION(session.id))}>
+                    <DropdownMenuItem
+                        onClick={() => router.push(ROUTES.DASHBOARD_FLEET_SESSION(session.id))}
+                    >
                         {t('actions.open')}
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setRenaming(true)}>{t('actions.rename')}</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => void copyLink()}>{t('actions.copyLink')}</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setRenaming(true)}>
+                        {t('actions.rename')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => void copyLink()}>
+                        {t('actions.copyLink')}
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     {live ? (
                         <DropdownMenuItem onClick={() => setEnding(true)} className="text-danger">
                             {t('actions.end')}
                         </DropdownMenuItem>
                     ) : (
-                        <DropdownMenuItem onClick={() => void restart()}>{t('actions.restart')}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void restart()}>
+                            {t('actions.restart')}
+                        </DropdownMenuItem>
                     )}
                 </DropdownMenuContent>
             </DropdownMenu>

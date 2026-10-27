@@ -78,10 +78,11 @@ describe('buildFleetHealthHistoryPoints', () => {
 	});
 
 	it('carries a roll-up peak through as the bucket peak', () => {
-		const { points } = buildFleetHealthHistoryPoints(
-			[{ at: FROM, cpuPercent: 20, cpuMax: 91 }],
-			{ from: FROM, to: FROM + 7 * 24 * HOUR, resolution: 'hourly' }
-		);
+		const { points } = buildFleetHealthHistoryPoints([{ at: FROM, cpuPercent: 20, cpuMax: 91 }], {
+			from: FROM,
+			to: FROM + 7 * 24 * HOUR,
+			resolution: 'hourly'
+		});
 		expect(points[0]).toMatchObject({ cpu: 20, cpuMax: 91 });
 	});
 

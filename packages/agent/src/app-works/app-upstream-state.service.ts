@@ -1277,7 +1277,8 @@ export class AppUpstreamStateService {
                     'No upstream workflow change is waiting for review on this App Work.',
                 );
             }
-            const reviewed = typeof options.workflowHeadSha === 'string' ? options.workflowHeadSha.trim() : '';
+            const reviewed =
+                typeof options.workflowHeadSha === 'string' ? options.workflowHeadSha.trim() : '';
             if (reviewed && reviewed.toLowerCase() !== hold.headSha.toLowerCase()) {
                 throw new AppUpstreamRefusalError(
                     'workflow_hold_changed',
@@ -1357,7 +1358,10 @@ export class AppUpstreamStateService {
         entry: AppUpstreamWorkerActivityEntry,
     ): Promise<boolean> {
         const action = typeof entry?.action === 'string' ? entry.action : '';
-        if (!isUuid(workId) || !(APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS as readonly string[]).includes(action)) {
+        if (
+            !isUuid(workId) ||
+            !(APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS as readonly string[]).includes(action)
+        ) {
             this.logger.warn(
                 `App upstream: refused a worker Activity entry (${action || 'no action'}) for work ${String(workId)}.`,
             );

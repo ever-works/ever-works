@@ -233,7 +233,8 @@ export async function discoverListeners(runner: CommandRunner, platform: string)
 			detail: `ss exited ${without.code ?? 'early'}: "${firstLine(without.stderr || withProcesses.stderr)}"`
 		};
 	} catch (error) {
-		const tool: FleetPortDiscoveryTool = platform === 'win32' ? 'powershell' : platform === 'darwin' ? 'lsof' : 'ss';
+		const tool: FleetPortDiscoveryTool =
+			platform === 'win32' ? 'powershell' : platform === 'darwin' ? 'lsof' : 'ss';
 		return { ok: false, reason: 'failed', tool, detail: error instanceof Error ? error.message : String(error) };
 	}
 }

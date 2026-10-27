@@ -6,7 +6,12 @@ import {
 	type FleetVirtualSystem,
 	type FleetVmCreatePayload
 } from '@ever-works/contracts';
-import { resolveVirtualImage, runnableImageRef, splitImageDigest, type VirtualImage } from '../link/modules/virtual/catalogue';
+import {
+	resolveVirtualImage,
+	runnableImageRef,
+	splitImageDigest,
+	type VirtualImage
+} from '../link/modules/virtual/catalogue';
 import {
 	containerBootstrapScript,
 	GUEST_ENROLLED_MARKER,
@@ -100,7 +105,12 @@ export async function pullPinnedImage(
 	await docker(deps, imagePullArgs(runnable), PULL_TIMEOUT_MS, 'could not pull the image');
 	if (image.digest) return { image, runnable };
 	// First use on this machine: record the digest the tag resolved to.
-	const stdout = await docker(deps, imageDigestArgs(image.ref), DOCKER_STEP_TIMEOUT_MS, 'could not read the image digest');
+	const stdout = await docker(
+		deps,
+		imageDigestArgs(image.ref),
+		DOCKER_STEP_TIMEOUT_MS,
+		'could not read the image digest'
+	);
 	const { digest } = splitImageDigest(stdout.trim());
 	if (!digest) return { image, runnable };
 	if (image.source === 'catalogue') {
@@ -112,8 +122,12 @@ export async function pullPinnedImage(
 
 /** Remove whatever a failed or cancelled build left: the container, its home volume, its folder. */
 export async function cleanUpChild(deps: VirtualHostDeps, childNodeId: string): Promise<void> {
-	await deps.runner.run('docker', containerControlArgs('remove', childNodeId), { timeoutMs: DOCKER_STEP_TIMEOUT_MS }).catch(() => undefined);
-	await deps.runner.run('docker', homeVolumeRemoveArgs(childNodeId), { timeoutMs: DOCKER_STEP_TIMEOUT_MS }).catch(() => undefined);
+	await deps.runner
+		.run('docker', containerControlArgs('remove', childNodeId), { timeoutMs: DOCKER_STEP_TIMEOUT_MS })
+		.catch(() => undefined);
+	await deps.runner
+		.run('docker', homeVolumeRemoveArgs(childNodeId), { timeoutMs: DOCKER_STEP_TIMEOUT_MS })
+		.catch(() => undefined);
 	await deps.state.removeChild(childNodeId).catch(() => undefined);
 }
 
@@ -126,10 +140,13 @@ export function createVmCreateExecutor(deps: VirtualHostDeps) {
 			return buildWindowsVm(deps, job, payload, system, signal, deps.nodeName ?? 'this computer');
 		}
 		const apiUrl = payload.apiUrl ?? deps.apiUrl;
-		const runtimeSpec = deps.env.EVER_WORKS_NODE_VIRTUAL_RUNTIME_SPEC?.trim() || `ever-works-node@${deps.nodeVersion}`;
+		const runtimeSpec =
+			deps.env.EVER_WORKS_NODE_VIRTUAL_RUNTIME_SPEC?.trim() || `ever-works-node@${deps.nodeVersion}`;
 		try {
 			// A leftover from an earlier attempt of the same create is removed first.
-			await deps.runner.run('docker', containerControlArgs('remove', child), { timeoutMs: DOCKER_STEP_TIMEOUT_MS });
+			await deps.runner.run('docker', containerControlArgs('remove', child), {
+				timeoutMs: DOCKER_STEP_TIMEOUT_MS
+			});
 
 			await report(deps, job, child, { phase: 'pulling-image', state: 'creating', error: null });
 			const { image, runnable } = await pullPinnedImage(deps, system);
@@ -171,15 +188,31 @@ export function createVmCreateExecutor(deps: VirtualHostDeps) {
 				deps,
 				async () => {
 					if (await guestHasFile(deps, child, GUEST_READY_MARKER)) return true;
-					const status = (await docker(deps, containerControlArgs('inspect', child), 15_000, 'could not read the container')).trim();
+					const status = (
+						await docker(
+							deps,
+							containerControlArgs('inspect', child),
+							15_000,
+							'could not read the container'
+						)
+					).trim();
 					if (status === 'exited' || status === 'dead') {
-						const logs = await deps.runner.run('docker', containerControlArgs('logs', child), { timeoutMs: 15_000 });
+						const logs = await deps.runner.run('docker', containerControlArgs('logs', child), {
+							timeoutMs: 15_000
+						});
 						const last = (logs.stderr || logs.stdout).trim().split(/\r?\n/).pop() ?? '';
-						throw new VirtualHostError(`the container stopped while installing the runtime${last ? `: ${last.slice(0, 200)}` : ''}`);
+						throw new VirtualHostError(
+							`the container stopped while installing the runtime${last ? `: ${last.slice(0, 200)}` : ''}`
+						);
 					}
 					return false;
 				},
-				{ timeoutMs: RUNTIME_INSTALL_TIMEOUT_MS, everyMs: GUEST_POLL_MS, signal, what: 'installing the node runtime' }
+				{
+					timeoutMs: RUNTIME_INSTALL_TIMEOUT_MS,
+					everyMs: GUEST_POLL_MS,
+					signal,
+					what: 'installing the node runtime'
+				}
 			);
 
 			await handOverToken(deps, job, child, GUEST_ENROLLED_MARKER, signal);

@@ -31,7 +31,8 @@ export function keysForAnswer(input: {
 }): TypistResult {
 	const { attention, answer } = input;
 	if (answer.text !== undefined) {
-		if (!attention.allowsText && !input.ruleKeys) return { ok: false, hint: 'this prompt takes one of its options' };
+		if (!attention.allowsText && !input.ruleKeys)
+			return { ok: false, hint: 'this prompt takes one of its options' };
 		const flat = answer.text.replace(/\r?\n/g, ' ');
 		if (UNSAFE_TEXT.test(flat)) return { ok: false, hint: 'an answer cannot carry control characters' };
 		if (input.ruleKeys) return { ok: true, keys: `${flat}\r` };

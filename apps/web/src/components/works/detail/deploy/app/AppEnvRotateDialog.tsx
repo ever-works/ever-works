@@ -42,7 +42,12 @@ type RotateRefusalLeaf = (typeof ROTATE_REFUSALS)[keyof typeof ROTATE_REFUSALS];
  * types the name to confirm — the API checks it again (`rotateConfirmationMismatch`). Nothing about
  * the value is ever shown: not the old one, not the new one.
  */
-export function AppEnvRotateDialog({ workId, entry, onOpenChange, onRotated }: AppEnvRotateDialogProps) {
+export function AppEnvRotateDialog({
+    workId,
+    entry,
+    onOpenChange,
+    onRotated,
+}: AppEnvRotateDialogProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.environment.rotate');
     const inputId = useId();
     const [typed, setTyped] = useState('');
@@ -70,7 +75,11 @@ export function AppEnvRotateDialog({ workId, entry, onOpenChange, onRotated }: A
             const leaf = result.code
                 ? (ROTATE_REFUSALS as Readonly<Record<string, RotateRefusalLeaf>>)[result.code]
                 : undefined;
-            setMessage(leaf ? t(`refusals.${leaf}`) : t('failed', { reason: result.error ?? result.code ?? '' }));
+            setMessage(
+                leaf
+                    ? t(`refusals.${leaf}`)
+                    : t('failed', { reason: result.error ?? result.code ?? '' }),
+            );
         } finally {
             inFlight.current = false;
             setPending(false);
@@ -92,7 +101,9 @@ export function AppEnvRotateDialog({ workId, entry, onOpenChange, onRotated }: A
                         {t('warning')}
                     </p>
                     <label htmlFor={inputId} className="block space-y-1 text-sm">
-                        <span className="block text-xs text-text-secondary">{t('typeToConfirm', { name: entry.name })}</span>
+                        <span className="block text-xs text-text-secondary">
+                            {t('typeToConfirm', { name: entry.name })}
+                        </span>
                         <Input
                             id={inputId}
                             value={typed}
@@ -103,7 +114,11 @@ export function AppEnvRotateDialog({ workId, entry, onOpenChange, onRotated }: A
                         />
                     </label>
                     {message && (
-                        <p className="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="app-env-rotate-error">
+                        <p
+                            className="text-sm text-red-600 dark:text-red-400"
+                            role="alert"
+                            data-testid="app-env-rotate-error"
+                        >
                             {message}
                         </p>
                     )}

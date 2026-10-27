@@ -42,14 +42,21 @@ export function SessionFooter({
 }) {
     const t = useTranslations('fleet.sessions');
     const sentence = roleSentence(presence, { userId: viewerUserId ?? '', role });
-    const others = (presence?.attached ?? []).filter((entry) => entry.userId !== viewerUserId).length;
+    const others = (presence?.attached ?? []).filter(
+        (entry) => entry.userId !== viewerUserId,
+    ).length;
 
     return (
         <footer
             className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-md border border-border dark:border-border-dark px-3 py-2 text-xs text-text-muted dark:text-text-muted-dark"
             data-testid="fleet-session-footer"
         >
-            <span role="status" aria-live="polite" className="font-medium text-text dark:text-text-dark" data-testid="fleet-session-role">
+            <span
+                role="status"
+                aria-live="polite"
+                className="font-medium text-text dark:text-text-dark"
+                data-testid="fleet-session-role"
+            >
                 {sentence.key === 'driving'
                     ? t('detail.driving')
                     : sentence.key === 'watchingDriven'
@@ -58,9 +65,17 @@ export function SessionFooter({
                         ? `${t('detail.watching')} · ${t('detail.nobodyDriving')}`
                         : t('detail.nobodyDriving')}
             </span>
-            <span data-testid="fleet-session-watchers">{t('detail.watchers', { count: others })}</span>
-            {size && <span className="tabular-nums">{t('detail.size', { cols: size.cols, rows: size.rows })}</span>}
-            {isolatedAgentName && <span>{t('detail.isolated', { agent: isolatedAgentName, node: nodeName })}</span>}
+            <span data-testid="fleet-session-watchers">
+                {t('detail.watchers', { count: others })}
+            </span>
+            {size && (
+                <span className="tabular-nums">
+                    {t('detail.size', { cols: size.cols, rows: size.rows })}
+                </span>
+            )}
+            {isolatedAgentName && (
+                <span>{t('detail.isolated', { agent: isolatedAgentName, node: nodeName })}</span>
+            )}
             {recordingSlot ?? (recordingState === 'recording' ? <span>●</span> : null)}
             <span className="ml-auto tabular-nums" data-testid="fleet-session-bandwidth">
                 {t('detail.bandwidth', { rate: formatBytes(bytesPerSecond) })}

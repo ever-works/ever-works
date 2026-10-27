@@ -15,7 +15,11 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { fleetMachineError, FleetVirtualService, type FleetVirtualChildrenView } from '@ever-works/agent/fleet';
+import {
+    fleetMachineError,
+    FleetVirtualService,
+    type FleetVirtualChildrenView,
+} from '@ever-works/agent/fleet';
 import type {
     FleetVirtualCreateResponse,
     FleetVirtualOperationResponse,
@@ -23,7 +27,10 @@ import type {
     FleetVirtualPasswordRevealResponse,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
-import { refuseMachinePrincipalAction, type MachinePrincipalRequest } from '../../auth/machine-principal';
+import {
+    refuseMachinePrincipalAction,
+    type MachinePrincipalRequest,
+} from '../../auth/machine-principal';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
@@ -37,13 +44,16 @@ import {
 } from './dto/fleet-virtual.dto';
 import { FleetVirtualEnabledGuard } from './fleet-virtual-enabled.guard';
 
-const REFUSAL_WHY = 'an Agent creates and changes virtual computers through its tools, where each act waits for its owner.';
+const REFUSAL_WHY =
+    'an Agent creates and changes virtual computers through its tools, where each act waits for its owner.';
 
 /** `:id` is a host's uuid, or `auto` on create / options ("Choose for me"). */
 function hostParam(id: string): string {
     if (id === 'auto') return id;
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
-        throw fleetMachineError('invalid', 'the computer id must be a uuid or auto', { field: 'id' });
+        throw fleetMachineError('invalid', 'the computer id must be a uuid or auto', {
+            field: 'id',
+        });
     }
     return id;
 }
@@ -73,11 +83,14 @@ export class FleetVirtualController {
 
     @Get('virtual')
     @ApiOperation({
-        summary: 'Every virtual computer the caller may see, grouped by the computer that hosts it.',
+        summary:
+            'Every virtual computer the caller may see, grouped by the computer that hosts it.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
-    async all(@CurrentUser() auth: AuthenticatedUser): Promise<{ hosts: FleetVirtualChildrenView[] }> {
+    async all(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<{ hosts: FleetVirtualChildrenView[] }> {
         return { hosts: await this.virtual.listAllChildren({ kind: 'user', userId: auth.userId }) };
     }
 
@@ -150,7 +163,13 @@ export class FleetVirtualController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetVirtualOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'start or stop a virtual computer', REFUSAL_WHY);
-        return this.virtual.power({ kind: 'user', userId: auth.userId }, id, childId, body.action, virtualConfirmFields(body));
+        return this.virtual.power(
+            { kind: 'user', userId: auth.userId },
+            id,
+            childId,
+            body.action,
+            virtualConfirmFields(body),
+        );
     }
 
     @Post('nodes/:id/virtual/:childId/destroy')
@@ -168,7 +187,12 @@ export class FleetVirtualController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetVirtualOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'destroy a virtual computer', REFUSAL_WHY);
-        return this.virtual.destroy({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+        return this.virtual.destroy(
+            { kind: 'user', userId: auth.userId },
+            id,
+            childId,
+            virtualConfirmFields(body),
+        );
     }
 
     @Patch('nodes/:id/virtual/:childId')
@@ -208,7 +232,12 @@ export class FleetVirtualController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetVirtualOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'rebuild a virtual computer', REFUSAL_WHY);
-        return this.virtual.rebuild({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+        return this.virtual.rebuild(
+            { kind: 'user', userId: auth.userId },
+            id,
+            childId,
+            virtualConfirmFields(body),
+        );
     }
 
     @Post('nodes/:id/virtual/:childId/password/reveal')
@@ -226,8 +255,18 @@ export class FleetVirtualController {
         @Body() body: FleetVirtualRevealDto,
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetVirtualPasswordRevealResponse> {
-        refuseMachinePrincipalAction(auth, req, 'reveal a virtual computer’s password', REFUSAL_WHY);
-        return this.virtual.revealPassword({ kind: 'user', userId: auth.userId }, id, childId, virtualConfirmFields(body));
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'reveal a virtual computer’s password',
+            REFUSAL_WHY,
+        );
+        return this.virtual.revealPassword(
+            { kind: 'user', userId: auth.userId },
+            id,
+            childId,
+            virtualConfirmFields(body),
+        );
     }
 
     @Post('nodes/:id/virtual/:childId/retry-enrollment')
@@ -243,7 +282,12 @@ export class FleetVirtualController {
         @Param('childId', ParseUUIDPipe) childId: string,
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetVirtualOperationResponse> {
-        refuseMachinePrincipalAction(auth, req, 'retry a virtual computer’s enrolment', REFUSAL_WHY);
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'retry a virtual computer’s enrolment',
+            REFUSAL_WHY,
+        );
         return this.virtual.retryEnrollment({ kind: 'user', userId: auth.userId }, id, childId);
     }
 }

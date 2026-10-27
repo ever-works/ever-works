@@ -9,7 +9,10 @@ import {
     FleetSessionService,
     FleetSessionsModule,
 } from '@ever-works/agent/fleet';
-import { FLEET_SESSION_ANSWER_ROUTER, type FleetSessionAnswerRouter } from '@ever-works/agent/inbox';
+import {
+    FLEET_SESSION_ANSWER_ROUTER,
+    type FleetSessionAnswerRouter,
+} from '@ever-works/agent/inbox';
 import { TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { FleetSessionRecorderService } from './fleet-session-recorder.service';
 import { FleetSessionRecordingService } from './fleet-session-recording.service';

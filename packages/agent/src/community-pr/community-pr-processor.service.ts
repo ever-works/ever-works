@@ -320,7 +320,9 @@ export class CommunityPrProcessorService {
             // APW-01 T10 (lane aw-safety) — pull requests on an App Work's repository are code
             // changes (the evolve loop's), never community submissions to triage and close.
             if (isAppWork(work)) {
-                this.logger.debug(`Skipping community PR processing for App Work ${work.id} (kind app)`);
+                this.logger.debug(
+                    `Skipping community PR processing for App Work ${work.id} (kind app)`,
+                );
                 continue;
             }
             try {

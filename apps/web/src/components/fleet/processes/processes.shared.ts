@@ -1,4 +1,8 @@
-import { fleetProcessMatchesFind, type FleetGpuView, type FleetProcessView } from '@ever-works/contracts';
+import {
+    fleetProcessMatchesFind,
+    type FleetGpuView,
+    type FleetProcessView,
+} from '@ever-works/contracts';
 import { formatBytes } from '../machine/machine-actions.shared';
 
 /**
@@ -9,7 +13,10 @@ import { formatBytes } from '../machine/machine-actions.shared';
 /** After Stop, the row offers Kill once this long has passed with the process still there (spec S8). */
 export const STILL_RUNNING_AFTER_MS = 5_000;
 
-export function visibleProcesses(processes: readonly FleetProcessView[], find: string): FleetProcessView[] {
+export function visibleProcesses(
+    processes: readonly FleetProcessView[],
+    find: string,
+): FleetProcessView[] {
     return processes.filter((process) => fleetProcessMatchesFind(process, find));
 }
 
@@ -38,10 +45,19 @@ export function gpuParts(gpu: FleetGpuView): {
             : total !== null
               ? formatBytes(total)
               : null;
-    return { model, utilization: gpu.utilizationPercent, memory, shared: gpu.sharedMemory === true };
+    return {
+        model,
+        utilization: gpu.utilizationPercent,
+        memory,
+        shared: gpu.sharedMemory === true,
+    };
 }
 
 /** Whether a Stop sent at `stoppedAt` should now offer Kill, given the process is still listed. */
-export function shouldOfferKill(stoppedAt: number | undefined, stillListed: boolean, now: number = Date.now()): boolean {
+export function shouldOfferKill(
+    stoppedAt: number | undefined,
+    stillListed: boolean,
+    now: number = Date.now(),
+): boolean {
     return stoppedAt !== undefined && stillListed && now - stoppedAt >= STILL_RUNNING_AFTER_MS;
 }

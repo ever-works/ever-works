@@ -107,7 +107,11 @@ export function SessionTerminal({
             data-testid="fleet-session-terminal"
         >
             {/* The renderer owns this node's children — React never renders inside it. */}
-            <div ref={hostRef} className="absolute inset-0" data-testid="fleet-session-terminal-host" />
+            <div
+                ref={hostRef}
+                className="absolute inset-0"
+                data-testid="fleet-session-terminal-host"
+            />
         </section>
     );
 }

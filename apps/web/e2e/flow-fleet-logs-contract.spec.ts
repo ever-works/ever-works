@@ -50,15 +50,20 @@ test.describe('Fleet logs — API contract (FL-08)', () => {
             data: { source: 'system:journal', follow: true },
         });
         expect([400, 404]).toContain(follow.status());
-        const tooMany = await request.post(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/logs/read`, {
-            headers,
-            data: { source: 'system:journal', lines: 501 },
-        });
+        const tooMany = await request.post(
+            `${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/logs/read`,
+            {
+                headers,
+                data: { source: 'system:journal', lines: 501 },
+            },
+        );
         expect([400, 404]).toContain(tooMany.status());
     });
 
     test('the routes need a signed-in person', async ({ request }) => {
-        const response = await request.get(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/logs/sources`);
+        const response = await request.get(
+            `${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/logs/sources`,
+        );
         expect([401, 404]).toContain(response.status());
     });
 });

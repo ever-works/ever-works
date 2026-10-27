@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Folder, Laptop } from 'lucide-react';
-import { isFleetSessionLive, type FleetCheckoutView, type FleetSessionView } from '@ever-works/contracts';
+import {
+    isFleetSessionLive,
+    type FleetCheckoutView,
+    type FleetSessionView,
+} from '@ever-works/contracts';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task } from '@/lib/api/tasks';
@@ -58,7 +62,12 @@ export function TaskFleetBlock({
         const lastSeenAgo = nodeLastSeenAt ? taskComputerAgo(nodeLastSeenAt, now) : null;
         return (
             <div className="space-y-2 text-sm">
-                <div className={cn('flex flex-wrap items-center gap-x-2 gap-y-1', !nodeOnline && 'opacity-70')}>
+                <div
+                    className={cn(
+                        'flex flex-wrap items-center gap-x-2 gap-y-1',
+                        !nodeOnline && 'opacity-70',
+                    )}
+                >
                     <Link
                         href={ROUTES.DASHBOARD_FLEET_COMPUTER(current.nodeId)}
                         className="font-medium text-text dark:text-text-dark hover:underline"
@@ -67,7 +76,10 @@ export function TaskFleetBlock({
                     </Link>
                     <span className="text-text-muted">·</span>
                     {current.agentId ? (
-                        <Link href={ROUTES.DASHBOARD_AGENT(current.agentId)} className="hover:underline">
+                        <Link
+                            href={ROUTES.DASHBOARD_AGENT(current.agentId)}
+                            className="hover:underline"
+                        >
                             {agent}
                         </Link>
                     ) : (
@@ -75,13 +87,21 @@ export function TaskFleetBlock({
                     )}
                     <span className="text-text-muted">·</span>
                     {live ? (
-                        <span className="inline-flex items-center gap-1.5" data-testid="task-fleet-state">
+                        <span
+                            className="inline-flex items-center gap-1.5"
+                            data-testid="task-fleet-state"
+                        >
                             <span
-                                className={cn('h-2 w-2 rounded-full', FLEET_TONE_DOT_CLASS[glyph.tone])}
+                                className={cn(
+                                    'h-2 w-2 rounded-full',
+                                    FLEET_TONE_DOT_CLASS[glyph.tone],
+                                )}
                                 aria-hidden="true"
                             />
                             {tStates(glyph.key)}
-                            {elapsed && <span className="tabular-nums text-text-muted">{elapsed}</span>}
+                            {elapsed && (
+                                <span className="tabular-nums text-text-muted">{elapsed}</span>
+                            )}
                         </span>
                     ) : (
                         <span className="text-text-muted" data-testid="task-fleet-state">
@@ -110,7 +130,9 @@ export function TaskFleetBlock({
                 </div>
                 {!nodeOnline && (
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {lastSeenAgo ? t('offlineAgo', { node, ago: lastSeenAgo }) : t('offline', { node })}
+                        {lastSeenAgo
+                            ? t('offlineAgo', { node, ago: lastSeenAgo })
+                            : t('offline', { node })}
                     </p>
                 )}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted dark:text-text-muted-dark">

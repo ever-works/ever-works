@@ -31,7 +31,15 @@ import {
  * green check; interrupted / cancelled — muted dot; no result — dashed ring;
  * idle — grey dot; a shell — none (its state is still named in words, FR-53).
  */
-export type SessionGlyph = 'spinner' | 'question' | 'redDot' | 'check' | 'mutedDot' | 'dashedRing' | 'greyDot' | 'none';
+export type SessionGlyph =
+    | 'spinner'
+    | 'question'
+    | 'redDot'
+    | 'check'
+    | 'mutedDot'
+    | 'dashedRing'
+    | 'greyDot'
+    | 'none';
 
 type StatusFields = Pick<FleetSessionView, 'state' | 'outcome' | 'provider'> & {
     attention?: FleetSessionAttention | null;
@@ -55,7 +63,8 @@ export function sessionGlyph(session: StatusFields): SessionGlyph {
             return reason === 'blocked' || reason === 'failed' ? 'redDot' : 'question';
         }
         case 'done':
-            if (session.outcome === 'interrupted' || session.outcome === 'cancelled') return 'mutedDot';
+            if (session.outcome === 'interrupted' || session.outcome === 'cancelled')
+                return 'mutedDot';
             if (session.outcome === 'failure') return 'redDot';
             if (session.outcome === 'unconfirmed') return 'dashedRing';
             return 'check';
@@ -171,14 +180,25 @@ export function sessionCardBody(
     if (session.state === 'needs_you' && attention && attention.reason !== 'finished') {
         return { kind: 'attention', attention };
     }
-    if (session.outcome === 'failure' && typeof session.exitCode === 'number' && session.exitCode !== 0) {
+    if (
+        session.outcome === 'failure' &&
+        typeof session.exitCode === 'number' &&
+        session.exitCode !== 0
+    ) {
         return { kind: 'exited', code: session.exitCode };
     }
-    if (session.outcome === 'unconfirmed' && (session.state === 'ended' || session.state === 'done')) {
+    if (
+        session.outcome === 'unconfirmed' &&
+        (session.state === 'ended' || session.state === 'done')
+    ) {
         return { kind: 'unconfirmed' };
     }
     const detail = session.lastEvidence?.detail;
-    return { kind: 'lines', userLine: detail?.userLine ?? null, agentLine: detail?.agentLine ?? null };
+    return {
+        kind: 'lines',
+        userLine: detail?.userLine ?? null,
+        agentLine: detail?.agentLine ?? null,
+    };
 }
 
 /** True when the attention is a Decision (a person answers it on the card or in My Decisions). */
@@ -210,7 +230,10 @@ export function sessionElapsedSlot(
         attention?: FleetSessionAttention | null;
     },
     now: Date,
-): { key: 'waiting' | 'doneAgo' | 'workingFor' | 'idleFor' | 'endedAgo' | 'startingFor'; span: string } | null {
+): {
+    key: 'waiting' | 'doneAgo' | 'workingFor' | 'idleFor' | 'endedAgo' | 'startingFor';
+    span: string;
+} | null {
     const since =
         session.state === 'ended'
             ? (session.endedAt ?? session.updatedAt)
@@ -250,7 +273,10 @@ export function statusSourceNote(
     },
     options: { detail?: boolean } = {},
 ): 'hooks' | 'partial' | 'codex' | 'screen' | 'shell' | 'fromScreen' | null {
-    const source: FleetSessionStatusSource = fleetSessionStatusSource(session.provider, session.hooks ?? null);
+    const source: FleetSessionStatusSource = fleetSessionStatusSource(
+        session.provider,
+        session.hooks ?? null,
+    );
     if (source === 'shell') return options.detail ? 'shell' : null;
     if (!options.detail) {
         if (session.lastEvidence?.source === 'rules') return 'fromScreen';

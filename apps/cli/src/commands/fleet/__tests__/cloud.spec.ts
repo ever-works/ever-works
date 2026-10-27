@@ -74,11 +74,24 @@ describe('fleet cloud (FL-17 P3)', () => {
     afterEach(() => vi.restoreAllMocks());
 
     it('refuses create without --acknowledge-price, exit 2, before any call', async () => {
-        const code = await run(['create', 'nyc-ops', '--provider', 'machines-plugin', '--region', 'nyc3', '--size', 's-2', '--json']);
+        const code = await run([
+            'create',
+            'nyc-ops',
+            '--provider',
+            'machines-plugin',
+            '--region',
+            'nyc3',
+            '--size',
+            's-2',
+            '--json',
+        ]);
         expect(code).toBe(2);
         expect(http.post).not.toHaveBeenCalled();
         const envelope = JSON.parse(stdout[0]);
-        expect(envelope).toMatchObject({ ok: false, error: { code: 'invalid', details: { field: 'acknowledgedPriceCents' } } });
+        expect(envelope).toMatchObject({
+            ok: false,
+            error: { code: 'invalid', details: { field: 'acknowledgedPriceCents' } },
+        });
     });
 
     it('creates with the acknowledged price and --yes, printing the API DTO with --json', async () => {
@@ -109,7 +122,10 @@ describe('fleet cloud (FL-17 P3)', () => {
             software: ['docker', 'codex'],
             confirm: true,
         });
-        expect(JSON.parse(stdout[0])).toEqual({ ok: true, data: { nodeId: NODE, operationId: NODE } });
+        expect(JSON.parse(stdout[0])).toEqual({
+            ok: true,
+            data: { nodeId: NODE, operationId: NODE },
+        });
     });
 
     it('exits 2 with the price sentence when the confirmation is missing (no terminal)', async () => {
@@ -120,7 +136,10 @@ describe('fleet cloud (FL-17 P3)', () => {
                     error: {
                         code: 'confirmation_required',
                         hint: 'send confirm: true to confirm',
-                        details: { class: 'confirm', summary: 'About $24/month ($0.036/hour), billed by Provider …' },
+                        details: {
+                            class: 'confirm',
+                            summary: 'About $24/month ($0.036/hour), billed by Provider …',
+                        },
                     },
                 },
             },
@@ -144,7 +163,10 @@ describe('fleet cloud (FL-17 P3)', () => {
     it('sets the idle policy through the catalogue route, and checks the hours first', async () => {
         http.patch.mockResolvedValueOnce({ data: { id: NODE, name: 'nyc-ops' } });
         expect(await run(['idle-policy', NODE, 'power-off', '--after', '2', '--json'])).toBe(0);
-        expect(http.patch).toHaveBeenCalledWith(`/fleet/cloud/${NODE}/idle-policy`, { mode: 'power-off', afterHours: 2 });
+        expect(http.patch).toHaveBeenCalledWith(`/fleet/cloud/${NODE}/idle-policy`, {
+            mode: 'power-off',
+            afterHours: 2,
+        });
 
         stdout = [];
         expect(await run(['idle-policy', NODE, 'power-off', '--after', '99', '--json'])).toBe(2);
@@ -175,7 +197,9 @@ describe('fleet cloud (FL-17 P3)', () => {
     it('destroys with the typed name, and powers with on / off only', async () => {
         http.post.mockResolvedValueOnce({ data: { operationId: NODE, costSoFarCents: 284 } });
         expect(await run(['destroy', NODE, '--confirm-name', 'nyc-ops', '--json'])).toBe(0);
-        expect(http.post).toHaveBeenCalledWith(`/fleet/cloud/${NODE}/destroy`, { confirmName: 'nyc-ops' });
+        expect(http.post).toHaveBeenCalledWith(`/fleet/cloud/${NODE}/destroy`, {
+            confirmName: 'nyc-ops',
+        });
         expect(await run(['power', NODE, 'reboot', '--json'])).toBe(2);
     });
 

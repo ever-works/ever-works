@@ -97,7 +97,10 @@ export class FleetLinkController {
     ): FleetOperationView[] {
         if (!config.fleet.isNodeLinkEnabled()) return [];
         if (state !== undefined && !(FLEET_OPERATION_STATES as readonly string[]).includes(state)) {
-            throw fleetLinkError('invalid', 'state is running, done, failed, cancelled or interrupted');
+            throw fleetLinkError(
+                'invalid',
+                'state is running, done, failed, cancelled or interrupted',
+            );
         }
         if (nodeId !== undefined && !/^[0-9a-f-]{36}$/i.test(nodeId)) {
             throw fleetLinkError('invalid', 'nodeId must be a computer id');

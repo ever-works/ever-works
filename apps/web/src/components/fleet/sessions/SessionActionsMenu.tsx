@@ -17,7 +17,12 @@ import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { OpenPullRequestDialog } from './OpenPullRequestDialog';
 import { SessionActionSheet } from './SessionActionSheet';
-import { actionLabelKey, hiddenReasonKey, menuActions, sessionGitErrorTitleKey } from './session-git.shared';
+import {
+    actionLabelKey,
+    hiddenReasonKey,
+    menuActions,
+    sessionGitErrorTitleKey,
+} from './session-git.shared';
 
 /**
  * Session git & actions (FL-06, spec FR-12 … FR-18, S3 … S9, U1 … U8, §5.2)
@@ -59,7 +64,9 @@ export function SessionActionsMenu({
             setData(result.data);
             setLoadError(null);
         } else {
-            setLoadError(`${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`);
+            setLoadError(
+                `${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`,
+            );
         }
     }, [session.id, tErrors]);
 
@@ -70,7 +77,8 @@ export function SessionActionsMenu({
     useEffect(() => {
         if (!open) return;
         const onDown = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) setOpen(false);
+            if (containerRef.current && !containerRef.current.contains(event.target as Node))
+                setOpen(false);
         };
         window.addEventListener('mousedown', onDown);
         return () => window.removeEventListener('mousedown', onDown);
@@ -94,9 +102,16 @@ export function SessionActionsMenu({
         if (!action.available) {
             setHiddenNote(
                 t('hidden', {
-                    action: t(`labels.${actionLabelKey(action.id, null)}` as Parameters<typeof t>[0]),
+                    action: t(
+                        `labels.${actionLabelKey(action.id, null)}` as Parameters<typeof t>[0],
+                    ),
                     reason: action.reason
-                        ? t(`reasons.${hiddenReasonKey(action.reason)}` as Parameters<typeof t>[0], { branch: data?.context.branch ?? 'main' })
+                        ? t(
+                              `reasons.${hiddenReasonKey(action.reason)}` as Parameters<
+                                  typeof t
+                              >[0],
+                              { branch: data?.context.branch ?? 'main' },
+                          )
                         : '',
                 }),
             );
@@ -107,23 +122,36 @@ export function SessionActionsMenu({
 
     useShortcut(
         { id: 'fleet.session.actions', scope: 'fleet-session', priority: SHORTCUT_PRIORITY.screen },
-        (event) => event.key.toLowerCase() === 'a' && !event.ctrlKey && !event.metaKey && !event.altKey,
+        (event) =>
+            event.key.toLowerCase() === 'a' && !event.ctrlKey && !event.metaKey && !event.altKey,
         () => setOpen(true),
     );
     useShortcut(
-        { id: 'fleet.session.actions-pick', scope: 'fleet-session', priority: SHORTCUT_PRIORITY.screen, enabled: open },
+        {
+            id: 'fleet.session.actions-pick',
+            scope: 'fleet-session',
+            priority: SHORTCUT_PRIORITY.screen,
+            enabled: open,
+        },
         (event) => /^[1-7]$/.test(event.key) && !event.ctrlKey && !event.metaKey && !event.altKey,
         (event) => pickByIndex(Number((event as KeyboardEvent).key) - 1),
     );
     useShortcut(
-        { id: 'fleet.session.actions-close', scope: 'fleet-session', priority: SHORTCUT_PRIORITY.screen, enabled: open },
+        {
+            id: 'fleet.session.actions-close',
+            scope: 'fleet-session',
+            priority: SHORTCUT_PRIORITY.screen,
+            enabled: open,
+        },
         (event) => event.key === 'Escape',
         () => setOpen(false),
     );
 
     const disabled = data?.disabled ?? null;
     const label = (id: FleetSessionActionId, update: { number: number } | undefined) =>
-        update ? t('labels.update', { number: update.number }) : t(`labels.${actionLabelKey(id, null)}` as Parameters<typeof t>[0]);
+        update
+            ? t('labels.update', { number: update.number })
+            : t(`labels.${actionLabelKey(id, null)}` as Parameters<typeof t>[0]);
 
     return (
         <div className="relative" ref={containerRef}>
@@ -144,16 +172,28 @@ export function SessionActionsMenu({
                     className="absolute right-0 z-40 mt-1 w-80 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-1 shadow-lg"
                     data-testid="fleet-session-actions-menu"
                 >
-                    {loadError ? <p className="px-2 py-1.5 text-xs text-danger">{loadError}</p> : null}
-                    {!data && !loadError ? <p className="px-2 py-1.5 text-xs text-text-muted">{t('loading')}</p> : null}
+                    {loadError ? (
+                        <p className="px-2 py-1.5 text-xs text-danger">{loadError}</p>
+                    ) : null}
+                    {!data && !loadError ? (
+                        <p className="px-2 py-1.5 text-xs text-text-muted">{t('loading')}</p>
+                    ) : null}
                     {data && session.provider === 'shell' ? (
-                        <p className="px-2 py-1.5 text-xs text-text-muted dark:text-text-muted-dark">{t('shellNote')}</p>
+                        <p className="px-2 py-1.5 text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('shellNote')}
+                        </p>
                     ) : null}
                     {data && !session.git ? (
-                        <p className="px-2 py-1.5 text-xs text-text-muted dark:text-text-muted-dark">{t('notInCheckout')}</p>
+                        <p className="px-2 py-1.5 text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('notInCheckout')}
+                        </p>
                     ) : null}
                     {disabled ? (
-                        <p className="px-2 py-1.5 text-xs text-warning" role="status" data-testid="fleet-session-actions-disabled">
+                        <p
+                            className="px-2 py-1.5 text-xs text-warning"
+                            role="status"
+                            data-testid="fleet-session-actions-disabled"
+                        >
                             {tErrors(sessionGitErrorTitleKey(disabled.code))} — {disabled.hint}
                         </p>
                     ) : null}
@@ -186,12 +226,17 @@ export function SessionActionsMenu({
                         </button>
                     ))}
                     {data && shown.length === 0 && session.provider !== 'shell' ? (
-                        <p className="px-2 py-1.5 text-xs text-text-muted dark:text-text-muted-dark">{t('none')}</p>
+                        <p className="px-2 py-1.5 text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('none')}
+                        </p>
                     ) : null}
                 </div>
             ) : null}
             {hiddenNote ? (
-                <p className="absolute right-0 mt-1 w-80 text-xs text-text-muted dark:text-text-muted-dark" role="status">
+                <p
+                    className="absolute right-0 mt-1 w-80 text-xs text-text-muted dark:text-text-muted-dark"
+                    role="status"
+                >
                     {hiddenNote}
                 </p>
             ) : null}

@@ -26,12 +26,19 @@ export function AppCronList({ cron }: AppCronListProps) {
     };
 
     return (
-        <ul className="divide-y divide-card-border text-sm dark:divide-white/9" data-testid="app-cron-list">
+        <ul
+            className="divide-y divide-card-border text-sm dark:divide-white/9"
+            data-testid="app-cron-list"
+        >
             {cron.map((entry) => {
                 const scheduled = when(entry.lastScheduleAt);
                 const succeeded = when(entry.lastSuccessAt);
                 return (
-                    <li key={entry.name} className="flex flex-wrap items-center justify-between gap-2 py-1.5" data-testid="app-cron-row">
+                    <li
+                        key={entry.name}
+                        className="flex flex-wrap items-center justify-between gap-2 py-1.5"
+                        data-testid="app-cron-row"
+                    >
                         <code className="text-xs font-semibold">{entry.name}</code>
                         <span className="text-xs text-text-secondary">
                             {scheduled ? t('lastRun', { when: scheduled }) : t('neverRun')}

@@ -263,7 +263,10 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 			const stream = await store.read(runId);
 			if (!stream) {
 				reply(requestId, {
-					error: makeFleetLinkError('not_found', `the full output of this run is no longer on ${options.nodeName}`)
+					error: makeFleetLinkError(
+						'not_found',
+						`the full output of this run is no longer on ${options.nodeName}`
+					)
 				});
 				return;
 			}
@@ -274,7 +277,10 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 					return;
 				}
 				for (let offset = 0; offset < raw.byteLength; offset += FLEET_COMMAND_DATA_CHUNK_BYTES) {
-					const piece = raw.subarray(offset, Math.min(raw.byteLength, offset + FLEET_COMMAND_DATA_CHUNK_BYTES));
+					const piece = raw.subarray(
+						offset,
+						Math.min(raw.byteLength, offset + FLEET_COMMAND_DATA_CHUNK_BYTES)
+					);
 					if (!context.sendBinary(FLEET_LINK_FRAME_KINDS.DATA, new Uint8Array(piece))) {
 						stream.destroy();
 						if (!closed) {
@@ -306,7 +312,9 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 						return;
 					}
 					if (ran) {
-						reply(requestId, { error: makeFleetLinkError('invalid', 'this channel already ran a command') });
+						reply(requestId, {
+							error: makeFleetLinkError('invalid', 'this channel already ran a command')
+						});
 						return;
 					}
 					const parsed = parseFleetCommandRunParams(request);
@@ -321,7 +329,9 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 					ran = true;
 					void run(requestId, parsed).catch((error: unknown) => {
 						options.logger?.warn(`Commands: a run failed unexpectedly: ${describe(error)}`);
-						reply(requestId, { error: makeFleetLinkError('operation_failed', 'the command could not run') });
+						reply(requestId, {
+							error: makeFleetLinkError('operation_failed', 'the command could not run')
+						});
 					});
 					return;
 				}
@@ -369,11 +379,15 @@ export function createCommandModule(options: CommandModuleOptions): NodeModule {
 				consent: 'manage',
 				open(context) {
 					const params = parseFleetCommandChannelParams(context.params);
-					if (!params) return { ok: false, error: makeFleetLinkError('invalid', 'command channel parameters') };
+					if (!params)
+						return { ok: false, error: makeFleetLinkError('invalid', 'command channel parameters') };
 					if (!options.consents.manage) {
 						return {
 							ok: false,
-							error: makeFleetLinkError('consent_missing', fleetConsentMissingHint('manage', options.nodeName))
+							error: makeFleetLinkError(
+								'consent_missing',
+								fleetConsentMissingHint('manage', options.nodeName)
+							)
 						};
 					}
 					return { ok: true, handler: openChannel(context, params) };

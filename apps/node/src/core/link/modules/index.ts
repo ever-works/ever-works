@@ -31,7 +31,11 @@ export const NODE_LINK_MODULES: readonly NodeModule[] = [
 export function createMachineFactModules(
 	deps: { services?: ServicesModuleDeps; processes?: ProcessesModuleDeps; docker?: DockerModuleDeps } = {}
 ): NodeModule[] {
-	return [createServicesModule(deps.services), createProcessesModule(deps.processes), createDockerModule(deps.docker)];
+	return [
+		createServicesModule(deps.services),
+		createProcessesModule(deps.processes),
+		createDockerModule(deps.docker)
+	];
 }
 
 export interface ComposeNodeLinkModulesOptions extends Omit<MachineModuleOptions, 'verb'> {

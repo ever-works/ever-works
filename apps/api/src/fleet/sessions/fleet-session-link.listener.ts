@@ -1,4 +1,10 @@
-import { Injectable, Logger, Optional, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+    Injectable,
+    Logger,
+    Optional,
+    type OnModuleDestroy,
+    type OnModuleInit,
+} from '@nestjs/common';
 import { config } from '@ever-works/agent/config';
 import { FleetSessionService, FleetSessionStateService } from '@ever-works/agent/fleet';
 import {
@@ -134,15 +140,13 @@ export class FleetSessionLinkListener implements OnModuleInit, OnModuleDestroy {
      */
     private enqueue(nodeId: string, type: string, work: () => Promise<void>): void {
         const previous = this.queues.get(nodeId) ?? Promise.resolve();
-        const run = previous
-            .then(work)
-            .catch((error: unknown) => {
-                this.logger.warn(
-                    `${type} from node ${nodeId} failed: ${
-                        error instanceof Error ? error.message : String(error)
-                    }`,
-                );
-            });
+        const run = previous.then(work).catch((error: unknown) => {
+            this.logger.warn(
+                `${type} from node ${nodeId} failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        });
         this.queues.set(nodeId, run);
         void run.then(() => {
             if (this.queues.get(nodeId) === run) this.queues.delete(nodeId);

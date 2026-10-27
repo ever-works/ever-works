@@ -42,7 +42,10 @@ function query(params: Record<string, string | undefined>): string {
 }
 
 export const fleetMachineAPI = {
-    listServices: async (nodeId: string, options: { scope?: FleetServiceScope | 'all'; find?: string } = {}) =>
+    listServices: async (
+        nodeId: string,
+        options: { scope?: FleetServiceScope | 'all'; find?: string } = {},
+    ) =>
         serverFetch<FleetServicesListResult>(
             `${BASE}/${encodeURIComponent(nodeId)}/services${query({ scope: options.scope, find: options.find })}`,
         ),
@@ -51,7 +54,10 @@ export const fleetMachineAPI = {
         nodeId: string,
         name: string,
         action: FleetServiceAction,
-        body: FleetActionConfirmFields & { scope?: FleetServiceScope; manager?: FleetServiceManager },
+        body: FleetActionConfirmFields & {
+            scope?: FleetServiceScope;
+            manager?: FleetServiceManager;
+        },
     ) =>
         serverMutation<FleetServiceActionResult | FleetOperationRef>({
             endpoint: `${BASE}/${encodeURIComponent(nodeId)}/services/${encodeURIComponent(name)}/${encodeURIComponent(action)}`,
@@ -60,7 +66,10 @@ export const fleetMachineAPI = {
             wrapInData: false,
         }),
 
-    listProcesses: async (nodeId: string, options: { sort?: FleetProcessSort; find?: string } = {}) =>
+    listProcesses: async (
+        nodeId: string,
+        options: { sort?: FleetProcessSort; find?: string } = {},
+    ) =>
         serverFetch<FleetProcessesListResult>(
             `${BASE}/${encodeURIComponent(nodeId)}/processes${query({ sort: options.sort, find: options.find })}`,
         ),
@@ -79,7 +88,9 @@ export const fleetMachineAPI = {
 
     // ─── Docker (P2) ──────────────────────────────────────────────────────
     listContainers: async (nodeId: string) =>
-        serverFetch<FleetContainersListResult>(`${BASE}/${encodeURIComponent(nodeId)}/docker/containers`),
+        serverFetch<FleetContainersListResult>(
+            `${BASE}/${encodeURIComponent(nodeId)}/docker/containers`,
+        ),
 
     containerAction: async (
         nodeId: string,

@@ -69,7 +69,8 @@ export function newRunPrintState(): RunPrintState {
 export function takeNewLines(run: FleetCommandRunView, state: RunPrintState): string[] {
     if (state.ended) return [];
     const lines: string[] = [];
-    const fresh = run.outputHead.length > state.headPrinted ? run.outputHead.slice(state.headPrinted) : '';
+    const fresh =
+        run.outputHead.length > state.headPrinted ? run.outputHead.slice(state.headPrinted) : '';
     state.headPrinted = Math.max(state.headPrinted, run.outputHead.length);
     let text = state.partial + fresh;
     const live = run.status === 'running';

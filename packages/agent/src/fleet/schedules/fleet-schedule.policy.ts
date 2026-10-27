@@ -56,10 +56,14 @@ function checkName(raw: unknown): { name: string | null; refusal: FleetScheduleR
     if (raw.trim().length > FLEET_SCHEDULE_NAME_MAX_LENGTH) {
         return {
             name: null,
-            refusal: refuse('limit_exceeded', `a name is at most ${FLEET_SCHEDULE_NAME_MAX_LENGTH} characters`, {
-                field: 'name',
-                limit: FLEET_SCHEDULE_NAME_MAX_LENGTH,
-            }),
+            refusal: refuse(
+                'limit_exceeded',
+                `a name is at most ${FLEET_SCHEDULE_NAME_MAX_LENGTH} characters`,
+                {
+                    field: 'name',
+                    limit: FLEET_SCHEDULE_NAME_MAX_LENGTH,
+                },
+            ),
         };
     }
     return { name: raw.trim(), refusal: null };
@@ -69,7 +73,8 @@ function checkCommand(raw: unknown): FleetScheduleRefusal {
     if (typeof raw !== 'string' || raw.trim().length === 0) {
         return refuse('invalid', 'type a command', { field: 'command' });
     }
-    if (raw.includes('\0')) return refuse('invalid', 'the command contains a NUL character', { field: 'command' });
+    if (raw.includes('\0'))
+        return refuse('invalid', 'the command contains a NUL character', { field: 'command' });
     if (fleetCommandUtf8Length(raw) > FLEET_COMMAND_MAX_LENGTH) {
         return refuse('limit_exceeded', 'a command is at most 8 KiB', {
             field: 'command',
@@ -82,13 +87,19 @@ function checkCommand(raw: unknown): FleetScheduleRefusal {
 function checkCwd(raw: unknown): { cwd: string | null; refusal: FleetScheduleRefusal } {
     if (raw === undefined || raw === null || raw === '') return { cwd: null, refusal: null };
     if (!isFleetCommandCwd(raw)) {
-        return { cwd: null, refusal: refuse('invalid', 'the folder is not a path', { field: 'cwd' }) };
+        return {
+            cwd: null,
+            refusal: refuse('invalid', 'the folder is not a path', { field: 'cwd' }),
+        };
     }
     const cwd = raw.trim();
     return { cwd: cwd === '~' ? null : cwd, refusal: null };
 }
 
-function checkCadence(raw: unknown): { cadence: FleetScheduleCadence | null; refusal: FleetScheduleRefusal } {
+function checkCadence(raw: unknown): {
+    cadence: FleetScheduleCadence | null;
+    refusal: FleetScheduleRefusal;
+} {
     const parsed = parseFleetScheduleCadence(raw);
     if (!parsed.cadence) {
         return {
@@ -115,7 +126,10 @@ function checkNode(raw: { nodeId?: unknown; nodeIds?: unknown }): {
         candidate = raw.nodeIds[0];
     }
     if (typeof candidate !== 'string' || !UUID.test(candidate)) {
-        return { nodeId: null, refusal: refuse('invalid', 'choose a computer', { field: 'nodeId' }) };
+        return {
+            nodeId: null,
+            refusal: refuse('invalid', 'choose a computer', { field: 'nodeId' }),
+        };
     }
     return { nodeId: candidate.toLowerCase(), refusal: null };
 }
@@ -174,9 +188,13 @@ export function checkFleetScheduleUpdate(
     changed: Array<keyof FleetScheduleShape>,
 ): FleetScheduleRefusal {
     if (raw.kind !== undefined || raw.prompt !== undefined || raw.agentId !== undefined) {
-        return refuse('invalid', 'a command schedule stays a command schedule; create a new one instead', {
-            field: 'kind',
-        });
+        return refuse(
+            'invalid',
+            'a command schedule stays a command schedule; create a new one instead',
+            {
+                field: 'kind',
+            },
+        );
     }
     if (raw.name !== undefined) {
         const name = checkName(raw.name);
@@ -264,14 +282,25 @@ export function checkFleetSchedulesPerNode(held: number, nodeName: string): Flee
  * app's node does not run schedules yet (R-10). Offline and missing-consent
  * computers DO save (spec U1, U2) — they read NEVER RUNS or "will sync".
  */
-export function fleetScheduleNodeRefusal(node: { name: string; kind: string; status: string }): FleetScheduleRefusal {
+export function fleetScheduleNodeRefusal(node: {
+    name: string;
+    kind: string;
+    status: string;
+}): FleetScheduleRefusal {
     if (node.kind === 'k8s') {
-        return refuse('unsupported_on_node', `${node.name} is a cluster node; schedules run on computers`);
+        return refuse(
+            'unsupported_on_node',
+            `${node.name} is a cluster node; schedules run on computers`,
+        );
     }
     if (node.kind === 'desktop-node') {
-        return refuse('unsupported_on_node', `schedules are not available on this kind of node yet (${node.name})`);
+        return refuse(
+            'unsupported_on_node',
+            `schedules are not available on this kind of node yet (${node.name})`,
+        );
     }
-    if (node.status === 'enrolling') return refuse('busy', `${node.name} has not finished enrolling`);
+    if (node.status === 'enrolling')
+        return refuse('busy', `${node.name} has not finished enrolling`);
     return null;
 }
 

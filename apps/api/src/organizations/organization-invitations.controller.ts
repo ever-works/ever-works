@@ -79,7 +79,8 @@ export interface OrganizationMemberResponse {
  * `@SessionCredentialOnly()`; this closes the "promote, then mint" path around it. Listing and
  * revoking a pending invitation are unchanged.
  */
-export const ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY_ENV = 'ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY';
+export const ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY_ENV =
+    'ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY';
 
 export function organizationMemberChangesSessionOnly(
     env: Record<string, string | undefined> = process.env,

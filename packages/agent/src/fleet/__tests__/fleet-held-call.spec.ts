@@ -18,7 +18,13 @@ describe('fleet held calls', () => {
         agentName: 'Nina',
         runId: 'r1',
         tool: 'fleet_services_action',
-        args: { nodeId: 'n1', name: 'nginx', action: 'restart', confirm: true, acknowledgeBlastRadius: true },
+        args: {
+            nodeId: 'n1',
+            name: 'nginx',
+            action: 'restart',
+            confirm: true,
+            acknowledgeBlastRadius: true,
+        },
         category: 'machine.admin',
         rung: 'ask',
     };
@@ -53,7 +59,10 @@ describe('fleet held calls', () => {
     });
 
     it('has the approval supply the confirmation, keeping only a typed name', () => {
-        expect(fleetHeldCallConfirmFields({ args: {} })).toEqual({ confirm: true, acknowledgeBlastRadius: true });
+        expect(fleetHeldCallConfirmFields({ args: {} })).toEqual({
+            confirm: true,
+            acknowledgeBlastRadius: true,
+        });
         expect(fleetHeldCallConfirmFields({ args: { confirmName: 'win-11-vm' } })).toEqual({
             confirm: true,
             acknowledgeBlastRadius: true,
@@ -73,13 +82,19 @@ describe('fleet held calls', () => {
         const c = buildFleetHeldCallPayload(input, new Date('2026-10-21T11:05:00Z'))!;
         expect(fleetHeldCallSubjectKey(a)).toBe(fleetHeldCallSubjectKey(b));
         expect(fleetHeldCallSubjectKey(a)).not.toBe(fleetHeldCallSubjectKey(c));
-        expect(fleetHeldCallSubjectKey(a).startsWith('fleet-tool-call:fleet_services_action:')).toBe(true);
+        expect(
+            fleetHeldCallSubjectKey(a).startsWith('fleet-tool-call:fleet_services_action:'),
+        ).toBe(true);
     });
 
     it('names the act a person recognises', () => {
-        expect(fleetHeldCallSummary(null, { name: 'fleet_ports_open', family: 'ports', verb: 'open' }, { port: 3000 })).toBe(
-            'An Agent wants to open 3000 (ports)',
-        );
+        expect(
+            fleetHeldCallSummary(
+                null,
+                { name: 'fleet_ports_open', family: 'ports', verb: 'open' },
+                { port: 3000 },
+            ),
+        ).toBe('An Agent wants to open 3000 (ports)');
     });
 
     it('rejects a payload that is not a held call', () => {

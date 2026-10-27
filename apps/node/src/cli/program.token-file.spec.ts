@@ -27,7 +27,9 @@ const deps = (platform = 'linux') => ({ platform }) as unknown as CliDeps;
 describe('resolveEnrollToken', () => {
 	it('reads, trims and deletes the token file', async () => {
 		const file = fakeFile(`  ${TOKEN}\n`);
-		await expect(resolveEnrollToken(deps(), { tokenFile: '/run/ever-works/enroll-token' }, file.io)).resolves.toBe(TOKEN);
+		await expect(resolveEnrollToken(deps(), { tokenFile: '/run/ever-works/enroll-token' }, file.io)).resolves.toBe(
+			TOKEN
+		);
 		expect(file.removed).toEqual(['/run/ever-works/enroll-token']);
 	});
 

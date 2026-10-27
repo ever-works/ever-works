@@ -122,7 +122,12 @@ describe('resolveUnderRoots (FL-08)', () => {
 	];
 
 	it('opens a file under a root', async () => {
-		const result = await resolveUnderRoots('/home/ops/code/api/storage/logs/laravel.log', roots, 'linux', fakeFs({}));
+		const result = await resolveUnderRoots(
+			'/home/ops/code/api/storage/logs/laravel.log',
+			roots,
+			'linux',
+			fakeFs({})
+		);
 		expect(result).toMatchObject({ ok: true, canonical: '/home/ops/code/api/storage/logs/laravel.log' });
 	});
 
@@ -156,7 +161,11 @@ describe('resolveUnderRoots (FL-08)', () => {
 describe('standardLogDirs (FL-08)', () => {
 	it('lists each platform’s folders, none on Windows (spec §8b)', () => {
 		expect(standardLogDirs('linux', '/home/ops')).toEqual(['/var/log']);
-		expect(standardLogDirs('darwin', '/Users/ops')).toEqual(['/var/log', '/Library/Logs', '/Users/ops/Library/Logs']);
+		expect(standardLogDirs('darwin', '/Users/ops')).toEqual([
+			'/var/log',
+			'/Library/Logs',
+			'/Users/ops/Library/Logs'
+		]);
 		expect(standardLogDirs('win32', 'C:\\Users\\ops')).toEqual([]);
 	});
 });

@@ -91,9 +91,9 @@ describe('windowsRunArgs (plan §6.6)', () => {
 describe('the installer image and the share', () => {
 	it('has no default image: the operator configures one', () => {
 		expect(resolveWindowsImage({})).toBeNull();
-		expect(resolveWindowsImage({ EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE: 'registry.example.com/windows:5' })?.ref).toBe(
-			'registry.example.com/windows:5'
-		);
+		expect(
+			resolveWindowsImage({ EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE: 'registry.example.com/windows:5' })?.ref
+		).toBe('registry.example.com/windows:5');
 		expect(resolveWindowsImage({ EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE: 'bad image; rm' })).toBeNull();
 	});
 

@@ -53,7 +53,7 @@ export class FleetLogsController {
     @Get('nodes/:id/logs/sources')
     @ApiOperation({
         summary:
-            "The log sources of one computer, in four groups: System (journal and kernel on Linux, the unified log on macOS, System / Application / Security event logs on Windows), Files (log files under the standard log folders and the folders the computer shares, newest first, 200 per folder; root-only files are listed but cannot be opened), Containers (every Docker container) and Services (running and failed, failed first). Needs the computer to run with --manage and the `logs` family; 404 for a computer I cannot see.",
+            'The log sources of one computer, in four groups: System (journal and kernel on Linux, the unified log on macOS, System / Application / Security event logs on Windows), Files (log files under the standard log folders and the folders the computer shares, newest first, 200 per folder; root-only files are listed but cannot be opened), Containers (every Docker container) and Services (running and failed, failed first). Needs the computer to run with --manage and the `logs` family; 404 for a computer I cannot see.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: FLEET_LOGS_SOURCES_RATE_LIMIT, ttl: 60_000 } })

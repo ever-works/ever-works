@@ -13,7 +13,13 @@ import { AgentSessionsList } from './AgentSessionsList';
  * `FLEET_SESSIONS_ENABLED` is on; every read is `.catch()`-ed, so a failed read
  * renders the block with its own words, never a broken page.
  */
-export async function AgentSessionsBlock({ agentId, agentName }: { agentId: string; agentName: string }) {
+export async function AgentSessionsBlock({
+    agentId,
+    agentName,
+}: {
+    agentId: string;
+    agentName: string;
+}) {
     const flags = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED'] as const);
     if (flags.FLEET_SESSIONS_ENABLED !== true) return null;
     const t = await getTranslations('fleet.sessions.agentBlock');
@@ -23,7 +29,8 @@ export async function AgentSessionsBlock({ agentId, agentName }: { agentId: stri
         getAuthFromCookie().catch(() => null),
     ]);
     const nodeNames: Record<string, string> = {};
-    for (const node of (nodes as Array<{ id: string; name: string }> | null) ?? []) nodeNames[node.id] = node.name;
+    for (const node of (nodes as Array<{ id: string; name: string }> | null) ?? [])
+        nodeNames[node.id] = node.name;
 
     return (
         <section
@@ -32,9 +39,13 @@ export async function AgentSessionsBlock({ agentId, agentName }: { agentId: stri
         >
             <h2 className="text-sm font-semibold text-text dark:text-text-dark">{t('title')}</h2>
             {page === null ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('loadFailed')}</p>
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                    {t('loadFailed')}
+                </p>
             ) : page.sessions.length === 0 ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('empty', { agent: agentName })}</p>
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                    {t('empty', { agent: agentName })}
+                </p>
             ) : (
                 <AgentSessionsList
                     sessions={page.sessions}

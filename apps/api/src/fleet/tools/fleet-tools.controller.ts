@@ -1,4 +1,12 @@
-import { BadRequestException, Controller, Get, HttpCode, HttpStatus, Query, UseGuards } from '@nestjs/common';
+import {
+    BadRequestException,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Query,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { FleetStatusView, FleetToolsGateView } from '@ever-works/contracts';
@@ -57,7 +65,9 @@ export class FleetToolsController {
         @Query('agentId') agentId?: string,
     ): Promise<FleetToolsGateView> {
         if (typeof agentId !== 'string' || !UUID.test(agentId)) {
-            throw new BadRequestException({ error: { code: 'invalid', hint: 'agentId must be an Agent id' } });
+            throw new BadRequestException({
+                error: { code: 'invalid', hint: 'agentId must be an Agent id' },
+            });
         }
         return this.gate.gateFor(auth.userId, agentId);
     }

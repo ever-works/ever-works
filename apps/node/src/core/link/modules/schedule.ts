@@ -106,7 +106,10 @@ export function createScheduleModule(options: ScheduleModuleOptions): ScheduleMo
 				...(options.realpath ? { realpath: options.realpath } : {})
 			});
 			if (folder.error) {
-				refused.push({ id: definition.id, error: makeFleetLinkError('invalid', folder.error.hint, { field: 'cwd' }) });
+				refused.push({
+					id: definition.id,
+					error: makeFleetLinkError('invalid', folder.error.hint, { field: 'cwd' })
+				});
 			} else {
 				held.push(definition);
 			}
@@ -132,7 +135,10 @@ export function createScheduleModule(options: ScheduleModuleOptions): ScheduleMo
 				for (const id of parsed.unreadable) {
 					refused.push({
 						id,
-						error: makeFleetLinkError('unsupported_on_node', `update the node on ${options.nodeName} to run this schedule`)
+						error: makeFleetLinkError(
+							'unsupported_on_node',
+							`update the node on ${options.nodeName} to run this schedule`
+						)
 					});
 				}
 				await loop.replace(held, parsed.params.generation);
@@ -173,8 +179,12 @@ export function createScheduleModule(options: ScheduleModuleOptions): ScheduleMo
 						? (message.params as Record<string, unknown>)
 						: {};
 				void handle(message.type, message.requestId, params).catch((error: unknown) => {
-					options.logger?.warn(`Schedules: a request failed: ${error instanceof Error ? error.message : String(error)}`);
-					reply(message.requestId, { error: makeFleetLinkError('operation_failed', 'the schedule request failed') });
+					options.logger?.warn(
+						`Schedules: a request failed: ${error instanceof Error ? error.message : String(error)}`
+					);
+					reply(message.requestId, {
+						error: makeFleetLinkError('operation_failed', 'the schedule request failed')
+					});
 				});
 			},
 			onClose() {
@@ -196,7 +206,10 @@ export function createScheduleModule(options: ScheduleModuleOptions): ScheduleMo
 					if (!options.consents.manage) {
 						return {
 							ok: false,
-							error: makeFleetLinkError('consent_missing', fleetConsentMissingHint('manage', options.nodeName))
+							error: makeFleetLinkError(
+								'consent_missing',
+								fleetConsentMissingHint('manage', options.nodeName)
+							)
 						};
 					}
 					return { ok: true, handler: openChannel(context) };

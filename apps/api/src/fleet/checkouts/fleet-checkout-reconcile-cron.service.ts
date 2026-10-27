@@ -3,7 +3,10 @@ import { Cron } from '@nestjs/schedule';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { config } from '@ever-works/agent/config';
 import { FleetCheckoutReconcileService } from '@ever-works/agent/fleet';
-import { FLEET_CHECKOUT_BIN_PURGE_CRON, FLEET_CHECKOUT_RECONCILE_CRON } from '@ever-works/contracts';
+import {
+    FLEET_CHECKOUT_BIN_PURGE_CRON,
+    FLEET_CHECKOUT_RECONCILE_CRON,
+} from '@ever-works/contracts';
 
 const FLEET_CHECKOUT_RECONCILE_LOCK_KEY = 'fleet-checkouts:reconcile';
 const FLEET_CHECKOUT_BIN_PURGE_LOCK_KEY = 'fleet-checkouts:bin-purge';
@@ -72,7 +75,9 @@ export class FleetCheckoutReconcileCronService {
                 try {
                     const summary = await this.reconciler.purgeBin();
                     if (summary.purged > 0) {
-                        this.logger.log(`fleet-checkout-bin-purge: ${summary.purged} bin row(s) purged`);
+                        this.logger.log(
+                            `fleet-checkout-bin-purge: ${summary.purged} bin row(s) purged`,
+                        );
                     }
                 } catch (error) {
                     const stack = error instanceof Error ? error.stack : String(error);

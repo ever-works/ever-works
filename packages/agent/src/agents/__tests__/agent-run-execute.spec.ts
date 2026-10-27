@@ -349,7 +349,13 @@ describe('AgentRunService.execute() — LLM dispatch (FU-1)', () => {
             taskId: 't1',
             chatMessageId: 'm1',
         });
-        await makeSvc().execute({ runId: 'r-task', agentId: 'a1', userId: 'u1', kind: 'task', taskId: 't1' });
+        await makeSvc().execute({
+            runId: 'r-task',
+            agentId: 'a1',
+            userId: 'u1',
+            kind: 'task',
+            taskId: 't1',
+        });
         await makeSvc().execute({
             runId: 'r-member',
             agentId: 'a1',

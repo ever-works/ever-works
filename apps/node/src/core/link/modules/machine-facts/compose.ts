@@ -127,7 +127,11 @@ interface ConfigService {
 }
 
 /** `compose config --format json` → services with their dependencies, ports, networks and mounts. */
-export function parseComposeConfig(stdout: string): { services: ConfigService[]; networks: string[]; volumes: string[] } {
+export function parseComposeConfig(stdout: string): {
+	services: ConfigService[];
+	networks: string[];
+	volumes: string[];
+} {
 	let parsed: Record<string, unknown>;
 	try {
 		parsed = JSON.parse(stdout) as Record<string, unknown>;
@@ -135,13 +139,15 @@ export function parseComposeConfig(stdout: string): { services: ConfigService[];
 		return { services: [], networks: [], volumes: [] };
 	}
 	const services: ConfigService[] = [];
-	const raw = parsed.services && typeof parsed.services === 'object' ? (parsed.services as Record<string, unknown>) : {};
+	const raw =
+		parsed.services && typeof parsed.services === 'object' ? (parsed.services as Record<string, unknown>) : {};
 	for (const [name, value] of Object.entries(raw)) {
 		const service = (value ?? {}) as Record<string, unknown>;
 		const dependsOn: ConfigService['dependsOn'] = [];
 		const depends = service.depends_on;
 		if (Array.isArray(depends)) {
-			for (const entry of depends) if (typeof entry === 'string') dependsOn.push({ service: entry, condition: 'service_started' });
+			for (const entry of depends)
+				if (typeof entry === 'string') dependsOn.push({ service: entry, condition: 'service_started' });
 		} else if (depends && typeof depends === 'object') {
 			for (const [other, spec] of Object.entries(depends as Record<string, unknown>)) {
 				const condition = text((spec as Record<string, unknown> | null)?.condition);
@@ -182,7 +188,8 @@ export function parseComposeConfig(stdout: string): { services: ConfigService[];
 		}
 		services.push({ name, image: text(service.image) || null, dependsOn, ports, networks, volumes, mounts });
 	}
-	const keys = (value: unknown) => (value && typeof value === 'object' ? Object.keys(value as Record<string, unknown>) : []);
+	const keys = (value: unknown) =>
+		value && typeof value === 'object' ? Object.keys(value as Record<string, unknown>) : [];
 	return { services, networks: keys(parsed.networks), volumes: keys(parsed.volumes) };
 }
 

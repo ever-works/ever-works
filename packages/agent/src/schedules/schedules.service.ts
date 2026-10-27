@@ -405,7 +405,10 @@ export class SchedulesService {
             if (filters.ownerType && view.ownerType !== filters.ownerType) return false;
             if (filters.enabledOnly && !view.enabled) return false;
             if (filters.agentId && view.agentId !== filters.agentId) return false;
-            if (filters.nodeId && (view.nodeId ?? '').toLowerCase() !== filters.nodeId.toLowerCase()) {
+            if (
+                filters.nodeId &&
+                (view.nodeId ?? '').toLowerCase() !== filters.nodeId.toLowerCase()
+            ) {
                 return false;
             }
             if (filters.status && view.status !== filters.status) return false;
@@ -1099,22 +1102,31 @@ export class SchedulesService {
         projected: ProjectedRow[],
         tasks: Task[],
     ): Promise<void> {
-        const sessionTaskIds = new Set(tasks.filter((task) => isFleetSessionScheduleTask(task)).map((task) => task.id));
+        const sessionTaskIds = new Set(
+            tasks.filter((task) => isFleetSessionScheduleTask(task)).map((task) => task.id),
+        );
         for (const row of projected) {
             if (sessionTaskIds.has(row.view.ownerId)) row.view.agentSession = true;
         }
         if (!this.affinityRepo || !this.fleetNodeRepo || !scope.organizationId) return;
         const agentIds = [
-            ...new Set(projected.map((row) => row.view.agentId).filter((id): id is string => Boolean(id))),
+            ...new Set(
+                projected.map((row) => row.view.agentId).filter((id): id is string => Boolean(id)),
+            ),
         ];
         if (agentIds.length === 0) return;
         try {
             const nodeByAgent = new Map<string, string>();
             for (const ids of chunked(agentIds, MAX_PER_SOURCE)) {
                 const affinities = await this.affinityRepo.find({
-                    where: { userId: scope.userId, organizationId: scope.organizationId, agentId: In(ids) },
+                    where: {
+                        userId: scope.userId,
+                        organizationId: scope.organizationId,
+                        agentId: In(ids),
+                    },
                 });
-                for (const affinity of affinities ?? []) nodeByAgent.set(affinity.agentId, affinity.nodeId);
+                for (const affinity of affinities ?? [])
+                    nodeByAgent.set(affinity.agentId, affinity.nodeId);
             }
             const nodeIds = [...new Set(nodeByAgent.values())];
             if (nodeIds.length === 0) return;
@@ -1174,7 +1186,11 @@ export class SchedulesService {
                     agentId: null,
                     agentName: null,
                     pausedAt: schedule.pausedAt,
-                    nextRunReasonKey: paused ? 'paused' : schedule.nextRunAt ? null : 'notScheduledYet',
+                    nextRunReasonKey: paused
+                        ? 'paused'
+                        : schedule.nextRunAt
+                          ? null
+                          : 'notScheduledYet',
                     nodeId: schedule.nodeId,
                     nodeName: schedule.nodeName,
                     nodeTimeZone: schedule.nodeTimeZone,

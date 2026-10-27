@@ -48,7 +48,10 @@ import { fleetSessionError, readFleetSessionError } from '../sessions/fleet-sess
 import { FleetSessionService, type FleetSessionActor } from '../sessions/fleet-session.service';
 import { FleetSessionTaskService } from '../sessions/fleet-session-task.service';
 import { readAgentFleetBlock } from './agent-fleet-block';
-import { FLEET_SESSION_PR_FACTS, type FleetSessionPrFactsPort } from './fleet-session-pr-facts.port';
+import {
+    FLEET_SESSION_PR_FACTS,
+    type FleetSessionPrFactsPort,
+} from './fleet-session-pr-facts.port';
 
 /** Everything one action read or send needs about a session. */
 interface ActionScene {
@@ -128,7 +131,10 @@ function iso(value: Date | string | null | undefined): string | null {
 export class FleetSessionActionService {
     private readonly logger = new Logger(FleetSessionActionService.name);
     /** Send times and the last sender per session (this API process; CONTRACTS §10 rates). */
-    private readonly sends = new Map<string, { at: number[]; last: { at: number; by: string } | null }>();
+    private readonly sends = new Map<
+        string,
+        { at: number[]; last: { at: number; by: string } | null }
+    >();
     private readonly now: () => number = () => Date.now();
 
     constructor(
@@ -141,7 +147,9 @@ export class FleetSessionActionService {
         @Optional() private readonly agents?: AgentRepository,
         @Optional() private readonly taskRules?: FleetSessionTaskService,
         @Optional() private readonly mergePolicy?: MergePolicyService,
-        @Optional() @Inject(FLEET_SESSION_PR_FACTS) private readonly prFacts?: FleetSessionPrFactsPort,
+        @Optional()
+        @Inject(FLEET_SESSION_PR_FACTS)
+        private readonly prFacts?: FleetSessionPrFactsPort,
     ) {}
 
     // ─── Reads ─────────────────────────────────────────────────────────────
@@ -154,7 +162,10 @@ export class FleetSessionActionService {
         for (const actionId of FLEET_SESSION_ACTION_IDS) {
             const override = scene.overrides[actionId];
             templates[actionId] = {
-                text: renderFleetSessionActionPrompt(override ?? FLEET_SESSION_ACTION_DEFAULTS[actionId], scene.render),
+                text: renderFleetSessionActionPrompt(
+                    override ?? FLEET_SESSION_ACTION_DEFAULTS[actionId],
+                    scene.render,
+                ),
                 source: override ? 'agent' : 'default',
             };
         }
@@ -170,12 +181,18 @@ export class FleetSessionActionService {
                 pullNumber: scene.render.pullNumber,
                 taskSlug: scene.task?.slug ?? null,
                 agentName: scene.agent?.name ?? null,
-                protectedBranch: isFleetProtectedBranch(scene.render.branch, scene.protectedBranches),
+                protectedBranch: isFleetProtectedBranch(
+                    scene.render.branch,
+                    scene.protectedBranches,
+                ),
                 reachable,
                 killSwitch: stopped,
             },
             disabled: stopped
-                ? { code: 'kill_switch', hint: 'Paused by the fleet stop — clear it under Settings → Fleet' }
+                ? {
+                      code: 'kill_switch',
+                      hint: 'Paused by the fleet stop — clear it under Settings → Fleet',
+                  }
                 : !reachable
                   ? { code: 'unreachable', hint: `${scene.node.name} is offline` }
                   : null,
@@ -244,7 +261,10 @@ export class FleetSessionActionService {
                 id: row.id,
                 actionId,
                 sentAt: iso(row.occurredAt) ?? new Date(0).toISOString(),
-                sentBy: typeof details.requestedBy === 'string' ? details.requestedBy : `user:${row.actorUserId ?? ''}`,
+                sentBy:
+                    typeof details.requestedBy === 'string'
+                        ? details.requestedBy
+                        : `user:${row.actorUserId ?? ''}`,
                 delivery,
                 deliveredAt: delivery === 'delivered' ? iso(row.occurredAt) : null,
                 prNumber: typeof details.number === 'number' ? details.number : null,
@@ -267,11 +287,17 @@ export class FleetSessionActionService {
         options: { resendOf?: string | null } = {},
     ): Promise<FleetSessionActionSendResponse> {
         if (!isFleetSessionActionId(request?.actionId)) {
-            throw fleetSessionError('invalid', 'actionId is one of the seven actions', { field: 'actionId' });
+            throw fleetSessionError('invalid', 'actionId is one of the seven actions', {
+                field: 'actionId',
+            });
         }
         const actionId = request.actionId;
         const prompt = typeof request.prompt === 'string' ? request.prompt.trim() : '';
-        if (prompt.length === 0 || prompt.length > FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH || prompt.includes('\0')) {
+        if (
+            prompt.length === 0 ||
+            prompt.length > FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH ||
+            prompt.includes('\0')
+        ) {
             throw fleetSessionError(
                 'invalid',
                 `the prompt is 1–${FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH} characters`,
@@ -280,7 +306,9 @@ export class FleetSessionActionService {
         }
         const scene = await this.scene(id, actor);
         const { session, node } = scene;
-        const offered = availableFleetSessionActions(scene.rules).find((entry) => entry.id === actionId);
+        const offered = availableFleetSessionActions(scene.rules).find(
+            (entry) => entry.id === actionId,
+        );
         if (!offered || !offered.available) {
             const reason = offered?.reason ?? 'not-in-checkout';
             throw fleetSessionError(
@@ -291,15 +319,23 @@ export class FleetSessionActionService {
         }
         // FR-18: in an owner session the pull request is opened from the dialog, by the platform.
         if (session.kind === 'owner' && actionId === 'pullRequest') {
-            throw fleetSessionError('invalid', 'in your own session, open the pull request from the dialog', {
-                field: 'actionId',
-                actionId,
-                rule: 'owner-dialog',
-            });
+            throw fleetSessionError(
+                'invalid',
+                'in your own session, open the pull request from the dialog',
+                {
+                    field: 'actionId',
+                    actionId,
+                    rule: 'owner-dialog',
+                },
+            );
         }
         // An Agent prompts its OWN sessions; another session (an owner's interactive one, another
         // Agent's) only when its owner switched on "may answer other sessions" (CONTRACTS R-32's reading).
-        if (actor.agentId && session.agentId !== actor.agentId && !(await this.agentMayPromptOthers(actor.agentId))) {
+        if (
+            actor.agentId &&
+            session.agentId !== actor.agentId &&
+            !(await this.agentMayPromptOthers(actor.agentId))
+        ) {
             throw fleetSessionError(
                 'permission_denied',
                 'an Agent sends actions to its own sessions; ask its owner to allow "may answer other sessions"',
@@ -308,7 +344,10 @@ export class FleetSessionActionService {
         }
         const requestedBy = actor.agentId ? `agent:${actor.agentId}` : `user:${actor.userId}`;
         this.consumeRate(session.id, requestedBy);
-        const preview = redactSecrets(prompt).cleaned.slice(0, FLEET_SESSION_ACTION_PREVIEW_MAX_LENGTH);
+        const preview = redactSecrets(prompt).cleaned.slice(
+            0,
+            FLEET_SESSION_ACTION_PREVIEW_MAX_LENGTH,
+        );
         const auditBase: Record<string, unknown> = {
             family: 'sessions',
             target: session.id,
@@ -320,8 +359,15 @@ export class FleetSessionActionService {
             ...(options.resendOf ? { resendOf: options.resendOf } : {}),
         };
         if (await this.isStopped()) {
-            await this.record(node, actor, { ...auditBase, outcome: 'refused', code: 'kill_switch' });
-            throw fleetSessionError('kill_switch', 'Paused by the fleet stop — actions are not sent');
+            await this.record(node, actor, {
+                ...auditBase,
+                outcome: 'refused',
+                code: 'kill_switch',
+            });
+            throw fleetSessionError(
+                'kill_switch',
+                'Paused by the fleet stop — actions are not sent',
+            );
         }
 
         // An Agent session's ledger row first ("pending"), so a crash between the
@@ -366,11 +412,19 @@ export class FleetSessionActionService {
             });
         } catch (error) {
             const typed = readFleetSessionError(error);
-            const lost = !typed || typed.code === 'unreachable' || typed.code === 'operation_failed' || typed.code === 'internal';
+            const lost =
+                !typed ||
+                typed.code === 'unreachable' ||
+                typed.code === 'operation_failed' ||
+                typed.code === 'internal';
             if (!lost) {
                 // Refused before anything was typed: nothing to deliver, no ledger row stays.
                 if (ledgerRow) await this.logs.delete(ledgerRow.id).catch(() => undefined);
-                await this.record(node, actor, { ...auditBase, outcome: 'refused', code: typed!.code });
+                await this.record(node, actor, {
+                    ...auditBase,
+                    outcome: 'refused',
+                    code: typed!.code,
+                });
                 throw error;
             }
             delivery = 'undelivered';
@@ -407,19 +461,33 @@ export class FleetSessionActionService {
         prompt?: string,
     ): Promise<FleetSessionActionSendResponse> {
         const { session } = await this.sessions.resolve(id, actor);
-        const entry = (await this.ledger(id, actor)).entries.find((candidate) => candidate.id === ledgerId);
-        if (!entry) throw fleetSessionError('not_found', 'no such action on this session', { field: 'ledgerId' });
-        if (entry.delivery === 'delivered') {
-            throw fleetSessionError('invalid', 'that action was delivered; it is never sent twice', {
+        const entry = (await this.ledger(id, actor)).entries.find(
+            (candidate) => candidate.id === ledgerId,
+        );
+        if (!entry)
+            throw fleetSessionError('not_found', 'no such action on this session', {
                 field: 'ledgerId',
             });
+        if (entry.delivery === 'delivered') {
+            throw fleetSessionError(
+                'invalid',
+                'that action was delivered; it is never sent twice',
+                {
+                    field: 'ledgerId',
+                },
+            );
         }
         let text = typeof prompt === 'string' ? prompt.trim() : '';
         if (!text) {
             const listing = await this.list(session.id, actor);
             text = listing.templates[entry.actionId].text;
         }
-        return this.send(session.id, actor, { actionId: entry.actionId, prompt: text }, { resendOf: ledgerId });
+        return this.send(
+            session.id,
+            actor,
+            { actionId: entry.actionId, prompt: text },
+            { resendOf: ledgerId },
+        );
     }
 
     /**
@@ -428,7 +496,10 @@ export class FleetSessionActionService {
      * produced). Agent sessions only — an owner session's ledger reads the
      * pull-request audit row itself. Never throws.
      */
-    async creditPullRequest(session: FleetSession, pr: { number: number; url: string }): Promise<void> {
+    async creditPullRequest(
+        session: FleetSession,
+        pr: { number: number; url: string },
+    ): Promise<void> {
         if (!session.agentRunId) return;
         try {
             const rows = await this.logs.find({
@@ -439,10 +510,14 @@ export class FleetSessionActionService {
             const cutoff = this.now() - PR_CREDIT_WINDOW_MS;
             for (const row of rows) {
                 const meta = asLedgerMeta(row.metadata);
-                if (!meta || meta.sessionId !== session.id || meta.actionId !== 'pullRequest') continue;
+                if (!meta || meta.sessionId !== session.id || meta.actionId !== 'pullRequest')
+                    continue;
                 if (Date.parse(meta.sentAt) < cutoff) return;
                 await this.logs.update(row.id, {
-                    metadata: { ...meta, prNumber: pr.number, prUrl: pr.url } as unknown as Record<string, unknown>,
+                    metadata: { ...meta, prNumber: pr.number, prUrl: pr.url } as unknown as Record<
+                        string,
+                        unknown
+                    >,
                 });
                 return;
             }
@@ -475,7 +550,10 @@ export class FleetSessionActionService {
         let task: FleetSessionTaskRef | null = null;
         if (session.agentRunId && this.taskRules) {
             try {
-                task = (await this.taskRules.refsForRuns([session.agentRunId])).get(session.agentRunId) ?? null;
+                task =
+                    (await this.taskRules.refsForRuns([session.agentRunId])).get(
+                        session.agentRunId,
+                    ) ?? null;
             } catch {
                 task = null;
             }
@@ -484,7 +562,11 @@ export class FleetSessionActionService {
         const pr = facts?.pr ?? line?.pr ?? null;
         const open = pr && (pr.state === 'open' || pr.state === 'draft') ? pr : null;
         const ownBase = fleetBranchWithoutRemote(line?.baseRef ?? row?.baseRef ?? null);
-        const base = facts?.baseRef ?? (ownBase && ownBase !== branch ? ownBase : null) ?? facts?.defaultBranch ?? null;
+        const base =
+            facts?.baseRef ??
+            (ownBase && ownBase !== branch ? ownBase : null) ??
+            facts?.defaultBranch ??
+            null;
         const protectedBranches = await this.protectedBranches(session, row);
         return {
             session,
@@ -518,7 +600,10 @@ export class FleetSessionActionService {
     }
 
     /** The merge policy's protected branches for this session's Agent / Work / Organization (FR-15). */
-    private async protectedBranches(session: FleetSession, checkout: FleetCheckout | null): Promise<string[]> {
+    private async protectedBranches(
+        session: FleetSession,
+        checkout: FleetCheckout | null,
+    ): Promise<string[]> {
         if (!this.mergePolicy) return [...FALLBACK_PROTECTED];
         try {
             const resolved = await this.mergePolicy.resolve({
@@ -537,7 +622,9 @@ export class FleetSessionActionService {
         if (!this.agents) return false;
         try {
             const agent = await this.agents.findById(agentId);
-            const permissions = agent?.permissions as unknown as Record<string, unknown> | undefined;
+            const permissions = agent?.permissions as unknown as
+                | Record<string, unknown>
+                | undefined;
             return permissions?.canAnswerOtherSessions === true;
         } catch {
             return false;
@@ -549,14 +636,18 @@ export class FleetSessionActionService {
         if (meta.deliveredAt) return 'delivered';
         if (meta.undelivered || meta.resent) return 'undelivered';
         const sent = Date.parse(meta.sentAt);
-        return Number.isFinite(sent) && now - sent < FLEET_SESSION_ACTION_DELIVERY_TIMEOUT_MS ? 'pending' : 'undelivered';
+        return Number.isFinite(sent) && now - sent < FLEET_SESSION_ACTION_DELIVERY_TIMEOUT_MS
+            ? 'pending'
+            : 'undelivered';
     }
 
     /** Mark a re-sent entry so it is not offered again. */
     private async markResent(session: FleetSession, ledgerId: string): Promise<void> {
         if (!session.agentRunId) return;
         try {
-            const row = await this.logs.findOne({ where: { id: ledgerId, runId: session.agentRunId } });
+            const row = await this.logs.findOne({
+                where: { id: ledgerId, runId: session.agentRunId },
+            });
             const meta = row ? asLedgerMeta(row.metadata) : null;
             if (row && meta) {
                 await this.logs.update(row.id, {
@@ -581,9 +672,13 @@ export class FleetSessionActionService {
             });
         }
         if (state.at.length >= FLEET_SESSION_ACTION_RATE.perMinute) {
-            throw fleetSessionError('limit_exceeded', `${FLEET_SESSION_ACTION_RATE.perMinute} actions per minute`, {
-                limit: `${FLEET_SESSION_ACTION_RATE.perMinute} per minute`,
-            });
+            throw fleetSessionError(
+                'limit_exceeded',
+                `${FLEET_SESSION_ACTION_RATE.perMinute} actions per minute`,
+                {
+                    limit: `${FLEET_SESSION_ACTION_RATE.perMinute} per minute`,
+                },
+            );
         }
         state.at.push(now);
         state.last = { at: now, by };

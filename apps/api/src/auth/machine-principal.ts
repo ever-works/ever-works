@@ -144,14 +144,19 @@ export const AUTONOMOUS_TASK_TEXT_FIELDS: readonly string[] = Object.freeze([
 
 /** Off (refused) unless `MACHINE_PRINCIPAL_AUTONOMOUS_TEXT_EDIT=true`. Default-safe. */
 export function machinePrincipalAutonomousTextEditAllowed(): boolean {
-    return (process.env.MACHINE_PRINCIPAL_AUTONOMOUS_TEXT_EDIT ?? '').trim().toLowerCase() === 'true';
+    return (
+        (process.env.MACHINE_PRINCIPAL_AUTONOMOUS_TEXT_EDIT ?? '').trim().toLowerCase() === 'true'
+    );
 }
 
 /** A Task whose text a FUTURE run dispatches with no person in between. */
 export function isAutonomouslyDispatchedTask(
     task: { isRecurring?: boolean | null; scheduledAt?: Date | string | null } | null | undefined,
 ): boolean {
-    return task?.isRecurring === true || (task?.scheduledAt !== undefined && task?.scheduledAt !== null);
+    return (
+        task?.isRecurring === true ||
+        (task?.scheduledAt !== undefined && task?.scheduledAt !== null)
+    );
 }
 
 /**
@@ -165,7 +170,10 @@ export function isAutonomouslyDispatchedTask(
 export function refuseMachinePrincipalAutonomousTextEdit(
     auth: AuthenticatedUser | null | undefined,
     req: MachinePrincipalRequest | null | undefined,
-    task: Record<string, unknown> & { isRecurring?: boolean | null; scheduledAt?: Date | string | null },
+    task: Record<string, unknown> & {
+        isRecurring?: boolean | null;
+        scheduledAt?: Date | string | null;
+    },
     body: Record<string, unknown> | null | undefined,
 ): void {
     const kind = machinePrincipalKind(auth, req);
@@ -283,7 +291,10 @@ export function rethrowReservedLabelRefusal(
     throw error;
 }
 
-function throwReservedLabelRefusal(kind: MachinePrincipalKind, change: ReservedTaskLabelChange): never {
+function throwReservedLabelRefusal(
+    kind: MachinePrincipalKind,
+    change: ReservedTaskLabelChange,
+): never {
     throwMachinePrincipalRefusal(kind, reservedTaskLabelRefusal(PRINCIPAL_LABEL[kind], change), {
         fields: ['labels'],
         reason: 'reserved_label',

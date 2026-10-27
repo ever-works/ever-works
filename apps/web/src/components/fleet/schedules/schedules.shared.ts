@@ -50,7 +50,9 @@ export function twoZoneTime(
 /** The row glyph (spec §5.1): ● active · ◐ running · ⏸ paused · ⚠ never runs. */
 export type ScheduleRowGlyph = 'active' | 'running' | 'paused' | 'neverRuns';
 
-export function scheduleRowGlyph(schedule: Pick<FleetScheduleView, 'enabled' | 'running' | 'neverRuns'>): ScheduleRowGlyph {
+export function scheduleRowGlyph(
+    schedule: Pick<FleetScheduleView, 'enabled' | 'running' | 'neverRuns'>,
+): ScheduleRowGlyph {
     if (schedule.neverRuns) return 'neverRuns';
     if (!schedule.enabled) return 'paused';
     if (schedule.running) return 'running';
@@ -73,7 +75,13 @@ export function runGlyph(status: FleetCommandRunView['status']): string {
 }
 
 /** A run status as an i18n leaf key (camelCase, CONTRACTS §11.4). */
-export type RunStatusKey = 'running' | 'done' | 'failed' | 'timeout' | 'skippedOverlap' | 'skippedOffline';
+export type RunStatusKey =
+    | 'running'
+    | 'done'
+    | 'failed'
+    | 'timeout'
+    | 'skippedOverlap'
+    | 'skippedOffline';
 
 export function runStatusKey(status: FleetCommandRunView['status']): RunStatusKey {
     if (status === 'skipped-overlap') return 'skippedOverlap';
@@ -82,7 +90,10 @@ export function runStatusKey(status: FleetCommandRunView['status']): RunStatusKe
 }
 
 /** The skip sentence of a history row (spec §5.7), or null when it ran. */
-export function runSkipText(run: Pick<FleetCommandRunView, 'status'>, computer: string): string | null {
+export function runSkipText(
+    run: Pick<FleetCommandRunView, 'status'>,
+    computer: string,
+): string | null {
     return describeFleetScheduleSkip(run.status, computer);
 }
 
@@ -129,7 +140,10 @@ export function draftFromCadence(cadence: FleetScheduleCadence): CadenceDraft {
 }
 
 /** The stored cadence a draft makes, or the reason it is not one. */
-export function cadenceFromDraft(draft: CadenceDraft): { cadence: FleetScheduleCadence | null; error: string | null } {
+export function cadenceFromDraft(draft: CadenceDraft): {
+    cadence: FleetScheduleCadence | null;
+    error: string | null;
+} {
     switch (draft.form) {
         case 'every':
             return fleetScheduleCadenceFromForm({ form: 'every', minutes: draft.minutes });
@@ -161,8 +175,14 @@ export function previewFires(
 }
 
 /** The confirmation details off a 409 `confirmation_required` body, or null. */
-export function readScheduleConfirmation(details: Record<string, unknown>): FleetScheduleConfirmationDetails | null {
-    if (details.class !== 'confirm' || typeof details.action !== 'string' || typeof details.nodeName !== 'string') {
+export function readScheduleConfirmation(
+    details: Record<string, unknown>,
+): FleetScheduleConfirmationDetails | null {
+    if (
+        details.class !== 'confirm' ||
+        typeof details.action !== 'string' ||
+        typeof details.nodeName !== 'string'
+    ) {
         return null;
     }
     return details as unknown as FleetScheduleConfirmationDetails;
@@ -209,5 +229,7 @@ export function schedulesOfPage(page: unknown): FleetScheduleView[] {
     if (!Array.isArray(items)) return [];
     return items
         .map((item) => (item as { nodeSchedule?: FleetScheduleView } | null)?.nodeSchedule)
-        .filter((schedule): schedule is FleetScheduleView => Boolean(schedule && schedule.kind === 'schedule'));
+        .filter((schedule): schedule is FleetScheduleView =>
+            Boolean(schedule && schedule.kind === 'schedule'),
+        );
 }

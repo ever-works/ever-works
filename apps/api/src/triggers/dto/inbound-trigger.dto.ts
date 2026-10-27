@@ -133,7 +133,8 @@ export class GithubForMePresetDto {
 
     @ApiPropertyOptional({
         enum: TRIGGER_AUTO_STARTS,
-        description: "'manual' (default) parks every Task in the Backlog; 'always' starts the Agent on it.",
+        description:
+            "'manual' (default) parks every Task in the Backlog; 'always' starts the Agent on it.",
     })
     @IsOptional()
     @IsIn(TRIGGER_AUTO_STARTS as unknown as string[])

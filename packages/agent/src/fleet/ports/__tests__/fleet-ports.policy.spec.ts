@@ -22,7 +22,10 @@ describe('resolveFleetPortOpenTargets', () => {
     });
 
     it('falls back to the preview browser without a desktop', () => {
-        const decision = resolveFleetPortOpenTargets({ ...all, capabilities: ['ports', 'browser'] });
+        const decision = resolveFleetPortOpenTargets({
+            ...all,
+            capabilities: ['ports', 'browser'],
+        });
         expect(decision.targets.desktop).toEqual({ available: false, reason: 'no-desktop' });
         expect(decision.defaultTarget).toBe('preview-profile');
     });
@@ -45,28 +48,43 @@ describe('resolveFleetPortOpenTargets', () => {
             previewProfileEnabled: false,
             capabilities: ['ports', 'browser'],
         });
-        expect(decision.targets['preview-profile']).toEqual({ available: false, reason: 'preview-off' });
+        expect(decision.targets['preview-profile']).toEqual({
+            available: false,
+            reason: 'preview-off',
+        });
     });
 
     it('offers nothing outside the ports audience; the desktop needs the desktop audience (U4)', () => {
         expect(resolveFleetPortOpenTargets({ ...all, canPorts: false }).defaultTarget).toBeNull();
-        expect(resolveFleetPortOpenTargets({ ...all, canDesktop: false }).targets.desktop.reason).toBe(
-            'desktop-family',
-        );
+        expect(
+            resolveFleetPortOpenTargets({ ...all, canDesktop: false }).targets.desktop.reason,
+        ).toBe('desktop-family');
     });
 
     it('maps each reason to its CONTRACTS §8 code', () => {
         expect(
-            fleetPortTargetRefusal('desktop', { available: false, reason: 'attend-missing' }, 'build-01').code,
+            fleetPortTargetRefusal(
+                'desktop',
+                { available: false, reason: 'attend-missing' },
+                'build-01',
+            ).code,
         ).toBe('consent_missing');
         expect(
-            fleetPortTargetRefusal('preview-profile', { available: false, reason: 'no-browser' }, 'build-01'),
+            fleetPortTargetRefusal(
+                'preview-profile',
+                { available: false, reason: 'no-browser' },
+                'build-01',
+            ),
         ).toMatchObject({
             code: 'unsupported_on_node',
             hint: 'No browser found on build-01 — install Chrome, Edge or Chromium there, or point the node at one',
         });
         expect(
-            fleetPortTargetRefusal('preview-profile', { available: false, reason: 'preview-off' }, 'build-01').hint,
+            fleetPortTargetRefusal(
+                'preview-profile',
+                { available: false, reason: 'preview-off' },
+                'build-01',
+            ).hint,
         ).toBe('The preview browser is switched off for build-01 — turn it on under Settings');
     });
 });

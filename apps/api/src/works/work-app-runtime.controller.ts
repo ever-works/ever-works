@@ -179,13 +179,18 @@ export class WorkAppRuntimeController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body()
-        body: { deploymentId?: unknown; runPreDeployJobs?: unknown; confirmClusterChange?: unknown },
+        body: {
+            deploymentId?: unknown;
+            runPreDeployJobs?: unknown;
+            confirmClusterChange?: unknown;
+        },
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<Record<string, unknown>> {
         await this.authorize(id, auth.userId, 'edit');
         if (appTargetChangeRequiresOwner()) {
             const confirmsChange = body?.confirmClusterChange === true;
-            const needsConfirmation = await this.targets.clusterCredentialNeedsOwnerConfirmation(id);
+            const needsConfirmation =
+                await this.targets.clusterCredentialNeedsOwnerConfirmation(id);
             if (confirmsChange || needsConfirmation) {
                 await requireAppWorkOwnerSession(
                     this.ownership,
@@ -245,11 +250,7 @@ export class WorkAppRuntimeController {
         @Res({ passthrough: true }) response: StatusOnlyResponse,
     ): Promise<{ status: 'accepted'; action: string; requestId: string; dispatched: boolean }> {
         const access = await this.authorize(id, auth.userId, 'edit');
-        if (
-            appDataDeleteOwnerOnly() &&
-            body?.action === 'remove' &&
-            body?.deleteData === true
-        ) {
+        if (appDataDeleteOwnerOnly() && body?.action === 'remove' && body?.deleteData === true) {
             await requireAppWorkOwnerSession(
                 this.ownership,
                 id,

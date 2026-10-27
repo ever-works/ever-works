@@ -45,7 +45,9 @@ export class FleetHeldCallService implements FleetHeldCallFiler {
         } catch (error) {
             // The (actionType, subjectKey) index refused a second proposal: hand back the
             // pending one; a decided one (or any other failure) keeps the plain hold.
-            const existing = await this.approvals.findBySubjectKey(input.userId, 'other', subjectKey).catch(() => null);
+            const existing = await this.approvals
+                .findBySubjectKey(input.userId, 'other', subjectKey)
+                .catch(() => null);
             if (existing && existing.status === 'pending') return { decisionId: existing.id };
             this.logger.warn(
                 `Held fleet call ${payload.tool} for Agent ${input.agentId} filed no Decision: ${

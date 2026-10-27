@@ -97,7 +97,8 @@ export function hostEligibility(input: HostEligibilityInput): FleetVirtualHostRe
     if (!input.allowed) return 'permission-denied';
     if (system.kind === 'vm') {
         // Windows VMs need KVM on a Linux x86-64 host (FR-5, U3); macOS and arm64 never advertise it.
-        if (os !== 'linux' || arch !== 'x64' || !capabilities.includes(FLEET_KVM_CAPABILITY)) return 'no-kvm';
+        if (os !== 'linux' || arch !== 'x64' || !capabilities.includes(FLEET_KVM_CAPABILITY))
+            return 'no-kvm';
     } else if (arch && !(system.arch as readonly string[]).includes(arch)) {
         return 'unsupported-arch';
     }
@@ -111,7 +112,8 @@ export function hostEligibility(input: HostEligibilityInput): FleetVirtualHostRe
     if (!capabilities.includes('docker')) return 'no-docker';
     if (!capabilities.includes(FLEET_VIRTUAL_HOST_CAPABILITY)) return 'not-upgraded';
     // Windows VMs (P2, lane decision 14): only with an installer image the host's operator configured.
-    if (system.kind === 'vm' && !capabilities.includes(FLEET_VIRTUAL_WINDOWS_CAPABILITY)) return 'no-windows-image';
+    if (system.kind === 'vm' && !capabilities.includes(FLEET_VIRTUAL_WINDOWS_CAPABILITY))
+        return 'no-windows-image';
     if (input.childCount >= FLEET_VIRTUAL_MAX_PER_HOST) return 'limit';
     return null;
 }
@@ -119,7 +121,12 @@ export function hostEligibility(input: HostEligibilityInput): FleetVirtualHostRe
 /** The CONTRACTS §8 code a reason is refused with on a direct request. */
 export function hostReasonErrorCode(
     reason: FleetVirtualHostReason,
-): 'unreachable' | 'consent_missing' | 'permission_denied' | 'unsupported_on_node' | 'limit_exceeded' {
+):
+    | 'unreachable'
+    | 'consent_missing'
+    | 'permission_denied'
+    | 'unsupported_on_node'
+    | 'limit_exceeded' {
     switch (reason) {
         case 'offline':
             return 'unreachable';
@@ -174,7 +181,8 @@ export function hostReasonHint(
 }
 
 /** The Windows free-disk floor (FR-18), in MiB. */
-export const FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_MIB = FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_GIB * 1024;
+export const FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_MIB =
+    FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_GIB * 1024;
 
 /** Memory every child reserves on its host, running or not (its size). */
 export function reservedMemoryMiB(children: readonly FleetVirtualChildFacts[]): number {
@@ -208,7 +216,10 @@ export function netFreeMemoryMiB(
  * ties (and unknown memory, ranked last) by name. Null when none is eligible.
  */
 export function autoPickHost(
-    hosts: readonly Pick<FleetVirtualHostOption, 'nodeId' | 'name' | 'eligible' | 'freeMemoryMiB'>[],
+    hosts: readonly Pick<
+        FleetVirtualHostOption,
+        'nodeId' | 'name' | 'eligible' | 'freeMemoryMiB'
+    >[],
 ): string | null {
     const eligible = hosts.filter((host) => host.eligible);
     if (eligible.length === 0) return null;
@@ -222,7 +233,9 @@ export function autoPickHost(
 }
 
 /** Whether a kind may host anything at all (README §8: no nesting). */
-export function canHost(node: Pick<FleetVirtualHostFacts, 'origin' | 'hostNodeId' | 'kind'>): boolean {
+export function canHost(
+    node: Pick<FleetVirtualHostFacts, 'origin' | 'hostNodeId' | 'kind'>,
+): boolean {
     return !isVirtualNode(node) && node.kind !== 'desktop-node';
 }
 

@@ -112,7 +112,9 @@ export { COMPUTER_CONTROL_POLICIES as FLEET_NODE_CONTROL_POLICIES } from '@ever-
 @Index('idx_fleet_nodes_host', ['hostNodeId'])
 // Cloud computers (FL-17): one Node per provider machine. A plain unique index:
 // NULLs never collide on Postgres or SQLite, so every other Node is unaffected.
-@Index('idx_fleet_nodes_provider_machine', ['providerPluginId', 'providerMachineRef'], { unique: true })
+@Index('idx_fleet_nodes_provider_machine', ['providerPluginId', 'providerMachineRef'], {
+    unique: true,
+})
 // Desktop view & control (FL-07): the Computers list filters on the helper's trust.
 @Index('idx_fleet_nodes_helper_trust', ['helperTrust'])
 export class FleetNode {

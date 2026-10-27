@@ -69,7 +69,11 @@ export interface AppEnvImportPreview {
     readonly workId: string;
     readonly lines: AppEnvImportPreviewLine[];
     /** The names that would change, sorted, by action. */
-    readonly changes: { readonly add: string[]; readonly replace: string[]; readonly remove: string[] };
+    readonly changes: {
+        readonly add: string[];
+        readonly replace: string[];
+        readonly remove: string[];
+    };
     readonly refused: number;
     /** A paste over FR-28's ceilings was not parsed at all. */
     readonly limits: { readonly code: string; readonly message: string } | null;
@@ -458,7 +462,9 @@ export function previewDotenv(
                 name: entry.name,
                 action: row?.set ? 'remove' : 'skipped',
                 code: null,
-                message: row?.set ? null : 'The value is empty and nothing is stored for this name.',
+                message: row?.set
+                    ? null
+                    : 'The value is empty and nothing is stored for this name.',
             });
             continue;
         }

@@ -88,9 +88,13 @@ export class FleetStatusService implements FleetStatusReaderPort {
     private async readLiveSessions(userId: string): Promise<Map<string, number> | null> {
         if (!this.sessions || !config.fleet.isSessionsEnabled()) return null;
         try {
-            const live = await this.sessions.list({ userId }, { state: 'live', limit: LIVE_SESSIONS_READ_LIMIT });
+            const live = await this.sessions.list(
+                { userId },
+                { state: 'live', limit: LIVE_SESSIONS_READ_LIMIT },
+            );
             const counts = new Map<string, number>();
-            for (const session of live) counts.set(session.nodeId, (counts.get(session.nodeId) ?? 0) + 1);
+            for (const session of live)
+                counts.set(session.nodeId, (counts.get(session.nodeId) ?? 0) + 1);
             return counts;
         } catch (error) {
             this.logger.warn(`fleet status: live sessions unreadable (${errorText(error)})`);
