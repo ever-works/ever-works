@@ -54,6 +54,7 @@ interface RouterPayload {
 	readonly authenticationResults?: unknown;
 }
 
+/** The router's HMAC secret: the resolved setting, else `EVER_EMAIL_ROUTER_SECRET`, else none. */
 function resolveSecret(options: EmailOptions): string | undefined {
 	const fromSettings = options.settings?.inboundWebhookSecret;
 	if (typeof fromSettings === 'string' && fromSettings.length > 0) return fromSettings;
@@ -71,6 +72,7 @@ function headerValue(headers: Readonly<Record<string, string>>, name: string): s
 	return undefined;
 }
 
+/** The router's JSON body as an object; throws on anything else (the callers decide what a throw means). */
 function decodePayload(rawBody: Buffer): RouterPayload {
 	const parsed: unknown = JSON.parse(rawBody.toString('utf8'));
 	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -209,6 +211,7 @@ function providerMessageIdFor(messageId: string | undefined, raw: Buffer, recipi
 		: `${digest}:${createHash('sha256').update(recipient).digest('hex')}`;
 }
 
+/** An attachment's bytes as base64 (`postal-mime` already gives base64 text when asked to). */
 function attachmentContent(content: ArrayBuffer | Uint8Array | string): string {
 	if (typeof content === 'string') return content;
 	return Buffer.from(content instanceof Uint8Array ? content : new Uint8Array(content)).toString('base64');
@@ -265,6 +268,10 @@ export class EverEmailRouterPlugin implements IEmailInboundPlugin {
 		// No-op.
 	}
 
+	/**
+	 * Authenticate a delivery: `x-ever-email-signature` must carry a fresh `t` and a `v1`
+	 * equal to HMAC-SHA256(secret, `<t>.` + the exact raw body). Throws on any failure.
+	 */
 	verifyWebhookSignature(rawBody: Buffer, headers: Readonly<Record<string, string>>, options: EmailOptions): void {
 		const secret = resolveSecret(options);
 		// FAIL CLOSED: with no (or a guessable) secret there is nothing to
@@ -310,6 +317,7 @@ export class EverEmailRouterPlugin implements IEmailInboundPlugin {
 		}
 	}
 
+	/** The lower-cased envelope recipient the router delivered to (`[]` when unreadable). */
 	extractInboundRecipients(rawBody: Buffer, _headers: Readonly<Record<string, string>>): readonly string[] {
 		// Best-effort, WITHOUT verifying the signature — the facade binds the
 		// owner (and so the secret scope) before verification. The ENVELOPE
@@ -324,6 +332,7 @@ export class EverEmailRouterPlugin implements IEmailInboundPlugin {
 		}
 	}
 
+	/** Decode the delivery's RFC 5322 message into the canonical inbound shape. */
 	async parseInboundWebhook(
 		rawBody: Buffer,
 		_headers: Readonly<Record<string, string>>,

@@ -258,6 +258,10 @@ export class EmailService {
         return this.addresses.findActiveByUser(userId, direction);
     }
 
+    /**
+     * Register a tenant address for `userId`, under its provider plugin's
+     * address policy when it declares one (domain, lower-cased, single owner).
+     */
     async createAddress(
         userId: string,
         input: CreateEmailAddressInput,
@@ -299,6 +303,10 @@ export class EmailService {
         return saved;
     }
 
+    /**
+     * Change an owned address's settings, reply default or disabled state;
+     * re-enabling it applies its provider plugin's address policy again.
+     */
     async updateAddress(
         userId: string,
         id: string,
