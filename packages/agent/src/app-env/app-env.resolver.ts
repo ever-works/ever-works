@@ -1912,7 +1912,6 @@ export function buildServiceOutputs(
     }
 }
 
-/** Is this row's provider one of the three external ones? (plan §4.10) */
 /**
  * The external destinations of a set of dependency facts — one rule for a full resolution's
  * `egress` and for the health poll's {@link AppEnvResolver.resolveEgressHosts}, so the two cannot
@@ -1946,6 +1945,7 @@ function collectEgressDestinations(
         .sort((left, right) => (left.host < right.host ? -1 : left.host > right.host ? 1 : 0));
 }
 
+/** Is this row's provider one of the three external ones? (plan §4.10) */
 function isExternalProvider(providerId: string | null): boolean {
     return (
         providerId !== null &&
