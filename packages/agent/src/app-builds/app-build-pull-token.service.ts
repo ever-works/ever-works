@@ -1,4 +1,9 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import {
+    APP_BUILD_TELEMETRY_EVENTS,
+    AppBuildsTelemetry,
+    type AppBuildPullTokenValidationResult,
+} from './app-builds.telemetry';
 import { APP_BUILD_PULL_TOKEN_EXPIRY_WARN_DAYS, type AppBuildKind } from '@ever-works/contracts';
 import { AppBuildRepository } from '../database/repositories/app-build.repository';
 import { WorkBuild } from '../entities/work-build.entity';
@@ -156,6 +161,24 @@ export function pullTokenRefusalFor(result: {
     return 'pullTokenCannotRead';
 }
 
+/**
+ * APW-05 T38 — a registry refusal as plan §9.1's `app_build_pull_token_validated.result`.
+ * `null` for a refusal that is not a validation of the token at all (a public image needs none).
+ */
+export function pullTokenTelemetryResultFor(
+    code: AppBuildPullTokenCode,
+): AppBuildPullTokenValidationResult | null {
+    switch (code) {
+        case 'pullTokenTooBroad':
+            return 'tooBroad';
+        case 'pullTokenCannotRead':
+        case 'pullTokenFineGrained':
+            return 'cannotRead';
+        default:
+            return null;
+    }
+}
+
 /** The HTTP status each code answers with (`plan.md:1200`). */
 export function pullTokenStatusCodeFor(code: AppBuildPullTokenCode): 409 | 422 | 503 {
     switch (code) {
@@ -180,6 +203,10 @@ export class AppBuildPullTokenService {
         @Optional()
         @Inject(APP_BUILD_PLATFORM_SETTINGS_WRITER)
         private readonly settings?: AppBuildPlatformManagedSettingsWriter,
+        // APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — `app_build_pull_token_validated`.
+        @Optional()
+        @Inject(AppBuildsTelemetry)
+        private readonly telemetry?: AppBuildsTelemetry,
     ) {}
 
     /**
@@ -230,6 +257,14 @@ export class AppBuildPullTokenService {
 
         const refusal = pullTokenRefusalFor(result);
         if (refusal) {
+            const validated = pullTokenTelemetryResultFor(refusal);
+            if (validated) {
+                this.telemetry?.track(
+                    APP_BUILD_TELEMETRY_EVENTS.pullTokenValidated,
+                    { result: validated },
+                    userId,
+                );
+            }
             return { ok: false, status: pullTokenStatusCodeFor(refusal), code: refusal };
         }
 
@@ -249,6 +284,11 @@ export class AppBuildPullTokenService {
             return { ok: false, status: 503, code: 'pullTokenUnavailable' };
         }
 
+        this.telemetry?.track(
+            APP_BUILD_TELEMETRY_EVENTS.pullTokenValidated,
+            { result: 'ok' },
+            userId,
+        );
         return {
             ok: true,
             pullAccess: {

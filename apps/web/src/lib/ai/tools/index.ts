@@ -7,7 +7,8 @@ import {
     getWorkConfig,
     getGenerationHistory,
     getScheduleStatus,
-    createWorkManual,
+    createCreateWorkManualTool,
+    inspectAppSource,
     createWorkWithAITool,
     importWorkTool,
     analyzeImportSource,
@@ -107,11 +108,14 @@ export function buildChatTools(model: LanguageModel, options: GeneratedToolsOpti
         getGenerationHistory,
         getScheduleStatus,
 
-        // Create
-        createWorkManual,
+        // Create — APW-01 T25: an App Work create carries the same user-turn
+        // confirmation check as the generated tools.
+        createWorkManual: createCreateWorkManualTool(options.userConfirmed),
         createWorkWithAI: createWorkWithAITool,
         importWork: importWorkTool,
         analyzeImportSource,
+        // APW-01 T32 — read-only check of a repository before an App Work create.
+        inspectAppSource,
 
         // Update / Delete
         updateWork: updateWorkTool,

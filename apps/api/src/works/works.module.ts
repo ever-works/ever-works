@@ -58,9 +58,13 @@ import { AppSourceController } from './app-source.controller';
 import { WorkAppDeployController } from './work-app-deploy.controller';
 // APW-06 T33 (lane aw-deploy-2) — GET/PUT app-target, POST app-target/check, GET app-status.
 import { WorkAppRuntimeController } from './work-app-runtime.controller';
+// APW-09 T10/T19 (lane aw-upstream-prs) — `/api/works/:id/upstream-pull-requests[...]`. Its
+// services come from `UpstreamPullRequestsModule`, already imported below for `WorkEvolveController`.
+import { UpstreamPullRequestsController } from './upstream-pull-requests.controller';
 // Lane aw-ops — refresh status, logs, run a job, run smoke checks, the Deployment history.
 import { WorkAppOpsController } from './work-app-ops.controller';
 import { WorkEvolveController } from './work-evolve.controller';
+import { WorkCostController } from './work-cost.controller';
 import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requests';
 import { WorkAppSpecController } from './work-app-spec.controller';
 import { WorkAppEnvController } from './work-app-env.controller';
@@ -252,6 +256,12 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // `POST /api/works/:id/provision`, `GET /api/works/:id/provisioning`. Its services
         // come from `AgentAppWorksModule` (imported above).
         WorkEvolveController,
+        // APW-09 T10/T19 (lane aw-upstream-prs) — the upstream pull request records: list,
+        // eligibility, one record, withdraw, acknowledge extra files.
+        UpstreamPullRequestsController,
+        // APW-08 T56 (lane B2) — `GET /api/works/:id/cost`: the month's spend against the Work's
+        // own budget. PluginUsageRepository + WorkBudgetRepository come from DatabaseModule.
+        WorkCostController,
         // Wave 4 M3 — per-Work AgentRun summary counts.
         WorkRunsController,
         // Wave 7 feature h (v1) — open PRs across the Work's repos.

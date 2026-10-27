@@ -1,4 +1,4 @@
-import { normalizeRecordListView } from '@ever-works/contracts';
+import { normalizeRecordListView, type TaskCostView } from '@ever-works/contracts';
 import {
     BadRequestException,
     Body,
@@ -57,7 +57,13 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // drive the chat-dispatch fan-out (TaskChatService:136-168). The
 // repository class lives under `@ever-works/agent/database` (the
 // agents barrel re-exports services + module only).
-import { AgentRepository, ownershipScopeOf, type OwnershipScope } from '@ever-works/agent/database';
+import {
+    AgentRepository,
+    AgentRunRepository,
+    ownershipScopeOf,
+    type OwnershipScope,
+} from '@ever-works/agent/database';
+import { buildTaskCostView } from './task-cost';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 // Re-litigation guard (memory upgrades M6) — provided + exported by
 // `KnowledgeBaseModule`, which the api-side TasksModule imports.
@@ -302,6 +308,10 @@ export class TasksController {
         // existing positional construction in the specs keeps compiling; the
         // board routes answer 503 when a reduced module graph lacks it.
         @Optional() private readonly boardReadModel?: TaskBoardService,
+        // APW-08 T24 — the Task's runs for `GET :id/cost`. Appended LAST + @Optional() so every
+        // positional construction keeps compiling; absent, the view lists no runs and still
+        // answers the Task's total from the usage ledger.
+        @Optional() private readonly agentRuns?: AgentRunRepository,
     ) {}
 
     /**
@@ -1552,6 +1562,21 @@ export class TasksController {
             currency,
         });
         return { taskId: id, totalCents, currency: currency ?? 'usd' };
+    }
+
+    @Get(':id/cost')
+    @ApiOperation({
+        summary:
+            "APW-08 — what a Task cost: each of its runs (the receipt's own lines, summed, with a link to the receipt) and every usage row attributed to it.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async cost(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<TaskCostView> {
+        // The same cross-account check as `:id/spend` — another account's Task is a 404.
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        return buildTaskCostView(id, { usage: this.pluginUsage, runs: this.agentRuns ?? null });
     }
 
     @Post(':id/chat')

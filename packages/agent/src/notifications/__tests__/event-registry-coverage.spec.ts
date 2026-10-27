@@ -186,13 +186,19 @@ describe('core notification event catalogue', () => {
             const group = deriveNotificationMatrixGroup(event);
             byGroup.set(group, [...(byGroup.get(group) ?? []), event.key]);
         }
-        expect(byGroup.get('needsYou')).toHaveLength(11);
+        // 12 since FL-05 P2 added the urgent `fleet_session_needs_you` (a session waiting on its person).
+        expect(byGroup.get('needsYou')).toHaveLength(12);
+        expect(byGroup.get('needsYou')).toContain('fleet_session_needs_you');
         expect(byGroup.get('routine')?.sort()).toEqual([
             'agent_run_finished',
             'work_generation_finished',
         ]);
         expect(byGroup.get('digest')).toEqual(['digest_ready']);
-        expect(byGroup.get('signals')).toHaveLength(10);
+        // 12 since FL-05 P2 added `fleet_session_finished` and `fleet_session_failed`.
+        expect(byGroup.get('signals')).toHaveLength(12);
+        expect(byGroup.get('signals')).toEqual(
+            expect.arrayContaining(['fleet_session_finished', 'fleet_session_failed']),
+        );
     });
 
     it('derives groups by rule, so plugin events land somewhere sensible', () => {

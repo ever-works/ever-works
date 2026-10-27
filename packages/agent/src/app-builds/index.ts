@@ -68,6 +68,8 @@ export * from './app-build-pull-token.service';
 export * from './app-build-sweep.service';
 export * from './app-build-run-discovery.service';
 export * from './app-builds.listener';
+// APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — plan §9.1's Builds telemetry.
+export * from './app-builds.telemetry';
 export {
     BUILD_SETTINGS_SOURCE,
     type BuildFacadeBinding,

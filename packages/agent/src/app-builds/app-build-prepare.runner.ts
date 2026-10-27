@@ -32,6 +32,11 @@ import { AppBuildRepository } from '../database/repositories/app-build.repositor
 import { WorkBuild } from '../entities/work-build.entity';
 import { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
 import {
+    APP_BUILD_TELEMETRY_EVENTS,
+    AppBuildsTelemetry,
+    appBuildWorkflowWrittenPath,
+} from './app-builds.telemetry';
+import {
     APP_BUILD_PLUGIN_RESOLVER,
     APP_BUILD_SPEC_SOURCE,
     APP_BUILD_WORK_SOURCE,
@@ -732,6 +737,12 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
         @Optional()
         @InjectRepository(WorkBuild)
         private readonly rows?: Repository<WorkBuild>,
+        // APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — plan §9.1's blocked, workflow and
+        // checks events. Appended last and `@Optional()`; `@Inject` by class (SWC erases the
+        // optional parameter's type to `Object`).
+        @Optional()
+        @Inject(AppBuildsTelemetry)
+        private readonly telemetry?: AppBuildsTelemetry,
     ) {}
 
     /* ---------------------------------------------------------------------- *
@@ -1214,6 +1225,7 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
                   secretSyncRuns,
                   bootstrap: false,
                   now,
+                  checksOnly: checksOnlyDelivery,
               });
 
         // The set of Builds this pass blocked, so step 6 never dispatches what it
@@ -1363,6 +1375,8 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             readonly secretSyncRuns: boolean;
             readonly bootstrap: boolean;
             readonly now: Date;
+            /** APW-05 T38 — §4.14's checks-only delivery, for `app_build_checks_written`. */
+            readonly checksOnly?: boolean;
         },
     ): Promise<PassOutcome> {
         const repository: BuildRepositoryRef = binding.repository ?? {
@@ -1420,6 +1434,7 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
 
         const state = appBuildWorkflowStateFor(result.workflow.state);
         const pluginBlocked = mapPluginBlockedReason(result.blocked?.reason ?? null);
+        this.emitDeliveryTelemetry(result, input);
         if (result.blocked && !pluginBlocked) {
             this.logger.warn(
                 `App builds: the build plugin refused the prepare of work ${workId} with reason ` +
@@ -1475,6 +1490,30 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             dispatched: 0,
             blocked: 0,
         };
+    }
+
+    /**
+     * APW-05 T38 — plan §9.1's `app_build_workflow_written` (`path`) and
+     * `app_build_checks_written` (`count`, `advisory`, `checksOnly`) for one delivery. Counts and
+     * codes only: never a check's name or command, never the workflow's path or content.
+     * Nothing is emitted for an `unchanged` workflow, and the checks event rides a write (the
+     * checks job lives inside the platform's workflow file).
+     */
+    private emitDeliveryTelemetry(
+        result: PrepareRepositoryResult,
+        input: { readonly checks: readonly AppBuildCheckInput[]; readonly checksOnly?: boolean },
+    ): void {
+        if (!this.telemetry) return;
+        const path = appBuildWorkflowWrittenPath(result.workflow?.state);
+        if (!path) return;
+        this.telemetry.track(APP_BUILD_TELEMETRY_EVENTS.workflowWritten, { path });
+        if (path !== 'editedByHand' && input.checks.length > 0) {
+            this.telemetry.track(APP_BUILD_TELEMETRY_EVENTS.checksWritten, {
+                count: input.checks.length,
+                advisory: input.checks.filter((check) => check.required === false).length,
+                checksOnly: input.checksOnly === true,
+            });
+        }
     }
 
     /**
@@ -1733,6 +1772,7 @@ export class AppBuildPrepareRunner implements AppBuildPrepareRunnerPort {
             this.logger.debug(
                 `App builds: build ${build.id} of work ${workId} is blocked (${reason}).`,
             );
+            this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.blocked, { reason });
         }
         return moved;
     }

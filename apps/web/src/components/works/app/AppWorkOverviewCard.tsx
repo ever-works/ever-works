@@ -7,6 +7,8 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { ChatAboutButton } from '@/components/ai/conversations/ConversationEntryButtons';
+import { RequestChangeDialog } from './RequestChangeDialog';
+import { WorkCostSummary } from './WorkCostSummary';
 
 /** The App spec states the card names; anything else reads "Not checked yet". */
 const APP_SPEC_STATUS_LEAVES = new Set([
@@ -214,8 +216,15 @@ export function AppWorkOverviewCard({
                 {/* Opens the docked Conversation's participant switcher with this
                     Work attached, so the Work's agent works in its repository.
                     Renders nothing outside the dashboard chat shell. */}
-                <ChatAboutButton contextType="work" contextId={workId} label={workName} />
+                <div className="flex flex-wrap items-center gap-2">
+                    <ChatAboutButton contextType="work" contextId={workId} label={workName} />
+                    {/* APW-08 T27 — the same change request, without a chat: one field, a Task. */}
+                    <RequestChangeDialog workId={workId} />
+                </div>
             </div>
+
+            {/* APW-08 T56 — this month's spend against the Work's own budget. */}
+            <WorkCostSummary workId={workId} />
         </section>
     );
 }
