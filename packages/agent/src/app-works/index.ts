@@ -190,3 +190,8 @@ export * from './app-work-run-classifier';
 
 // APW-08 T49 (XC-10, FR-74, R-30, lane B2) — the evolve loop's operator kill switches.
 export * from './app-work-switches';
+
+// APW-08 T18 (lane B2) — the App Work run brief from the App rules at the base commit, and the
+// source both run paths (AgentRunService, the fleet planner) ask for it.
+export * from './app-run-brief';
+export * from './app-run-brief.service';

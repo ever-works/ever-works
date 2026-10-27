@@ -93,6 +93,8 @@ import {
     describeAppChangesPaused,
     readAppWorkSwitches,
 } from '../app-works/app-work-switches';
+// APW-08 T18 — the token and its interface only (the service itself is bound API-side).
+import { APP_RUN_BRIEF_SOURCE, type AppRunBriefSource } from '../app-works/app-run-brief.service';
 
 export interface AgentRunContext {
     runId: string;
@@ -341,6 +343,12 @@ export class AgentRunService {
         @Optional()
         @Inject(APP_WORK_RUN_CLASSIFIER)
         private readonly appWorkRuns?: AppWorkRunClassifier,
+        // APW-08 T18 — an App Work Task run's brief from the App rules at the base commit
+        // and the repository's fenced instruction files. Trailing + `@Optional()`; the API
+        // binds it in its @Global() AgentsModule. Unbound, every run is briefed as before.
+        @Optional()
+        @Inject(APP_RUN_BRIEF_SOURCE)
+        private readonly appRunBriefs?: AppRunBriefSource,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -496,6 +504,43 @@ export class AgentRunService {
             ].join('\n');
             prompt.systemMessage = `${prompt.systemMessage}\n\n${visionBlock}`;
             prompt.totalSystemTokens = estimateTokens(prompt.systemMessage);
+        }
+
+        // 3a'. APW-08 T18 — an App Work Task run is told the App rules as they are at the base
+        // commit (protected paths, human-merge paths, size guidance, and that the platform
+        // pushes and opens the pull request), then the repository's own instruction files
+        // inside nonce'd untrusted fences. Appended AFTER assembly for the same reasons as the
+        // vision block. Nothing here can change the tool list (decided from platform rows).
+        if (
+            context.kind === 'task' &&
+            context.taskId &&
+            this.appRunBriefs &&
+            !isAgentReviewRunScope(context.delegationScope)
+        ) {
+            const brief = await this.appRunBriefs
+                .forTask({ taskId: context.taskId })
+                .catch(() => null);
+            if (brief) {
+                prompt.systemMessage = [prompt.systemMessage, brief.rules, brief.instructions]
+                    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+                    .join('\n\n');
+                prompt.totalSystemTokens = estimateTokens(prompt.systemMessage);
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level: brief.refusedFiles.length > 0 ? 'WARN' : 'INFO',
+                        step: 'app-rules',
+                        message: `App rules from \`${brief.branch}\`${brief.baseSha ? ` at ${brief.baseSha.slice(0, 12)}` : ''}; instruction files: ${brief.includedFiles.length} included, ${brief.refusedFiles.length} refused.`,
+                        metadata: {
+                            branch: brief.branch,
+                            baseSha: brief.baseSha,
+                            includedFiles: [...brief.includedFiles],
+                            truncatedFiles: [...brief.truncatedFiles],
+                            refusedFiles: brief.refusedFiles.map((file) => ({ ...file })),
+                        },
+                    })
+                    .catch(() => undefined);
+            }
         }
 
         // 3b. Memory recall injection (memory upgrades M2) — task-kind

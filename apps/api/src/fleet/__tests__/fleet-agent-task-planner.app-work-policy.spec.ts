@@ -83,7 +83,7 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
 
-    const build = () =>
+    const build = (appRunBriefs?: unknown) =>
         new FleetAgentTaskPlannerService(
             tasks as never,
             agents as never,
@@ -112,6 +112,7 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
                     repositories: ['member/cal-fork'],
                 }),
             } as never,
+            appRunBriefs as never,
         );
 
     beforeEach(() => {
@@ -188,5 +189,51 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
         expect(plan!.mcp).toEqual(
             expect.objectContaining({ enabled: true, serverName: 'ever-works' }),
         );
+    });
+
+    /**
+     * APW-08 T18 — the fleet brief carries the App rules (in the never-truncated tail, before the
+     * Task) and the fenced instruction files (after the workspace facts), read at the workspace's
+     * own base ref.
+     */
+    describe('the App Work run brief (T18)', () => {
+        const brief = {
+            rules: ['# APP RULES (platform rules)', 'Protected paths:', '- `src/billing/**`'].join(
+                '\n',
+            ),
+            instructions: [
+                '# UNTRUSTED REPOSITORY CONTENT',
+                '<untrusted_repository_content id="n1">',
+                'Use tabs.',
+                '</untrusted_repository_content id="n1">',
+            ].join('\n'),
+        };
+
+        it('puts the rules before the Task and the instruction files after the workspace', async () => {
+            const source = { forTask: jest.fn().mockResolvedValue(brief) };
+
+            const plan = await build(source).plan(payload);
+
+            expect(source.forTask).toHaveBeenCalledWith({ taskId: 'task-1', baseRef: 'main' });
+            const text = plan!.execution.instructions;
+            const rulesAt = text.indexOf('# APP RULES');
+            const workspaceAt = text.indexOf('# WORKSPACE (fleet node)');
+            const filesAt = text.indexOf('# UNTRUSTED REPOSITORY CONTENT');
+            expect(rulesAt).toBeGreaterThan(-1);
+            expect(rulesAt).toBeLessThan(text.indexOf('TSK-9'));
+            expect(filesAt).toBeGreaterThan(workspaceAt);
+        });
+
+        it('a run without a brief (not an App Work, or none could be composed) is planned as before', async () => {
+            const plan = await build({ forTask: jest.fn().mockResolvedValue(null) }).plan(payload);
+            expect(plan!.execution.instructions).not.toContain('# APP RULES');
+        });
+
+        it('a brief source that throws never fails the plan', async () => {
+            const plan = await build({
+                forTask: jest.fn().mockRejectedValue(new Error('down')),
+            }).plan(payload);
+            expect(plan).not.toBeNull();
+        });
     });
 });
