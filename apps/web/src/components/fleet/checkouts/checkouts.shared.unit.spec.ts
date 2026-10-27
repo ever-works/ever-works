@@ -74,7 +74,12 @@ describe('groupCheckoutsByRepository (FL-14 spec §5.1, S2)', () => {
             row({ id: 'b', repository: 'acme/beta', path: '/home/nina/beta' }),
             row({ id: 'a', repository: 'acme/Alpha', path: '/home/nina/alpha' }),
         ]);
-        expect(groups.map((group) => group.label)).toEqual(['acme/Alpha', 'acme/beta', 'acme/Zeta', null]);
+        expect(groups.map((group) => group.label)).toEqual([
+            'acme/Alpha',
+            'acme/beta',
+            'acme/Zeta',
+            null,
+        ]);
     });
 
     it('never merges a same-named repository on another host', () => {

@@ -191,7 +191,9 @@ describe('ScheduleRowMenu', () => {
         await waitFor(() =>
             expect(runScheduleNow).toHaveBeenCalledWith('node_schedule:ns-1', { confirm: true }),
         );
-        expect(confirm).toHaveBeenCalledWith(`${T}.runNow.confirmOnComputer({"name":"Nightly backup"})`);
+        expect(confirm).toHaveBeenCalledWith(
+            `${T}.runNow.confirmOnComputer({"name":"Nightly backup"})`,
+        );
         confirm.mockRestore();
     });
 

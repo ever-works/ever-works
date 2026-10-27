@@ -84,7 +84,9 @@ function makeAppWork(
  * APW-06 T59 (7e53baced) — `GET /api/works/:id/app-deletion-preview` for a deployed App on
  * the member's own cluster: one workload removed, one volume kept unless stored data goes too.
  */
-function makePreview(overrides: Partial<AppDeletionPreviewResponse> = {}): AppDeletionPreviewResponse {
+function makePreview(
+    overrides: Partial<AppDeletionPreviewResponse> = {},
+): AppDeletionPreviewResponse {
     return {
         target: 'your-cluster',
         deployed: true,
@@ -175,7 +177,10 @@ describe('DeleteComponent — an App Work (APW-01 T39)', () => {
         vi.mocked(deleteWork).mockResolvedValue({ success: true } as never);
         vi.mocked(getAppDeleteTarget).mockResolvedValue({ success: true, target: 'your-cluster' });
         // APW-06 T59 (7e53baced) — no Deployment running, so the delete stays available.
-        vi.mocked(getAppDeletionPreview).mockResolvedValue({ success: true, preview: makePreview() });
+        vi.mocked(getAppDeletionPreview).mockResolvedValue({
+            success: true,
+            preview: makePreview(),
+        });
     });
 
     /** Open the dialog and wait for the app-target and deletion-preview reads to settle. */
@@ -339,7 +344,10 @@ describe('DeleteComponent — an App Work (APW-01 T39)', () => {
     });
 
     it('says the preview is unavailable when it cannot be read, and still allows the delete', async () => {
-        vi.mocked(getAppDeletionPreview).mockResolvedValue({ success: false, error: 'unreachable' });
+        vi.mocked(getAppDeletionPreview).mockResolvedValue({
+            success: false,
+            error: 'unreachable',
+        });
 
         await openAppDialog(makeAppWork());
         expect(await screen.findByText('deleteAppPreviewUnavailable')).toBeInTheDocument();
