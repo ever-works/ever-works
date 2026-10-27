@@ -1,22 +1,29 @@
 name: Screen Helper
 
 # Desktop view & control (FL-07) — the native screen helper crate
-# (`apps/node/native/ever-works-screen`).
+# (`apps/node/native/ever-works-screen`): format, lint, unit + protocol tests,
+# a release build and the reproducible release build, on Windows, Linux and
+# macOS.
 #
-# GATED OFF: `workflow_dispatch` only, never a required check. The crate was
-# written on a workstation without a Rust toolchain and has not yet been
-# compiled; this workflow is where it first is. Run it on demand:
+# WHEN IT RUNS: on a pull request that touches the crate (or this file), and
+# on demand against any branch:
 #   gh workflow run screen-helper.yml --ref <branch>
-# Once it is green on all three runners (and `Cargo.lock` is committed), a
-# later change may add the `stage` / `main` push trigger the job launcher's
-# workflow has — that is an owner decision, recorded in the FL-07 lane log.
+# It is NOT a required check, and the path filter keeps it off every other
+# pull request, so it can never block one. GitHub-hosted runners (the crate
+# needs no secrets and no self-hosted pool; rustup is preinstalled on all
+# three images). History: the crate was written without a Rust toolchain and
+# first compiled on 2026-10-27; until then this workflow was dispatch-only.
 on:
+  pull_request:
+    paths:
+      - 'apps/node/native/ever-works-screen/**'
+      - '.github/workflows/screen-helper.yml'
   workflow_dispatch:
     inputs:
       release:
-        description: 'Also run the reproducible release build (needs a committed Cargo.lock)'
+        description: 'Also run the reproducible release build (always runs on pull requests)'
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -27,37 +34,72 @@ concurrency:
 
 jobs:
   verify:
+    name: verify (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022, macos-14]
+        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
       run:
+        shell: bash
         working-directory: apps/node/native/ever-works-screen
+    env:
+      CARGO_TERM_COLOR: always
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
-      - name: Show the pinned toolchain
-        run: rustup show
+      - name: Install the pinned toolchain (rust-toolchain.toml)
+        run: |
+          rustup --version
+          rustup toolchain install
+          rustup show
+          cargo --version
+          cargo clippy --version
 
       - name: Verify Rust formatting
         run: cargo fmt --all -- --check
 
       - name: Lint
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
 
-      - name: Unit tests
-        run: cargo test
+      - name: Unit and protocol tests
+        run: cargo test --locked
+
+      - name: Release build
+        run: |
+          cargo build --locked --release
+          ./target/release/ever-works-screen --version
+
+      - name: Also lint and build for Intel Macs
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo clippy --locked --all-targets --target x86_64-apple-darwin -- -D warnings
+          cargo build --locked --release --target x86_64-apple-darwin
+          file target/x86_64-apple-darwin/release/ever-works-screen
 
       - name: Reproducible release build (Linux, macOS)
-        if: ${{ inputs.release && runner.os != 'Windows' }}
-        shell: bash
-        run: ./build-release.sh dist
+        if: ${{ runner.os != 'Windows' && (github.event_name == 'pull_request' || inputs.release) }}
+        run: bash ./build-release.sh dist
 
       - name: Reproducible release build (Windows)
-        if: ${{ inputs.release && runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Windows' && (github.event_name == 'pull_request' || inputs.release) }}
         shell: pwsh
         run: ./build-release.ps1 -OutDir dist
+
+      # The unsigned build and its fingerprint, for inspection only: nothing is
+      # published, and a helper reaches a node only through the owner-approved
+      # release steps in PACKAGING.md.
+      - name: Keep the unsigned build for inspection
+        if: ${{ github.event_name == 'pull_request' || inputs.release }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ever-works-screen-${{ runner.os }}-unsigned
+          path: apps/node/native/ever-works-screen/dist/
+          retention-days: 7
+          if-no-files-found: error
