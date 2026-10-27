@@ -97,12 +97,17 @@ impl X11Capturer {
             .ok()
             .and_then(|cookie| cookie.reply().ok());
         let mut out = Vec::new();
+        // A display this helper added carries its name in an output property (T-45).
+        let tag = crate::virtual_display::x11::tag_atom(&self.conn);
         if let Some(reply) = reply {
             for (index, monitor) in reply.monitors.iter().enumerate() {
                 if monitor.width == 0 || monitor.height == 0 {
                     continue;
                 }
-                let name = self
+                let virtual_name = monitor.outputs.first().and_then(|output| {
+                    crate::virtual_display::x11::tag_of(&self.conn, *output, tag)
+                });
+                let monitor_name = self
                     .conn
                     .get_atom_name(monitor.name)
                     .ok()
@@ -112,13 +117,13 @@ impl X11Capturer {
                     .unwrap_or_else(|| format!("Monitor {}", index + 1));
                 out.push((
                     Display {
-                        id: sanitize_id(&name),
-                        name,
+                        id: sanitize_id(&monitor_name),
+                        is_virtual: virtual_name.is_some(),
+                        name: virtual_name.unwrap_or(monitor_name),
                         width: monitor.width as u32,
                         height: monitor.height as u32,
                         scale: 1.0,
                         primary: monitor.primary,
-                        is_virtual: false,
                     },
                     Rect {
                         x: monitor.x,
