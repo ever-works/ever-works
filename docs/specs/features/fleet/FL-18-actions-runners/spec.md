@@ -466,6 +466,7 @@ Actions runners on <computer>**, **Actions jobs**. i18n groups: `fleet.runners.i
 - **Resolved** by CONTRACTS R-37: the Actions jobs view is a hub Overview panel (`registerOverviewBlock`), not a seventh tab or route; the run-level act is worded "Cancel workflow run" and the tool is `fleet_runners_cancel_run`.
 - **Resolved** by CONTRACTS §3.3 (`runner.*` on the `machine` channel) and §12 (runner jobs are durable): the registration token is minted at the node's `awaiting-token` phase and pushed over the link as `runner.token`; if the link is down the job waits at that phase and the token is sent on reconnect (U11).
 - `[NEEDS CLARIFICATION: Should the Ever Works GitHub App manifest gain "Self-hosted runners" (organisation) and repository "Administration" now, accepting the re-authorisation prompt existing installations will see? Default until answered: the manifest is unchanged; repository runners use the permission when an installation already has it, and every missing permission shows the exact name with Grant access (S7, FR-26).]`
+  **Answered by the owner 2026-10-27:** yes — the App requests repository **Administration: Read and write** and organisation **Self-hosted runners: Read and write** by default. Existing installations accept the updated permissions on GitHub; the Grant access card, the Install dialog and a failed runner row say exactly what to accept. The live App's settings change only in GitHub's UI (click-path: `docs/internal/fleet/lanes/FL-18.md`, Owner action).
 
 ---
 

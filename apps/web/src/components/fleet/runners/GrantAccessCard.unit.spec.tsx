@@ -93,4 +93,32 @@ describe('GrantAccessCard', () => {
             'Checking…',
         );
     });
+
+    it('says exactly what to accept on GitHub (FL-18 A16, owner decision 2026-10-27)', () => {
+        render(
+            <GrantAccessCard
+                account="acme"
+                permission="Self-hosted runners: Read and write"
+                grantUrl="https://github.com/organizations/acme/settings/installations/1"
+                onCheckAgain={vi.fn()}
+            />,
+        );
+        expect(screen.getByTestId('fleet-runners-grant-access-accept')).toHaveTextContent(
+            'What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, check that “Self-hosted runners: Read and write” is listed, then press “Accept new permissions”.',
+        );
+    });
+
+    it('says what to accept when the permission was not named', () => {
+        render(
+            <GrantAccessCard
+                account="acme"
+                permission={null}
+                grantUrl={null}
+                onCheckAgain={vi.fn()}
+            />,
+        );
+        expect(screen.getByTestId('fleet-runners-grant-access-accept')).toHaveTextContent(
+            /press “Review request”, then “Accept new permissions”\. No request there\?/,
+        );
+    });
 });

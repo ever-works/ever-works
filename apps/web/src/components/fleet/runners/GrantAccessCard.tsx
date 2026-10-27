@@ -13,8 +13,14 @@ import { Button } from '@/components/ui/button';
  *  Organisation runners need one more permission
  *  The Ever Works GitHub App on acme needs "Self-hosted runners: Read and write".
  *  Grant it on GitHub, then come back and press Check again.
+ *  What to accept: … press “Review request”, check that “Self-hosted runners: Read and
+ *  write” is listed, then press “Accept new permissions”. …
  *                    [ Grant access ↗ ]  [ Check again ]  [ Use a repository instead ]
  * ```
+ *
+ * The App asks for the runner permissions by default (owner decision 2026-10-27, FL-18
+ * A16), so an installation made before that sees a permission request on GitHub; the
+ * "What to accept" line says exactly which button to press and what must be listed.
  *
  * **Grant access** opens the installation's permission page on GitHub; the
  * platform never asks for a personal token. **Check again** re-asks the API;
@@ -53,6 +59,9 @@ export function GrantAccessCard({
                 {t('title')}
             </p>
             <p>{permission ? t('body', { account, permission }) : t('bodyUnnamed', { account })}</p>
+            <p data-testid={`${testId}-accept`}>
+                {permission ? t('accept', { permission }) : t('acceptUnnamed')}
+            </p>
             <div className="flex flex-wrap items-center gap-2">
                 {grantUrl ? (
                     <a

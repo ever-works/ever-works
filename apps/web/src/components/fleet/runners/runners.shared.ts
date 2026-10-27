@@ -161,6 +161,34 @@ export function runnerStatus(
     };
 }
 
+/**
+ * The GitHub App permission names FL-18 can report as missing — the facade's
+ * `actionsRunnersPermissionLabel` values, matched verbatim.
+ */
+export const RUNNER_APP_PERMISSION_NAMES: readonly string[] = [
+    'Administration: Read and write',
+    'Self-hosted runners: Read and write',
+    'Actions: Read and write',
+    'Actions: Read-only',
+];
+
+/**
+ * The GitHub App permission a FAILED runner's error says is missing (`… the Ever Works
+ * GitHub App on acme needs "Administration: Read and write"`), so the row can say what to
+ * accept on GitHub; null for any other failure or state.
+ */
+export function runnerMissingAppPermission(
+    runner: Pick<FleetActionsRunnerView, 'state' | 'lastError'>,
+): string | null {
+    if (runner.state !== 'failed' || typeof runner.lastError !== 'string') return null;
+    const text = runner.lastError;
+    if (!text.includes('GitHub App')) return null;
+    for (const name of RUNNER_APP_PERMISSION_NAMES) {
+        if (text.includes(`needs "${name}"`) || text.includes(`needs “${name}”`)) return name;
+    }
+    return null;
+}
+
 /** Every label the row shows as a chip: GitHub's own first, then the owner's. */
 export function runnerLabelChips(
     runner: Pick<FleetActionsRunnerView, 'defaultLabels' | 'labels'>,
