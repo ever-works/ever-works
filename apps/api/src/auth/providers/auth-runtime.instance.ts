@@ -132,6 +132,19 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                 // and matches the UUID format already used by the User
                 // entity's `@PrimaryGeneratedColumn('uuid')`.
                 generateId: () => randomUUID(),
+                // Better Auth >=1.7.3 compares the live schema with the fields
+                // it writes, once per process, and every `auth.api.*` call
+                // (sign-up, sign-in, getSession, sign-out) awaits that verdict.
+                // A mismatch rejects them all with `SCHEMA_MISMATCH`, not just
+                // the insert that would have failed. TypeORM owns these tables,
+                // so a migration on `users`, `account`, `session`,
+                // `verification` or `terms_acceptance` must keep two rules:
+                // every column Better Auth writes (the core fields plus the
+                // `additionalFields` below) exists, and every column it does
+                // not write is nullable or has a default. The check stays on
+                // so drift fails loudly at boot instead of as a 422 on the next
+                // signup; set this to `false` only as an emergency switch.
+                validateSchema: true,
             },
         },
         user: {
