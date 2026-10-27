@@ -373,15 +373,23 @@ describe('FleetController', () => {
             recordWatchSessions: true,
             recordingRetentionDays: 30,
         } as never);
-        expect(service.setDesktopRecordingSettingsForUser).toHaveBeenCalledWith('user-1', nodeView.id, {
-            recordWatchSessions: true,
-            recordingRetentionDays: 30,
-        });
+        expect(service.setDesktopRecordingSettingsForUser).toHaveBeenCalledWith(
+            'user-1',
+            nodeView.id,
+            {
+                recordWatchSessions: true,
+                recordingRetentionDays: 30,
+            },
+        );
         expect(view).toMatchObject({ recordWatchSessions: true, recordingRetentionDays: 30 });
         await controller.update(auth, nodeView.id, { recordingRetentionDays: 7 } as never);
-        expect(service.setDesktopRecordingSettingsForUser).toHaveBeenLastCalledWith('user-1', nodeView.id, {
-            recordingRetentionDays: 7,
-        });
+        expect(service.setDesktopRecordingSettingsForUser).toHaveBeenLastCalledWith(
+            'user-1',
+            nodeView.id,
+            {
+                recordingRetentionDays: 7,
+            },
+        );
     });
 
     it('remove is owner-scoped', async () => {

@@ -17,7 +17,13 @@ import { DesktopRecordingSettings } from './DesktopRecordingSettings';
 
 /** FL-07 P3: the owner's recording settings — each change saves exactly that setting. */
 const node = (extra: Partial<FleetNodeView> = {}) =>
-    ({ id: 'node-1', name: 'studio', recordWatchSessions: false, recordingRetentionDays: 14, ...extra }) as FleetNodeView;
+    ({
+        id: 'node-1',
+        name: 'studio',
+        recordWatchSessions: false,
+        recordingRetentionDays: 14,
+        ...extra,
+    }) as FleetNodeView;
 
 describe('DesktopRecordingSettings', () => {
     afterEach(() => {
@@ -29,7 +35,9 @@ describe('DesktopRecordingSettings', () => {
         saveMock.mockResolvedValue({ success: true, data: null, error: null });
         render(<DesktopRecordingSettings node={node()} />);
         fireEvent.click(screen.getByTestId('fleet-desktop-record-watch-toggle'));
-        await waitFor(() => expect(saveMock).toHaveBeenCalledWith('node-1', { recordWatchSessions: true }));
+        await waitFor(() =>
+            expect(saveMock).toHaveBeenCalledWith('node-1', { recordWatchSessions: true }),
+        );
     });
 
     it('saves a new retention and puts the old one back when the save is refused', async () => {
@@ -38,7 +46,9 @@ describe('DesktopRecordingSettings', () => {
         const select = screen.getByTestId('fleet-desktop-recording-retention') as HTMLSelectElement;
         expect(select.value).toBe('21');
         fireEvent.change(select, { target: { value: '30' } });
-        await waitFor(() => expect(saveMock).toHaveBeenCalledWith('node-1', { recordingRetentionDays: 30 }));
+        await waitFor(() =>
+            expect(saveMock).toHaveBeenCalledWith('node-1', { recordingRetentionDays: 30 }),
+        );
         await waitFor(() => expect(select.value).toBe('21'));
     });
 });

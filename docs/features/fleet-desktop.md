@@ -66,11 +66,11 @@ nothing is approved.
 
 ### What each operating system needs
 
-| | Watching | Control |
-| --- | --- | --- |
-| **Linux** | An X11 session the node runs in (`DISPLAY` set); a Wayland session is refused by name (`wayland-unsupported`) | The X server's XTest extension |
+|             | Watching                                                                                                               | Control                                                                                        |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| **Linux**   | An X11 session the node runs in (`DISPLAY` set); a Wayland session is refused by name (`wayland-unsupported`)          | The X server's XTest extension                                                                 |
 | **Windows** | The node running in the signed-in person's session — a node running as a service has no desktop (`no-display-session`) | Nothing more; screens the system protects (the sign-in and elevation prompts) cannot be driven |
-| **macOS** | **Screen Recording** for the helper (System Settings → Privacy & Security), asked the first time | **Accessibility** for the helper (System Settings → Privacy & Security → Accessibility) |
+| **macOS**   | **Screen Recording** for the helper (System Settings → Privacy & Security), asked the first time                       | **Accessibility** for the helper (System Settings → Privacy & Security → Accessibility)        |
 
 A computer that is not a person's machine (a cluster node) never offers the Desktop source (`kind-unsupported`).
 
@@ -88,14 +88,14 @@ Control drives the machine's real mouse and keyboard, so it is opt-in **twice**:
 
 1. **On the machine**, its owner allows it — once per approved helper:
 
-   ```sh
-   ever-works-node helper control allow    # explains what control means, then type "control"
-   ever-works-node helper control deny     # withdraw it: control ends within a second
-   ever-works-node helper control status
-   ```
+    ```sh
+    ever-works-node helper control allow    # explains what control means, then type "control"
+    ever-works-node helper control deny     # withdraw it: control ends within a second
+    ever-works-node helper control status
+    ```
 
-   Approving the helper again (after an update) turns control off until it is allowed again. On macOS the helper also
-   needs **Accessibility** (System Settings → Privacy & Security → Accessibility).
+    Approving the helper again (after an update) turns control off until it is allowed again. On macOS the helper also
+    needs **Accessibility** (System Settings → Privacy & Security → Accessibility).
 
 2. **In the view**, a person in the desktop audience presses **Take control** and confirms. One person controls a
    computer at a time, across every view of it; the others see _"Someone else has control of build-01."_ and may

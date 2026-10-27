@@ -27,7 +27,11 @@ describe('DesktopHelperNote', () => {
 
     it('shows nothing for a signed helper', () => {
         const { container } = render(
-            <DesktopHelperNote nodeName="studio" trust="signed" helper={helper({ trust: 'signed' })} />,
+            <DesktopHelperNote
+                nodeName="studio"
+                trust="signed"
+                helper={helper({ trust: 'signed' })}
+            />,
         );
         expect(container.textContent).toBe('');
     });
@@ -35,7 +39,9 @@ describe('DesktopHelperNote', () => {
     it('says Reduced trust for a hash-pinned helper, with its fingerprint', () => {
         render(<DesktopHelperNote nodeName="studio" trust="hash-pinned" helper={helper()} />);
         const note = screen.getByTestId('desktop-reduced-trust');
-        expect(note.textContent).toContain('Reduced trust — the screen helper on studio is hash-pinned');
+        expect(note.textContent).toContain(
+            'Reduced trust — the screen helper on studio is hash-pinned',
+        );
         expect(note.textContent).toContain('Fingerprint ab12cd34');
         expect(screen.queryByTestId('desktop-signed-available')).toBeNull();
     });

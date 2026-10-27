@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { FleetHelperManifest } from '@ever-works/contracts';
 import { DesktopHelperHost } from '../desktop-helper-backend';
 import { HelperAdmissionError, helperAdmitSigned, type HelperAdmissionDeps } from './helper-admission';
-import { helperPathsFor, readHelperEvents, readHelperPolicy, verifyHelper, type HelperSignatureChecker } from './helper-trust';
+import {
+	helperPathsFor,
+	readHelperEvents,
+	readHelperPolicy,
+	verifyHelper,
+	type HelperSignatureChecker
+} from './helper-trust';
 import { fakeHelperSpawner, memoryHelperFs, sha256Of } from './helper-test-kit';
 
 /**
@@ -61,7 +67,9 @@ describe('helper admit --signed', () => {
 		await expect(helperAdmitSigned(deps({ checkSignature: signedBy('ZZZZZ99999') }).deps)).rejects.toThrow(
 			/not by ABCDE12345/
 		);
-		await expect(helperAdmitSigned(deps({ manifest: NO_SIGNER }).deps)).rejects.toBeInstanceOf(HelperAdmissionError);
+		await expect(helperAdmitSigned(deps({ manifest: NO_SIGNER }).deps)).rejects.toBeInstanceOf(
+			HelperAdmissionError
+		);
 		const noChecker = deps().deps;
 		delete (noChecker as { checkSignature?: unknown }).checkSignature;
 		await expect(helperAdmitSigned(noChecker)).rejects.toBeInstanceOf(HelperAdmissionError);

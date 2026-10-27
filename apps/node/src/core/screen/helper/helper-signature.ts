@@ -117,7 +117,9 @@ export async function checkHelperSignature(
 			if (!read) return { ok: false, reason: 'invalid' };
 			if (read.status === 'NotSigned') return { ok: false, reason: 'unsigned' };
 			if (read.status !== 'Valid') return { ok: false, reason: 'invalid', detail: read.status.slice(0, 40) };
-			return read.subject === expected ? { ok: true, signer: read.subject } : { ok: false, reason: 'wrong-signer' };
+			return read.subject === expected
+				? { ok: true, signer: read.subject }
+				: { ok: false, reason: 'wrong-signer' };
 		}
 		return { ok: false, reason: 'unsupported' };
 	} catch {

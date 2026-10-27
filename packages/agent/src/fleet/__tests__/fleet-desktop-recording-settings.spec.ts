@@ -44,7 +44,9 @@ function build() {
             [...store.values()].filter((row) => row.userId === userId),
         ),
         findByOrganizations: jest.fn(async (ids: readonly string[]) =>
-            [...store.values()].filter((row) => row.organizationId && ids.includes(row.organizationId)),
+            [...store.values()].filter(
+                (row) => row.organizationId && ids.includes(row.organizationId),
+            ),
         ),
         update: jest.fn(async (id: string, patch: Partial<FleetNode>) => {
             const current = store.get(id);
@@ -63,12 +65,21 @@ function build() {
     };
     const access = new FleetAccessService(repository as never, directory as never);
     const audit = {
-        recordNodeAction: jest.fn(async (input: { action: string; extra?: Record<string, unknown> | null }) => {
-            audits.push(input);
-            return true;
-        }),
+        recordNodeAction: jest.fn(
+            async (input: { action: string; extra?: Record<string, unknown> | null }) => {
+                audits.push(input);
+                return true;
+            },
+        ),
     };
-    const service = new FleetService(repository as never, undefined, undefined, undefined, audit as never, access);
+    const service = new FleetService(
+        repository as never,
+        undefined,
+        undefined,
+        undefined,
+        audit as never,
+        access,
+    );
     return { service, repository, store, audits };
 }
 
@@ -81,8 +92,13 @@ describe('FleetService.setDesktopRecordingSettingsForUser (FL-07 P3)', () => {
         });
         expect(view.recordWatchSessions).toBe(true);
         expect(view.recordingRetentionDays).toBe(30);
-        expect(store.get('node-1')).toMatchObject({ recordWatchSessions: true, recordingRetentionDays: 30 });
-        expect(audits.map((row) => [row.action, row.extra?.setting, row.extra?.from, row.extra?.to])).toEqual([
+        expect(store.get('node-1')).toMatchObject({
+            recordWatchSessions: true,
+            recordingRetentionDays: 30,
+        });
+        expect(
+            audits.map((row) => [row.action, row.extra?.setting, row.extra?.from, row.extra?.to]),
+        ).toEqual([
             ['node.policy.change', 'recordWatchSessions', false, true],
             ['node.policy.change', 'recordingRetentionDays', 14, 30],
         ]);
@@ -102,11 +118,15 @@ describe('FleetService.setDesktopRecordingSettingsForUser (FL-07 P3)', () => {
         const { service, repository } = build();
         for (const days of [0, 91, 2.5, '7']) {
             await expect(
-                service.setDesktopRecordingSettingsForUser(OWNER, 'node-1', { recordingRetentionDays: days }),
+                service.setDesktopRecordingSettingsForUser(OWNER, 'node-1', {
+                    recordingRetentionDays: days,
+                }),
             ).rejects.toBeInstanceOf(BadRequestException);
         }
         await expect(
-            service.setDesktopRecordingSettingsForUser(OWNER, 'node-1', { recordWatchSessions: 'yes' }),
+            service.setDesktopRecordingSettingsForUser(OWNER, 'node-1', {
+                recordWatchSessions: 'yes',
+            }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(repository.update).not.toHaveBeenCalled();
     });

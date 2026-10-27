@@ -198,7 +198,9 @@ export async function helperAdmitSigned(
 		);
 	}
 	if (!deps.checkSignature) {
-		throw new HelperAdmissionError('Signed approval is not available on this platform; approve it hash-pinned: ever-works-node helper admit');
+		throw new HelperAdmissionError(
+			'Signed approval is not available on this platform; approve it hash-pinned: ever-works-node helper admit'
+		);
 	}
 	const signature = await deps.checkSignature(path, expected);
 	if (!signature.ok) {

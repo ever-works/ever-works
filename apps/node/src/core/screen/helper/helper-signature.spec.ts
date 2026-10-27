@@ -23,7 +23,12 @@ function runner(answers: Array<{ code: number | null; stdout?: string; stderr?: 
 		run: async (command: string, args: string[]) => {
 			calls.push({ command, args });
 			const answer = answers.shift() ?? { code: 1 };
-			return { code: answer.code, stdout: answer.stdout ?? '', stderr: answer.stderr ?? '', spawnError: answer.spawnError };
+			return {
+				code: answer.code,
+				stdout: answer.stdout ?? '',
+				stderr: answer.stderr ?? '',
+				spawnError: answer.spawnError
+			};
 		}
 	};
 }
@@ -50,13 +55,28 @@ describe('macOS', () => {
 
 	it('refuses another team, an unsigned file, a broken signature and an ad-hoc one', async () => {
 		expect(
-			await checkHelperSignature(runner([{ code: 0 }, { code: 0, stderr: DISPLAY }]) as never, 'darwin', '/x', 'ZZZZZ99999')
+			await checkHelperSignature(
+				runner([{ code: 0 }, { code: 0, stderr: DISPLAY }]) as never,
+				'darwin',
+				'/x',
+				'ZZZZZ99999'
+			)
 		).toMatchObject({ ok: false, reason: 'wrong-signer' });
 		expect(
-			await checkHelperSignature(runner([{ code: 1, stderr: 'code object is not signed at all' }]) as never, 'darwin', '/x', 'A')
+			await checkHelperSignature(
+				runner([{ code: 1, stderr: 'code object is not signed at all' }]) as never,
+				'darwin',
+				'/x',
+				'A'
+			)
 		).toMatchObject({ ok: false, reason: 'unsigned' });
 		expect(
-			await checkHelperSignature(runner([{ code: 1, stderr: 'a sealed resource is missing' }]) as never, 'darwin', '/x', 'A')
+			await checkHelperSignature(
+				runner([{ code: 1, stderr: 'a sealed resource is missing' }]) as never,
+				'darwin',
+				'/x',
+				'A'
+			)
 		).toMatchObject({ ok: false, reason: 'invalid' });
 		expect(
 			await checkHelperSignature(
@@ -91,14 +111,26 @@ describe('Windows', () => {
 	});
 
 	it('refuses NotSigned, HashMismatch and another subject', async () => {
-		expect(await checkHelperSignature(runner([{ code: 0, stdout: 'NotSigned|' }]) as never, 'win32', 'C:\\h', SUBJECT)).toMatchObject({
+		expect(
+			await checkHelperSignature(runner([{ code: 0, stdout: 'NotSigned|' }]) as never, 'win32', 'C:\\h', SUBJECT)
+		).toMatchObject({
 			reason: 'unsigned'
 		});
 		expect(
-			await checkHelperSignature(runner([{ code: 0, stdout: `HashMismatch|${SUBJECT}` }]) as never, 'win32', 'C:\\h', SUBJECT)
+			await checkHelperSignature(
+				runner([{ code: 0, stdout: `HashMismatch|${SUBJECT}` }]) as never,
+				'win32',
+				'C:\\h',
+				SUBJECT
+			)
 		).toMatchObject({ reason: 'invalid' });
 		expect(
-			await checkHelperSignature(runner([{ code: 0, stdout: 'Valid|CN=Someone Else' }]) as never, 'win32', 'C:\\h', SUBJECT)
+			await checkHelperSignature(
+				runner([{ code: 0, stdout: 'Valid|CN=Someone Else' }]) as never,
+				'win32',
+				'C:\\h',
+				SUBJECT
+			)
 		).toMatchObject({ reason: 'wrong-signer' });
 	});
 
@@ -112,15 +144,22 @@ describe('Windows', () => {
 
 describe('elsewhere', () => {
 	it('has no signed level on Linux, and a missing tool is a reason', async () => {
-		expect(await checkHelperSignature(runner([]) as never, 'linux', '/x', 'A')).toEqual({ ok: false, reason: 'unsupported' });
-		expect(await checkHelperSignature(runner([{ code: 1, spawnError: 'ENOENT' }]) as never, 'darwin', '/x', 'A')).toMatchObject({
+		expect(await checkHelperSignature(runner([]) as never, 'linux', '/x', 'A')).toEqual({
+			ok: false,
+			reason: 'unsupported'
+		});
+		expect(
+			await checkHelperSignature(runner([{ code: 1, spawnError: 'ENOENT' }]) as never, 'darwin', '/x', 'A')
+		).toMatchObject({
 			reason: 'tool-missing'
 		});
 	});
 
 	it('runs the tools by their system paths, never a PATH lookup', () => {
 		expect(windowsPowerShellPath('D:\\Win')).toBe('D:\\Win\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
-		expect(windowsPowerShellPath('relative')).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+		expect(windowsPowerShellPath('relative')).toBe(
+			'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+		);
 		expect(windowsPowerShellPath(undefined)).toMatch(/^[A-Za-z]:\\.*\\powershell\.exe$/);
 	});
 });

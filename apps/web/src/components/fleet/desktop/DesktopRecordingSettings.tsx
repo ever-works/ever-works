@@ -65,7 +65,9 @@ export function DesktopRecordingSettings({ node }: { node: FleetNodeView }) {
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <p className="text-sm font-medium">{t('watch')}</p>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('watchHint')}</p>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('watchHint')}
+                    </p>
                 </div>
                 <Switch
                     checked={watch}
@@ -84,7 +86,9 @@ export function DesktopRecordingSettings({ node }: { node: FleetNodeView }) {
                     <label htmlFor={retentionId} className="text-sm font-medium">
                         {t('retention')}
                     </label>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('retentionHint')}</p>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('retentionHint')}
+                    </p>
                 </div>
                 <select
                     id={retentionId}

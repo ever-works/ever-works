@@ -1464,7 +1464,11 @@ export class FleetService {
             wanted.recordingRetentionDays = days;
         }
         const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
-        const changes: Array<{ setting: 'recordWatchSessions' | 'recordingRetentionDays'; from: unknown; to: unknown }> = [];
+        const changes: Array<{
+            setting: 'recordWatchSessions' | 'recordingRetentionDays';
+            from: unknown;
+            to: unknown;
+        }> = [];
         if (
             wanted.recordWatchSessions !== undefined &&
             Boolean(node.recordWatchSessions) !== wanted.recordWatchSessions
@@ -1476,7 +1480,10 @@ export class FleetService {
             });
         }
         const storedDays = toOptionalNumber(node.recordingRetentionDays) ?? 14;
-        if (wanted.recordingRetentionDays !== undefined && storedDays !== wanted.recordingRetentionDays) {
+        if (
+            wanted.recordingRetentionDays !== undefined &&
+            storedDays !== wanted.recordingRetentionDays
+        ) {
             changes.push({
                 setting: 'recordingRetentionDays',
                 from: storedDays,
