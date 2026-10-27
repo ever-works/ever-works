@@ -187,3 +187,6 @@ export * from '../apps-catalog/app-blueprint-apply.runner';
 // consumes it) and the run classifier the API binds for `AgentRunService`.
 export * from './app-work-task-tool-policy';
 export * from './app-work-run-classifier';
+
+// APW-08 T49 (XC-10, FR-74, R-30, lane B2) — the evolve loop's operator kill switches.
+export * from './app-work-switches';
