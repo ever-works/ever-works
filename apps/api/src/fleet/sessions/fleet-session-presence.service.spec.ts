@@ -58,7 +58,17 @@ describe('FleetSessionPresenceService', () => {
     it('refuses the sixth browser limit_exceeded, naming the five', () => {
         for (let i = 0; i < FLEET_SESSION_MAX_VIEWERS; i += 1)
             presence.admit(viewer(`v${i}`, 'viewer'));
-        expect(() => presence.admit(viewer('v6', 'viewer'))).toThrow(/already has 5 watchers/);
+        // The refusal's text is its `hint` (the HTTP body); `FleetLinkException` is an
+        // `HttpException` with an object body, so its `message` is Nest's generic "Fleet Link
+        // Exception" (c72ef6dbd) and a pattern on `message` could never match.
+        expect(() => presence.admit(viewer('v6', 'viewer'))).toThrow(
+            expect.objectContaining({
+                code: 'limit_exceeded',
+                linkError: expect.objectContaining({
+                    hint: expect.stringMatching(/already has 5 watchers/),
+                }),
+            }),
+        );
         try {
             presence.admit(viewer('v7', 'viewer'));
         } catch (error) {

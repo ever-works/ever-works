@@ -96,9 +96,10 @@ describe('NotificationMatrixService', () => {
         expect(eventTypes.findAll).toHaveBeenCalledTimes(1);
     });
 
-    it('returns all 24 core events grouped in page order, with the shipped defaults selected', async () => {
+    it('returns all 27 core events grouped in page order, with the shipped defaults selected', async () => {
         const matrix = await build().getMatrix('u1');
-        expect(matrix.events).toHaveLength(24);
+        // 24 → 27 in 5f9c3a5d5 (FL-05 P2): the three session events, asserted by name below.
+        expect(matrix.events).toHaveLength(27);
         const groups = matrix.events.map((e) => e.group);
         expect(groups.indexOf('signals')).toBeGreaterThan(groups.lastIndexOf('needsYou'));
         expect(groups.indexOf('routine')).toBeGreaterThan(groups.lastIndexOf('signals'));
@@ -121,6 +122,21 @@ describe('NotificationMatrixService', () => {
         });
         const budget = matrix.events.find((e) => e.key === 'budget_threshold_warning')!;
         expect(budget).toMatchObject({ emailGovernedByProfile: true, group: 'signals' });
+
+        expect(matrix.events.find((e) => e.key === 'fleet_session_needs_you')).toMatchObject({
+            group: 'needsYou',
+            urgent: true,
+            muteCategory: 'agent',
+            selectedTargets: ['in-app', 'email'],
+        });
+        for (const key of ['fleet_session_finished', 'fleet_session_failed']) {
+            expect(matrix.events.find((e) => e.key === key)).toMatchObject({
+                group: 'signals',
+                urgent: false,
+                muteCategory: 'agent',
+                selectedTargets: ['in-app'],
+            });
+        }
     });
 
     it('shows a choice saved in the matrix, including an explicit empty one, instead of the defaults', async () => {
@@ -178,7 +194,8 @@ describe('NotificationMatrixService', () => {
     it('still renders when the organisation default lookup fails', async () => {
         resolver.loadOrgDefaultMap.mockRejectedValue(new Error('db'));
         const matrix = await build().getMatrix('u1');
-        expect(matrix.events).toHaveLength(24);
+        // 27 core events since 5f9c3a5d5 (FL-05 P2).
+        expect(matrix.events).toHaveLength(27);
     });
 
     it('lists in-app, email, then the user’s channels newest first — disabled ones greyed, labels from the registry', async () => {
