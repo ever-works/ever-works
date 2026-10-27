@@ -100,6 +100,9 @@ export * from './upstream-schedule';
 export * from './app-upstream-conflict.copy';
 export * from './upstream-workflow-diff';
 export * from './app-upstream-sync.service';
+// APW-02 T48 (FR-63) — the private copy's compare/move capability, bound to
+// `APP_UPSTREAM_PRIVATE_COPY_PORT` where the sync run is composed (the worker).
+export * from './app-upstream-private-copy.adapter';
 export * from './app-upstream-sync-dispatcher.service';
 export * from './app-source-catalog.port';
 export * from './app-prompted-values.port';

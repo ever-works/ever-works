@@ -55,6 +55,11 @@ import type {
     GitForkDivergence,
     GitRepositoryCopyInput,
     GitRepositoryCopyResult,
+    // APW-02 T48 (FR-63) — the private copy's upstream sync.
+    GitRepositoryCopyDivergenceInput,
+    GitRepositoryCopyDivergence,
+    GitRepositoryCopyBranchMoveInput,
+    GitRepositoryCopyBranchMoveResult,
     GitActionsPermissionsInput,
     GitActionsPermissionsResult,
     GitWebhookInput,
@@ -2009,6 +2014,42 @@ export class GitFacadeService implements IGitFacade {
         const impl = plugin.createRepositoryCopy;
         if (typeof impl !== 'function') {
             throw new GitOperationNotSupportedError('createRepositoryCopy', plugin.id);
+        }
+        return impl.call(plugin, input, token);
+    }
+
+    /**
+     * How far a private copy has drifted from its upstream (APW-02 T48, FR-63):
+     * the private copy's counterpart of {@link getForkDivergence}. The plugin
+     * takes the reading in a working copy of its own — this facade, and the agent
+     * package behind it, never run git (Constitution I).
+     */
+    async getRepositoryCopyDivergence(
+        input: GitRepositoryCopyDivergenceInput,
+        options: GitFacadeOptions,
+    ): Promise<GitRepositoryCopyDivergence> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getRepositoryCopyDivergence;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getRepositoryCopyDivergence', plugin.id);
+        }
+        return impl.call(plugin, input, token);
+    }
+
+    /**
+     * Point a private copy's branch at one exact upstream commit, fast-forward
+     * only (APW-02 T48, FR-63) — the private copy's `ever-works/upstream-sync`
+     * move. `not_fast_forward` is an answer (upstream rewrote its history), never
+     * a reason to force anything.
+     */
+    async moveRepositoryCopyBranch(
+        input: GitRepositoryCopyBranchMoveInput,
+        options: GitFacadeOptions,
+    ): Promise<GitRepositoryCopyBranchMoveResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.moveRepositoryCopyBranch;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('moveRepositoryCopyBranch', plugin.id);
         }
         return impl.call(plugin, input, token);
     }

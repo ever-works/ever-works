@@ -324,11 +324,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppUpstreamSyncWorkerModule :: APP_UPSTREAM_PRIVATE_COPY_PORT',
-        reason: "FR-63's private-copy compare/move capability is a plugin capability that is not written; unbound, a private copy's sync is `failed/provider_unsupported` (a fork's sync is unaffected).",
-        source: 'packages/agent/src/app-works/app-upstream-sync.service.ts:200-250 (APW-02 P1 plugin capability, FR-63)',
-    },
-    {
         key: 'AppUpstreamSyncWorkerModule :: ActivityLogService',
         reason: 'The worker has no `ActivityLogService` and no database module; the sync outcome is settled on the row through the state-service proxy, but its `app.upstream.*` / `app.actions.*` Activity rows are not written from the worker.',
         source: 'packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts:161-163 (no ActivityLogService in worker scope)',

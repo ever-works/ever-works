@@ -40,6 +40,36 @@ const COPY_INPUT = {
     maxSizeKb: 512_000,
 };
 
+const COPY_DIVERGENCE_INPUT = {
+    sourceOwner: 'upstream-org',
+    sourceRepo: 'widgets',
+    sourceBranch: 'main',
+    targetOwner: 'me',
+    targetRepo: 'widgets-copy',
+    targetBranch: 'main',
+    maxCommits: 10_000,
+};
+
+const COPY_DIVERGENCE = {
+    aheadBy: 1,
+    behindBy: 4,
+    upstreamHeadSha: 'a'.repeat(40),
+    copyHeadSha: 'b'.repeat(40),
+    mergeBaseSha: 'c'.repeat(40),
+    capped: false,
+};
+
+const COPY_MOVE_INPUT = {
+    sourceOwner: 'upstream-org',
+    sourceRepo: 'widgets',
+    sourceBranch: 'main',
+    targetOwner: 'me',
+    targetRepo: 'widgets-copy',
+    targetBaseBranch: 'main',
+    branchName: 'ever-works/upstream-sync',
+    headSha: 'a'.repeat(40),
+};
+
 const ACTIONS_INPUT = {
     disableWorkflowsExcept: ['.github/workflows/ever-works-build.yml'],
     skipWorkflowIds: [11, 12],
@@ -138,6 +168,21 @@ const FORWARDING_CASES: Array<{
         call: (facade) => facade.createRepositoryCopy(COPY_INPUT, OPTIONS),
         args: [COPY_INPUT],
         resolves: COPY_RESULT,
+    },
+    // APW-02 T48 (FR-63) — the private copy's divergence and sync-branch move.
+    {
+        name: 'getRepositoryCopyDivergence',
+        member: 'getRepositoryCopyDivergence',
+        call: (facade) => facade.getRepositoryCopyDivergence(COPY_DIVERGENCE_INPUT, OPTIONS),
+        args: [COPY_DIVERGENCE_INPUT],
+        resolves: COPY_DIVERGENCE,
+    },
+    {
+        name: 'moveRepositoryCopyBranch',
+        member: 'moveRepositoryCopyBranch',
+        call: (facade) => facade.moveRepositoryCopyBranch(COPY_MOVE_INPUT, OPTIONS),
+        args: [COPY_MOVE_INPUT],
+        resolves: { outcome: 'moved', pushedSha: 'a'.repeat(40) },
     },
     {
         name: 'setActionsPermissions',

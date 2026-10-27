@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { logger, task, wait } from '@trigger.dev/sdk';
 import {
     APP_UPSTREAM_LICENSE_SERVICE,
+    APP_UPSTREAM_PRIVATE_COPY_PORT,
     APP_UPSTREAM_SYNC_SPEC_SOURCE,
     AppActionsHygieneService,
+    AppUpstreamPrivateCopyAdapter,
     AppUpstreamStateService,
     AppUpstreamSyncService,
     type AppUpstreamSyncTrigger,
@@ -52,8 +54,9 @@ import { withWorkerContext } from '../../trigger/worker/utils/worker-context.uti
  * - `ActivityLogService` — the worker has none (`trigger-worker.module.ts:161-163`), so
  *   the run's `app.upstream.*` Activity events are not written from here. The outcome
  *   itself is on the row (`finishSync`) and in this task's result.
- * - `APP_UPSTREAM_PRIVATE_COPY_PORT` (FR-63) — unbound ⇒ a private copy's sync is
- *   `failed/provider_unsupported`; a fork's sync is unaffected.
+ * - (bound since APW-02 T48) `APP_UPSTREAM_PRIVATE_COPY_PORT` (FR-63) is now
+ *   `AppUpstreamPrivateCopyAdapter` over the worker's git facade; a provider without the
+ *   capability still ends `failed/provider_unsupported`, and a fork's sync is unaffected.
  *
  * ## Budget — 1 800 s, no retry
  *
@@ -130,6 +133,10 @@ const TRIGGERS: readonly AppUpstreamSyncTrigger[] = ['schedule', 'manual', 'dive
         },
         TenantRuntimeBindingResolverService,
         AppActionsHygieneService,
+        // FR-63 (APW-02 T48) — the private copy's compare and sync-branch move, through the
+        // worker's git facade (the provider plugin does the git work; the agent never does).
+        AppUpstreamPrivateCopyAdapter,
+        { provide: APP_UPSTREAM_PRIVATE_COPY_PORT, useExisting: AppUpstreamPrivateCopyAdapter },
         AppUpstreamSyncService,
     ],
 })

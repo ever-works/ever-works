@@ -1328,15 +1328,29 @@ export class AppUpstreamSyncService {
         await context.budget.call(() =>
             this.git.deleteBranch(row.dataOwner, row.dataRepo, APP_UPSTREAM_SYNC_BRANCH, options),
         );
-        await context.budget.call(() =>
-            this.git.createBranchFromSha(
-                row.dataOwner,
-                row.dataRepo,
-                APP_UPSTREAM_SYNC_BRANCH,
+        if (row.relation === 'private-copy') {
+            // APW-02 T48 (FR-63): a private copy shares no objects with upstream, so a REST
+            // ref create could never name an upstream sha there — the capability pushes the
+            // checked commit onto the branch just deleted instead.
+            const recreated = await this.moveSyncBranchForRelation(
+                context,
+                row,
                 String(outcome.toSha ?? ''),
-                options,
-            ),
-        );
+            );
+            if (recreated !== 'moved') {
+                return { ...outcome, result: 'failed', reason: 'upstream_history_rewritten' };
+            }
+        } else {
+            await context.budget.call(() =>
+                this.git.createBranchFromSha(
+                    row.dataOwner,
+                    row.dataRepo,
+                    APP_UPSTREAM_SYNC_BRANCH,
+                    String(outcome.toSha ?? ''),
+                    options,
+                ),
+            );
+        }
 
         // The branch is at the new head now, so only the pull request is left.
         return await this.pullRequestPath(context, row, outcome, undefined, { moveBranch: false });

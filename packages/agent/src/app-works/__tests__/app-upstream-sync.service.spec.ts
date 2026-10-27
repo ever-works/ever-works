@@ -1710,6 +1710,44 @@ describe('AppUpstreamSyncService — the private copy (FR-63, ACC-02-15, ACC-02-
         expect(harness.calls.createPullRequest).toHaveLength(0);
     });
 
+    it('recreates a rewritten sync branch through the capability, never the REST ref create (T48)', async () => {
+        const harness = makeHarness({ row: makeRow({ relation: 'private-copy' }) });
+        const move = (harness.privateCopies as { moveSyncBranch: jest.Mock }).moveSyncBranch;
+        // Upstream rewrote its history: the first move is not a fast-forward; once the
+        // branch is deleted, the capability pushes the checked commit onto it afresh.
+        move.mockResolvedValueOnce('not_fast_forward').mockResolvedValueOnce('moved');
+
+        const result = await runSync(harness);
+
+        expect(harness.calls.deleteBranch).toHaveLength(1);
+        // A private copy shares no objects with upstream: a REST ref create could never name
+        // the upstream sha there, so it is never attempted.
+        expect(harness.calls.createBranchFromSha).toHaveLength(0);
+        expect(move).toHaveBeenCalledTimes(2);
+        expect(move.mock.calls[1][0]).toEqual({
+            workId: WORK_ID,
+            owner: OWNER,
+            repo: REPO,
+            headSha: SHA_B,
+        });
+        expect(result.result).toBe('pull_request_opened');
+        expect(forcedWrites(harness.calls)).toEqual([]);
+    });
+
+    it('fails as upstream_history_rewritten when the capability cannot recreate the branch either', async () => {
+        const harness = makeHarness({ row: makeRow({ relation: 'private-copy' }) });
+        (harness.privateCopies as { moveSyncBranch: jest.Mock }).moveSyncBranch.mockResolvedValue(
+            'not_fast_forward',
+        );
+
+        const result = await runSync(harness);
+
+        expect(result.result).toBe('failed');
+        expect(result.reason).toBe('upstream_history_rewritten');
+        expect(harness.calls.createBranchFromSha).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+    });
+
     it('fails closed with provider_unsupported when the capability is not bound (plan §7)', async () => {
         const harness = makeHarness({
             row: makeRow({ relation: 'private-copy' }),
