@@ -207,6 +207,13 @@ export interface ExportedWork {
      *  would silently re-enable recall on the imported work. Absent in
      *  old payloads = leave defaults. */
     memoryRecallEnabled?: boolean;
+    /** App Launcher exposure (APW-11 FR-19, `works.appLauncherExposed`). A
+     *  member-editable Work setting on every kind (`PUT /api/works/:id`),
+     *  so it must round-trip: `true`/`false` is an explicit choice that
+     *  always wins, and `null` is the real, permanent "kind default" state
+     *  (on for an App Work, off otherwise). Absent in old payloads = leave
+     *  the existing Work's setting alone; any other value is dropped. */
+    appLauncherExposed?: boolean | null;
     /** External containers this Work claims for ingested-event routing
      *  (chat channels, tracker teams, doc databases, meetings). A
      *  user-visible Work setting, so it must round-trip. Payloads are

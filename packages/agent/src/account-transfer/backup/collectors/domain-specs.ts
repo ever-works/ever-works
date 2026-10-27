@@ -394,6 +394,67 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 entity: 'ReleasePromotion',
                 scope: { by: 'workspace' as const },
             },
+            // ── App Works (Resolution R-25) ─────────────────────────────
+            // Every table an App Works epic adds is reached through the
+            // parent Work ids `works.jsonl` registered above — never
+            // `by: 'user'`, which would also export the rows of Works the
+            // person runs in another workspace. These are a RECORD of the
+            // App's state: an import never creates or converts an App Work
+            // (APW-01 T41, `account-import.service.ts`), so nothing here is
+            // replayed. Secret columns are redacted or dropped by the rules
+            // in `../redaction.ts`, each with its reason there.
+            //
+            // APW-02 T45 — fork, readiness and upstream sync state.
+            {
+                file: 'upstream-states.jsonl',
+                entity: 'WorkUpstreamState',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            // APW-03 T54 — the App spec evaluation, licence and Blueprint state.
+            {
+                file: 'app-spec-states.jsonl',
+                entity: 'WorkAppSpecState',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            // APW-04 T47 — provisioning runs, through the Work (a run the
+            // person started for a Work in another workspace stays there).
+            {
+                file: 'app-provisionings.jsonl',
+                entity: 'WorkAppProvisioning',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            // APW-05 T45 — Builds, and the per-App-Work preparation state
+            // (`APW05-G03`: data-model §9 item 1 left the second table
+            // unclassified; T45 names it, and this is that reading).
+            {
+                file: 'builds.jsonl',
+                entity: 'WorkBuild',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            {
+                file: 'build-preparations.jsonl',
+                entity: 'WorkBuildPreparation',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            // APW-06 T65 — where the App runs, its health and lifecycle state.
+            {
+                file: 'app-runtime-states.jsonl',
+                entity: 'WorkAppRuntimeState',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            // APW-07 T45 — env values (names and origins; every value is
+            // `{ wasSet }`) and managed dependencies (config and outputs are
+            // `{ wasSet }`).
+            {
+                file: 'app-env-values.jsonl',
+                entity: 'WorkAppEnvValue',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            {
+                file: 'app-dependencies.jsonl',
+                entity: 'WorkAppDependency',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
         ]),
     },
 
