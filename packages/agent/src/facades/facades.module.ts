@@ -35,6 +35,7 @@ import { AppRuntimeFacadeService } from './app-runtime.facade';
 import { AppDependencyFacadeService } from './app-dependency.facade';
 import { IdentityProviderFacadeService } from './identity-provider.facade';
 import { StatsSinkFacadeService } from './stats-sink.facade';
+import { ActionsRunnersFacadeService } from './actions-runners.facade';
 
 const FACADES = [
     AiFacadeService,
@@ -102,6 +103,12 @@ const FACADES = [
     // PluginSettingsService, so it resolves in this module; consumed by
     // `FleetCloudService` (packages/agent/src/fleet/cloud).
     MachineProviderFacadeService,
+    // Actions runners on computers (FL-18, CONTRACTS R-14) — the `actions-runners`
+    // facade: holds the GitHub App credential, resolves the person's installation
+    // for a target and mints a token narrowed to one permission per call. Depends
+    // on the global PluginRegistryService / PluginSettingsService and the two
+    // installation repositories DatabaseModule (imported above) provides.
+    ActionsRunnersFacadeService,
 ];
 
 /**

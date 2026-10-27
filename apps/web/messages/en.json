@@ -14860,7 +14860,8 @@
                 "system": "system log",
                 "file": "file",
                 "container": "container",
-                "service": "service"
+                "service": "service",
+                "runner": "Actions runner"
             },
             "sources": {
                 "title": "Sources",
@@ -15689,6 +15690,129 @@
             "palette": {
                 "usage": "Fleet usage",
                 "usageOn": "Usage on {name}"
+            }
+        },
+        "runners": {
+            "block": {
+                "title": "Actions runners",
+                "titleCount": "Actions runners ({count})",
+                "listLabel": "Actions runners on {name}",
+                "loading": "Loading runners…",
+                "loadFailed": "The runners could not be read.",
+                "lastKnown": "Last known state — {reason}",
+                "checked": "checked {time}",
+                "notChecked": "not checked yet",
+                "rateLimited": "GitHub is rate-limiting; next check {time}",
+                "rateLimitedWait": "GitHub is rate-limiting; the next check waits until it allows one",
+                "killSwitch": "All computers are stopped — runners keep running; installing and controlling them is paused.",
+                "cannotInstall": "Runners cannot be installed on {name} right now.",
+                "empty": "No Actions runners on {name}",
+                "emptyHint": "Install runners to let {name} run GitHub Actions jobs for a repository or organisation your GitHub App covers. Runners cost nothing in Ever Works."
+            },
+            "row": {
+                "states": {
+                    "installing": "installing",
+                    "idle": "idle",
+                    "working": "working",
+                    "offline": "offline",
+                    "stopped": "stopped",
+                    "stoppedByYou": "stopped (by you)",
+                    "failed": "failed",
+                    "removed": "removed",
+                    "unknown": "unknown",
+                    "removing": "removing…"
+                },
+                "phases": {
+                    "queued": "queued",
+                    "downloading": "downloading",
+                    "verifying": "verifying",
+                    "awaitingToken": "waiting to register",
+                    "registering": "registering",
+                    "installingService": "installing service",
+                    "starting": "starting",
+                    "done": "done",
+                    "removing": "removing"
+                },
+                "modes": {
+                    "service": "service",
+                    "docker": "container-isolated"
+                },
+                "sourceGithub": "as GitHub reports it",
+                "sourceNode": "as {name} reports it",
+                "job": "“{job}”",
+                "jobRun": "“{job}” run #{run}",
+                "labels": "Labels",
+                "version": "runner {version}",
+                "checked": "checked {time}",
+                "logs": "Logs",
+                "logsOf": "Logs of {name}",
+                "openJob": "Open job on GitHub",
+                "openOnGitHub": "Open on GitHub"
+            },
+            "actions": {
+                "start": "Start",
+                "stop": "Stop",
+                "restart": "Restart",
+                "more": "More for {name}",
+                "notAllowed": "Only the people allowed to change computers on {computer} can control its runners",
+                "paused": "Paused while all computers are stopped",
+                "starting": "Starting {name}…",
+                "stopping": "Stopping {name}…",
+                "restarting": "Restarting {name}…",
+                "failed": "The runner could not be changed."
+            },
+            "remove": {
+                "button": "Remove runner…",
+                "confirm": "Remove",
+                "removing": "Removing {name}…",
+                "failed": "The runner could not be removed."
+            },
+            "install": {
+                "button": "Install runners",
+                "title": "Install Actions runners on {name}",
+                "description": "The computer runs GitHub Actions jobs for the repository or organisation you choose.",
+                "loading": "Loading repositories and organisations…",
+                "loadFailed": "The install options could not be read.",
+                "cannotHost": "Runners cannot be installed on {name} right now.",
+                "noApp": "Install the Ever Works GitHub App on a repository or organisation first.",
+                "noTargets": "Your GitHub App does not cover a repository or organisation yet.",
+                "openAppSettings": "Open GitHub App settings",
+                "target": "Register with",
+                "targetHint": "Repositories and organisations your GitHub App covers",
+                "repositories": "Repositories",
+                "organisations": "Organisations",
+                "permissionMissing": "Registering runners for {target} needs one more permission for the Ever Works GitHub App on {account}.",
+                "grantAccess": "Grant access",
+                "checkAgain": "Check again",
+                "count": "How many",
+                "countHint": "up to {max}",
+                "names": "Names",
+                "nameLabel": "Name of runner {n}",
+                "nameInvalid": "A name is up to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit.",
+                "nameDuplicate": "Each runner needs its own name.",
+                "labels": "Extra labels",
+                "labelsPlaceholder": "gpu, large",
+                "labelsAdded": "GitHub adds:",
+                "labelInvalid": "“{label}” is not a label: use letters, digits and . _ : / + - without spaces.",
+                "labelsTooMany": "At most {max} extra labels.",
+                "mode": "Run as",
+                "modes": {
+                    "service": "Service — starts at boot, restarts on failure",
+                    "serviceWindows": "Windows service — the only mode on Windows",
+                    "docker": "Container-isolated — each runner in its own container"
+                },
+                "noModes": "This computer offers no way to run a runner as a service.",
+                "assurance": "The runner is downloaded from GitHub and its checksum verified. Registration happens through your GitHub App; you never handle a token. Runners cost nothing in Ever Works.",
+                "rootRequired": "Installing a service on {name} needs elevated rights for the node’s user. Run this once on {name}:",
+                "copy": "Copy the command",
+                "copied": "Copied",
+                "cancel": "Cancel",
+                "submit": "{count, plural, one {Install # runner} other {Install # runners}}",
+                "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
+                "failed": "The runners could not be installed."
+            },
+            "palette": {
+                "install": "Install Actions runners on {name}"
             }
         }
     }

@@ -161,6 +161,17 @@ export {
 // hosted `agentmemory` REST server on :3111)
 export { AgentMemoryFacadeService, AgentMemoryFacadeError } from './agent-memory.facade';
 export { TerminalStreamFacadeService, TerminalStreamFacadeError } from './terminal-stream.facade';
+// Actions runners on computers (FL-18) — GitHub's self-hosted runner API through the GitHub App.
+export {
+    ActionsRunnersFacadeService,
+    ActionsRunnersFacadeError,
+    actionsRunnersGrantUrl,
+    actionsRunnersPermissionLabel,
+    actionsRunnersPermissionsFor,
+    type ActionsRunnersFailureReason,
+    type ActionsRunnersTarget,
+    type ActionsRunnersTokenPurpose,
+} from './actions-runners.facade';
 export { WorkspaceFacadeService, WorkspaceFacadeError } from './workspace.facade';
 
 // Vector Store Facade — EW-642 RFC §6 selection chain + D4 embedding
