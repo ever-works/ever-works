@@ -55,3 +55,6 @@ first time). **Control** of the mouse and keyboard is a second, separate approva
 `ever-works-node helper control allow` (type `control`). `helper control deny` withdraws it and `helper revoke`
 withdraws the helper. Replacing the file — a new build included — makes the node refuse it (`helper-untrusted`) until
 you admit it again, and admitting again turns control off.
+
+A helper from a **signed release** is approved with `ever-works-node helper admit --signed` instead, and keeps its
+approval across updates by the same publisher. How a release is signed: [`PACKAGING.md`](PACKAGING.md#release-signing).
