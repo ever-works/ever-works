@@ -504,6 +504,13 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
         'lastRunOutput',
         'verificationNamespace',
     ]),
+    // FL-20 — `FleetSession.tokens` is the session's usage roll-up
+    // (`FleetSessionUsage`: per-model token COUNTS, cents, model names,
+    // timestamps). It is derived: `FleetUsageReconcilerService` recomputes it
+    // from the session's `fleet_usage_samples` on every report, so an archive
+    // copy would be stale bytes. The archive does not export `FleetSession`
+    // today; this records the decision for the day it does.
+    FleetSession: Object.freeze(['tokens']),
 });
 
 /**
@@ -570,6 +577,16 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
     // exactly its job: a new `*credential*`-shaped column has to be decided, not
     // inherited. The reason below is read off the column's own docstring
     // (`work-upstream-state.entity.ts:307-322`), not inferred from the name.
+    // FL-20 usage samples and FL-11 checkouts. The guard fired on these when the
+    // tables landed: `*Tokens` here are model token COUNTS (`bigint`), and
+    // `remoteHadCredential` is a flag that a credential was stripped.
+    inputTokens:
+        'A model token count (FL-20 usage sample, `bigint`) — how much a request used, not a credential.',
+    outputTokens: 'A model token count (FL-20 usage sample, `bigint`).',
+    cacheReadTokens: 'A model token count (FL-20 usage sample, `bigint`).',
+    cacheWriteTokens: 'A model token count (FL-20 usage sample, `bigint`).',
+    remoteHadCredential:
+        'A boolean on a Fleet checkout: the remote URL the member gave carried a credential that the checkout service STRIPPED before the row was written (spec FR-5, U12). It records that something was removed; the value is never stored.',
     credentialMemberUserId:
         'A USER ID, not a credential: the member whose connection is the credential of record for this App Work’s background jobs once a handover has been recorded (NULL = no handover, and the creator `Work.userId` is used instead). It addresses a member the archive already carries in full; the connection it points at is stored elsewhere and is dropped or redacted there by its own rule.',
 });
