@@ -65,7 +65,19 @@ const STATE = {
     deployLockId: 'dep-1',
     clusterCheck: { fingerprint: 'fp-1', code: null },
     clusterFingerprint: null,
-    targetSettings: { tls: 'none' },
+    targetSettings: {
+        tls: 'none',
+        // fdfe10df1 (works-security) — a never-deployed Work's credential with no provenance is
+        // refused `cluster_changed_unconfirmed` until the owner confirms it; this one was saved by
+        // the owner, as `AppTargetService.recordCredentialProvenance` writes it.
+        clusterCredential: {
+            savedByUserId: 'user-1',
+            savedByOwner: true,
+            savedAt: '2026-10-17T09:00:00.000Z',
+            ownerConfirmedByUserId: null,
+            ownerConfirmedAt: null,
+        },
+    },
     paused: false,
 };
 
