@@ -31,6 +31,7 @@ import {
 import { formatFileBytes } from '../files/files.shared';
 import { useNow } from '../health/use-now';
 import { DesktopControlBar } from './DesktopControlBar';
+import { DesktopRecordings } from './DesktopRecordings';
 import { DesktopDisplayPicker } from './DesktopDisplayPicker';
 import { DesktopHelperNote } from './DesktopHelperNote';
 import { DesktopUnavailableCard } from './DesktopUnavailableCard';
@@ -120,6 +121,8 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
     const pressedRef = useRef<'left' | 'middle' | 'right' | null>(null);
     const [inputNotice, setInputNotice] = useState<string | null>(null);
     const nowMs = useNow(1_000);
+    /** P2.C (FR-55): whether the view is being recorded right now, read every few seconds. */
+    const [recordingState, setRecordingState] = useState<{ state: string; reason: string | null } | null>(null);
 
     const load = useCallback(async () => {
         const result = await desktopClient.availability(node.id);
@@ -259,6 +262,25 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
     useEffect(() => {
         reconnectRef.current = () => void reconnect();
     }, [reconnect]);
+
+    // P2.C: the recording badge — the view says whether it is recorded (FR-48, FR-55).
+    useEffect(() => {
+        if (!viewId || (phase !== 'live' && phase !== 'stalled')) {
+            setRecordingState(null);
+            return;
+        }
+        let cancelled = false;
+        const read = async () => {
+            const result = await desktopClient.view(node.id, viewId);
+            if (!cancelled && result.ok) setRecordingState(result.data.recording ?? null);
+        };
+        void read();
+        const timer = setInterval(() => void read(), 10_000);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [node.id, phase, viewId]);
 
     const control = useDesktopControl({
         nodeId: node.id,
@@ -444,14 +466,19 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
     }
     if (phase === 'unavailable' && availability?.blocker) {
         return (
-            <DesktopUnavailableCard
-                nodeName={name}
-                blocker={availability.blocker}
-                hint={availability.hint}
-                lastSeen={availability.lastSeenAt}
-                browserSourceAvailable={availability.browserSourceAvailable}
-                onRetry={() => void load()}
-            />
+            <div className="flex flex-col gap-4">
+                <DesktopUnavailableCard
+                    nodeName={name}
+                    blocker={availability.blocker}
+                    hint={availability.hint}
+                    lastSeen={availability.lastSeenAt}
+                    browserSourceAvailable={availability.browserSourceAvailable}
+                    onRetry={() => void load()}
+                />
+                {availability.blocker !== 'permission-denied' && availability.blocker !== 'kind-unsupported' ? (
+                    <DesktopRecordings nodeId={node.id} nodeName={name} />
+                ) : null}
+            </div>
         );
     }
     if (phase === 'unavailable') {
@@ -474,8 +501,15 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
                     })}
                 </span>
                 {phase === 'live' ? (
-                    <span className="font-semibold text-red-600" data-testid="desktop-live">
-                        ● {t('live')}
+                    <span className="flex items-center gap-2">
+                        {recordingState?.state === 'recording' ? (
+                            <span className="font-semibold text-red-600" data-testid="desktop-recording">
+                                ◉ {t('recordings.on')}
+                            </span>
+                        ) : null}
+                        <span className="font-semibold text-red-600" data-testid="desktop-live">
+                            ● {t('live')}
+                        </span>
                     </span>
                 ) : null}
             </header>
@@ -659,6 +693,12 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
                     </div>
                 </footer>
             ) : null}
+            {recordingState?.state === 'failed' ? (
+                <p className="text-xs text-amber-700" role="status" data-testid="desktop-recording-failed">
+                    {t('recordings.failed')}
+                </p>
+            ) : null}
+            <DesktopRecordings nodeId={node.id} nodeName={name} />
         </section>
     );
 }

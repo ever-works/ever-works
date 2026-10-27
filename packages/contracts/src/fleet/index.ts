@@ -45,3 +45,4 @@ export * from './fleet-desktop.types.js';
 export * from './fleet-desktop-tiles.codec.js';
 export * from './fleet-helper.types.js';
 export * from './fleet-desktop-control.types.js';
+export * from './fleet-desktop-recording.types.js';

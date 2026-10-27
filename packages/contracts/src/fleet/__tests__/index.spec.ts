@@ -1506,6 +1506,26 @@ const DESKTOP_CONTROL_EXPORTS = [
 	'fleetDesktopInputBlocked'
 ] as const;
 
+/** Desktop recordings (FL-07 P2.C): `fleet-desktop-recording.types.ts`, a NEW module (one witness row below). */
+const DESKTOP_RECORDING_EXPORTS = [
+	'FLEET_DESKTOP_RECORDING_MAX_BYTES',
+	'FLEET_DESKTOP_RECORDING_MAX_MS',
+	'FLEET_DESKTOP_RECORDING_CHUNK_MS',
+	'FLEET_DESKTOP_RECORDING_KEYFRAME_EVERY_MS',
+	'FLEET_DESKTOP_RECORDING_RETENTION_DAYS_DEFAULT',
+	'FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MIN',
+	'FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MAX',
+	'fleetDesktopRecordingRetentionDays',
+	'FLEET_DESKTOP_RECORDING_STOP_REASONS',
+	'isFleetDesktopRecordingStopReason',
+	'FLEET_DESKTOP_RECORDING_TRIGGERS',
+	'FLEET_DESKTOP_RECORDING_MAGIC',
+	'FLEET_DESKTOP_RECORDING_MAX_CHUNK_BYTES',
+	'encodeDesktopRecordingChunk',
+	'decodeDesktopRecordingChunk',
+	'FLEET_DESKTOP_RECORDING_GC_CRON'
+] as const;
+
 /** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
 const ACTIONS_RUNNERS_EXPORTS = [
 	'FLEET_ACTIONS_RUNNER_CAPABILITY',
@@ -1687,6 +1707,7 @@ const ALL_EXPORTS = [
 	...DESKTOP_TILES_EXPORTS,
 	...HELPER_EXPORTS,
 	...DESKTOP_CONTROL_EXPORTS,
+	...DESKTOP_RECORDING_EXPORTS,
 	...USAGE_EXPORTS,
 	...MODEL_LIST_PRICES_EXPORTS,
 	...CLOUD_P2_EXPORTS,
@@ -2279,7 +2300,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1385 runtime symbols', () => {
+	it('exposes exactly these 1401 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2386,7 +2407,8 @@ describe('fleet barrel', () => {
 		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
 		// → +5 with FL-18 P3 (Docker-isolated runners, versions): same module.
 		// → +23 with desktop control (FL-07 P2): `fleet-desktop-control.types.ts`, a NEW module.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 5 + 23);
+		// → +16 with desktop recordings (FL-07 P2.C): `fleet-desktop-recording.types.ts`, a NEW module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 5 + 23 + 16);
 	});
 
 	it.each([
@@ -2434,6 +2456,7 @@ describe('fleet barrel', () => {
 		['fleet-desktop-tiles.codec.js', 'encodeDesktopTiles'],
 		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS'],
 		['fleet-desktop-control.types.js', 'FLEET_DESKTOP_CONTROL_REASONS'],
+		['fleet-desktop-recording.types.js', 'FLEET_DESKTOP_RECORDING_MAX_BYTES'],
 		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
 		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES'],
 		['fleet-actions-runners.types.js', 'FLEET_ACTIONS_RUNNER_CAPABILITY']

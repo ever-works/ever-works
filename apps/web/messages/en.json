@@ -16015,6 +16015,35 @@
                     "inputUnavailable": "The computer does not take input in this session.",
                     "injectFailed": "The computer did not take that input."
                 }
+            },
+            "recordings": {
+                "title": "Recordings of {name}",
+                "none": "Nothing recorded yet. A view is recorded whenever someone has control.",
+                "error": "The recordings could not be read.",
+                "on": "RECORDING",
+                "failed": "This view is not being recorded: the recording could not be stored.",
+                "expires": "Deleted on {date}",
+                "watch": "Watch",
+                "close": "Close",
+                "loading": "Loading the recording…",
+                "player": "Recording of {name}",
+                "watermark": "EVER WORKS · RECORDING · DESKTOP · {name}",
+                "play": "Play",
+                "pause": "Pause",
+                "back10": "−10 s",
+                "back1": "−1 s",
+                "forward1": "+1 s",
+                "forward10": "+10 s",
+                "scrubber": "Position in the recording",
+                "facts": "Display {display} · {quality} · stored in {storage} · {size} · deleted on {date}",
+                "primary": "primary",
+                "never": "never",
+                "spans": "Amber marks the stretches when someone had control.",
+                "delete": "Delete now",
+                "deleteTitle": "Delete this recording of {name}?",
+                "deleteBody": "It is removed from storage at once and cannot be brought back.",
+                "deleteYes": "Delete",
+                "deleteNo": "Cancel"
             }
         },
         "cloud": {

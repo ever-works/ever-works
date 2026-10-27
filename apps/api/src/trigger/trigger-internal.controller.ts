@@ -80,6 +80,7 @@ import {
     FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
+import { DesktopRecordingService } from '@ever-works/agent/computer';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { ConversationMessageService } from '@ever-works/agent/conversations';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
@@ -777,6 +778,12 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + `@Optional()` per the arity rule above.
         @Optional()
         private readonly appBlueprintApplyRunner?: AppBlueprintApplyRunner,
+        // Desktop view & control (FL-07 P2.C, T-40) — backs the `computer-recording-gc` cron:
+        // the worker proxy calls `sweepExpired()`, the facade's only member (the writer and
+        // the reader never reach the worker). Provided by the `@Global()` FleetDesktopApiModule.
+        // Appended LAST + `@Optional()` per the arity rule above.
+        @Optional()
+        private readonly desktopRecordingService?: DesktopRecordingService,
     ) {}
 
     onModuleInit() {
@@ -949,6 +956,12 @@ export class TriggerInternalController implements OnModuleInit {
             // control / token mint must never reach the worker).
             FleetActionsRunnersPollService: this.fleetActionsRunnersPollService
                 ? { reconcile: () => this.fleetActionsRunnersPollService!.reconcile() }
+                : undefined,
+            // Desktop recordings (FL-07 P2.C) — `computer-recording-gc` calls `sweepExpired()`
+            // here, and only that (a one-member facade: start / push / remove never reach the
+            // worker). `undefined` (a loud "Unknown remote target") when desktop is not mounted.
+            DesktopRecordingService: this.desktopRecordingService
+                ? { sweepExpired: () => this.desktopRecordingService!.sweepExpired() }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

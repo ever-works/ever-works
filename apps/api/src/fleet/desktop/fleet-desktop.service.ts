@@ -9,6 +9,7 @@ import {
     computerSessionScopeKey,
     resolveComputerSessionLimits,
     resolveSessionExpiry,
+    DesktopRecordingService,
     type ComputerControlActor,
     type ComputerControlOutcome,
     type ComputerSession,
@@ -50,6 +51,8 @@ import {
     type FleetDesktopBlocker,
     type FleetDesktopControlRequest,
     type FleetDesktopControlResult,
+    type FleetDesktopRecordingTrigger,
+    type FleetDesktopRecordingView,
     type FleetDesktopOpenRequest,
     type FleetDesktopOpenResult,
     type FleetDesktopScreenshot,
@@ -126,6 +129,8 @@ export const DESKTOP_INPUT_WRITE_EVERY_MS = 5_000;
 export const DESKTOP_HOLD_CHECK_EVERY_MS = 1_000;
 /** A view this replica holds in memory is re-read from its row at most this long after the last read. */
 export const DESKTOP_VIEW_RECHECK_MS = 10_000;
+/** A recording whose view has no socket for this long is stopped (`view-ended`). */
+export const DESKTOP_RECORDING_IDLE_STOP_MS = 120_000;
 /** The node-link frame kind of a controller's input (`INPUT`). */
 const INPUT_FRAME_KIND = FLEET_LINK_FRAME_KINDS.INPUT;
 
@@ -160,6 +165,8 @@ interface DesktopViewRecord {
     releaseTimer: ReturnType<typeof setTimeout> | null;
     /** When this replica last read the view's row (a cached view is re-read every few seconds). */
     checkedAt: number;
+    /** P2.C: the recording ends when no socket of the view came back within this timer. */
+    recordingTimer: ReturnType<typeof setTimeout> | null;
 }
 
 @Injectable()
@@ -180,6 +187,8 @@ export class FleetDesktopService
         @Optional() private readonly gateway?: FleetLinkViewerGatewayService,
         // P2 (control) — APPENDED and @Optional(): unbound, control answers `unsupported_on_node`.
         @Optional() private readonly control?: ComputerControlArbiter,
+        // P2.C (recordings) — APPENDED and @Optional(): unbound, nothing is recorded.
+        @Optional() private readonly recording?: DesktopRecordingService,
     ) {}
 
     /** The wall clock (a method, so a spec can move it). */
@@ -298,6 +307,7 @@ export class FleetDesktopService
             statsBytes: 0,
             releaseTimer: null,
             checkedAt: now,
+            recordingTimer: null,
         };
         // AW-11's admission lock: the caps and the row that counts against them, together.
         await this.withAdmissionLock(node, async () => {
@@ -520,6 +530,8 @@ export class FleetDesktopService
             return { state, attach: null };
         }
         const state = this.controlOutcome(await control.take(this.actorOf(record)), node);
+        // FR-48: a view in control mode is recorded, from the moment control is won.
+        if (state.mode === 'controlling') await this.recordIfDue(record, 'control');
         const attach = state.mode === 'controlling' ? await this.mintFor(record, 'driver') : null;
         return { state, attach };
     }
@@ -598,11 +610,78 @@ export class FleetDesktopService
             const change = event.change;
             if (change.held || !this.views.has(change.sessionId)) return;
             this.closeDrivers(change.sessionId, 'control ended');
+            void this.stopControlRecording(change.sessionId);
         } catch (error) {
             this.logger.warn(
                 `desktop control change not applied: ${error instanceof Error ? error.message : String(error)}`,
             );
         }
+    }
+
+    // ─── Recordings (P2.C, FR-53 … FR-55) ───────────────────────────────────
+
+    /** The recordings of a computer, for people in its `desktop` audience (the same right as watching it). */
+    async recordings(userId: string, nodeId: string): Promise<FleetDesktopRecordingView[]> {
+        const node = await this.recordingNode(userId, nodeId);
+        return this.requireRecording().list(node.id, node.name);
+    }
+
+    /** One recording with its chunks (never a storage key). */
+    async recordingFor(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopRecordingView> {
+        const node = await this.recordingNode(userId, nodeId);
+        const view = await this.requireRecording().read(viewId, node.id, node.name);
+        if (!view) throw this.recordingGone();
+        return view;
+    }
+
+    /** One chunk's bytes (the player paints them; served `attachment` + `nosniff`). */
+    async recordingChunk(userId: string, nodeId: string, viewId: string, seq: number): Promise<Uint8Array> {
+        const node = await this.recordingNode(userId, nodeId);
+        const bytes = await this.requireRecording().chunk(viewId, node.id, seq);
+        if (!bytes) throw this.recordingGone();
+        return bytes;
+    }
+
+    /** "Delete now" (class `confirm`, audited `node.desktop.recording.delete`): objects first, the row second. */
+    async deleteRecording(userId: string, nodeId: string, viewId: string, confirm: boolean): Promise<void> {
+        const node = await this.recordingNode(userId, nodeId);
+        const recording = this.requireRecording();
+        const view = await recording.read(viewId, node.id, node.name);
+        if (!view) throw this.recordingGone();
+        if (!confirm) {
+            throw fleetLinkError(
+                'confirmation_required',
+                `Confirm to delete the recording of ${node.name} from ${view.startedAt}: send confirm: true`,
+                {
+                    class: 'confirm',
+                    summary: `Delete the recording of ${node.name} from ${view.startedAt}? It cannot be brought back.`,
+                },
+            );
+        }
+        if (!(await recording.remove(viewId, userId))) {
+            throw fleetLinkError('operation_failed', 'the recording could not be deleted from storage — try again');
+        }
+    }
+
+    private async recordingNode(userId: string, nodeId: string): Promise<FleetNode> {
+        const { node } = await this.access.resolveVisible(nodeId, { userId });
+        if (!(await this.access.canAct(node, { userId }, 'desktop'))) {
+            throw fleetLinkError('permission_denied', this.hintFor('permission-denied', node), {
+                actionFamily: 'desktop',
+            });
+        }
+        return node;
+    }
+
+    private requireRecording(): DesktopRecordingService {
+        if (!this.recording) {
+            throw fleetLinkError('unsupported_on_node', 'recordings are not available on this platform yet');
+        }
+        return this.recording;
+    }
+
+    private recordingGone(): FleetLinkException {
+        return fleetLinkError('not_found', 'this recording is gone — it may have expired or been deleted');
     }
 
     // ─── Screenshot (the read-only Agent tool's read) ───────────────────────
@@ -728,6 +807,11 @@ export class FleetDesktopService
         const record = this.desktopRecordOf(viewer);
         if (!record) return;
         record.sockets += 1;
+        if (record.recordingTimer) {
+            clearTimeout(record.recordingTimer);
+            record.recordingTimer = null;
+        }
+        void this.recordIfDue(record, viewer.claims.role === 'driver' ? 'control' : 'watch');
         if (viewer.claims.role === 'driver') {
             record.drivers += 1;
             if (record.releaseTimer) {
@@ -760,6 +844,14 @@ export class FleetDesktopService
         if (!record) return;
         record.sockets = Math.max(0, record.sockets - 1);
         record.lastGrantAt = this.now();
+        if (record.sockets === 0 && this.recording?.isRecording(record.viewId) && !record.recordingTimer) {
+            record.recordingTimer = setTimeout(() => {
+                record.recordingTimer = null;
+                if (record.sockets > 0) return;
+                void this.recording?.stop(record.viewId, 'view-ended').catch(() => undefined);
+            }, DESKTOP_RECORDING_IDLE_STOP_MS);
+            record.recordingTimer.unref?.();
+        }
         if (viewer.claims.role !== 'driver') return;
         record.drivers = Math.max(0, record.drivers - 1);
         if (record.drivers > 0 || !this.control || record.releaseTimer) return;
@@ -817,6 +909,56 @@ export class FleetDesktopService
                 if (!hold.held) this.closeDrivers(record.viewId, 'control ended');
             })
             .catch(() => undefined);
+    }
+
+    /** P2.C: the pictures the view received go to its recording (when it has one). */
+    nodeBinary(viewer: FleetLinkViewerHandle, kind: number, payload: Uint8Array): void {
+        if (!this.recording) return;
+        if (kind !== FLEET_LINK_FRAME_KINDS.FRAME && kind !== FLEET_LINK_FRAME_KINDS.TILES) return;
+        const record = this.desktopRecordOf(viewer);
+        if (!record?.persisted || !this.recording.isRecording(record.viewId)) return;
+        this.recording.push(record.viewId, kind, payload);
+    }
+
+    /**
+     * FR-48: record a view in control mode, always; a watching one only when
+     * the computer's owner opted in (`recordWatchSessions`). Never throws.
+     */
+    private async recordIfDue(record: DesktopViewRecord, mode: 'control' | 'watch'): Promise<void> {
+        const recording = this.recording;
+        if (!recording || !record.persisted || recording.isRecording(record.viewId)) return;
+        try {
+            let trigger: FleetDesktopRecordingTrigger | null = mode === 'control' ? 'control' : null;
+            if (!trigger) {
+                const node = await this.nodes.findById(record.nodeId);
+                if (node?.recordWatchSessions === true) trigger = 'watch-opt-in';
+            }
+            if (!trigger) return;
+            await recording.start({
+                viewId: record.viewId,
+                nodeId: record.nodeId,
+                ownerUserId: record.ownerUserId,
+                actorUserId: record.userId,
+                trigger,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `desktop view ${record.viewId}: recording not started: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /** Control ended: its recording stops — unless the owner records watching views too. */
+    private async stopControlRecording(viewId: string): Promise<void> {
+        const record = this.views.get(viewId);
+        if (!record || !this.recording?.isRecording(viewId)) return;
+        try {
+            const node = await this.nodes.findById(record.nodeId);
+            if (node?.recordWatchSessions === true) return;
+            await this.recording.stop(viewId, 'control-ended');
+        } catch {
+            // the view's end stops it anyway
+        }
     }
 
     /** `desktop.stats` (once a second): the view's row is stamped so AW-11's stall rule sees it alive. */
@@ -1052,6 +1194,10 @@ export class FleetDesktopService
 
     private forget(record: DesktopViewRecord): void {
         this.views.delete(record.viewId);
+        if (record.recordingTimer) {
+            clearTimeout(record.recordingTimer);
+            record.recordingTimer = null;
+        }
         if (record.releaseTimer) {
             clearTimeout(record.releaseTimer);
             record.releaseTimer = null;
@@ -1102,6 +1248,7 @@ export class FleetDesktopService
         viewId: string,
         reason: 'closed-by-user' | 'session-ceiling' | 'error',
     ): Promise<void> {
+        await this.recording?.stop(viewId, 'view-ended').catch(() => undefined);
         try {
             if (typeof this.sessions?.close === 'function') {
                 await this.sessions.close(viewId, {
@@ -1182,6 +1329,7 @@ export class FleetDesktopService
             statsBytes: 0,
             releaseTimer: null,
             checkedAt: this.now(),
+            recordingTimer: null,
         };
         this.views.set(record.viewId, record);
         return record;
@@ -1390,6 +1538,11 @@ export class FleetDesktopService
             openedByUserId: record.userId,
             openedAt: new Date(record.openedAt).toISOString(),
             fleetSessionId: record.fleetSessionId,
+            recording: this.recording?.isRecording(record.viewId)
+                ? { state: 'recording', reason: null }
+                : this.recording?.failureOf(record.viewId)
+                  ? { state: 'failed', reason: this.recording.failureOf(record.viewId) }
+                  : { state: 'off', reason: null },
         };
     }
 

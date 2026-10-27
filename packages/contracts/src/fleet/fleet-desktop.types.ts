@@ -495,6 +495,12 @@ export interface FleetDesktopViewView {
 	openedByUserId: string;
 	openedAt: string;
 	fleetSessionId: string | null;
+	/**
+	 * P2.C (FR-48, FR-55): whether the view is being recorded right now —
+	 * `recording`, `off` (watching, and the owner has not opted in), or
+	 * `failed` with why (the view goes on, unrecorded). Absent from an older platform.
+	 */
+	recording?: { state: 'recording' | 'off' | 'failed'; reason: string | null };
 }
 
 /** The single-use, 60-second viewer grant for `/ws/fleet/desktop/<viewId>` (FL-02's minter). */

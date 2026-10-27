@@ -11,6 +11,7 @@ import {
     FLEET_LINK_VIEWER_PING_INTERVAL_MS,
     parseFleetLinkViewerPath,
     type FleetLinkFamily,
+    type FleetLinkFrameKind,
 } from '@ever-works/contracts';
 import { FleetLinkAttachService, type FleetLinkViewerClaims } from './fleet-link-attach.service';
 import { FleetLinkException } from './fleet-link.errors';
@@ -74,6 +75,13 @@ export interface FleetLinkViewerObserver {
      * Called before the message is forwarded; never sees a `DATA` payload.
      */
     nodeMessage?(viewer: FleetLinkViewerHandle, message: Record<string, unknown>): void;
+    /**
+     * A binary frame the NODE sent on the viewer's channel (FL-07 P2.C: the
+     * Desktop view's recording reads its `FRAME` and `TILES`). Called before
+     * the frame is forwarded; the payload is the node's, read-only — an
+     * observer that keeps it copies it.
+     */
+    nodeBinary?(viewer: FleetLinkViewerHandle, kind: number, payload: Uint8Array): void;
     /** The viewer is gone. */
     closed?(viewer: FleetLinkViewerHandle): void;
 }
@@ -289,7 +297,7 @@ export class FleetLinkViewerGatewayService
             const observer = state.observer;
             // FL-08: an observer that reads the node's JSON messages sees each
             // one before it is forwarded (bytes are never shown to it).
-            const events =
+            const withMessages =
                 observer?.nodeMessage !== undefined
                     ? {
                           ...bridge.events,
@@ -303,6 +311,21 @@ export class FleetLinkViewerGatewayService
                           },
                       }
                     : bridge.events;
+            // FL-07 P2.C: an observer that reads the node's binary frames sees each one first.
+            const events =
+                observer?.nodeBinary !== undefined
+                    ? {
+                          ...withMessages,
+                          binary: (kind: FleetLinkFrameKind, payload: Uint8Array) => {
+                              try {
+                                  observer.nodeBinary?.(handle, kind, payload);
+                              } catch {
+                                  // an observer never breaks the stream
+                              }
+                              withMessages.binary?.(kind, payload);
+                          },
+                      }
+                    : withMessages;
             const channel = await this.links.openChannel({
                 nodeId: claims.nodeId,
                 family: claims.family,

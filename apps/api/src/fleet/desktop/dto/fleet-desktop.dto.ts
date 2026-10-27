@@ -97,3 +97,11 @@ export class AnswerFleetDesktopControlDto {
     @IsIn([...COMPUTER_CONTROL_DECISIONS])
     decision!: ComputerControlDecision;
 }
+
+/** `DELETE …/desktop/recordings/:viewId` (FL-07 P2.C): CONTRACTS §2.2 class `confirm`. */
+export class DeleteFleetDesktopRecordingDto {
+    @ApiProperty({ required: false, description: 'Without it the answer is 409 `confirmation_required`.' })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}

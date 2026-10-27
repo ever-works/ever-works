@@ -13,5 +13,6 @@ export * from './node-agent-profile.service';
 export * from './control-policy';
 export * from './computer-control.repository';
 export * from './control-arbiter.service';
+export * from './desktop-recording.service';
 export { ComputerSession } from '../entities/computer-session.entity';
 export { NodeAgentProfile } from '../entities/node-agent-profile.entity';

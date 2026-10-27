@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { COMPUTER_SESSION_OPEN_STATUSES } from '@ever-works/contracts';
 import { advisoryLockObjectId } from '../database/repositories/agent-run.repository';
 import { ComputerSession } from '../entities/computer-session.entity';
@@ -131,6 +131,31 @@ export class ComputerSessionRepository {
         if (!id || !openedByUserId) return null;
         return this.repository.findOne({
             where: { id, openedByUserId, source: 'desktop', agentId: IsNull() },
+        });
+    }
+
+    // ── Desktop recordings (FL-07 P2.C) ──────────────────────────────────
+
+    /** Write a Desktop view's recording fields (the recording path only). */
+    async setRecording(id: string, patch: Partial<ComputerSession>): Promise<void> {
+        await this.repository.update({ id, source: 'desktop' }, patch);
+    }
+
+    /** One computer's Desktop views that still have a recording, newest first. */
+    async findDesktopRecordingsForNode(nodeId: string, take = 50): Promise<ComputerSession[]> {
+        return this.repository.find({
+            where: { nodeId, source: 'desktop', recordingRef: Not(IsNull()) },
+            order: { createdAt: 'DESC' },
+            take,
+        });
+    }
+
+    /** Desktop recordings past their expiry (the retention sweep). */
+    async findExpiredDesktopRecordings(now: Date, take = 100): Promise<ComputerSession[]> {
+        return this.repository.find({
+            where: { source: 'desktop', recordingRef: Not(IsNull()), recordingExpiresAt: LessThan(now) },
+            order: { recordingExpiresAt: 'ASC' },
+            take,
         });
     }
 
