@@ -41,7 +41,10 @@ class UpstreamDiffStatsDto {
 export class UpstreamPullRequestViewDto {
     @ApiProperty({ format: 'uuid' }) id: string;
     @ApiProperty({ type: String, format: 'uuid', nullable: true }) sourceTaskId: string | null;
-    @ApiProperty({ format: 'uuid', description: 'The author: whose GitHub account the pull request carries.' })
+    @ApiProperty({
+        format: 'uuid',
+        description: 'The author: whose GitHub account the pull request carries.',
+    })
     userId: string;
     @ApiProperty({ enum: [...UPSTREAM_PULL_REQUEST_ORIGINS] }) origin: string;
     @ApiProperty({ enum: [...UPSTREAM_PULL_REQUEST_STATES] }) state: string;
@@ -54,12 +57,19 @@ export class UpstreamPullRequestViewDto {
     @ApiProperty({ type: String, nullable: true }) body: string | null;
     @ApiProperty({ type: String, nullable: true }) disclosureText: string | null;
     @ApiProperty() maintainerCanModify: boolean;
-    @ApiProperty({ enum: [...UPSTREAM_CHECKS_SUMMARIES], nullable: true }) checksSummary: string | null;
-    @ApiProperty({ enum: [...UPSTREAM_REVIEW_SUMMARIES], nullable: true }) reviewSummary: string | null;
-    @ApiProperty({ enum: [...UPSTREAM_SIGNATURE_STATES], nullable: true }) signatureState: string | null;
+    @ApiProperty({ enum: [...UPSTREAM_CHECKS_SUMMARIES], nullable: true }) checksSummary:
+        | string
+        | null;
+    @ApiProperty({ enum: [...UPSTREAM_REVIEW_SUMMARIES], nullable: true }) reviewSummary:
+        | string
+        | null;
+    @ApiProperty({ enum: [...UPSTREAM_SIGNATURE_STATES], nullable: true }) signatureState:
+        | string
+        | null;
     @ApiProperty({ type: String, nullable: true }) refusalCode: string | null;
     @ApiProperty({ type: String, nullable: true }) refusalDetail: string | null;
-    @ApiProperty({ type: UpstreamDiffStatsDto, nullable: true }) diffStats: UpstreamDiffStatsDto | null;
+    @ApiProperty({ type: UpstreamDiffStatsDto, nullable: true })
+    diffStats: UpstreamDiffStatsDto | null;
     @ApiProperty({ type: String, nullable: true }) extraFilesAcknowledgedAt: string | null;
     @ApiProperty({ type: String, nullable: true }) approvalProposalId: string | null;
     @ApiProperty({ type: String, nullable: true }) approvalExpiresAt: string | null;
@@ -76,10 +86,15 @@ export class UpstreamPullRequestDetailViewDto extends UpstreamPullRequestViewDto
     @ApiProperty({
         type: Object,
         nullable: true,
-        description: 'The prepared diff, while awaiting approval (300 files / 1 MB). `null` until preparation ships.',
+        description:
+            'The prepared diff, while awaiting approval (300 files / 1 MB). `null` until preparation ships.',
     })
     diff: Record<string, unknown> | null;
-    @ApiProperty({ type: [Object], nullable: true, description: 'Agent-reported check results (FR-47).' })
+    @ApiProperty({
+        type: [Object],
+        nullable: true,
+        description: 'Agent-reported check results (FR-47).',
+    })
     checkResults: Record<string, unknown>[] | null;
     @ApiProperty({ type: [String], nullable: true }) missingPieces: string[] | null;
     @ApiProperty({ type: String, nullable: true }) claUrl: string | null;
@@ -105,15 +120,22 @@ class UpstreamEligibilityTargetDto {
 export class UpstreamEligibilityViewDto {
     @ApiProperty() allowed: boolean;
     @ApiPropertyOptional({ enum: [...UPSTREAM_REFUSAL_CODES] }) code?: string;
-    @ApiPropertyOptional({ enum: [...UPSTREAM_RATE_LIMIT_KEYS], description: 'FR-27: which limit refused.' })
+    @ApiPropertyOptional({
+        enum: [...UPSTREAM_RATE_LIMIT_KEYS],
+        description: 'FR-27: which limit refused.',
+    })
     limit?: string;
     @ApiPropertyOptional({ description: 'ISO; absent for `openPerUpstream`.' }) nextSlotAt?: string;
     @ApiPropertyOptional() limitValue?: number;
-    @ApiProperty({ type: UpstreamEligibilityTargetDto, nullable: true }) target: UpstreamEligibilityTargetDto | null;
+    @ApiProperty({ type: UpstreamEligibilityTargetDto, nullable: true })
+    target: UpstreamEligibilityTargetDto | null;
     @ApiProperty() orgFork: boolean;
     @ApiProperty() maintainerCanModifyDefault: boolean;
-    @ApiProperty({ type: String, nullable: true, enum: ['fork', 'private-copy', 'link'] }) relation: string | null;
-    @ApiProperty({ description: '`false` until the preparation step ships: nothing can be prepared yet.' })
+    @ApiProperty({ type: String, nullable: true, enum: ['fork', 'private-copy', 'link'] })
+    relation: string | null;
+    @ApiProperty({
+        description: '`false` until the preparation step ships: nothing can be prepared yet.',
+    })
     preparationAvailable: boolean;
     @ApiPropertyOptional({
         type: String,

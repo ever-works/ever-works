@@ -10,7 +10,14 @@ import {
     Query,
     UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+    ApiBearerAuth,
+    ApiOperation,
+    ApiParam,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     UPSTREAM_PULL_REQUEST_STATES,
@@ -231,7 +238,11 @@ export class UpstreamPullRequestsController {
                 const status = error.getStatus();
                 if (status === HttpStatus.NOT_FOUND || status === HttpStatus.FORBIDDEN) {
                     throw new HttpException(
-                        { status: 'error', code: 'not_found', message: `Work ${workId} not found.` },
+                        {
+                            status: 'error',
+                            code: 'not_found',
+                            message: `Work ${workId} not found.`,
+                        },
                         HttpStatus.NOT_FOUND,
                     );
                 }
@@ -240,7 +251,11 @@ export class UpstreamPullRequestsController {
         }
         if (!isAppWorkKind(access.work.kind)) {
             throw new HttpException(
-                { status: 'error', code: 'notAppWork', message: `Work ${workId} is not an App Work.` },
+                {
+                    status: 'error',
+                    code: 'notAppWork',
+                    message: `Work ${workId} is not an App Work.`,
+                },
                 HttpStatus.UNPROCESSABLE_ENTITY,
             );
         }
@@ -270,7 +285,11 @@ function parseState(value: string | undefined): UpstreamPullRequestState | null 
         return value as UpstreamPullRequestState;
     }
     throw new HttpException(
-        { status: 'error', code: 'invalidState', message: `Unknown state "${String(value).slice(0, 40)}".` },
+        {
+            status: 'error',
+            code: 'invalidState',
+            message: `Unknown state "${String(value).slice(0, 40)}".`,
+        },
         HttpStatus.BAD_REQUEST,
     );
 }
