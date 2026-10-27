@@ -86,6 +86,13 @@ import {
     type AppWorkTaskToolDenial,
     type AppWorkTaskToolPolicyCounts,
 } from '../app-works/app-work-task-tool-policy';
+// APW-08 T49 — a leaf (the Nest logger only).
+import {
+    APP_WORK_SWITCH_ENV,
+    APP_WORK_SWITCH_OFF_CODE,
+    describeAppChangesPaused,
+    readAppWorkSwitches,
+} from '../app-works/app-work-switches';
 
 export interface AgentRunContext {
     runId: string;
@@ -363,6 +370,32 @@ export class AgentRunService {
                 `AgentRunService.execute: ownership mismatch for run ${context.runId} — agent ${context.agentId} is not owned by the requesting user; refusing cross-tenant run.`,
             );
             return { runId: context.runId, status: 'agent-not-found' };
+        }
+
+        // 0. APW-08 T49 (R-30) — the operator's change switch, read again at execution. The
+        // dispatch path already refuses a NEW run while it is off; this catches every run that
+        // reaches a worker another way (a resumed or drained run, an assign-task enqueue, a job
+        // queued before the switch was flipped), before any model call or workspace change.
+        if (await this.appChangesPausedForRun(context)) {
+            const message = describeAppChangesPaused();
+            await this.runs.markFailed(context.runId, message);
+            await this.runLogs
+                .append({
+                    runId: context.runId,
+                    level: 'ERROR',
+                    step: 'switch',
+                    message,
+                    metadata: {
+                        code: APP_WORK_SWITCH_OFF_CODE,
+                        switch: APP_WORK_SWITCH_ENV.changes,
+                    },
+                })
+                .catch(() => undefined);
+            return {
+                runId: context.runId,
+                status: 'dispatch-failed',
+                outcome: { errored: true, errorMessage: message },
+            };
         }
 
         // 1. Pre-flight budget check.
@@ -2245,6 +2278,25 @@ export class AgentRunService {
         // PromptAssembler sees no recent-activity segment — the
         // Agent's own SOUL/AGENTS/HEARTBEAT still drive the run.
         return [];
+    }
+
+    /**
+     * APW-08 T49 — `EVER_WORKS_APP_CHANGES_ENABLED` is off and this run works on a Task on an
+     * App Work. Switch first (no query while it is on); a run with no Task, and a code-review
+     * run (it changes nothing), are never paused. Uses the T47 classifier with the Task only, so
+     * the answer is "the Task's Work is an App Work" (fail closed on unreadable rows). Unbound
+     * classifier = not paused (a runtime without the Task tables, a unit test).
+     */
+    private async appChangesPausedForRun(context: AgentRunContext): Promise<boolean> {
+        if (readAppWorkSwitches().changesEnabled) return false;
+        if (!context.taskId) return false;
+        if (isAgentReviewRunScope(context.delegationScope)) return false;
+        if (!this.appWorkRuns) return false;
+        try {
+            return await this.appWorkRuns.appliesTo({ taskId: context.taskId });
+        } catch {
+            return true;
+        }
     }
 
     /**

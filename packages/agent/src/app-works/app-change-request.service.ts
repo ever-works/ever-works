@@ -20,6 +20,7 @@ import {
 } from './app-work-agent-resolver';
 import { GitFacadeService } from '../facades/git.facade';
 import { AppSpecUnreadableError, AppWorkRulesService } from './app-work-rules.service';
+import { APP_CHANGES_PAUSED_MESSAGE, readAppWorkSwitches } from './app-work-switches';
 
 /**
  * APW-08 T25 — the evolve loop's entry point: "change this App Work" → a Task on the Work,
@@ -121,7 +122,9 @@ export interface AppChangeRefused {
         | 'taskCreateFailed'
         // Live e2e 2026-10-18 (T-40): the base branch has no `.works/works.yml`, so
         // the change gate would refuse the pull request after the run anyway.
-        | 'appSpecMissing';
+        | 'appSpecMissing'
+        // APW-08 T49 (R-30): `EVER_WORKS_APP_CHANGES_ENABLED` is off (CONTRACTS §8 `switch_off`, 503).
+        | 'switchOff';
     readonly message: string;
     readonly candidates?: ReadonlyArray<{ id: string; name: string }>;
     readonly createFromTemplate?: { templateSlug: string; reason: 'noCommittableAgent' };
@@ -180,6 +183,12 @@ export class AppChangeRequestService {
         const { work } = input;
         if (!isAppWorkKind(work.kind)) {
             return refused(422, 'notAppWork', `Work ${work.id} is not an App Work.`);
+        }
+
+        // APW-08 T49 (R-30) — the operator's change switch, read now (never cached). Off, no
+        // change Task is filed and nothing starts; every existing Task stays as it is.
+        if (!readAppWorkSwitches().changesEnabled) {
+            return refused(503, 'switchOff', APP_CHANGES_PAUSED_MESSAGE);
         }
 
         const text = typeof input.request === 'string' ? input.request.trim() : '';
