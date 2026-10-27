@@ -31,6 +31,8 @@ function harness(
         /** 2026-10-27: expose `findStateForWorks` (the managed Works are on the tier). */
         stateRows?: boolean;
         stateThrows?: boolean;
+        /** Work ids on the tier with a namespace prepared but NO Deployment recorded. */
+        preparedOnly?: string[];
     } = {},
 ) {
     const counted: Array<{ owner: string; exclude: string | null | undefined }> = [];
@@ -73,7 +75,9 @@ function harness(
                                       workId: id,
                                       target: 'ever-works-apps',
                                       removedAt: null,
-                                      currentDeploymentId: `dep-${id}`,
+                                      currentDeploymentId: options.preparedOnly?.includes(id)
+                                          ? null
+                                          : `dep-${id}`,
                                       namespace: `ewapp-${id}`,
                                   },
                               ]),
@@ -411,6 +415,22 @@ describe('the cap depends on the owner plan (owner decision 2026-10-27)', () => 
             await expect(h.service.evaluate('owner-1', { workId: 'w-new' })).resolves.toMatchObject(
                 { eligible: false, reasons: ['capReached'] },
             );
+        });
+
+        it('a Work only POINTED at the tier (namespace prepared, never deployed) is still a NEW App', async () => {
+            // Its first Deployment over the cap is refused: a prepared namespace is not a running App,
+            // so two Works chosen in a race cannot both start past the cap.
+            const h = harness({
+                plan: 'free',
+                managed: managedApps(4),
+                stateRows: true,
+                preparedOnly: ['w-4'],
+            });
+
+            await expect(h.service.evaluate('owner-1', { workId: 'w-4' })).resolves.toMatchObject({
+                eligible: false,
+                reasons: ['capReached'],
+            });
         });
 
         it('an unreadable runtime state keeps the cap (fail closed)', async () => {

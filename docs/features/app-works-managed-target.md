@@ -144,8 +144,9 @@ every Deployment; the isolated worker re-checks it.
 - **Paid owner** — no limit unless `EVER_WORKS_APPS_MAX_PER_PAID_USER` is set.
 - **Plan unknown** — if the plan cannot be read, or billing is switched off, the unpaid cap applies.
   The extra allowance fails closed.
-- **Redeploys are never refused for the cap.** An App that already runs on the tier keeps
-  redeploying even when its owner is over the cap (after a downgrade, say). Only a new App is refused.
+- **Redeploys are never refused for the cap.** An App that already runs on the tier (a Deployment
+  recorded there) keeps redeploying even when its owner is over the cap (after a downgrade, say).
+  Only a new App is refused, including one that was pointed at the tier but never deployed.
 - `EVER_WORKS_APPS_MANAGED_REQUIRE_PAID_PLAN=true` additionally refuses unpaid owners outright
   (`planRequired`; default off).
 

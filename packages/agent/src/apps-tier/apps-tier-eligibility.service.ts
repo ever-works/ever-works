@@ -66,8 +66,8 @@ export {
  * nothing deployed does not. The Work being deployed is never counted against itself, so a
  * redeploy of one of the three is never refused. Since 2026-10-27 an owner can also be OVER the cap
  * with Apps that were all admitted (a downgrade to free, a lowered cap, a paid owner whose plan
- * cannot be read), so a Work that already occupies the tier (a Deployment or namespace recorded on
- * `ever-works-apps`) is never refused `capReached` either — only a NEW App is.
+ * cannot be read), so a Work that already runs on the tier (a Deployment recorded on
+ * `ever-works-apps`, not removed) is never refused `capReached` either — only a NEW App is.
  *
  * ## Fail-closed
  *
@@ -219,11 +219,12 @@ export class AppsTierEligibilityService implements AppsTierEligibilitySource {
     }
 
     /**
-     * Whether the Work being deployed already occupies Ever Works Apps: its runtime-state row is on
-     * `ever-works-apps`, not removed, and records a Deployment or a namespace (the count's own
-     * predicate WITHOUT the deploy lock, so a first Deployment in flight is still a NEW App and the
-     * worker's re-check keeps catching two new Apps racing past the cap). Anything unreadable
-     * answers `false`: the cap then applies, as before.
+     * Whether the Work being deployed is an App that already RUNS on Ever Works Apps: its
+     * runtime-state row is on `ever-works-apps`, not removed, and records a Deployment. Narrower
+     * than the count's own predicate on purpose: a namespace alone (prepared when the target is
+     * chosen) or the deploy lock (a first Deployment in flight) is still a NEW App, so the cap and
+     * the worker's re-check keep catching two new Apps racing past it. Anything unreadable answers
+     * `false`: the cap then applies, as before.
      */
     private async alreadyOnTier(workId: string): Promise<boolean> {
         const states = this.runtimeStates;
@@ -234,7 +235,7 @@ export class AppsTierEligibilityService implements AppsTierEligibilitySource {
                 row &&
                 row.target === 'ever-works-apps' &&
                 !row.removedAt &&
-                (row.currentDeploymentId || row.namespace),
+                row.currentDeploymentId,
             );
         } catch (error) {
             this.warn(`the runtime state of ${workId} could not be read`, error);
