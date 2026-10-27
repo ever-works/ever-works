@@ -88,6 +88,9 @@ except the kubeconfig, which goes on the **worker only**.
 | `EVER_WORKS_APPS_MANAGED_INGRESS_NAMESPACE`                                                                | worker                  | `ingress-nginx`                                     | The controller's namespace; it is the only source `ew-allow-ingress` admits.                                                                                                                                             |
 | `EVER_WORKS_APPS_MANAGED_RUNTIME_CLASS`                                                                    | worker                  | — (**required**)                                    | RuntimeClass every managed pod runs in. Without it, deploys are refused `managed_sandbox_unavailable`. Use `ever-works-apps` from the YAML below.                                                                        |
 | `EVER_WORKS_APPS_MANAGED_SCOPE`                                                                            | API + worker            | `any`                                               | `verified-blueprints` admits only verified Blueprints.                                                                                                                                                                   |
+| `EVER_WORKS_APPS_MAX_PER_USER`                                                                             | API                     | `3`                                                 | How many App Works an owner on an **unpaid** plan may run on the tier. A malformed or non-positive value keeps 3.                                                                                                        |
+| `EVER_WORKS_APPS_MAX_PER_PAID_USER`                                                                        | API                     | unset (no limit)                                    | Optional bound for an owner on a **paid** plan. Never below `EVER_WORKS_APPS_MAX_PER_USER`; a malformed value falls back to it.                                                                                          |
+| `EVER_WORKS_APPS_MANAGED_REQUIRE_PAID_PLAN`                                                                | API                     | off                                                 | `true` refuses owners on an unpaid plan entirely (`planRequired`).                                                                                                                                                       |
 | `EVER_WORKS_APPS_MANAGED_SERVICE_ACCOUNT`                                                                  | worker                  | `ever-works-apps-system/ever-works-apps-controller` | Subject of each namespace's RoleBinding.                                                                                                                                                                                 |
 | `EVER_WORKS_APPS_MANAGED_NAMESPACE_ROLE`                                                                   | worker                  | `ever-works-apps-namespace-admin`                   | ClusterRole each namespace's RoleBinding grants.                                                                                                                                                                         |
 | `EVER_WORKS_APPS_MANAGED_NAMESPACE_GRANT`                                                                  | worker                  | on                                                  | `false` skips the per-namespace RoleBinding. Only use it if you bound the role some other way.                                                                                                                           |
@@ -125,7 +128,30 @@ shell environment.
 | ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `EVER_WORKS_APPS_MANAGED_KUBECONFIG` (secret)                                                                                  | The Trigger.dev **staging / prod** env stores of the project above. Nowhere else.                                                                                                                                                      |
 | `EVER_WORKS_APPS_MANAGED_ENABLED`, `…_DOMAIN`, `…_SCOPE`                                                                       | The Trigger.dev env stores **and** the API. The API is `ever-works-app-{dev,stage,prod}`; set them on the inline `env` of its Deployment in `ever-co/k8s-gitops`. They are not secrets, so they do not go in `ever-works-app-secrets`. |
+| `EVER_WORKS_APPS_MAX_PER_USER`, `EVER_WORKS_APPS_MAX_PER_PAID_USER`, `EVER_WORKS_APPS_MANAGED_REQUIRE_PAID_PLAN`               | The API (inline `env`, as above). The worker's re-check asks the API, so the worker needs none of them.                                                                                                                                |
 | `…_RUNTIME_CLASS`, `…_INGRESS_CLASS`, `…_INGRESS_NAMESPACE`, `…_SERVICE_ACCOUNT`, `…_NAMESPACE_ROLE`, `…_QUOTA_*`, `…_LIMIT_*` | The Trigger.dev env stores. Only the worker renders and applies objects.                                                                                                                                                               |
+
+## Who may run an App on the tier
+
+Owner decision (2026-10-27): **at most 3 managed Apps per owner on an unpaid plan, a verified email
+for everyone, and more than 3 on a paid plan.** The API checks this when the target is chosen and on
+every Deployment; the isolated worker re-checks it.
+
+- **Verified email** — the person deploying must have one (`emailUnverified`).
+- **Unpaid owner** (the `free` or `selfhosted_community` plan) — at most `EVER_WORKS_APPS_MAX_PER_USER`
+  (default 3) App Works on the tier. The fourth is refused `capReached` (`quota_exceeded` at deploy),
+  and the refusal says that a paid plan allows more.
+- **Paid owner** — no limit unless `EVER_WORKS_APPS_MAX_PER_PAID_USER` is set.
+- **Plan unknown** — if the plan cannot be read, or billing is switched off, the unpaid cap applies.
+  The extra allowance fails closed.
+- **Redeploys are never refused for the cap.** An App that already runs on the tier keeps
+  redeploying even when its owner is over the cap (after a downgrade, say). Only a new App is refused.
+- `EVER_WORKS_APPS_MANAGED_REQUIRE_PAID_PLAN=true` additionally refuses unpaid owners outright
+  (`planRequired`; default off).
+
+The "plan" is the Work **owner's**, read through `SubscriptionService.resolvePlanForUser`, and the
+count covers the owner's other App Works that occupy the tier (a Deployment, a namespace or a deploy
+lock recorded on `ever-works-apps`, not removed).
 
 ## TLS
 

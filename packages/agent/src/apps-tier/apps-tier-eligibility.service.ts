@@ -203,7 +203,10 @@ export class AppsTierEligibilityService implements AppsTierEligibilitySource {
                             }
                         }
                     } catch (error) {
-                        this.warn(`the managed App Works of ${ownerId} could not be counted`, error);
+                        this.warn(
+                            `the managed App Works of ${ownerId} could not be counted`,
+                            error,
+                        );
                         reasons.push(APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON);
                     }
                 }
@@ -229,9 +232,9 @@ export class AppsTierEligibilityService implements AppsTierEligibilitySource {
             const row = (await states.findStateForWorks([workId])).get(workId);
             return Boolean(
                 row &&
-                    row.target === 'ever-works-apps' &&
-                    !row.removedAt &&
-                    (row.currentDeploymentId || row.namespace),
+                row.target === 'ever-works-apps' &&
+                !row.removedAt &&
+                (row.currentDeploymentId || row.namespace),
             );
         } catch (error) {
             this.warn(`the runtime state of ${workId} could not be read`, error);

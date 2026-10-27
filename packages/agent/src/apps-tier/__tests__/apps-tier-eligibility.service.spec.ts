@@ -344,25 +344,25 @@ describe('the cap depends on the owner plan (owner decision 2026-10-27)', () => 
         it('a plan read that throws still admits a free-sized footprint (2 others)', async () => {
             const h = harness({ planThrows: true, managed: managedApps(2) });
 
-            await expect(
-                h.service.evaluate('owner-1', { workId: 'w-new' }),
-            ).resolves.toMatchObject({ eligible: true, max: 3 });
+            await expect(h.service.evaluate('owner-1', { workId: 'w-new' })).resolves.toMatchObject(
+                { eligible: true, max: 3 },
+            );
         });
 
         it('no plan reader bound => the free cap', async () => {
             const h = harness({ noPlanReader: true, managed: managedApps(3) });
 
-            await expect(
-                h.service.evaluate('owner-1', { workId: 'w-new' }),
-            ).resolves.toMatchObject({ eligible: false, reasons: ['capReached'], max: 3 });
+            await expect(h.service.evaluate('owner-1', { workId: 'w-new' })).resolves.toMatchObject(
+                { eligible: false, reasons: ['capReached'], max: 3 },
+            );
         });
 
         it('a plan with no code => unpaid => the free cap', async () => {
             const h = harness({ plan: null, managed: managedApps(3) });
 
-            await expect(
-                h.service.evaluate('owner-1', { workId: 'w-new' }),
-            ).resolves.toMatchObject({ eligible: false, reasons: ['capReached'], max: 3 });
+            await expect(h.service.evaluate('owner-1', { workId: 'w-new' })).resolves.toMatchObject(
+                { eligible: false, reasons: ['capReached'], max: 3 },
+            );
         });
 
         it('billing switched off => no one is on a paid plan => the free cap, and no upgrade hint', async () => {
@@ -408,9 +408,9 @@ describe('the cap depends on the owner plan (owner decision 2026-10-27)', () => 
         it('but a NEW App of an owner over the cap is refused', async () => {
             const h = harness({ plan: 'free', managed: managedApps(5), stateRows: true });
 
-            await expect(
-                h.service.evaluate('owner-1', { workId: 'w-new' }),
-            ).resolves.toMatchObject({ eligible: false, reasons: ['capReached'] });
+            await expect(h.service.evaluate('owner-1', { workId: 'w-new' })).resolves.toMatchObject(
+                { eligible: false, reasons: ['capReached'] },
+            );
         });
 
         it('an unreadable runtime state keeps the cap (fail closed)', async () => {
