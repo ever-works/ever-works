@@ -55,10 +55,15 @@ function checksOf(ciState: unknown): FleetGitLinePullRequestChecks | null {
 }
 
 function httpsUrl(value: unknown): string | null {
-    return typeof value === 'string' && /^https:\/\//.test(value) && value.length <= 2048 ? value : null;
+    return typeof value === 'string' && /^https:\/\//.test(value) && value.length <= 2048
+        ? value
+        : null;
 }
 
-function emptyFacts(checkoutId: string, pr: FleetGitLinePullRequest | null): FleetCheckoutPullRequestFacts {
+function emptyFacts(
+    checkoutId: string,
+    pr: FleetGitLinePullRequest | null,
+): FleetCheckoutPullRequestFacts {
     return {
         checkoutId,
         pr,
@@ -153,7 +158,8 @@ export class FleetPrEnrichmentService {
         const now = this.now();
         const cached = this.cache.get(row.id);
         const interval = options.minIntervalMs ?? FLEET_PR_ENRICHMENT_MIN_INTERVAL_MS;
-        if (cached && cached.branch === branch && !options.force && now - cached.at < interval) return cached.facts;
+        if (cached && cached.branch === branch && !options.force && now - cached.at < interval)
+            return cached.facts;
         const remote = parseFleetRemote(row.remoteUrl ?? null);
         if (!branch || !remote || remote.host !== 'github.com') {
             // Another provider, no remote, a detached head: nothing to ask (GitLab and others are out of scope, §8).
@@ -172,7 +178,9 @@ export class FleetPrEnrichmentService {
             );
             const pick =
                 candidates.find((pr) => pr.state === 'open') ??
-                [...candidates].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0] ??
+                [...candidates].sort(
+                    (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+                )[0] ??
                 null;
             let pr: FleetGitLinePullRequest | null = null;
             let mergeable: boolean | null = null;
@@ -181,7 +189,12 @@ export class FleetPrEnrichmentService {
             if (pick) {
                 let status: Awaited<ReturnType<GitFacadeService['getPullRequestStatus']>> = null;
                 try {
-                    status = await this.git.getPullRequestStatus(remote.owner, remote.repo, pick.number, access);
+                    status = await this.git.getPullRequestStatus(
+                        remote.owner,
+                        remote.repo,
+                        pick.number,
+                        access,
+                    );
                 } catch (error) {
                     this.logger.debug(
                         `Pull request ${remote.owner}/${remote.repo}#${pick.number} status unreadable: ${
@@ -191,7 +204,8 @@ export class FleetPrEnrichmentService {
                 }
                 const state = status?.state ?? pick.state;
                 const url = httpsUrl(status?.url) ?? httpsUrl(pick.url);
-                if (url) pr = { number: pick.number, state, checks: checksOf(status?.ciState), url };
+                if (url)
+                    pr = { number: pick.number, state, checks: checksOf(status?.ciState), url };
                 mergeable = typeof status?.mergeable === 'boolean' ? status.mergeable : null;
                 baseRef = status?.baseRef ?? pick.base ?? null;
                 if (state === 'open' || state === 'draft') {
@@ -204,7 +218,9 @@ export class FleetPrEnrichmentService {
                         );
                         // A comment still anchored to a line of the current diff is still open; an
                         // outdated one (no line) was addressed by a later push (lane-log decision).
-                        unresolvedComments = comments.filter((comment) => comment.line !== null).length;
+                        unresolvedComments = comments.filter(
+                            (comment) => comment.line !== null,
+                        ).length;
                     } catch {
                         unresolvedComments = null;
                     }
@@ -258,14 +274,19 @@ export class FleetPrEnrichmentService {
         const now = this.now();
         let refreshed = 0;
         let enriched = 0;
-        const sessions = await this.sessions.findWithCheckoutForCadence(new Date(now - STOP_WINDOW_MS), 500);
+        const sessions = await this.sessions.findWithCheckoutForCadence(
+            new Date(now - STOP_WINDOW_MS),
+            500,
+        );
         const byNode = new Map<string, Set<string>>();
         const live = new Set<string>();
         for (const session of sessions) {
             if (!session.checkoutId) continue;
             if (session.state !== 'ended') live.add(session.checkoutId);
             const working = session.state === 'working';
-            const changedAt = session.stateChangedAt ? new Date(session.stateChangedAt).getTime() : 0;
+            const changedAt = session.stateChangedAt
+                ? new Date(session.stateChangedAt).getTime()
+                : 0;
             const justStopped =
                 !working && now - changedAt < STOP_WINDOW_MS && !this.stopRefreshed.has(session.id);
             if (!working && !justStopped) continue;
@@ -274,14 +295,18 @@ export class FleetPrEnrichmentService {
             ids.add(session.checkoutId);
             byNode.set(session.nodeId, ids);
         }
-        for (const [key, at] of this.stopRefreshed) if (now - at > 10 * STOP_WINDOW_MS) this.stopRefreshed.delete(key);
+        for (const [key, at] of this.stopRefreshed)
+            if (now - at > 10 * STOP_WINDOW_MS) this.stopRefreshed.delete(key);
         for (const [nodeId, ids] of byNode) {
             const result = await this.checkouts.refreshForSessions(nodeId, [...ids]);
             refreshed += result.refreshed;
         }
 
         const liveRows = await this.rows.findByIds([...live]);
-        const recentRows = await this.rows.findWithPullRequestSince(new Date(now - FLEET_PR_ENRICHMENT_RECENT_MS), 300);
+        const recentRows = await this.rows.findWithPullRequestSince(
+            new Date(now - FLEET_PR_ENRICHMENT_RECENT_MS),
+            300,
+        );
         const seen = new Set<string>();
         const queue: Array<{ row: FleetCheckout; interval: number }> = [];
         for (const row of liveRows) {
@@ -315,18 +340,25 @@ export class FleetPrEnrichmentService {
             }
             const scope = await this.push.describeScope(userId, [{ repositoryId, repoUrl }]);
             if (scope.ok) {
-                const minted = await requestGitHubAppInstallationAccessTokenDetails(scope.installationId, credentials, {
-                    repositoryIds: scope.repositoryIds,
-                });
+                const minted = await requestGitHubAppInstallationAccessTokenDetails(
+                    scope.installationId,
+                    credentials,
+                    {
+                        repositoryIds: scope.repositoryIds,
+                    },
+                );
                 if (minted.token) {
                     const expiresAt = minted.expiresAt ? Date.parse(minted.expiresAt) : NaN;
                     this.tokens.set(key, {
                         token: minted.token,
-                        expiresAt: Number.isFinite(expiresAt) ? expiresAt : this.now() + 55 * 60_000,
+                        expiresAt: Number.isFinite(expiresAt)
+                            ? expiresAt
+                            : this.now() + 55 * 60_000,
                     });
                     if (this.tokens.size > 2000) {
                         for (const [entry, value] of this.tokens) {
-                            if (value.expiresAt - this.now() <= TOKEN_MARGIN_MS) this.tokens.delete(entry);
+                            if (value.expiresAt - this.now() <= TOKEN_MARGIN_MS)
+                                this.tokens.delete(entry);
                         }
                     }
                     return { providerId: 'github', token: minted.token, userId };
@@ -336,7 +368,10 @@ export class FleetPrEnrichmentService {
         return { providerId: 'github', userId };
     }
 
-    private async defaultBranchOf(remote: FleetParsedRemote, access: GitFacadeOptions): Promise<string | null> {
+    private async defaultBranchOf(
+        remote: FleetParsedRemote,
+        access: GitFacadeOptions,
+    ): Promise<string | null> {
         const key = `${remote.host}/${remote.fullName}`;
         const known = this.defaults.get(key);
         if (known && this.now() - known.at < DEFAULT_BRANCH_TTL_MS) return known.branch;

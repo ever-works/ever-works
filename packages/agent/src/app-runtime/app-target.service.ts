@@ -56,11 +56,7 @@ import type { AppClusterCredentialProvenance } from '../entities/work-app-runtim
 import type { AppLogTail } from '@ever-works/plugin';
 import { CACHE_MANAGER, type Cache } from '../cache';
 import { APP_RUNTIME_ENV_SOURCE } from './ports';
-import {
-    APP_OP_CACHE_TTL_MS,
-    appLogsCacheKey,
-    appOpCacheKey,
-} from './app-lifecycle-ops.service';
+import { APP_OP_CACHE_TTL_MS, appLogsCacheKey, appOpCacheKey } from './app-lifecycle-ops.service';
 import { redactAppLogTail } from './app-log-redaction';
 
 /**
@@ -440,7 +436,10 @@ export class AppTargetService {
             await this.dispatchOp({ op: 'prepare-namespace', workId, userId });
         }
 
-        return { ok: true, body: await this.targetBody(await this.readState(workId), userId, workId) };
+        return {
+            ok: true,
+            body: await this.targetBody(await this.readState(workId), userId, workId),
+        };
     }
 
     /* ---------------------------------------------------------------------- *
@@ -590,7 +589,11 @@ export class AppTargetService {
     async rollback(
         workId: string,
         userId: string,
-        body: { deploymentId?: unknown; runPreDeployJobs?: unknown; confirmClusterChange?: unknown },
+        body: {
+            deploymentId?: unknown;
+            runPreDeployJobs?: unknown;
+            confirmClusterChange?: unknown;
+        },
         options?: { requestedByHumanSession?: boolean },
     ): Promise<
         { ok: true; result: AppDeployRequestResult } | { ok: false; refusal: AppTargetRefusal }
@@ -782,14 +785,25 @@ export class AppTargetService {
     ): Promise<AppOpsAccepted | { ok: false; refusal: AppTargetRefusal }> {
         const component = text(body?.component);
         const job = text(body?.job);
-        if ((component && !APP_RUNTIME_NAME.test(component)) || (job && !APP_RUNTIME_NAME.test(job))) {
+        if (
+            (component && !APP_RUNTIME_NAME.test(component)) ||
+            (job && !APP_RUNTIME_NAME.test(job))
+        ) {
             return refuse(400, 'invalid_log_target', 'Name one component or job of this App.');
         }
         if (component && job) {
-            return refuse(400, 'log_target_ambiguous', 'Ask for the logs of a component or a job, not both.');
+            return refuse(
+                400,
+                'log_target_ambiguous',
+                'Ask for the logs of a component or a job, not both.',
+            );
         }
         if (!component && !job) {
-            return refuse(400, 'log_target_required', 'Name the component or the job to read logs from.');
+            return refuse(
+                400,
+                'log_target_required',
+                'Name the component or the job to read logs from.',
+            );
         }
         const deploymentId = text(body?.deploymentId);
         if (deploymentId && !UUID.test(deploymentId)) {
@@ -802,7 +816,11 @@ export class AppTargetService {
         if (body?.lines !== undefined && body.lines !== null) {
             const asked = Number(body.lines);
             if (!Number.isFinite(asked) || asked < 1) {
-                return refuse(400, 'invalid_lines', `lines must be between 1 and ${APP_LOG_LINES_MAX}.`);
+                return refuse(
+                    400,
+                    'invalid_lines',
+                    `lines must be between 1 and ${APP_LOG_LINES_MAX}.`,
+                );
             }
             lines = Math.min(APP_LOG_LINES_MAX, Math.floor(asked));
         }
@@ -838,7 +856,11 @@ export class AppTargetService {
             lines,
         });
         if (!dispatched) {
-            await this.cacheSet(key, { state: 'failed', code: 'worker_unavailable' }, APP_OP_CACHE_TTL_MS);
+            await this.cacheSet(
+                key,
+                { state: 'failed', code: 'worker_unavailable' },
+                APP_OP_CACHE_TTL_MS,
+            );
         }
         return { ok: true, httpStatus: 202, op: 'logs', requestId, dispatched };
     }
@@ -935,7 +957,13 @@ export class AppTargetService {
             return refuse(409, 'job_active', `A run of ${jobName} is still going.`);
         }
 
-        return this.queueOp(workId, userId, 'job-run', { jobName, confirmFirstDeploy: true }, jobName);
+        return this.queueOp(
+            workId,
+            userId,
+            'job-run',
+            { jobName, confirmFirstDeploy: true },
+            jobName,
+        );
     }
 
     /* ---------------------------------------------------------------------- *
@@ -956,7 +984,11 @@ export class AppTargetService {
         const blocked = refuseUnlessDeployed(row);
         if (blocked) return blocked;
         if (row?.paused === true || row?.pausedAt) {
-            return refuse(409, 'app_paused', 'The app is paused. Resume it to run the smoke checks.');
+            return refuse(
+                409,
+                'app_paused',
+                'The app is paused. Resume it to run the smoke checks.',
+            );
         }
         if (text(row?.deployLockId)) {
             return refuse(
@@ -1227,7 +1259,9 @@ export class AppTargetService {
             }
         }
         if (typeof plugin?.checkClusterCredentialShape !== 'function') return null;
-        let verdict: ReturnType<NonNullable<ClusterCredentialShapeCheck['checkClusterCredentialShape']>>;
+        let verdict: ReturnType<
+            NonNullable<ClusterCredentialShapeCheck['checkClusterCredentialShape']>
+        >;
         try {
             verdict = plugin.checkClusterCredentialShape(kubeconfig, kubeContext || undefined);
         } catch {

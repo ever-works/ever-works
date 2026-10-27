@@ -1194,7 +1194,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/services/{name}/{action}',
 		toolName: 'fleet_services_action',
 		description:
-			"Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.",
+			'Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.',
 		annotations: { destructiveHint: true }
 	},
 	{

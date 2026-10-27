@@ -48,7 +48,11 @@ import {
     type TestFireInboundTriggerResult,
     type UpdateInboundTriggerInput,
 } from './inbound-trigger.types';
-import { matchesEvent, normalizeEventAudience, normalizeEventMatcher } from './trigger-event-matcher';
+import {
+    matchesEvent,
+    normalizeEventAudience,
+    normalizeEventMatcher,
+} from './trigger-event-matcher';
 import { GitHubAppUserLinkRepository } from '../database/repositories/github-app-user-link.repository';
 import { TaskChatService } from '../tasks-domain/task-chat.service';
 import {
@@ -273,13 +277,22 @@ export class InboundTriggersService {
      */
     async createGithubForMe(
         scope: InboundTriggerScope,
-        input: { audience?: string[] | null; agentId?: string | null; autoStart?: InboundTriggerAutoStart | null },
+        input: {
+            audience?: string[] | null;
+            agentId?: string | null;
+            autoStart?: InboundTriggerAutoStart | null;
+        },
     ): Promise<{ trigger: InboundTriggerView; secret: string }> {
         const audience = normalizeEventAudience({
-            me: input.audience && input.audience.length > 0 ? input.audience : ['review-requested', 'assigned', 'authored'],
+            me:
+                input.audience && input.audience.length > 0
+                    ? input.audience
+                    : ['review-requested', 'assigned', 'authored'],
         });
         if (!audience) {
-            throw new BadRequestException('Choose at least one of: review requested, assigned, authored.');
+            throw new BadRequestException(
+                'Choose at least one of: review requested, assigned, authored.',
+            );
         }
         return this.create(scope, {
             name: GITHUB_FOR_ME_TRIGGER_NAME,
@@ -294,9 +307,14 @@ export class InboundTriggersService {
     }
 
     /** FL-15 P3 (U11): an audience matcher needs the owner's linked GitHub account. */
-    private async assertGithubLinkedFor(userId: string, matcher: InboundTriggerEventMatcher | null): Promise<void> {
+    private async assertGithubLinkedFor(
+        userId: string,
+        matcher: InboundTriggerEventMatcher | null,
+    ): Promise<void> {
         if (!matcher?.audience) return;
-        const link = this.githubLinks ? await this.githubLinks.findByUserId(userId).catch(() => null) : null;
+        const link = this.githubLinks
+            ? await this.githubLinks.findByUserId(userId).catch(() => null)
+            : null;
         if (!link?.githubLogin) {
             throw new BadRequestException(
                 "Connect your GitHub account first — the Trigger needs to know who 'me' is.",
@@ -316,17 +334,25 @@ export class InboundTriggersService {
      * from this audience Trigger posts one chat line on that Task instead of
      * a second Task. Best effort; never throws.
      */
-    private async noteCoalescedEvent(row: InboundTrigger, taskId: string, event: IngestedEvent): Promise<void> {
+    private async noteCoalescedEvent(
+        row: InboundTrigger,
+        taskId: string,
+        event: IngestedEvent,
+    ): Promise<void> {
         if (!this.taskChat || !row.eventMatcher?.audience) return;
         try {
             const action =
-                event.payload && typeof event.payload.action === 'string' ? event.payload.action.replace(/_/g, ' ') : 'update';
+                event.payload && typeof event.payload.action === 'string'
+                    ? event.payload.action.replace(/_/g, ' ')
+                    : 'update';
             const subject = event.subjectExternalId ?? event.title ?? 'this item';
             const line = `GitHub: ${action} on ${subject}${event.sourceUrl ? ` — ${event.sourceUrl}` : ''}`;
-            await this.taskChat.post(
-                row.userId,
-                { taskId, body: line.slice(0, 1000), authorType: 'user', authorId: row.userId } as never,
-            );
+            await this.taskChat.post(row.userId, {
+                taskId,
+                body: line.slice(0, 1000),
+                authorType: 'user',
+                authorId: row.userId,
+            } as never);
         } catch (error) {
             this.logger.debug(
                 `Trigger ${row.id}: coalesced event ${event.id} not noted on task ${taskId}: ${

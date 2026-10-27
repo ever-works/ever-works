@@ -8,13 +8,7 @@ import {
 } from '@ever-works/contracts';
 import { runnableImageRef, splitImageDigest } from '../link/modules/virtual/catalogue';
 import { containerControlArgs, imageDigestArgs, imagePullArgs } from '../link/modules/virtual/docker-args';
-import {
-	docker,
-	report,
-	VirtualHostError,
-	waitFor,
-	type VirtualHostDeps
-} from '../link/modules/virtual/host';
+import { docker, report, VirtualHostError, waitFor, type VirtualHostDeps } from '../link/modules/virtual/host';
 import {
 	generateWindowsPassword,
 	parseViewerPort,
@@ -86,7 +80,9 @@ export async function windowsPrechecks(deps: VirtualHostDeps, hostName: string) 
 	}
 	const image = resolveWindowsImage(deps.env);
 	if (!image) {
-		throw new VirtualHostError(`No Windows installer image is configured on ${hostName}; set EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE there`);
+		throw new VirtualHostError(
+			`No Windows installer image is configured on ${hostName}; set EVER_WORKS_NODE_VIRTUAL_WINDOWS_IMAGE there`
+		);
 	}
 	const free = await dockerFreeDiskMiB(deps);
 	if (free !== null && free < FLEET_VIRTUAL_WINDOWS_MIN_FREE_DISK_GIB * 1024) {
@@ -100,7 +96,9 @@ export async function windowsPrechecks(deps: VirtualHostDeps, hostName: string) 
 
 /** Remove a failed / destroyed VM: the container, its disk volume, its password, its folder. */
 export async function cleanUpWindows(deps: VirtualHostDeps, childNodeId: string): Promise<void> {
-	await deps.runner.run('docker', containerControlArgs('remove', childNodeId), { timeoutMs: DOCKER_STEP_TIMEOUT_MS }).catch(() => undefined);
+	await deps.runner
+		.run('docker', containerControlArgs('remove', childNodeId), { timeoutMs: DOCKER_STEP_TIMEOUT_MS })
+		.catch(() => undefined);
 	await deps.runner
 		.run('docker', ['volume', 'rm', '-f', storageVolumeName(childNodeId)], { timeoutMs: DOCKER_STEP_TIMEOUT_MS })
 		.catch(() => undefined);
@@ -122,9 +120,14 @@ export async function handOverWindowsToken(
 	const shared = deps.state.sharedDir(childNodeId);
 	const minted = await deps.client().mintVirtualEnrollToken(childNodeId, job.id, job.leaseGeneration);
 	const token = minted?.token;
-	if (typeof token !== 'string' || token.length < 16) throw new VirtualHostError('the platform did not hand over a token');
+	if (typeof token !== 'string' || token.length < 16)
+		throw new VirtualHostError('the platform did not hand over a token');
 	deps.logger?.protect(token);
-	const tokenPath = await deps.state.writePrivate(childNodeId, posix.join('shared', WINDOWS_TOKEN_FILE), `${token}\n`);
+	const tokenPath = await deps.state.writePrivate(
+		childNodeId,
+		posix.join('shared', WINDOWS_TOKEN_FILE),
+		`${token}\n`
+	);
 	try {
 		await report(deps, job, childNodeId, { phase: 'enrolling' });
 		await waitFor(deps, () => deps.state.exists(posix.join(shared, WINDOWS_ENROLLED_MARKER)), {
@@ -161,12 +164,19 @@ export async function buildWindowsVm(
 		const lock = await deps.state.readLock();
 		const locked = lock[system.id];
 		const image =
-			!configured.digest && locked && locked.ref === configured.ref ? { ...configured, digest: locked.digest } : configured;
+			!configured.digest && locked && locked.ref === configured.ref
+				? { ...configured, digest: locked.digest }
+				: configured;
 		const runnable = runnableImageRef(image);
 		await docker(deps, imagePullArgs(runnable), PULL_TIMEOUT_MS, 'could not pull the installer image');
 		let digest = image.digest;
 		if (!digest) {
-			const stdout = await docker(deps, imageDigestArgs(image.ref), DOCKER_STEP_TIMEOUT_MS, 'could not read the image digest');
+			const stdout = await docker(
+				deps,
+				imageDigestArgs(image.ref),
+				DOCKER_STEP_TIMEOUT_MS,
+				'could not read the image digest'
+			);
 			digest = splitImageDigest(stdout.trim()).digest;
 			if (digest) await deps.state.writeLock({ ...lock, [system.id]: { ref: image.ref, digest } });
 		}
@@ -237,8 +247,11 @@ export async function buildWindowsVm(
 					phase = 'installing';
 					await report(deps, job, child, { phase: 'installing' });
 				}
-				const status = (await docker(deps, containerControlArgs('inspect', child), 15_000, 'could not read the installer')).trim();
-				if (status === 'exited' || status === 'dead') throw new VirtualHostError('the installer stopped before Windows was ready');
+				const status = (
+					await docker(deps, containerControlArgs('inspect', child), 15_000, 'could not read the installer')
+				).trim();
+				if (status === 'exited' || status === 'dead')
+					throw new VirtualHostError('the installer stopped before Windows was ready');
 				return false;
 			},
 			{ timeoutMs: INSTALL_TIMEOUT_MS, everyMs: POLL_MS, signal, what: 'installing Windows' }
@@ -251,7 +264,11 @@ export async function buildWindowsVm(
 		if (envFile) await deps.state.removeFile(envFile).catch(() => undefined);
 		const message = error instanceof Error ? error.message : String(error);
 		await cleanUpWindows(deps, child);
-		await report(deps, job, child, { state: 'failed', error: message.split(/\r?\n/)[0].slice(0, 300), viewerPort: null });
+		await report(deps, job, child, {
+			state: 'failed',
+			error: message.split(/\r?\n/)[0].slice(0, 300),
+			viewerPort: null
+		});
 		throw error instanceof VirtualHostError ? error : new VirtualHostError(message);
 	}
 }

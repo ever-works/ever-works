@@ -24,7 +24,9 @@ function tool(name: string, invoke: TaskToolDescriptor['invoke']): TaskToolDescr
 
 describe('decorateFleetTool', () => {
     it('annotates a catalogued tool and appends the no-credits sentence (FR-2, FR-25)', () => {
-        const decorated = decorateFleetTool(tool('fleet_services_action', async () => ({ ok: true })));
+        const decorated = decorateFleetTool(
+            tool('fleet_services_action', async () => ({ ok: true })),
+        );
         expect(decorated.annotations).toEqual({
             destructive: true,
             confirmationClass: 'confirm',
@@ -43,22 +45,31 @@ describe('decorateFleetTool', () => {
     it('redacts secrets in every string of a result', async () => {
         const secret = 'ghp_' + 'a'.repeat(36);
         const decorated = decorateFleetTool(
-            tool('fleet_logs_read', async () => ({ lines: [`token=${secret}`], nested: { value: secret } })),
+            tool('fleet_logs_read', async () => ({
+                lines: [`token=${secret}`],
+                nested: { value: secret },
+            })),
         );
         const reply = JSON.stringify(await decorated.invoke({}));
         expect(reply).not.toContain(secret);
     });
 
     it('types a free-text refusal and a throw (FR-5)', async () => {
-        const refused = decorateFleetTool(tool('fleet_ports_list', async () => ({ error: 'Fleet node x not found' })));
-        expect(await refused.invoke({})).toEqual({ error: { code: 'not_found', hint: 'Fleet node x not found' } });
+        const refused = decorateFleetTool(
+            tool('fleet_ports_list', async () => ({ error: 'Fleet node x not found' })),
+        );
+        expect(await refused.invoke({})).toEqual({
+            error: { code: 'not_found', hint: 'Fleet node x not found' },
+        });
 
         const thrown = decorateFleetTool(
             tool('fleet_ports_list', async () => {
                 throw Object.assign(new Error('nope'), { getStatus: () => 403 });
             }),
         );
-        expect(await thrown.invoke({})).toEqual({ error: { code: 'permission_denied', hint: 'nope' } });
+        expect(await thrown.invoke({})).toEqual({
+            error: { code: 'permission_denied', hint: 'nope' },
+        });
     });
 
     it('passes a typed refusal through unchanged', () => {
@@ -67,7 +78,11 @@ describe('decorateFleetTool', () => {
     });
 
     it('reads the CONTRACTS §8 envelope off an HttpException body', () => {
-        const err = { getResponse: () => ({ error: { code: 'busy', hint: 'Ana holds control', details: { who: 'Ana' } } }) };
+        const err = {
+            getResponse: () => ({
+                error: { code: 'busy', hint: 'Ana holds control', details: { who: 'Ana' } },
+            }),
+        };
         expect(fleetToolErrorFromThrow(err)).toEqual({
             error: { code: 'busy', hint: 'Ana holds control', details: { who: 'Ana' } },
         });
@@ -75,14 +90,25 @@ describe('decorateFleetTool', () => {
 
     it('keeps non-string values and dates as they are', () => {
         const at = new Date('2026-10-21T00:00:00Z');
-        expect(redactFleetToolResult({ n: 1, b: true, at, list: [1, 'x'] })).toEqual({ n: 1, b: true, at, list: [1, 'x'] });
+        expect(redactFleetToolResult({ n: 1, b: true, at, list: [1, 'x'] })).toEqual({
+            n: 1,
+            b: true,
+            at,
+            list: [1, 'x'],
+        });
     });
 });
 
 describe('buildFleetCoreTools', () => {
     const nodes = [
         { id: NODE_ID, name: 'build-01', kind: 'node', status: 'online', viewerRole: 'owner' },
-        { id: 'n2', name: 'shared-mac', kind: 'desktop-node', status: 'offline', viewerRole: 'org-member' },
+        {
+            id: 'n2',
+            name: 'shared-mac',
+            kind: 'desktop-node',
+            status: 'offline',
+            viewerRole: 'org-member',
+        },
     ];
     const service = {
         listVisibleForUser: jest.fn().mockResolvedValue(nodes),
@@ -90,7 +116,11 @@ describe('buildFleetCoreTools', () => {
     };
 
     it('offers fleet_status and the operations tools only when their ports are bound', () => {
-        const bare = buildFleetCoreTools({ userId: 'u1', agentId: 'a1', service: service as never }).map((t) => t.name);
+        const bare = buildFleetCoreTools({
+            userId: 'u1',
+            agentId: 'a1',
+            service: service as never,
+        }).map((t) => t.name);
         expect(bare).toEqual(['fleet_nodes_list', 'fleet_nodes_get']);
         const full = buildFleetCoreTools({
             userId: 'u1',
@@ -110,22 +140,37 @@ describe('buildFleetCoreTools', () => {
 
     it('answers fleet_status as the Agent owner', async () => {
         const status = { status: jest.fn().mockResolvedValue({ computers: [] }) };
-        const [statusTool] = buildFleetCoreTools({ userId: 'owner-9', agentId: 'a1', service: service as never, status });
+        const [statusTool] = buildFleetCoreTools({
+            userId: 'owner-9',
+            agentId: 'a1',
+            service: service as never,
+            status,
+        });
         await statusTool.invoke({});
         expect(status.status).toHaveBeenCalledWith('owner-9');
     });
 
     it('filters fleet_nodes_list by scope, kind and status and refuses bad filters', async () => {
-        const list = buildFleetCoreTools({ userId: 'u1', agentId: 'a1', service: service as never })[0];
+        const list = buildFleetCoreTools({
+            userId: 'u1',
+            agentId: 'a1',
+            service: service as never,
+        })[0];
         expect(await list.invoke({ scope: 'own' })).toEqual({ nodes: [nodes[0]], total: 1 });
         expect(await list.invoke({ status: 'offline' })).toEqual({ nodes: [nodes[1]], total: 1 });
         expect(await list.invoke({ kind: 'robot' })).toMatchObject({ error: { code: 'invalid' } });
     });
 
     it('refuses a malformed node id before any read', async () => {
-        const get = buildFleetCoreTools({ userId: 'u1', agentId: 'a1', service: service as never })[1];
+        const get = buildFleetCoreTools({
+            userId: 'u1',
+            agentId: 'a1',
+            service: service as never,
+        })[1];
         service.getVisibleForUser.mockClear();
-        expect(await get.invoke({ nodeId: 'build-01' })).toMatchObject({ error: { code: 'invalid' } });
+        expect(await get.invoke({ nodeId: 'build-01' })).toMatchObject({
+            error: { code: 'invalid' },
+        });
         expect(service.getVisibleForUser).not.toHaveBeenCalled();
         expect(await get.invoke({ nodeId: NODE_ID })).toEqual({ node: nodes[0], role: 'owner' });
     });
@@ -135,7 +180,12 @@ describe('buildFleetCoreTools', () => {
             get: jest.fn().mockReturnValue({ id: 'op1', state: 'interrupted' }),
             listForUser: jest.fn().mockReturnValue([]),
         };
-        const tools = buildFleetCoreTools({ userId: 'u1', agentId: 'a1', service: service as never, operations });
+        const tools = buildFleetCoreTools({
+            userId: 'u1',
+            agentId: 'a1',
+            service: service as never,
+            operations,
+        });
         const get = tools.find((t) => t.name === 'fleet_operations_get')!;
         const list = tools.find((t) => t.name === 'fleet_operations_list')!;
         expect(await get.invoke({ operationId: 'op1' })).toEqual({
@@ -144,7 +194,12 @@ describe('buildFleetCoreTools', () => {
         });
         expect(operations.get).toHaveBeenCalledWith('op1', 'u1');
         await list.invoke({ state: 'cancelled', limit: 500 });
-        expect(operations.listForUser).toHaveBeenCalledWith('u1', { state: 'cancelled', limit: 100 });
-        expect(await list.invoke({ state: 'paused' })).toMatchObject({ error: { code: 'invalid' } });
+        expect(operations.listForUser).toHaveBeenCalledWith('u1', {
+            state: 'cancelled',
+            limit: 100,
+        });
+        expect(await list.invoke({ state: 'paused' })).toMatchObject({
+            error: { code: 'invalid' },
+        });
     });
 });

@@ -32,7 +32,11 @@ export const FLEET_LOGS_SOURCES_TOOL_NAME = 'fleet_logs_sources';
 export const FLEET_LOGS_READ_TOOL_NAME = 'fleet_logs_read';
 
 export const FLEET_LOGS_TOOL_ANNOTATIONS = {
-    [FLEET_LOGS_SOURCES_TOOL_NAME]: { readOnly: true, destructive: false, confirmationClass: 'plain' },
+    [FLEET_LOGS_SOURCES_TOOL_NAME]: {
+        readOnly: true,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
     [FLEET_LOGS_READ_TOOL_NAME]: { readOnly: true, destructive: false, confirmationClass: 'plain' },
 } as const;
 
@@ -83,7 +87,8 @@ function refusal(err: unknown): ToolError {
     }
     const status = (err as { getStatus?: () => number } | null)?.getStatus?.();
     if (status === 404) return toolError('not_found', 'no such computer');
-    if (status === 403) return toolError('permission_denied', err instanceof Error ? err.message : 'not allowed');
+    if (status === 403)
+        return toolError('permission_denied', err instanceof Error ? err.message : 'not allowed');
     return toolError('internal', err instanceof Error ? err.message : String(err));
 }
 
@@ -105,13 +110,17 @@ export function buildFleetLogsTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                nodeId: { type: 'string', description: 'The computer (its id, from list_fleet_nodes).' },
+                nodeId: {
+                    type: 'string',
+                    description: 'The computer (its id, from list_fleet_nodes).',
+                },
             },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as FleetLogsSourcesArgs;
-            if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId)) return toolError('invalid', 'nodeId');
+            if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId))
+                return toolError('invalid', 'nodeId');
             try {
                 return await args.reader.listSources(caller, a.nodeId);
             } catch (err) {
@@ -132,8 +141,14 @@ export function buildFleetLogsTools(args: {
                     description:
                         'The source id from fleet_logs_sources, e.g. service:nginx.service, container:acme-api, file:/var/log/syslog, system:journal.',
                 },
-                lines: { type: 'integer', description: `How many of the newest lines, 1–${FLEET_LOGS_INITIAL_LINES} (default ${FLEET_LOGS_INITIAL_LINES}).` },
-                filter: { type: 'string', description: 'Keep only lines containing this text (case-insensitive).' },
+                lines: {
+                    type: 'integer',
+                    description: `How many of the newest lines, 1–${FLEET_LOGS_INITIAL_LINES} (default ${FLEET_LOGS_INITIAL_LINES}).`,
+                },
+                filter: {
+                    type: 'string',
+                    description: 'Keep only lines containing this text (case-insensitive).',
+                },
             },
             required: ['nodeId', 'source'],
         },
@@ -142,14 +157,18 @@ export function buildFleetLogsTools(args: {
             if (a.follow !== undefined && a.follow !== false) {
                 return toolError('invalid', 'an Agent reads a log once; it cannot follow it');
             }
-            if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId)) return toolError('invalid', 'nodeId');
+            if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId))
+                return toolError('invalid', 'nodeId');
             if (!isFleetLogSourceId(a.source)) {
                 return toolError(
                     'invalid',
                     "source — use an id from fleet_logs_sources; only files under this computer's shared folders and standard log directories can be read",
                 );
             }
-            if (a.lines !== undefined && (typeof a.lines !== 'number' || a.lines < 1 || a.lines > FLEET_LOGS_INITIAL_LINES)) {
+            if (
+                a.lines !== undefined &&
+                (typeof a.lines !== 'number' || a.lines < 1 || a.lines > FLEET_LOGS_INITIAL_LINES)
+            ) {
                 return toolError('invalid', `lines must be 1–${FLEET_LOGS_INITIAL_LINES}`);
             }
             const filter =

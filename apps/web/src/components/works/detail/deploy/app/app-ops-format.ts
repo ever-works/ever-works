@@ -29,7 +29,11 @@ export function minutesSince(iso: string | null | undefined, now: number | null)
 }
 
 /** Whether an ISO instant lies within the last `hours` of `now`. */
-export function withinHours(iso: string | null | undefined, now: number | null, hours: number): boolean {
+export function withinHours(
+    iso: string | null | undefined,
+    now: number | null,
+    hours: number,
+): boolean {
     if (!iso || now === null) return false;
     const at = new Date(iso).getTime();
     return !Number.isNaN(at) && now - at >= 0 && now - at <= hours * 3_600_000;

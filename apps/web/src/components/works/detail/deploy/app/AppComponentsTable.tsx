@@ -55,13 +55,22 @@ export function AppComponentsTable({ components, canReadLogs, onLogs }: AppCompo
                 <tbody className="divide-y divide-card-border dark:divide-white/9">
                     {components.map((component) => {
                         const short = component.ready < component.desired;
-                        const down = component.role === 'web' && component.ready === 0 && component.desired > 0;
+                        const down =
+                            component.role === 'web' &&
+                            component.ready === 0 &&
+                            component.desired > 0;
                         const oomRecent = withinHours(component.oomKilledAt, now, 24);
                         return (
-                            <tr key={component.name} data-testid="app-component-row" data-name={component.name}>
+                            <tr
+                                key={component.name}
+                                data-testid="app-component-row"
+                                data-name={component.name}
+                            >
                                 <td className="py-1.5 pr-3">
                                     <code className="text-xs font-semibold">{component.name}</code>{' '}
-                                    <span className="text-xs text-text-muted">{t(`roles.${component.role}`)}</span>
+                                    <span className="text-xs text-text-muted">
+                                        {t(`roles.${component.role}`)}
+                                    </span>
                                 </td>
                                 <td
                                     className={cn(
@@ -73,7 +82,10 @@ export function AppComponentsTable({ components, canReadLogs, onLogs }: AppCompo
                                               : 'text-text',
                                     )}
                                 >
-                                    {t('readyOf', { ready: component.ready, desired: component.desired })}
+                                    {t('readyOf', {
+                                        ready: component.ready,
+                                        desired: component.desired,
+                                    })}
                                 </td>
                                 <td className="py-1.5 pr-3 tabular-nums">{component.restarts}</td>
                                 <td className="py-1.5 pr-3 text-xs text-text-secondary">
@@ -97,7 +109,10 @@ export function AppComponentsTable({ components, canReadLogs, onLogs }: AppCompo
                                             aria-label={t('logsAria', { name: component.name })}
                                             data-testid="app-component-logs"
                                         >
-                                            <ScrollText className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                                            <ScrollText
+                                                className="mr-1 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
                                             {t('logs')}
                                         </Button>
                                     </td>

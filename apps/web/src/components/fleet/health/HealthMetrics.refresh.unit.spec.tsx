@@ -8,7 +8,9 @@ vi.mock('next-intl', async () => {
 });
 vi.mock('@/app/actions/settings/fleet', () => ({ clearFleetNodeModelThrottleAction: vi.fn() }));
 vi.mock('@/i18n/navigation', () => ({
-    Link: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+    Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
 }));
 
 import { HealthMetrics, secondsToNextCheck } from './overview/HealthMetrics';
@@ -42,7 +44,12 @@ describe('HealthMetrics — Refresh now', () => {
     it('is enabled when the link can reach the computer, and presses with a click', () => {
         const onRefresh = vi.fn();
         render(
-            <HealthMetrics node={node()} now={NOW} refresh={{ available: true, reason: null }} onRefresh={onRefresh} />,
+            <HealthMetrics
+                node={node()}
+                now={NOW}
+                refresh={{ available: true, reason: null }}
+                onRefresh={onRefresh}
+            />,
         );
         const button = screen.getByTestId('fleet-health-refresh');
         expect(button).not.toBeDisabled();
@@ -54,7 +61,12 @@ describe('HealthMetrics — Refresh now', () => {
     it('presses with R, never while typing', () => {
         const onRefresh = vi.fn();
         render(
-            <HealthMetrics node={node()} now={NOW} refresh={{ available: true, reason: null }} onRefresh={onRefresh} />,
+            <HealthMetrics
+                node={node()}
+                now={NOW}
+                refresh={{ available: true, reason: null }}
+                onRefresh={onRefresh}
+            />,
         );
         fireEvent.keyDown(document, { key: 'r' });
         expect(onRefresh).toHaveBeenCalledTimes(1);
@@ -81,7 +93,9 @@ describe('HealthMetrics — Refresh now', () => {
                 refreshState="done"
             />,
         );
-        expect(screen.getByTestId('fleet-health-refresh-reason')).toHaveTextContent('Checked just now');
+        expect(screen.getByTestId('fleet-health-refresh-reason')).toHaveTextContent(
+            'Checked just now',
+        );
     });
 
     it('keeps the cards and offers Try again with the hint when the link dropped (U3)', () => {
@@ -113,17 +127,30 @@ describe('HealthMetrics — Refresh now', () => {
         ['link-disabled', 'This deployment does not accept node links yet.'],
     ] as const)('is disabled with its reason for %s', (reason, text) => {
         render(
-            <HealthMetrics node={node()} now={NOW} refresh={{ available: false, reason }} onRefresh={vi.fn()} />,
+            <HealthMetrics
+                node={node()}
+                now={NOW}
+                refresh={{ available: false, reason }}
+                onRefresh={vi.fn()}
+            />,
         );
         const button = screen.getByTestId('fleet-health-refresh');
         expect(button).toBeDisabled();
         expect(screen.getByTestId('fleet-health-refresh-reason')).toHaveTextContent(text);
-        expect(button).toHaveAttribute('aria-describedby', screen.getByTestId('fleet-health-refresh-reason').id);
+        expect(button).toHaveAttribute(
+            'aria-describedby',
+            screen.getByTestId('fleet-health-refresh-reason').id,
+        );
     });
 
     it('shows the start command next to a no-link reason (U2)', () => {
         render(
-            <HealthMetrics node={node()} now={NOW} refresh={{ available: false, reason: 'no-link' }} onRefresh={vi.fn()} />,
+            <HealthMetrics
+                node={node()}
+                now={NOW}
+                refresh={{ available: false, reason: 'no-link' }}
+                onRefresh={vi.fn()}
+            />,
         );
         expect(screen.getByText('ever-works-node start --work')).toBeInTheDocument();
     });
@@ -131,7 +158,9 @@ describe('HealthMetrics — Refresh now', () => {
     it('keeps the old reason against an API older than Refresh now', () => {
         render(<HealthMetrics node={node()} now={NOW} />);
         expect(screen.getByTestId('fleet-health-refresh')).toBeDisabled();
-        expect(screen.getByTestId('fleet-health-refresh-reason')).toHaveTextContent('Refresh now arrives with the node link');
+        expect(screen.getByTestId('fleet-health-refresh-reason')).toHaveTextContent(
+            'Refresh now arrives with the node link',
+        );
     });
 });
 

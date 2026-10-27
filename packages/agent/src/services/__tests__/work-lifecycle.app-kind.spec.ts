@@ -734,8 +734,15 @@ describe('deleteWork — the APP_WORK_DELETION_PORT contract (T39)', () => {
         const stack = makeStack(appWork('fork'), 'refusal');
 
         await expect(
-            stack.service.deleteWork('w-app', await viaGlobalPipe({ delete_data_repository: true }), user),
-        ).rejects.toMatchObject({ status: 404, response: expect.objectContaining({ code: 'not_found' }) });
+            stack.service.deleteWork(
+                'w-app',
+                await viaGlobalPipe({ delete_data_repository: true }),
+                user,
+            ),
+        ).rejects.toMatchObject({
+            status: 404,
+            response: expect.objectContaining({ code: 'not_found' }),
+        });
 
         expect(callNames(stack.calls)).toEqual([]);
         expect(stack.workRepository.delete).not.toHaveBeenCalled();

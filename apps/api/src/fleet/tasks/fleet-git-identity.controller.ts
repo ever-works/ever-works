@@ -1,4 +1,16 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    ParseUUIDPipe,
+    Post,
+    Query,
+    UseGuards,
+    UseInterceptors,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetGitIdentityService } from '@ever-works/agent/fleet';
@@ -48,7 +60,11 @@ export class FleetGitIdentityController {
         @Param('id', ParseUUIDPipe) id: string,
         @Query() query: FleetGitIdentityQueryDto,
     ): Promise<FleetGitIdentity> {
-        return this.identity.read(id, { kind: 'user', userId: auth.userId }, { fresh: query.fresh === '1' });
+        return this.identity.read(
+            id,
+            { kind: 'user', userId: auth.userId },
+            { fresh: query.fresh === '1' },
+        );
     }
 
     @Post('nodes/:id/git/identity')
@@ -63,6 +79,10 @@ export class FleetGitIdentityController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: SetFleetGitIdentityDto,
     ): Promise<FleetGitIdentitySetResult> {
-        return this.identity.set(id, { kind: 'user', userId: auth.userId }, { confirm: body.confirm === true });
+        return this.identity.set(
+            id,
+            { kind: 'user', userId: auth.userId },
+            { confirm: body.confirm === true },
+        );
     }
 }

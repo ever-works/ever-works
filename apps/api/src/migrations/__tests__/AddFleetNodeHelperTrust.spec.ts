@@ -48,7 +48,9 @@ describe('AddFleetNodeHelperTrust1796070000000', () => {
         expect(nodes?.findColumnByName('helperTrust')).toBeDefined();
         expect(nodes?.findColumnByName('desktopFacts')?.isNullable).toBe(true);
         expect(nodes?.indices.map((index) => index.name)).toContain('idx_fleet_nodes_helper_trust');
-        const rows = await dataSource.query(`SELECT "helperTrust", "desktopFacts" FROM "fleet_nodes"`);
+        const rows = await dataSource.query(
+            `SELECT "helperTrust", "desktopFacts" FROM "fleet_nodes"`,
+        );
         expect(rows).toEqual([{ helperTrust: 'none', desktopFacts: null }]);
     });
 
@@ -59,6 +61,8 @@ describe('AddFleetNodeHelperTrust1796070000000', () => {
         const nodes = await table();
         expect(nodes?.findColumnByName('helperTrust')).toBeUndefined();
         expect(nodes?.findColumnByName('desktopFacts')).toBeUndefined();
-        expect(nodes?.indices.map((index) => index.name)).not.toContain('idx_fleet_nodes_helper_trust');
+        expect(nodes?.indices.map((index) => index.name)).not.toContain(
+            'idx_fleet_nodes_helper_trust',
+        );
     });
 });

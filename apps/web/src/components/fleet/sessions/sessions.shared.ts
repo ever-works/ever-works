@@ -59,14 +59,16 @@ export function sessionsTabCard(
         sessionDaemon?: unknown;
     },
 ): SessionsTabCard {
-    if (node.status === 'offline') return { kind: 'offline', lastSeen: node.lastHeartbeatAt ?? null };
+    if (node.status === 'offline')
+        return { kind: 'offline', lastSeen: node.lastHeartbeatAt ?? null };
     const consents = readNodeConsents(node);
     if (!consents.manage && !consents.work) {
         return { kind: 'consent-missing', command: sessionConsentCommand('owner') };
     }
     const daemon = normalizeFleetSessionDaemonReport(node.sessionDaemon);
     const tagged = (node.capabilities ?? []).includes(FLEET_SESSIONS_CAPABILITY);
-    if (daemon && daemon.state !== 'running') return { kind: 'daemon-down', reason: daemon.reason ?? null };
+    if (daemon && daemon.state !== 'running')
+        return { kind: 'daemon-down', reason: daemon.reason ?? null };
     if (!daemon && !tagged) return { kind: 'daemon-down', reason: null };
     return { kind: 'none' };
 }
@@ -96,10 +98,16 @@ export function canStartAgentSession(
 // ─── Providers ─────────────────────────────────────────────────────────────
 
 /** The providers the start dialog offers, in order. */
-export const SESSION_DIALOG_PROVIDERS: readonly FleetSessionStartableProvider[] = ['claude-code', 'codex', 'shell'];
+export const SESSION_DIALOG_PROVIDERS: readonly FleetSessionStartableProvider[] = [
+    'claude-code',
+    'codex',
+    'shell',
+];
 
 /** The message key (under `fleet.sessions.providers`) of a provider's name. */
-export function providerKey(provider: FleetSessionProvider): 'shell' | 'claudeCode' | 'codex' | 'other' {
+export function providerKey(
+    provider: FleetSessionProvider,
+): 'shell' | 'claudeCode' | 'codex' | 'other' {
     if (provider === 'claude-code') return 'claudeCode';
     if (provider === 'codex') return 'codex';
     if (provider === 'shell') return 'shell';
@@ -116,8 +124,12 @@ export function providerInstalled(
 }
 
 /** The provider the dialog preselects: the first installed agent CLI, else the shell. */
-export function defaultProvider(node: Pick<FleetNodeView, 'capabilities'>): FleetSessionStartableProvider {
-    return SESSION_DIALOG_PROVIDERS.find((provider) => providerInstalled(node, provider)) ?? 'shell';
+export function defaultProvider(
+    node: Pick<FleetNodeView, 'capabilities'>,
+): FleetSessionStartableProvider {
+    return (
+        SESSION_DIALOG_PROVIDERS.find((provider) => providerInstalled(node, provider)) ?? 'shell'
+    );
 }
 
 // ─── States, time ──────────────────────────────────────────────────────────
@@ -151,7 +163,10 @@ export function sessionElapsed(
     const start = Date.parse(session.startedAt ?? session.createdAt);
     if (!Number.isFinite(start)) return null;
     const end = session.endedAt ? Date.parse(session.endedAt) : now.getTime();
-    const seconds = Math.max(0, Math.floor(((Number.isFinite(end) ? end : now.getTime()) - start) / 1000));
+    const seconds = Math.max(
+        0,
+        Math.floor(((Number.isFinite(end) ? end : now.getTime()) - start) / 1000),
+    );
     if (seconds < 60) return `${seconds} s`;
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes} min`;
@@ -167,7 +182,8 @@ export function groupSessions(sessions: readonly FleetSessionView[]): {
 } {
     const live: FleetSessionView[] = [];
     const ended: FleetSessionView[] = [];
-    for (const session of sessions) (isFleetSessionLive(session.state) ? live : ended).push(session);
+    for (const session of sessions)
+        (isFleetSessionLive(session.state) ? live : ended).push(session);
     const at = (iso: string | null | undefined) => (iso ? Date.parse(iso) || 0 : 0);
     live.sort((a, b) => at(b.lastActivityAt ?? b.createdAt) - at(a.lastActivityAt ?? a.createdAt));
     ended.sort((a, b) => at(b.endedAt ?? b.updatedAt) - at(a.endedAt ?? a.updatedAt));
@@ -177,8 +193,8 @@ export function groupSessions(sessions: readonly FleetSessionView[]): {
 /** Whether a computer is at its owner-session limit (the dialog's limit card, U6). */
 export function atOwnerLimit(sessions: readonly FleetSessionView[]): boolean {
     return (
-        sessions.filter((session) => session.kind === 'owner' && isFleetSessionLive(session.state)).length >=
-        FLEET_SESSION_MAX_OWNER_PER_NODE
+        sessions.filter((session) => session.kind === 'owner' && isFleetSessionLive(session.state))
+            .length >= FLEET_SESSION_MAX_OWNER_PER_NODE
     );
 }
 
@@ -201,7 +217,9 @@ export function endedLine(
     if (session.state !== 'ended') return null;
     switch (session.endedReason) {
         case 'exit':
-            return typeof session.exitCode === 'number' ? { key: 'endedExit', code: session.exitCode } : { key: 'endedLost' };
+            return typeof session.exitCode === 'number'
+                ? { key: 'endedExit', code: session.exitCode }
+                : { key: 'endedLost' };
         case 'user':
             return { key: 'endedUser' };
         case 'agent':
@@ -215,7 +233,9 @@ export function endedLine(
         case 'timeout':
             return { key: 'endedTimeout' };
         default:
-            return typeof session.exitCode === 'number' ? { key: 'endedExit', code: session.exitCode } : { key: 'endedLost' };
+            return typeof session.exitCode === 'number'
+                ? { key: 'endedExit', code: session.exitCode }
+                : { key: 'endedLost' };
     }
 }
 
@@ -229,15 +249,14 @@ export function endedLine(
 export function roleSentence(
     presence: FleetSessionPresence | undefined,
     me: { userId: string; role: FleetSessionAttachRole | null },
-):
-    | { key: 'driving' }
-    | { key: 'watchingDriven'; others: number }
-    | { key: 'nobodyDriving' } {
+): { key: 'driving' } | { key: 'watchingDriven'; others: number } | { key: 'nobodyDriving' } {
     if (me.role === 'driver') return { key: 'driving' };
     const otherDrivers = (presence?.attached ?? []).filter(
         (entry) => entry.role === 'driver' && entry.userId !== me.userId,
     ).length;
-    return otherDrivers > 0 ? { key: 'watchingDriven', others: otherDrivers } : { key: 'nobodyDriving' };
+    return otherDrivers > 0
+        ? { key: 'watchingDriven', others: otherDrivers }
+        : { key: 'nobodyDriving' };
 }
 
 // ─── Held input ────────────────────────────────────────────────────────────
@@ -256,7 +275,9 @@ export function sessionReconnectDelayMs(attempt: number): number {
 /** Append typed input to the held buffer, dropping what does not fit (the oldest is kept). */
 export function holdInput(held: string, data: string): string {
     const next = held + data;
-    return next.length > SESSION_HELD_INPUT_MAX_BYTES ? next.slice(0, SESSION_HELD_INPUT_MAX_BYTES) : next;
+    return next.length > SESSION_HELD_INPUT_MAX_BYTES
+        ? next.slice(0, SESSION_HELD_INPUT_MAX_BYTES)
+        : next;
 }
 
 /** How many lines the held input is ("You typed {count} lines while offline"), at least 1 when anything was typed. */

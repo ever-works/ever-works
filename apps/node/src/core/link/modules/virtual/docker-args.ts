@@ -127,7 +127,14 @@ export function guestTestFileArgs(childNodeId: string, path: string): string[] {
 export function guestWriteTokenArgs(childNodeId: string, path: string): string[] {
 	const container = guestContainer(childNodeId, path);
 	const dir = path.slice(0, path.lastIndexOf('/')) || '/';
-	return ['exec', '-i', container, 'sh', '-c', `umask 077 && mkdir -p ${dir} && cat > ${path}.part && mv ${path}.part ${path}`];
+	return [
+		'exec',
+		'-i',
+		container,
+		'sh',
+		'-c',
+		`umask 077 && mkdir -p ${dir} && cat > ${path}.part && mv ${path}.part ${path}`
+	];
 }
 
 /** `docker exec <child> rm -f <path>` — the belt behind `enroll --token-file`'s own delete. */

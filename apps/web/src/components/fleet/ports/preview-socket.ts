@@ -45,7 +45,8 @@ const utf8 = new TextEncoder();
 
 function messageBytes(data: unknown): Uint8Array | null {
     if (data instanceof ArrayBuffer) return new Uint8Array(data);
-    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (ArrayBuffer.isView(data))
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     return null;
 }
 
@@ -93,7 +94,13 @@ export class FleetPreviewSocket {
         if (!this.ready) return false;
         const encoded = encodeComputerFrame(input);
         if (!encoded) return false;
-        return this.send(encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.INPUT, utf8.encode(encoded)));
+        return this.send(
+            encodeFleetLinkFrame(
+                FLEET_LINK_VIEWER_CHANNEL,
+                FLEET_LINK_FRAME_KINDS.INPUT,
+                utf8.encode(encoded),
+            ),
+        );
     }
 
     /** Ask for a fresh picture now. */
@@ -144,7 +151,11 @@ export class FleetPreviewSocket {
             }
             return;
         }
-        if (frame.channel !== FLEET_LINK_VIEWER_CHANNEL || frame.kind !== FLEET_LINK_FRAME_KINDS.FRAME) return;
+        if (
+            frame.channel !== FLEET_LINK_VIEWER_CHANNEL ||
+            frame.kind !== FLEET_LINK_FRAME_KINDS.FRAME
+        )
+            return;
         const picture = decodeComputerFrame(frame.payload);
         if (!picture || picture.kind !== 'frame') return;
         this.events.onPicture({
@@ -158,6 +169,11 @@ export class FleetPreviewSocket {
         if (this.finished) return;
         this.finished = true;
         this.socket = null;
-        this.events.onClosed?.({ code, reason: this.reason, hint: this.hint, wasReady: this.ready });
+        this.events.onClosed?.({
+            code,
+            reason: this.reason,
+            hint: this.hint,
+            wasReady: this.ready,
+        });
     }
 }

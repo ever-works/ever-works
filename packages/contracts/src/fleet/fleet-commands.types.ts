@@ -343,7 +343,8 @@ export function summarizeFleetCommandRuns(
 			summary.failed += 1;
 			if (run.status === 'timeout') summary.timedOut += 1;
 		}
-		if (typeof run.durationMs === 'number' && run.durationMs > summary.longestMs) summary.longestMs = run.durationMs;
+		if (typeof run.durationMs === 'number' && run.durationMs > summary.longestMs)
+			summary.longestMs = run.durationMs;
 	}
 	return summary;
 }
@@ -534,7 +535,9 @@ export class FleetCommandEdgeBuffer {
 export function boundFleetCommandEdge(value: unknown): string {
 	if (typeof value !== 'string') return '';
 	// A UTF-8 byte is at least one UTF-16 unit, so this never cuts a stored edge short.
-	return value.length > FLEET_COMMAND_STORED_EDGE_BYTES * 2 ? value.slice(0, FLEET_COMMAND_STORED_EDGE_BYTES * 2) : value;
+	return value.length > FLEET_COMMAND_STORED_EDGE_BYTES * 2
+		? value.slice(0, FLEET_COMMAND_STORED_EDGE_BYTES * 2)
+		: value;
 }
 
 // ─── Link messages (CONTRACTS §3.3 `command` family) ────────────────────────
@@ -589,7 +592,8 @@ export function parseFleetCommandRunParams(value: unknown): FleetCommandRunParam
 	const record = value as Record<string, unknown>;
 	if (!isFleetCommandId(record.runId) || !isFleetCommandLine(record.command)) return null;
 	if (typeof record.timeoutSec !== 'number' || !Number.isFinite(record.timeoutSec)) return null;
-	if (record.timeoutSec > FLEET_COMMAND_MAX_TIMEOUT_SEC || record.timeoutSec < FLEET_COMMAND_MIN_TIMEOUT_SEC) return null;
+	if (record.timeoutSec > FLEET_COMMAND_MAX_TIMEOUT_SEC || record.timeoutSec < FLEET_COMMAND_MIN_TIMEOUT_SEC)
+		return null;
 	const params: FleetCommandRunParams = {
 		runId: record.runId,
 		command: record.command,
@@ -653,7 +657,9 @@ export type FleetCommandNodeMessage =
 	| FleetCommandOutputMessage;
 
 const boundCount = (value: unknown): number =>
-	typeof value === 'number' && Number.isFinite(value) ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(value))) : 0;
+	typeof value === 'number' && Number.isFinite(value)
+		? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(value)))
+		: 0;
 
 /** One node→platform message on a `command` channel, or null for anything else. */
 export function parseFleetCommandNodeMessage(value: unknown): FleetCommandNodeMessage | null {

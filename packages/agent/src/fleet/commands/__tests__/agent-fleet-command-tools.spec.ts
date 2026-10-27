@@ -57,7 +57,11 @@ function tools(overrides: { proposals?: unknown; service?: Record<string, jest.M
 describe('fleet_commands_run', () => {
     it('holds the command for the owner instead of running it', async () => {
         const { byName, proposals, service } = tools();
-        const result = await byName('fleet_commands_run').invoke({ nodeIds: [NODE], command: 'df -h', timeoutSec: 60 });
+        const result = await byName('fleet_commands_run').invoke({
+            nodeIds: [NODE],
+            command: 'df -h',
+            timeoutSec: 60,
+        });
         expect(result).toMatchObject({ held: true, proposalId: 'p1' });
         expect(proposals!.propose).toHaveBeenCalledWith(
             'u1',
@@ -78,18 +82,24 @@ describe('fleet_commands_run', () => {
 
     it('refuses (never runs) without an approval queue', async () => {
         const { byName } = tools({ proposals: null });
-        expect(await byName('fleet_commands_run').invoke({ nodeIds: [NODE], command: 'df -h' })).toMatchObject({
+        expect(
+            await byName('fleet_commands_run').invoke({ nodeIds: [NODE], command: 'df -h' }),
+        ).toMatchObject({
             error: { code: 'confirmation_required' },
         });
     });
 
     it('refuses an empty command and too many computers', async () => {
         const { byName } = tools();
-        expect(await byName('fleet_commands_run').invoke({ nodeIds: [NODE], command: '  ' })).toMatchObject({
+        expect(
+            await byName('fleet_commands_run').invoke({ nodeIds: [NODE], command: '  ' }),
+        ).toMatchObject({
             error: { code: 'invalid' },
         });
         const many = Array.from({ length: 51 }, (_, index) => `n${index}`);
-        expect(await byName('fleet_commands_run').invoke({ nodeIds: many, command: 'ls' })).toMatchObject({
+        expect(
+            await byName('fleet_commands_run').invoke({ nodeIds: many, command: 'ls' }),
+        ).toMatchObject({
             error: { code: 'limit_exceeded' },
         });
     });
@@ -99,7 +109,9 @@ describe('the reads and the cancel', () => {
     it('lists only Agent-requested Commands', async () => {
         const { byName, service } = tools();
         await byName('fleet_commands_list').invoke({ limit: 3 });
-        expect(service.listRecent).toHaveBeenCalledWith({ userId: 'u1', agentId: 'a1' }, 3, { requestedBy: 'agent' });
+        expect(service.listRecent).toHaveBeenCalledWith({ userId: 'u1', agentId: 'a1' }, 3, {
+            requestedBy: 'agent',
+        });
     });
 
     it('treats a Command a person ran as unknown', async () => {
@@ -117,7 +129,9 @@ describe('the reads and the cancel', () => {
 
     it('carries the service refusal', async () => {
         const { byName } = tools({
-            service: { get: jest.fn().mockRejectedValue(fleetCommandError('not_found', 'no such command')) },
+            service: {
+                get: jest.fn().mockRejectedValue(fleetCommandError('not_found', 'no such command')),
+            },
         });
         expect(await byName('fleet_commands_get').invoke({ commandId: 'c9' })).toEqual({
             error: { code: 'not_found', hint: 'no such command' },
@@ -135,7 +149,12 @@ describe('FleetCommandProposalListener', () => {
             status: 'approved',
             decidedVia: 'user',
             decidedById: 'u1',
-            payload: { kind: FLEET_COMMAND_PROPOSAL_KIND, agentId: 'a1', command: 'uptime', nodeIds: [NODE] },
+            payload: {
+                kind: FLEET_COMMAND_PROPOSAL_KIND,
+                agentId: 'a1',
+                command: 'uptime',
+                nodeIds: [NODE],
+            },
             ...over,
         }) as never;
 
@@ -155,7 +174,14 @@ describe('FleetCommandProposalListener', () => {
         await listener.handleProposalDecided(event({ decidedVia: 'guardrail', decidedById: null }));
         await listener.handleProposalDecided(event({ payload: { kind: 'fleet-machine-action' } }));
         await listener.handleProposalDecided(
-            event({ payload: { kind: FLEET_COMMAND_PROPOSAL_KIND, agentId: 'a2', command: 'uptime', nodeIds: [NODE] } }),
+            event({
+                payload: {
+                    kind: FLEET_COMMAND_PROPOSAL_KIND,
+                    agentId: 'a2',
+                    command: 'uptime',
+                    nodeIds: [NODE],
+                },
+            }),
         );
         expect(run).not.toHaveBeenCalled();
     });

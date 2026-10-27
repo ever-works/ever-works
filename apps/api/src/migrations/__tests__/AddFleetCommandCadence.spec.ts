@@ -54,13 +54,23 @@ describe('AddFleetCommandCadence1796130000000 + AddFleetNodeTimeZone179613010000
     it('adds the schedule columns, the run fire time, the node zone and both indexes', async () => {
         await runUp();
         const commands = await table('fleet_commands');
-        for (const name of ['pausedAt', 'pausedReason', 'syncGeneration', 'syncedGeneration', 'deletedAt']) {
+        for (const name of [
+            'pausedAt',
+            'pausedReason',
+            'syncGeneration',
+            'syncedGeneration',
+            'deletedAt',
+        ]) {
             expect(commands?.findColumnByName(name)).toBeDefined();
         }
-        expect(commands?.indices.map((index) => index.name)).toContain('idx_fleet_commands_schedule');
+        expect(commands?.indices.map((index) => index.name)).toContain(
+            'idx_fleet_commands_schedule',
+        );
         const runs = await table('fleet_command_runs');
         expect(runs?.findColumnByName('scheduledFor')?.isNullable).toBe(true);
-        expect(runs?.indices.map((index) => index.name)).toContain('idx_fleet_command_runs_scheduled');
+        expect(runs?.indices.map((index) => index.name)).toContain(
+            'idx_fleet_command_runs_scheduled',
+        );
         const nodes = await table('fleet_nodes');
         expect(nodes?.findColumnByName('timeZone')?.isNullable).toBe(true);
     });
@@ -76,7 +86,12 @@ describe('AddFleetCommandCadence1796130000000 + AddFleetNodeTimeZone179613010000
         const [row] = await dataSource.query(
             `SELECT "command", "syncGeneration", "syncedGeneration", "pausedAt", "deletedAt" FROM "fleet_commands"`,
         );
-        expect(row).toMatchObject({ command: 'uptime', syncGeneration: 0, syncedGeneration: 0, pausedAt: null });
+        expect(row).toMatchObject({
+            command: 'uptime',
+            syncGeneration: 0,
+            syncedGeneration: 0,
+            pausedAt: null,
+        });
         expect(row.deletedAt).toBeNull();
     });
 

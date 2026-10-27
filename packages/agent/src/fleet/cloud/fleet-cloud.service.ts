@@ -50,7 +50,11 @@ import {
     type FleetNodeView,
     type FleetViewerRole,
 } from '@ever-works/contracts';
-import { isMachineProviderError, type MachineProviderMachine, type MachineProviderOptions } from '@ever-works/plugin';
+import {
+    isMachineProviderError,
+    type MachineProviderMachine,
+    type MachineProviderOptions,
+} from '@ever-works/plugin';
 import { config } from '../../config';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import { NoProviderError, ProviderNotFoundError } from '../../facades/base.facade';
@@ -137,9 +141,17 @@ const MAX_ADOPTED_PER_PASS = 5;
  * valid computer name, else `unclaimed-<ref>`, with a numeric suffix until it
  * is unique among the owner's computers.
  */
-export function unclaimedName(providerName: string | undefined, ref: string, taken: ReadonlySet<string>): string {
+export function unclaimedName(
+    providerName: string | undefined,
+    ref: string,
+    taken: ReadonlySet<string>,
+): string {
     const lower = typeof providerName === 'string' ? providerName.toLowerCase() : '';
-    const tail = ref.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24) || 'machine';
+    const tail =
+        ref
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '')
+            .slice(0, 24) || 'machine';
     const base = isFleetCloudName(lower) ? lower : `unclaimed-${tail}`;
     if (!taken.has(base)) return base;
     for (let i = 2; i < 1000; i += 1) {
@@ -202,7 +214,10 @@ export class FleetCloudService {
                 name: summary.name,
                 providerName: summary.providerName,
                 configured: summary.configured,
-                account: cached && Date.now() - cached.at < FLEET_CLOUD_OPTIONS_CACHE_MS ? cached.value.account.label : null,
+                account:
+                    cached && Date.now() - cached.at < FLEET_CLOUD_OPTIONS_CACHE_MS
+                        ? cached.value.account.label
+                        : null,
                 oauthAvailable: summary.oauthAvailable,
             });
         }
@@ -214,7 +229,11 @@ export class FleetCloudService {
      * and the connected account (spec FR-3, FR-4) — cached 10 minutes per
      * provider + owner (plan §5). `fresh` skips the cache (Create's price check).
      */
-    async options(caller: FleetMachineCaller, pluginId: string, fresh = false): Promise<FleetCloudOptionsView> {
+    async options(
+        caller: FleetMachineCaller,
+        pluginId: string,
+        fresh = false,
+    ): Promise<FleetCloudOptionsView> {
         this.requireEnabled();
         const userId = fleetMachineCallerUserId(caller);
         const value = await this.readOptions(pluginId, userId, fresh);
@@ -269,7 +288,12 @@ export class FleetCloudService {
      * composes its `cloud` block from this method (plan §5).
      */
     async usageSummary(userId: string, nowMs: number = Date.now()): Promise<FleetCloudUsageView> {
-        return usageOf(await this.ownCloudNodes(userId), nowMs, await this.destroyedThisMonth(userId, nowMs), userId);
+        return usageOf(
+            await this.ownCloudNodes(userId),
+            nowMs,
+            await this.destroyedThisMonth(userId, nowMs),
+            userId,
+        );
     }
 
     /**
@@ -277,15 +301,21 @@ export class FleetCloudService {
      * registration is gone, so their figures come from their `node.cloud.destroy`
      * audit rows (the cost this month at destroy time). Best-effort.
      */
-    private async destroyedThisMonth(userId: string, nowMs: number = Date.now()): Promise<FleetCloudUsageRow[]> {
+    private async destroyedThisMonth(
+        userId: string,
+        nowMs: number = Date.now(),
+    ): Promise<FleetCloudUsageRow[]> {
         if (!this.audit || typeof this.audit.forOwnerActionSince !== 'function') return [];
         const since = new Date(fleetCloudMonthStartMs(nowMs));
-        const rows = await this.audit.forOwnerActionSince(userId, 'node.cloud.destroy', since).catch(() => []);
+        const rows = await this.audit
+            .forOwnerActionSince(userId, 'node.cloud.destroy', since)
+            .catch(() => []);
         const out: FleetCloudUsageRow[] = [];
         for (const row of rows) {
             const details = (row.details ?? {}) as Record<string, unknown>;
             if (details.outcome !== 'ok' || !row.nodeId) continue;
-            const monthToDate = typeof details.monthToDateCents === 'number' ? details.monthToDateCents : 0;
+            const monthToDate =
+                typeof details.monthToDateCents === 'number' ? details.monthToDateCents : 0;
             out.push({
                 nodeId: row.nodeId,
                 name: typeof details.targetName === 'string' ? details.targetName : row.nodeId,
@@ -294,7 +324,10 @@ export class FleetCloudService {
                 sizeLabel: typeof details.sizeLabel === 'string' ? details.sizeLabel : '',
                 hourlyCents: 0,
                 monthToDateCents: monthToDate,
-                sinceCreatedCents: typeof details.finalCostCents === 'number' ? details.finalCostCents : monthToDate,
+                sinceCreatedCents:
+                    typeof details.finalCostCents === 'number'
+                        ? details.finalCostCents
+                        : monthToDate,
                 state: 'gone',
                 destroyedAt: row.occurredAt,
             });
@@ -305,10 +338,14 @@ export class FleetCloudService {
     // ─── Idle policy (P2, spec FR-25 – FR-28) ────────────────────────────
 
     /** A requested policy, validated (FR-25): `invalid` naming the field, else the policy. */
-    private readIdlePolicy(input: Partial<FleetCloudIdlePolicy> | null | undefined): FleetCloudIdlePolicy {
+    private readIdlePolicy(
+        input: Partial<FleetCloudIdlePolicy> | null | undefined,
+    ): FleetCloudIdlePolicy {
         const mode = input?.mode;
         if (!isFleetCloudIdlePolicyMode(mode)) {
-            throw fleetMachineError('invalid', 'mode must be nothing, tell-me or power-off', { field: 'mode' });
+            throw fleetMachineError('invalid', 'mode must be nothing, tell-me or power-off', {
+                field: 'mode',
+            });
         }
         const hours = input?.afterHours;
         if (
@@ -336,10 +373,21 @@ export class FleetCloudService {
         caller: FleetMachineCaller,
         nodeId: string,
         input: Partial<FleetCloudIdlePolicy> | null | undefined,
-    ): Promise<{ nodeId: string; name: string; from: FleetCloudIdlePolicy; to: FleetCloudIdlePolicy; summary: string }> {
+    ): Promise<{
+        nodeId: string;
+        name: string;
+        from: FleetCloudIdlePolicy;
+        to: FleetCloudIdlePolicy;
+        summary: string;
+    }> {
         this.requireEnabled();
         const to = this.readIdlePolicy(input);
-        const { node, meta } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
+        const { node, meta } = await this.resolveForAct(
+            caller,
+            nodeId,
+            'node.policy.change',
+            false,
+        );
         return {
             nodeId: node.id,
             name: node.name,
@@ -364,18 +412,34 @@ export class FleetCloudService {
     ): Promise<FleetNodeView> {
         this.requireEnabled();
         const to = this.readIdlePolicy(input);
-        const { node, meta, role } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
+        const { node, meta, role } = await this.resolveForAct(
+            caller,
+            nodeId,
+            'node.policy.change',
+            false,
+        );
         const from = meta.idlePolicy;
-        await this.patchMeta(node.id, (fresh) => ({ ...fresh, idlePolicy: to, idleSince: null, idleNotifiedKey: null }));
-        await this.record('node.policy.change', fleetMachineCallerUserId(caller), node.userId, node.id, {
-            targetName: node.name,
-            requestedBy: describeFleetMachineCaller(caller),
-            confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
-            outcome: 'ok',
-            policy: 'idle',
-            from,
-            to,
-        });
+        await this.patchMeta(node.id, (fresh) => ({
+            ...fresh,
+            idlePolicy: to,
+            idleSince: null,
+            idleNotifiedKey: null,
+        }));
+        await this.record(
+            'node.policy.change',
+            fleetMachineCallerUserId(caller),
+            node.userId,
+            node.id,
+            {
+                targetName: node.name,
+                requestedBy: describeFleetMachineCaller(caller),
+                confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
+                outcome: 'ok',
+                policy: 'idle',
+                from,
+                to,
+            },
+        );
         const updated = (await this.nodes.findById(node.id)) ?? node;
         return this.fleet.viewForRole(updated, role);
     }
@@ -388,21 +452,34 @@ export class FleetCloudService {
      */
     async keepRunning(caller: FleetMachineCaller, nodeId: string): Promise<FleetNodeView> {
         this.requireEnabled();
-        const { node, meta, role } = await this.resolveForAct(caller, nodeId, 'node.policy.change', false);
+        const { node, meta, role } = await this.resolveForAct(
+            caller,
+            nodeId,
+            'node.policy.change',
+            false,
+        );
         const now = new Date().toISOString();
         if (meta.idleSince) {
-            await this.patchMeta(node.id, (fresh) => (fresh.idleSince ? { ...fresh, idleSince: now } : null));
-            await this.record('node.policy.change', fleetMachineCallerUserId(caller), node.userId, node.id, {
-                targetName: node.name,
-                requestedBy: describeFleetMachineCaller(caller),
-                confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
-                outcome: 'ok',
-                policy: 'idle',
-                act: 'keep-running',
-                from: meta.idlePolicy,
-                to: meta.idlePolicy,
-                idleSince: meta.idleSince,
-            });
+            await this.patchMeta(node.id, (fresh) =>
+                fresh.idleSince ? { ...fresh, idleSince: now } : null,
+            );
+            await this.record(
+                'node.policy.change',
+                fleetMachineCallerUserId(caller),
+                node.userId,
+                node.id,
+                {
+                    targetName: node.name,
+                    requestedBy: describeFleetMachineCaller(caller),
+                    confirmationClass: FLEET_CLOUD_ACTION_CLASS['idle-policy'],
+                    outcome: 'ok',
+                    policy: 'idle',
+                    act: 'keep-running',
+                    from: meta.idlePolicy,
+                    to: meta.idlePolicy,
+                    idleSince: meta.idleSince,
+                },
+            );
         }
         const updated = (await this.nodes.findById(node.id)) ?? node;
         return this.fleet.viewForRole(updated, role);
@@ -425,36 +502,58 @@ export class FleetCloudService {
         let acted = 0;
         for (const node of await this.nodes.findCloudNodes()) {
             const meta = normalizeCloudMeta(node.providerMeta);
-            if (!meta || !cloudHasMachine(node) || meta.powerState === 'gone' || !node.providerPluginId) continue;
+            if (
+                !meta ||
+                !cloudHasMachine(node) ||
+                meta.powerState === 'gone' ||
+                !node.providerPluginId
+            )
+                continue;
             // A "nothing" policy keeps no window; an open one from an earlier policy is closed below.
             if (meta.idlePolicy.mode === 'nothing' && !meta.idleSince) continue;
             machines += 1;
             try {
                 if (!loads.has(node.userId)) {
-                    const load = this.jobs ? await this.jobs.loadByNodeForUser(node.userId).catch(() => ({})) : {};
+                    const load = this.jobs
+                        ? await this.jobs.loadByNodeForUser(node.userId).catch(() => ({}))
+                        : {};
                     loads.set(node.userId, load as Record<string, { activeJobCount: number }>);
                 }
-                const live = this.sessions ? await this.sessions.findLiveForNode(node.id).catch(() => []) : [];
+                const live = this.sessions
+                    ? await this.sessions.findLiveForNode(node.id).catch(() => [])
+                    : [];
                 const busySessions = live.filter((session) =>
-                    FLEET_CLOUD_BUSY_SESSION_STATES.includes(String((session as { state?: unknown }).state)),
+                    FLEET_CLOUD_BUSY_SESSION_STATES.includes(
+                        String((session as { state?: unknown }).state),
+                    ),
                 ).length;
                 // Every earlier sample of an open window was already judged flat (a
                 // busy one would have closed it), so only the samples since the last
                 // pass are read — two cadences back, never before the window opened.
                 const lookback = nowMs - IDLE_SAMPLE_LOOKBACK_MS;
                 const opened = meta.idleSince ? Date.parse(meta.idleSince) : NaN;
-                const since = new Date(Number.isFinite(opened) ? Math.max(opened, lookback) : lookback);
+                const since = new Date(
+                    Number.isFinite(opened) ? Math.max(opened, lookback) : lookback,
+                );
                 const samples = this.healthSamples
                     ? await this.healthSamples.series(node.id, 'raw', since).catch(() => [])
                     : [];
-                const latestCpu = (node.health as { cpuPercent?: unknown } | null | undefined)?.cpuPercent;
+                const latestCpu = (node.health as { cpuPercent?: unknown } | null | undefined)
+                    ?.cpuPercent;
                 const cpuSamples =
                     samples.length > 0
-                        ? samples.map((sample) => (typeof sample.cpuPercent === 'number' ? sample.cpuPercent : null))
+                        ? samples.map((sample) =>
+                              typeof sample.cpuPercent === 'number' ? sample.cpuPercent : null,
+                          )
                         : [typeof latestCpu === 'number' ? latestCpu : null];
                 const decision =
                     meta.idlePolicy.mode === 'nothing'
-                        ? { idleSince: null, windowReached: false, act: 'none' as const, attentionKey: null }
+                        ? {
+                              idleSince: null,
+                              windowReached: false,
+                              act: 'none' as const,
+                              attentionKey: null,
+                          }
                         : evaluateCloudIdle({
                               nodeId: node.id,
                               status: node.status,
@@ -468,7 +567,11 @@ export class FleetCloudService {
                     const wrote = await this.patchMeta(node.id, (fresh) =>
                         fresh.idleNotifiedKey === decision.attentionKey
                             ? null
-                            : { ...fresh, idleSince: decision.idleSince, idleNotifiedKey: decision.attentionKey },
+                            : {
+                                  ...fresh,
+                                  idleSince: decision.idleSince,
+                                  idleNotifiedKey: decision.attentionKey,
+                              },
                     );
                     if (wrote) {
                         await this.notice(node, meta, decision.idleSince, 'idle', nowMs);
@@ -481,7 +584,10 @@ export class FleetCloudService {
                     continue;
                 }
                 if (decision.idleSince !== (meta.idleSince ?? null)) {
-                    await this.patchMeta(node.id, (fresh) => ({ ...fresh, idleSince: decision.idleSince }));
+                    await this.patchMeta(node.id, (fresh) => ({
+                        ...fresh,
+                        idleSince: decision.idleSince,
+                    }));
                 }
             } catch (error) {
                 this.logger.debug(
@@ -510,9 +616,19 @@ export class FleetCloudService {
         if (!fresh || !meta || meta.powerState !== 'running' || meta.pending !== null) return false;
         if (meta.idleNotifiedKey === decision.attentionKey) return false;
         try {
-            await this.machines.power(node.providerPluginId, node.userId, node.providerMachineRef, 'off');
+            await this.machines.power(
+                node.providerPluginId,
+                node.userId,
+                node.providerMachineRef,
+                'off',
+            );
         } catch (error) {
-            const hint = await this.providerFailureHint(error, node.providerPluginId, node.userId, meta.providerName);
+            const hint = await this.providerFailureHint(
+                error,
+                node.providerPluginId,
+                node.userId,
+                meta.providerName,
+            );
             this.logger.warn(`idle policy could not power off ${node.id}: ${hint}`);
             await this.record('node.cloud.power', null, node.userId, node.id, {
                 targetName: node.name,
@@ -559,7 +675,10 @@ export class FleetCloudService {
     ): Promise<void> {
         if (!this.inbox) return;
         const hours = fleetCloudIdleHours(idleSince, nowMs) ?? meta.idlePolicy.afterHours;
-        const rate = formatFleetCloudMoney(meta.hourlyRateCents, { currency: meta.currency, perHour: true });
+        const rate = formatFleetCloudMoney(meta.hourlyRateCents, {
+            currency: meta.currency,
+            perHour: true,
+        });
         const message =
             variant === 'idle'
                 ? {
@@ -573,7 +692,10 @@ export class FleetCloudService {
                           : 'Power it on from the Fleet when you need it again.',
                   };
         try {
-            await this.inbox.notice(node.userId, { ...message, organizationId: node.organizationId ?? null });
+            await this.inbox.notice(node.userId, {
+                ...message,
+                organizationId: node.organizationId ?? null,
+            });
         } catch (error) {
             this.logger.warn(
                 `cloud idle notice for ${node.id} was not filed: ${error instanceof Error ? error.message : String(error)}`,
@@ -601,7 +723,11 @@ export class FleetCloudService {
         const groups = new Map<string, { pluginId: string; userId: string; refs: string[] }>();
         for (const node of nodes) {
             const key = `${node.providerPluginId}::${node.userId}`;
-            const group = groups.get(key) ?? { pluginId: node.providerPluginId!, userId: node.userId, refs: [] };
+            const group = groups.get(key) ?? {
+                pluginId: node.providerPluginId!,
+                userId: node.userId,
+                refs: [],
+            };
             if (cloudHasMachine(node)) group.refs.push(node.providerMachineRef!);
             groups.set(key, group);
         }
@@ -609,9 +735,14 @@ export class FleetCloudService {
         for (const [key, group] of groups) {
             let figure: number | null = null;
             if (this.machines && group.refs.length > 0) {
-                const usage = await this.machines.usage(group.pluginId, group.userId, group.refs).catch(() => null);
+                const usage = await this.machines
+                    .usage(group.pluginId, group.userId, group.refs)
+                    .catch(() => null);
                 const cents = usage?.providerMonthToDateCents;
-                figure = typeof cents === 'number' && Number.isFinite(cents) && cents >= 0 ? cents : null;
+                figure =
+                    typeof cents === 'number' && Number.isFinite(cents) && cents >= 0
+                        ? cents
+                        : null;
             }
             figures.set(key, figure);
         }
@@ -641,7 +772,10 @@ export class FleetCloudService {
 
     // ─── Create (spec FR-6 – FR-14) ──────────────────────────────────────
 
-    async create(caller: FleetMachineCaller, input: FleetCloudCreateInput): Promise<FleetCloudCreateResponse> {
+    async create(
+        caller: FleetMachineCaller,
+        input: FleetCloudCreateInput,
+    ): Promise<FleetCloudCreateResponse> {
         this.requireEnabled();
         const userId = fleetMachineCallerUserId(caller);
         const requestedBy = describeFleetMachineCaller(caller);
@@ -653,12 +787,19 @@ export class FleetCloudService {
                 outcome: 'refused',
                 code: 'kill_switch',
             });
-            throw fleetMachineError('kill_switch', 'the Fleet is stopped; clear it under Settings → Fleet');
+            throw fleetMachineError(
+                'kill_switch',
+                'the Fleet is stopped; clear it under Settings → Fleet',
+            );
         }
 
         // 4: the request.
-        const pluginId = typeof input.providerPluginId === 'string' ? input.providerPluginId.trim() : '';
-        if (!pluginId) throw fleetMachineError('invalid', 'choose a cloud provider', { field: 'providerPluginId' });
+        const pluginId =
+            typeof input.providerPluginId === 'string' ? input.providerPluginId.trim() : '';
+        if (!pluginId)
+            throw fleetMachineError('invalid', 'choose a cloud provider', {
+                field: 'providerPluginId',
+            });
         const name = typeof input.name === 'string' ? input.name.trim() : '';
         if (!isFleetCloudName(name)) {
             throw fleetMachineError(
@@ -669,7 +810,11 @@ export class FleetCloudService {
         }
         const ownerNodes = await this.nodes.findByUser(userId);
         if (ownerNodes.some((node) => node.name.toLowerCase() === name)) {
-            throw fleetMachineError('invalid', `the name ${name} is already used by another computer`, { field: 'name' });
+            throw fleetMachineError(
+                'invalid',
+                `the name ${name} is already used by another computer`,
+                { field: 'name' },
+            );
         }
         const cloudCount = ownerNodes.filter((node) => node.origin === 'cloud').length;
         if (cloudCount >= FLEET_CLOUD_MAX_PER_OWNER) {
@@ -692,7 +837,9 @@ export class FleetCloudService {
         // P3 (FR-32): the overlay-VPN auth key — checked here, handed to the bootstrap
         // once, never stored, echoed, logged or audited (no refusal quotes it).
         const vpnAuthKey =
-            typeof input.vpnAuthKey === 'string' && input.vpnAuthKey.trim() ? input.vpnAuthKey.trim() : null;
+            typeof input.vpnAuthKey === 'string' && input.vpnAuthKey.trim()
+                ? input.vpnAuthKey.trim()
+                : null;
         if (vpnAuthKey !== null) {
             if (!software.includes('overlay-vpn')) {
                 throw fleetMachineError(
@@ -722,18 +869,30 @@ export class FleetCloudService {
         const options = await this.readOptions(pluginId, userId, true);
         const region = options.regions.find((entry) => entry.id === input.regionId);
         if (!region || !region.available) {
-            throw fleetMachineError('invalid', 'choose one of the listed regions', { field: 'regionId' });
+            throw fleetMachineError('invalid', 'choose one of the listed regions', {
+                field: 'regionId',
+            });
         }
         const size = options.sizes.find((entry) => entry.id === input.sizeId);
-        if (!size || !size.available || (size.regions.length > 0 && !size.regions.includes(region.id))) {
-            throw fleetMachineError('invalid', `choose a size available in ${region.label}`, { field: 'sizeId' });
+        if (
+            !size ||
+            !size.available ||
+            (size.regions.length > 0 && !size.regions.includes(region.id))
+        ) {
+            throw fleetMachineError('invalid', `choose a size available in ${region.label}`, {
+                field: 'sizeId',
+            });
         }
         const acknowledged = input.acknowledgedPriceCents;
         if (typeof acknowledged !== 'number' || !Number.isFinite(acknowledged)) {
-            throw fleetMachineError('invalid', 'acknowledgedPriceCents (the monthly price you were shown) is required', {
-                field: 'acknowledgedPriceCents',
-                currentPriceCents: size.priceMonthlyCents,
-            });
+            throw fleetMachineError(
+                'invalid',
+                'acknowledgedPriceCents (the monthly price you were shown) is required',
+                {
+                    field: 'acknowledgedPriceCents',
+                    currentPriceCents: size.priceMonthlyCents,
+                },
+            );
         }
         if (Math.round(acknowledged) !== Math.round(size.priceMonthlyCents)) {
             throw fleetMachineError(
@@ -759,20 +918,26 @@ export class FleetCloudService {
             billsWhileOff: options.billsWhileOff,
             currency: options.currency,
         };
-        this.requireConfirmation('create', name, fleetCloudPriceSentence(priceFacts), input.fields ?? { confirm: input.confirm }, {
-            decision: fleetCloudCreateSummary({
-                ...priceFacts,
-                name,
+        this.requireConfirmation(
+            'create',
+            name,
+            fleetCloudPriceSentence(priceFacts),
+            input.fields ?? { confirm: input.confirm },
+            {
+                decision: fleetCloudCreateSummary({
+                    ...priceFacts,
+                    name,
+                    regionId: region.id,
+                    vcpus: size.vcpus,
+                    memoryMiB: size.memoryMiB,
+                }),
+                priceMonthlyCents: size.priceMonthlyCents,
+                priceHourlyCents: size.priceHourlyCents,
+                providerPluginId: pluginId,
                 regionId: region.id,
-                vcpus: size.vcpus,
-                memoryMiB: size.memoryMiB,
-            }),
-            priceMonthlyCents: size.priceMonthlyCents,
-            priceHourlyCents: size.priceHourlyCents,
-            providerPluginId: pluginId,
-            regionId: region.id,
-            sizeId: size.id,
-        });
+                sizeId: size.id,
+            },
+        );
 
         // The registration FIRST (FR-7): `enrolling`, `origin: cloud`, the
         // provider facts, a one-time token whose hash alone is stored.
@@ -826,7 +991,11 @@ export class FleetCloudService {
         // P3: plus this deployment's site tag, so reconciliation can tell its own
         // unclaimed machines from another deployment's on the same account (FR-30).
         const site = this.siteFingerprint();
-        const tags = [FLEET_CLOUD_TAG, fleetCloudNodeTag(node.id), ...(site ? [fleetCloudSiteTag(site)] : [])];
+        const tags = [
+            FLEET_CLOUD_TAG,
+            fleetCloudNodeTag(node.id),
+            ...(site ? [fleetCloudSiteTag(site)] : []),
+        ];
         await this.nodes.update(node.id, { providerMeta: { ...meta, tags } });
 
         // Then the provider — not awaited, so Create answers within 500 ms (FR-7);
@@ -932,7 +1101,9 @@ export class FleetCloudService {
             if (node && meta) {
                 const now = new Date().toISOString();
                 await this.nodes
-                    .update(nodeId, { providerMeta: { ...meta, phase: 'failed', phaseAt: now, error: hint } })
+                    .update(nodeId, {
+                        providerMeta: { ...meta, phase: 'failed', phaseAt: now, error: hint },
+                    })
                     .catch(() => undefined);
             }
             await this.record('node.cloud.create', args.userId, args.userId, nodeId, {
@@ -961,35 +1132,66 @@ export class FleetCloudService {
         if (!isFleetCloudPowerAction(action)) {
             throw fleetMachineError('invalid', 'action must be on or off', { field: 'action' });
         }
-        const { node, meta } = await this.resolveForAct(caller, nodeId, 'node.cloud.power', action === 'on');
+        const { node, meta } = await this.resolveForAct(
+            caller,
+            nodeId,
+            'node.cloud.power',
+            action === 'on',
+        );
         const ref = this.requireMachine(node, meta);
         if (meta.pending) {
-            throw fleetMachineError('busy', `${node.name} is ${meta.pending.replace('-', ' ')} already`, { pending: meta.pending });
+            throw fleetMachineError(
+                'busy',
+                `${node.name} is ${meta.pending.replace('-', ' ')} already`,
+                { pending: meta.pending },
+            );
         }
         if (action === 'off' && meta.powerState === 'off') {
-            throw fleetMachineError('busy', `${node.name} is already powered off`, { state: meta.powerState });
+            throw fleetMachineError('busy', `${node.name} is already powered off`, {
+                state: meta.powerState,
+            });
         }
         if (action === 'on' && meta.powerState === 'running') {
-            throw fleetMachineError('busy', `${node.name} is already running`, { state: meta.powerState });
+            throw fleetMachineError('busy', `${node.name} is already running`, {
+                state: meta.powerState,
+            });
         }
         const summary =
             action === 'off'
                 ? fleetCloudPowerOffSummary(node.name, meta.providerName, meta.billsWhileOff)
                 : `Power on ${node.name}? It bills about ${formatFleetCloudMoney(meta.hourlyRateCents, { currency: meta.currency, perHour: true })}/hour while it runs.`;
-        this.requireConfirmation(action === 'off' ? 'power-off' : 'power-on', node.name, summary, fields);
-        await this.callProvider(node, meta, () => this.machines!.power(node.providerPluginId!, node.userId, ref, action));
+        this.requireConfirmation(
+            action === 'off' ? 'power-off' : 'power-on',
+            node.name,
+            summary,
+            fields,
+        );
+        await this.callProvider(node, meta, () =>
+            this.machines!.power(node.providerPluginId!, node.userId, ref, action),
+        );
         const now = new Date().toISOString();
         await this.nodes.update(node.id, {
-            providerMeta: { ...meta, pending: action === 'off' ? 'powering-off' : 'starting', powerStateAt: now },
+            providerMeta: {
+                ...meta,
+                pending: action === 'off' ? 'powering-off' : 'starting',
+                powerStateAt: now,
+            },
         });
-        await this.record('node.cloud.power', fleetMachineCallerUserId(caller), node.userId, node.id, {
-            targetName: node.name,
-            requestedBy: describeFleetMachineCaller(caller),
-            confirmationClass: FLEET_CLOUD_ACTION_CLASS[action === 'off' ? 'power-off' : 'power-on'],
-            outcome: 'ok',
-            action,
-            ...this.priceExtra(node, meta),
-        });
+        await this.record(
+            'node.cloud.power',
+            fleetMachineCallerUserId(caller),
+            node.userId,
+            node.id,
+            {
+                targetName: node.name,
+                requestedBy: describeFleetMachineCaller(caller),
+                confirmationClass:
+                    FLEET_CLOUD_ACTION_CLASS[action === 'off' ? 'power-off' : 'power-on'],
+                outcome: 'ok',
+                action,
+                ...this.priceExtra(node, meta),
+            },
+        );
         return { operationId: node.id };
     }
 
@@ -999,14 +1201,25 @@ export class FleetCloudService {
         fields?: FleetActionConfirmFields | null,
     ): Promise<FleetCloudOperationResponse> {
         this.requireEnabled();
-        const { node, meta } = await this.resolveForAct(caller, nodeId, 'node.cloud.destroy', false);
+        const { node, meta } = await this.resolveForAct(
+            caller,
+            nodeId,
+            'node.cloud.destroy',
+            false,
+        );
         if (meta.pending === 'destroying') {
-            throw fleetMachineError('busy', `${node.name} is already being destroyed`, { pending: meta.pending });
+            throw fleetMachineError('busy', `${node.name} is already being destroyed`, {
+                pending: meta.pending,
+            });
         }
         if (meta.phase === 'asking-provider' && !cloudHasMachine(node)) {
-            throw fleetMachineError('busy', `${node.name} is still being created at ${meta.providerName}; try again in a minute`, {
-                phase: meta.phase,
-            });
+            throw fleetMachineError(
+                'busy',
+                `${node.name} is still being created at ${meta.providerName}; try again in a minute`,
+                {
+                    phase: meta.phase,
+                },
+            );
         }
         // Busy first (FR-20): a person never types the name only to be told to wait.
         await this.assertNotWorking(node, caller);
@@ -1028,10 +1241,16 @@ export class FleetCloudService {
             await this.nodes.update(node.id, { providerMeta: { ...meta, pending: 'destroying' } });
             try {
                 await this.callProvider(node, meta, () =>
-                    this.machines!.destroy(node.providerPluginId!, node.userId, node.providerMachineRef!),
+                    this.machines!.destroy(
+                        node.providerPluginId!,
+                        node.userId,
+                        node.providerMachineRef!,
+                    ),
                 );
             } catch (error) {
-                await this.nodes.update(node.id, { providerMeta: { ...meta, pending: null } }).catch(() => undefined);
+                await this.nodes
+                    .update(node.id, { providerMeta: { ...meta, pending: null } })
+                    .catch(() => undefined);
                 throw error;
             }
         }
@@ -1039,15 +1258,21 @@ export class FleetCloudService {
         // registration goes, job history stays (FR-18).
         const final = fleetCloudCost({ ...meta, destroyedAt: new Date().toISOString() });
         await this.nodes.delete(node.id);
-        await this.record('node.cloud.destroy', fleetMachineCallerUserId(caller), node.userId, node.id, {
-            targetName: node.name,
-            requestedBy: describeFleetMachineCaller(caller),
-            confirmationClass: FLEET_CLOUD_ACTION_CLASS.destroy,
-            outcome: 'ok',
-            finalCostCents: final.sinceCreatedCents,
-            monthToDateCents: final.monthToDateCents,
-            ...this.priceExtra(node, meta),
-        });
+        await this.record(
+            'node.cloud.destroy',
+            fleetMachineCallerUserId(caller),
+            node.userId,
+            node.id,
+            {
+                targetName: node.name,
+                requestedBy: describeFleetMachineCaller(caller),
+                confirmationClass: FLEET_CLOUD_ACTION_CLASS.destroy,
+                outcome: 'ok',
+                finalCostCents: final.sinceCreatedCents,
+                monthToDateCents: final.monthToDateCents,
+                ...this.priceExtra(node, meta),
+            },
+        );
         return { operationId: node.id, costSoFarCents: final.sinceCreatedCents };
     }
 
@@ -1057,11 +1282,16 @@ export class FleetCloudService {
      * replace on a running machine, so a fresh token cannot reach it: Destroy
      * and create again is the fix, and the refusal says so.
      */
-    async retryEnrollment(caller: FleetMachineCaller, nodeId: string): Promise<FleetCloudOperationResponse> {
+    async retryEnrollment(
+        caller: FleetMachineCaller,
+        nodeId: string,
+    ): Promise<FleetCloudOperationResponse> {
         this.requireEnabled();
         const { node } = await this.resolveForAct(caller, nodeId, 'node.cloud.power', false);
         if (node.status !== 'enrolling') {
-            throw fleetMachineError('busy', `${node.name} is already enrolled`, { status: node.status });
+            throw fleetMachineError('busy', `${node.name} is already enrolled`, {
+                status: node.status,
+            });
         }
         throw fleetMachineError(
             'unsupported_on_node',
@@ -1085,7 +1315,13 @@ export class FleetCloudService {
         const nodes = await this.nodes.findCloudNodes();
         for (const node of nodes) {
             const meta = normalizeCloudMeta(node.providerMeta);
-            if (!meta || !cloudHasMachine(node) || meta.powerState === 'gone' || !node.providerPluginId) continue;
+            if (
+                !meta ||
+                !cloudHasMachine(node) ||
+                meta.powerState === 'gone' ||
+                !node.providerPluginId
+            )
+                continue;
             machines += 1;
             if (await this.refreshMachine(node, meta)) changed += 1;
         }
@@ -1128,17 +1364,22 @@ export class FleetCloudService {
         const site = this.siteFingerprint();
         const groups = new Map<string, { pluginId: string; userId: string }>();
         const add = (pluginId: unknown, userId: unknown) => {
-            if (typeof pluginId !== 'string' || !pluginId || typeof userId !== 'string' || !userId) return;
+            if (typeof pluginId !== 'string' || !pluginId || typeof userId !== 'string' || !userId)
+                return;
             groups.set(`${pluginId}::${userId}`, { pluginId, userId });
         };
         for (const node of nodes) add(node.providerPluginId, node.userId);
         if (this.audit && typeof this.audit.forActionSince === 'function') {
             const since = new Date(nowMs - UNCLAIMED_OWNER_LOOKBACK_MS);
-            const rows = await this.audit.forActionSince('node.cloud.create', since).catch(() => []);
+            const rows = await this.audit
+                .forActionSince('node.cloud.create', since)
+                .catch(() => []);
             for (const row of rows) add((row.details ?? {})['providerPluginId'], row.ownerUserId);
         }
         const knownRefs = new Set(
-            nodes.filter((node) => cloudHasMachine(node)).map((node) => `${node.providerPluginId}::${node.providerMachineRef}`),
+            nodes
+                .filter((node) => cloudHasMachine(node))
+                .map((node) => `${node.providerPluginId}::${node.providerMachineRef}`),
         );
         let repaired = 0;
         let adopted = 0;
@@ -1156,12 +1397,18 @@ export class FleetCloudService {
             }
             let adoptedHere = 0;
             for (const machine of machines.slice(0, 200)) {
-                const ref = typeof machine.machineRef === 'string' ? machine.machineRef.slice(0, 128) : '';
-                if (!ref || machine.state === 'gone' || knownRefs.has(`${pluginId}::${ref}`)) continue;
+                const ref =
+                    typeof machine.machineRef === 'string' ? machine.machineRef.slice(0, 128) : '';
+                if (!ref || machine.state === 'gone' || knownRefs.has(`${pluginId}::${ref}`))
+                    continue;
                 const nodeId = fleetCloudNodeIdFromTags(machine.tags);
                 const row = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
                 if (row) {
-                    if (row.userId === userId && row.providerPluginId === pluginId && !cloudHasMachine(row)) {
+                    if (
+                        row.userId === userId &&
+                        row.providerPluginId === pluginId &&
+                        !cloudHasMachine(row)
+                    ) {
                         if (await this.repairRow(row, machine, ref, nowMs)) {
                             repaired += 1;
                             knownRefs.add(`${pluginId}::${ref}`);
@@ -1183,18 +1430,28 @@ export class FleetCloudService {
 
     /** The provider's machine state as the row keeps it. */
     private static powerStateOf(machine: MachineProviderMachine): FleetCloudMeta['powerState'] {
-        return machine.state === 'provisioning' || machine.state === 'running' || machine.state === 'off'
+        return machine.state === 'provisioning' ||
+            machine.state === 'running' ||
+            machine.state === 'off'
             ? machine.state
             : 'unknown';
     }
 
     /** Write a machine the provider holds onto its own row, which had no reference (U7). */
-    private async repairRow(node: FleetNode, machine: MachineProviderMachine, ref: string, nowMs: number): Promise<boolean> {
+    private async repairRow(
+        node: FleetNode,
+        machine: MachineProviderMachine,
+        ref: string,
+        nowMs: number,
+    ): Promise<boolean> {
         const fresh = await this.nodes.findById(node.id);
         const meta = fresh ? normalizeCloudMeta(fresh.providerMeta) : null;
         if (!fresh || !meta || cloudHasMachine(fresh)) return false;
         const now = new Date(nowMs).toISOString();
-        const created = machine.createdAt && Number.isFinite(Date.parse(machine.createdAt)) ? machine.createdAt : now;
+        const created =
+            machine.createdAt && Number.isFinite(Date.parse(machine.createdAt))
+                ? machine.createdAt
+                : now;
         let timeline = appendPowerEvent(meta.powerTimeline, 'running', created);
         if (machine.state === 'off') timeline = appendPowerEvent(timeline, 'off', now);
         const stillCreating = meta.phase === 'asking-provider' || meta.phase === 'failed';
@@ -1203,7 +1460,11 @@ export class FleetCloudService {
             providerMeta: {
                 ...meta,
                 machineCreatedAt: meta.machineCreatedAt ?? created,
-                phase: stillCreating ? (machine.state === 'running' ? 'installing' : 'booting') : meta.phase,
+                phase: stillCreating
+                    ? machine.state === 'running'
+                        ? 'installing'
+                        : 'booting'
+                    : meta.phase,
                 phaseAt: stillCreating ? now : meta.phaseAt,
                 error: stillCreating ? null : meta.error,
                 powerState: FleetCloudService.powerStateOf(machine),
@@ -1233,13 +1494,23 @@ export class FleetCloudService {
     ): Promise<boolean> {
         if (await this.nodes.findByProviderMachine(pluginId, ref)) return false;
         const owned = await this.nodes.findByUser(userId);
-        const name = unclaimedName(machine.name, ref, new Set(owned.map((node) => node.name.toLowerCase())));
+        const name = unclaimedName(
+            machine.name,
+            ref,
+            new Set(owned.map((node) => node.name.toLowerCase())),
+        );
         const options = await this.readOptions(pluginId, userId, false).catch(() => null);
         const size = options?.sizes.find((entry) => entry.id === machine.sizeId) ?? null;
         const region = options?.regions.find((entry) => entry.id === machine.regionId) ?? null;
-        const providerName = options?.providerName ?? (await this.machines?.providerName(pluginId, userId)) ?? 'the provider';
+        const providerName =
+            options?.providerName ??
+            (await this.machines?.providerName(pluginId, userId)) ??
+            'the provider';
         const now = new Date(nowMs).toISOString();
-        const created = machine.createdAt && Number.isFinite(Date.parse(machine.createdAt)) ? machine.createdAt : now;
+        const created =
+            machine.createdAt && Number.isFinite(Date.parse(machine.createdAt))
+                ? machine.createdAt
+                : now;
         let timeline = appendPowerEvent([], 'running', created);
         if (machine.state === 'off') timeline = appendPowerEvent(timeline, 'off', now);
         const meta: FleetCloudMeta = {
@@ -1271,7 +1542,9 @@ export class FleetCloudService {
             idleSince: null,
             cost: null,
             software: [],
-            tags: (machine.tags ?? []).filter((tag): tag is string => typeof tag === 'string').slice(0, 20),
+            tags: (machine.tags ?? [])
+                .filter((tag): tag is string => typeof tag === 'string')
+                .slice(0, 20),
             ipv4: machine.ipv4 ?? null,
             unclaimedAt: now,
         };
@@ -1337,8 +1610,10 @@ export class FleetCloudService {
             }
             const inFlight =
                 meta.pending !== null ||
-                (node.status === 'enrolling' && (meta.phase === 'booting' || meta.powerState === 'provisioning'));
-            if (!inFlight || !cloudHasMachine(node) || !this.machines || !node.providerPluginId) continue;
+                (node.status === 'enrolling' &&
+                    (meta.phase === 'booting' || meta.powerState === 'provisioning'));
+            if (!inFlight || !cloudHasMachine(node) || !this.machines || !node.providerPluginId)
+                continue;
             checked += 1;
             if (await this.refreshMachine(node, meta)) changed += 1;
         }
@@ -1346,10 +1621,17 @@ export class FleetCloudService {
     }
 
     /** True when the node is a cloud computer that should have enrolled by now and has not (FR-11). */
-    static isUnenrolled(node: Pick<FleetNode, 'status'>, meta: FleetCloudMeta, nowMs: number): boolean {
-        if (node.status !== 'enrolling' || meta.phase === 'failed' || meta.powerState === 'gone') return false;
+    static isUnenrolled(
+        node: Pick<FleetNode, 'status'>,
+        meta: FleetCloudMeta,
+        nowMs: number,
+    ): boolean {
+        if (node.status !== 'enrolling' || meta.phase === 'failed' || meta.powerState === 'gone')
+            return false;
         const created = Date.parse(meta.machineCreatedAt ?? '');
-        return Number.isFinite(created) && nowMs - created > FLEET_CLOUD_UNENROLLED_AFTER_MIN * 60_000;
+        return (
+            Number.isFinite(created) && nowMs - created > FLEET_CLOUD_UNENROLLED_AFTER_MIN * 60_000
+        );
     }
 
     // ─── Shared ───────────────────────────────────────────────────────────
@@ -1358,7 +1640,11 @@ export class FleetCloudService {
     private async refreshMachine(node: FleetNode, meta: FleetCloudMeta): Promise<boolean> {
         let machine;
         try {
-            machine = await this.machines!.getMachine(node.providerPluginId!, node.userId, node.providerMachineRef!);
+            machine = await this.machines!.getMachine(
+                node.providerPluginId!,
+                node.userId,
+                node.providerMachineRef!,
+            );
         } catch (error) {
             this.logger.debug(
                 `cloud reconcile: ${node.id} could not be read: ${error instanceof Error ? error.message : String(error)}`,
@@ -1411,7 +1697,10 @@ export class FleetCloudService {
 
     private requireEnabled(): void {
         if (!config.fleet.isCloudEnabled()) {
-            throw fleetMachineError('not_found', 'cloud computers are not switched on in this deployment');
+            throw fleetMachineError(
+                'not_found',
+                'cloud computers are not switched on in this deployment',
+            );
         }
     }
 
@@ -1456,7 +1745,11 @@ export class FleetCloudService {
         this.requireCloud(node);
         const meta = normalizeCloudMeta(node.providerMeta);
         if (!meta) throw fleetMachineError('not_found', 'this computer carries no cloud facts');
-        const refuse = async (code: FleetLinkErrorCode, hint: string, details?: Record<string, unknown>) => {
+        const refuse = async (
+            code: FleetLinkErrorCode,
+            hint: string,
+            details?: Record<string, unknown>,
+        ) => {
             await this.record(auditAction, userId, node.userId, node.id, {
                 targetName: node.name,
                 requestedBy: describeFleetMachineCaller(caller),
@@ -1466,43 +1759,73 @@ export class FleetCloudService {
             return fleetMachineError(code, hint, details);
         };
         if (refusedWhileStopped && (await this.isStopped())) {
-            throw await refuse('kill_switch', 'the Fleet is stopped; power-off and destroy stay available');
+            throw await refuse(
+                'kill_switch',
+                'the Fleet is stopped; power-off and destroy stay available',
+            );
         }
         if (!(await this.allows(node, role, userId))) {
-            throw await refuse('permission_denied', `Only the owner of ${node.name} can power or destroy it`, {
-                family: 'machines',
-            });
+            throw await refuse(
+                'permission_denied',
+                `Only the owner of ${node.name} can power or destroy it`,
+                {
+                    family: 'machines',
+                },
+            );
         }
         return { node, meta, role };
     }
 
     /** Destroy is refused `busy` while a Run or a Session is live on the machine (FR-20). */
     private async assertNotWorking(node: FleetNode, caller: FleetMachineCaller): Promise<void> {
-        const load = this.jobs ? (await this.jobs.loadByNodeForUser(node.userId).catch(() => ({})))[node.id] : undefined;
-        const live = this.sessions ? await this.sessions.findLiveForNode(node.id).catch(() => []) : [];
+        const load = this.jobs
+            ? (await this.jobs.loadByNodeForUser(node.userId).catch(() => ({})))[node.id]
+            : undefined;
+        const live = this.sessions
+            ? await this.sessions.findLiveForNode(node.id).catch(() => [])
+            : [];
         if ((load && load.activeJobCount > 0) || live.length > 0) {
-            await this.record('node.cloud.destroy', fleetMachineCallerUserId(caller), node.userId, node.id, {
-                targetName: node.name,
-                requestedBy: describeFleetMachineCaller(caller),
-                outcome: 'refused',
-                code: 'busy',
-            });
-            throw fleetMachineError('busy', `Something is working on ${node.name} right now; end the session or wait`, {
-                activeJobs: load?.activeJobCount ?? 0,
-                liveSessions: live.length,
-            });
+            await this.record(
+                'node.cloud.destroy',
+                fleetMachineCallerUserId(caller),
+                node.userId,
+                node.id,
+                {
+                    targetName: node.name,
+                    requestedBy: describeFleetMachineCaller(caller),
+                    outcome: 'refused',
+                    code: 'busy',
+                },
+            );
+            throw fleetMachineError(
+                'busy',
+                `Something is working on ${node.name} right now; end the session or wait`,
+                {
+                    activeJobs: load?.activeJobCount ?? 0,
+                    liveSessions: live.length,
+                },
+            );
         }
     }
 
     /** Run a provider call; a disabled plugin or a provider refusal becomes `operation_failed` with its first line. */
-    private async callProvider<T>(node: FleetNode, meta: FleetCloudMeta, call: () => Promise<T>): Promise<T> {
+    private async callProvider<T>(
+        node: FleetNode,
+        meta: FleetCloudMeta,
+        call: () => Promise<T>,
+    ): Promise<T> {
         if (!this.machines || !node.providerPluginId) {
             throw fleetMachineError('operation_failed', pluginDisabledHint(meta.providerName));
         }
         try {
             return await call();
         } catch (error) {
-            const hint = await this.providerFailureHint(error, node.providerPluginId, node.userId, meta.providerName);
+            const hint = await this.providerFailureHint(
+                error,
+                node.providerPluginId,
+                node.userId,
+                meta.providerName,
+            );
             throw fleetMachineError('operation_failed', hint);
         }
     }
@@ -1514,7 +1837,8 @@ export class FleetCloudService {
         userId: string,
         knownName?: string,
     ): Promise<string> {
-        const providerName = knownName ?? (await this.machines?.providerName(pluginId, userId)) ?? 'the provider';
+        const providerName =
+            knownName ?? (await this.machines?.providerName(pluginId, userId)) ?? 'the provider';
         if (error instanceof ProviderNotFoundError || error instanceof NoProviderError) {
             return pluginDisabledHint(providerName);
         }
@@ -1534,16 +1858,27 @@ export class FleetCloudService {
     ): Promise<Omit<FleetCloudOptionsView, 'limits'>> {
         const key = this.cacheKey(pluginId, userId);
         const cached = this.optionsCache.get(key);
-        if (!fresh && cached && Date.now() - cached.at < FLEET_CLOUD_OPTIONS_CACHE_MS) return cached.value;
-        if (!this.machines) throw fleetMachineError('not_found', 'no cloud provider is available in this deployment');
+        if (!fresh && cached && Date.now() - cached.at < FLEET_CLOUD_OPTIONS_CACHE_MS)
+            return cached.value;
+        if (!this.machines)
+            throw fleetMachineError(
+                'not_found',
+                'no cloud provider is available in this deployment',
+            );
         let raw: MachineProviderOptions;
         try {
             raw = await this.machines.listOptions(pluginId, userId);
         } catch (error) {
             if (error instanceof ProviderNotFoundError || error instanceof NoProviderError) {
-                throw fleetMachineError('not_found', 'connect a cloud provider first: enable it under Plugins and save its token');
+                throw fleetMachineError(
+                    'not_found',
+                    'connect a cloud provider first: enable it under Plugins and save its token',
+                );
             }
-            throw fleetMachineError('operation_failed', await this.providerFailureHint(error, pluginId, userId));
+            throw fleetMachineError(
+                'operation_failed',
+                await this.providerFailureHint(error, pluginId, userId),
+            );
         }
         const providerName = (await this.machines.providerName(pluginId, userId)) ?? pluginId;
         const value: Omit<FleetCloudOptionsView, 'limits'> = {
@@ -1555,7 +1890,9 @@ export class FleetCloudService {
                 available: region.available !== false,
             })),
             sizes: (raw.sizes ?? [])
-                .filter((size) => Number.isFinite(size.priceMonthlyCents) && size.priceMonthlyCents > 0)
+                .filter(
+                    (size) => Number.isFinite(size.priceMonthlyCents) && size.priceMonthlyCents > 0,
+                )
                 .map((size) => ({
                     id: String(size.id),
                     label: String(size.label ?? size.id),
@@ -1568,9 +1905,9 @@ export class FleetCloudService {
                     available: size.available !== false,
                 }))
                 .sort((a, b) => a.priceMonthlyCents - b.priceMonthlyCents),
-            software: FLEET_CLOUD_SOFTWARE_IDS.filter((id) => id !== 'overlay-vpn' || this.overlayVpnInstallUrl() !== null).map(
-                (id) => ({ id, default: id !== 'overlay-vpn' }),
-            ),
+            software: FLEET_CLOUD_SOFTWARE_IDS.filter(
+                (id) => id !== 'overlay-vpn' || this.overlayVpnInstallUrl() !== null,
+            ).map((id) => ({ id, default: id !== 'overlay-vpn' })),
             billsWhileOff: raw.billsWhileOff !== false,
             currency: typeof raw.currency === 'string' && raw.currency ? raw.currency : 'USD',
             account: { label: String(raw.account?.label ?? '') },
@@ -1597,7 +1934,9 @@ export class FleetCloudService {
         if (!missing) return;
         throw fleetMachineError(
             'confirmation_required',
-            missing === 'confirm-destructive' ? `type ${target} to confirm` : 'send confirm: true to confirm',
+            missing === 'confirm-destructive'
+                ? `type ${target} to confirm`
+                : 'send confirm: true to confirm',
             {
                 ...extra,
                 class: missing,
@@ -1633,12 +1972,18 @@ export class FleetCloudService {
     /** The API origin a new machine enrols against (`FLEET_NODE_API_URL`, else `PLATFORM_API_URL`). */
     private enrollApiUrl(): string | null {
         const raw = config.fleetNode.getApiUrl() ?? process.env.PLATFORM_API_URL ?? '';
-        const trimmed = raw.trim().replace(/\/+$/, '').replace(/\/api$/, '');
+        const trimmed = raw
+            .trim()
+            .replace(/\/+$/, '')
+            .replace(/\/api$/, '');
         return /^https?:\/\/[A-Za-z0-9.-]+(?::\d{1,5})?$/.test(trimmed) ? trimmed : null;
     }
 
     private runtimeSpec(): string {
-        return config.fleet.getCloudRuntimeSpec() ?? `ever-works-node@${FLEET_CLOUD_DEFAULT_RUNTIME_VERSION}`;
+        return (
+            config.fleet.getCloudRuntimeSpec() ??
+            `ever-works-node@${FLEET_CLOUD_DEFAULT_RUNTIME_VERSION}`
+        );
     }
 
     /** P3: the operator's overlay-VPN install script (`FLEET_CLOUD_OVERLAY_VPN_INSTALL_URL`), or null. */
@@ -1686,7 +2031,8 @@ export class FleetCloudService {
             }
         }
         const node = nodeId ? await this.nodes.findById(nodeId) : null;
-        if (!node || node.userId !== userId) throw fleetMachineError('not_found', 'no such computer');
+        if (!node || node.userId !== userId)
+            throw fleetMachineError('not_found', 'no such computer');
         return { node, role: 'owner' };
     }
 
@@ -1702,8 +2048,13 @@ export class FleetCloudService {
     }
 
     /** Own cloud computers plus those shared with the caller through an Organization. */
-    private async visibleCloudNodes(userId: string): Promise<Array<{ node: FleetNode; role: FleetViewerRole }>> {
-        const own = (await this.ownCloudNodes(userId)).map((node) => ({ node, role: 'owner' as FleetViewerRole }));
+    private async visibleCloudNodes(
+        userId: string,
+    ): Promise<Array<{ node: FleetNode; role: FleetViewerRole }>> {
+        const own = (await this.ownCloudNodes(userId)).map((node) => ({
+            node,
+            role: 'owner' as FleetViewerRole,
+        }));
         const shared = this.access ? await this.access.listSharedWith(userId).catch(() => []) : [];
         return [
             ...own,

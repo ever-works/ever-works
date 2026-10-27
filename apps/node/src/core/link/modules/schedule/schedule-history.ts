@@ -78,7 +78,10 @@ export class ScheduleHistory {
 	 * Every run, across schedules, that ended at or after `since` (all when
 	 * null) or is still running — oldest end first, at most one page.
 	 */
-	async since(since: string | null, limit = FLEET_SCHEDULE_RUNS_PAGE): Promise<{ runs: FleetScheduleRunReport[]; more: boolean }> {
+	async since(
+		since: string | null,
+		limit = FLEET_SCHEDULE_RUNS_PAGE
+	): Promise<{ runs: FleetScheduleRunReport[]; more: boolean }> {
 		const all: FleetScheduleRunReport[] = [];
 		for (const id of await this.scheduleIds()) {
 			for (const run of await this.list(id)) {

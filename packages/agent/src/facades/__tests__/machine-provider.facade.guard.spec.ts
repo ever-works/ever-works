@@ -11,7 +11,14 @@ import { join, resolve } from 'path';
  */
 
 const ROOT = resolve(__dirname, '../../../../..');
-const TREES = ['packages/agent/src', 'apps/api/src', 'apps/web/src', 'apps/mcp/src', 'apps/cli/src', 'packages/contracts/src'];
+const TREES = [
+    'packages/agent/src',
+    'apps/api/src',
+    'apps/web/src',
+    'apps/mcp/src',
+    'apps/cli/src',
+    'packages/contracts/src',
+];
 const PROVIDER = /digital\s*ocean/i;
 
 function walk(dir: string, out: string[]): void {
@@ -22,11 +29,22 @@ function walk(dir: string, out: string[]): void {
         return;
     }
     for (const entry of entries) {
-        if (entry === 'node_modules' || entry === 'dist' || entry === '__tests__' || entry === '.next') continue;
+        if (
+            entry === 'node_modules' ||
+            entry === 'dist' ||
+            entry === '__tests__' ||
+            entry === '.next'
+        )
+            continue;
         const path = join(dir, entry);
         const stat = statSync(path);
         if (stat.isDirectory()) walk(path, out);
-        else if (/\.(ts|tsx)$/.test(entry) && !/\.spec\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) out.push(path);
+        else if (
+            /\.(ts|tsx)$/.test(entry) &&
+            !/\.spec\.tsx?$/.test(entry) &&
+            !/\.test\.tsx?$/.test(entry)
+        )
+            out.push(path);
     }
 }
 

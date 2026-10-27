@@ -47,12 +47,19 @@ function run(over: Partial<FleetCommandRunView> = {}): FleetCommandRunView {
 
 describe('resolveNodeTokens', () => {
     it('resolves names case-insensitively and ids, keeping the order', () => {
-        expect(resolveNodeTokens('Build-02, build-01', NODES).ids).toEqual([NODES[1].id, NODES[0].id]);
+        expect(resolveNodeTokens('Build-02, build-01', NODES).ids).toEqual([
+            NODES[1].id,
+            NODES[0].id,
+        ]);
         expect(resolveNodeTokens(NODES[0].id, NODES).ids).toEqual([NODES[0].id]);
     });
 
     it('reports unknown and ambiguous names', () => {
-        expect(resolveNodeTokens('nope,twin', NODES)).toEqual({ ids: [], unknown: ['nope'], ambiguous: ['twin'] });
+        expect(resolveNodeTokens('nope,twin', NODES)).toEqual({
+            ids: [],
+            unknown: ['nope'],
+            ambiguous: ['twin'],
+        });
     });
 });
 
@@ -61,14 +68,22 @@ describe('takeNewLines', () => {
         const state = newRunPrintState();
         expect(takeNewLines(run({ outputHead: 'a\nb' }), state)).toEqual(['a']);
         expect(takeNewLines(run({ outputHead: 'a\nbc\nd' }), state)).toEqual(['bc']);
-        expect(takeNewLines(run({ status: 'done', exitCode: 0, outputHead: 'a\nbc\nde\n' }), state)).toEqual(['de']);
+        expect(
+            takeNewLines(run({ status: 'done', exitCode: 0, outputHead: 'a\nbc\nde\n' }), state),
+        ).toEqual(['de']);
         expect(takeNewLines(run({ status: 'done', outputHead: 'a\nbc\nde\n' }), state)).toEqual([]);
     });
 
     it('prints the marker and the tail of a truncated run once', () => {
         const state = newRunPrintState();
         const lines = takeNewLines(
-            run({ status: 'done', exitCode: 0, outputHead: 'head\n', outputTail: 'tail1\ntail2\n', truncated: true }),
+            run({
+                status: 'done',
+                exitCode: 0,
+                outputHead: 'head\n',
+                outputTail: 'tail1\ntail2\n',
+                truncated: true,
+            }),
             state,
         );
         expect(lines).toEqual(['head', '… first 64 KiB and last 64 KiB shown …', 'tail1', 'tail2']);
@@ -77,21 +92,40 @@ describe('takeNewLines', () => {
 
 describe('end words and exit codes', () => {
     it('says what the hub says', () => {
-        expect(describeRunEnd(run({ status: 'done', exitCode: 0, durationMs: 800 }))).toBe('✓ 0.8 s');
-        expect(describeRunEnd(run({ status: 'failed', exitCode: 128, durationMs: 1200 }))).toBe('Exit 128 · 1.2 s');
+        expect(describeRunEnd(run({ status: 'done', exitCode: 0, durationMs: 800 }))).toBe(
+            '✓ 0.8 s',
+        );
+        expect(describeRunEnd(run({ status: 'failed', exitCode: 128, durationMs: 1200 }))).toBe(
+            'Exit 128 · 1.2 s',
+        );
         expect(
             describeRunEnd(
-                run({ status: 'failed', error: { code: 'consent_missing', hint: 'start the node with --manage on build-01' } }),
+                run({
+                    status: 'failed',
+                    error: {
+                        code: 'consent_missing',
+                        hint: 'start the node with --manage on build-01',
+                    },
+                }),
             ),
         ).toBe('consent_missing: start the node with --manage on build-01');
-        expect(describeSummary({ total: 2, running: 0, succeeded: 1, failed: 1, timedOut: 0, longestMs: 1200 })).toBe(
-            '1 of 2 failed · 1.2 s',
-        );
+        expect(
+            describeSummary({
+                total: 2,
+                running: 0,
+                succeeded: 1,
+                failed: 1,
+                timedOut: 0,
+                longestMs: 1200,
+            }),
+        ).toBe('1 of 2 failed · 1.2 s');
     });
 
     it('exits 0, 1 or 124', () => {
         expect(fleetCommandCliExitCode([run({ status: 'done' })])).toBe(0);
-        expect(fleetCommandCliExitCode([run({ status: 'done' }), run({ status: 'failed' })])).toBe(1);
+        expect(fleetCommandCliExitCode([run({ status: 'done' }), run({ status: 'failed' })])).toBe(
+            1,
+        );
         expect(fleetCommandCliExitCode([run({ status: 'timeout' })])).toBe(124);
     });
 });

@@ -84,8 +84,14 @@ describe('idle policy (FR-25)', () => {
 		expect(clampFleetCloudIdleHours(500)).toBe(72);
 		expect(clampFleetCloudIdleHours('6')).toBe(6);
 		expect(clampFleetCloudIdleHours('x')).toBe(3);
-		expect(normalizeFleetCloudIdlePolicy({ mode: 'power-off', afterHours: 2 })).toEqual({ mode: 'power-off', afterHours: 2 });
-		expect(normalizeFleetCloudIdlePolicy({ mode: 'destroy', afterHours: 2 })).toEqual({ mode: 'tell-me', afterHours: 2 });
+		expect(normalizeFleetCloudIdlePolicy({ mode: 'power-off', afterHours: 2 })).toEqual({
+			mode: 'power-off',
+			afterHours: 2
+		});
+		expect(normalizeFleetCloudIdlePolicy({ mode: 'destroy', afterHours: 2 })).toEqual({
+			mode: 'tell-me',
+			afterHours: 2
+		});
 		expect(normalizeFleetCloudIdlePolicy(null)).toEqual({ mode: 'tell-me', afterHours: 3 });
 	});
 });
@@ -171,7 +177,9 @@ describe('cost model (FR-21, FR-22)', () => {
 
 	it('projects a running machine to the monthly price, and a powered-off free machine to what it already cost', () => {
 		const now = Date.parse('2026-10-18T07:00:00.000Z');
-		expect(fleetCloudCost(meta({ machineCreatedAt: '2026-10-01T00:00:00.000Z' }), now).projectedMonthCents).toBe(2400);
+		expect(fleetCloudCost(meta({ machineCreatedAt: '2026-10-01T00:00:00.000Z' }), now).projectedMonthCents).toBe(
+			2400
+		);
 		const off = meta({
 			billsWhileOff: false,
 			powerState: 'off',
@@ -207,9 +215,9 @@ describe('Remove from Fleet (CONTRACTS R-36, FR-19)', () => {
 		expect(fleetCloudRemovable({ hasMachine: true, meta: { powerState: 'gone', phase: 'online' } })).toBe(true);
 		expect(fleetCloudRemovable({ hasMachine: false, meta: { powerState: 'unknown', phase: 'failed' } })).toBe(true);
 		// Still asking the provider: a machine may be appearing — not removable yet.
-		expect(fleetCloudRemovable({ hasMachine: false, meta: { powerState: 'unknown', phase: 'asking-provider' } })).toBe(
-			false
-		);
+		expect(
+			fleetCloudRemovable({ hasMachine: false, meta: { powerState: 'unknown', phase: 'asking-provider' } })
+		).toBe(false);
 	});
 });
 
@@ -254,7 +262,11 @@ describe('confirmation copy (CONTRACTS §2.2, spec §0, §5.4)', () => {
 				costSoFarCents: 284,
 				createdAt: '2026-10-15T00:00:00.000Z'
 			})
-		).toBe('Destroy nyc-ops? It has cost $2.84 since 2026-10-15. The machine and its disk are deleted at Provider; this cannot be undone.');
-		expect(fleetCloudPowerOffSummary('nyc-ops', 'Provider', true)).toContain('still bills this size while it is off');
+		).toBe(
+			'Destroy nyc-ops? It has cost $2.84 since 2026-10-15. The machine and its disk are deleted at Provider; this cannot be undone.'
+		);
+		expect(fleetCloudPowerOffSummary('nyc-ops', 'Provider', true)).toContain(
+			'still bills this size while it is off'
+		);
 	});
 });

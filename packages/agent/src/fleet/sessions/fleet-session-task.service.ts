@@ -25,7 +25,9 @@ export interface FleetSessionTaskAdmission {
 }
 
 /** The Agent a hand-off is judged for. */
-export type FleetSessionTaskAgent = Pick<Agent, 'id' | 'name' | 'organizationId'> & { userId?: string };
+export type FleetSessionTaskAgent = Pick<Agent, 'id' | 'name' | 'organizationId'> & {
+    userId?: string;
+};
 
 /**
  * Tasks on computers (FL-15 P1) — the start-time rules of a Task hand-off and
@@ -67,13 +69,18 @@ export class FleetSessionTaskService {
         node: Pick<FleetNode, 'id' | 'name' | 'effectiveMaxConcurrentJobs'>;
         taskId: string;
     }): Promise<FleetSessionTaskAdmission> {
-        const task = await this.findTask(input.userId, input.taskId, input.agent.organizationId ?? null);
+        const task = await this.findTask(
+            input.userId,
+            input.taskId,
+            input.agent.organizationId ?? null,
+        );
         if (!task) throw fleetSessionError('not_found', 'no such Task', { field: 'taskId' });
 
         if (this.runs) {
             const inflight = await this.runs.findInFlightForTaskAgent(task.id, input.agent.id);
             if (inflight) {
-                const sessionId = (inflight as { fleetSessionId?: string | null }).fleetSessionId ?? null;
+                const sessionId =
+                    (inflight as { fleetSessionId?: string | null }).fleetSessionId ?? null;
                 throw fleetSessionError(
                     'busy',
                     `${input.agent.name} is already working on ${task.slug}`,
@@ -103,16 +110,24 @@ export class FleetSessionTaskService {
         });
         if (!verdict.selectable) {
             if (verdict.reason === 'not-pinned') {
-                throw fleetSessionError('invalid', verdict.hint ?? 'the Agent is pinned to another computer', {
-                    field: 'nodeId',
-                    reason: 'not-pinned',
-                    pinnedNodeId,
-                });
+                throw fleetSessionError(
+                    'invalid',
+                    verdict.hint ?? 'the Agent is pinned to another computer',
+                    {
+                        field: 'nodeId',
+                        reason: 'not-pinned',
+                        pinnedNodeId,
+                    },
+                );
             }
-            throw fleetSessionError('limit_exceeded', verdict.hint ?? 'no free agent slot on this computer', {
-                reason: verdict.reason,
-                slots: input.node.effectiveMaxConcurrentJobs ?? null,
-            });
+            throw fleetSessionError(
+                'limit_exceeded',
+                verdict.hint ?? 'no free agent slot on this computer',
+                {
+                    reason: verdict.reason,
+                    slots: input.node.effectiveMaxConcurrentJobs ?? null,
+                },
+            );
         }
 
         const branch =
@@ -177,7 +192,9 @@ export class FleetSessionTaskService {
         if (ids.length === 0 || !this.runs) return out;
         try {
             const runs = await this.runs.findByIds(ids);
-            const taskIds = [...new Set(runs.map((run) => run.taskId).filter((id): id is string => !!id))];
+            const taskIds = [
+                ...new Set(runs.map((run) => run.taskId).filter((id): id is string => !!id)),
+            ];
             if (taskIds.length === 0) return out;
             const tasks = await this.tasks.find({
                 select: { id: true, slug: true, title: true },
@@ -197,7 +214,11 @@ export class FleetSessionTaskService {
     }
 
     /** The person's own Task, or one of their Agent's Organization. */
-    private async findTask(userId: string, taskId: string, organizationId: string | null): Promise<Task | null> {
+    private async findTask(
+        userId: string,
+        taskId: string,
+        organizationId: string | null,
+    ): Promise<Task | null> {
         if (typeof taskId !== 'string' || !UUID.test(taskId)) {
             throw fleetSessionError('invalid', 'taskId', { field: 'taskId' });
         }

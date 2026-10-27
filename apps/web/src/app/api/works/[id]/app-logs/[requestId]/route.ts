@@ -1,5 +1,10 @@
 import { bffProxy } from '@/lib/api/bff-proxy';
-import { appRuntimeApiUrl, forwardAppRuntimeCall, invalidIdResponse, isUuid } from '@/lib/api/app-runtime-bff';
+import {
+    appRuntimeApiUrl,
+    forwardAppRuntimeCall,
+    invalidIdResponse,
+    isUuid,
+} from '@/lib/api/app-runtime-bff';
 
 type RouteContext = { params: Promise<{ id: string; requestId: string }> };
 
@@ -12,5 +17,8 @@ type RouteContext = { params: Promise<{ id: string; requestId: string }> };
 export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id, requestId } = await ctx.params;
     if (!isUuid(id) || !isUuid(requestId)) return invalidIdResponse();
-    return forwardAppRuntimeCall(appRuntimeApiUrl(id, `/app-logs/${requestId}`), { method: 'GET', headers });
+    return forwardAppRuntimeCall(appRuntimeApiUrl(id, `/app-logs/${requestId}`), {
+        method: 'GET',
+        headers,
+    });
 });

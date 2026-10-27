@@ -33,7 +33,11 @@ import {
     type CheckoutActionResult,
 } from '@/app/actions/fleet-checkouts';
 import { CopyCommand } from '../link/CopyCommand';
-import { DeleteCheckoutDialog, readDeletePreview, type CheckoutDeletePreview } from './DeleteCheckoutDialog';
+import {
+    DeleteCheckoutDialog,
+    readDeletePreview,
+    type CheckoutDeletePreview,
+} from './DeleteCheckoutDialog';
 import { CleanUpButton } from '../sessions/CleanUpButton';
 import { canCleanUp } from '../sessions/session-git.shared';
 import { GitLine } from './GitLine';
@@ -99,7 +103,9 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
     const [rows, setRows] = useState<FleetCheckoutView[]>(initial.rows);
     const [bin, setBin] = useState<number>(initial.bin);
     const [meta, setMeta] = useState<FleetNodeCheckoutsMeta | null>(initial.meta ?? null);
-    const [stale, setStale] = useState<{ code: string; hint: string } | null>(initial.stale ?? null);
+    const [stale, setStale] = useState<{ code: string; hint: string } | null>(
+        initial.stale ?? null,
+    );
     const [error, setError] = useState<{ code: string | null; hint: string | null } | null>(
         initial.error ?? null,
     );
@@ -107,7 +113,10 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
     const [binRows, setBinRows] = useState<FleetCheckoutView[] | null>(null);
     const [pending, setPending] = useState<Set<string>>(new Set());
     const [notices, setNotices] = useState<Record<string, RowNotice>>({});
-    const [confirming, setConfirming] = useState<{ id: string; action: 'archive' | 'pull' | 'push' } | null>(null);
+    const [confirming, setConfirming] = useState<{
+        id: string;
+        action: 'archive' | 'pull' | 'push';
+    } | null>(null);
     const [deleting, setDeleting] = useState<{
         id: string;
         mode: 'delete' | 'forget';
@@ -129,7 +138,9 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
     const describeRefusal = useCallback(
         (result: CheckoutActionResult<unknown>): string => {
             if (result.success) return '';
-            const title = result.code ? t(`errorTitles.${errorTitleKey(result.code)}`) : t('errorTitles.internal');
+            const title = result.code
+                ? t(`errorTitles.${errorTitleKey(result.code)}`)
+                : t('errorTitles.internal');
             return result.hint ? `${title} — ${result.hint}` : title;
         },
         [t],
@@ -211,22 +222,47 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                 }
                 return;
             }
-            if (action === 'refresh' || action === 'fetch' || action === 'pull' || action === 'push') {
+            if (
+                action === 'refresh' ||
+                action === 'fetch' ||
+                action === 'pull' ||
+                action === 'push'
+            ) {
                 const result =
                     action === 'refresh'
                         ? await refreshCheckoutAction(row.id)
-                        : await syncCheckoutAction(row.id, action, action === 'fetch' ? undefined : true);
+                        : await syncCheckoutAction(
+                              row.id,
+                              action,
+                              action === 'fetch' ? undefined : true,
+                          );
                 setConfirming(null);
                 if (result.success) {
                     replaceRow(result.data.checkout);
                     const last = result.data.checkout.lastCommand;
                     const text = result.data.operationId
                         ? t('notices.running')
-                        : action !== 'refresh' && last && last.exitCode !== null && last.exitCode !== 0
-                          ? t('notices.syncFailed', { op: action, code: last.exitCode, line: last.stderrHead ?? '' })
-                          : t(`notices.${action === 'refresh' ? 'refreshed' : action === 'fetch' ? 'fetched' : action === 'pull' ? 'pulled' : 'pushed'}`);
-                    const tone = action !== 'refresh' && last && last.exitCode !== null && last.exitCode !== 0;
-                    setNotices((current) => ({ ...current, [row.id]: { tone: tone ? 'error' : 'ok', text } }));
+                        : action !== 'refresh' &&
+                            last &&
+                            last.exitCode !== null &&
+                            last.exitCode !== 0
+                          ? t('notices.syncFailed', {
+                                op: action,
+                                code: last.exitCode,
+                                line: last.stderrHead ?? '',
+                            })
+                          : t(
+                                `notices.${action === 'refresh' ? 'refreshed' : action === 'fetch' ? 'fetched' : action === 'pull' ? 'pulled' : 'pushed'}`,
+                            );
+                    const tone =
+                        action !== 'refresh' &&
+                        last &&
+                        last.exitCode !== null &&
+                        last.exitCode !== 0;
+                    setNotices((current) => ({
+                        ...current,
+                        [row.id]: { tone: tone ? 'error' : 'ok', text },
+                    }));
                 } else {
                     setNotices((current) => ({
                         ...current,
@@ -249,7 +285,9 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
             } else if (action === 'restore') {
                 const result = await restoreCheckoutAction(row.id);
                 if (result.success) {
-                    setBinRows((current) => current?.filter((entry) => entry.id !== row.id) ?? null);
+                    setBinRows(
+                        (current) => current?.filter((entry) => entry.id !== row.id) ?? null,
+                    );
                     setBin((count) => Math.max(0, count - 1));
                     replaceRow(result.data);
                 } else {
@@ -271,7 +309,9 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                 ? [single]
                 : nodes.filter(
                       (node) =>
-                          isComputerOnline(node) && node.consents?.manage === true && mayManageCheckouts(node),
+                          isComputerOnline(node) &&
+                          node.consents?.manage === true &&
+                          mayManageCheckouts(node),
                   );
             for (const node of targets.slice(0, 20)) {
                 const result = await listNodeCheckoutsAction(node.id, { rescan: true });
@@ -314,7 +354,9 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
     return (
         <section className="space-y-4" data-testid={`fleet-checkouts-${mode}`}>
             <header className="flex flex-wrap items-center gap-2">
-                <h2 className="mr-auto text-sm font-semibold">{t(mode === 'hub' ? 'hub.title' : 'tab.title')}</h2>
+                <h2 className="mr-auto text-sm font-semibold">
+                    {t(mode === 'hub' ? 'hub.title' : 'tab.title')}
+                </h2>
                 {mode === 'hub' && nodes.length > 1 ? (
                     <label className="flex items-center gap-1 text-xs">
                         <span>{t('hub.computerFilter')}</span>
@@ -342,14 +384,20 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                     data-testid="fleet-checkouts-scan"
                 >
                     <ScanSearch className="mr-1 h-4 w-4" aria-hidden />
-                    {scanning ? t('actions.scanning') : t(mode === 'hub' ? 'actions.scanAll' : 'actions.scan')}
+                    {scanning
+                        ? t('actions.scanning')
+                        : t(mode === 'hub' ? 'actions.scanAll' : 'actions.scan')}
                 </Button>
                 <Button
                     variant="primary"
                     size="sm"
                     onClick={() => setCreating((open) => !open)}
                     aria-expanded={creating}
-                    disabled={!nodes.some((node) => isComputerOnline(node) && node.consents?.manage === true)}
+                    disabled={
+                        !nodes.some(
+                            (node) => isComputerOnline(node) && node.consents?.manage === true,
+                        )
+                    }
                     title={t('disabled.scan')}
                     data-testid="fleet-checkouts-new"
                 >
@@ -378,8 +426,14 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
             ) : null}
 
             {error ? (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400" data-testid="fleet-checkouts-error">
-                    {error.code ? t(`errorTitles.${errorTitleKey(error.code)}`) : t('errorTitles.internal')}
+                <p
+                    role="alert"
+                    className="text-sm text-red-600 dark:text-red-400"
+                    data-testid="fleet-checkouts-error"
+                >
+                    {error.code
+                        ? t(`errorTitles.${errorTitleKey(error.code)}`)
+                        : t('errorTitles.internal')}
                     {error.hint ? ` — ${error.hint}` : ''}
                 </p>
             ) : null}
@@ -390,21 +444,33 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                     data-testid="fleet-checkouts-consent-banner"
                 >
                     <p>{t('states.consentMissing', { name: single.name })}</p>
-                    <CopyCommand command="ever-works-node start --manage" testId="fleet-checkouts-consent-command" />
+                    <CopyCommand
+                        command="ever-works-node start --manage"
+                        testId="fleet-checkouts-consent-command"
+                    />
                 </div>
             ) : null}
 
             {single && stale && stale.code === 'unreachable' ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-checkouts-stale">
+                <p
+                    className="text-sm text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-checkouts-stale"
+                >
                     {t('states.offline', {
                         name: single.name,
                         count: rows.length,
-                        age: formatAge(t, now === null ? null : ageParts(single.lastHeartbeatAt, now)),
+                        age: formatAge(
+                            t,
+                            now === null ? null : ageParts(single.lastHeartbeatAt, now),
+                        ),
                     })}
                 </p>
             ) : null}
             {single && stale && stale.code !== 'unreachable' ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-checkouts-stale">
+                <p
+                    className="text-sm text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-checkouts-stale"
+                >
                     {t('states.lastKnown', { hint: stale.hint })}
                 </p>
             ) : null}
@@ -441,7 +507,10 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                                 </span>
                             ) : null}
                             <span className="ml-auto text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('group.count', { count: group.rows.length, computers: group.computers })}
+                                {t('group.count', {
+                                    count: group.rows.length,
+                                    computers: group.computers,
+                                })}
                             </span>
                         </h3>
                         <ul className="divide-y divide-border rounded-lg border border-border dark:divide-border-dark dark:border-border-dark">
@@ -453,12 +522,19 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                                     showComputer={mode === 'hub'}
                                     pending={pending.has(row.id)}
                                     notice={notices[row.id] ?? null}
-                                    confirming={confirming?.id === row.id ? confirming.action : null}
+                                    confirming={
+                                        confirming?.id === row.id ? confirming.action : null
+                                    }
                                     now={now}
                                     onAction={(action) => {
                                         if (
-                                            (action === 'archive' || action === 'pull' || action === 'push') &&
-                                            !(confirming?.id === row.id && confirming.action === action)
+                                            (action === 'archive' ||
+                                                action === 'pull' ||
+                                                action === 'push') &&
+                                            !(
+                                                confirming?.id === row.id &&
+                                                confirming.action === action
+                                            )
                                         ) {
                                             setConfirming({ id: row.id, action });
                                             return;
@@ -469,7 +545,9 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                                     deleting={deleting?.id === row.id ? deleting : null}
                                     onDeleted={(result) => {
                                         setDeleting(null);
-                                        setRows((current) => current.filter((entry) => entry.id !== row.id));
+                                        setRows((current) =>
+                                            current.filter((entry) => entry.id !== row.id),
+                                        );
                                         if (!result.forgotten) {
                                             setBin((count) => count + 1);
                                             setBinRows(null);
@@ -490,7 +568,10 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                             {t('states.offline', {
                                 name: node.name,
                                 count: rows.filter((row) => row.nodeId === node.id).length,
-                                age: formatAge(t, now === null ? null : ageParts(node.lastHeartbeatAt, now)),
+                                age: formatAge(
+                                    t,
+                                    now === null ? null : ageParts(node.lastHeartbeatAt, now),
+                                ),
                             })}
                         </li>
                     ))}
@@ -523,11 +604,22 @@ export function CheckoutsPanel({ mode, nodes, initial }: CheckoutsPanelProps) {
                                         setDeleting(null);
                                         setBinRows(
                                             (current) =>
-                                                current?.map((entry) =>
-                                                    entry.id === row.id && result.checkout ? result.checkout : entry,
-                                                ).filter((entry) => !(result.forgotten && entry.id === row.id)) ?? null,
+                                                current
+                                                    ?.map((entry) =>
+                                                        entry.id === row.id && result.checkout
+                                                            ? result.checkout
+                                                            : entry,
+                                                    )
+                                                    .filter(
+                                                        (entry) =>
+                                                            !(
+                                                                result.forgotten &&
+                                                                entry.id === row.id
+                                                            ),
+                                                    ) ?? null,
                                         );
-                                        if (result.forgotten) setBin((count) => Math.max(0, count - 1));
+                                        if (result.forgotten)
+                                            setBin((count) => Math.max(0, count - 1));
                                     }}
                                     onCancelDelete={() => setDeleting(null)}
                                 />
@@ -622,7 +714,10 @@ function CodeFolders({
                 <span className="ml-auto text-xs text-text-muted dark:text-text-muted-dark">
                     {meta?.scannedAt
                         ? t('lastScan', {
-                              age: formatAge(tAge, now === null ? null : ageParts(meta.scannedAt, now)),
+                              age: formatAge(
+                                  tAge,
+                                  now === null ? null : ageParts(meta.scannedAt, now),
+                              ),
                           })
                         : t('neverScanned')}
                     {' · '}
@@ -639,7 +734,9 @@ function CodeFolders({
                 </ul>
             ) : (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {folders === null ? t('unknown', { name: node.name }) : t('none', { name: node.name })}
+                    {folders === null
+                        ? t('unknown', { name: node.name })
+                        : t('none', { name: node.name })}
                 </p>
             )}
             {meta?.truncated ? (
@@ -648,7 +745,10 @@ function CodeFolders({
                 </p>
             ) : null}
             <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('setOnMachine')}</p>
-            <CopyCommand command={CODE_FOLDER_COMMAND} testId="fleet-checkouts-code-folder-command" />
+            <CopyCommand
+                command={CODE_FOLDER_COMMAND}
+                testId="fleet-checkouts-code-folder-command"
+            />
         </div>
     );
 }
@@ -699,14 +799,16 @@ function CheckoutRow({
         if (row.busy === 'lease') return t('row.taskRunning');
         if (row.busy === 'session') return t('row.sessionRunning');
         if (!online) return t('row.lastKnown', { age: ago(row.lastSeenAt) });
-        if (row.createdBy === 'discovery')
-            return t('row.found', { age: ago(row.createdAt) });
+        if (row.createdBy === 'discovery') return t('row.found', { age: ago(row.createdAt) });
         return t('row.seen', { age: ago(row.lastSeenAt) });
     })();
 
     return (
         <li
-            className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm', dimmed && 'opacity-60')}
+            className={cn(
+                'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm',
+                dimmed && 'opacity-60',
+            )}
             data-testid="fleet-checkout-row"
             data-state={row.state}
             data-kind={row.kind}
@@ -715,7 +817,10 @@ function CheckoutRow({
                 <span className="inline-flex min-w-[6rem] items-center gap-1 text-xs">
                     <span
                         aria-hidden
-                        className={cn('h-2 w-2 rounded-full', online ? 'bg-emerald-500' : 'bg-gray-400')}
+                        className={cn(
+                            'h-2 w-2 rounded-full',
+                            online ? 'bg-emerald-500' : 'bg-gray-400',
+                        )}
                     />
                     {node?.name ?? t('row.unknownComputer')}
                 </span>
@@ -725,15 +830,23 @@ function CheckoutRow({
             </span>
             <GitLine line={row.gitLine} branch={row.branch} />
             <span className="text-xs text-text-muted dark:text-text-muted-dark">{activity}</span>
-            {size ? <span className="text-xs text-text-muted dark:text-text-muted-dark">{size}</span> : null}
+            {size ? (
+                <span className="text-xs text-text-muted dark:text-text-muted-dark">{size}</span>
+            ) : null}
             {row.kind === 'worktree' && row.createdBy === 'task' ? (
-                <span className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-800">{t('row.taskBadge')}</span>
+                <span className="rounded bg-gray-100 px-1 text-xs dark:bg-gray-800">
+                    {t('row.taskBadge')}
+                </span>
             ) : null}
             {row.isolation === 'container' ? (
-                <span className="rounded bg-blue-100 px-1 text-xs dark:bg-blue-900">{t('row.containerBadge')}</span>
+                <span className="rounded bg-blue-100 px-1 text-xs dark:bg-blue-900">
+                    {t('row.containerBadge')}
+                </span>
             ) : null}
             {row.remoteHadCredential ? (
-                <span className="text-xs text-amber-600 dark:text-amber-400">{t('row.credentialStripped')}</span>
+                <span className="text-xs text-amber-600 dark:text-amber-400">
+                    {t('row.credentialStripped')}
+                </span>
             ) : null}
             {row.reaperNote ? (
                 <span className="text-xs text-text-muted dark:text-text-muted-dark">
@@ -747,7 +860,11 @@ function CheckoutRow({
                 pr: row.gitLine?.pr,
                 sessionLive: row.busy === 'session',
             }) ? (
-                <CleanUpButton checkoutId={row.id} branch={row.branch} nodeName={node?.name ?? ''} />
+                <CleanUpButton
+                    checkoutId={row.id}
+                    branch={row.branch}
+                    nodeName={node?.name ?? ''}
+                />
             ) : null}
             <span className="ml-auto flex items-center gap-1">
                 {confirming ? (
@@ -790,7 +907,11 @@ function CheckoutRow({
                                 size="sm"
                                 variant={action === 'fetch' ? 'secondary' : 'ghost'}
                                 disabled={pending || !state.enabled}
-                                title={state.enabled ? undefined : t(`disabled.${state.reason}`, { name: node?.name ?? '' })}
+                                title={
+                                    state.enabled
+                                        ? undefined
+                                        : t(`disabled.${state.reason}`, { name: node?.name ?? '' })
+                                }
                                 onClick={() => onAction(action)}
                                 data-testid={`fleet-checkout-${action}`}
                             >
@@ -815,7 +936,9 @@ function CheckoutRow({
                     role={notice.tone === 'error' ? 'alert' : 'status'}
                     className={cn(
                         'basis-full text-xs',
-                        notice.tone === 'error' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600',
+                        notice.tone === 'error'
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-emerald-600',
                     )}
                 >
                     {notice.text}

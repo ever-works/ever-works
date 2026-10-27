@@ -54,7 +54,12 @@ describe('initialComputerId (FL-15 FR-3)', () => {
                 computer({ nodeId: 'b', pinned: true, selectable: true }),
             ]),
         ).toBe('b');
-        expect(initialComputerId([computer({ nodeId: 'a', selectable: false }), computer({ nodeId: 'c' })])).toBe('c');
+        expect(
+            initialComputerId([
+                computer({ nodeId: 'a', selectable: false }),
+                computer({ nodeId: 'c' }),
+            ]),
+        ).toBe('c');
         expect(initialComputerId([computer({ selectable: false })])).toBeNull();
     });
 
@@ -66,13 +71,23 @@ describe('initialComputerId (FL-15 FR-3)', () => {
 
 describe('the checkout choice (FR-5, U7)', () => {
     it('defaults to a new worktree of the matching checkout', () => {
-        expect(initialCheckoutChoice(step(), task)).toEqual({ mode: 'worktree', parentCheckoutId: 'c-1' });
+        expect(initialCheckoutChoice(step(), task)).toEqual({
+            mode: 'worktree',
+            parentCheckoutId: 'c-1',
+        });
     });
 
     it('reuses a checkout already on the Task branch', () => {
         const withTaskBranch = step({
             matching: [
-                { checkoutId: 'c-1', path: '/code/api', kind: 'clone', branch: 'main', repository: 'acme/api', matchesTask: true },
+                {
+                    checkoutId: 'c-1',
+                    path: '/code/api',
+                    kind: 'clone',
+                    branch: 'main',
+                    repository: 'acme/api',
+                    matchesTask: true,
+                },
                 {
                     checkoutId: 'c-2',
                     path: '/code/api-task',
@@ -83,22 +98,33 @@ describe('the checkout choice (FR-5, U7)', () => {
                 },
             ],
         });
-        expect(initialCheckoutChoice(withTaskBranch, task)).toEqual({ mode: 'existing', checkoutId: 'c-2' });
+        expect(initialCheckoutChoice(withTaskBranch, task)).toEqual({
+            mode: 'existing',
+            checkoutId: 'c-2',
+        });
     });
 
     it('falls back to a fresh clone, then the home folder', () => {
-        expect(initialCheckoutChoice(step({ matching: [], defaultMode: 'clone' }), task)).toEqual({ mode: 'clone' });
+        expect(initialCheckoutChoice(step({ matching: [], defaultMode: 'clone' }), task)).toEqual({
+            mode: 'clone',
+        });
         expect(initialCheckoutChoice(undefined, { repoUrl: null })).toEqual({ mode: 'none' });
     });
 
     it('drops a choice the new computer does not offer', () => {
-        expect(choiceStillOffered({ mode: 'worktree', parentCheckoutId: 'c-1' }, step(), task)).toBe(true);
-        expect(choiceStillOffered({ mode: 'worktree', parentCheckoutId: 'c-9' }, step(), task)).toBe(false);
+        expect(
+            choiceStillOffered({ mode: 'worktree', parentCheckoutId: 'c-1' }, step(), task),
+        ).toBe(true);
+        expect(
+            choiceStillOffered({ mode: 'worktree', parentCheckoutId: 'c-9' }, step(), task),
+        ).toBe(false);
         expect(choiceStillOffered({ mode: 'clone' }, step(), { repoUrl: null })).toBe(false);
     });
 
     it('asks FL-14 for a worktree or a clone on the Task branch, and nothing otherwise', () => {
-        expect(checkoutCreateRequest('n-1', { mode: 'worktree', parentCheckoutId: 'c-1' }, task)).toEqual({
+        expect(
+            checkoutCreateRequest('n-1', { mode: 'worktree', parentCheckoutId: 'c-1' }, task),
+        ).toEqual({
             nodeId: 'n-1',
             source: { kind: 'worktree', parentCheckoutId: 'c-1' },
             branch: 'task/login-1',
@@ -108,7 +134,9 @@ describe('the checkout choice (FR-5, U7)', () => {
             source: { kind: 'clone', repoUrl: 'https://github.com/acme/api.git' },
             branch: 'task/login-1',
         });
-        expect(checkoutCreateRequest('n-1', { mode: 'existing', checkoutId: 'c-1' }, task)).toBeNull();
+        expect(
+            checkoutCreateRequest('n-1', { mode: 'existing', checkoutId: 'c-1' }, task),
+        ).toBeNull();
         expect(checkoutCreateRequest('n-1', { mode: 'none' }, task)).toBeNull();
     });
 });
@@ -132,8 +160,12 @@ describe('handoffStartRequest (FR-6)', () => {
             checkoutId: 'c-2',
         });
         expect(
-            handoffStartRequest({ taskId: 't-1', agent: { id: 'a-1', cli: 'claude-code' }, firstMessage: 'x', checkout: null })
-                .cwd,
+            handoffStartRequest({
+                taskId: 't-1',
+                agent: { id: 'a-1', cli: 'claude-code' },
+                firstMessage: 'x',
+                checkout: null,
+            }).cwd,
         ).toBe('~');
     });
 });

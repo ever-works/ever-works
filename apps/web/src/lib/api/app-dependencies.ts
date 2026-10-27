@@ -43,7 +43,9 @@ export const appDependenciesAPI = {
             endpoint: `${base(workId)}/${encodeURIComponent(kind)}`,
             data: {
                 ...(input.providerId ? { providerId: input.providerId } : {}),
-                ...(input.config && Object.keys(input.config).length > 0 ? { config: input.config } : {}),
+                ...(input.config && Object.keys(input.config).length > 0
+                    ? { config: input.config }
+                    : {}),
                 ...(typeof input.sizeGiB === 'number' ? { sizeGiB: input.sizeGiB } : {}),
             },
             method: 'PUT',

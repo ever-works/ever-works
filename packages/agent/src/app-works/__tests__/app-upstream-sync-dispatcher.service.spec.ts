@@ -769,10 +769,16 @@ describe('AppUpstreamSyncDispatcherService', () => {
 
         it('checks on view only when the last check is older than 60 s', async () => {
             const fresh = build({
-                row: makeRow({ syncPullRequestNumber: 7, syncPullRequestCheckedAt: new Date(NOW - 30_000) }),
+                row: makeRow({
+                    syncPullRequestNumber: 7,
+                    syncPullRequestCheckedAt: new Date(NOW - 30_000),
+                }),
             });
             const stale = build({
-                row: makeRow({ syncPullRequestNumber: 7, syncPullRequestCheckedAt: new Date(NOW - 61_000) }),
+                row: makeRow({
+                    syncPullRequestNumber: 7,
+                    syncPullRequestCheckedAt: new Date(NOW - 61_000),
+                }),
             });
             const none = build({ row: makeRow({ syncPullRequestNumber: null }) });
 

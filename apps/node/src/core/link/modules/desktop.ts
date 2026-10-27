@@ -23,7 +23,9 @@ import type { NodeChannelContext, NodeChannelOpenResult, NodeModule } from './re
  * `open` runs; a view exists only under `--attend` anyway.
  */
 
-export type DesktopSourceOpener = (context: NodeChannelContext) => NodeChannelOpenResult | Promise<NodeChannelOpenResult>;
+export type DesktopSourceOpener = (
+	context: NodeChannelContext
+) => NodeChannelOpenResult | Promise<NodeChannelOpenResult>;
 
 export interface DesktopFamilySources {
 	/** FL-10: the preview profile's page (`source: 'browser', profile: 'preview'`). */

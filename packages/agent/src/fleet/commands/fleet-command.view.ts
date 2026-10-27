@@ -52,7 +52,10 @@ export function toFleetCommandRunView(
         outputTail: row.outputTail ?? '',
         truncated: row.truncated === true,
         capped: row.capped === true,
-        outputBytes: typeof row.outputBytes === 'number' ? row.outputBytes : Number(row.outputBytes ?? 0) || 0,
+        outputBytes:
+            typeof row.outputBytes === 'number'
+                ? row.outputBytes
+                : Number(row.outputBytes ?? 0) || 0,
         hasFullOutput: typeof row.outputRef === 'string' && row.outputRef.length > 0,
         linkDown: row.status === 'running' && !connected(row.nodeId),
     };

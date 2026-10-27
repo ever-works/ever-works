@@ -23,11 +23,15 @@ export {
 } from './fleet-sessions-bff';
 
 /** The attach-token body, rebuilt; null when no valid source is named (the route answers 400). */
-export function sanitizeLogsAttachBody(raw: Record<string, unknown>): FleetLogsAttachRequest | null {
+export function sanitizeLogsAttachBody(
+    raw: Record<string, unknown>,
+): FleetLogsAttachRequest | null {
     if (!isFleetLogSourceId(raw.source)) return null;
     const body: FleetLogsAttachRequest = { source: raw.source };
     if (Array.isArray(raw.sources)) {
-        const sources = raw.sources.filter(isFleetLogSourceId).slice(0, FLEET_LOGS_MAX_MERGED_SOURCES - 1);
+        const sources = raw.sources
+            .filter(isFleetLogSourceId)
+            .slice(0, FLEET_LOGS_MAX_MERGED_SOURCES - 1);
         if (sources.length !== raw.sources.length) return null;
         if (sources.length > 0) body.sources = sources;
     }

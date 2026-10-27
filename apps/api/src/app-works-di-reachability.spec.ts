@@ -339,7 +339,7 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
-        reason: "Bound in the API since 2026-10-26 (lane aw-safety, `appHostsRebuildRequester` in `AppDeployRequestModule`); the worker never requests a rebuild — a primary-domain change is an API request — so it stays unbound here rather than opening a rebuild RPC.",
+        reason: 'Bound in the API since 2026-10-26 (lane aw-safety, `appHostsRebuildRequester` in `AppDeployRequestModule`); the worker never requests a rebuild — a primary-domain change is an API request — so it stays unbound here rather than opening a rebuild RPC.',
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05); packages/agent/src/app-runtime/app-hosts-rebuild.requester.ts',
     },
 ];

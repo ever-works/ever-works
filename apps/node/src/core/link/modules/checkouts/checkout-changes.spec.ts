@@ -92,7 +92,8 @@ describe('readCheckoutChanges', () => {
 		});
 		const reply = await readCheckoutChanges('/work/api', git, {
 			now: () => Date.parse('2026-10-21T10:00:00Z'),
-			readUntracked: async () => 'diff --git a/notes.md b/notes.md\nnew file\n--- /dev/null\n+++ b/notes.md\n@@ -0,0 +1,1 @@\n+hello\n'
+			readUntracked: async () =>
+				'diff --git a/notes.md b/notes.md\nnew file\n--- /dev/null\n+++ b/notes.md\n@@ -0,0 +1,1 @@\n+hello\n'
 		});
 		const byPath = new Map(reply.files.map((file) => [file.path, file]));
 		expect(byPath.get('src/a file.ts')?.patch).toContain('+new <script>alert(1)</script>');

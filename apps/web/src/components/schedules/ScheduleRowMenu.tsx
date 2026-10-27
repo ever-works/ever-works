@@ -142,7 +142,10 @@ export function ScheduleRowMenu({
         startTransition(async () => {
             // FL-13 (FR-25): a Command schedule runs on a real machine — ask first.
             const isNodeSchedule = schedule.sourceType === 'node_schedule';
-            if (isNodeSchedule && !window.confirm(t('runNow.confirmOnComputer', { name: schedule.ownerName }))) {
+            if (
+                isNodeSchedule &&
+                !window.confirm(t('runNow.confirmOnComputer', { name: schedule.ownerName }))
+            ) {
                 return;
             }
             const response = await runScheduleNow(schedule.id, { confirm: isNodeSchedule });

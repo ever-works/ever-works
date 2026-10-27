@@ -95,10 +95,20 @@ describe('refreshStatus (POST app-status/refresh, FR-46)', () => {
         const { service, ops, cache } = harness();
         const result = await service.refreshStatus(WORK_ID, 'u-1');
 
-        expect(result).toMatchObject({ ok: true, httpStatus: 202, op: 'status-refresh', dispatched: true });
+        expect(result).toMatchObject({
+            ok: true,
+            httpStatus: 202,
+            op: 'status-refresh',
+            dispatched: true,
+        });
         const requestId = (result as { requestId: string }).requestId;
         expect(ops.dispatch).toHaveBeenCalledWith(
-            expect.objectContaining({ op: 'status-refresh', workId: WORK_ID, userId: 'u-1', requestId }),
+            expect.objectContaining({
+                op: 'status-refresh',
+                workId: WORK_ID,
+                userId: 'u-1',
+                requestId,
+            }),
         );
         expect(cache.store.get(`app-op:${WORK_ID}:${requestId}`)).toEqual({
             op: 'status-refresh',
@@ -111,22 +121,32 @@ describe('refreshStatus (POST app-status/refresh, FR-46)', () => {
         await service.refreshStatus(WORK_ID, 'u-1');
         const second = await service.refreshStatus(WORK_ID, 'u-2');
 
-        expect(second).toMatchObject({ ok: false, refusal: { httpStatus: 429, code: 'refresh_too_soon' } });
-        expect((second as { refusal: { retryAfterSeconds: number } }).refusal.retryAfterSeconds).toBeGreaterThan(0);
+        expect(second).toMatchObject({
+            ok: false,
+            refusal: { httpStatus: 429, code: 'refresh_too_soon' },
+        });
+        expect(
+            (second as { refusal: { retryAfterSeconds: number } }).refusal.retryAfterSeconds,
+        ).toBeGreaterThan(0);
         expect(ops.dispatch).toHaveBeenCalledTimes(1);
     });
 
     it('refuses a Work with nothing deployed and one being deleted', async () => {
-        await expect(harness({ target: 'your-cluster' }).service.refreshStatus(WORK_ID, 'u')).resolves.toMatchObject({
+        await expect(
+            harness({ target: 'your-cluster' }).service.refreshStatus(WORK_ID, 'u'),
+        ).resolves.toMatchObject({
             ok: false,
             refusal: { httpStatus: 409, code: 'app_not_deployed' },
         });
         await expect(
-            harness({ currentDeploymentId: DEPLOYMENT_ID, deletionRequestedAt: new Date() }).service.refreshStatus(
-                WORK_ID,
-                'u',
-            ),
-        ).resolves.toMatchObject({ ok: false, refusal: { httpStatus: 409, code: 'APP_WORK_DELETING' } });
+            harness({
+                currentDeploymentId: DEPLOYMENT_ID,
+                deletionRequestedAt: new Date(),
+            }).service.refreshStatus(WORK_ID, 'u'),
+        ).resolves.toMatchObject({
+            ok: false,
+            refusal: { httpStatus: 409, code: 'APP_WORK_DELETING' },
+        });
     });
 
     it('turns the entry failed at once when no worker takes the op', async () => {
@@ -145,11 +165,18 @@ describe('refreshStatus (POST app-status/refresh, FR-46)', () => {
 describe('requestLogs / readLogs (FR-48)', () => {
     it('dispatches names and ids only — never a secret value — and marks the request pending', async () => {
         const { service, ops, cache } = harness();
-        const result = await service.requestLogs(WORK_ID, 'u-1', { component: 'web', lines: 900, previous: true });
+        const result = await service.requestLogs(WORK_ID, 'u-1', {
+            component: 'web',
+            lines: 900,
+            previous: true,
+        });
 
         expect(result).toMatchObject({ ok: true, httpStatus: 202, op: 'logs' });
         const requestId = (result as { requestId: string }).requestId;
-        const payload = (ops.dispatch.mock.calls as unknown as unknown[][])[0]?.[0] as Record<string, unknown>;
+        const payload = (ops.dispatch.mock.calls as unknown as unknown[][])[0]?.[0] as Record<
+            string,
+            unknown
+        >;
         expect(payload).toEqual({
             op: 'logs',
             workId: WORK_ID,
@@ -165,7 +192,9 @@ describe('requestLogs / readLogs (FR-48)', () => {
 
     it('refuses a request that names both, neither, or a malformed target', async () => {
         const { service, ops } = harness();
-        await expect(service.requestLogs(WORK_ID, 'u', { component: 'web', job: 'migrate' })).resolves.toMatchObject({
+        await expect(
+            service.requestLogs(WORK_ID, 'u', { component: 'web', job: 'migrate' }),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 400, code: 'log_target_ambiguous' },
         });
         await expect(service.requestLogs(WORK_ID, 'u', {})).resolves.toMatchObject({
@@ -174,7 +203,9 @@ describe('requestLogs / readLogs (FR-48)', () => {
         await expect(service.requestLogs(WORK_ID, 'u', { job: '../etc' })).resolves.toMatchObject({
             refusal: { httpStatus: 400, code: 'invalid_log_target' },
         });
-        await expect(service.requestLogs(WORK_ID, 'u', { job: 'migrate', lines: 0 })).resolves.toMatchObject({
+        await expect(
+            service.requestLogs(WORK_ID, 'u', { job: 'migrate', lines: 0 }),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 400, code: 'invalid_lines' },
         });
         expect(ops.dispatch).not.toHaveBeenCalled();
@@ -182,18 +213,24 @@ describe('requestLogs / readLogs (FR-48)', () => {
 
     it('allows logs of a Work whose Deployment failed (no current one), but not of target none', async () => {
         const failed = harness({ target: 'your-cluster', currentDeploymentId: null });
-        await expect(failed.service.requestLogs(WORK_ID, 'u', { job: 'migrate' })).resolves.toMatchObject({
+        await expect(
+            failed.service.requestLogs(WORK_ID, 'u', { job: 'migrate' }),
+        ).resolves.toMatchObject({
             ok: true,
         });
         const none = harness({ target: 'none' });
-        await expect(none.service.requestLogs(WORK_ID, 'u', { job: 'migrate' })).resolves.toMatchObject({
+        await expect(
+            none.service.requestLogs(WORK_ID, 'u', { job: 'migrate' }),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 409, code: 'app_target_none' },
         });
     });
 
     it('reads pending, then a READY tail redacted again with the App’s secret values', async () => {
         const { service, cache } = harness();
-        const accepted = (await service.requestLogs(WORK_ID, 'u', { component: 'web' })) as { requestId: string };
+        const accepted = (await service.requestLogs(WORK_ID, 'u', { component: 'web' })) as {
+            requestId: string;
+        };
 
         await expect(service.readLogs(WORK_ID, accepted.requestId)).resolves.toEqual({
             ok: true,
@@ -205,7 +242,12 @@ describe('requestLogs / readLogs (FR-48)', () => {
             state: 'done',
             tail: {
                 containers: [
-                    { pod: 'web-1', container: 'web', lines: [`connecting with ${SECRET}`, 'ready'], truncated: false },
+                    {
+                        pod: 'web-1',
+                        container: 'web',
+                        lines: [`connecting with ${SECRET}`, 'ready'],
+                        truncated: false,
+                    },
                 ],
                 redactedNames: [],
                 fetchedAt: '2026-10-27T00:00:00.000Z',
@@ -220,23 +262,36 @@ describe('requestLogs / readLogs (FR-48)', () => {
                 body: { tail: { containers: Array<{ lines: string[] }>; redactedNames: string[] } };
             }
         ).body;
-        expect(body.tail.containers[0].lines).toEqual(['connecting with DATABASE_PASSWORD', 'ready']);
+        expect(body.tail.containers[0].lines).toEqual([
+            'connecting with DATABASE_PASSWORD',
+            'ready',
+        ]);
         expect(body.tail.redactedNames).toEqual(['DATABASE_PASSWORD']);
     });
 
     it('withholds a ready tail when the secret values cannot be read (fail closed)', async () => {
         const unreadable = harness(undefined, { secrets: null });
-        const accepted = (await unreadable.service.requestLogs(WORK_ID, 'u', { component: 'web' })) as {
+        const accepted = (await unreadable.service.requestLogs(WORK_ID, 'u', {
+            component: 'web',
+        })) as {
             requestId: string;
         };
         unreadable.cache.store.set(`app-logs:${WORK_ID}:${accepted.requestId}`, {
             state: 'done',
-            tail: { containers: [{ pod: 'p', container: 'c', lines: [SECRET], truncated: false }], redactedNames: [], fetchedAt: '' },
+            tail: {
+                containers: [{ pod: 'p', container: 'c', lines: [SECRET], truncated: false }],
+                redactedNames: [],
+                fetchedAt: '',
+            },
         });
         const read = await unreadable.service.readLogs(WORK_ID, accepted.requestId);
         expect(read).toEqual({
             ok: true,
-            body: { requestId: accepted.requestId, status: 'failed', code: 'redaction_unavailable' },
+            body: {
+                requestId: accepted.requestId,
+                status: 'failed',
+                code: 'redaction_unavailable',
+            },
         });
 
         const noSource = harness(undefined, { envSource: null });
@@ -254,22 +309,33 @@ describe('requestLogs / readLogs (FR-48)', () => {
 
     it('misses for another Work’s request id, an expired one and a malformed one', async () => {
         const { service } = harness();
-        const accepted = (await service.requestLogs(WORK_ID, 'u', { component: 'web' })) as { requestId: string };
+        const accepted = (await service.requestLogs(WORK_ID, 'u', { component: 'web' })) as {
+            requestId: string;
+        };
 
         await expect(service.readLogs(OTHER_WORK_ID, accepted.requestId)).resolves.toMatchObject({
             ok: false,
             refusal: { httpStatus: 404, code: 'logs_request_not_found' },
         });
-        await expect(service.readLogs(WORK_ID, 'b5e1c7a0-3333-4c4d-9e5f-607182930415')).resolves.toMatchObject({
+        await expect(
+            service.readLogs(WORK_ID, 'b5e1c7a0-3333-4c4d-9e5f-607182930415'),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 404 },
         });
-        await expect(service.readLogs(WORK_ID, 'not-a-uuid')).resolves.toMatchObject({ refusal: { httpStatus: 404 } });
+        await expect(service.readLogs(WORK_ID, 'not-a-uuid')).resolves.toMatchObject({
+            refusal: { httpStatus: 404 },
+        });
     });
 
     it('passes a worker failure through with its code', async () => {
         const { service, cache } = harness();
-        const accepted = (await service.requestLogs(WORK_ID, 'u', { job: 'migrate' })) as { requestId: string };
-        cache.store.set(`app-logs:${WORK_ID}:${accepted.requestId}`, { state: 'failed', code: 'cluster_unreachable' });
+        const accepted = (await service.requestLogs(WORK_ID, 'u', { job: 'migrate' })) as {
+            requestId: string;
+        };
+        cache.store.set(`app-logs:${WORK_ID}:${accepted.requestId}`, {
+            state: 'failed',
+            code: 'cluster_unreachable',
+        });
         await expect(service.readLogs(WORK_ID, accepted.requestId)).resolves.toEqual({
             ok: true,
             body: { requestId: accepted.requestId, status: 'failed', code: 'cluster_unreachable' },
@@ -289,11 +355,18 @@ describe('runJob (POST app-jobs/:name/run, FR-51)', () => {
 
     it('dispatches job-run with the job name and the confirmation, and lists it in app-status', async () => {
         const { service, ops } = harness();
-        const result = await service.runJob(WORK_ID, 'u-1', 'migrate', { confirmFirstDeploy: true });
+        const result = await service.runJob(WORK_ID, 'u-1', 'migrate', {
+            confirmFirstDeploy: true,
+        });
 
         expect(result).toMatchObject({ ok: true, httpStatus: 202, op: 'job-run' });
         expect(ops.dispatch).toHaveBeenCalledWith(
-            expect.objectContaining({ op: 'job-run', jobName: 'migrate', confirmFirstDeploy: true, workId: WORK_ID }),
+            expect.objectContaining({
+                op: 'job-run',
+                jobName: 'migrate',
+                confirmFirstDeploy: true,
+                workId: WORK_ID,
+            }),
         );
         const status = await service.getStatus(WORK_ID);
         expect(status.requests).toEqual([
@@ -307,8 +380,14 @@ describe('runJob (POST app-jobs/:name/run, FR-51)', () => {
     });
 
     it('refuses during a Deployment, while a run of the job is going, and on a malformed name', async () => {
-        const locked = harness({ target: 'your-cluster', currentDeploymentId: DEPLOYMENT_ID, deployLockId: 'd-2' });
-        await expect(locked.service.runJob(WORK_ID, 'u', 'migrate', { confirmFirstDeploy: true })).resolves.toMatchObject({
+        const locked = harness({
+            target: 'your-cluster',
+            currentDeploymentId: DEPLOYMENT_ID,
+            deployLockId: 'd-2',
+        });
+        await expect(
+            locked.service.runJob(WORK_ID, 'u', 'migrate', { confirmFirstDeploy: true }),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 409, code: 'deploy_in_progress' },
         });
 
@@ -317,15 +396,21 @@ describe('runJob (POST app-jobs/:name/run, FR-51)', () => {
             currentDeploymentId: DEPLOYMENT_ID,
             statusSnapshot: { jobs: [{ name: 'migrate', last: { status: 'running' } }] },
         });
-        await expect(running.service.runJob(WORK_ID, 'u', 'migrate', { confirmFirstDeploy: true })).resolves.toMatchObject({
+        await expect(
+            running.service.runJob(WORK_ID, 'u', 'migrate', { confirmFirstDeploy: true }),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 409, code: 'job_active' },
         });
         // Another job is not blocked by it.
-        await expect(running.service.runJob(WORK_ID, 'u', 'seed', { confirmFirstDeploy: true })).resolves.toMatchObject({
+        await expect(
+            running.service.runJob(WORK_ID, 'u', 'seed', { confirmFirstDeploy: true }),
+        ).resolves.toMatchObject({
             ok: true,
         });
 
-        await expect(harness().service.runJob(WORK_ID, 'u', 'a b', { confirmFirstDeploy: true })).resolves.toMatchObject({
+        await expect(
+            harness().service.runJob(WORK_ID, 'u', 'a b', { confirmFirstDeploy: true }),
+        ).resolves.toMatchObject({
             refusal: { httpStatus: 400, code: 'invalid_job_name' },
         });
     });
@@ -334,24 +419,33 @@ describe('runJob (POST app-jobs/:name/run, FR-51)', () => {
 describe('runSmoke (POST app-smoke)', () => {
     it('queues the smoke op for the live Deployment', async () => {
         const { service, ops } = harness();
-        await expect(service.runSmoke(WORK_ID, 'u-1')).resolves.toMatchObject({ ok: true, op: 'smoke' });
+        await expect(service.runSmoke(WORK_ID, 'u-1')).resolves.toMatchObject({
+            ok: true,
+            op: 'smoke',
+        });
         expect(ops.dispatch).toHaveBeenCalledWith(
-            expect.objectContaining({ op: 'smoke', deploymentId: DEPLOYMENT_ID, trigger: 'manual' }),
+            expect.objectContaining({
+                op: 'smoke',
+                deploymentId: DEPLOYMENT_ID,
+                trigger: 'manual',
+            }),
         );
     });
 
     it('refuses a paused app and a running Deployment', async () => {
         await expect(
-            harness({ target: 'your-cluster', currentDeploymentId: DEPLOYMENT_ID, paused: true }).service.runSmoke(
-                WORK_ID,
-                'u',
-            ),
+            harness({
+                target: 'your-cluster',
+                currentDeploymentId: DEPLOYMENT_ID,
+                paused: true,
+            }).service.runSmoke(WORK_ID, 'u'),
         ).resolves.toMatchObject({ refusal: { httpStatus: 409, code: 'app_paused' } });
         await expect(
-            harness({ target: 'your-cluster', currentDeploymentId: DEPLOYMENT_ID, deployLockId: 'x' }).service.runSmoke(
-                WORK_ID,
-                'u',
-            ),
+            harness({
+                target: 'your-cluster',
+                currentDeploymentId: DEPLOYMENT_ID,
+                deployLockId: 'x',
+            }).service.runSmoke(WORK_ID, 'u'),
         ).resolves.toMatchObject({ refusal: { httpStatus: 409, code: 'deploy_in_progress' } });
     });
 });
@@ -365,7 +459,9 @@ describe('getStatus smoke and listDeployments', () => {
             state: 'READY',
             smokeResult: {
                 observedAt: '2026-10-27T00:00:00.000Z',
-                inCluster: [{ name: 'health', status: 'passed', httpStatus: 200, found: `token=${SECRET}` }],
+                inCluster: [
+                    { name: 'health', status: 'passed', httpStatus: 200, found: `token=${SECRET}` },
+                ],
                 public: [{ name: 'home', status: 'failed', classification: 'tls_not_ready' }],
             },
         });
@@ -389,7 +485,10 @@ describe('getStatus smoke and listDeployments', () => {
                 appTrigger: 'manual',
                 buildId: 'b-1',
                 commitSha: 'abc',
-                appRender: { image: { digest: 'sha256:1234' }, envFingerprints: { SECRET_KEY: 'fp' } },
+                appRender: {
+                    image: { digest: 'sha256:1234' },
+                    envFingerprints: { SECRET_KEY: 'fp' },
+                },
                 createdAt: new Date('2026-10-27T00:00:00.000Z'),
                 lastError: null,
             },
@@ -416,7 +515,12 @@ describe('redactAppLogTail', () => {
         const tail = redactAppLogTail(
             {
                 containers: [
-                    { pod: 'p', container: 'c', lines: ['a=longsecret123 b=longsecret short=abc'], truncated: true },
+                    {
+                        pod: 'p',
+                        container: 'c',
+                        lines: ['a=longsecret123 b=longsecret short=abc'],
+                        truncated: true,
+                    },
                 ],
                 redactedNames: ['FROM_WORKER'],
                 fetchedAt: 'now',

@@ -35,7 +35,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * Needs a runtime with a global `WebSocket` (Node 22+, this repo runs 26).
  */
 export const attachCommand = new Command('attach')
-    .description('Attach this terminal to a session on one of your computers (Ctrl-] then d detaches)')
+    .description(
+        'Attach this terminal to a session on one of your computers (Ctrl-] then d detaches)',
+    )
     .argument('<sessionId>', 'Session id')
     .option('--watch', 'Watch only — never type into the session')
     // FL-19 (spec FR-22) names `--drive` for typing; accepted beside FL-04's default (driver unless --watch).
@@ -47,22 +49,33 @@ export const attachCommand = new Command('attach')
         }
         const WS = (globalThis as { WebSocket?: typeof WebSocket }).WebSocket;
         if (!WS) {
-            console.error(chalk.red('Error: this Node.js has no WebSocket client; use Node 22 or newer'));
+            console.error(
+                chalk.red('Error: this Node.js has no WebSocket client; use Node 22 or newer'),
+            );
             process.exit(SESSION_CLI_EXIT.usage);
         }
         await requireAuth();
         const role = options.watch && !options.drive ? 'viewer' : 'driver';
-        const size = () => ({ cols: process.stdout.columns || 120, rows: process.stdout.rows || 32 });
+        const size = () => ({
+            cols: process.stdout.columns || 120,
+            rows: process.stdout.rows || 32,
+        });
         let grant: { token: string; wsPath: string; role: string };
         try {
-            const { data } = await getHttpClient().post<{ token: string; wsPath: string; role: string }>(
-                `/fleet/sessions/${sessionId}/attach-token`,
-                { role, ...size() },
-            );
+            const { data } = await getHttpClient().post<{
+                token: string;
+                wsPath: string;
+                role: string;
+            }>(`/fleet/sessions/${sessionId}/attach-token`, { role, ...size() });
             grant = data;
         } catch (error) {
-            const body = (error as { response?: { data?: { error?: { hint?: string } } } }).response?.data;
-            console.error(chalk.red(`Refused: ${body?.error?.hint ?? (error instanceof Error ? error.message : 'error')}`));
+            const body = (error as { response?: { data?: { error?: { hint?: string } } } }).response
+                ?.data;
+            console.error(
+                chalk.red(
+                    `Refused: ${body?.error?.hint ?? (error instanceof Error ? error.message : 'error')}`,
+                ),
+            );
             process.exit(SESSION_CLI_EXIT.refused);
         }
 
@@ -104,10 +117,15 @@ export const attachCommand = new Command('attach')
                     if (stdin.isTTY) stdin.setRawMode(true);
                     stdin.resume();
                     process.stderr.write(
-                        chalk.gray(`[attached as ${driver ? 'driver' : 'watcher'} — Ctrl-] then d detaches]\r\n`),
+                        chalk.gray(
+                            `[attached as ${driver ? 'driver' : 'watcher'} — Ctrl-] then d detaches]\r\n`,
+                        ),
                     );
                 } else if (message?.type === 'channel.close') {
-                    closeReason = typeof message.hint === 'string' ? message.hint : String(message.reason ?? '');
+                    closeReason =
+                        typeof message.hint === 'string'
+                            ? message.hint
+                            : String(message.reason ?? '');
                     if (message.reason !== 'normal') exitCode = SESSION_CLI_EXIT.refused;
                 }
                 return;
@@ -117,7 +135,9 @@ export const attachCommand = new Command('attach')
                 process.stdout.write(frame.payload);
             } else if (frame.kind === FLEET_LINK_FRAME_KINDS.EXIT) {
                 const code = decodeFleetLinkExit(frame.payload);
-                process.stderr.write(chalk.gray(`\r\n[the session ended — exit code ${code ?? 'unknown'}]\r\n`));
+                process.stderr.write(
+                    chalk.gray(`\r\n[the session ended — exit code ${code ?? 'unknown'}]\r\n`),
+                );
             } else if (frame.kind === FLEET_LINK_FRAME_KINDS.JSON) {
                 const message = decodeFleetLinkJson(frame.payload);
                 if (message?.requestId === 'cli-attach-1' && message.error) {
@@ -128,22 +148,34 @@ export const attachCommand = new Command('attach')
                     return;
                 }
                 const notice = message ? parseFleetSessionNotice(message) : null;
-                if (notice?.notice === 'paused') process.stderr.write(chalk.yellow('\r\n[paused by the fleet stop]\r\n'));
+                if (notice?.notice === 'paused')
+                    process.stderr.write(chalk.yellow('\r\n[paused by the fleet stop]\r\n'));
                 if (notice?.notice === 'drain') {
-                    process.stderr.write(chalk.yellow(`\r\n[fleet drain: this session ends in ${notice.seconds} s]\r\n`));
+                    process.stderr.write(
+                        chalk.yellow(
+                            `\r\n[fleet drain: this session ends in ${notice.seconds} s]\r\n`,
+                        ),
+                    );
                 }
             }
         };
         socket.onclose = () => {
             restore();
-            if (closeReason && exitCode !== SESSION_CLI_EXIT.ok) process.stderr.write(chalk.red(`\r\n${closeReason}\r\n`));
+            if (closeReason && exitCode !== SESSION_CLI_EXIT.ok)
+                process.stderr.write(chalk.red(`\r\n${closeReason}\r\n`));
             process.exit(exitCode);
         };
 
         stdin.on('data', (chunk: Buffer) => {
             const { forward, detach: wantsDetach } = chord(new Uint8Array(chunk));
             if (driver && forward.byteLength > 0) {
-                send(encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.DATA, forward));
+                send(
+                    encodeFleetLinkFrame(
+                        FLEET_LINK_VIEWER_CHANNEL,
+                        FLEET_LINK_FRAME_KINDS.DATA,
+                        forward,
+                    ),
+                );
             }
             if (wantsDetach) detach();
         });
@@ -151,7 +183,14 @@ export const attachCommand = new Command('attach')
             process.stdout.on('resize', () => {
                 const { cols, rows } = size();
                 const payload = encodeFleetLinkResize(cols, rows);
-                if (payload) send(encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.RESIZE, payload));
+                if (payload)
+                    send(
+                        encodeFleetLinkFrame(
+                            FLEET_LINK_VIEWER_CHANNEL,
+                            FLEET_LINK_FRAME_KINDS.RESIZE,
+                            payload,
+                        ),
+                    );
             });
         }
     });

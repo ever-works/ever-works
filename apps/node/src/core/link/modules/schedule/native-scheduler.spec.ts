@@ -21,7 +21,11 @@ const ID = '3f2b8c1e-5a4d-4e6f-9a7b-1c2d3e4f5a6b';
 const command = { file: '/usr/bin/node', args: ['/opt/ever works/cli.js'] };
 const daily = (at: string): FleetScheduleCadence => ({ kind: 'daily', at, timezone: 'node' });
 const weekdays = (at: string): FleetScheduleCadence => ({ kind: 'weekdays', at, timezone: 'node' });
-const every = (minutes: number): FleetScheduleCadence => ({ kind: 'interval', expr: String(minutes), timezone: 'node' });
+const every = (minutes: number): FleetScheduleCadence => ({
+	kind: 'interval',
+	expr: String(minutes),
+	timezone: 'node'
+});
 const cron = (expr: string): FleetScheduleCadence => ({ kind: 'cron', expr, timezone: 'node' });
 
 describe('native scheduler (FL-13 P3, T-39)', () => {
@@ -64,7 +68,9 @@ describe('native scheduler (FL-13 P3, T-39)', () => {
 		expect(cronUnsafeWordReason('/x/\0/node')).toMatch(/NUL/);
 		// A backslash that is NOT before a `%` is fine (it sits inside single quotes).
 		expect(cronUnsafeWordReason('/x/a\\b/node')).toBeNull();
-		expect(cronLine(entry, { file: '/x/a\\b/node', args: [] })).toBe(`30 8 * * * '/x/a\\b/node' schedule-run ${ID}`);
+		expect(cronLine(entry, { file: '/x/a\\b/node', args: [] })).toBe(
+			`30 8 * * * '/x/a\\b/node' schedule-run ${ID}`
+		);
 		// Every `%` gets exactly one escaping backslash, also inside single quotes.
 		expect(cronLine(entry, { file: "/x/50% o'clock/node", args: [] })).toBe(
 			`30 8 * * * '/x/50\\% o'\\''clock/node' schedule-run ${ID}`
@@ -86,13 +92,17 @@ describe('native scheduler (FL-13 P3, T-39)', () => {
 		expect(windowsQuoteArg('C:\\a b\\c')).toBe('"C:\\a b\\c"');
 
 		const entry = { id: ID, cadence: daily('08:30') };
-		expect(schtasksRunLine(entry, { file: 'C:\\Program Files\\node\\node.exe', args: ['C:\\ew\\cli.js'] })).toEqual({
-			line: `"C:\\Program Files\\node\\node.exe" C:\\ew\\cli.js schedule-run ${ID}`
-		});
+		expect(schtasksRunLine(entry, { file: 'C:\\Program Files\\node\\node.exe', args: ['C:\\ew\\cli.js'] })).toEqual(
+			{
+				line: `"C:\\Program Files\\node\\node.exe" C:\\ew\\cli.js schedule-run ${ID}`
+			}
+		);
 		expect(schtasksRunLine(entry, { file: 'node.exe', args: ['a\nb'] })).toEqual({
 			reason: 'a command word contains a line break'
 		});
-		expect(schtasksRunLine({ id: 'nope', cadence: daily('08:30') }, command)).toEqual({ reason: 'not a schedule id' });
+		expect(schtasksRunLine({ id: 'nope', cadence: daily('08:30') }, command)).toEqual({
+			reason: 'not a schedule id'
+		});
 	});
 
 	it('installs into Task Scheduler with the quoted /TR line and skips an unsafe one', async () => {
@@ -102,7 +112,12 @@ describe('native scheduler (FL-13 P3, T-39)', () => {
 			return { code: 0, stdout: '', stderr: '' };
 		};
 		const winCommand = { file: 'C:\\Program Files\\node\\node.exe', args: ['C:\\ew dir\\'] };
-		const scheduler = createNativeScheduler({ platform: 'win32', homedir: 'C:\\Users\\me', command: winCommand, exec });
+		const scheduler = createNativeScheduler({
+			platform: 'win32',
+			homedir: 'C:\\Users\\me',
+			command: winCommand,
+			exec
+		});
 		const result = await scheduler!.install([{ id: ID, cadence: daily('02:00') }]);
 		expect(result.installed).toEqual([ID]);
 		const tr = created[0][created[0].indexOf('/TR') + 1];
@@ -147,7 +162,9 @@ describe('native scheduler (FL-13 P3, T-39)', () => {
 		expect(launchdPlist({ id: ID, cadence: daily('03:00') }, command)).toContain(
 			`<string>works.ever.node.schedule.${ID}</string>`
 		);
-		expect(schtasksTiming(cron('5 9 * * 1,3'))).toEqual({ args: ['/SC', 'WEEKLY', '/D', 'MON,WED', '/ST', '09:05'] });
+		expect(schtasksTiming(cron('5 9 * * 1,3'))).toEqual({
+			args: ['/SC', 'WEEKLY', '/D', 'MON,WED', '/ST', '09:05']
+		});
 		expect(schtasksTiming(every(15))).toEqual({ args: ['/SC', 'MINUTE', '/MO', '15'] });
 		expect('reason' in schtasksTiming(cron('0 2 1 * *'))).toBe(true);
 	});

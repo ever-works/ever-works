@@ -22,6 +22,10 @@ describe('agent fleet tools palette entry', () => {
     it('is absent elsewhere and with the hub off', () => {
         expect(agentFleetToolsScreens('/tasks')).toEqual([]);
         expect(agentFleetToolsScreens(`/agents/${AGENT}`, { fleetEnabled: false })).toEqual([]);
-        expect(screensFor(`/agents/${AGENT}`).some((screen) => screen.id.startsWith('agent.fleetTools.'))).toBe(true);
+        expect(
+            screensFor(`/agents/${AGENT}`).some((screen) =>
+                screen.id.startsWith('agent.fleetTools.'),
+            ),
+        ).toBe(true);
     });
 });

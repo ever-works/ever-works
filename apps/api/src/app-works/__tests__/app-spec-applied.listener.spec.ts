@@ -29,7 +29,10 @@ function build(
     const specs = {
         getEffectiveSpec: jest.fn().mockResolvedValue({
             status: 'valid',
-            spec: options.spec === undefined ? { upstreamSync: { schedule: '0 3 * * *' } } : options.spec,
+            spec:
+                options.spec === undefined
+                    ? { upstreamSync: { schedule: '0 3 * * *' } }
+                    : options.spec,
         }),
     };
     const listener = new AppSpecAppliedUpstreamListener(rows as never, specs as never);
@@ -37,18 +40,24 @@ function build(
 }
 
 describe('AppSpecAppliedUpstreamListener (APW-02 T49)', () => {
-    it.each(['upstreamSync', 'source'])('recomputes the schedule and next slot on a %s change', async (block) => {
-        const h = build();
+    it.each(['upstreamSync', 'source'])(
+        'recomputes the schedule and next slot on a %s change',
+        async (block) => {
+            const h = build();
 
-        const outcome = await h.listener.onSpecApplied({ workId: WORK_ID, changedBlocks: [block] }, NOW);
+            const outcome = await h.listener.onSpecApplied(
+                { workId: WORK_ID, changedBlocks: [block] },
+                NOW,
+            );
 
-        expect(outcome.reason).toBe('recomputed');
-        expect(h.rows.update).toHaveBeenCalledTimes(1);
-        const [, patch] = h.rows.update.mock.calls[0];
-        expect(patch.syncSchedule).toBe('0 3 * * *');
-        expect(patch.nextSyncAt).toBeInstanceOf(Date);
-        expect((patch.nextSyncAt as Date).getTime()).toBeGreaterThan(NOW.getTime());
-    });
+            expect(outcome.reason).toBe('recomputed');
+            expect(h.rows.update).toHaveBeenCalledTimes(1);
+            const [, patch] = h.rows.update.mock.calls[0];
+            expect(patch.syncSchedule).toBe('0 3 * * *');
+            expect(patch.nextSyncAt).toBeInstanceOf(Date);
+            expect((patch.nextSyncAt as Date).getTime()).toBeGreaterThan(NOW.getTime());
+        },
+    );
 
     it('leaves the row alone for any other block', async () => {
         const h = build();
@@ -73,8 +82,18 @@ describe('AppSpecAppliedUpstreamListener (APW-02 T49)', () => {
 
     it('writes the schedule only for a paused or not-ready row', async () => {
         for (const row of [
-            { workId: WORK_ID, relation: 'fork', readinessState: 'ready', upstreamStatus: 'archived' },
-            { workId: WORK_ID, relation: 'fork', readinessState: 'preparing', upstreamStatus: 'available' },
+            {
+                workId: WORK_ID,
+                relation: 'fork',
+                readinessState: 'ready',
+                upstreamStatus: 'archived',
+            },
+            {
+                workId: WORK_ID,
+                relation: 'fork',
+                readinessState: 'preparing',
+                upstreamStatus: 'available',
+            },
         ]) {
             const h = build({ row });
 
@@ -93,15 +112,17 @@ describe('AppSpecAppliedUpstreamListener (APW-02 T49)', () => {
         const none = build({ row: null });
         const empty = build();
 
-        expect((await link.listener.onSpecApplied({ workId: WORK_ID, changedBlocks: ['source'] })).reason).toBe(
-            'link',
-        );
-        expect((await none.listener.onSpecApplied({ workId: WORK_ID, changedBlocks: ['source'] })).reason).toBe(
-            'no_state',
-        );
-        expect((await empty.listener.onSpecApplied({ workId: '', changedBlocks: ['source'] })).reason).toBe(
-            'no_work',
-        );
+        expect(
+            (await link.listener.onSpecApplied({ workId: WORK_ID, changedBlocks: ['source'] }))
+                .reason,
+        ).toBe('link');
+        expect(
+            (await none.listener.onSpecApplied({ workId: WORK_ID, changedBlocks: ['source'] }))
+                .reason,
+        ).toBe('no_state');
+        expect(
+            (await empty.listener.onSpecApplied({ workId: '', changedBlocks: ['source'] })).reason,
+        ).toBe('no_work');
         for (const h of [link, none, empty]) expect(h.rows.update).not.toHaveBeenCalled();
     });
 

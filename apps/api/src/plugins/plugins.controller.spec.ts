@@ -773,7 +773,9 @@ describe('PluginsController', () => {
         it("refuses the owner's API key, allows the owner in a session", async () => {
             const { gated } = appWork('owner');
             const dto = { secretSettings: { kubeconfig: 'apiVersion: v1' } } as any;
-            await expect(gated.updateWorkPluginSettings(apiKey, 'w-1', 'k8s', dto)).rejects.toMatchObject({
+            await expect(
+                gated.updateWorkPluginSettings(apiKey, 'w-1', 'k8s', dto),
+            ).rejects.toMatchObject({
                 status: 403,
             });
             await gated.updateWorkPluginSettings(session, 'w-1', 'k8s', dto);

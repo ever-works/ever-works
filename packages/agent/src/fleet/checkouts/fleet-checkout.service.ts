@@ -158,7 +158,9 @@ function firstLine(text: string | null | undefined): string | null {
 export function describeLoss(evidence: { uncommitted: number; unpushedCommits: number }): string {
     const parts: string[] = [];
     if (evidence.uncommitted > 0)
-        parts.push(`${evidence.uncommitted} uncommitted file${evidence.uncommitted === 1 ? '' : 's'}`);
+        parts.push(
+            `${evidence.uncommitted} uncommitted file${evidence.uncommitted === 1 ? '' : 's'}`,
+        );
     if (evidence.unpushedCommits > 0)
         parts.push(
             `${evidence.unpushedCommits} commit${evidence.unpushedCommits === 1 ? '' : 's'} not on any remote`,
@@ -229,7 +231,11 @@ export class FleetCheckoutService {
     async listForNode(
         nodeId: string,
         actor: FleetCheckoutActor,
-        options: { rescan?: boolean; refresh?: boolean; state?: FleetCheckoutListQuery['state'] } = {},
+        options: {
+            rescan?: boolean;
+            refresh?: boolean;
+            state?: FleetCheckoutListQuery['state'];
+        } = {},
     ): Promise<FleetNodeCheckoutsResponse> {
         const rescan = options.rescan === true;
         const { node } = await this.nodeFor(nodeId, actor, rescan ? 'checkouts' : 'view');
@@ -251,7 +257,9 @@ export class FleetCheckoutService {
             const ago = describeAgo(node.lastHeartbeatAt, now);
             const error = {
                 code: 'unreachable',
-                hint: ago ? `${node.name} is offline; last seen ${ago} ago` : `${node.name} is offline`,
+                hint: ago
+                    ? `${node.name} is offline; last seen ${ago} ago`
+                    : `${node.name} is offline`,
             };
             if (rescan) throw fleetCheckoutError('unreachable', error.hint, { nodeId: node.id });
             stale = error;
@@ -326,10 +334,14 @@ export class FleetCheckoutService {
             FLEET_CHECKOUT_MANUAL_REFRESH_MIN_MS,
         );
         if (retryAt !== null) {
-            throw fleetCheckoutError('limit_exceeded', 'one refresh per checkout every 10 seconds', {
-                limit: '1 per 10 s',
-                retryAt: new Date(retryAt).toISOString(),
-            });
+            throw fleetCheckoutError(
+                'limit_exceeded',
+                'one refresh per checkout every 10 seconds',
+                {
+                    limit: '1 per 10 s',
+                    retryAt: new Date(retryAt).toISOString(),
+                },
+            );
         }
         if (checkout.state === 'archived')
             throw fleetCheckoutError('invalid', 'this checkout is in the bin; restore it first');
@@ -379,7 +391,10 @@ export class FleetCheckoutService {
                     op === 'pull'
                         ? `Pull ${branch} into ${shown} on ${node.name}? Fast-forward only; refused if anything is uncommitted.`
                         : `Push ${branch} from ${shown} on ${node.name} to ${target}?`;
-                throw fleetCheckoutError('confirmation_required', summary, { class: 'confirm', summary });
+                throw fleetCheckoutError('confirmation_required', summary, {
+                    class: 'confirm',
+                    summary,
+                });
             }
             // U9: pull and push wait for the session working in the checkout; fetch does not.
             await this.refuseWhileSessionRuns(checkout, node);
@@ -390,7 +405,12 @@ export class FleetCheckoutService {
         // Recorded BEFORE the machine is asked: a checkout Ever Works made gets its
         // scoped credential only while an operation of the right kind runs on it.
         await this.checkouts.update(checkout.id, {
-            lastCommand: { command: op, exitCode: null, at: new Date(this.now()).toISOString(), operationId: null },
+            lastCommand: {
+                command: op,
+                exitCode: null,
+                at: new Date(this.now()).toISOString(),
+                operationId: null,
+            },
         });
         let outcome: FleetCheckoutNodeOutcome;
         try {
@@ -462,10 +482,14 @@ export class FleetCheckoutService {
             throw fleetCheckoutError('busy', 'this checkout is still being created');
         const name = fleetCheckoutDisplayPath(checkout.path);
         if (request?.confirm !== true) {
-            throw fleetCheckoutError('confirmation_required', `Move ${name} on ${node.name} to the bin?`, {
-                class: 'confirm',
-                summary: `Move ${name} on ${node.name} to the bin? The folder is not touched; restore it from the bin any time.`,
-            });
+            throw fleetCheckoutError(
+                'confirmation_required',
+                `Move ${name} on ${node.name} to the bin?`,
+                {
+                    class: 'confirm',
+                    summary: `Move ${name} on ${node.name} to the bin? The folder is not touched; restore it from the bin any time.`,
+                },
+            );
         }
         this.consumeWrite(actor.userId);
         if (await this.isStopped())
@@ -551,7 +575,9 @@ export class FleetCheckoutService {
     ): Promise<FleetCheckoutCreateResponse> {
         const source = request?.source;
         if (!source || (source.kind !== 'clone' && source.kind !== 'worktree')) {
-            throw fleetCheckoutError('invalid', 'source must be a clone or a worktree', { field: 'source' });
+            throw fleetCheckoutError('invalid', 'source must be a clone or a worktree', {
+                field: 'source',
+            });
         }
         const container = request.isolation === 'container';
         const sharedFolders = Array.isArray(request.sharedFolders) ? request.sharedFolders : [];
@@ -564,9 +590,13 @@ export class FleetCheckoutService {
                 sharedFolders.length > FLEET_CHECKOUT_SHARED_FOLDERS_MAX ||
                 !sharedFolders.every((folder) => isFleetCheckoutSharedFolder(folder))
             ) {
-                throw fleetCheckoutError('invalid', 'shared folders are relative folders inside the parent', {
-                    field: 'sharedFolders',
-                });
+                throw fleetCheckoutError(
+                    'invalid',
+                    'shared folders are relative folders inside the parent',
+                    {
+                        field: 'sharedFolders',
+                    },
+                );
             }
         }
         if (request.branch !== undefined && !isFleetCheckoutBranchName(request.branch)) {
@@ -580,21 +610,31 @@ export class FleetCheckoutService {
             // Spec U11: refused before anything is written — Windows, or no Docker advertised.
             const tags = node.capabilities ?? [];
             if (tags.includes('os:win32'))
-                throw fleetCheckoutError('unsupported_on_node', 'Container checkouts are not available on Windows computers', {
-                    field: 'isolation',
-                    missing: 'os',
-                });
+                throw fleetCheckoutError(
+                    'unsupported_on_node',
+                    'Container checkouts are not available on Windows computers',
+                    {
+                        field: 'isolation',
+                        missing: 'os',
+                    },
+                );
             if (!tags.includes('docker'))
-                throw fleetCheckoutError('unsupported_on_node', `Container checkouts need Docker on ${node.name}`, {
-                    field: 'isolation',
-                    missing: 'docker',
-                });
+                throw fleetCheckoutError(
+                    'unsupported_on_node',
+                    `Container checkouts need Docker on ${node.name}`,
+                    {
+                        field: 'isolation',
+                        missing: 'docker',
+                    },
+                );
         }
         this.consumeWrite(actor.userId);
         if (await this.isStopped())
             throw fleetCheckoutError('kill_switch', 'clear it under Settings → Fleet');
         const rows = await this.checkouts.findForNode(node.id);
-        if (rows.filter((row) => row.state !== 'archived').length >= FLEET_CHECKOUTS_DISCOVERY_CAP) {
+        if (
+            rows.filter((row) => row.state !== 'archived').length >= FLEET_CHECKOUTS_DISCOVERY_CAP
+        ) {
             throw fleetCheckoutError(
                 'limit_exceeded',
                 `${FLEET_CHECKOUTS_DISCOVERY_CAP} checkouts on ${node.name} — archive or forget some first`,
@@ -607,16 +647,23 @@ export class FleetCheckoutService {
         if (source.kind === 'clone') {
             const stripped = stripFleetRemoteCredential(source.repoUrl);
             if (!stripped || stripped.hadCredential || !parseFleetRemote(stripped.url)) {
-                throw fleetCheckoutError('invalid', 'a clone URL must name one repository, with no credential in it', {
-                    field: 'repoUrl',
-                });
+                throw fleetCheckoutError(
+                    'invalid',
+                    'a clone URL must name one repository, with no credential in it',
+                    {
+                        field: 'repoUrl',
+                    },
+                );
             }
             remoteUrl = stripped.url;
         } else {
             parent = rows.find((row) => row.id === source.parentCheckoutId) ?? null;
-            if (!parent) throw fleetCheckoutError('invalid', 'the parent checkout is not on this computer');
+            if (!parent)
+                throw fleetCheckoutError('invalid', 'the parent checkout is not on this computer');
             if (parent.state !== 'ready')
-                throw fleetCheckoutError('invalid', 'the parent checkout must be ready', { state: parent.state });
+                throw fleetCheckoutError('invalid', 'the parent checkout must be ready', {
+                    state: parent.state,
+                });
             if (!parent.remoteUrl)
                 throw fleetCheckoutError('invalid', 'the parent checkout has no remote');
             remoteUrl = parent.remoteUrl;
@@ -635,13 +682,16 @@ export class FleetCheckoutService {
         }
         let branch: string | null = request.branch ?? null;
         if (source.kind === 'worktree') {
-            const base = request.branch ?? `ever-works/${fleetCheckoutFolderName(parent!.branch ?? repository.repo)}`;
+            const base =
+                request.branch ??
+                `ever-works/${fleetCheckoutFolderName(parent!.branch ?? repository.repo)}`;
             branch = proposeFleetCheckoutBranch(base, taken);
         } else if (branch && taken.has(branch) && !remoteBranches.includes(branch)) {
             // A clone may check out an existing remote branch; it is a NEW branch name that must be unique.
             branch = proposeFleetCheckoutBranch(branch, taken);
         }
-        const baseRef = request.baseRef ?? (source.kind === 'worktree' ? (parent!.branch ?? null) : null);
+        const baseRef =
+            request.baseRef ?? (source.kind === 'worktree' ? (parent!.branch ?? null) : null);
 
         const root = await this.checkoutsRootOf(node, actor);
         const separator = root.includes('\\') && !root.includes('/') ? '\\' : '/';
@@ -694,7 +744,10 @@ export class FleetCheckoutService {
                     baseRef,
                     createdBy: actor.agentId ? 'agent' : 'user',
                     ...(container
-                        ? { isolation: 'container', containerImage: config.fleet.getCheckoutContainerImage() }
+                        ? {
+                              isolation: 'container',
+                              containerImage: config.fleet.getCheckoutContainerImage(),
+                          }
                         : {}),
                     ...(sharedFolders.length > 0 ? { sharedFolders } : {}),
                 },
@@ -719,7 +772,12 @@ export class FleetCheckoutService {
         if ('result' in outcome) await this.applyCreateResult(node, outcome.result);
         else {
             await this.checkouts.update(row.id, {
-                lastCommand: { command: kind, exitCode: null, at, operationId: outcome.operationId },
+                lastCommand: {
+                    command: kind,
+                    exitCode: null,
+                    at,
+                    operationId: outcome.operationId,
+                },
             });
         }
         await this.record('node.checkout.create', actor, node, path, {
@@ -756,44 +814,68 @@ export class FleetCheckoutService {
     ): Promise<FleetCheckoutView | { forgotten: true; id: string }> {
         const { checkout, node } = await this.resolve(id, actor, 'checkouts');
         const mode: FleetCheckoutDeleteMode =
-            request.mode ?? (checkout.kind === 'discovered' || checkout.createdBy === 'task' ? 'forget' : 'delete');
+            request.mode ??
+            (checkout.kind === 'discovered' || checkout.createdBy === 'task' ? 'forget' : 'delete');
         if (!isFleetCheckoutDeleteMode(mode))
             throw fleetCheckoutError('invalid', 'mode must be delete or forget', { field: 'mode' });
         if (mode === 'delete' && checkout.kind === 'discovered') {
-            throw fleetCheckoutError('invalid', 'a checkout found on this computer is only forgotten, never deleted', {
-                field: 'mode',
-            });
+            throw fleetCheckoutError(
+                'invalid',
+                'a checkout found on this computer is only forgotten, never deleted',
+                {
+                    field: 'mode',
+                },
+            );
         }
         if (mode === 'delete' && checkout.createdBy === 'task') {
-            throw fleetCheckoutError('invalid', 'Task worktrees are tidied by the computer’s own clean-up', {
-                field: 'mode',
-            });
+            throw fleetCheckoutError(
+                'invalid',
+                'Task worktrees are tidied by the computer’s own clean-up',
+                {
+                    field: 'mode',
+                },
+            );
         }
         if (options.cleanUp) {
             // FL-06's Clean up gate (FR-26a), applied before the changes-check.
             if (checkout.kind !== 'worktree')
-                throw fleetCheckoutError('invalid', 'Clean up applies to worktrees only', { rule: 'worktree' });
+                throw fleetCheckoutError('invalid', 'Clean up applies to worktrees only', {
+                    rule: 'worktree',
+                });
             const pr = parseFleetGitLine(checkout.gitLine)?.pr ?? null;
             if (!pr || (pr.state !== 'merged' && pr.state !== 'closed'))
-                throw fleetCheckoutError('invalid', 'Clean up waits until the pull request is merged or closed', {
-                    rule: 'pull-request',
-                });
+                throw fleetCheckoutError(
+                    'invalid',
+                    'Clean up waits until the pull request is merged or closed',
+                    {
+                        rule: 'pull-request',
+                    },
+                );
             // FL-06 (spec FR-25): and only once no live session uses it.
             if (this.sessions && (await this.sessions.countLiveInCheckout(checkout.id)) > 0)
-                throw fleetCheckoutError('invalid', 'Clean up waits until no session works in this worktree', {
-                    rule: 'live-session',
-                });
+                throw fleetCheckoutError(
+                    'invalid',
+                    'Clean up waits until no session works in this worktree',
+                    {
+                        rule: 'live-session',
+                    },
+                );
         }
-        if (mode === 'delete' && isCheckoutFolderRemoved(checkout)) return this.view(checkout, actor);
+        if (mode === 'delete' && isCheckoutFolderRemoved(checkout))
+            return this.view(checkout, actor);
         const name = fleetCheckoutName(checkout.path);
         const shown = fleetCheckoutDisplayPath(checkout.path);
         if (mode === 'forget') {
             if (request.confirm !== true && request.confirmName !== name) {
-                throw fleetCheckoutError('confirmation_required', `Forget ${shown} on ${node.name}?`, {
-                    class: 'confirm',
-                    summary: `Forget ${shown} on ${node.name}? The folder is not touched; a scan finds it again.`,
-                    name,
-                });
+                throw fleetCheckoutError(
+                    'confirmation_required',
+                    `Forget ${shown} on ${node.name}?`,
+                    {
+                        class: 'confirm',
+                        summary: `Forget ${shown} on ${node.name}? The folder is not touched; a scan finds it again.`,
+                        name,
+                    },
+                );
             }
             this.consumeWrite(actor.userId);
             if (await this.isStopped())
@@ -829,7 +911,8 @@ export class FleetCheckoutService {
 
         // mode === 'delete'
         await this.refuseWhileSessionRuns(checkout, node);
-        if (checkout.state === 'creating') throw fleetCheckoutError('busy', 'this checkout is still being created');
+        if (checkout.state === 'creating')
+            throw fleetCheckoutError('busy', 'this checkout is still being created');
         let evidence = { uncommitted: 0, unpushedCommits: 0 };
         if (checkout.state !== 'missing') {
             const preview = await this.askOrThrow(node, actor, {
@@ -840,11 +923,18 @@ export class FleetCheckoutService {
                 target: checkout.path,
                 timeoutMs: LIST_TIMEOUT_MS,
             });
-            const read = 'result' in preview ? parseFleetCheckoutsDeleteResult(preview.result) : null;
+            const read =
+                'result' in preview ? parseFleetCheckoutsDeleteResult(preview.result) : null;
             if (!read) {
-                throw fleetCheckoutError('operation_failed', `${node.name} did not answer in time; try again`);
+                throw fleetCheckoutError(
+                    'operation_failed',
+                    `${node.name} did not answer in time; try again`,
+                );
             }
-            evidence = { uncommitted: read.evidence.uncommitted, unpushedCommits: read.evidence.unpushedCommits };
+            evidence = {
+                uncommitted: read.evidence.uncommitted,
+                unpushedCommits: read.evidence.unpushedCommits,
+            };
         }
         const clean = evidence.uncommitted === 0 && evidence.unpushedCommits === 0;
         const confirmationClass = clean ? 'confirm' : 'confirm-destructive';
@@ -890,7 +980,12 @@ export class FleetCheckoutService {
             });
             if ('operationId' in outcome) {
                 await this.checkouts.update(checkout.id, {
-                    lastCommand: { command: 'delete', exitCode: null, at, operationId: outcome.operationId },
+                    lastCommand: {
+                        command: 'delete',
+                        exitCode: null,
+                        at,
+                        operationId: outcome.operationId,
+                    },
                 });
             } else {
                 await this.applyDeleteResult(node, outcome.result, checkout);
@@ -928,10 +1023,15 @@ export class FleetCheckoutService {
     ): Promise<{ userId: string; remoteUrl: string }> {
         const checkout = await this.checkouts.findById(checkoutId);
         if (!checkout || checkout.nodeId !== nodeId) throw new Error('unknown-checkout');
-        if (checkout.kind === 'discovered' || checkout.createdBy === 'discovery' || checkout.createdBy === 'task') {
+        if (
+            checkout.kind === 'discovered' ||
+            checkout.createdBy === 'discovery' ||
+            checkout.createdBy === 'task'
+        ) {
             throw new Error('not-platform-created');
         }
-        if (checkout.state !== 'creating' && checkout.state !== 'ready') throw new Error('not-usable');
+        if (checkout.state !== 'creating' && checkout.state !== 'ready')
+            throw new Error('not-usable');
         if (!checkout.remoteUrl) throw new Error('no-remote');
         const last = checkout.lastCommand;
         const running = last !== null && last !== undefined && last.exitCode === null;
@@ -943,7 +1043,9 @@ export class FleetCheckoutService {
     private async applyCreateResult(node: FleetNode, raw: unknown): Promise<void> {
         const result = parseFleetCheckoutsCreateResult(raw);
         if (!result) {
-            this.logger.warn(`Node ${node.id} sent a checkout create result this platform cannot read`);
+            this.logger.warn(
+                `Node ${node.id} sent a checkout create result this platform cannot read`,
+            );
             return;
         }
         const row = await this.checkouts.findById(result.checkoutId);
@@ -976,11 +1078,17 @@ export class FleetCheckoutService {
         });
     }
 
-    private async applyDeleteResult(node: FleetNode, raw: unknown, known: FleetCheckout | null): Promise<void> {
+    private async applyDeleteResult(
+        node: FleetNode,
+        raw: unknown,
+        known: FleetCheckout | null,
+    ): Promise<void> {
         const result = parseFleetCheckoutsDeleteResult(raw);
         if (!result || result.mode !== 'delete') return;
         const row =
-            known && known.path === result.path ? known : await this.checkouts.findByPath(node.id, result.path);
+            known && known.path === result.path
+                ? known
+                : await this.checkouts.findByPath(node.id, result.path);
         if (!row) return;
         const at = new Date(this.now()).toISOString();
         if (result.removed) {
@@ -1017,7 +1125,11 @@ export class FleetCheckoutService {
     }
 
     /** The remote's branch names for one checkout (FL-06's `remoteHeads`); empty when it cannot be asked. */
-    private async remoteBranchesOf(node: FleetNode, actor: FleetCheckoutActor, path: string): Promise<string[]> {
+    private async remoteBranchesOf(
+        node: FleetNode,
+        actor: FleetCheckoutActor,
+        path: string,
+    ): Promise<string[]> {
         try {
             const outcome = await this.ask(node, actor, {
                 verb: 'checkouts.list',
@@ -1057,7 +1169,11 @@ export class FleetCheckoutService {
      * (`unreachable`, U1), then the machine's own consent check: `--manage`, or
      * `--work` for a Task's worktree. A read: no audit row.
      */
-    async changes(id: string, actor: FleetCheckoutActor, maxBytes?: number): Promise<FleetCheckoutChangesReply> {
+    async changes(
+        id: string,
+        actor: FleetCheckoutActor,
+        maxBytes?: number,
+    ): Promise<FleetCheckoutChangesReply> {
         const { checkout, node } = await this.resolve(id, actor, 'checkouts');
         this.requireUsable(checkout, node);
         if (await this.isStopped())
@@ -1081,9 +1197,13 @@ export class FleetCheckoutService {
             target: checkout.path,
             timeoutMs: LIST_TIMEOUT_MS,
         });
-        const reply = 'result' in outcome ? parseFleetCheckoutChangesReply(outcome.result, cap) : null;
+        const reply =
+            'result' in outcome ? parseFleetCheckoutChangesReply(outcome.result, cap) : null;
         if (!reply) {
-            throw fleetCheckoutError('operation_failed', `${node.name} did not answer in time; try again`);
+            throw fleetCheckoutError(
+                'operation_failed',
+                `${node.name} did not answer in time; try again`,
+            );
         }
         return reply;
     }
@@ -1098,12 +1218,18 @@ export class FleetCheckoutService {
     async takenBranchNames(
         id: string,
         actor: FleetCheckoutActor,
-    ): Promise<{ checkout: FleetCheckoutView; nodeName: string; taken: string[]; remoteChecked: boolean }> {
+    ): Promise<{
+        checkout: FleetCheckoutView;
+        nodeName: string;
+        taken: string[];
+        remoteChecked: boolean;
+    }> {
         const { checkout, node } = await this.resolve(id, actor, 'view');
         const taken = new Set<string>();
         if (checkout.remoteUrl) {
             for (const row of await this.checkouts.findForUser(node.userId)) {
-                if (row.branch && fleetRemotesMatch(row.remoteUrl, checkout.remoteUrl)) taken.add(row.branch);
+                if (row.branch && fleetRemotesMatch(row.remoteUrl, checkout.remoteUrl))
+                    taken.add(row.branch);
             }
         }
         let remoteChecked = false;
@@ -1117,7 +1243,8 @@ export class FleetCheckoutService {
                     target: checkout.path,
                     timeoutMs: LIST_TIMEOUT_MS,
                 });
-                const reply = 'result' in outcome ? parseFleetCheckoutsListReply(outcome.result) : null;
+                const reply =
+                    'result' in outcome ? parseFleetCheckoutsListReply(outcome.result) : null;
                 if (reply?.remoteBranches) {
                     remoteChecked = true;
                     for (const name of reply.remoteBranches) taken.add(name);
@@ -1130,7 +1257,12 @@ export class FleetCheckoutService {
                 );
             }
         }
-        return { checkout: await this.view(checkout, actor), nodeName: node.name, taken: [...taken], remoteChecked };
+        return {
+            checkout: await this.view(checkout, actor),
+            nodeName: node.name,
+            taken: [...taken],
+            remoteChecked,
+        };
     }
 
     /**
@@ -1139,7 +1271,11 @@ export class FleetCheckoutService {
      * `fleet_checkouts`. Only while the line is still on the branch the pull
      * request was resolved for; answers whether anything changed.
      */
-    async setPullRequest(id: string, branch: string, pr: FleetGitLinePullRequest | null): Promise<boolean> {
+    async setPullRequest(
+        id: string,
+        branch: string,
+        pr: FleetGitLinePullRequest | null,
+    ): Promise<boolean> {
         const row = await this.checkouts.findById(id);
         if (!row) return false;
         const line = parseFleetGitLine(row.gitLine);
@@ -1164,8 +1300,12 @@ export class FleetCheckoutService {
      * contacts the remote; skipped while the computer cannot be reached or the
      * kill switch is on. Never throws.
      */
-    async refreshForSessions(nodeId: string, checkoutIds: readonly string[]): Promise<{ refreshed: number }> {
-        if (!this.node || !this.node.isConnected(nodeId) || checkoutIds.length === 0) return { refreshed: 0 };
+    async refreshForSessions(
+        nodeId: string,
+        checkoutIds: readonly string[],
+    ): Promise<{ refreshed: number }> {
+        if (!this.node || !this.node.isConnected(nodeId) || checkoutIds.length === 0)
+            return { refreshed: 0 };
         if (await this.isStopped()) return { refreshed: 0 };
         try {
             const node = await this.nodes.findById(nodeId);
@@ -1340,7 +1480,8 @@ export class FleetCheckoutService {
         for (const record of reply.checkouts) {
             const row = byPath.get(record.path) ?? null;
             const patch = checkoutPatchFromRecord(row, record, now);
-            const remoteUrl = patch.remoteUrl !== undefined ? patch.remoteUrl : (row?.remoteUrl ?? null);
+            const remoteUrl =
+                patch.remoteUrl !== undefined ? patch.remoteUrl : (row?.remoteUrl ?? null);
             const work = matchCheckoutWork(remoteUrl, works);
             if (work) patch.workId = work.id;
             else if (needsWorks && remoteUrl) patch.workId = null;
@@ -1416,7 +1557,9 @@ export class FleetCheckoutService {
     ): Promise<void> {
         const result = parseFleetCheckoutsSyncResult(raw);
         if (!result) {
-            this.logger.warn(`Node ${node.id} sent a checkout sync result this platform cannot read`);
+            this.logger.warn(
+                `Node ${node.id} sent a checkout sync result this platform cannot read`,
+            );
             return;
         }
         const row =
@@ -1480,7 +1623,11 @@ export class FleetCheckoutService {
         const checkout = await this.checkouts.findById(id);
         if (!checkout) throw fleetCheckoutError('not_found', 'no such checkout');
         try {
-            const { node } = await this.access.resolveForFamily(checkout.nodeId, actor.userId, family);
+            const { node } = await this.access.resolveForFamily(
+                checkout.nodeId,
+                actor.userId,
+                family,
+            );
             return { checkout, node };
         } catch (error) {
             const typed = readFleetSessionError(error);
@@ -1528,7 +1675,8 @@ export class FleetCheckoutService {
             try {
                 const live = await this.sessions.findLiveForNode(node.id);
                 const inside = live.find(
-                    (session) => session.checkoutId === checkout.id || session.cwd === checkout.path,
+                    (session) =>
+                        session.checkoutId === checkout.id || session.cwd === checkout.path,
                 );
                 if (inside) title = inside.title;
             } catch (error) {

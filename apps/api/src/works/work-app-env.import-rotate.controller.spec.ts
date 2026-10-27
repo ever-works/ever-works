@@ -58,7 +58,12 @@ function editor() {
             limits: null,
             undeclared: [],
         })),
-        rotate: jest.fn(async () => ({ workId: WORK_ID, name: 'SESSION', version: 3, entries: [] })),
+        rotate: jest.fn(async () => ({
+            workId: WORK_ID,
+            name: 'SESSION',
+            version: 3,
+            entries: [],
+        })),
     };
 }
 
@@ -75,7 +80,9 @@ async function statusOf(call: () => Promise<unknown>) {
 describe('WorkAppEnvController — import preview and rotate (lane aw-ops)', () => {
     it('serves POST :id/app-env/import-preview and POST :id/app-env/:name/rotate', () => {
         const proto = WorkAppEnvController.prototype as unknown as Record<string, () => unknown>;
-        expect(Reflect.getMetadata(PATH_METADATA, proto.previewImport)).toBe(':id/app-env/import-preview');
+        expect(Reflect.getMetadata(PATH_METADATA, proto.previewImport)).toBe(
+            ':id/app-env/import-preview',
+        );
         expect(Reflect.getMetadata(METHOD_METADATA, proto.previewImport)).toBe(RequestMethod.POST);
         expect(Reflect.getMetadata(PATH_METADATA, proto.rotate)).toBe(':id/app-env/:name/rotate');
         expect(Reflect.getMetadata(METHOD_METADATA, proto.rotate)).toBe(RequestMethod.POST);
@@ -83,18 +90,30 @@ describe('WorkAppEnvController — import preview and rotate (lane aw-ops)', () 
 
     it('previews for an editor and passes the body through untouched', async () => {
         const e = editor();
-        const controller = new WorkAppEnvController(ownership('owner'), e as unknown as AppEnvEditorService);
+        const controller = new WorkAppEnvController(
+            ownership('owner'),
+            e as unknown as AppEnvEditorService,
+        );
         const body = { import: { dotenv: 'A=1' } };
         await expect(controller.previewImport(USER, WORK_ID, body)).resolves.toMatchObject({
             changes: { add: ['A'] },
         });
-        expect(e.previewImport).toHaveBeenCalledWith(WORK_ID, { userId: expect.any(String), canEdit: true }, body);
+        expect(e.previewImport).toHaveBeenCalledWith(
+            WORK_ID,
+            { userId: expect.any(String), canEdit: true },
+            body,
+        );
     });
 
     it('rotates for an editor with the name from the path', async () => {
         const e = editor();
-        const controller = new WorkAppEnvController(ownership('owner'), e as unknown as AppEnvEditorService);
-        await expect(controller.rotate(USER, WORK_ID, 'SESSION', { confirmName: 'SESSION' })).resolves.toEqual({
+        const controller = new WorkAppEnvController(
+            ownership('owner'),
+            e as unknown as AppEnvEditorService,
+        );
+        await expect(
+            controller.rotate(USER, WORK_ID, 'SESSION', { confirmName: 'SESSION' }),
+        ).resolves.toEqual({
             workId: WORK_ID,
             name: 'SESSION',
             version: 3,
@@ -114,9 +133,16 @@ describe('WorkAppEnvController — import preview and rotate (lane aw-ops)', () 
             ['foreign', HttpStatus.NOT_FOUND],
         ] as const) {
             const e = editor();
-            const controller = new WorkAppEnvController(ownership(role), e as unknown as AppEnvEditorService);
-            expect((await statusOf(() => controller.previewImport(USER, WORK_ID, {}))).status).toBe(status);
-            expect((await statusOf(() => controller.rotate(USER, WORK_ID, 'SESSION', {}))).status).toBe(status);
+            const controller = new WorkAppEnvController(
+                ownership(role),
+                e as unknown as AppEnvEditorService,
+            );
+            expect((await statusOf(() => controller.previewImport(USER, WORK_ID, {}))).status).toBe(
+                status,
+            );
+            expect(
+                (await statusOf(() => controller.rotate(USER, WORK_ID, 'SESSION', {}))).status,
+            ).toBe(status);
             expect(e.previewImport).not.toHaveBeenCalled();
             expect(e.rotate).not.toHaveBeenCalled();
         }
@@ -139,23 +165,39 @@ describe('WorkAppEnvController — import preview and rotate (lane aw-ops)', () 
                 status: 422,
             }),
         );
-        const controller = new WorkAppEnvController(ownership('owner'), e as unknown as AppEnvEditorService);
+        const controller = new WorkAppEnvController(
+            ownership('owner'),
+            e as unknown as AppEnvEditorService,
+        );
 
         await expect(statusOf(() => controller.previewImport(USER, WORK_ID, {}))).resolves.toEqual({
             status: 400,
-            body: { status: 'error', code: 'undeclaredName', message: 'undeclared', names: ['TYPO'] },
+            body: {
+                status: 'error',
+                code: 'undeclaredName',
+                message: 'undeclared',
+                names: ['TYPO'],
+            },
         });
-        await expect(statusOf(() => controller.rotate(USER, WORK_ID, 'SESSION', { confirmName: 'X' }))).resolves.toEqual(
-            { status: 422, body: { status: 'error', code: 'rotateConfirmationMismatch', message: 'mismatch' } },
-        );
+        await expect(
+            statusOf(() => controller.rotate(USER, WORK_ID, 'SESSION', { confirmName: 'X' })),
+        ).resolves.toEqual({
+            status: 422,
+            body: { status: 'error', code: 'rotateConfirmationMismatch', message: 'mismatch' },
+        });
     });
 
     it('lets an unexpected error through untouched', async () => {
         const e = editor();
         const boom = new Error('db down');
         e.rotate.mockRejectedValueOnce(boom);
-        const controller = new WorkAppEnvController(ownership('owner'), e as unknown as AppEnvEditorService);
-        await expect(controller.rotate(USER, WORK_ID, 'SESSION', { confirmName: 'SESSION' })).rejects.toBe(boom);
+        const controller = new WorkAppEnvController(
+            ownership('owner'),
+            e as unknown as AppEnvEditorService,
+        );
+        await expect(
+            controller.rotate(USER, WORK_ID, 'SESSION', { confirmName: 'SESSION' }),
+        ).rejects.toBe(boom);
         void NotFoundException;
     });
 });

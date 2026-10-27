@@ -109,7 +109,12 @@ function ownership() {
 function targets(overrides: Record<string, unknown> = {}) {
     return {
         putTarget: jest.fn(async () => ({ ok: true, body: { target: 'your-cluster' } })),
-        check: jest.fn(async () => ({ ok: true, httpStatus: 202, requestId: 'r', dispatched: true })),
+        check: jest.fn(async () => ({
+            ok: true,
+            httpStatus: 202,
+            requestId: 'r',
+            dispatched: true,
+        })),
         rollback: jest.fn(async () => ({
             ok: true,
             result: { status: 'accepted', httpStatus: 202, unmet: [], advisory: [], warnings: [] },
@@ -121,7 +126,10 @@ function targets(overrides: Record<string, unknown> = {}) {
             dispatched: true,
             action: 'remove',
         })),
-        pendingTargetChange: jest.fn(async () => ({ targetChanges: true, namespaceChanges: false })),
+        pendingTargetChange: jest.fn(async () => ({
+            targetChanges: true,
+            namespaceChanges: false,
+        })),
         clusterCredentialNeedsOwnerConfirmation: jest.fn(async () => false),
         confirmClusterCredential: jest.fn(async () => true),
         ...overrides,
@@ -152,8 +160,12 @@ describe('app-owner-gate switches', () => {
     it('are ON unless exactly false', () => {
         expect(appTargetChangeRequiresOwner({})).toBe(true);
         expect(appDataDeleteOwnerOnly({ APP_DATA_DELETE_OWNER_ONLY: 'no' })).toBe(true);
-        expect(appLicenseAttestSessionOnly({ APP_LICENSE_ATTEST_SESSION_ONLY: ' False ' })).toBe(false);
-        expect(appTargetChangeRequiresOwner({ APP_TARGET_CHANGE_REQUIRES_OWNER: 'false' })).toBe(false);
+        expect(appLicenseAttestSessionOnly({ APP_LICENSE_ATTEST_SESSION_ONLY: ' False ' })).toBe(
+            false,
+        );
+        expect(appTargetChangeRequiresOwner({ APP_TARGET_CHANGE_REQUIRES_OWNER: 'false' })).toBe(
+            false,
+        );
     });
 
     it('carriesValue: absent, null and blank text carry nothing', () => {
@@ -201,7 +213,12 @@ describe('POST app-target/check — saving a cluster credential is the owner’s
         const { controller, svc } = build();
         expect(
             await outcome(() =>
-                controller.checkAppTarget(editorSession, WORK_ID, { kubeContext: 'prod' }, response()),
+                controller.checkAppTarget(
+                    editorSession,
+                    WORK_ID,
+                    { kubeContext: 'prod' },
+                    response(),
+                ),
             ),
         ).toBe('ownerRequired');
         expect(
@@ -218,7 +235,12 @@ describe('POST app-target/check — saving a cluster credential is the owner’s
                 controller.checkAppTarget(editorSession, WORK_ID, { kubeconfig: 'x' }, response()),
             ),
         ).toBe('allowed');
-        expect(svc.check).toHaveBeenCalledWith(WORK_ID, EDITOR, { kubeconfig: 'x' }, { isOwner: false });
+        expect(svc.check).toHaveBeenCalledWith(
+            WORK_ID,
+            EDITOR,
+            { kubeconfig: 'x' },
+            { isOwner: false },
+        );
     });
 });
 
@@ -228,10 +250,15 @@ describe('PUT app-target — the target and namespace are the owner’s', () => 
         const svc = targets();
         const controller = new WorkAppRuntimeController(own as never, svc as never);
 
-        expect(await outcome(() => controller.putAppTarget(editorSession, WORK_ID, { target: 'none' }))).toBe(
-            'ownerRequired',
-        );
-        svc.pendingTargetChange.mockResolvedValueOnce({ targetChanges: false, namespaceChanges: true });
+        expect(
+            await outcome(() =>
+                controller.putAppTarget(editorSession, WORK_ID, { target: 'none' }),
+            ),
+        ).toBe('ownerRequired');
+        svc.pendingTargetChange.mockResolvedValueOnce({
+            targetChanges: false,
+            namespaceChanges: true,
+        });
         expect(
             await outcome(() =>
                 controller.putAppTarget(editorSession, WORK_ID, {
@@ -242,21 +269,24 @@ describe('PUT app-target — the target and namespace are the owner’s', () => 
         ).toBe('ownerRequired');
         expect(svc.putTarget).not.toHaveBeenCalled();
 
-        expect(await outcome(() => controller.putAppTarget(ownerKey, WORK_ID, { target: 'none' }))).toBe(
-            'session',
-        );
-        expect(await outcome(() => controller.putAppTarget(integration, WORK_ID, { target: 'none' }))).toBe(
-            'integration',
-        );
-        expect(await outcome(() => controller.putAppTarget(ownerSession, WORK_ID, { target: 'none' }))).toBe(
-            'allowed',
-        );
+        expect(
+            await outcome(() => controller.putAppTarget(ownerKey, WORK_ID, { target: 'none' })),
+        ).toBe('session');
+        expect(
+            await outcome(() => controller.putAppTarget(integration, WORK_ID, { target: 'none' })),
+        ).toBe('integration');
+        expect(
+            await outcome(() => controller.putAppTarget(ownerSession, WORK_ID, { target: 'none' })),
+        ).toBe('allowed');
     });
 
     it('other settings stay an editor action, and the switch off restores today', async () => {
         const own = ownership();
         const svc = targets({
-            pendingTargetChange: jest.fn(async () => ({ targetChanges: false, namespaceChanges: false })),
+            pendingTargetChange: jest.fn(async () => ({
+                targetChanges: false,
+                namespaceChanges: false,
+            })),
         });
         const controller = new WorkAppRuntimeController(own as never, svc as never);
         expect(
@@ -271,9 +301,11 @@ describe('PUT app-target — the target and namespace are the owner’s', () => 
         process.env.APP_TARGET_CHANGE_REQUIRES_OWNER = 'false';
         const off = targets();
         const offController = new WorkAppRuntimeController(ownership() as never, off as never);
-        expect(await outcome(() => offController.putAppTarget(editorSession, WORK_ID, { target: 'none' }))).toBe(
-            'allowed',
-        );
+        expect(
+            await outcome(() =>
+                offController.putAppTarget(editorSession, WORK_ID, { target: 'none' }),
+            ),
+        ).toBe('allowed');
         expect(off.pendingTargetChange).not.toHaveBeenCalled();
     });
 });
@@ -320,9 +352,9 @@ describe('POST deploy — confirming a cluster change, or first use of a non-own
 
     it('an ordinary deploy stays an editor action and says whether a person asked', async () => {
         const { controller, request } = build();
-        expect(await outcome(() => controller.deploy(editorSession, WORK_ID, {} as never, response()))).toBe(
-            'allowed',
-        );
+        expect(
+            await outcome(() => controller.deploy(editorSession, WORK_ID, {} as never, response())),
+        ).toBe('allowed');
         expect(request).toHaveBeenLastCalledWith(
             expect.objectContaining({ userId: EDITOR, requestedByHumanSession: true }),
         );
@@ -336,20 +368,26 @@ describe('POST deploy — confirming a cluster change, or first use of a non-own
     it("the first use of a credential a non-owner saved needs the owner's session, which confirms it", async () => {
         const editorCase = build(true);
         expect(
-            await outcome(() => editorCase.controller.deploy(editorSession, WORK_ID, {} as never, response())),
+            await outcome(() =>
+                editorCase.controller.deploy(editorSession, WORK_ID, {} as never, response()),
+            ),
         ).toBe('ownerRequired');
         expect(editorCase.svc.confirmClusterCredential).not.toHaveBeenCalled();
         expect(editorCase.request).not.toHaveBeenCalled();
 
         const keyCase = build(true);
         expect(
-            await outcome(() => keyCase.controller.deploy(ownerKey, WORK_ID, {} as never, response())),
+            await outcome(() =>
+                keyCase.controller.deploy(ownerKey, WORK_ID, {} as never, response()),
+            ),
         ).toBe('session');
         expect(keyCase.svc.confirmClusterCredential).not.toHaveBeenCalled();
 
         const ownerCase = build(true);
         expect(
-            await outcome(() => ownerCase.controller.deploy(ownerSession, WORK_ID, {} as never, response())),
+            await outcome(() =>
+                ownerCase.controller.deploy(ownerSession, WORK_ID, {} as never, response()),
+            ),
         ).toBe('allowed');
         expect(ownerCase.svc.confirmClusterCredential).toHaveBeenCalledWith(WORK_ID, OWNER);
         // Confirmed BEFORE the request, so the preconditions see it.
@@ -363,10 +401,17 @@ describe('POST deploy — confirming a cluster change, or first use of a non-own
         const { controller, request, svc } = build(true);
         expect(
             await outcome(() =>
-                controller.deploy(editorSession, WORK_ID, { confirmClusterChange: true } as never, response()),
+                controller.deploy(
+                    editorSession,
+                    WORK_ID,
+                    { confirmClusterChange: true } as never,
+                    response(),
+                ),
             ),
         ).toBe('allowed');
-        expect(request).toHaveBeenCalledWith(expect.objectContaining({ confirmClusterChange: true }));
+        expect(request).toHaveBeenCalledWith(
+            expect.objectContaining({ confirmClusterChange: true }),
+        );
         expect(svc.clusterCredentialNeedsOwnerConfirmation).not.toHaveBeenCalled();
     });
 });
@@ -429,9 +474,9 @@ describe('POST app-lifecycle — removing with the data is the owner’s', () =>
     ])('remove + deleteData: %s → %s', async (_who, auth, expected) => {
         const svc = targets();
         const controller = new WorkAppRuntimeController(ownership() as never, svc as never);
-        expect(await outcome(() => controller.lifecycleApp(auth, WORK_ID, removeWithData, response()))).toBe(
-            expected,
-        );
+        expect(
+            await outcome(() => controller.lifecycleApp(auth, WORK_ID, removeWithData, response())),
+        ).toBe(expected);
         expect(svc.lifecycle).toHaveBeenCalledTimes(expected === 'allowed' ? 1 : 0);
     });
 
@@ -445,13 +490,17 @@ describe('POST app-lifecycle — removing with the data is the owner’s', () =>
             { action: 'remove', deleteData: false },
             { action: 'cancel-deploy' },
         ]) {
-            expect(await outcome(() => controller.lifecycleApp(editorSession, WORK_ID, body, response()))).toBe(
-                'allowed',
-            );
+            expect(
+                await outcome(() =>
+                    controller.lifecycleApp(editorSession, WORK_ID, body, response()),
+                ),
+            ).toBe('allowed');
         }
         process.env.APP_DATA_DELETE_OWNER_ONLY = 'false';
         expect(
-            await outcome(() => controller.lifecycleApp(editorSession, WORK_ID, removeWithData, response())),
+            await outcome(() =>
+                controller.lifecycleApp(editorSession, WORK_ID, removeWithData, response()),
+            ),
         ).toBe('allowed');
     });
 });
@@ -477,10 +526,18 @@ describe('DELETE app-dependencies/:kind — Delete data is the owner’s', () =>
         const { controller, dependencies } = build();
         expect(
             await outcome(() =>
-                controller.deleteData(auth, WORK_ID, 'postgres', { confirmSlug: 'acme' }, response()),
+                controller.deleteData(
+                    auth,
+                    WORK_ID,
+                    'postgres',
+                    { confirmSlug: 'acme' },
+                    response(),
+                ),
             ),
         ).toBe(expected);
-        expect(dependencies.requestDataDeletion).toHaveBeenCalledTimes(expected === 'allowed' ? 1 : 0);
+        expect(dependencies.requestDataDeletion).toHaveBeenCalledTimes(
+            expected === 'allowed' ? 1 : 0,
+        );
     });
 
     it('the list tells the card who may delete data, and the switch off restores today', async () => {
@@ -500,7 +557,13 @@ describe('DELETE app-dependencies/:kind — Delete data is the owner’s', () =>
         const off = build();
         expect(
             await outcome(() =>
-                off.controller.deleteData(editorSession, WORK_ID, 'postgres', { confirmSlug: 'acme' }, response()),
+                off.controller.deleteData(
+                    editorSession,
+                    WORK_ID,
+                    'postgres',
+                    { confirmSlug: 'acme' },
+                    response(),
+                ),
             ),
         ).toBe('allowed');
     });

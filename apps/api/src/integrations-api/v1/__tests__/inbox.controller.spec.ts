@@ -328,7 +328,10 @@ describe('IntegrationInboxController', () => {
                 code: 'scope_missing',
                 response: {
                     error: {
-                        details: { missing: ['decisions:individual'], reason: 'individual_decision' },
+                        details: {
+                            missing: ['decisions:individual'],
+                            reason: 'individual_decision',
+                        },
                     },
                 },
             });

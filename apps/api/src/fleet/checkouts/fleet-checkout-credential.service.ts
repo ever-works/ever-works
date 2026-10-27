@@ -86,7 +86,9 @@ export class FleetCheckoutCredentialService {
             grant = await this.checkouts.authorizeCredential(nodeId, checkoutId, access);
         } catch (error) {
             const reason = error instanceof Error ? error.message : 'refused';
-            this.logger.warn(`Checkout ${checkoutId}: scoped credential refused for node ${nodeId} — ${reason}`);
+            this.logger.warn(
+                `Checkout ${checkoutId}: scoped credential refused for node ${nodeId} — ${reason}`,
+            );
             throw new FleetCheckoutCredentialRefusal(reason);
         }
         const repositoryId = fleetPushRemoteRepositoryId(grant.remoteUrl);
@@ -95,18 +97,25 @@ export class FleetCheckoutCredentialService {
             { repositoryId, repoUrl: grant.remoteUrl },
         ]);
         if (!scope.ok) {
-            this.logger.warn(`Checkout ${checkoutId}: no installation covers its repository — ${scope.reason}`);
+            this.logger.warn(
+                `Checkout ${checkoutId}: no installation covers its repository — ${scope.reason}`,
+            );
             throw new FleetCheckoutCredentialRefusal(scope.reason);
         }
         const credentials = appCredentials();
-        if (!credentials) throw new FleetCheckoutCredentialRefusal(FLEET_PUSH_CREDENTIAL_NOT_CONFIGURED_REASON);
+        if (!credentials)
+            throw new FleetCheckoutCredentialRefusal(FLEET_PUSH_CREDENTIAL_NOT_CONFIGURED_REASON);
         let minted: { token: string; expiresAt: string | null };
         try {
-            minted = await requestGitHubAppInstallationAccessTokenDetails(scope.installationId, credentials, {
-                repositoryIds: scope.repositoryIds,
-                // The ONE permission the operation needs. Never `workflows`.
-                permissions: { contents: access === 'write' ? 'write' : 'read' },
-            });
+            minted = await requestGitHubAppInstallationAccessTokenDetails(
+                scope.installationId,
+                credentials,
+                {
+                    repositoryIds: scope.repositoryIds,
+                    // The ONE permission the operation needs. Never `workflows`.
+                    permissions: { contents: access === 'write' ? 'write' : 'read' },
+                },
+            );
         } catch (error) {
             this.logger.error(
                 `Checkout ${checkoutId}: scoped credential mint failed (${

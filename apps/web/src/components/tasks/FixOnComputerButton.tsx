@@ -37,7 +37,11 @@ export function FixOnComputerButton({
             if (event.key !== 'f' && event.key !== 'F') return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
             const target = event.target as HTMLElement | null;
-            if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+            if (
+                target &&
+                (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))
+            )
+                return;
             event.preventDefault();
             setOpen(true);
         };
@@ -63,7 +67,12 @@ export function FixOnComputerButton({
                 <Laptop className="h-3.5 w-3.5" aria-hidden="true" />
                 {!compact && <span>{t('button')}</span>}
             </button>
-            <FixOnComputerDialog taskId={taskId} taskSlug={taskSlug} open={open} onOpenChange={setOpen} />
+            <FixOnComputerDialog
+                taskId={taskId}
+                taskSlug={taskSlug}
+                open={open}
+                onOpenChange={setOpen}
+            />
         </>
     );
 }

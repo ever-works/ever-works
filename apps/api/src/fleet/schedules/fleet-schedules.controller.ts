@@ -81,7 +81,10 @@ export class FleetSchedulesController {
         @Query() query: ListFleetSchedulesQueryDto,
     ): Promise<{ schedules: FleetScheduleView[] }> {
         return {
-            schedules: await this.schedules.listForUser(actorOf(auth), query.nodeId ? { nodeId: query.nodeId } : {}),
+            schedules: await this.schedules.listForUser(
+                actorOf(auth),
+                query.nodeId ? { nodeId: query.nodeId } : {},
+            ),
         };
     }
 
@@ -141,7 +144,8 @@ export class FleetSchedulesController {
 
     @Delete(':id')
     @ApiOperation({
-        summary: 'Delete a schedule (`confirm: true`); it stops on the computer and its runs stay readable for 30 days.',
+        summary:
+            'Delete a schedule (`confirm: true`); it stops on the computer and its runs stay readable for 30 days.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: FLEET_SCHEDULE_WRITES_PER_MINUTE, ttl: 60_000 } })
@@ -154,7 +158,10 @@ export class FleetSchedulesController {
     }
 
     @Get(':id/runs')
-    @ApiOperation({ summary: "A schedule's last runs, newest first (at most 30), with the fire each belongs to." })
+    @ApiOperation({
+        summary:
+            "A schedule's last runs, newest first (at most 30), with the fire each belongs to.",
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 240, ttl: 60_000 } })
     async runs(
@@ -176,9 +183,19 @@ export class FleetSchedulesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: ConfirmFleetScheduleDto,
-    ): Promise<{ runId: string; startedAt: string; nextRunAt: string | null; schedule: FleetScheduleView }> {
+    ): Promise<{
+        runId: string;
+        startedAt: string;
+        nextRunAt: string | null;
+        schedule: FleetScheduleView;
+    }> {
         const started = await this.schedules.runNow(id, actorOf(auth), body?.confirm === true);
-        return { runId: started.runId, startedAt: started.startedAt, nextRunAt: started.nextRunAt, schedule: started.view };
+        return {
+            runId: started.runId,
+            startedAt: started.startedAt,
+            nextRunAt: started.nextRunAt,
+            schedule: started.view,
+        };
     }
 
     @Post(':id/pause')
@@ -193,7 +210,10 @@ export class FleetSchedulesController {
     }
 
     @Post(':id/resume')
-    @ApiOperation({ summary: 'Resume a paused schedule (class `plain`); fires missed while paused are not replayed.' })
+    @ApiOperation({
+        summary:
+            'Resume a paused schedule (class `plain`); fires missed while paused are not replayed.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: FLEET_SCHEDULE_WRITES_PER_MINUTE, ttl: 60_000 } })
     async resume(
@@ -224,7 +244,7 @@ export class FleetNodeSchedulesController {
     @Get(':id/schedules/agents')
     @ApiOperation({
         summary:
-            "The Agents an Agent-session schedule on this computer may use: pinned to it first, every other one listed with why it cannot be picked (pinned elsewhere, not pinned, no Organization).",
+            'The Agents an Agent-session schedule on this computer may use: pinned to it first, every other one listed with why it cannot be picked (pinned elsewhere, not pinned, no Organization).',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
@@ -232,13 +252,15 @@ export class FleetNodeSchedulesController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<{ agents: FleetScheduleAgentOption[] }> {
-        return { agents: await this.sessionSchedules.listAgentsForNode(this.sessionActor(auth), id) };
+        return {
+            agents: await this.sessionSchedules.listAgentsForNode(this.sessionActor(auth), id),
+        };
     }
 
     @Post(':id/schedules/agent-session')
     @ApiOperation({
         summary:
-            "Schedule an Agent session on this computer (FL-13 P2): a recurring Task of an Agent pinned here; each fire runs as an Agent session on this computer with the sign-in set up there. Without `confirm: true` it answers 409 `confirmation_required` carrying the unattended-credential sentence.",
+            'Schedule an Agent session on this computer (FL-13 P2): a recurring Task of an Agent pinned here; each fire runs as an Agent session on this computer with the sign-in set up there. Without `confirm: true` it answers 409 `confirmation_required` carrying the unattended-credential sentence.',
     })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: FLEET_SCHEDULE_WRITES_PER_MINUTE, ttl: 60_000 } })
@@ -283,7 +305,9 @@ export class FleetNodeSchedulesController {
     }
 
     @Post(':id/schedules/resume-all')
-    @ApiOperation({ summary: "Undo a Pause all within 15 minutes: resume exactly the schedules it paused." })
+    @ApiOperation({
+        summary: 'Undo a Pause all within 15 minutes: resume exactly the schedules it paused.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async undoPauseAll(

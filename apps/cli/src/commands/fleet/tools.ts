@@ -1,6 +1,10 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { FLEET_TOOL_CATALOGUE, type FleetCliEnvelope, type FleetToolCatalogueEntry } from '@ever-works/contracts';
+import {
+    FLEET_TOOL_CATALOGUE,
+    type FleetCliEnvelope,
+    type FleetToolCatalogueEntry,
+} from '@ever-works/contracts';
 import { FLEET_EXIT } from './fleet-exit';
 import { fleetTable } from './fleet-output';
 

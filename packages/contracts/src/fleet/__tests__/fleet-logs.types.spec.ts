@@ -40,7 +40,10 @@ describe('limits (CONTRACTS §10)', () => {
 
 describe('source ids', () => {
 	it('round-trips every kind', () => {
-		expect(parseFleetLogSourceId(fleetLogSourceId('system', 'journal'))).toEqual({ kind: 'system', key: 'journal' });
+		expect(parseFleetLogSourceId(fleetLogSourceId('system', 'journal'))).toEqual({
+			kind: 'system',
+			key: 'journal'
+		});
 		expect(parseFleetLogSourceId('file:/var/log/syslog')).toEqual({ kind: 'file', key: '/var/log/syslog' });
 		expect(parseFleetLogSourceId('file:C:\\ProgramData\\app\\app.log')).toEqual({
 			kind: 'file',

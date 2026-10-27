@@ -45,10 +45,15 @@ const GAP_X = 72;
 const GAP_Y = 28;
 
 /** Layer of every service (longest path over `depends_on`), cycle-safe. */
-export function composeLayers(services: readonly Pick<FleetComposeServiceView, 'name' | 'dependsOn'>[]): Map<string, number> {
+export function composeLayers(
+    services: readonly Pick<FleetComposeServiceView, 'name' | 'dependsOn'>[],
+): Map<string, number> {
     const names = new Set(services.map((service) => service.name));
     const deps = new Map(
-        services.map((service) => [service.name, service.dependsOn.map((dep) => dep.service).filter((dep) => names.has(dep))]),
+        services.map((service) => [
+            service.name,
+            service.dependsOn.map((dep) => dep.service).filter((dep) => names.has(dep)),
+        ]),
     );
     const layer = new Map<string, number>();
     const visiting = new Set<string>();
@@ -72,7 +77,12 @@ export function edgeTone(
     dependency: Pick<FleetComposeServiceView, 'state' | 'health'> | undefined,
     condition: string,
 ): LayoutEdge['tone'] {
-    if (!dependency || dependency.state === 'absent' || dependency.state === 'exited' || dependency.state === 'dead') {
+    if (
+        !dependency ||
+        dependency.state === 'absent' ||
+        dependency.state === 'exited' ||
+        dependency.state === 'dead'
+    ) {
         return 'red';
     }
     if (condition === 'service_healthy' && dependency.health !== 'healthy') return 'amber';
@@ -87,12 +97,18 @@ export function layoutCompose(services: readonly FleetComposeServiceView[]): Com
         byLayer.set(value, [...(byLayer.get(value) ?? []), service.name]);
     }
     const rowOf = new Map<string, number>();
-    const depsOf = new Map(services.map((service) => [service.name, service.dependsOn.map((dep) => dep.service)]));
+    const depsOf = new Map(
+        services.map((service) => [service.name, service.dependsOn.map((dep) => dep.service)]),
+    );
     for (const value of [...byLayer.keys()].sort((a, b) => a - b)) {
         const names = byLayer.get(value) ?? [];
         const barycentre = (name: string): number => {
-            const placed = (depsOf.get(name) ?? []).map((dep) => rowOf.get(dep)).filter((row): row is number => row !== undefined);
-            return placed.length > 0 ? placed.reduce((sum, row) => sum + row, 0) / placed.length : Number.POSITIVE_INFINITY;
+            const placed = (depsOf.get(name) ?? [])
+                .map((dep) => rowOf.get(dep))
+                .filter((row): row is number => row !== undefined);
+            return placed.length > 0
+                ? placed.reduce((sum, row) => sum + row, 0) / placed.length
+                : Number.POSITIVE_INFINITY;
         };
         const ordered = [...names].sort((a, b) => {
             const delta = barycentre(a) - barycentre(b);
@@ -120,7 +136,12 @@ export function layoutCompose(services: readonly FleetComposeServiceView[]): Com
     for (const service of services) {
         for (const dep of service.dependsOn) {
             if (!byName.has(dep.service)) continue;
-            edges.push({ from: service.name, to: dep.service, tone: edgeTone(byName.get(dep.service), dep.condition), condition: dep.condition });
+            edges.push({
+                from: service.name,
+                to: dep.service,
+                tone: edgeTone(byName.get(dep.service), dep.condition),
+                condition: dep.condition,
+            });
         }
     }
     edges.sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));

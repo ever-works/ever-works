@@ -64,7 +64,11 @@ import {
 } from '@ever-works/contracts';
 import { fleetVirtualViewOf } from './virtual/fleet-virtual.view';
 import { fleetCloudRemovableNode, fleetCloudViewOf } from './cloud/fleet-cloud.view';
-import { applyReportedDesktop, fleetNodeDesktopViewOf, helperEventAudit } from './desktop/fleet-desktop-facts';
+import {
+    applyReportedDesktop,
+    fleetNodeDesktopViewOf,
+    helperEventAudit,
+} from './desktop/fleet-desktop-facts';
 import type {
     FleetAuditAction,
     FleetNodeHealthStored,
@@ -1526,37 +1530,44 @@ export class FleetService {
         const rows = await this.repository.findByUser(userId);
         const now = Date.now();
         const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
-        return rows
-            // A virtual computer being built (FL-16) is not a token a person
-            // minted: its row waits for the guest, which is handed its own
-            // token when it is ready. The hub shows it under its host instead.
-            // A cloud computer (FL-17) is the same: its token went into the
-            // provider's bootstrap, and the hub shows the row with its phase.
-            .filter((row) => row.status === 'enrolling' && row.origin !== 'virtual' && row.origin !== 'cloud')
-            .map((row) => {
-                const issuedAtMs = credentialIssuedAtMs(row);
-                const hasIssuedAt = Number.isFinite(issuedAtMs);
-                // The LIVE TTL, not the exported default: this list is the
-                // expiry an operator is SHOWN, and `enroll` validates
-                // against `config.fleet.getEnrollmentTokenTtlMs()`. Reading
-                // the constant here made the two disagree the moment
-                // `FLEET_ENROLLMENT_TOKEN_TTL_MS` was set — a token listed
-                // as live that enroll refuses, or the reverse.
-                const expiresAtMs = issuedAtMs + ttlMs;
-                return {
-                    nodeId: row.id,
-                    name: row.name,
-                    kind: row.kind,
-                    issuedAt: hasIssuedAt ? new Date(issuedAtMs).toISOString() : null,
-                    expiresAt: hasIssuedAt ? new Date(expiresAtMs).toISOString() : null,
-                    // A row we cannot date is treated as expired — the
-                    // enroll path refuses it for the same reason.
-                    expired: !hasIssuedAt || expiresAtMs <= now,
-                    // A rotation mints a token on a row that already
-                    // beat once; a fresh "add node" never has.
-                    rotated: Boolean(row.lastHeartbeatAt),
-                };
-            });
+        return (
+            rows
+                // A virtual computer being built (FL-16) is not a token a person
+                // minted: its row waits for the guest, which is handed its own
+                // token when it is ready. The hub shows it under its host instead.
+                // A cloud computer (FL-17) is the same: its token went into the
+                // provider's bootstrap, and the hub shows the row with its phase.
+                .filter(
+                    (row) =>
+                        row.status === 'enrolling' &&
+                        row.origin !== 'virtual' &&
+                        row.origin !== 'cloud',
+                )
+                .map((row) => {
+                    const issuedAtMs = credentialIssuedAtMs(row);
+                    const hasIssuedAt = Number.isFinite(issuedAtMs);
+                    // The LIVE TTL, not the exported default: this list is the
+                    // expiry an operator is SHOWN, and `enroll` validates
+                    // against `config.fleet.getEnrollmentTokenTtlMs()`. Reading
+                    // the constant here made the two disagree the moment
+                    // `FLEET_ENROLLMENT_TOKEN_TTL_MS` was set — a token listed
+                    // as live that enroll refuses, or the reverse.
+                    const expiresAtMs = issuedAtMs + ttlMs;
+                    return {
+                        nodeId: row.id,
+                        name: row.name,
+                        kind: row.kind,
+                        issuedAt: hasIssuedAt ? new Date(issuedAtMs).toISOString() : null,
+                        expiresAt: hasIssuedAt ? new Date(expiresAtMs).toISOString() : null,
+                        // A row we cannot date is treated as expired — the
+                        // enroll path refuses it for the same reason.
+                        expired: !hasIssuedAt || expiresAtMs <= now,
+                        // A rotation mints a token on a row that already
+                        // beat once; a fresh "add node" never has.
+                        rotated: Boolean(row.lastHeartbeatAt),
+                    };
+                })
+        );
     }
 
     /**
@@ -1987,7 +1998,10 @@ export class FleetService {
         // bill — the owner destroys it from the Fleet. Its credential dies here
         // (heartbeat fails closed on a NULL hash) and the row stays, drained.
         if ((node.origin === 'cloud' || node.providerPluginId) && !fleetCloudRemovableNode(node)) {
-            await this.repository.update(node.id, { status: 'disabled', enrollmentTokenHash: null });
+            await this.repository.update(node.id, {
+                status: 'disabled',
+                enrollmentTokenHash: null,
+            });
             await this.tryAuditNode({
                 action: 'node.unenroll',
                 actorUserId: null,
@@ -2067,7 +2081,11 @@ export class FleetService {
         throw new UnprocessableEntityException({
             statusCode: 422,
             message: hint,
-            error: { code: 'unsupported_on_node', hint, details: { origin: 'cloud', action: 'destroy' } },
+            error: {
+                code: 'unsupported_on_node',
+                hint,
+                details: { origin: 'cloud', action: 'destroy' },
+            },
         });
     }
 
@@ -2089,7 +2107,8 @@ export class FleetService {
         // Read through a guard: a repository double built before FL-16 has no
         // children finder, and a registry without one has no children.
         const finder = (this.repository as Partial<FleetNodeRepository>).findByHostNodeIds;
-        const children = typeof finder === 'function' ? await finder.call(this.repository, [node.id]) : [];
+        const children =
+            typeof finder === 'function' ? await finder.call(this.repository, [node.id]) : [];
         if (children.length > 0) {
             const names = children.map((child) => child.name).sort();
             const hint =
@@ -2109,7 +2128,11 @@ export class FleetService {
         const host = node.hostNodeId ? await this.repository.findById(node.hostNodeId) : null;
         if (!host) return;
         const hostBeat = host.lastHeartbeatAt ? new Date(host.lastHeartbeatAt).getTime() : NaN;
-        if (!Number.isFinite(hostBeat) || Date.now() - hostBeat > FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS) return;
+        if (
+            !Number.isFinite(hostBeat) ||
+            Date.now() - hostBeat > FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS
+        )
+            return;
         const hint = `${node.name} still runs on ${host.name}; destroy it instead`;
         throw new UnprocessableEntityException({
             statusCode: 422,

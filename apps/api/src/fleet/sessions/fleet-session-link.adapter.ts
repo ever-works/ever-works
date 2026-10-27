@@ -104,7 +104,10 @@ export class FleetSessionLinkAdapter implements FleetSessionNodePort {
      */
     ack(nodeId: string, sessionIds: readonly string[]): void {
         if (sessionIds.length === 0) return;
-        const message: FleetSessionAckMessage = { type: 'session.ack', sessionIds: [...sessionIds] };
+        const message: FleetSessionAckMessage = {
+            type: 'session.ack',
+            sessionIds: [...sessionIds],
+        };
         if (!this.registry.sendNodeControl(nodeId, { ...message })) {
             this.logger.debug(`session.ack for node ${nodeId} not sent: no link on this replica`);
         }

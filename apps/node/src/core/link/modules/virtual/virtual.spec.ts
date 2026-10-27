@@ -147,12 +147,16 @@ describe('the bootstrap (T-15)', () => {
 	});
 
 	it('refuses inputs that could break out of the script', () => {
-		expect(isBootstrapSafe({ apiUrl: 'https://api.ever.works; rm -rf /', runtimeSpec: 'ever-works-node', nodeMajor: 26 })).toBe(
-			false
-		);
-		expect(isBootstrapSafe({ apiUrl: 'https://api.ever.works', runtimeSpec: 'ever-works-node@$(id)', nodeMajor: 26 })).toBe(
-			false
-		);
+		expect(
+			isBootstrapSafe({
+				apiUrl: 'https://api.ever.works; rm -rf /',
+				runtimeSpec: 'ever-works-node',
+				nodeMajor: 26
+			})
+		).toBe(false);
+		expect(
+			isBootstrapSafe({ apiUrl: 'https://api.ever.works', runtimeSpec: 'ever-works-node@$(id)', nodeMajor: 26 })
+		).toBe(false);
 	});
 });
 
@@ -166,7 +170,14 @@ describe('the host folders (state.ts)', () => {
 	it('reads back a meta.json and rejects a foreign file', () => {
 		expect(
 			parseChildMeta(
-				JSON.stringify({ childNodeId: CHILD, name: 'n1', systemId: 'alpine', kind: 'container', cpus: 2, memoryGiB: 4 })
+				JSON.stringify({
+					childNodeId: CHILD,
+					name: 'n1',
+					systemId: 'alpine',
+					kind: 'container',
+					cpus: 2,
+					memoryGiB: 4
+				})
 			)
 		).toMatchObject({ childNodeId: CHILD, systemId: 'alpine' });
 		expect(parseChildMeta('{"childNodeId":"x"}')).toBeNull();

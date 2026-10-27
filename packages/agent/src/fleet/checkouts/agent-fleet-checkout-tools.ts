@@ -29,13 +29,19 @@ export interface FleetCheckoutToolAnnotations {
     confirmationClass: 'plain' | 'confirm' | 'confirm-destructive';
 }
 
-export const FLEET_CHECKOUT_TOOL_ANNOTATIONS: Readonly<Record<string, FleetCheckoutToolAnnotations>> = {
+export const FLEET_CHECKOUT_TOOL_ANNOTATIONS: Readonly<
+    Record<string, FleetCheckoutToolAnnotations>
+> = {
     fleet_checkouts_list: { readOnly: true, destructive: false, confirmationClass: 'plain' },
     fleet_checkouts_get: { readOnly: true, destructive: false, confirmationClass: 'plain' },
     fleet_checkouts_create: { readOnly: false, destructive: false, confirmationClass: 'plain' },
     fleet_checkouts_sync: { readOnly: false, destructive: false, confirmationClass: 'confirm' },
     fleet_checkouts_archive: { readOnly: false, destructive: false, confirmationClass: 'confirm' },
-    fleet_checkouts_delete: { readOnly: false, destructive: true, confirmationClass: 'confirm-destructive' },
+    fleet_checkouts_delete: {
+        readOnly: false,
+        destructive: true,
+        confirmationClass: 'confirm-destructive',
+    },
 };
 
 type CheckoutToolService = Pick<
@@ -43,10 +49,21 @@ type CheckoutToolService = Pick<
     'list' | 'listForNode' | 'get' | 'create' | 'sync' | 'archive' | 'remove'
 >;
 
-function failure(error: unknown): { error: { code: string; hint: string; details?: Record<string, unknown> } } {
+function failure(error: unknown): {
+    error: { code: string; hint: string; details?: Record<string, unknown> };
+} {
     const typed = readFleetSessionError(error);
-    if (typed) return { error: { code: typed.code, hint: typed.hint, ...(typed.details ? { details: typed.details } : {}) } };
-    return { error: { code: 'internal', hint: error instanceof Error ? error.message : String(error) } };
+    if (typed)
+        return {
+            error: {
+                code: typed.code,
+                hint: typed.hint,
+                ...(typed.details ? { details: typed.details } : {}),
+            },
+        };
+    return {
+        error: { code: 'internal', hint: error instanceof Error ? error.message : String(error) },
+    };
 }
 
 function text(value: unknown): string | undefined {
@@ -74,7 +91,10 @@ export function buildFleetCheckoutTools(args: {
                 type: 'object',
                 properties: {
                     nodeId: { type: 'string', description: 'Only this computer.' },
-                    state: { type: 'string', description: 'creating, ready, missing or archived (the bin).' },
+                    state: {
+                        type: 'string',
+                        description: 'creating, ready, missing or archived (the bin).',
+                    },
                 },
                 required: [],
             },
@@ -83,7 +103,12 @@ export function buildFleetCheckoutTools(args: {
                 const state = isFleetCheckoutState(input.state) ? input.state : undefined;
                 try {
                     const nodeId = text(input.nodeId);
-                    if (nodeId) return await args.service.listForNode(nodeId, actor, state ? { state } : {});
+                    if (nodeId)
+                        return await args.service.listForNode(
+                            nodeId,
+                            actor,
+                            state ? { state } : {},
+                        );
                     return await args.service.list(actor, state ? { state } : {});
                 } catch (error) {
                     return failure(error);
@@ -96,7 +121,10 @@ export function buildFleetCheckoutTools(args: {
             parameters: { type: 'object', properties: { checkoutId }, required: ['checkoutId'] },
             invoke: async (raw) => {
                 try {
-                    return await args.service.get(text((raw as { checkoutId?: unknown })?.checkoutId) ?? '', actor);
+                    return await args.service.get(
+                        text((raw as { checkoutId?: unknown })?.checkoutId) ?? '',
+                        actor,
+                    );
                 } catch (error) {
                     return failure(error);
                 }
@@ -110,18 +138,29 @@ export function buildFleetCheckoutTools(args: {
                 type: 'object',
                 properties: {
                     nodeId: { type: 'string', description: 'The computer.' },
-                    repoUrl: { type: 'string', description: 'For a fresh clone: the repository URL (no credential in it).' },
-                    parentCheckoutId: { type: 'string', description: 'For a worktree: the checkout to branch off.' },
-                    branch: { type: 'string', description: 'Branch name; proposed (and made unique) when absent.' },
+                    repoUrl: {
+                        type: 'string',
+                        description: 'For a fresh clone: the repository URL (no credential in it).',
+                    },
+                    parentCheckoutId: {
+                        type: 'string',
+                        description: 'For a worktree: the checkout to branch off.',
+                    },
+                    branch: {
+                        type: 'string',
+                        description: 'Branch name; proposed (and made unique) when absent.',
+                    },
                     baseRef: { type: 'string', description: 'What a new branch starts from.' },
                     isolation: {
                         type: 'string',
-                        description: 'host (default) or container: sessions in it run in a container (needs Docker; not on Windows).',
+                        description:
+                            'host (default) or container: sessions in it run in a container (needs Docker; not on Windows).',
                     },
                     sharedFolders: {
                         type: 'array',
                         items: { type: 'string' },
-                        description: 'Worktrees only: ignored folders of the parent to link in (e.g. node_modules).',
+                        description:
+                            'Worktrees only: ignored folders of the parent to link in (e.g. node_modules).',
                     },
                 },
                 required: ['nodeId'],
@@ -162,12 +201,19 @@ export function buildFleetCheckoutTools(args: {
                 properties: {
                     checkoutId,
                     op: { type: 'string', description: 'fetch, pull or push.' },
-                    confirm: { type: 'boolean', description: 'The user confirmed this pull or push.' },
+                    confirm: {
+                        type: 'boolean',
+                        description: 'The user confirmed this pull or push.',
+                    },
                 },
                 required: ['checkoutId', 'op'],
             },
             invoke: async (raw) => {
-                const input = (raw ?? {}) as { checkoutId?: unknown; op?: unknown; confirm?: unknown };
+                const input = (raw ?? {}) as {
+                    checkoutId?: unknown;
+                    op?: unknown;
+                    confirm?: unknown;
+                };
                 if (!isFleetCheckoutSyncOp(input.op)) {
                     return { error: { code: 'invalid', hint: 'op must be fetch, pull or push' } };
                 }
@@ -189,7 +235,10 @@ export function buildFleetCheckoutTools(args: {
                 type: 'object',
                 properties: {
                     checkoutId,
-                    confirm: { type: 'boolean', description: 'The user confirmed moving this checkout to the bin.' },
+                    confirm: {
+                        type: 'boolean',
+                        description: 'The user confirmed moving this checkout to the bin.',
+                    },
                 },
                 required: ['checkoutId'],
             },
@@ -213,19 +262,30 @@ export function buildFleetCheckoutTools(args: {
                 properties: {
                     checkoutId,
                     mode: { type: 'string', description: 'delete or forget.' },
-                    confirm: { type: 'boolean', description: 'The user confirmed this delete or forget.' },
-                    confirmName: { type: 'string', description: 'The checkout’s folder name, typed by the user.' },
+                    confirm: {
+                        type: 'boolean',
+                        description: 'The user confirmed this delete or forget.',
+                    },
+                    confirmName: {
+                        type: 'string',
+                        description: 'The checkout’s folder name, typed by the user.',
+                    },
                 },
                 required: ['checkoutId'],
             },
             invoke: async (raw) => {
                 const input = (raw ?? {}) as Record<string, unknown>;
-                const mode = input.mode === 'delete' || input.mode === 'forget' ? (input.mode as FleetCheckoutDeleteMode) : undefined;
+                const mode =
+                    input.mode === 'delete' || input.mode === 'forget'
+                        ? (input.mode as FleetCheckoutDeleteMode)
+                        : undefined;
                 try {
                     return await args.service.remove(text(input.checkoutId) ?? '', actor, {
                         ...(mode ? { mode } : {}),
                         confirm: input.confirm === true,
-                        ...(text(input.confirmName) ? { confirmName: text(input.confirmName) } : {}),
+                        ...(text(input.confirmName)
+                            ? { confirmName: text(input.confirmName) }
+                            : {}),
                     });
                 } catch (error) {
                     return failure(error);

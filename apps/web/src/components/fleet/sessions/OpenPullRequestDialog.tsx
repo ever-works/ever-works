@@ -8,9 +8,18 @@ import {
     FLEET_PULL_REQUEST_TITLE_MAX_LENGTH,
     type FleetPullRequestDraft,
 } from '@ever-works/contracts';
-import { getPullRequestDraftAction, openCheckoutPullRequestAction } from '@/app/actions/fleet-session-git';
+import {
+    getPullRequestDraftAction,
+    openCheckoutPullRequestAction,
+} from '@/app/actions/fleet-session-git';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { sessionGitErrorTitleKey } from './session-git.shared';
 
 /**
@@ -50,7 +59,9 @@ export function OpenPullRequestDialog({
         void getPullRequestDraftAction(checkoutId).then((result) => {
             if (cancelled) return;
             if (!result.success) {
-                setError(`${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`);
+                setError(
+                    `${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`,
+                );
                 return;
             }
             setDraft(result.data);
@@ -62,7 +73,10 @@ export function OpenPullRequestDialog({
         };
     }, [open, checkoutId, tErrors]);
 
-    const existing = draft?.existing && (draft.existing.state === 'open' || draft.existing.state === 'draft') ? draft.existing : null;
+    const existing =
+        draft?.existing && (draft.existing.state === 'open' || draft.existing.state === 'draft')
+            ? draft.existing
+            : null;
     const submit = async () => {
         if (pending || !title.trim()) return;
         setPending(true);
@@ -75,11 +89,21 @@ export function OpenPullRequestDialog({
         });
         setPending(false);
         if (!result.success) {
-            setError(`${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`);
+            setError(
+                `${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`,
+            );
             return;
         }
-        toast.success(result.data.updated ? t('updated', { number: result.data.number }) : t('opened', { number: result.data.number }));
-        onOpened({ number: result.data.number, url: result.data.url, updated: result.data.updated });
+        toast.success(
+            result.data.updated
+                ? t('updated', { number: result.data.number })
+                : t('opened', { number: result.data.number }),
+        );
+        onOpened({
+            number: result.data.number,
+            url: result.data.url,
+            updated: result.data.updated,
+        });
         onOpenChange(false);
     };
 
@@ -89,12 +113,17 @@ export function OpenPullRequestDialog({
                 <div data-testid="fleet-pull-request-dialog">
                     <DialogHeader>
                         <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
-                            {existing ? t('titleUpdate', { number: existing.number }) : t('titleOpen')}
+                            {existing
+                                ? t('titleUpdate', { number: existing.number })
+                                : t('titleOpen')}
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3">
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('branchLine', { branch: draft?.branch ?? '—', base: draft?.base ?? '—' })}
+                            {t('branchLine', {
+                                branch: draft?.branch ?? '—',
+                                base: draft?.base ?? '—',
+                            })}
                         </p>
                         {draft && !draft.pushed ? (
                             <p className="text-xs text-warning" role="status">
@@ -102,7 +131,9 @@ export function OpenPullRequestDialog({
                             </p>
                         ) : null}
                         <label className="block space-y-1 text-sm">
-                            <span className="text-text-muted dark:text-text-muted-dark">{t('titleLabel')}</span>
+                            <span className="text-text-muted dark:text-text-muted-dark">
+                                {t('titleLabel')}
+                            </span>
                             <input
                                 value={title}
                                 onChange={(event) => setTitle(event.target.value)}
@@ -112,7 +143,9 @@ export function OpenPullRequestDialog({
                             />
                         </label>
                         <label className="block space-y-1 text-sm">
-                            <span className="text-text-muted dark:text-text-muted-dark">{t('bodyLabel')}</span>
+                            <span className="text-text-muted dark:text-text-muted-dark">
+                                {t('bodyLabel')}
+                            </span>
                             <textarea
                                 value={body}
                                 onChange={(event) => setBody(event.target.value)}
@@ -133,15 +166,26 @@ export function OpenPullRequestDialog({
                                 <span>{t('draft')}</span>
                             </label>
                         ) : null}
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('byPlatform')}</p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('byPlatform')}
+                        </p>
                         {error ? (
-                            <p role="alert" className="text-sm text-danger" data-testid="fleet-pull-request-error">
+                            <p
+                                role="alert"
+                                className="text-sm text-danger"
+                                data-testid="fleet-pull-request-error"
+                            >
                                 {error}
                             </p>
                         ) : null}
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             {t('cancel')}
                         </Button>
                         <Button
@@ -150,7 +194,11 @@ export function OpenPullRequestDialog({
                             disabled={pending || !title.trim()}
                             data-testid="fleet-pull-request-submit"
                         >
-                            {pending ? t('working') : existing ? t('submitUpdate') : t('submitOpen')}
+                            {pending
+                                ? t('working')
+                                : existing
+                                  ? t('submitUpdate')
+                                  : t('submitOpen')}
                         </Button>
                     </DialogFooter>
                 </div>

@@ -23,8 +23,15 @@ export class FleetWakeToolAdapter implements FleetWakeToolPort {
     constructor(private readonly moduleRef: ModuleRef) {}
 
     async wake(userId: string, nodeId: string): Promise<FleetNodeWakeResult> {
-        const controller = getOptionalProvider<FleetHealthController>(this.moduleRef, FleetHealthController);
-        if (!controller) throw fleetLinkError('unreachable', 'waking computers is not available on this deployment');
+        const controller = getOptionalProvider<FleetHealthController>(
+            this.moduleRef,
+            FleetHealthController,
+        );
+        if (!controller)
+            throw fleetLinkError(
+                'unreachable',
+                'waking computers is not available on this deployment',
+            );
         return controller.wake({ userId } as AuthenticatedUser, nodeId);
     }
 }

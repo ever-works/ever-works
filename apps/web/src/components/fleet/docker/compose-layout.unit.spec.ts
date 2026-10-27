@@ -9,7 +9,10 @@ import { requestFromForm, splitCommand, EMPTY_RUN_FORM } from './docker.shared';
  * form → request.
  */
 
-function service(name: string, overrides: Partial<FleetComposeServiceView> = {}): FleetComposeServiceView {
+function service(
+    name: string,
+    overrides: Partial<FleetComposeServiceView> = {},
+): FleetComposeServiceView {
     return {
         name,
         image: `${name}:1`,
@@ -30,7 +33,12 @@ function service(name: string, overrides: Partial<FleetComposeServiceView> = {})
 
 describe('compose layout (FR-33)', () => {
     const services = [
-        service('api', { dependsOn: [{ service: 'db', condition: 'service_healthy' }, { service: 'cache', condition: 'service_started' }] }),
+        service('api', {
+            dependsOn: [
+                { service: 'db', condition: 'service_healthy' },
+                { service: 'cache', condition: 'service_started' },
+            ],
+        }),
         service('db', { health: 'starting' }),
         service('cache'),
     ];
@@ -65,7 +73,13 @@ describe('compose layout (FR-33)', () => {
 
 describe('Run dialog form (FR-28, FR-29)', () => {
     it('splits a command with quotes', () => {
-        expect(splitCommand('redis-server --save "60 1" --appendonly yes')).toEqual(['redis-server', '--save', '60 1', '--appendonly', 'yes']);
+        expect(splitCommand('redis-server --save "60 1" --appendonly yes')).toEqual([
+            'redis-server',
+            '--save',
+            '60 1',
+            '--appendonly',
+            'yes',
+        ]);
     });
 
     it('builds a validated request and a preview without values', () => {
@@ -78,7 +92,9 @@ describe('Run dialog form (FR-28, FR-29)', () => {
         });
         expect(built.ok).toBe(true);
         if (!built.ok) return;
-        expect(built.preview).toBe('docker run -d --name cache -p 6379:6379 -e REDIS_ARGS=… --restart unless-stopped redis:7');
+        expect(built.preview).toBe(
+            'docker run -d --name cache -p 6379:6379 -e REDIS_ARGS=… --restart unless-stopped redis:7',
+        );
         expect(built.preview).not.toContain('secret-value');
     });
 
@@ -86,7 +102,9 @@ describe('Run dialog form (FR-28, FR-29)', () => {
         const built = requestFromForm({
             ...EMPTY_RUN_FORM,
             image: 'redis:7',
-            volumes: [{ source: '/var/run/docker.sock', target: '/var/run/docker.sock', readOnly: false }],
+            volumes: [
+                { source: '/var/run/docker.sock', target: '/var/run/docker.sock', readOnly: false },
+            ],
         });
         expect(built).toMatchObject({ ok: false, field: 'volumes' });
     });

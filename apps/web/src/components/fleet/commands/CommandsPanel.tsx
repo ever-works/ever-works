@@ -140,7 +140,9 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
         let cancelled = false;
         void Promise.all(
             ids.map(async (nodeId) => {
-                const result = await listNodeCheckoutsAction(nodeId, { state: 'ready' }).catch(() => null);
+                const result = await listNodeCheckoutsAction(nodeId, { state: 'ready' }).catch(
+                    () => null,
+                );
                 if (!result || !result.success) return [];
                 const name = nodes.find((node) => node.id === nodeId)?.name ?? '';
                 return result.data.data.map((checkout) => ({
@@ -177,7 +179,9 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
             return;
         }
         const details =
-            result.error.code === 'confirmation_required' ? readCommandConfirmation(result.error.details) : null;
+            result.error.code === 'confirmation_required'
+                ? readCommandConfirmation(result.error.details)
+                : null;
         if (details) {
             setConfirm(details);
             setConfirmFor(next);
@@ -256,7 +260,9 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
     const toggle = (row: CommandPickRow) => {
         if (!row.selectable) return;
         setSelected((list) =>
-            list.includes(row.nodeId) ? list.filter((id) => id !== row.nodeId) : [...list, row.nodeId],
+            list.includes(row.nodeId)
+                ? list.filter((id) => id !== row.nodeId)
+                : [...list, row.nodeId],
         );
     };
 
@@ -282,9 +288,16 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
 
     if (nodes.length === 0) {
         return (
-            <section className="rounded-lg border border-border p-6 text-center dark:border-border-dark" data-testid="fleet-commands-empty">
-                <h2 className="text-base font-semibold text-text dark:text-text-dark">{t('empty.title')}</h2>
-                <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">{t('empty.body')}</p>
+            <section
+                className="rounded-lg border border-border p-6 text-center dark:border-border-dark"
+                data-testid="fleet-commands-empty"
+            >
+                <h2 className="text-base font-semibold text-text dark:text-text-dark">
+                    {t('empty.title')}
+                </h2>
+                <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
+                    {t('empty.body')}
+                </p>
             </section>
         );
     }
@@ -294,7 +307,9 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
     return (
         <div className="space-y-4" data-testid="fleet-commands-panel">
             <section className="rounded-lg border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
-                <h2 className="mb-3 text-sm font-semibold text-text dark:text-text-dark">{t('title')}</h2>
+                <h2 className="mb-3 text-sm font-semibold text-text dark:text-text-dark">
+                    {t('title')}
+                </h2>
                 <label className="sr-only" htmlFor="fleet-command-input">
                     {t('composer.label')}
                 </label>
@@ -329,12 +344,19 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                             const reason = row.reason
                                 ? row.reason === 'offline'
                                     ? agoLabel(row.lastHeartbeatAt, now)
-                                        ? t('picker.reasons.offline', { time: agoLabel(row.lastHeartbeatAt, now) ?? '' })
+                                        ? t('picker.reasons.offline', {
+                                              time: agoLabel(row.lastHeartbeatAt, now) ?? '',
+                                          })
                                         : t('picker.reasons.offlineNever')
                                     : t(`picker.reasons.${row.reason}`, { name: row.name })
                                 : null;
                             return (
-                                <div key={row.nodeId} className="min-w-0" data-testid="fleet-command-picker-row" data-node-id={row.nodeId}>
+                                <div
+                                    key={row.nodeId}
+                                    className="min-w-0"
+                                    data-testid="fleet-command-picker-row"
+                                    data-node-id={row.nodeId}
+                                >
                                     <Checkbox
                                         checked={row.selectable && chosen.includes(row.nodeId)}
                                         disabled={!row.selectable}
@@ -359,7 +381,9 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                         >
                             {FLEET_COMMAND_TIMEOUT_CHOICES_SEC.map((seconds) => (
                                 <option key={seconds} value={seconds}>
-                                    {t('composer.timeoutMinutes', { minutes: Math.round(seconds / 60) })}
+                                    {t('composer.timeoutMinutes', {
+                                        minutes: Math.round(seconds / 60),
+                                    })}
                                 </option>
                             ))}
                         </select>
@@ -376,9 +400,16 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                             data-testid="fleet-command-folder"
                         />
                         {folders.length > 0 && (
-                            <datalist id="fleet-command-folders" data-testid="fleet-command-folder-checkouts">
+                            <datalist
+                                id="fleet-command-folders"
+                                data-testid="fleet-command-folder-checkouts"
+                            >
                                 {folders.map((folder) => (
-                                    <option key={folder.path} value={folder.path} label={folder.label} />
+                                    <option
+                                        key={folder.path}
+                                        value={folder.path}
+                                        label={folder.label}
+                                    />
                                 ))}
                             </datalist>
                         )}
@@ -389,7 +420,9 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                         disabled={pending || !command.trim() || chosen.length === 0}
                         data-testid="fleet-command-run"
                     >
-                        {chosen.length > 0 ? t('composer.run', { count: chosen.length }) : t('composer.runNone')}
+                        {chosen.length > 0
+                            ? t('composer.run', { count: chosen.length })
+                            : t('composer.runNone')}
                     </Button>
                     {/* Schedules on computers (FL-13, spec §5.5): the same command, on a cadence, on ONE computer. */}
                     {chosen.length === 1 && command.trim() ? (
@@ -408,11 +441,18 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                 <p className="mt-3 text-xs text-warning" data-testid="fleet-command-sandbox">
                     {`⚠ ${t('sandbox')}`}
                 </p>
-                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-command-cost">
+                <p
+                    className="mt-1 text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-command-cost"
+                >
                     {t('costNote')}
                 </p>
                 {error && (
-                    <p role="alert" className="mt-2 text-sm text-danger" data-testid="fleet-command-error">
+                    <p
+                        role="alert"
+                        className="mt-2 text-sm text-danger"
+                        data-testid="fleet-command-error"
+                    >
                         {error.code === 'network'
                             ? t('errors.network')
                             : error.hint
@@ -427,7 +467,12 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                     <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
                         <code className="truncate font-mono text-sm text-text dark:text-text-dark">{`$ ${current.command}`}</code>
                         {commandIsLive(current.runs) ? (
-                            <Button variant="secondary" size="sm" onClick={() => void onStop()} data-testid="fleet-command-stop">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => void onStop()}
+                                data-testid="fleet-command-stop"
+                            >
                                 {t('stop')}
                             </Button>
                         ) : (
@@ -449,7 +494,10 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                         ))}
                     </div>
                     {summary && (
-                        <p className="mt-2 text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-command-summary">
+                        <p
+                            className="mt-2 text-sm text-text-muted dark:text-text-muted-dark"
+                            data-testid="fleet-command-summary"
+                        >
                             {t(`summary.${summary.key}`, summary.values)}
                         </p>
                     )}
@@ -463,11 +511,16 @@ export default function CommandsPanel({ nodes, flags }: FleetHubTabProps) {
                 {recent === null ? (
                     <div className="flex flex-wrap gap-2" aria-label={t('recent.loading')}>
                         {Array.from({ length: FLEET_COMMAND_RECENT }, (_, index) => (
-                            <span key={index} className="h-6 w-24 animate-pulse rounded bg-black/5 dark:bg-white/5" />
+                            <span
+                                key={index}
+                                className="h-6 w-24 animate-pulse rounded bg-black/5 dark:bg-white/5"
+                            />
                         ))}
                     </div>
                 ) : recent.length === 0 ? (
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('recent.empty')}</p>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('recent.empty')}
+                    </p>
                 ) : (
                     <ul className="flex flex-wrap gap-2">
                         {recent.map((entry) => (

@@ -1,7 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FLEET_PORT_LIST_REFRESH_MS, FLEET_PORT_WATCH_MAX, type FleetPortsListResponse } from '@ever-works/contracts';
+import {
+    FLEET_PORT_LIST_REFRESH_MS,
+    FLEET_PORT_WATCH_MAX,
+    type FleetPortsListResponse,
+} from '@ever-works/contracts';
 import { portsClient, type PortsErrorRead } from './ports.shared';
 
 /**
@@ -46,7 +50,8 @@ export function usePortsLive(nodeId: string, enabled = true) {
         if (!enabled) return;
         const slowTimer = setTimeout(() => setSlow(true), 10_000);
         void reload().finally(() => clearTimeout(slowTimer));
-        const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
+        const visible = () =>
+            typeof document === 'undefined' || document.visibilityState === 'visible';
         const timer = setInterval(() => {
             if (visible()) void reload();
         }, FLEET_PORT_LIST_REFRESH_MS);
@@ -65,7 +70,9 @@ export function usePortsLive(nodeId: string, enabled = true) {
         (port: number) => {
             setWatch((current) => {
                 const next =
-                    current.includes(port) || current.length >= FLEET_PORT_WATCH_MAX ? current : [...current, port];
+                    current.includes(port) || current.length >= FLEET_PORT_WATCH_MAX
+                        ? current
+                        : [...current, port];
                 watchRef.current = next;
                 return next;
             });

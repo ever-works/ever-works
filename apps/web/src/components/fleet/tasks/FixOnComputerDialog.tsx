@@ -10,11 +10,20 @@ import {
     type FleetTaskHandoffOptions,
 } from '@ever-works/contracts';
 import { createCheckoutAction } from '@/app/actions/fleet-checkouts';
-import { getHandoffCheckoutAction, getTaskHandoffOptionsAction } from '@/app/actions/fleet-task-handoff';
+import {
+    getHandoffCheckoutAction,
+    getTaskHandoffOptionsAction,
+} from '@/app/actions/fleet-task-handoff';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { sessionsClient } from '../sessions/sessions.client';
 import { CheckoutChoice } from './CheckoutChoice';
 import { ComputerPicker } from './ComputerPicker';
@@ -117,7 +126,9 @@ export function FixOnComputerDialog({
                 const chosen = next(current);
                 const step = data.checkouts.find((row) => row.nodeId === chosen);
                 setChoice((previous) =>
-                    chosen && choiceStillOffered(previous, step, data.task) && previous.mode !== 'none'
+                    chosen &&
+                    choiceStillOffered(previous, step, data.task) &&
+                    previous.mode !== 'none'
                         ? previous
                         : initialCheckoutChoice(step, data.task),
                 );
@@ -168,25 +179,28 @@ export function FixOnComputerDialog({
         }
     };
 
-    const waitForAck = useCallback(async (session: FleetSessionView) => {
-        let current = session;
-        const since = Date.now();
-        setPhase({ kind: 'waiting', session: current, overdue: false });
-        while (alive.current) {
-            if (current.state !== 'starting') {
-                setPhase({ kind: 'started', session: current });
-                router.refresh();
-                return;
+    const waitForAck = useCallback(
+        async (session: FleetSessionView) => {
+            let current = session;
+            const since = Date.now();
+            setPhase({ kind: 'waiting', session: current, overdue: false });
+            while (alive.current) {
+                if (current.state !== 'starting') {
+                    setPhase({ kind: 'started', session: current });
+                    router.refresh();
+                    return;
+                }
+                if (Date.now() - since > HANDOFF_ACK_WAIT_MS) {
+                    setPhase({ kind: 'waiting', session: current, overdue: true });
+                    return;
+                }
+                await sleep(HANDOFF_POLL_MS);
+                const again = await sessionsClient.get(current.id);
+                if (again.ok) current = again.data;
             }
-            if (Date.now() - since > HANDOFF_ACK_WAIT_MS) {
-                setPhase({ kind: 'waiting', session: current, overdue: true });
-                return;
-            }
-            await sleep(HANDOFF_POLL_MS);
-            const again = await sessionsClient.get(current.id);
-            if (again.ok) current = again.data;
-        }
-    }, [router]);
+        },
+        [router],
+    );
 
     const keepWaiting = () => {
         if (phase.kind === 'waiting') void waitForAck(phase.session);
@@ -223,7 +237,10 @@ export function FixOnComputerDialog({
             if (!alive.current) return;
             if (view.state !== 'ready') {
                 setPhase({ kind: 'idle' });
-                setError({ code: 'operation_failed', hint: t('dialog.checkoutNotReady', { state: view.state }) });
+                setError({
+                    code: 'operation_failed',
+                    hint: t('dialog.checkoutNotReady', { state: view.state }),
+                });
                 return;
             }
             checkout = { id: view.id, path: view.path };
@@ -237,7 +254,9 @@ export function FixOnComputerDialog({
         if (!result.ok) {
             setPhase({ kind: 'idle' });
             const sessionId =
-                typeof result.error.details?.sessionId === 'string' ? result.error.details.sessionId : null;
+                typeof result.error.details?.sessionId === 'string'
+                    ? result.error.details.sessionId
+                    : null;
             setError({ code: result.error.code, hint: result.error.hint, sessionId });
             return;
         }
@@ -246,7 +265,12 @@ export function FixOnComputerDialog({
 
     const costLine = useMemo(() => {
         if (!agent || !computer) return null;
-        const values = { agent: agent.name, node: computer.name, slug: taskSlug, model: agent.modelId ?? '' };
+        const values = {
+            agent: agent.name,
+            node: computer.name,
+            slug: taskSlug,
+            model: agent.modelId ?? '',
+        };
         return agent.modelId ? t('cost', values) : t('costNoModel', values);
     }, [agent, computer, taskSlug, t]);
 
@@ -260,14 +284,20 @@ export function FixOnComputerDialog({
                         </DialogTitle>
                         {options && (
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('dialog.subtitle', { slug: options.task.slug, title: options.task.title })}
+                                {t('dialog.subtitle', {
+                                    slug: options.task.slug,
+                                    title: options.task.title,
+                                })}
                             </p>
                         )}
                     </DialogHeader>
 
                     <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
                         {options?.killSwitch && (
-                            <p role="status" className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
+                            <p
+                                role="status"
+                                className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning"
+                            >
                                 {t('dialog.killSwitch')}
                             </p>
                         )}
@@ -289,8 +319,13 @@ export function FixOnComputerDialog({
                                 loading={loading && !options}
                             />
                             {options && none && agent && (
-                                <p className="text-sm text-warning" role="status" data-testid="fleet-handoff-none">
-                                    {t('dialog.noComputer', { agent: agent.name })} {t('dialog.runWithAgentHint')}
+                                <p
+                                    className="text-sm text-warning"
+                                    role="status"
+                                    data-testid="fleet-handoff-none"
+                                >
+                                    {t('dialog.noComputer', { agent: agent.name })}{' '}
+                                    {t('dialog.runWithAgentHint')}
                                 </p>
                             )}
                         </section>
@@ -312,7 +347,9 @@ export function FixOnComputerDialog({
                                     {(options?.agents ?? []).map((candidate) => (
                                         <option key={candidate.id} value={candidate.id}>
                                             {candidate.name} —{' '}
-                                            {t(`sources.${candidate.source === 'work-default' ? 'workDefault' : candidate.source}`)}
+                                            {t(
+                                                `sources.${candidate.source === 'work-default' ? 'workDefault' : candidate.source}`,
+                                            )}
                                         </option>
                                     ))}
                                 </select>
@@ -326,7 +363,11 @@ export function FixOnComputerDialog({
                                 </h3>
                                 {options.task.pullRequest && (
                                     <p
-                                        className={options.task.pullRequest.readOnly ? 'text-xs text-warning' : 'text-xs text-text-muted'}
+                                        className={
+                                            options.task.pullRequest.readOnly
+                                                ? 'text-xs text-warning'
+                                                : 'text-xs text-text-muted'
+                                        }
                                         data-testid="fleet-handoff-pr"
                                     >
                                         {options.task.pullRequest.readOnly
@@ -371,11 +412,18 @@ export function FixOnComputerDialog({
                         </section>
 
                         {computer?.selectable && (
-                            <IdentityLine key={computer.nodeId} nodeId={computer.nodeId} nodeName={computer.name} />
+                            <IdentityLine
+                                key={computer.nodeId}
+                                nodeId={computer.nodeId}
+                                nodeName={computer.name}
+                            />
                         )}
 
                         {costLine && (
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-handoff-cost">
+                            <p
+                                className="text-xs text-text-muted dark:text-text-muted-dark"
+                                data-testid="fleet-handoff-cost"
+                            >
                                 {costLine}
                             </p>
                         )}
@@ -387,16 +435,30 @@ export function FixOnComputerDialog({
                             </p>
                         )}
                         {phase.kind === 'waiting' && computer && (
-                            <div role="status" className="space-y-2 text-sm" data-testid="fleet-handoff-waiting">
+                            <div
+                                role="status"
+                                className="space-y-2 text-sm"
+                                data-testid="fleet-handoff-waiting"
+                            >
                                 <p className="flex items-center gap-2">
-                                    {!phase.overdue && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                                    {!phase.overdue && (
+                                        <Loader2
+                                            className="h-4 w-4 animate-spin"
+                                            aria-hidden="true"
+                                        />
+                                    )}
                                     {phase.overdue
                                         ? t('dialog.notStartedYet', { node: computer.name })
                                         : t('dialog.waiting', { node: computer.name })}
                                 </p>
                                 <div className="flex gap-2">
                                     {phase.overdue && (
-                                        <Button type="button" size="sm" variant="secondary" onClick={keepWaiting}>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={keepWaiting}
+                                        >
                                             {t('dialog.keepWaiting')}
                                         </Button>
                                     )}
@@ -410,7 +472,11 @@ export function FixOnComputerDialog({
                             </div>
                         )}
                         {phase.kind === 'started' && computer && agent && (
-                            <p role="status" className="text-sm text-emerald-600" data-testid="fleet-handoff-started">
+                            <p
+                                role="status"
+                                className="text-sm text-emerald-600"
+                                data-testid="fleet-handoff-started"
+                            >
                                 {t('dialog.started', { agent: agent.name, node: computer.name })}{' '}
                                 <Link
                                     href={ROUTES.DASHBOARD_FLEET_SESSION(phase.session.id)}
@@ -422,7 +488,11 @@ export function FixOnComputerDialog({
                         )}
 
                         {error && (
-                            <p role="alert" className="text-sm text-danger" data-testid="fleet-handoff-error">
+                            <p
+                                role="alert"
+                                className="text-sm text-danger"
+                                data-testid="fleet-handoff-error"
+                            >
                                 {error.code === 'busy' && agent
                                     ? t('dialog.busy', { agent: agent.name })
                                     : (error.hint ?? t('dialog.failed'))}{' '}
@@ -450,11 +520,22 @@ export function FixOnComputerDialog({
                     </div>
 
                     <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
-                            {phase.kind === 'started' || phase.kind === 'waiting' ? t('dialog.close') : t('dialog.cancel')}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => onOpenChange(false)}
+                            disabled={busy}
+                        >
+                            {phase.kind === 'started' || phase.kind === 'waiting'
+                                ? t('dialog.close')
+                                : t('dialog.cancel')}
                         </Button>
                         {phase.kind !== 'started' && phase.kind !== 'waiting' && (
-                            <Button type="submit" disabled={!canStart} data-testid="fleet-handoff-start">
+                            <Button
+                                type="submit"
+                                disabled={!canStart}
+                                data-testid="fleet-handoff-start"
+                            >
                                 {busy ? t('dialog.starting') : t('dialog.start')}
                             </Button>
                         )}

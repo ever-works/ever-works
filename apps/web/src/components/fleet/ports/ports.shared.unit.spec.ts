@@ -10,8 +10,19 @@ import {
     timeLeft,
 } from './ports.shared';
 
-const row = (port: number, kind: FleetListeningPort['kind'], extra: Partial<FleetListeningPort> = {}) =>
-    ({ port, proto: 'tcp', bind: '0.0.0.0', localOnly: false, kind, ...extra }) as FleetListeningPort;
+const row = (
+    port: number,
+    kind: FleetListeningPort['kind'],
+    extra: Partial<FleetListeningPort> = {},
+) =>
+    ({
+        port,
+        proto: 'tcp',
+        bind: '0.0.0.0',
+        localOnly: false,
+        kind,
+        ...extra,
+    }) as FleetListeningPort;
 
 describe('ports.shared (FL-10)', () => {
     it('orders web servers first and folds the others with their names (S1)', () => {
@@ -28,12 +39,14 @@ describe('ports.shared (FL-10)', () => {
     });
 
     it('reads the program line, a container first', () => {
-        expect(programLine(row(3000, 'web', { program: { name: 'node', pid: 4812, cwd: '~/code/api' } }))).toBe(
-            'node (pid 4812) · ~/code/api',
-        );
-        expect(programLine(row(8080, 'web', { container: { id: 'abc', name: 'acme-proxy' } }))).toBe(
-            'acme-proxy (container)',
-        );
+        expect(
+            programLine(
+                row(3000, 'web', { program: { name: 'node', pid: 4812, cwd: '~/code/api' } }),
+            ),
+        ).toBe('node (pid 4812) · ~/code/api');
+        expect(
+            programLine(row(8080, 'web', { container: { id: 'abc', name: 'acme-proxy' } })),
+        ).toBe('acme-proxy (container)');
         expect(programLine(row(9, 'other'))).toBeNull();
     });
 
@@ -46,10 +59,18 @@ describe('ports.shared (FL-10)', () => {
     });
 
     it('formats the time left and the address', () => {
-        expect(timeLeft('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T09:00:48.000Z'))).toBe('59:12');
-        expect(timeLeft('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T11:00:00.000Z'))).toBe('0:00');
+        expect(timeLeft('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T09:00:48.000Z'))).toBe(
+            '59:12',
+        );
+        expect(timeLeft('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T11:00:00.000Z'))).toBe(
+            '0:00',
+        );
         expect(
-            portAddress(row(9000, 'web', { web: { scheme: 'https', status: 200, title: null, probedAt: '' } })),
+            portAddress(
+                row(9000, 'web', {
+                    web: { scheme: 'https', status: 200, title: null, probedAt: '' },
+                }),
+            ),
         ).toBe('https://127.0.0.1:9000/');
         expect(reasonKey('preview-off')).toBe('previewOff');
     });

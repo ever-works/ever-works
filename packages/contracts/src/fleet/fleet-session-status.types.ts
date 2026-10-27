@@ -456,7 +456,9 @@ export function parseFleetSessionHooks(value: unknown): FleetSessionHooks | null
 	if (!isFleetSessionProvider(record.provider) || typeof record.injected !== 'boolean') return null;
 	const events = Array.isArray(record.events)
 		? record.events
-				.filter((event): event is string => typeof event === 'string' && /^[A-Za-z][A-Za-z0-9-]{0,47}$/.test(event))
+				.filter(
+					(event): event is string => typeof event === 'string' && /^[A-Za-z][A-Za-z0-9-]{0,47}$/.test(event)
+				)
 				.slice(0, 16)
 		: [];
 	const hooks: FleetSessionHooks = { provider: record.provider, injected: record.injected, events };
@@ -490,7 +492,12 @@ export interface FleetSessionStatusSnapshot {
 	/** When any evidence last arrived (ms) — the idle clock. */
 	lastEvidenceAt: number;
 	/** The evidence that last changed anything. */
-	lastEvidence: { source: FleetSessionEvidenceSource; event: FleetSessionEvidenceEvent; at: number; rule?: string } | null;
+	lastEvidence: {
+		source: FleetSessionEvidenceSource;
+		event: FleetSessionEvidenceEvent;
+		at: number;
+		rule?: string;
+	} | null;
 	/** The source that set the current state, and when (the precedence guard). */
 	stateSource: FleetSessionEvidenceSource | null;
 	stateSourceAt: number;
@@ -508,7 +515,10 @@ export interface FleetSessionStatusSnapshot {
 }
 
 /** The snapshot of a session nobody has reported on yet (the node's first sight of it). */
-export function initialFleetSessionStatus(at: number, state: FleetSessionState = 'working'): FleetSessionStatusSnapshot {
+export function initialFleetSessionStatus(
+	at: number,
+	state: FleetSessionState = 'working'
+): FleetSessionStatusSnapshot {
 	return {
 		state,
 		outcome: null,
@@ -554,9 +564,10 @@ function attentionFor(
 	evidence: FleetSessionEvidence,
 	edges: number
 ): FleetSessionAttention {
-	const promptId = evidence.promptId && /^[A-Za-z0-9._-]{1,64}$/.test(evidence.promptId)
-		? evidence.promptId
-		: `t${prev.turn}e${edges}`;
+	const promptId =
+		evidence.promptId && /^[A-Za-z0-9._-]{1,64}$/.test(evidence.promptId)
+			? evidence.promptId
+			: `t${prev.turn}e${edges}`;
 	const attention: FleetSessionAttention = {
 		key: fleetSessionAttentionKey(ctx.sessionId, reason, promptId),
 		reason,

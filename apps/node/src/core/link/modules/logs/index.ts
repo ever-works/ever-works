@@ -72,7 +72,10 @@ export function createLogsLinkModule(options: LogsLinkModuleOptions): NodeModule
 			case 'system': {
 				const key = ref.key as ReturnType<typeof fleetLogSystemSourcesFor>[number];
 				if (!fleetLogSystemSourcesFor(io.platform).includes(key)) {
-					throw new LogReadError('unsupported_on_node', `that system log is not on this kind of computer (${io.platform})`);
+					throw new LogReadError(
+						'unsupported_on_node',
+						`that system log is not on this kind of computer (${io.platform})`
+					);
 				}
 				switch (key) {
 					case 'journal':
@@ -94,7 +97,10 @@ export function createLogsLinkModule(options: LogsLinkModuleOptions): NodeModule
 						}
 						return createEventLogReader(io, { logs: ['Security'] });
 					default:
-						throw new LogReadError('unsupported_on_node', 'that system log is not on this kind of computer');
+						throw new LogReadError(
+							'unsupported_on_node',
+							'that system log is not on this kind of computer'
+						);
 				}
 			}
 			case 'file': {
@@ -119,7 +125,8 @@ export function createLogsLinkModule(options: LogsLinkModuleOptions): NodeModule
 			case 'service':
 				return createServiceReader(io, ref.key);
 			case 'runner': {
-				if (!options.runners) throw new LogReadError('unsupported_on_node', 'no Actions runners on this computer');
+				if (!options.runners)
+					throw new LogReadError('unsupported_on_node', 'no Actions runners on this computer');
 				const path = await options.runners.logPath(ref.key);
 				if (!path) throw new LogReadError('not_found', `${ref.key} has not written a diagnostic log yet`);
 				return createFileReader(io, path);

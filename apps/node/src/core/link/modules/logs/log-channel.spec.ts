@@ -89,10 +89,21 @@ function harness(params: Record<string, unknown> = { source: 'system:journal' })
 		close,
 		operations: { start: () => 'op', progress: () => undefined, done: () => undefined }
 	};
-	return { context, control, json, frames, state, close, lines: () => frames.flatMap((frame) => parseFleetLogLines(frame)) };
+	return {
+		context,
+		control,
+		json,
+		frames,
+		state,
+		close,
+		lines: () => frames.flatMap((frame) => parseFleetLogLines(frame))
+	};
 }
 
-function reader(batch: RawLogLine[], extra: Partial<LogReader> = {}): LogReader & { sink: LogFollowSink | null; stopped: number } {
+function reader(
+	batch: RawLogLine[],
+	extra: Partial<LogReader> = {}
+): LogReader & { sink: LogFollowSink | null; stopped: number } {
 	const self = {
 		supportsEarlier: false,
 		sink: null as LogFollowSink | null,
@@ -290,7 +301,10 @@ describe('openLogChannel', () => {
 		const outside = {
 			timers,
 			openReaders: async () => {
-				throw new LogReadError('invalid', "Only files under this computer's shared folders and standard log directories can be read");
+				throw new LogReadError(
+					'invalid',
+					"Only files under this computer's shared folders and standard log directories can be read"
+				);
 			}
 		};
 		expect(await openLogChannel(harness({ source: 'file:/etc/shadow' }).context, outside)).toMatchObject({

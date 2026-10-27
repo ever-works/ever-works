@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fleetConfirmFields } from '../fleet-confirm';
 import { fleetPathWithQuery } from '../fleet-client';
 import { FLEET_EXIT, fleetExitFor } from '../fleet-exit';
-import { emitFleetError, emitFleetOk, fleetFirstList, fleetTable, readFleetCliError } from '../fleet-output';
+import {
+    emitFleetError,
+    emitFleetOk,
+    fleetFirstList,
+    fleetTable,
+    readFleetCliError,
+} from '../fleet-output';
 
 /**
  * FL-19 T-09 — the CLI contract (spec ACC-FL19-13): the `--json` envelope, the
@@ -64,24 +70,42 @@ describe('fleet CLI contract', () => {
     });
 
     it('exits 1 on a refusal', () => {
-        expect(() => emitFleetError(false, { code: 'permission_denied', hint: 'ask the owner' })).toThrow(new Exit(1));
+        expect(() =>
+            emitFleetError(false, { code: 'permission_denied', hint: 'ask the owner' }),
+        ).toThrow(new Exit(1));
         expect(stderr.join('')).toContain('permission_denied — ask the owner');
     });
 
     it('reads the typed envelope, else the HTTP status', () => {
         expect(
-            readFleetCliError({ response: { status: 409, data: { error: { code: 'busy', hint: 'Ana holds it' } } } }),
+            readFleetCliError({
+                response: { status: 409, data: { error: { code: 'busy', hint: 'Ana holds it' } } },
+            }),
         ).toEqual({ code: 'busy', hint: 'Ana holds it' });
-        expect(readFleetCliError({ response: { status: 404, data: { message: 'Cannot find route' } } })).toEqual({
+        expect(
+            readFleetCliError({
+                response: { status: 404, data: { message: 'Cannot find route' } },
+            }),
+        ).toEqual({
             code: 'not_found',
             hint: 'Cannot find route',
         });
-        expect(readFleetCliError(new Error('socket hang up'))).toEqual({ code: 'internal', hint: 'socket hang up' });
+        expect(readFleetCliError(new Error('socket hang up'))).toEqual({
+            code: 'internal',
+            hint: 'socket hang up',
+        });
     });
 
     it('turns --yes / --confirm-name / --ack-blast-radius / --no-wait into the request fields', () => {
         expect(fleetConfirmFields({})).toEqual({});
-        expect(fleetConfirmFields({ yes: true, confirmName: 'win-11-vm', ackBlastRadius: true, wait: false })).toEqual({
+        expect(
+            fleetConfirmFields({
+                yes: true,
+                confirmName: 'win-11-vm',
+                ackBlastRadius: true,
+                wait: false,
+            }),
+        ).toEqual({
             confirm: true,
             confirmName: 'win-11-vm',
             acknowledgeBlastRadius: true,
@@ -90,14 +114,25 @@ describe('fleet CLI contract', () => {
     });
 
     it('builds query strings without empty values', () => {
-        expect(fleetPathWithQuery('/fleet/operations', { state: 'running', nodeId: undefined, limit: '20' })).toBe(
-            '/fleet/operations?state=running&limit=20',
-        );
+        expect(
+            fleetPathWithQuery('/fleet/operations', {
+                state: 'running',
+                nodeId: undefined,
+                limit: '20',
+            }),
+        ).toBe('/fleet/operations?state=running&limit=20');
         expect(fleetPathWithQuery('/fleet/status', {})).toBe('/fleet/status');
     });
 
     it('finds the list in a reply and aligns a table', () => {
-        expect(fleetFirstList({ meta: 1, services: [{ name: 'nginx' }] })).toEqual([{ name: 'nginx' }]);
-        expect(fleetTable([['A', 'BB'], ['ccc', 'd']])).toBe('A    BB\nccc  d');
+        expect(fleetFirstList({ meta: 1, services: [{ name: 'nginx' }] })).toEqual([
+            { name: 'nginx' },
+        ]);
+        expect(
+            fleetTable([
+                ['A', 'BB'],
+                ['ccc', 'd'],
+            ]),
+        ).toBe('A    BB\nccc  d');
     });
 });

@@ -51,15 +51,23 @@ export const commandsClient = {
             body: request as unknown as Record<string, unknown>,
         }),
     get: (commandId: string) =>
-        call<FleetCommandView>(`/api/fleet/commands/${encodeURIComponent(commandId)}`, { method: 'GET' }),
-    recent: (limit = 8) => call<FleetCommandListResponse>(`/api/fleet/commands?limit=${limit}`, { method: 'GET' }),
-    cancel: (commandId: string) =>
-        call<FleetCommandView>(`/api/fleet/commands/${encodeURIComponent(commandId)}/cancel`, { method: 'POST' }),
-    /** P2 — a computer's last run of the person's Commands (its Overview). */
-    lastForNode: (nodeId: string) =>
-        call<FleetCommandLastRunResponse>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/commands/last`, {
+        call<FleetCommandView>(`/api/fleet/commands/${encodeURIComponent(commandId)}`, {
             method: 'GET',
         }),
+    recent: (limit = 8) =>
+        call<FleetCommandListResponse>(`/api/fleet/commands?limit=${limit}`, { method: 'GET' }),
+    cancel: (commandId: string) =>
+        call<FleetCommandView>(`/api/fleet/commands/${encodeURIComponent(commandId)}/cancel`, {
+            method: 'POST',
+        }),
+    /** P2 — a computer's last run of the person's Commands (its Overview). */
+    lastForNode: (nodeId: string) =>
+        call<FleetCommandLastRunResponse>(
+            `/api/fleet/nodes/${encodeURIComponent(nodeId)}/commands/last`,
+            {
+                method: 'GET',
+            },
+        ),
     /**
      * P2 — "Open full output": the computer's full output of one run as a
      * Blob (read from the machine), or the refusal (offline, no longer kept).
@@ -68,7 +76,9 @@ export const commandsClient = {
         commandId: string,
         runId: string,
         fetchImpl: typeof fetch = browserApiFetch,
-    ): Promise<{ ok: true; blob: Blob; filename: string } | { ok: false; error: CommandErrorRead }> => {
+    ): Promise<
+        { ok: true; blob: Blob; filename: string } | { ok: false; error: CommandErrorRead }
+    > => {
         try {
             const response = await fetchImpl(
                 `/api/fleet/commands/${encodeURIComponent(commandId)}/runs/${encodeURIComponent(runId)}/output`,
@@ -86,7 +96,11 @@ export const commandsClient = {
             }
             const disposition = response.headers.get('content-disposition') ?? '';
             const match = /filename="([^"]+)"/.exec(disposition);
-            return { ok: true, blob: await response.blob(), filename: match?.[1] ?? 'command-output.log' };
+            return {
+                ok: true,
+                blob: await response.blob(),
+                filename: match?.[1] ?? 'command-output.log',
+            };
         } catch {
             return { ok: false, error: { code: 'network', hint: null, details: {}, status: 0 } };
         }

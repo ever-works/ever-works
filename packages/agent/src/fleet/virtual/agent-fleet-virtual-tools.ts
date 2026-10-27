@@ -65,7 +65,10 @@ type ToolError = { error: FleetLinkError };
 function toolError(error: unknown): ToolError {
     const known = readFleetMachineError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -78,14 +81,20 @@ export function buildFleetVirtualTools(args: {
     userId: string;
     agentId: string;
     runId: string | null;
-    service: Pick<FleetVirtualService, 'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'>;
+    service: Pick<
+        FleetVirtualService,
+        'options' | 'listChildren' | 'listAllChildren' | 'create' | 'power' | 'destroy'
+    >;
     /** The approval seam for held acts; null = held acts are refused (fail closed). */
     proposals: AgentProposalToolSource | null;
 }): TaskToolDescriptor[] {
     const caller = { kind: 'agent' as const, agentId: args.agentId, ownerUserId: args.userId };
     const out: TaskToolDescriptor[] = [];
 
-    const hold = async (payload: Omit<FleetVirtualActionProposalPayload, 'kind' | 'agentId'>, title: string) => {
+    const hold = async (
+        payload: Omit<FleetVirtualActionProposalPayload, 'kind' | 'agentId'>,
+        title: string,
+    ) => {
         if (!args.proposals) {
             return {
                 error: {
@@ -99,7 +108,12 @@ export function buildFleetVirtualTools(args: {
             agentId: args.agentId,
             ...payload,
         };
-        const subject = JSON.stringify([full.verb, full.hostNodeId, full.childNodeId ?? null, full.args]);
+        const subject = JSON.stringify([
+            full.verb,
+            full.hostNodeId,
+            full.childNodeId ?? null,
+            full.args,
+        ]);
         const proposal = await args.proposals.propose(args.userId, {
             agentId: args.agentId,
             runId: args.runId,
@@ -130,7 +144,10 @@ export function buildFleetVirtualTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                hostNodeId: { type: 'string', description: 'Optional: the host computer (Fleet node id).' },
+                hostNodeId: {
+                    type: 'string',
+                    description: 'Optional: the host computer (Fleet node id).',
+                },
             },
             required: [],
         },
@@ -156,7 +173,8 @@ export function buildFleetVirtualTools(args: {
             properties: {
                 systemId: {
                     type: 'string',
-                    description: 'ubuntu-26.04, ubuntu-24.04, debian-13, fedora, alpine or arch (default ubuntu-26.04).',
+                    description:
+                        'ubuntu-26.04, ubuntu-24.04, debian-13, fedora, alpine or arch (default ubuntu-26.04).',
                 },
             },
             required: [],
@@ -164,7 +182,10 @@ export function buildFleetVirtualTools(args: {
         invoke: async (raw) => {
             const a = (raw ?? {}) as { systemId?: unknown };
             try {
-                return await args.service.options(caller, isFleetVirtualSystemId(a.systemId) ? a.systemId : undefined);
+                return await args.service.options(
+                    caller,
+                    isFleetVirtualSystemId(a.systemId) ? a.systemId : undefined,
+                );
             } catch (error) {
                 return toolError(error);
             }
@@ -178,9 +199,18 @@ export function buildFleetVirtualTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                name: { type: 'string', description: '2–39 lower-case letters, digits and hyphens.' },
-                systemId: { type: 'string', description: 'ubuntu-26.04, ubuntu-24.04, debian-13, fedora, alpine or arch.' },
-                hostNodeId: { type: 'string', description: 'Optional: the host computer; omitted = Choose for me.' },
+                name: {
+                    type: 'string',
+                    description: '2–39 lower-case letters, digits and hyphens.',
+                },
+                systemId: {
+                    type: 'string',
+                    description: 'ubuntu-26.04, ubuntu-24.04, debian-13, fedora, alpine or arch.',
+                },
+                hostNodeId: {
+                    type: 'string',
+                    description: 'Optional: the host computer; omitted = Choose for me.',
+                },
                 cpus: { type: 'number', description: '2, 4 or 8 (default 4).' },
                 memoryGiB: { type: 'number', description: '4, 8 or 16 (default 8).' },
             },
@@ -189,17 +219,23 @@ export function buildFleetVirtualTools(args: {
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
             if (!isFleetVirtualName(a.name)) {
-                return invalid('name', 'the name must be 2–39 lower-case letters, digits and hyphens');
+                return invalid(
+                    'name',
+                    'the name must be 2–39 lower-case letters, digits and hyphens',
+                );
             }
-            if (!isFleetVirtualSystemId(a.systemId)) return invalid('systemId', 'choose one of the listed systems');
-            if (a.cpus !== undefined && !isFleetVirtualCpus(a.cpus)) return invalid('cpus', 'CPUs must be 2, 4 or 8');
+            if (!isFleetVirtualSystemId(a.systemId))
+                return invalid('systemId', 'choose one of the listed systems');
+            if (a.cpus !== undefined && !isFleetVirtualCpus(a.cpus))
+                return invalid('cpus', 'CPUs must be 2, 4 or 8');
             if (a.memoryGiB !== undefined && !isFleetVirtualMemoryGiB(a.memoryGiB)) {
                 return invalid('memoryGiB', 'memory must be 4, 8 or 16 GB');
             }
             if (a.diskGiB !== undefined && !isFleetVirtualDiskGiB(a.diskGiB)) {
                 return invalid('diskGiB', 'disk must be 64, 128 or 256 GB');
             }
-            const requestedHost = typeof a.hostNodeId === 'string' && a.hostNodeId ? a.hostNodeId : 'auto';
+            const requestedHost =
+                typeof a.hostNodeId === 'string' && a.hostNodeId ? a.hostNodeId : 'auto';
             const input = {
                 name: a.name,
                 systemId: a.systemId,
@@ -211,7 +247,9 @@ export function buildFleetVirtualTools(args: {
                 // Without `confirm`: the whole chain runs and answers with the summary.
                 await args.service.create(caller, requestedHost, { ...input, fields: {} });
                 // Not reachable: create always needs `confirm`. Belt: never report success without it.
-                return { error: { code: 'internal' as const, hint: 'the create was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the create was not confirmed' },
+                };
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
@@ -220,7 +258,10 @@ export function buildFleetVirtualTools(args: {
                     typeof details.hostNodeId === 'string' && details.hostNodeId
                         ? details.hostNodeId
                         : requestedHost;
-                return hold({ verb: 'create', hostNodeId, args: { ...input } }, summary || `Create ${input.name}`);
+                return hold(
+                    { verb: 'create', hostNodeId, args: { ...input } },
+                    summary || `Create ${input.name}`,
+                );
             }
         },
     } as TaskToolDescriptor);
@@ -233,23 +274,34 @@ export function buildFleetVirtualTools(args: {
             type: 'object',
             properties: {
                 hostNodeId: { type: 'string', description: 'The host computer (Fleet node id).' },
-                childNodeId: { type: 'string', description: 'The virtual computer (Fleet node id).' },
+                childNodeId: {
+                    type: 'string',
+                    description: 'The virtual computer (Fleet node id).',
+                },
                 action: { type: 'string', description: 'start or stop.' },
             },
             required: ['hostNodeId', 'childNodeId', 'action'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.hostNodeId !== 'string' || !a.hostNodeId) return invalid('hostNodeId', 'hostNodeId is required');
-            if (typeof a.childNodeId !== 'string' || !a.childNodeId) return invalid('childNodeId', 'childNodeId is required');
-            if (!isFleetVirtualPowerAction(a.action)) return invalid('action', 'action must be start or stop');
+            if (typeof a.hostNodeId !== 'string' || !a.hostNodeId)
+                return invalid('hostNodeId', 'hostNodeId is required');
+            if (typeof a.childNodeId !== 'string' || !a.childNodeId)
+                return invalid('childNodeId', 'childNodeId is required');
+            if (!isFleetVirtualPowerAction(a.action))
+                return invalid('action', 'action must be start or stop');
             try {
                 return await args.service.power(caller, a.hostNodeId, a.childNodeId, a.action, {});
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
                 return hold(
-                    { verb: 'stop', hostNodeId: a.hostNodeId, childNodeId: a.childNodeId, args: {} },
+                    {
+                        verb: 'stop',
+                        hostNodeId: a.hostNodeId,
+                        childNodeId: a.childNodeId,
+                        args: {},
+                    },
                     summary || 'Stop a virtual computer',
                 );
             }
@@ -264,25 +316,38 @@ export function buildFleetVirtualTools(args: {
             type: 'object',
             properties: {
                 hostNodeId: { type: 'string', description: 'The host computer (Fleet node id).' },
-                childNodeId: { type: 'string', description: 'The virtual computer (Fleet node id).' },
+                childNodeId: {
+                    type: 'string',
+                    description: 'The virtual computer (Fleet node id).',
+                },
                 name: { type: 'string', description: 'The virtual computer’s exact name.' },
             },
             required: ['hostNodeId', 'childNodeId', 'name'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.hostNodeId !== 'string' || !a.hostNodeId) return invalid('hostNodeId', 'hostNodeId is required');
-            if (typeof a.childNodeId !== 'string' || !a.childNodeId) return invalid('childNodeId', 'childNodeId is required');
-            if (!isFleetVirtualName(a.name)) return invalid('name', 'the name is not a virtual computer name');
+            if (typeof a.hostNodeId !== 'string' || !a.hostNodeId)
+                return invalid('hostNodeId', 'hostNodeId is required');
+            if (typeof a.childNodeId !== 'string' || !a.childNodeId)
+                return invalid('childNodeId', 'childNodeId is required');
+            if (!isFleetVirtualName(a.name))
+                return invalid('name', 'the name is not a virtual computer name');
             try {
                 // Without `confirmName`: the chain runs (busy, permission, kill switch) and answers with the summary.
                 await args.service.destroy(caller, a.hostNodeId, a.childNodeId, {});
-                return { error: { code: 'internal' as const, hint: 'the destroy was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the destroy was not confirmed' },
+                };
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
                 return hold(
-                    { verb: 'destroy', hostNodeId: a.hostNodeId, childNodeId: a.childNodeId, args: { name: a.name } },
+                    {
+                        verb: 'destroy',
+                        hostNodeId: a.hostNodeId,
+                        childNodeId: a.childNodeId,
+                        args: { name: a.name },
+                    },
                     summary || `Destroy ${a.name}`,
                 );
             }

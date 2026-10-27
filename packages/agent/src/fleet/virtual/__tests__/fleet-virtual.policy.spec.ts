@@ -41,13 +41,22 @@ const judge = (facts: FleetVirtualHostFacts, system = ubuntu, childCount = 0, al
 describe('hostEligibility (spec FR-4, FR-5, FR-6, FR-9, FR-10)', () => {
     it('admits a Linux host with Docker, --manage and the FL-16 node', () => {
         expect(judge(host())).toBeNull();
-        expect(judge(host({ capabilities: ['os:darwin', 'arch:arm64', 'docker', 'managed', 'virtual-host'] }))).toBeNull();
+        expect(
+            judge(
+                host({
+                    capabilities: ['os:darwin', 'arch:arm64', 'docker', 'managed', 'virtual-host'],
+                }),
+            ),
+        ).toBeNull();
     });
 
     it.each([
         ['is-virtual', host({ origin: 'virtual', hostNodeId: 'h0' })],
         ['desktop-node', host({ kind: 'desktop-node' })],
-        ['windows-host', host({ capabilities: ['os:win32', 'arch:x64', 'docker', 'managed', 'virtual-host'] })],
+        [
+            'windows-host',
+            host({ capabilities: ['os:win32', 'arch:x64', 'docker', 'managed', 'virtual-host'] }),
+        ],
         ['offline', host({ lastHeartbeatAt: new Date(NOW - 2 * 3_600_000) })],
         ['offline', host({ status: 'paused' })],
         [
@@ -73,7 +82,9 @@ describe('hostEligibility (spec FR-4, FR-5, FR-6, FR-9, FR-10)', () => {
     });
 
     it('offers Arch Linux on x86-64 only (FR-6)', () => {
-        const arm = host({ capabilities: ['os:linux', 'arch:arm64', 'docker', 'managed', 'virtual-host'] });
+        const arm = host({
+            capabilities: ['os:linux', 'arch:arm64', 'docker', 'managed', 'virtual-host'],
+        });
         expect(judge(arm, arch)).toBe('unsupported-arch');
         expect(judge(arm, ubuntu)).toBeNull();
     });
@@ -81,10 +92,34 @@ describe('hostEligibility (spec FR-4, FR-5, FR-6, FR-9, FR-10)', () => {
     it('offers Windows only on Linux x86-64 with kvm (FR-5, U3)', () => {
         expect(judge(host(), windows)).toBe('no-kvm');
         expect(
-            judge(host({ capabilities: ['os:linux', 'arch:x64', 'docker', 'managed', 'virtual-host', 'kvm'] }), windows),
+            judge(
+                host({
+                    capabilities: [
+                        'os:linux',
+                        'arch:x64',
+                        'docker',
+                        'managed',
+                        'virtual-host',
+                        'kvm',
+                    ],
+                }),
+                windows,
+            ),
         ).toBeNull();
         expect(
-            judge(host({ capabilities: ['os:darwin', 'arch:x64', 'docker', 'managed', 'virtual-host', 'kvm'] }), windows),
+            judge(
+                host({
+                    capabilities: [
+                        'os:darwin',
+                        'arch:x64',
+                        'docker',
+                        'managed',
+                        'virtual-host',
+                        'kvm',
+                    ],
+                }),
+                windows,
+            ),
         ).toBe('no-kvm');
     });
 
@@ -120,7 +155,9 @@ describe('autoPickHost (S3)', () => {
                 { nodeId: 'a', name: 'alpha', eligible: true, freeMemoryMiB: 8_000 },
             ]),
         ).toBe('a');
-        expect(autoPickHost([{ nodeId: 'a', name: 'alpha', eligible: false, freeMemoryMiB: 1 }])).toBeNull();
+        expect(
+            autoPickHost([{ nodeId: 'a', name: 'alpha', eligible: false, freeMemoryMiB: 1 }]),
+        ).toBeNull();
     });
 });
 
@@ -131,7 +168,9 @@ describe('reservations (S6)', () => {
             { virtualMeta: { memoryGiB: 4, state: 'stopped' as const } },
         ];
         expect(reservedMemoryMiB(children)).toBe(12 * 1024);
-        expect(netFreeMemoryMiB({ memTotalMiB: 32_768, memUsedMiB: 8_192 }, children)).toBe(32_768 - 8_192 - 4_096);
+        expect(netFreeMemoryMiB({ memTotalMiB: 32_768, memUsedMiB: 8_192 }, children)).toBe(
+            32_768 - 8_192 - 4_096,
+        );
         expect(netFreeMemoryMiB(null, children)).toBeNull();
     });
 
@@ -167,15 +206,20 @@ describe('the view state (FleetVirtualState)', () => {
 
     it('follows the create phases while enrolling', () => {
         expect(deriveVirtualState(child('enrolling'), NOW)).toBe('creating');
-        expect(deriveVirtualState(child('enrolling', { phase: 'enrolling' }), NOW)).toBe('enrolling');
+        expect(deriveVirtualState(child('enrolling', { phase: 'enrolling' }), NOW)).toBe(
+            'enrolling',
+        );
         expect(deriveVirtualState(child('enrolling', { state: 'failed' }), NOW)).toBe('failed');
     });
 
     it('reads not-enrolled 20 minutes after the guest asked for its token (U10)', () => {
         const asked = new Date(NOW - 21 * 60_000).toISOString();
-        expect(deriveVirtualState(child('enrolling', { phase: 'enrolling', enrollRequestedAt: asked }), NOW)).toBe(
-            'not-enrolled',
-        );
+        expect(
+            deriveVirtualState(
+                child('enrolling', { phase: 'enrolling', enrollRequestedAt: asked }),
+                NOW,
+            ),
+        ).toBe('not-enrolled');
     });
 
     it('is running while the child heartbeats, else the last machine state', () => {
@@ -187,8 +231,15 @@ describe('the view state (FleetVirtualState)', () => {
     });
 
     it('builds the view block only for a virtual computer, and never carries a failure that is not one', () => {
-        expect(fleetVirtualViewOf({ origin: 'enrolled', status: 'online', virtualMeta: null })).toBeNull();
+        expect(
+            fleetVirtualViewOf({ origin: 'enrolled', status: 'online', virtualMeta: null }),
+        ).toBeNull();
         const view = fleetVirtualViewOf(child('online', { error: 'old' }), 'build-01', NOW);
-        expect(view).toMatchObject({ state: 'running', systemLabel: 'Ubuntu 26.04', hostName: 'build-01', error: null });
+        expect(view).toMatchObject({
+            state: 'running',
+            systemLabel: 'Ubuntu 26.04',
+            hostName: 'build-01',
+            error: null,
+        });
     });
 });

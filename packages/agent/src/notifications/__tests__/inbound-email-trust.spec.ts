@@ -188,7 +188,11 @@ describe('inbound email trusted-sender rule', () => {
                 INBOUND_EMAIL_TRUSTED_SENDERS: 'ops@partner.test',
             };
             expect(
-                isTrustedSender({ from: 'ops@partner.test', ownerAddresses: [], env: listedWithAuthserv }),
+                isTrustedSender({
+                    from: 'ops@partner.test',
+                    ownerAddresses: [],
+                    env: listedWithAuthserv,
+                }),
             ).toBe(false);
             expect(
                 isTrustedSender({
@@ -205,9 +209,9 @@ describe('inbound email trusted-sender rule', () => {
             const pushed = { source: 'integration', integrationKeyId: 'key-1' };
             // The listed sender on spelling alone (verdict "none") — trusted when a provider
             // delivered it, refused when an integration pushed it.
-            expect(isTrustedSender({ from: 'ops@partner.test', ownerAddresses: [], env: listed })).toBe(
-                true,
-            );
+            expect(
+                isTrustedSender({ from: 'ops@partner.test', ownerAddresses: [], env: listed }),
+            ).toBe(true);
             expect(
                 isTrustedSender({
                     from: 'ops@partner.test',

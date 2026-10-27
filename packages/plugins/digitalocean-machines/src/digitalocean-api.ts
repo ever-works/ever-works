@@ -42,10 +42,14 @@ export class DigitalOceanApi {
 		private readonly token: string,
 		private readonly fetchImpl: typeof fetch = fetch,
 		private readonly baseUrl: string = DIGITALOCEAN_API_BASE,
-		private readonly sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+		private readonly sleep: (ms: number) => Promise<void> = (ms) =>
+			new Promise((resolve) => setTimeout(resolve, ms))
 	) {
 		if (typeof token !== 'string' || token.trim().length === 0) {
-			throw new MachineProviderError('unauthorized', 'no DigitalOcean API token is saved; add one in the plugin settings');
+			throw new MachineProviderError(
+				'unauthorized',
+				'no DigitalOcean API token is saved; add one in the plugin settings'
+			);
 		}
 	}
 
@@ -126,7 +130,11 @@ function messageOf(body: unknown): string | null {
 export function toProviderError(status: number, body: unknown): MachineProviderError {
 	const message = messageOf(body);
 	if (status === 401) {
-		return new MachineProviderError('unauthorized', 'the DigitalOcean API token was refused; save a new one', status);
+		return new MachineProviderError(
+			'unauthorized',
+			'the DigitalOcean API token was refused; save a new one',
+			status
+		);
 	}
 	if (status === 403) {
 		return new MachineProviderError(
@@ -139,8 +147,17 @@ export function toProviderError(status: number, body: unknown): MachineProviderE
 	if (status === 422) {
 		const lower = (message ?? '').toLowerCase();
 		const quota = lower.includes('limit') || lower.includes('quota');
-		return new MachineProviderError(quota ? 'quota' : 'invalid', message ?? 'DigitalOcean refused the request', status);
+		return new MachineProviderError(
+			quota ? 'quota' : 'invalid',
+			message ?? 'DigitalOcean refused the request',
+			status
+		);
 	}
-	if (status === 429) return new MachineProviderError('rate_limited', 'DigitalOcean is rate-limiting this account; try again shortly', status);
+	if (status === 429)
+		return new MachineProviderError(
+			'rate_limited',
+			'DigitalOcean is rate-limiting this account; try again shortly',
+			status
+		);
 	return new MachineProviderError('unavailable', message ?? `DigitalOcean answered ${status}`, status);
 }

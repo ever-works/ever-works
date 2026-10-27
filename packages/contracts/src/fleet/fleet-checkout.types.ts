@@ -894,7 +894,11 @@ export function proposeFleetCheckoutBranch(base: string, taken: Iterable<string>
 
 /** A folder name for a new checkout, from its branch: `nina/fix-login` → `fix-login`. */
 export function fleetCheckoutFolderName(branch: string): string {
-	const last = branch.split('/').filter((part) => part.length > 0).pop() ?? branch;
+	const last =
+		branch
+			.split('/')
+			.filter((part) => part.length > 0)
+			.pop() ?? branch;
 	const slug = trimDashesAndDots(last.replace(/[^A-Za-z0-9._-]+/g, '-')).slice(0, 80);
 	return slug || 'checkout';
 }

@@ -38,12 +38,15 @@ export function fleetRequestedByExtra(
     requester: FleetRequester | { userId: string; agentId?: string | null },
     decisionId?: string | null,
 ): { requestedBy: string; decisionId?: string } {
-    const requestedBy = 'kind' in requester ? fleetRequestedBy(requester) : fleetRequestedByActor(requester);
+    const requestedBy =
+        'kind' in requester ? fleetRequestedBy(requester) : fleetRequestedByActor(requester);
     return decisionId ? { requestedBy, decisionId } : { requestedBy };
 }
 
 /** Read a `requestedBy` value back: its kind and id, or null when it is not one. */
-export function parseFleetRequestedBy(value: unknown): { kind: FleetRequester['kind']; id: string } | null {
+export function parseFleetRequestedBy(
+    value: unknown,
+): { kind: FleetRequester['kind']; id: string } | null {
     if (typeof value !== 'string') return null;
     const match = /^(user|agent|schedule|system):(.+)$/.exec(value);
     if (!match) return null;

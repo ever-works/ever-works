@@ -70,7 +70,8 @@ export class FleetMachineLinkAdapter implements FleetMachineNodePort {
         }
         // The node turned it into an operation: wait for it (the record is kept by
         // FleetOperationsService, readable by the person it belongs to).
-        const userId = input.caller.kind === 'user' ? input.caller.userId : input.caller.ownerUserId;
+        const userId =
+            input.caller.kind === 'user' ? input.caller.userId : input.caller.ownerUserId;
         const deadline = Date.now() + input.awaitOperationMs;
         let view = outcome.operation;
         while (!isFleetOperationTerminal(view.state) && Date.now() < deadline) {
@@ -84,7 +85,8 @@ export class FleetMachineLinkAdapter implements FleetMachineNodePort {
         if (view.state === 'done') return { result: view.result };
         if (isFleetOperationTerminal(view.state)) {
             throw new FleetLinkException(
-                view.error ?? makeFleetLinkError('operation_failed', 'the computer did not finish it'),
+                view.error ??
+                    makeFleetLinkError('operation_failed', 'the computer did not finish it'),
             );
         }
         return { operationId: outcome.operationId, operation: view };

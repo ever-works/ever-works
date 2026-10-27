@@ -1,4 +1,8 @@
-import type { FleetGitIdentity, FleetGitIdentitySetResult, FleetTaskHandoffOptions } from '@ever-works/contracts';
+import type {
+    FleetGitIdentity,
+    FleetGitIdentitySetResult,
+    FleetTaskHandoffOptions,
+} from '@ever-works/contracts';
 import { config } from '../config';
 import type { TaskToolDescriptor } from '../tasks-domain/agent-task-tools';
 import { readFleetMachineError } from './machine/fleet-machine.errors';
@@ -28,32 +32,65 @@ import { readFleetSessionError } from './sessions/fleet-session.errors';
 
 /** Annotations FL-19's catalogue reads (MCP tool annotations, CONTRACTS §11.3). */
 export const FLEET_TASK_TOOL_ANNOTATIONS: Readonly<
-    Record<string, { readOnly: boolean; destructive: boolean; confirmationClass: 'plain' | 'confirm' }>
+    Record<
+        string,
+        { readOnly: boolean; destructive: boolean; confirmationClass: 'plain' | 'confirm' }
+    >
 > = {
     fleet_tasks_handoff_options: { readOnly: true, destructive: false, confirmationClass: 'plain' },
-    fleet_nodes_git_identity_get: { readOnly: true, destructive: false, confirmationClass: 'plain' },
-    fleet_nodes_git_identity_set: { readOnly: false, destructive: false, confirmationClass: 'confirm' },
+    fleet_nodes_git_identity_get: {
+        readOnly: true,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
+    fleet_nodes_git_identity_set: {
+        readOnly: false,
+        destructive: false,
+        confirmationClass: 'confirm',
+    },
 };
 
 /** The hand-off options reader (the API's `FleetTaskHandoffService`). */
 export interface FleetTaskHandoffToolPort {
-    options(userId: string, taskId: string, agentId: string | null): Promise<FleetTaskHandoffOptions>;
+    options(
+        userId: string,
+        taskId: string,
+        agentId: string | null,
+    ): Promise<FleetTaskHandoffOptions>;
 }
 
 /** The identity service (`FleetGitIdentityService`). */
 export interface FleetGitIdentityToolPort {
-    read(nodeId: string, caller: FleetMachineCaller, options?: { fresh?: boolean }): Promise<FleetGitIdentity>;
-    set(nodeId: string, caller: FleetMachineCaller, request?: { confirm?: boolean }): Promise<FleetGitIdentitySetResult>;
+    read(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        options?: { fresh?: boolean },
+    ): Promise<FleetGitIdentity>;
+    set(
+        nodeId: string,
+        caller: FleetMachineCaller,
+        request?: { confirm?: boolean },
+    ): Promise<FleetGitIdentitySetResult>;
 }
 
-function failure(error: unknown): { error: { code: string; hint: string; details?: Record<string, unknown> } } {
+function failure(error: unknown): {
+    error: { code: string; hint: string; details?: Record<string, unknown> };
+} {
     const typed = readFleetMachineError(error) ?? readFleetSessionError(error);
     if (typed) {
-        return { error: { code: typed.code, hint: typed.hint, ...(typed.details ? { details: typed.details } : {}) } };
+        return {
+            error: {
+                code: typed.code,
+                hint: typed.hint,
+                ...(typed.details ? { details: typed.details } : {}),
+            },
+        };
     }
     const status = (error as { status?: number })?.status;
     if (status === 404) return { error: { code: 'not_found', hint: 'no such Task' } };
-    return { error: { code: 'internal', hint: error instanceof Error ? error.message : String(error) } };
+    return {
+        error: { code: 'internal', hint: error instanceof Error ? error.message : String(error) },
+    };
 }
 
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -67,7 +104,11 @@ export function buildFleetTaskTools(args: {
 }): TaskToolDescriptor[] {
     if (!config.fleet.isCheckoutsEnabled()) return [];
     const out: TaskToolDescriptor[] = [];
-    const caller: FleetMachineCaller = { kind: 'agent', agentId: args.agentId, ownerUserId: args.userId };
+    const caller: FleetMachineCaller = {
+        kind: 'agent',
+        agentId: args.agentId,
+        ownerUserId: args.userId,
+    };
 
     if (args.handoff) {
         const handoff = args.handoff;
@@ -84,7 +125,8 @@ export function buildFleetTaskTools(args: {
             },
             invoke: async (raw) => {
                 const taskId = String((raw as { taskId?: unknown } | null)?.taskId ?? '');
-                if (!UUID.test(taskId)) return { error: { code: 'invalid', hint: 'taskId must be a Task id' } };
+                if (!UUID.test(taskId))
+                    return { error: { code: 'invalid', hint: 'taskId must be a Task id' } };
                 try {
                     const options = await handoff.options(args.userId, taskId, args.agentId);
                     return {
@@ -112,14 +154,21 @@ export function buildFleetTaskTools(args: {
                 type: 'object',
                 properties: {
                     nodeId: { type: 'string', description: 'The computer’s id.' },
-                    fresh: { type: 'boolean', description: 'Read the computer again instead of the 60 s copy.' },
+                    fresh: {
+                        type: 'boolean',
+                        description: 'Read the computer again instead of the 60 s copy.',
+                    },
                 },
                 required: ['nodeId'],
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { nodeId?: unknown; fresh?: unknown };
                 try {
-                    return { identity: await identity.read(String(a.nodeId ?? ''), caller, { fresh: a.fresh === true }) };
+                    return {
+                        identity: await identity.read(String(a.nodeId ?? ''), caller, {
+                            fresh: a.fresh === true,
+                        }),
+                    };
                 } catch (error) {
                     return failure(error);
                 }
@@ -134,14 +183,19 @@ export function buildFleetTaskTools(args: {
                 type: 'object',
                 properties: {
                     nodeId: { type: 'string', description: 'The computer’s id.' },
-                    confirm: { type: 'boolean', description: 'true to set it (after showing the confirmation).' },
+                    confirm: {
+                        type: 'boolean',
+                        description: 'true to set it (after showing the confirmation).',
+                    },
                 },
                 required: ['nodeId'],
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { nodeId?: unknown; confirm?: unknown };
                 try {
-                    const result = await identity.set(String(a.nodeId ?? ''), caller, { confirm: a.confirm === true });
+                    const result = await identity.set(String(a.nodeId ?? ''), caller, {
+                        confirm: a.confirm === true,
+                    });
                     return { identity: result };
                 } catch (error) {
                     return failure(error);

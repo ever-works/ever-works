@@ -96,7 +96,10 @@ export function SessionCard({
     const glyph = sessionGlyph(session);
     const words = sessionStateWords(session);
     const stateText = words.qualifier
-        ? t('states.withQualifier', { state: t(`states.${words.key}`), qualifier: t(`states.${words.qualifier}`) })
+        ? t('states.withQualifier', {
+              state: t(`states.${words.key}`),
+              qualifier: t(`states.${words.qualifier}`),
+          })
         : t(`states.${words.key}`);
     const tint = sessionTint(session);
     const unread = isSessionUnread(session);
@@ -104,7 +107,8 @@ export function SessionCard({
     const elapsed = sessionElapsedSlot(session, now);
     const source = statusSourceNote(session);
     const providerName = t(`providers.${providerKey(session.provider)}`);
-    const who = session.kind === 'agent' ? (agentName?.trim() || t('card.agentFallback')) : providerName;
+    const who =
+        session.kind === 'agent' ? agentName?.trim() || t('card.agentFallback') : providerName;
     const startedBy = session.startedBy.startsWith('agent:')
         ? t('tab.startedByAgent')
         : session.userId === viewerUserId
@@ -114,7 +118,8 @@ export function SessionCard({
     // FR-52: on a focused card, 1–9 answer a numbered option, A / D allow / deny.
     const shortcutsRef = useRef<((key: string) => boolean) | null>(null);
     const onCardKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-        if (event.target !== event.currentTarget || event.metaKey || event.ctrlKey || event.altKey) return;
+        if (event.target !== event.currentTarget || event.metaKey || event.ctrlKey || event.altKey)
+            return;
         if (shortcutsRef.current?.(event.key)) event.preventDefault();
     };
     const answerBox =
@@ -147,7 +152,10 @@ export function SessionCard({
             })}
         >
             <header className="flex items-center gap-2 min-w-0">
-                <KindIcon className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
+                <KindIcon
+                    className="w-3.5 h-3.5 shrink-0 text-text-muted dark:text-text-muted-dark"
+                    aria-hidden="true"
+                />
                 <Link
                     href={ROUTES.DASHBOARD_FLEET_SESSION(session.id)}
                     className={cn(
@@ -169,7 +177,10 @@ export function SessionCard({
                 </span>
             </header>
 
-            <div className="text-xs text-text-muted dark:text-text-muted-dark space-y-0.5" data-testid="fleet-session-card-body">
+            <div
+                className="text-xs text-text-muted dark:text-text-muted-dark space-y-0.5"
+                data-testid="fleet-session-card-body"
+            >
                 {body.kind === 'attention' && (
                     <div
                         role="group"
@@ -177,10 +188,14 @@ export function SessionCard({
                         className="rounded-md border border-warning/50 bg-warning/10 px-2.5 py-1.5 text-text dark:text-text-dark space-y-1.5"
                         data-testid="fleet-session-card-attention"
                     >
-                        <p className="line-clamp-2 break-words">{body.attention.prompt || t('card.needsYouNoPrompt')}</p>
+                        <p className="line-clamp-2 break-words">
+                            {body.attention.prompt || t('card.needsYouNoPrompt')}
+                        </p>
                         {answerBox}
                         {source === 'fromScreen' && (
-                            <p className="text-[11px] text-text-muted dark:text-text-muted-dark">{t('card.fromScreen')}</p>
+                            <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                                {t('card.fromScreen')}
+                            </p>
                         )}
                     </div>
                 )}
@@ -188,7 +203,11 @@ export function SessionCard({
                 {body.kind === 'unconfirmed' && <p>{t('card.unconfirmed', { node: nodeName })}</p>}
                 {body.kind === 'lines' && (
                     <>
-                        {body.userLine && <p className="line-clamp-2 break-words">{t('card.you', { text: body.userLine })}</p>}
+                        {body.userLine && (
+                            <p className="line-clamp-2 break-words">
+                                {t('card.you', { text: body.userLine })}
+                            </p>
+                        )}
                         {body.agentLine && (
                             <p className="line-clamp-2 break-words text-text dark:text-text-dark">
                                 {t('card.agent', { who, text: body.agentLine })}
@@ -203,16 +222,21 @@ export function SessionCard({
                 {/* FL-06 (spec FR-6, FR-8): the checkout's git line and its pull request fill these slots. */}
                 {(slots?.gitLine || session.git) && (
                     <span data-slot="gitLine">
-                        {slots?.gitLine ?? <SessionGitLine git={session.git} now={now} pill={false} />}
+                        {slots?.gitLine ?? (
+                            <SessionGitLine git={session.git} now={now} pill={false} />
+                        )}
                     </span>
                 )}
                 {(slots?.prPill || session.git?.gitLine?.pr) && (
-                    <span data-slot="prPill">{slots?.prPill ?? <PrPill pr={session.git?.gitLine?.pr ?? null} />}</span>
+                    <span data-slot="prPill">
+                        {slots?.prPill ?? <PrPill pr={session.git?.gitLine?.pr ?? null} />}
+                    </span>
                 )}
                 {/* FL-15 P1 (spec FR-10): the Task this session's Run works on fills the taskChip slot. */}
                 {(slots?.taskChip || session.task) && (
                     <span data-slot="taskChip">
-                        {slots?.taskChip ?? (session.task ? <SessionTaskChip task={session.task} /> : null)}
+                        {slots?.taskChip ??
+                            (session.task ? <SessionTaskChip task={session.task} /> : null)}
                     </span>
                 )}
                 {elapsed && (
@@ -223,7 +247,12 @@ export function SessionCard({
                 {/* FL-20 (spec FR-10): the session's model work at list price fills the cost slot. */}
                 {(slots?.cost || sessionCostChipModel(session)) && (
                     <span data-slot="cost">
-                        {slots?.cost ?? <SessionCostChip costCents={session.costCents} tokens={session.tokens} />}
+                        {slots?.cost ?? (
+                            <SessionCostChip
+                                costCents={session.costCents}
+                                tokens={session.tokens}
+                            />
+                        )}
                     </span>
                 )}
                 {/* FL-06 (spec FR-25, S11): Clean up once the pull request is merged or closed. */}
@@ -237,10 +266,16 @@ export function SessionCard({
                       sessionLive: isFleetSessionLive(session.state),
                   }) ? (
                     <span data-slot="cleanUp">
-                        <CleanUpButton checkoutId={session.git.checkoutId} branch={session.git.branch} nodeName={nodeName} />
+                        <CleanUpButton
+                            checkoutId={session.git.checkoutId}
+                            branch={session.git.branch}
+                            nodeName={nodeName}
+                        />
                     </span>
                 ) : null}
-                {source === 'fromScreen' && body.kind !== 'attention' && <span>{t('card.fromScreen')}</span>}
+                {source === 'fromScreen' && body.kind !== 'attention' && (
+                    <span>{t('card.fromScreen')}</span>
+                )}
                 {session.agentRunId && (
                     <Link
                         href={ROUTES.DASHBOARD_AGENT_SESSION(session.agentRunId)}

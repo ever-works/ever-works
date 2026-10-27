@@ -42,7 +42,8 @@ export function workRepositories(work: FleetCheckoutWorkCandidate): FleetParsedR
         push(parseFleetRemote(`https://github.com/${source.owner}/${source.repo}`));
     }
     // A GitHub App installation names its repository by full name, on github.com.
-    const fullName = source.auth?.mode === 'github_app_installation' ? source.auth.repoFullName : null;
+    const fullName =
+        source.auth?.mode === 'github_app_installation' ? source.auth.repoFullName : null;
     if (typeof fullName === 'string' && fullName.includes('/')) {
         push(parseFleetRemote(`https://github.com/${fullName}`));
     }
@@ -63,7 +64,8 @@ export function matchCheckoutWork<T extends FleetCheckoutWorkCandidate>(
     if (!remote) return null;
     for (const work of works) {
         for (const repository of workRepositories(work)) {
-            if (repository.host === remote.host && repository.fullName === remote.fullName) return work;
+            if (repository.host === remote.host && repository.fullName === remote.fullName)
+                return work;
         }
     }
     return null;

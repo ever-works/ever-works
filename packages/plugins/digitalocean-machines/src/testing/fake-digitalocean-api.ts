@@ -101,7 +101,11 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 
 		if (method === 'GET' && path === '/v2/account') {
 			return json(200, {
-				account: { uuid: 'b6fc48dbf6d9906cace5e2d4dbb6ae8e9b4b9d25', email: 'owner@example.com', team: { name: 'acme' } }
+				account: {
+					uuid: 'b6fc48dbf6d9906cace5e2d4dbb6ae8e9b4b9d25',
+					email: 'owner@example.com',
+					team: { name: 'acme' }
+				}
 			});
 		}
 		if (method === 'GET' && path === '/v2/regions') {
@@ -116,9 +120,36 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 		if (method === 'GET' && path === '/v2/sizes') {
 			return json(200, {
 				sizes: [
-					{ slug: 's-2vcpu-4gb', memory: 4096, vcpus: 2, disk: 80, price_monthly: 24, price_hourly: 0.03571, regions: ['nyc3', 'fra1'], available: true },
-					{ slug: 's-1vcpu-2gb', memory: 2048, vcpus: 1, disk: 50, price_monthly: 12, price_hourly: 0.01786, regions: ['nyc3', 'fra1'], available: true },
-					{ slug: 's-4vcpu-8gb', memory: 8192, vcpus: 4, disk: 160, price_monthly: 48, price_hourly: 0.07143, regions: ['nyc3'], available: true }
+					{
+						slug: 's-2vcpu-4gb',
+						memory: 4096,
+						vcpus: 2,
+						disk: 80,
+						price_monthly: 24,
+						price_hourly: 0.03571,
+						regions: ['nyc3', 'fra1'],
+						available: true
+					},
+					{
+						slug: 's-1vcpu-2gb',
+						memory: 2048,
+						vcpus: 1,
+						disk: 50,
+						price_monthly: 12,
+						price_hourly: 0.01786,
+						regions: ['nyc3', 'fra1'],
+						available: true
+					},
+					{
+						slug: 's-4vcpu-8gb',
+						memory: 8192,
+						vcpus: 4,
+						disk: 160,
+						price_monthly: 48,
+						price_hourly: 0.07143,
+						regions: ['nyc3'],
+						available: true
+					}
 				]
 			});
 		}
@@ -129,7 +160,9 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 		}
 		const keyMatch = path.match(/^\/v2\/account\/keys\/(\d+)$/);
 		if (method === 'DELETE' && keyMatch) {
-			return keys.delete(Number(keyMatch[1])) ? json(204, null) : json(404, { id: 'not_found', message: 'not found' });
+			return keys.delete(Number(keyMatch[1]))
+				? json(204, null)
+				: json(404, { id: 'not_found', message: 'not found' });
 		}
 		if (method === 'POST' && path === '/v2/droplets') {
 			if (refusal) {
@@ -163,7 +196,12 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 			const droplet = droplets.get(id);
 			if (method === 'GET') {
 				return droplet
-					? json(200, { droplet: { ...view(droplet), networks: { v4: [{ ip_address: '203.0.113.10', type: 'public' }] } } })
+					? json(200, {
+							droplet: {
+								...view(droplet),
+								networks: { v4: [{ ip_address: '203.0.113.10', type: 'public' }] }
+							}
+						})
 					: json(404, { id: 'not_found', message: 'The resource you were accessing could not be found.' });
 			}
 			if (method === 'DELETE') {

@@ -28,5 +28,9 @@ export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => 
             { status: 400 },
         );
     }
-    return forwardFleetCall(fleetApiUrl(`/sessions/${id}/answer`), { method: 'POST', headers, body });
+    return forwardFleetCall(fleetApiUrl(`/sessions/${id}/answer`), {
+        method: 'POST',
+        headers,
+        body,
+    });
 });

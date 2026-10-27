@@ -4,7 +4,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { FLEET_SESSION_TITLE_MAX_LENGTH, type FleetSessionView } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { sessionsClient } from './sessions.client';
 import type { SessionErrorRead } from './sessions.shared';
 
@@ -63,7 +69,9 @@ export function SessionRenameDialog({
                         </DialogTitle>
                     </DialogHeader>
                     <label className="block space-y-1 text-sm">
-                        <span className="text-text-muted dark:text-text-muted-dark">{t('actions.renameLabel')}</span>
+                        <span className="text-text-muted dark:text-text-muted-dark">
+                            {t('actions.renameLabel')}
+                        </span>
                         <input
                             autoFocus
                             value={title}
@@ -75,14 +83,25 @@ export function SessionRenameDialog({
                     </label>
                     {error && (
                         <p role="alert" className="mt-2 text-sm text-danger">
-                            {error.hint ? t('actions.failed', { hint: error.hint }) : t('actions.failedGeneric')}
+                            {error.hint
+                                ? t('actions.failed', { hint: error.hint })
+                                : t('actions.failedGeneric')}
                         </p>
                     )}
                     <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             {t('actions.cancel')}
                         </Button>
-                        <Button type="submit" disabled={!valid || pending} data-testid="fleet-session-rename-save">
+                        <Button
+                            type="submit"
+                            disabled={!valid || pending}
+                            data-testid="fleet-session-rename-save"
+                        >
                             {t('actions.save')}
                         </Button>
                     </DialogFooter>

@@ -37,7 +37,10 @@ export default function RunsHereBlock({ nodes, flags }: FleetOverviewBlockProps)
     // second block.
     const virtualRows =
         flags?.FLEET_VIRTUAL_ENABLED === true ? (
-            <VirtualRunsHereRows hostNodeId={node.id} allowed={computerActionAllowed(node, 'machines')} />
+            <VirtualRunsHereRows
+                hostNodeId={node.id}
+                allowed={computerActionAllowed(node, 'machines')}
+            />
         ) : null;
     return (
         <RunsHere
@@ -74,15 +77,23 @@ function RunsHere({
             key: `container:${container.id}`,
             dialog: dialogForRow({
                 class: container.confirmation[action],
-                title: t('dialog.title', { action: label, name: container.name, machine: nodeName }),
+                title: t('dialog.title', {
+                    action: label,
+                    name: container.name,
+                    machine: nodeName,
+                }),
             }),
             actionLabel: label,
-            run: (fields) => fleetContainerAction(nodeId, { container: container.id, action, fields }),
+            run: (fields) =>
+                fleetContainerAction(nodeId, { container: container.id, action, fields }),
             onDone: () => {
                 toast.success(t('done', { action: label, name: container.name }));
                 void list.refresh();
             },
-            onError: (error) => toast.error(error.hint ? t('actionFailedWith', { hint: error.hint }) : t('actionFailed')),
+            onError: (error) =>
+                toast.error(
+                    error.hint ? t('actionFailedWith', { hint: error.hint }) : t('actionFailed'),
+                ),
         });
     };
 
@@ -95,28 +106,49 @@ function RunsHere({
             <div className="flex flex-wrap items-center gap-3 text-sm">
                 <h3 className="font-semibold">{t('runsHere.title')}</h3>
                 {rows.map((container) => (
-                    <span key={container.id} className="inline-flex items-center gap-1" data-testid="fleet-runs-here-item">
-                        <span aria-hidden className={container.state === 'running' ? 'text-success' : 'text-text-muted dark:text-text-muted-dark'}>
+                    <span
+                        key={container.id}
+                        className="inline-flex items-center gap-1"
+                        data-testid="fleet-runs-here-item"
+                    >
+                        <span
+                            aria-hidden
+                            className={
+                                container.state === 'running'
+                                    ? 'text-success'
+                                    : 'text-text-muted dark:text-text-muted-dark'
+                            }
+                        >
                             {containerGlyph(container)}
                         </span>
                         <span>{container.name}</span>
                         {container.state !== 'running' ? (
-                            <span className="text-xs text-text-muted dark:text-text-muted-dark">({container.state})</span>
+                            <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                ({container.state})
+                            </span>
                         ) : null}
-                        {allowed && container.actions.includes(container.state === 'running' ? 'stop' : 'start') ? (
+                        {allowed &&
+                        container.actions.includes(
+                            container.state === 'running' ? 'stop' : 'start',
+                        ) ? (
                             <Button
                                 type="button"
                                 size="sm"
                                 variant="ghost"
                                 disabled={machineAction.busyKey === `container:${container.id}`}
-                                onClick={() => act(container, container.state === 'running' ? 'stop' : 'start')}
+                                onClick={() =>
+                                    act(container, container.state === 'running' ? 'stop' : 'start')
+                                }
                             >
                                 {container.state === 'running' ? t('act.stop') : t('act.start')}
                             </Button>
                         ) : null}
                     </span>
                 ))}
-                <Link className="ml-auto text-xs underline" href={ROUTES.DASHBOARD_FLEET_COMPUTER(nodeId, 'docker')}>
+                <Link
+                    className="ml-auto text-xs underline"
+                    href={ROUTES.DASHBOARD_FLEET_COMPUTER(nodeId, 'docker')}
+                >
                     {t('runsHere.open')}
                 </Link>
             </div>

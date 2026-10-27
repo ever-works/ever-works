@@ -27,16 +27,27 @@ const line = (text: string, extra: Partial<FleetLogLine> = {}): FleetLogLine => 
     ...extra,
 });
 
-const node = { kind: 'node' as const, status: 'online' as const, lastHeartbeatAt: '2026-10-21T09:00:00.000Z' };
+const node = {
+    kind: 'node' as const,
+    status: 'online' as const,
+    lastHeartbeatAt: '2026-10-21T09:00:00.000Z',
+};
 
 describe('logsTabCard', () => {
     it('names the one reason the tab cannot list', () => {
-        expect(logsTabCard({ ...node, kind: 'desktop-node' }, null)).toEqual({ kind: 'desktop-node' });
+        expect(logsTabCard({ ...node, kind: 'desktop-node' }, null)).toEqual({
+            kind: 'desktop-node',
+        });
         expect(logsTabCard({ ...node, status: 'offline' }, null)).toEqual({
             kind: 'offline',
             lastSeenAt: '2026-10-21T09:00:00.000Z',
         });
-        const error = (code: string) => ({ code: code as never, hint: 'h', details: {}, status: 409 });
+        const error = (code: string) => ({
+            code: code as never,
+            hint: 'h',
+            details: {},
+            status: 409,
+        });
         expect(logsTabCard(node, error('consent_missing'))).toEqual({
             kind: 'consent-missing',
             command: 'ever-works-node start --manage',
@@ -94,8 +105,15 @@ describe('the held window (FR-21)', () => {
     });
 
     it('filters held lines case-insensitively (FR-17)', () => {
-        const window = appendHeld(EMPTY_WINDOW, [line('GET nginx'), line('postgres'), line('NGINX reload')]);
-        expect(filterHeld(window.lines, 'nginx').map((held) => held.line.text)).toEqual(['GET nginx', 'NGINX reload']);
+        const window = appendHeld(EMPTY_WINDOW, [
+            line('GET nginx'),
+            line('postgres'),
+            line('NGINX reload'),
+        ]);
+        expect(filterHeld(window.lines, 'nginx').map((held) => held.line.text)).toEqual([
+            'GET nginx',
+            'NGINX reload',
+        ]);
         expect(filterHeld(window.lines, '  ')).toHaveLength(3);
     });
 });
@@ -134,7 +152,15 @@ describe('footer (spec §5.1 … §5.4)', () => {
     });
 
     it('reads paused with its count, the filter, drops and discards', () => {
-        const parts = logFooterParts({ ...base, paused: true, pausedCount: 12, filter: 'nginx', shown: 37, dropped: 1240, discarded: 3 });
+        const parts = logFooterParts({
+            ...base,
+            paused: true,
+            pausedCount: 12,
+            filter: 'nginx',
+            shown: 37,
+            dropped: 1240,
+            discarded: 3,
+        });
         expect(parts.map((part) => part.key)).toEqual([
             'footerPaused',
             'footerFiltered',
@@ -150,20 +176,25 @@ describe('footer (spec §5.1 … §5.4)', () => {
 
 describe('copy and download (FR-19, FR-40)', () => {
     it('copies plain text, one line per line', () => {
-        const window = appendHeld(EMPTY_WINDOW, [line('a', { ts: '2026-10-21T09:41:02.000Z' }), line('b')]);
+        const window = appendHeld(EMPTY_WINDOW, [
+            line('a', { ts: '2026-10-21T09:41:02.000Z' }),
+            line('b'),
+        ]);
         expect(logsCopyText(window.lines)).toBe('2026-10-21T09:41:02.000Z a\nb');
     });
 
     it('names a download after the computer, the source and the time', () => {
-        expect(logsDownloadName('build-01', 'service:nginx.service', new Date(2026, 9, 21, 9, 41, 2))).toBe(
-            'build-01-nginx.service-20261021-094102.log',
-        );
+        expect(
+            logsDownloadName('build-01', 'service:nginx.service', new Date(2026, 9, 21, 9, 41, 2)),
+        ).toBe('build-01-nginx.service-20261021-094102.log');
     });
 });
 
 describe('typedPathSourceId (S8)', () => {
     it('accepts absolute paths only', () => {
-        expect(typedPathSourceId(' /var/log/nginx/error.log ')).toBe('file:/var/log/nginx/error.log');
+        expect(typedPathSourceId(' /var/log/nginx/error.log ')).toBe(
+            'file:/var/log/nginx/error.log',
+        );
         expect(typedPathSourceId('C:\\logs\\app.log')).toBe('file:C:\\logs\\app.log');
         expect(typedPathSourceId('var/log/x')).toBeNull();
         expect(typedPathSourceId('')).toBeNull();

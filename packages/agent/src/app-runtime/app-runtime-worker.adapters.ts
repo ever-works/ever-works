@@ -965,7 +965,11 @@ export interface AppsTierEligibilityRemote {
     evaluate(
         userId: string,
         opts?: { workId?: string | null },
-    ): Promise<{ eligible?: boolean; reasons?: unknown; counted?: unknown; max?: unknown } | null | undefined>;
+    ): Promise<
+        | { eligible?: boolean; reasons?: unknown; counted?: unknown; max?: unknown }
+        | null
+        | undefined
+    >;
 }
 
 /**
@@ -991,12 +995,13 @@ export function workerAppsTierEligibilitySource(remote: AppsTierEligibilityRemot
             if (!answer || typeof answer.eligible !== 'boolean') {
                 throw new Error('The API answered no eligibility verdict.');
             }
-            const out: { eligible: boolean; reasons: string[]; counted?: string[]; max?: number } = {
-                eligible: answer.eligible === true,
-                reasons: Array.isArray(answer.reasons)
-                    ? answer.reasons.map((reason) => String(reason)).slice(0, 10)
-                    : [],
-            };
+            const out: { eligible: boolean; reasons: string[]; counted?: string[]; max?: number } =
+                {
+                    eligible: answer.eligible === true,
+                    reasons: Array.isArray(answer.reasons)
+                        ? answer.reasons.map((reason) => String(reason)).slice(0, 10)
+                        : [],
+                };
             if (Array.isArray(answer.counted)) {
                 out.counted = answer.counted.map((name) => String(name)).slice(0, 20);
             }

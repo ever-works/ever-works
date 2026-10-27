@@ -109,7 +109,11 @@ async function systemSources(io: LogIo): Promise<FleetLogSource[]> {
 			let whole = await io.isElevated();
 			if (!whole) {
 				const groups = await io.runner.run('id', ['-Gn'], { timeoutMs: 3_000 }).catch(() => null);
-				whole = Boolean(groups && groups.code === 0 && groups.stdout.split(/\s+/).some((group) => JOURNAL_GROUPS.includes(group)));
+				whole = Boolean(
+					groups &&
+					groups.code === 0 &&
+					groups.stdout.split(/\s+/).some((group) => JOURNAL_GROUPS.includes(group))
+				);
 			}
 			const partial: Partial<FleetLogSource> = whole
 				? {}
@@ -151,7 +155,9 @@ async function walkRoot(io: LogIo, root: AllowedRoot, signal?: AbortSignal): Pro
 	const logDir = root.kind === 'log-dir';
 	const maxDepth = logDir ? MAX_DEPTH_LOG_DIR : MAX_DEPTH_ROOT;
 	let visits = 0;
-	const queue: Array<{ dir: string; depth: number; inLogDir: boolean }> = [{ dir: root.path, depth: 0, inLogDir: logDir }];
+	const queue: Array<{ dir: string; depth: number; inLogDir: boolean }> = [
+		{ dir: root.path, depth: 0, inLogDir: logDir }
+	];
 	while (queue.length > 0 && visits < MAX_VISITS_PER_ROOT) {
 		if (signal?.aborted) break;
 		const { dir, depth, inLogDir } = queue.shift()!;
@@ -216,7 +222,8 @@ async function fileSources(io: LogIo, roots: readonly AllowedRoot[], signal?: Ab
 					? {}
 					: {
 							unreadableReason: 'root-only' as const,
-							hint: io.platform === 'win32' ? 'Readable by an administrator only' : 'Readable by root only'
+							hint:
+								io.platform === 'win32' ? 'Readable by an administrator only' : 'Readable by root only'
 						}),
 				lastWrittenAt: new Date(file.mtimeMs).toISOString(),
 				sizeBytes: file.size,
@@ -250,14 +257,20 @@ export function parseDockerPs(stdout: string): FleetLogSource[] {
 			supportsEarlier: false
 		});
 	}
-	return out.sort((a, b) => Number(b.state === 'running') - Number(a.state === 'running') || a.label.localeCompare(b.label));
+	return out.sort(
+		(a, b) => Number(b.state === 'running') - Number(a.state === 'running') || a.label.localeCompare(b.label)
+	);
 }
 
 async function containerSources(io: LogIo): Promise<FleetLogSource[]> {
 	const result = await io.runner
-		.run('docker', ['ps', '-a', '--format', '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Label "com.docker.compose.project"}}'], {
-			timeoutMs: 5_000
-		})
+		.run(
+			'docker',
+			['ps', '-a', '--format', '{{.Names}}\t{{.State}}\t{{.Status}}\t{{.Label "com.docker.compose.project"}}'],
+			{
+				timeoutMs: 5_000
+			}
+		)
 		.catch(() => null);
 	if (!result || result.code !== 0) return [];
 	return parseDockerPs(result.stdout);
@@ -316,7 +329,7 @@ export function parseWindowsServices(stdout: string): FleetLogSource[] {
 
 const WINDOWS_SERVICES_SCRIPT = [
 	'[Console]::OutputEncoding = [System.Text.Encoding]::UTF8',
-	"Get-Service | Where-Object { $_.Status -eq 'Running' } | ForEach-Object { \"$($_.Name)`t$($_.DisplayName)\" }"
+	'Get-Service | Where-Object { $_.Status -eq \'Running\' } | ForEach-Object { "$($_.Name)`t$($_.DisplayName)" }'
 ].join('\n');
 
 async function serviceSources(io: LogIo): Promise<FleetLogSource[]> {

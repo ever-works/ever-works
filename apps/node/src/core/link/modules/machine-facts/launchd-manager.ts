@@ -123,7 +123,8 @@ export function parseBrewServices(stdout: string): BrewRow[] {
 		const status = typeof raw.status === 'string' ? raw.status : 'none';
 		const pid = typeof raw.pid === 'number' && raw.pid > 0 ? raw.pid : null;
 		const exitCode = typeof raw.exit_code === 'number' ? raw.exit_code : null;
-		const state: FleetServiceState = status === 'error' ? 'failed' : status === 'started' || pid ? 'running' : 'inactive';
+		const state: FleetServiceState =
+			status === 'error' ? 'failed' : status === 'started' || pid ? 'running' : 'inactive';
 		out.push({
 			name: raw.name,
 			state,
@@ -155,7 +156,11 @@ export interface BrewManager {
 	act(input: { name: string; action: FleetServiceAction }): Promise<ManagerActOutcome>;
 }
 
-export function createLaunchdManager(deps: { runner: CommandRunner; root: RootRunner; uid: () => number }): LaunchdManager {
+export function createLaunchdManager(deps: {
+	runner: CommandRunner;
+	root: RootRunner;
+	uid: () => number;
+}): LaunchdManager {
 	const { runner, root } = deps;
 	const domain = (scope: FleetServiceScope): string => (scope === 'system' ? 'system' : `gui/${deps.uid()}`);
 
@@ -284,7 +289,11 @@ export function createBrewManager(deps: { runner: CommandRunner }): BrewManager 
 			const brew = await locate();
 			if (!brew) return { ok: false, refusal: 'not-found' };
 			if (action === 'disable') {
-				return { ok: false, refusal: 'failed', message: 'Homebrew turns a service off at login only by stopping it — use Stop' };
+				return {
+					ok: false,
+					refusal: 'failed',
+					message: 'Homebrew turns a service off at login only by stopping it — use Stop'
+				};
 			}
 			const verb = action === 'start' ? 'run' : action === 'enable' ? 'start' : action;
 			// Homebrew refuses to run as root, and a user's services need no root.

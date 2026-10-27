@@ -3,11 +3,21 @@
 import { useLocale, useTranslations } from 'next-intl';
 import type { ComputerState, FleetNodeView } from '@ever-works/contracts';
 import { relativeTimeParts } from '@/components/dashboard/runner-status.shared';
-import { computerStateCopy, formatInstant, preferredStateResolution } from './computer-state.shared';
+import {
+    computerStateCopy,
+    formatInstant,
+    preferredStateResolution,
+} from './computer-state.shared';
 import { useNow } from './use-now';
 
 /** States whose sentence only restates what FL-01's word beside the dot already says. */
-const SENTENCE_REPEATS_WORD: readonly ComputerState[] = ['online', 'busy', 'offline', 'paused', 'disabled'];
+const SENTENCE_REPEATS_WORD: readonly ComputerState[] = [
+    'online',
+    'busy',
+    'offline',
+    'paused',
+    'disabled',
+];
 
 export interface ComputerStateSentenceProps {
     node: FleetNodeView;
@@ -31,7 +41,11 @@ export interface ComputerStateSentenceProps {
  * `resolveComputerState`, the same pure function every other surface uses; a
  * reset time is in the reader's zone with UTC in the tooltip (FR-11).
  */
-export function ComputerStateSentence({ node, now: nowProp, wakeVia = null }: ComputerStateSentenceProps) {
+export function ComputerStateSentence({
+    node,
+    now: nowProp,
+    wakeVia = null,
+}: ComputerStateSentenceProps) {
     const t = useTranslations('fleet');
     const locale = useLocale();
     const ticking = useNow();
@@ -59,8 +73,11 @@ export function ComputerStateSentence({ node, now: nowProp, wakeVia = null }: Co
     const word = t(`states.${copy.wordKey}`);
     const sentence = t(`stateSentences.${copy.sentenceKey}`, values);
     const saysMore = !SENTENCE_REPEATS_WORD.includes(copy.state) && sentence !== word;
-    const wakeNote = copy.state === 'offline' && wakeVia ? t('wake.cardCanWake', { via: wakeVia }) : null;
-    const parts = [saysMore ? sentence : null, wakeNote].filter((part): part is string => Boolean(part));
+    const wakeNote =
+        copy.state === 'offline' && wakeVia ? t('wake.cardCanWake', { via: wakeVia }) : null;
+    const parts = [saysMore ? sentence : null, wakeNote].filter((part): part is string =>
+        Boolean(part),
+    );
     if (parts.length === 0) return null;
 
     return (

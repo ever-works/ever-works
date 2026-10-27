@@ -17,12 +17,12 @@ Session status, attention and the board ship with `FLEET_SESSIONS_ENABLED=true` 
 
 ## Four states and an outcome
 
-| State         | What it means                                                                                                   | On the card                       |
-| ------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| **Working**   | The agent is doing something; nothing is required of you.                                                       | spinner ring                      |
-| **Needs you** | It stopped to ask — permission to run a tool, an answer to a question — or it is blocked.                      | question bubble, warm tint        |
-| **Done**      | It finished a turn and waits for your next instruction, with an outcome: success, failed, stopped, no result.  | green check (success), green tint |
-| **Idle**      | Nothing happened for 30 minutes and nobody said it is finished. Silence never makes a session "done".          | grey dot                          |
+| State         | What it means                                                                                                 | On the card                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| **Working**   | The agent is doing something; nothing is required of you.                                                     | spinner ring                      |
+| **Needs you** | It stopped to ask — permission to run a tool, an answer to a question — or it is blocked.                     | question bubble, warm tint        |
+| **Done**      | It finished a turn and waits for your next instruction, with an outcome: success, failed, stopped, no result. | green check (success), green tint |
+| **Idle**      | Nothing happened for 30 minutes and nobody said it is finished. Silence never makes a session "done".         | grey dot                          |
 
 A fifth word, **ended**, says the process is gone, with its reason. A plain shell is only ever working, idle or ended — it has no agent status.
 

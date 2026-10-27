@@ -38,7 +38,9 @@ describe('the virtual-computer system catalogue', () => {
 
 	it('offers Arch Linux on x86-64 only and every other Container on both architectures (FR-6)', () => {
 		expect(fleetVirtualSystem('arch')?.arch).toEqual(['x64']);
-		for (const system of FLEET_VIRTUAL_SYSTEMS.filter((entry) => entry.kind === 'container' && entry.id !== 'arch')) {
+		for (const system of FLEET_VIRTUAL_SYSTEMS.filter(
+			(entry) => entry.kind === 'container' && entry.id !== 'arch'
+		)) {
 			expect([...system.arch].sort()).toEqual(['arm64', 'x64']);
 		}
 	});

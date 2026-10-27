@@ -66,7 +66,15 @@ function compact(view: FleetSessionView) {
 export interface FleetSessionsToolService {
     service: Pick<
         FleetSessionService,
-        'listPage' | 'get' | 'start' | 'restart' | 'rename' | 'end' | 'sendInput' | 'question' | 'answer'
+        | 'listPage'
+        | 'get'
+        | 'start'
+        | 'restart'
+        | 'rename'
+        | 'end'
+        | 'sendInput'
+        | 'question'
+        | 'answer'
     >;
 }
 
@@ -95,7 +103,10 @@ export function buildFleetSessionTools(args: {
             properties: {
                 state: { type: 'string', description: 'Optional: live or ended.' },
                 nodeId: { type: 'string', description: 'Optional: one computer’s id.' },
-                limit: { type: 'integer', description: 'Max sessions (default 20, capped at 100).' },
+                limit: {
+                    type: 'integer',
+                    description: 'Max sessions (default 20, capped at 100).',
+                },
             },
             required: [],
         },
@@ -144,13 +155,20 @@ export function buildFleetSessionTools(args: {
             properties: {
                 nodeId: { type: 'string', description: 'The computer’s id.' },
                 provider: { type: 'string', description: 'claude-code or codex.' },
-                cwd: { type: 'string', description: 'The folder on the computer (~ is the home folder).' },
+                cwd: {
+                    type: 'string',
+                    description: 'The folder on the computer (~ is the home folder).',
+                },
                 firstMessage: {
                     type: 'string',
-                    description: 'What to do first (3–4 000 characters); typed into the CLI as it starts.',
+                    description:
+                        'What to do first (3–4 000 characters); typed into the CLI as it starts.',
                 },
                 title: { type: 'string', description: 'Optional title (1–200 characters).' },
-                restartOf: { type: 'string', description: 'Optional: an ended session of yours to start again.' },
+                restartOf: {
+                    type: 'string',
+                    description: 'Optional: an ended session of yours to start again.',
+                },
                 taskId: {
                     type: 'string',
                     description:
@@ -176,19 +194,29 @@ export function buildFleetSessionTools(args: {
                 checkoutId?: string;
             };
             if (!isFleetAgentSessionProvider(a.provider)) {
-                return { error: { code: 'invalid', hint: 'provider is claude-code or codex' } } as unknown;
+                return {
+                    error: { code: 'invalid', hint: 'provider is claude-code or codex' },
+                } as unknown;
             }
             try {
                 if (a.restartOf) {
                     const ended = await own(a.restartOf);
-                    const view = await args.service.restart(ended.id, actor, {}, { expectNodeId: String(a.nodeId ?? '') });
+                    const view = await args.service.restart(
+                        ended.id,
+                        actor,
+                        {},
+                        { expectNodeId: String(a.nodeId ?? '') },
+                    );
                     return { session: compact(view) };
                 }
                 const view = await args.service.start(String(a.nodeId ?? ''), actor, {
                     kind: 'agent',
                     provider: a.provider,
                     cwd: String(a.cwd ?? ''),
-                    firstMessage: String(a.firstMessage ?? '').slice(0, FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH),
+                    firstMessage: String(a.firstMessage ?? '').slice(
+                        0,
+                        FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH,
+                    ),
                     agentId: args.agentId,
                     ...(a.title ? { title: String(a.title) } : {}),
                     // FL-15 P1/P3: the one start tool takes the Task and the checkout (spec FR-21).
@@ -218,7 +246,9 @@ export function buildFleetSessionTools(args: {
             const a = (raw ?? {}) as { sessionId?: string; text?: string };
             const text = String(a.text ?? '');
             if (text.length === 0 || text.length > FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH) {
-                return { error: { code: 'invalid', hint: 'text is 1–4 000 characters' } } as unknown;
+                return {
+                    error: { code: 'invalid', hint: 'text is 1–4 000 characters' },
+                } as unknown;
             }
             try {
                 const view = await own(String(a.sessionId ?? ''));
@@ -245,7 +275,11 @@ export function buildFleetSessionTools(args: {
             const a = (raw ?? {}) as { sessionId?: string; title?: string };
             try {
                 const view = await own(String(a.sessionId ?? ''));
-                return { session: compact(await args.service.rename(view.id, actor, String(a.title ?? ''))) };
+                return {
+                    session: compact(
+                        await args.service.rename(view.id, actor, String(a.title ?? '')),
+                    ),
+                };
             } catch (error) {
                 return refusal(error);
             }
@@ -268,7 +302,11 @@ export function buildFleetSessionTools(args: {
             const a = (raw ?? {}) as { sessionId?: string; confirm?: boolean };
             try {
                 const view = await own(String(a.sessionId ?? ''));
-                return { session: compact(await args.service.end(view.id, actor, { confirm: a.confirm === true })) };
+                return {
+                    session: compact(
+                        await args.service.end(view.id, actor, { confirm: a.confirm === true }),
+                    ),
+                };
             } catch (error) {
                 return refusal(error);
             }
@@ -304,9 +342,15 @@ export function buildFleetSessionTools(args: {
             type: 'object',
             properties: {
                 sessionId: { type: 'string', description: 'The session id.' },
-                key: { type: 'string', description: 'The attention key fleet_sessions_question gave.' },
+                key: {
+                    type: 'string',
+                    description: 'The attention key fleet_sessions_question gave.',
+                },
                 optionId: { type: 'string', description: 'One of the options (or give text).' },
-                text: { type: 'string', description: 'A free-text answer, when the question takes one.' },
+                text: {
+                    type: 'string',
+                    description: 'A free-text answer, when the question takes one.',
+                },
                 confirm: { type: 'boolean', description: 'true once the answer is decided.' },
             },
             required: ['sessionId', 'key'],
@@ -324,7 +368,8 @@ export function buildFleetSessionTools(args: {
                 if (a.confirm !== true) {
                     const choice =
                         typeof a.optionId === 'string'
-                            ? asked.attention?.options.find((option) => option.id === a.optionId)?.label ?? a.optionId
+                            ? (asked.attention?.options.find((option) => option.id === a.optionId)
+                                  ?.label ?? a.optionId)
                             : 'your text';
                     return {
                         error: {

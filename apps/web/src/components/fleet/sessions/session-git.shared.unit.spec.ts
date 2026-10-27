@@ -25,7 +25,12 @@ const line: FleetGitLine = {
     removed: 38,
     filesChanged: 6,
     uncommitted: 2,
-    pr: { number: 912, state: 'open', checks: 'passing', url: 'https://github.com/acme/api/pull/912' },
+    pr: {
+        number: 912,
+        state: 'open',
+        checks: 'passing',
+        url: 'https://github.com/acme/api/pull/912',
+    },
     at: '2026-10-21T10:00:00.000Z',
 };
 
@@ -35,7 +40,9 @@ describe('FL-06 session git — shared rules', () => {
         expect(prChecksGlyph('failing')).toBe('✗');
         expect(prChecksGlyph('pending')).toBe('⏳');
         expect(prChecksGlyph(null)).toBe('');
-        expect(safeHttpsUrl('https://github.com/acme/api/pull/912')).toBe('https://github.com/acme/api/pull/912');
+        expect(safeHttpsUrl('https://github.com/acme/api/pull/912')).toBe(
+            'https://github.com/acme/api/pull/912',
+        );
         expect(safeHttpsUrl('javascript:alert(1)')).toBeNull();
         expect(safeHttpsUrl('https://user:pass@github.com/x')).toBeNull();
         expect(safeHttpsUrl('http://github.com/x')).toBeNull();
@@ -90,15 +97,36 @@ describe('FL-06 session git — shared rules', () => {
     });
 
     it('counts minutes since GitHub was last reachable, at least one', () => {
-        expect(minutesSince('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T10:03:10.000Z'))).toBe(3);
-        expect(minutesSince('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T10:00:05.000Z'))).toBe(1);
+        expect(
+            minutesSince('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T10:03:10.000Z')),
+        ).toBe(3);
+        expect(
+            minutesSince('2026-10-21T10:00:00.000Z', Date.parse('2026-10-21T10:00:05.000Z')),
+        ).toBe(1);
         expect(minutesSince(null, 0)).toBeNull();
     });
 
     it('preselects a new worktree for an Agent session in a checkout with a remote (spec FR-2)', () => {
-        expect(defaultWhereMode('agent', { createdBy: 'user', remoteUrl: 'https://github.com/acme/api' })).toBe('worktree');
-        expect(defaultWhereMode('owner', { createdBy: 'user', remoteUrl: 'https://github.com/acme/api' })).toBe('existing');
-        expect(defaultWhereMode('agent', { createdBy: 'task', remoteUrl: 'https://github.com/acme/api' })).toBe('existing');
-        expect(defaultWhereMode('agent', { createdBy: 'discovery', remoteUrl: null })).toBe('existing');
+        expect(
+            defaultWhereMode('agent', {
+                createdBy: 'user',
+                remoteUrl: 'https://github.com/acme/api',
+            }),
+        ).toBe('worktree');
+        expect(
+            defaultWhereMode('owner', {
+                createdBy: 'user',
+                remoteUrl: 'https://github.com/acme/api',
+            }),
+        ).toBe('existing');
+        expect(
+            defaultWhereMode('agent', {
+                createdBy: 'task',
+                remoteUrl: 'https://github.com/acme/api',
+            }),
+        ).toBe('existing');
+        expect(defaultWhereMode('agent', { createdBy: 'discovery', remoteUrl: null })).toBe(
+            'existing',
+        );
     });
 });

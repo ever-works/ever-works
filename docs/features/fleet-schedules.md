@@ -43,14 +43,14 @@ schedules.
 
 ## When it runs
 
-| Form            | Example                     | Notes                                                                 |
-| --------------- | --------------------------- | --------------------------------------------------------------------- |
-| Every N minutes | every 30 min                | 1–59 minutes; restarts every hour (every 25 min = :00, :25, :50)      |
-| Hourly          | hourly                      | on the hour                                                           |
-| Daily           | daily 08:30                 |                                                                       |
-| Weekdays        | weekdays 02:00              | Monday to Friday                                                      |
-| Specific days   | Mon, Wed, Fri 09:00         |                                                                       |
-| Cron            | `0 2 1 * *`                 | five fields: minute hour day month weekday                            |
+| Form            | Example             | Notes                                                            |
+| --------------- | ------------------- | ---------------------------------------------------------------- |
+| Every N minutes | every 30 min        | 1–59 minutes; restarts every hour (every 25 min = :00, :25, :50) |
+| Hourly          | hourly              | on the hour                                                      |
+| Daily           | daily 08:30         |                                                                  |
+| Weekdays        | weekdays 02:00      | Monday to Friday                                                 |
+| Specific days   | Mon, Wed, Fri 09:00 |                                                                  |
+| Cron            | `0 2 1 * *`         | five fields: minute hour day month weekday                       |
 
 Every time is the **computer's** own (its time zone is reported by the node); the tab and the dialog show yours beside
 it. On a day the clocks jump forward, a time that does not exist (02:30) runs as far past the jump (03:30); on a day
@@ -108,7 +108,7 @@ scheduler, which starts `ever-works-node schedule-run <id>` at each time even wh
 | ------- | ---------------------------------------------------------------------------- |
 | Linux   | a marked block in your crontab (`# >>> ever-works-node schedules` … `# <<<`) |
 | macOS   | one LaunchAgent per schedule (`works.ever.node.schedule.<id>`)               |
-| Windows | Task Scheduler folder `\EverWorks\`, one task per schedule                  |
+| Windows | Task Scheduler folder `\EverWorks\`, one task per schedule                   |
 
 While a node process is running, `schedule-run` leaves the fire to it, so nothing runs twice. A cron expression that
 launchd or Task Scheduler cannot express is left to the node's own clock (the node logs which). `unenroll` removes
@@ -123,12 +123,12 @@ when it is fixed. A passing run clears it.
 
 ## Never runs
 
-| Says                                   | Why                                              | What to do                                            |
-| -------------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| NEVER RUNS · needs --manage            | the node was not started with `--manage`         | run `ever-works-node start --manage` on that computer |
-| NEVER RUNS · update the node on …      | the node is older than schedules                 | update the node                                       |
-| NEVER RUNS · computer removed          | the computer was removed from Fleet              | edit the schedule and pick another computer           |
-| Will sync when build-01 is back        | it was saved while the computer was offline      | nothing — it reaches the computer when it reconnects  |
+| Says                              | Why                                         | What to do                                            |
+| --------------------------------- | ------------------------------------------- | ----------------------------------------------------- |
+| NEVER RUNS · needs --manage       | the node was not started with `--manage`    | run `ever-works-node start --manage` on that computer |
+| NEVER RUNS · update the node on … | the node is older than schedules            | update the node                                       |
+| NEVER RUNS · computer removed     | the computer was removed from Fleet         | edit the schedule and pick another computer           |
+| Will sync when build-01 is back   | it was saved while the computer was offline | nothing — it reaches the computer when it reconnects  |
 
 ## Confirmations, limits and audit
 
@@ -168,18 +168,18 @@ Every verb takes `--json` (the web's shapes). Exit codes: `0` ok, `1` refused or
 
 ## API
 
-| Method | Path                                             | What                                                                  |
-| ------ | ------------------------------------------------ | --------------------------------------------------------------------- |
-| POST   | `/api/fleet/commands` with `cadence` and `name`  | create (201); without `confirm: true` → 409 `confirmation_required`   |
-| GET    | `/api/fleet/commands/:id`                        | one schedule                                                          |
-| PATCH  | `/api/fleet/commands/:id`                        | edit, or move with `nodeId`                                           |
-| DELETE | `/api/fleet/commands/:id`                        | delete (`confirm: true`)                                              |
-| GET    | `/api/fleet/commands/:id/runs`                   | the last 30 runs                                                      |
-| GET    | `/api/schedules/page?sourceType=node_schedule&node=<id>` | the schedules on one computer                                 |
-| POST   | `/api/schedules/node_schedule:<id>/run-now`      | Run now (`confirm: true`)                                             |
-| POST   | `/api/schedules/node_schedule:<id>/pause` · `/resume` | pause, resume                                                    |
-| GET · POST | `/api/fleet/schedules` · GET · PATCH · DELETE `/api/fleet/schedules/:id` | the same schedules as a resource (Agent, MCP, CLI) |
-| GET    | `/api/fleet/schedules/:id/runs` · POST `/:id/run` · `/:id/pause` · `/:id/resume` | runs, Run now (`confirm`), pause, resume       |
-| POST   | `/api/fleet/nodes/:id/schedules/pause-all` · `/resume-all` | Pause all (`confirm`) and its 15-minute Undo (`breakerAt`)  |
-| GET    | `/api/fleet/nodes/:id/schedules/agents`          | the Agents an Agent-session schedule here may use                     |
-| POST   | `/api/fleet/nodes/:id/schedules/agent-session`   | create an Agent-session schedule (`confirm`)                          |
+| Method     | Path                                                                             | What                                                                |
+| ---------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| POST       | `/api/fleet/commands` with `cadence` and `name`                                  | create (201); without `confirm: true` → 409 `confirmation_required` |
+| GET        | `/api/fleet/commands/:id`                                                        | one schedule                                                        |
+| PATCH      | `/api/fleet/commands/:id`                                                        | edit, or move with `nodeId`                                         |
+| DELETE     | `/api/fleet/commands/:id`                                                        | delete (`confirm: true`)                                            |
+| GET        | `/api/fleet/commands/:id/runs`                                                   | the last 30 runs                                                    |
+| GET        | `/api/schedules/page?sourceType=node_schedule&node=<id>`                         | the schedules on one computer                                       |
+| POST       | `/api/schedules/node_schedule:<id>/run-now`                                      | Run now (`confirm: true`)                                           |
+| POST       | `/api/schedules/node_schedule:<id>/pause` · `/resume`                            | pause, resume                                                       |
+| GET · POST | `/api/fleet/schedules` · GET · PATCH · DELETE `/api/fleet/schedules/:id`         | the same schedules as a resource (Agent, MCP, CLI)                  |
+| GET        | `/api/fleet/schedules/:id/runs` · POST `/:id/run` · `/:id/pause` · `/:id/resume` | runs, Run now (`confirm`), pause, resume                            |
+| POST       | `/api/fleet/nodes/:id/schedules/pause-all` · `/resume-all`                       | Pause all (`confirm`) and its 15-minute Undo (`breakerAt`)          |
+| GET        | `/api/fleet/nodes/:id/schedules/agents`                                          | the Agents an Agent-session schedule here may use                   |
+| POST       | `/api/fleet/nodes/:id/schedules/agent-session`                                   | create an Agent-session schedule (`confirm`)                        |

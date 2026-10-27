@@ -20,7 +20,10 @@ import { TaskFleetBlock } from './TaskFleetBlock';
  * broken Task page.
  */
 export async function TaskFleetSection({ task }: { task: Task }) {
-    const flags = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED', 'FLEET_CHECKOUTS_ENABLED'] as const);
+    const flags = readFleetFeatureFlags([
+        'FLEET_SESSIONS_ENABLED',
+        'FLEET_CHECKOUTS_ENABLED',
+    ] as const);
     if (flags.FLEET_SESSIONS_ENABLED !== true) return null;
     const page = await fleetTaskHandoffAPI.sessionsForTask(task.id, 1).catch(() => null);
     const session: FleetSessionView | null = page?.sessions?.[0] ?? null;
@@ -32,7 +35,9 @@ export async function TaskFleetSection({ task }: { task: Task }) {
     if (session) {
         const [nodes, agent, checkoutView] = await Promise.all([
             fleetAPI.listVisibleNodes().catch(() => null),
-            session.agentId ? agentsAPI.get(session.agentId).catch(() => null) : Promise.resolve(null),
+            session.agentId
+                ? agentsAPI.get(session.agentId).catch(() => null)
+                : Promise.resolve(null),
             session.checkoutId && flags.FLEET_CHECKOUTS_ENABLED === true
                 ? fleetCheckoutsAPI.get(session.checkoutId).catch(() => null)
                 : Promise.resolve(null),

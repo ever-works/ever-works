@@ -38,9 +38,13 @@ export function scheduleFailedItems(
         for (const schedule of schedules.get(node.id) ?? []) {
             if (schedule.userId !== context.userId || schedule.deletedAt) continue;
             const counted = (runs.get(schedule.id) ?? []).filter(isCountedFleetScheduleRun);
-            const latest = counted.find((run) => run.status !== 'running' && run.status !== 'skipped-overlap');
+            const latest = counted.find(
+                (run) => run.status !== 'running' && run.status !== 'skipped-overlap',
+            );
             if (!latest) continue;
-            const streak = fleetScheduleFailureStreak(counted as Array<{ status: FleetCommandRunStatus }>);
+            const streak = fleetScheduleFailureStreak(
+                counted as Array<{ status: FleetCommandRunStatus }>,
+            );
             const asleep = latest.status === 'skipped-offline';
             if (streak < FLEET_SCHEDULE_FAILURE_ALERT && !asleep) continue;
             const name = schedule.name ?? 'A schedule';
@@ -83,11 +87,16 @@ export class FleetScheduleNeedsALookProducer implements NeedsALookProducer, OnMo
         this.registry?.register(this);
     }
 
-    async produce(nodes: readonly FleetNodeView[], context: NeedsALookContext): Promise<NeedsALookItem[]> {
+    async produce(
+        nodes: readonly FleetNodeView[],
+        context: NeedsALookContext,
+    ): Promise<NeedsALookItem[]> {
         const byNode = new Map<string, FleetCommand[]>();
         const ids: string[] = [];
         for (const node of nodes) {
-            const rows = (await this.schedules.listForNode(node.id)).filter((row) => row.userId === context.userId);
+            const rows = (await this.schedules.listForNode(node.id)).filter(
+                (row) => row.userId === context.userId,
+            );
             if (rows.length === 0) continue;
             byNode.set(node.id, rows);
             ids.push(...rows.map((row) => row.id));

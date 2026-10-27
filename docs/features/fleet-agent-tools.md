@@ -32,21 +32,21 @@ ever-works fleet tools            # what this deployment ships
 ever-works fleet tools --planned  # also the families that have not landed yet
 ```
 
-| Family     | Reads                                                     | Acts (class)                                                                                     |
-| ---------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| status     | `fleet_status` — computers, needs-a-look, stop switch      | —                                                                                                |
-| nodes      | `fleet_nodes_list`, `_get`, `_health`, `_needs_a_look`     | `fleet_nodes_wake` (plain)                                                                       |
-| sessions   | `fleet_sessions_list`, `_read`, `_question`                | `_start`, `_send`, `_rename` (plain) · `_answer`, `_end` (confirm)                               |
-| logs       | `fleet_logs_sources`, `fleet_logs_read`                    | —                                                                                                |
-| services   | `fleet_services_list`                                      | `fleet_services_action` (confirm; blast-radius when the computer warns)                          |
-| processes  | `fleet_processes_list`                                     | `fleet_processes_signal` (confirm)                                                               |
-| docker     | containers, images, Compose projects                       | container / image / Compose actions (confirm; remove is confirm-destructive), `fleet_docker_run` |
-| ports      | `fleet_ports_list`                                         | `fleet_ports_open`, previews (plain)                                                             |
-| files      | roots, list, stat                                          | (with [Files](./fleet-files.md))                                                                 |
-| commands   | `fleet_commands_list`, `_get`                              | `fleet_commands_run` (confirm, always held for a person), `_cancel`                              |
-| checkouts  | `fleet_checkouts_list`, `_get`                             | create, sync, archive, delete                                                                    |
-| virtual    | `fleet_virtual_list`, `_options`                           | create, power, destroy ([Virtual computers](./fleet-virtual-computers.md))                       |
-| operations | `fleet_operations_get`, `_list`                            | `fleet_operations_cancel` (plain)                                                                |
+| Family     | Reads                                                  | Acts (class)                                                                                     |
+| ---------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| status     | `fleet_status` — computers, needs-a-look, stop switch  | —                                                                                                |
+| nodes      | `fleet_nodes_list`, `_get`, `_health`, `_needs_a_look` | `fleet_nodes_wake` (plain)                                                                       |
+| sessions   | `fleet_sessions_list`, `_read`, `_question`            | `_start`, `_send`, `_rename` (plain) · `_answer`, `_end` (confirm)                               |
+| logs       | `fleet_logs_sources`, `fleet_logs_read`                | —                                                                                                |
+| services   | `fleet_services_list`                                  | `fleet_services_action` (confirm; blast-radius when the computer warns)                          |
+| processes  | `fleet_processes_list`                                 | `fleet_processes_signal` (confirm)                                                               |
+| docker     | containers, images, Compose projects                   | container / image / Compose actions (confirm; remove is confirm-destructive), `fleet_docker_run` |
+| ports      | `fleet_ports_list`                                     | `fleet_ports_open`, previews (plain)                                                             |
+| files      | roots, list, stat                                      | (with [Files](./fleet-files.md))                                                                 |
+| commands   | `fleet_commands_list`, `_get`                          | `fleet_commands_run` (confirm, always held for a person), `_cancel`                              |
+| checkouts  | `fleet_checkouts_list`, `_get`                         | create, sync, archive, delete                                                                    |
+| virtual    | `fleet_virtual_list`, `_options`                       | create, power, destroy ([Virtual computers](./fleet-virtual-computers.md))                       |
+| operations | `fleet_operations_get`, `_list`                        | `fleet_operations_cancel` (plain)                                                                |
 
 Every tool description ends with the same sentence: the tool **spends no credits by itself**; the Agent's own Run
 carries the cost of its reasoning.
@@ -64,13 +64,13 @@ An Agent may act on a computer only when **three things agree**:
 The checks run in this order — the fleet stop switch, the Workspace pause, the Agent pause, grants, ladder, limits,
 then the computer — and **the first refusal is the one named**, with what would fix it:
 
-| Refusal                                                          | Code                | Fix                                                |
-| ---------------------------------------------------------------- | ------------------- | -------------------------------------------------- |
-| _"clear it under Settings → Fleet"_                              | `kill_switch`       | clear the stop                                     |
-| _"fleet_files_write is denied by a tool grant at Work scope"_   | `permission_denied` | change the grant                                   |
-| _"'Change a computer' is Off for Nina — raise it on her Safety tab"_ | `permission_denied` | raise the rung                                 |
-| _"ask the owner of build-02 to allow org members: services"_     | `permission_denied` | the computer's owner widens the audience           |
-| _"start the node with ever-works-node start --manage on build-01"_ | `consent_missing` | restart the node with the consent                  |
+| Refusal                                                              | Code                | Fix                                      |
+| -------------------------------------------------------------------- | ------------------- | ---------------------------------------- |
+| _"clear it under Settings → Fleet"_                                  | `kill_switch`       | clear the stop                           |
+| _"fleet_files_write is denied by a tool grant at Work scope"_        | `permission_denied` | change the grant                         |
+| _"'Change a computer' is Off for Nina — raise it on her Safety tab"_ | `permission_denied` | raise the rung                           |
+| _"ask the owner of build-02 to allow org members: services"_         | `permission_denied` | the computer's owner widens the audience |
+| _"start the node with ever-works-node start --manage on build-01"_   | `consent_missing`   | restart the node with the consent        |
 
 **Reads keep working** while the stop switch is on, and are never held by the ladder; they still need their grant,
 the computer's audience and its consent.
@@ -97,11 +97,11 @@ Every act an Agent's call causes is audited on the computer as `agent:<id>`.
 Where a person sees a dialog, a tool call gets a first answer and a second call confirms it. There are **no
 confirmation tokens**: every caller — the web, Agent tools, MCP and the CLI — sends the same request fields.
 
-| Class                 | Without the field                                         | The confirming call sends            |
-| --------------------- | --------------------------------------------------------- | ------------------------------------ |
-| `confirm`             | 409 `confirmation_required`, the summary                  | `confirm: true`                      |
-| `confirm-destructive` | 409, _"type the exact name: win-11-vm"_                   | `confirmName: "win-11-vm"`           |
-| `blast-radius`        | 409, the computer's own warning sentence                  | `confirm: true, acknowledgeBlastRadius: true` |
+| Class                 | Without the field                        | The confirming call sends                     |
+| --------------------- | ---------------------------------------- | --------------------------------------------- |
+| `confirm`             | 409 `confirmation_required`, the summary | `confirm: true`                               |
+| `confirm-destructive` | 409, _"type the exact name: win-11-vm"_  | `confirmName: "win-11-vm"`                    |
+| `blast-radius`        | 409, the computer's own warning sentence | `confirm: true, acknowledgeBlastRadius: true` |
 
 The confirming call is checked against the computer **as it is then**: a service that disappeared answers
 `not_found`, an offline computer `unreachable`, and a warning that appeared since the first answer asks again.

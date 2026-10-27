@@ -115,7 +115,11 @@ export async function bindSourceAllowed(
 	return isWithinAllowedRoots(real, realRoots, platform);
 }
 
-function refuse(code: Parameters<typeof makeFleetLinkError>[0], hint: string, details?: Record<string, unknown>): MachineVerbError {
+function refuse(
+	code: Parameters<typeof makeFleetLinkError>[0],
+	hint: string,
+	details?: Record<string, unknown>
+): MachineVerbError {
 	return new MachineVerbError(makeFleetLinkError(code, hint, details));
 }
 
@@ -130,7 +134,8 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 	/** Docker must answer: `unsupported_on_node` when it is not installed (U6), `operation_failed` when its daemon is down (U7). */
 	const requireDaemon = async (machine: string): Promise<FleetDockerStatus> => {
 		const status = await dockerStatus(runner);
-		if (!status.installed) throw refuse('unsupported_on_node', `Docker is not installed on ${machine}`, { docker: status });
+		if (!status.installed)
+			throw refuse('unsupported_on_node', `Docker is not installed on ${machine}`, { docker: status });
 		if (!status.daemonRunning) {
 			throw refuse('operation_failed', `Docker is installed but not running on ${machine}`, { docker: status });
 		}
@@ -155,7 +160,9 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		if (!status.installed || !status.daemonRunning) {
 			return { docker: status, containers: [], sampledAt: now().toISOString() };
 		}
-		const listed = await runner.run(DOCKER, ['ps', '-a', '--no-trunc', '--format', '{{json .}}'], { timeoutMs: 15_000 });
+		const listed = await runner.run(DOCKER, ['ps', '-a', '--no-trunc', '--format', '{{json .}}'], {
+			timeoutMs: 15_000
+		});
 		if (listed.code !== 0) throw refuse('operation_failed', firstLine(listed.stderr, 'docker ps failed'));
 		const rows = parseContainers(listed.stdout);
 		if (rows.some((row) => row.state === 'running')) {
@@ -187,7 +194,13 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 			runner.run(DOCKER, ['ps', '-a', '--no-trunc', '--format', '{{.Image}}'], { timeoutMs: 15_000 })
 		]);
 		if (listed.code !== 0) throw refuse('operation_failed', firstLine(listed.stderr, 'docker images failed'));
-		const refs = used.code === 0 ? used.stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : [];
+		const refs =
+			used.code === 0
+				? used.stdout
+						.split(/\r?\n/)
+						.map((line) => line.trim())
+						.filter(Boolean)
+				: [];
 		const rows = countImageUse(parseImages(listed.stdout), refs);
 		const unused = rows.filter((row) => row.inUseBy === 0);
 		return {
@@ -217,7 +230,8 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		const result = await runner.run(DOCKER, verb[action], { timeoutMs: ACTION_TIMEOUT_MS });
 		if (result.code !== 0) {
 			const message = firstLine(result.stderr || result.stdout, `docker ${verb[action][0]} failed`);
-			if (/no such container/i.test(message)) throw refuse('not_found', `${id} is not a container on ${context.nodeName}`);
+			if (/no such container/i.test(message))
+				throw refuse('not_found', `${id} is not a container on ${context.nodeName}`);
 			if (/running container|stop the container/i.test(message)) {
 				throw refuse('busy', `${id} is running; stop it first`);
 			}
@@ -225,7 +239,9 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		}
 		context.logger?.info(`docker: ${action} ${id}`);
 		if (action === 'remove') return { id, action, state: 'removed' };
-		const inspected = await runner.run(DOCKER, ['inspect', '--format', '{{.State.Status}}', id], { timeoutMs: 10_000 });
+		const inspected = await runner.run(DOCKER, ['inspect', '--format', '{{.State.Status}}', id], {
+			timeoutMs: 10_000
+		});
 		return { id, action, state: inspected.code === 0 ? inspected.stdout.trim() || 'unknown' : 'unknown' };
 	};
 
@@ -250,17 +266,35 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 				signal: context.signal,
 				onLine: (line) => {
 					const update = progress(line);
-					context.progress(update ? { ...update, ...(update.message ? { message: safeOutputLine(update.message, masked) } : {}) } : { message: safeOutputLine(line, masked) });
+					context.progress(
+						update
+							? {
+									...update,
+									...(update.message ? { message: safeOutputLine(update.message, masked) } : {})
+								}
+							: { message: safeOutputLine(line, masked) }
+					);
 				}
 			});
 			if (result.aborted) throw refuse('operation_failed', 'cancelled');
 			if (result.timedOut) throw refuse('operation_failed', 'timed out after 60 min');
 			if (result.code !== 0) {
-				throw refuse('operation_failed', safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? 'docker run failed', masked));
+				throw refuse(
+					'operation_failed',
+					safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? 'docker run failed', masked)
+				);
 			}
-			const containerId = [...result.stdoutTail].reverse().find((line) => /^[a-f0-9]{64}$/.test(line.trim()))?.trim() ?? null;
+			const containerId =
+				[...result.stdoutTail]
+					.reverse()
+					.find((line) => /^[a-f0-9]{64}$/.test(line.trim()))
+					?.trim() ?? null;
 			context.logger?.info(`docker: ran ${request.image}${request.name ? ` as ${request.name}` : ''}`);
-			return { containerId: containerId ? containerId.slice(0, 12) : null, name: request.name ?? null, image: request.image };
+			return {
+				containerId: containerId ? containerId.slice(0, 12) : null,
+				name: request.name ?? null,
+				image: request.image
+			};
 		});
 	};
 
@@ -274,13 +308,20 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 				signal: context.signal,
 				onLine: (line) => {
 					const update = progress(line);
-					if (update) context.progress({ ...update, ...(update.message ? { message: safeOutputLine(update.message) } : {}) });
+					if (update)
+						context.progress({
+							...update,
+							...(update.message ? { message: safeOutputLine(update.message) } : {})
+						});
 				}
 			});
 			if (result.aborted) throw refuse('operation_failed', 'cancelled');
 			if (result.timedOut) throw refuse('operation_failed', 'timed out after 60 min');
 			if (result.code !== 0) {
-				throw refuse('operation_failed', safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? 'docker pull failed'));
+				throw refuse(
+					'operation_failed',
+					safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? 'docker pull failed')
+				);
 			}
 			const digest = [...result.stdoutTail].reverse().find((line) => line.startsWith('Digest:'));
 			context.logger?.info(`docker: pulled ${ref}`);
@@ -295,7 +336,8 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		const result = await runner.run(DOCKER, ['rmi', id], { timeoutMs: ACTION_TIMEOUT_MS });
 		if (result.code !== 0) {
 			const message = firstLine(result.stderr || result.stdout, 'docker rmi failed');
-			if (/no such image/i.test(message)) throw refuse('not_found', `${id} is not an image on ${context.nodeName}`);
+			if (/no such image/i.test(message))
+				throw refuse('not_found', `${id} is not an image on ${context.nodeName}`);
 			const user = /(?:running|stopped) container ([a-f0-9]{12})/i.exec(message);
 			if (/being used|must be forced|conflict/i.test(message)) {
 				throw refuse('busy', user ? `container ${user[1]} uses this image` : 'a container uses this image', {
@@ -314,7 +356,8 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 
 	const prune = async (context: MachineVerbContext): Promise<FleetImagePruneResult> => {
 		const listed = await images();
-		if (!listed.docker.installed) throw refuse('unsupported_on_node', `Docker is not installed on ${context.nodeName}`);
+		if (!listed.docker.installed)
+			throw refuse('unsupported_on_node', `Docker is not installed on ${context.nodeName}`);
 		if (!listed.docker.daemonRunning) {
 			throw refuse('operation_failed', `Docker is installed but not running on ${context.nodeName}`);
 		}
@@ -325,7 +368,11 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 				onLine: (line) => context.progress({ message: safeOutputLine(line) })
 			});
 			if (result.aborted) throw refuse('operation_failed', 'cancelled');
-			if (result.code !== 0) throw refuse('operation_failed', safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? 'docker image prune failed'));
+			if (result.code !== 0)
+				throw refuse(
+					'operation_failed',
+					safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? 'docker image prune failed')
+				);
 			return parsePruneSummary(result.stdoutTail);
 		});
 	};
@@ -348,7 +395,8 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 
 	/** The project as Compose lists it — a request names a project, never a path. */
 	const findProject = async (raw: unknown, machine: string) => {
-		if (!isFleetComposeProject(raw)) throw refuse('invalid', 'that is not a Compose project name', { field: 'project' });
+		if (!isFleetComposeProject(raw))
+			throw refuse('invalid', 'that is not a Compose project name', { field: 'project' });
 		await requireDaemon(machine);
 		const project = (await composeProjects()).find((row) => row.name === raw);
 		if (!project) throw refuse('not_found', `${raw} is not a Compose project on ${machine}`);
@@ -362,7 +410,15 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 				? Promise.resolve(null)
 				: runner.run(
 						DOCKER,
-						['compose', '-p', project.name, ...composeFileArgs(project.configFiles), 'config', '--format', 'json'],
+						[
+							'compose',
+							'-p',
+							project.name,
+							...composeFileArgs(project.configFiles),
+							'config',
+							'--format',
+							'json'
+						],
 						{ timeoutMs: 20_000 }
 					),
 			runner.run(DOCKER, ['compose', '-p', project.name, 'ps', '-a', '--format', 'json'], { timeoutMs: 15_000 })
@@ -376,9 +432,13 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 		const runningIds = rows.filter((row) => row.state === 'running' && row.id).map((row) => row.id);
 		let stats = new Map<string, { cpuPercent: number | null; memBytes: number | null }>();
 		if (runningIds.length > 0) {
-			const read = await runner.run(DOCKER, ['stats', '--no-stream', '--no-trunc', '--format', '{{json .}}', ...runningIds], {
-				timeoutMs: 15_000
-			});
+			const read = await runner.run(
+				DOCKER,
+				['stats', '--no-stream', '--no-trunc', '--format', '{{json .}}', ...runningIds],
+				{
+					timeoutMs: 15_000
+				}
+			);
 			if (read.code === 0) stats = parseStats(read.stdout);
 		}
 		return {
@@ -391,31 +451,49 @@ export function createDockerModule(deps: DockerModuleDeps = {}): NodeModule {
 
 	const composeAction = async (context: MachineVerbContext) => {
 		const action = context.params.action;
-		if (!isFleetComposeAction(action)) throw refuse('invalid', 'action must be up, down, restart or pull', { field: 'action' });
+		if (!isFleetComposeAction(action))
+			throw refuse('invalid', 'action must be up, down, restart or pull', { field: 'action' });
 		const service = context.params.service;
 		if (service !== undefined && service !== null && !isFleetComposeService(service)) {
 			throw refuse('invalid', 'that is not a Compose service name', { field: 'service' });
 		}
 		const project = await findProject(context.params.project, context.nodeName);
 		if (!project.actions.includes(action)) {
-			throw refuse('unsupported_on_node', `${project.name}'s Compose files are missing on ${context.nodeName}; only Down is possible`);
+			throw refuse(
+				'unsupported_on_node',
+				`${project.name}'s Compose files are missing on ${context.nodeName}; only Down is possible`
+			);
 		}
-		const args = composeActionArgs(project.name, project.filesMissing ? [] : project.configFiles, action, typeof service === 'string' ? service : undefined);
+		const args = composeActionArgs(
+			project.name,
+			project.filesMissing ? [] : project.configFiles,
+			action,
+			typeof service === 'string' ? service : undefined
+		);
 		const progress = createPullProgress();
 		return asOperation(context.nodeName, async () => {
 			const result = await stream(DOCKER, args, {
 				signal: context.signal,
 				onLine: (line) => {
 					const update = action === 'pull' ? progress(line) : null;
-					context.progress(update ? { ...update, ...(update.message ? { message: safeOutputLine(update.message) } : {}) } : { message: safeOutputLine(line) });
+					context.progress(
+						update
+							? { ...update, ...(update.message ? { message: safeOutputLine(update.message) } : {}) }
+							: { message: safeOutputLine(line) }
+					);
 				}
 			});
 			if (result.aborted) throw refuse('operation_failed', 'cancelled');
 			if (result.timedOut) throw refuse('operation_failed', 'timed out after 60 min');
 			if (result.code !== 0) {
-				throw refuse('operation_failed', safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? `docker compose ${action} failed`));
+				throw refuse(
+					'operation_failed',
+					safeOutputLine(result.stderrTail[result.stderrTail.length - 1] ?? `docker compose ${action} failed`)
+				);
 			}
-			context.logger?.info(`docker: compose ${action} ${project.name}${typeof service === 'string' ? ` ${service}` : ''}`);
+			context.logger?.info(
+				`docker: compose ${action} ${project.name}${typeof service === 'string' ? ` ${service}` : ''}`
+			);
 			return { project: project.name, action, ...(typeof service === 'string' ? { service } : {}) };
 		});
 	};

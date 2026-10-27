@@ -47,7 +47,12 @@ import { FleetPortTunnelRepository } from './fleet-port-tunnel.repository';
 /** How the tunnel transport is reached (bound by the API's bridge, `FleetPortTunnelBridge`). */
 export interface FleetPortTunnelLinkPort {
     /** Open the tunnel's channel on the node's link (the node checks the port listens). Throws the §8 refusal. */
-    open(input: { tunnelId: string; nodeId: string; port: number; caller: FleetPortsCaller }): Promise<void>;
+    open(input: {
+        tunnelId: string;
+        nodeId: string;
+        port: number;
+        caller: FleetPortsCaller;
+    }): Promise<void>;
     /** Close this replica's channel of the tunnel; another replica's closes on its next request or when idle. */
     close(tunnelId: string, reason: FleetPortTunnelClosedReason): void;
     /** The platform holds the node's link right now. */
@@ -76,7 +81,10 @@ function iso(value: Date | string | null | undefined): string | null {
 }
 
 /** The view of a row. */
-export function toFleetPortTunnelView(row: FleetPortTunnel, requestedBy?: string | null): FleetPortTunnelView {
+export function toFleetPortTunnelView(
+    row: FleetPortTunnel,
+    requestedBy?: string | null,
+): FleetPortTunnelView {
     const view: FleetPortTunnelView = {
         id: row.id,
         nodeId: row.nodeId,
@@ -120,7 +128,9 @@ export class FleetPortTunnelService {
         private readonly killSwitch: FleetKillSwitchService,
         private readonly nodes: FleetNodeRepository,
         @Optional() private readonly audit?: FleetAuditService,
-        @Optional() @Inject(FLEET_PORT_TUNNEL_LINK_PORT) private readonly link?: FleetPortTunnelLinkPort,
+        @Optional()
+        @Inject(FLEET_PORT_TUNNEL_LINK_PORT)
+        private readonly link?: FleetPortTunnelLinkPort,
     ) {}
 
     /** `FLEET_PORT_TUNNEL_ENABLED` with a preview host (and the machine-facts flag). */
@@ -135,9 +145,12 @@ export class FleetPortTunnelService {
         actor: FleetPortsActor,
     ): Promise<{ tunnel: FleetPortTunnelView; created: boolean }> {
         const previewHost = config.fleet.getPortPreviewHost();
-        if (!this.isEnabled() || !previewHost) throw fleetPortsError('not_found', 'Cannot find route');
+        if (!this.isEnabled() || !previewHost)
+            throw fleetPortsError('not_found', 'Cannot find route');
         if (!isFleetPortNumber(port)) {
-            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', { field: 'port' });
+            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', {
+                field: 'port',
+            });
         }
         const ownerUserId = ownerOf(actor);
         const { node } = await this.access.resolveForFamily(nodeId, ownerUserId, 'ports');
@@ -191,12 +204,19 @@ export class FleetPortTunnelService {
     }
 
     /** The open tunnel to `port` the actor's owner holds on the computer (404 when none). */
-    async current(nodeId: string, port: number, actor: FleetPortsActor): Promise<FleetPortTunnelView> {
+    async current(
+        nodeId: string,
+        port: number,
+        actor: FleetPortsActor,
+    ): Promise<FleetPortTunnelView> {
         if (!this.isEnabled()) throw fleetPortsError('not_found', 'Cannot find route');
         const ownerUserId = ownerOf(actor);
         const { node } = await this.access.resolveForFamily(nodeId, ownerUserId, 'view');
-        const row = isFleetPortNumber(port) ? await this.tunnels.findOpenForPort(ownerUserId, node.id, port) : null;
-        if (!row) throw fleetPortsError('not_found', `no preview of :${port} is open on ${node.name}`);
+        const row = isFleetPortNumber(port)
+            ? await this.tunnels.findOpenForPort(ownerUserId, node.id, port)
+            : null;
+        if (!row)
+            throw fleetPortsError('not_found', `no preview of :${port} is open on ${node.name}`);
         return toFleetPortTunnelView(row);
     }
 
@@ -212,8 +232,11 @@ export class FleetPortTunnelService {
         if (!this.isEnabled()) throw fleetPortsError('not_found', 'Cannot find route');
         const ownerUserId = ownerOf(actor);
         const { node } = await this.access.resolveForFamily(nodeId, ownerUserId, 'ports');
-        const row = isFleetPortNumber(port) ? await this.tunnels.findOpenForPort(ownerUserId, node.id, port) : null;
-        if (!row) throw fleetPortsError('not_found', `no preview of :${port} is open on ${node.name}`);
+        const row = isFleetPortNumber(port)
+            ? await this.tunnels.findOpenForPort(ownerUserId, node.id, port)
+            : null;
+        if (!row)
+            throw fleetPortsError('not_found', `no preview of :${port} is open on ${node.name}`);
         await this.close(row.id, 'user', actor.kind === 'agent' ? 'agent' : 'user', actor);
     }
 
@@ -240,20 +263,26 @@ export class FleetPortTunnelService {
             );
         }
         const node = await this.nodes.findById(row.nodeId).catch(() => null);
-        const auditId = await this.recordAudit('node.port.preview.close', node, actor, {
-            port: row.port,
-            tunnelId: row.id,
-            reason,
-            trigger,
-            requestCount: toNumber(row.requestCount),
-            bytesIn: toNumber(row.bytesIn),
-            bytesOut: toNumber(row.bytesOut),
-            durationSec: Math.max(
-                0,
-                Math.round((closedAt.getTime() - new Date(row.openedAt).getTime()) / 1000),
-            ),
-            outcome: 'closed',
-        }, row.ownerUserId);
+        const auditId = await this.recordAudit(
+            'node.port.preview.close',
+            node,
+            actor,
+            {
+                port: row.port,
+                tunnelId: row.id,
+                reason,
+                trigger,
+                requestCount: toNumber(row.requestCount),
+                bytesIn: toNumber(row.bytesIn),
+                bytesOut: toNumber(row.bytesOut),
+                durationSec: Math.max(
+                    0,
+                    Math.round((closedAt.getTime() - new Date(row.openedAt).getTime()) / 1000),
+                ),
+                outcome: 'closed',
+            },
+            row.ownerUserId,
+        );
         if (auditId) await this.tunnels.stampAudit(row.id, { auditCloseId: auditId });
         return true;
     }
@@ -264,7 +293,10 @@ export class FleetPortTunnelService {
      * (the sweeper is the floor, this is the ceiling); a stopped fleet closes
      * it `kill-switch` (spec U3: within 5 s of the next request).
      */
-    async authorizeRequest(tunnelId: string, userId: string): Promise<FleetPortTunnelAuthorization> {
+    async authorizeRequest(
+        tunnelId: string,
+        userId: string,
+    ): Promise<FleetPortTunnelAuthorization> {
         if (!this.isEnabled()) return { ok: false, why: 'off' };
         const row = await this.tunnels.findById(tunnelId);
         if (!row || row.state !== 'open') return { ok: false, why: 'ended' };
@@ -294,7 +326,10 @@ export class FleetPortTunnelService {
     }
 
     /** Advance an open tunnel's counters and idle clock (the serving replica, after each request). */
-    async touch(tunnelId: string, delta: { requests: number; bytesIn: number; bytesOut: number }): Promise<void> {
+    async touch(
+        tunnelId: string,
+        delta: { requests: number; bytesIn: number; bytesOut: number },
+    ): Promise<void> {
         try {
             await this.tunnels.touch(tunnelId, { ...delta, at: new Date() });
         } catch (error) {
@@ -336,10 +371,15 @@ export class FleetPortTunnelService {
                     trigger = expired;
                 } else {
                     if (!nodes.has(row.nodeId)) {
-                        nodes.set(row.nodeId, await this.nodes.findById(row.nodeId).catch(() => null));
+                        nodes.set(
+                            row.nodeId,
+                            await this.nodes.findById(row.nodeId).catch(() => null),
+                        );
                     }
                     const node = nodes.get(row.nodeId) ?? null;
-                    const silentSince = node?.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).getTime() : 0;
+                    const silentSince = node?.lastHeartbeatAt
+                        ? new Date(node.lastHeartbeatAt).getTime()
+                        : 0;
                     if (!node) {
                         reason = 'node-offline';
                         trigger = 'node-removed';
@@ -363,7 +403,9 @@ export class FleetPortTunnelService {
 
     private assertKind(node: FleetNode): void {
         if (node.kind !== 'node') {
-            throw fleetPortsError('unsupported_on_node', 'Not available on this kind of node yet', { kind: node.kind });
+            throw fleetPortsError('unsupported_on_node', 'Not available on this kind of node yet', {
+                kind: node.kind,
+            });
         }
     }
 
@@ -394,7 +436,11 @@ export class FleetPortTunnelService {
         try {
             const row = await this.audit.record({
                 action,
-                actorUserId: actor ? (actor.kind === 'user' ? actor.userId : actor.ownerUserId) : null,
+                actorUserId: actor
+                    ? actor.kind === 'user'
+                        ? actor.userId
+                        : actor.ownerUserId
+                    : null,
                 ownerUserId: node?.userId ?? ownerUserId ?? null,
                 nodeId: node?.id ?? null,
                 details: {

@@ -30,7 +30,11 @@ import {
  */
 
 export interface CheckoutCredentialClient {
-	mint(checkoutId: string, access: FleetCheckoutCredentialAccess, signal?: AbortSignal): Promise<FleetCheckoutCredentialResponse>;
+	mint(
+		checkoutId: string,
+		access: FleetCheckoutCredentialAccess,
+		signal?: AbortSignal
+	): Promise<FleetCheckoutCredentialResponse>;
 	revoke(token: string): Promise<void>;
 }
 
@@ -113,8 +117,12 @@ export function createCheckoutCredentialClient(options: {
 			options.protect?.(body.token);
 			return {
 				token: body.token,
-				username: typeof body.username === 'string' && body.username ? body.username : FLEET_PUSH_CREDENTIAL_USERNAME,
-				expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : new Date(Date.now() + 55 * 60_000).toISOString(),
+				username:
+					typeof body.username === 'string' && body.username ? body.username : FLEET_PUSH_CREDENTIAL_USERNAME,
+				expiresAt:
+					typeof body.expiresAt === 'string'
+						? body.expiresAt
+						: new Date(Date.now() + 55 * 60_000).toISOString(),
 				repository: body.repository,
 				access: body.access
 			};
@@ -144,7 +152,10 @@ export function createCheckoutCredentialClient(options: {
  * Refuse unless the remote names exactly the repository the token covers, on
  * github.com over https (`fleetPushRemoteRepositoryId` is host-checked).
  */
-export function assertCredentialCovers(remoteUrl: string, credential: Pick<FleetCheckoutCredentialResponse, 'repository'>): void {
+export function assertCredentialCovers(
+	remoteUrl: string,
+	credential: Pick<FleetCheckoutCredentialResponse, 'repository'>
+): void {
 	const repositoryId = fleetPushRemoteRepositoryId(remoteUrl);
 	if (!repositoryId) {
 		throw new CheckoutCredentialError(

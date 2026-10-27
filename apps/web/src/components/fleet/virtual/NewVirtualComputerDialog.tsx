@@ -60,7 +60,9 @@ export function NewVirtualComputerDialog({
     onCreated?: (created: FleetVirtualCreateResponse) => void;
 }) {
     const t = useTranslations('fleet.virtual');
-    const [form, setForm] = useState<VirtualForm>(() => initialVirtualForm(DEFAULT_SYSTEM, hostNodeId));
+    const [form, setForm] = useState<VirtualForm>(() =>
+        initialVirtualForm(DEFAULT_SYSTEM, hostNodeId),
+    );
     const [options, setOptions] = useState<FleetVirtualOptionsView | null>(null);
     const [loadError, setLoadError] = useState<FleetLinkError | null>(null);
     const [error, setError] = useState<FleetLinkError | null>(null);
@@ -117,15 +119,18 @@ export function NewVirtualComputerDialog({
         if (!canCreate || !system) return;
         setError(null);
         startTransition(async () => {
-            const result = await createFleetVirtualAction(form.hostNodeId === 'auto' ? 'auto' : form.hostNodeId, {
-                name: form.name,
-                systemId: system.id,
-                hostNodeId: form.hostNodeId === 'auto' ? null : form.hostNodeId,
-                cpus: form.cpus as 2 | 4 | 8,
-                memoryGiB: form.memoryGiB as 4 | 8 | 16,
-                ...(isVm ? { diskGiB: form.diskGiB as 64 | 128 | 256 } : {}),
-                confirm: true,
-            });
+            const result = await createFleetVirtualAction(
+                form.hostNodeId === 'auto' ? 'auto' : form.hostNodeId,
+                {
+                    name: form.name,
+                    systemId: system.id,
+                    hostNodeId: form.hostNodeId === 'auto' ? null : form.hostNodeId,
+                    cpus: form.cpus as 2 | 4 | 8,
+                    memoryGiB: form.memoryGiB as 4 | 8 | 16,
+                    ...(isVm ? { diskGiB: form.diskGiB as 64 | 128 | 256 } : {}),
+                    confirm: true,
+                },
+            );
             if (result.ok) {
                 toast.success(t('create.created', { name: form.name, host: host?.name ?? '' }));
                 onCreated?.(result.data);
@@ -139,7 +144,12 @@ export function NewVirtualComputerDialog({
     const containers = systems.filter((entry) => entry.kind === 'container');
     const vms = systems.filter((entry) => entry.kind === 'vm');
     const reason = (option: (typeof hosts)[number]) =>
-        option.reason ? t(`reasons.${VIRTUAL_REASON_KEYS[option.reason]}` as Parameters<typeof t>[0], { name: option.name, limit: 4 }) : null;
+        option.reason
+            ? t(`reasons.${VIRTUAL_REASON_KEYS[option.reason]}` as Parameters<typeof t>[0], {
+                  name: option.name,
+                  limit: 4,
+              })
+            : null;
 
     return (
         <Dialog open={open} onOpenChange={(next) => (!next ? onClose() : undefined)}>
@@ -202,12 +212,20 @@ export function NewVirtualComputerDialog({
                             <option value="auto">
                                 {options?.autoPickNodeId
                                     ? t('create.chooseForMeNamed', {
-                                          name: hosts.find((entry) => entry.nodeId === options.autoPickNodeId)?.name ?? '',
+                                          name:
+                                              hosts.find(
+                                                  (entry) =>
+                                                      entry.nodeId === options.autoPickNodeId,
+                                              )?.name ?? '',
                                       })
                                     : t('create.chooseForMe')}
                             </option>
                             {hosts.map((option) => (
-                                <option key={option.nodeId} value={option.nodeId} disabled={!option.eligible}>
+                                <option
+                                    key={option.nodeId}
+                                    value={option.nodeId}
+                                    disabled={!option.eligible}
+                                >
                                     {option.eligible
                                         ? t('create.hostLine', {
                                               name: option.name,
@@ -218,9 +236,13 @@ export function NewVirtualComputerDialog({
                                 </option>
                             ))}
                         </select>
-                        {host && !host.eligible ? <span className="text-xs text-danger">{reason(host)}</span> : null}
+                        {host && !host.eligible ? (
+                            <span className="text-xs text-danger">{reason(host)}</span>
+                        ) : null}
                         {!host && options && !options.autoPickNodeId ? (
-                            <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('menu.noHost')}</span>
+                            <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('menu.noHost')}
+                            </span>
                         ) : null}
                     </label>
 
@@ -250,18 +272,30 @@ export function NewVirtualComputerDialog({
                         ) : null}
                     </div>
 
-                    <p className="rounded-md bg-surface-secondary dark:bg-surface-secondary-dark p-2 text-xs" data-testid="fleet-virtual-note">
+                    <p
+                        className="rounded-md bg-surface-secondary dark:bg-surface-secondary-dark p-2 text-xs"
+                        data-testid="fleet-virtual-note"
+                    >
                         {isVm
                             ? t('create.noteVm', { host: host?.name ?? '' })
-                            : t('create.noteContainer', { host: host?.name ?? t('create.theHost') })}
+                            : t('create.noteContainer', {
+                                  host: host?.name ?? t('create.theHost'),
+                              })}
                     </p>
                     {summary ? (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-virtual-summary">
+                        <p
+                            className="text-xs text-text-muted dark:text-text-muted-dark"
+                            data-testid="fleet-virtual-summary"
+                        >
                             {summary}
                         </p>
                     ) : null}
                     {error ? (
-                        <p className="text-sm text-danger" role="alert" data-testid="fleet-virtual-error">
+                        <p
+                            className="text-sm text-danger"
+                            role="alert"
+                            data-testid="fleet-virtual-error"
+                        >
                             {error.hint || t('create.failed')}
                         </p>
                     ) : null}
@@ -271,7 +305,12 @@ export function NewVirtualComputerDialog({
                     <Button type="button" variant="ghost" onClick={onClose}>
                         {t('create.cancel')}
                     </Button>
-                    <Button type="button" onClick={create} disabled={!canCreate} data-testid="fleet-virtual-create">
+                    <Button
+                        type="button"
+                        onClick={create}
+                        disabled={!canCreate}
+                        data-testid="fleet-virtual-create"
+                    >
                         {isVm ? t('create.createVm') : t('create.createContainer')}
                     </Button>
                 </DialogFooter>
@@ -293,7 +332,9 @@ function SystemGroup({
 }) {
     return (
         <div className="flex flex-wrap items-center gap-3">
-            <span className="w-20 text-xs uppercase text-text-muted dark:text-text-muted-dark">{label}</span>
+            <span className="w-20 text-xs uppercase text-text-muted dark:text-text-muted-dark">
+                {label}
+            </span>
             {systems.map((system) => (
                 <label key={system.id} className="inline-flex items-center gap-1">
                     <input
@@ -331,7 +372,11 @@ function Choice<T extends number>({
             </span>
             {choices.map((choice) => (
                 <label key={choice} className="inline-flex items-center gap-1">
-                    <input type="radio" checked={value === choice} onChange={() => onChange(choice)} />
+                    <input
+                        type="radio"
+                        checked={value === choice}
+                        onChange={() => onChange(choice)}
+                    />
                     {format(choice)}
                 </label>
             ))}

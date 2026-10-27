@@ -7,7 +7,9 @@ describe('AddWorkUpstreamSyncRelease1796500000000', () => {
     const migration = new AddWorkUpstreamSyncRelease1796500000000();
     const COLUMNS = ['syncPullRequestCheckedAt', 'workflowHold', 'workflowRelease'];
 
-    async function columns(): Promise<Array<{ name: string; notnull: number; dflt_value: string | null }>> {
+    async function columns(): Promise<
+        Array<{ name: string; notnull: number; dflt_value: string | null }>
+    > {
         return (await dataSource.query(`PRAGMA table_info("work_upstream_states")`)) as Array<{
             name: string;
             notnull: number;

@@ -48,8 +48,18 @@ describe('replay.shared (FL-04 P3)', () => {
             chunk(3, '2026-10-21T10:00:02.000Z'),
         ]);
         const marks = spanMarks(timeline, [
-            { userId: 'u', requestedBy: 'user:u', from: '2026-10-21T10:00:01.000Z', to: '2026-10-21T10:00:02.000Z' },
-            { userId: 'u', requestedBy: 'user:u', from: '2026-10-21T12:00:00.000Z', to: '2026-10-21T12:00:01.000Z' },
+            {
+                userId: 'u',
+                requestedBy: 'user:u',
+                from: '2026-10-21T10:00:01.000Z',
+                to: '2026-10-21T10:00:02.000Z',
+            },
+            {
+                userId: 'u',
+                requestedBy: 'user:u',
+                from: '2026-10-21T12:00:00.000Z',
+                to: '2026-10-21T12:00:01.000Z',
+            },
         ]);
         expect(marks).toHaveLength(1);
         expect(marks[0].start).toBeCloseTo(0.5);

@@ -57,7 +57,10 @@ export function readFleetPortsError(thrown: unknown): FleetLinkError | null {
         }
         if (thrown.getStatus() === 404) return makeFleetLinkError('not_found', 'no such computer');
         if (thrown.getStatus() === 403) {
-            return makeFleetLinkError('permission_denied', 'ask the owner of this computer to allow you');
+            return makeFleetLinkError(
+                'permission_denied',
+                'ask the owner of this computer to allow you',
+            );
         }
     }
     return null;

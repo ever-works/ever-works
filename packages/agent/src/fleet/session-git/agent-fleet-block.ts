@@ -52,21 +52,29 @@ export function readAgentFleetBlock(agentYml: string | null | undefined): {
     block: AgentFleetBlock;
     error: AgentFleetBlockError | null;
 } {
-    if (typeof agentYml !== 'string' || agentYml.trim() === '') return { block: EMPTY, error: null };
+    if (typeof agentYml !== 'string' || agentYml.trim() === '')
+        return { block: EMPTY, error: null };
     let parsed: unknown;
     try {
         parsed = YAML.parse(agentYml);
     } catch {
         return { block: EMPTY, error: null };
     }
-    if (!isRecord(parsed) || parsed.fleet === undefined || parsed.fleet === null) return { block: EMPTY, error: null };
+    if (!isRecord(parsed) || parsed.fleet === undefined || parsed.fleet === null)
+        return { block: EMPTY, error: null };
     const fleet = parsed.fleet;
     if (!isRecord(fleet)) {
-        return { block: EMPTY, error: { field: 'fleet', message: 'fleet must be a map of branchPrefix and actions' } };
+        return {
+            block: EMPTY,
+            error: { field: 'fleet', message: 'fleet must be a map of branchPrefix and actions' },
+        };
     }
     for (const key of Object.keys(fleet)) {
         if (key !== 'branchPrefix' && key !== 'actions') {
-            return { block: EMPTY, error: { field: `fleet.${key}`, message: `unknown key "${key}" in fleet` } };
+            return {
+                block: EMPTY,
+                error: { field: `fleet.${key}`, message: `unknown key "${key}" in fleet` },
+            };
         }
     }
     const block: AgentFleetBlock = { branchPrefix: null, actions: {} };
@@ -90,7 +98,10 @@ export function readAgentFleetBlock(agentYml: string | null | undefined): {
     }
     if (fleet.actions !== undefined && fleet.actions !== null) {
         if (!isRecord(fleet.actions)) {
-            return { block: EMPTY, error: { field: 'fleet.actions', message: 'actions must be a map of action ids' } };
+            return {
+                block: EMPTY,
+                error: { field: 'fleet.actions', message: 'actions must be a map of action ids' },
+            };
         }
         for (const [id, text] of Object.entries(fleet.actions)) {
             if (!isFleetSessionActionId(id)) {
@@ -103,7 +114,10 @@ export function readAgentFleetBlock(agentYml: string | null | undefined): {
                 };
             }
             if (text === null || text === undefined || text === '') continue;
-            if (typeof text !== 'string' || text.length > FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH) {
+            if (
+                typeof text !== 'string' ||
+                text.length > FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH
+            ) {
                 return {
                     block: EMPTY,
                     error: {
@@ -125,7 +139,10 @@ export function readAgentFleetBlock(agentYml: string | null | undefined): {
  * A file that is not YAML at all is refused (null): the editor then says so
  * instead of overwriting what the person wrote.
  */
-export function writeAgentFleetBlock(agentYml: string | null | undefined, block: AgentFleetBlock): string | null {
+export function writeAgentFleetBlock(
+    agentYml: string | null | undefined,
+    block: AgentFleetBlock,
+): string | null {
     const text = typeof agentYml === 'string' ? agentYml : '';
     let document: YAML.Document;
     try {
@@ -136,15 +153,20 @@ export function writeAgentFleetBlock(agentYml: string | null | undefined, block:
     }
     const contents = document.toJS() as unknown;
     if (text.trim() !== '' && !isRecord(contents)) return null;
-    if (block.branchPrefix && block.branchPrefix.trim()) document.setIn(['fleet', 'branchPrefix'], block.branchPrefix.trim());
-    else if (document.hasIn(['fleet', 'branchPrefix'])) document.deleteIn(['fleet', 'branchPrefix']);
+    if (block.branchPrefix && block.branchPrefix.trim())
+        document.setIn(['fleet', 'branchPrefix'], block.branchPrefix.trim());
+    else if (document.hasIn(['fleet', 'branchPrefix']))
+        document.deleteIn(['fleet', 'branchPrefix']);
     for (const id of FLEET_SESSION_ACTION_IDS) {
         const value = block.actions[id];
-        if (typeof value === 'string' && value.trim()) document.setIn(['fleet', 'actions', id], value);
-        else if (document.hasIn(['fleet', 'actions', id])) document.deleteIn(['fleet', 'actions', id]);
+        if (typeof value === 'string' && value.trim())
+            document.setIn(['fleet', 'actions', id], value);
+        else if (document.hasIn(['fleet', 'actions', id]))
+            document.deleteIn(['fleet', 'actions', id]);
     }
     const actions = document.getIn(['fleet', 'actions']) as unknown;
-    if (actions && YAML.isMap(actions) && actions.items.length === 0) document.deleteIn(['fleet', 'actions']);
+    if (actions && YAML.isMap(actions) && actions.items.length === 0)
+        document.deleteIn(['fleet', 'actions']);
     const fleet = document.get('fleet') as unknown;
     if (fleet && YAML.isMap(fleet) && fleet.items.length === 0) document.delete('fleet');
     return document.toString();
