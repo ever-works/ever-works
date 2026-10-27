@@ -500,6 +500,53 @@ export class WorkAppRuntimeStateRepository implements WorkAppRuntimeStatePort {
         return (result.affected ?? 0) === 1;
     }
 
+    /**
+     * Lane aw-safety (2026-10-26) — undo a deletion claim whose dispatch could not be made, so the
+     * Work does not read **Deleting…** with nothing running the removal. Only a claim no attempt
+     * has run under is released (`deletionAttempts = 0`): once the op has touched the cluster the
+     * claim is the record of that, and it stays.
+     *
+     * @returns `true` when a claim was released.
+     */
+    async releaseDeletionClaim(workId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppRuntimeState)
+            .set({
+                deletionRequestedAt: null,
+                deletionDeleteData: null,
+                deletionRequestedByUserId: null,
+            })
+            .where('workId = :workId', { workId })
+            .andWhere('deletionRequestedAt IS NOT NULL')
+            .andWhere('deletionAttempts = 0')
+            .execute();
+
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
+     * Lane aw-safety (2026-10-26) — the atomic re-claim of a STALE deletion claim (older than
+     * `staleBefore`): the op was lost, the worker died, or the completion never arrived, and the
+     * Work still exists. Compare-and-set on `deletionRequestedAt`, so of two repeated deletes only
+     * one wins and dispatches. The member's `deletionDeleteData` decision is kept as it was
+     * claimed; the attempt counter restarts with the fresh op.
+     *
+     * @returns `true` when this call won the re-claim and owns the dispatch.
+     */
+    async reclaimStaleDeletion(workId: string, staleBefore: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppRuntimeState)
+            .set({ deletionRequestedAt: new Date(), deletionAttempts: 0 })
+            .where('workId = :workId', { workId })
+            .andWhere('deletionRequestedAt IS NOT NULL')
+            .andWhere('deletionRequestedAt < :staleBefore', { staleBefore })
+            .execute();
+
+        return (result.affected ?? 0) === 1;
+    }
+
     /** §9.7:1509 — record an attempt so the row's `deletionAttempts` reflects the retries. */
     async recordDeletionAttempt(workId: string): Promise<number> {
         return serializeOnSingleConnection(this.repository.manager, () =>

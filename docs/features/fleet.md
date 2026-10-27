@@ -1085,6 +1085,10 @@ Uploading a node's own log when a run fails is not built: the node has no authen
 - [Fleet session trust model](../specs/security/fleet-session-trust-model.md) — what a run on your machine trusts,
   what each control guarantees, and the residual gaps (prompt-injection posture; the canary lives in `apps/node`)
 
+## Usage and cost
+
+With the machine owner's opt-in (`ever-works-node start --usage-scan`), a computer reports what the Claude Code and Codex work on it would cost at list price — token counts only, never content. See [Usage and cost on your Fleet](./fleet-usage.md).
+
 ## Sessions on computers
 
 A computer can also keep **sessions** — a shell, Claude Code or Codex in a folder, kept running by the computer even when nobody watches, for you or for one of your Agents. See [Sessions on computers](./fleet-sessions.md).

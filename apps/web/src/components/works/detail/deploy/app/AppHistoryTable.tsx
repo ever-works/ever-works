@@ -20,7 +20,7 @@ export interface AppHistoryTableProps {
 }
 
 /** A Deployment state → its `history.states.*` leaf. Anything else reads "In progress". */
-const STATE_LEAF: Readonly<Record<string, string>> = {
+const STATE_LEAF = {
     READY: 'live',
     ERROR: 'failed',
     TIMEOUT: 'timedOut',
@@ -28,17 +28,27 @@ const STATE_LEAF: Readonly<Record<string, string>> = {
     CANCELED: 'cancelled',
     SUPERSEDED: 'skipped',
     QUEUED: 'queued',
-};
+} as const;
+type StateLeaf = (typeof STATE_LEAF)[keyof typeof STATE_LEAF] | 'inProgress';
 
 /** A trigger → its `history.triggers.*` leaf. */
-const TRIGGER_LEAF: Readonly<Record<string, string>> = {
+const TRIGGER_LEAF = {
     manual: 'manual',
     build: 'build',
     rollback: 'rollback',
     'spec-applied': 'specApplied',
     'env-change': 'envChange',
     'domain-change': 'domainChange',
-};
+} as const;
+type TriggerLeaf = (typeof TRIGGER_LEAF)[keyof typeof TRIGGER_LEAF];
+
+function stateLeafOf(state: string): StateLeaf {
+    return (STATE_LEAF as Readonly<Record<string, StateLeaf>>)[state] ?? 'inProgress';
+}
+
+function triggerLeafOf(trigger: string | null): TriggerLeaf | undefined {
+    return trigger ? (TRIGGER_LEAF as Readonly<Record<string, TriggerLeaf>>)[trigger] : undefined;
+}
 
 /**
  * Lane aw-ops (APW-06 T39, spec §6.3 "History") — the last 20 Deployments: state, what started
@@ -101,8 +111,8 @@ export function AppHistoryTable({ workId, refreshKey }: AppHistoryTableProps) {
                         </thead>
                         <tbody className="divide-y divide-card-border dark:divide-white/9">
                             {rows.map((row) => {
-                                const leaf = STATE_LEAF[row.state] ?? 'inProgress';
-                                const trigger = row.trigger ? TRIGGER_LEAF[row.trigger] : undefined;
+                                const leaf = stateLeafOf(row.state);
+                                const trigger = triggerLeafOf(row.trigger);
                                 const at = row.createdAt ? new Date(row.createdAt) : null;
                                 return (
                                     <tr key={row.id} data-testid="app-history-row" data-state={row.state} data-current={row.current}>

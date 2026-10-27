@@ -765,8 +765,10 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		cli: 'fleet cloud idle-policy'
 	}),
 
-	// ── runners (FL-18) ──
-	read('fleet_runners_list', 'view', 'FL-18', 'FLEET_ACTIONS_RUNNERS_ENABLED', 'planned', {
+	// ── runners (FL-18) ── P1 shipped: list, install, start / stop / restart, remove. An install, a
+	// stop, a restart and a remove asked by an Agent are held for the owner's approval
+	// (`agent-fleet-runners-tools.ts`). The Actions jobs read and Cancel workflow run arrive with P2.
+	read('fleet_runners_list', 'view', 'FL-18', 'FLEET_ACTIONS_RUNNERS_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/nodes/{id}/runners'),
 		cli: 'fleet runners list'
@@ -781,23 +783,29 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'machines',
 		'FL-18',
 		'FLEET_ACTIONS_RUNNERS_ENABLED',
-		'planned',
+		'live',
 		confirm('machine.admin'),
-		{ phase: 'P3', route: POST('/api/fleet/nodes/{id}/runners'), cli: 'fleet runners install', waitable: true }
+		{
+			phase: 'P3',
+			route: POST('/api/fleet/nodes/{id}/runners'),
+			cli: 'fleet runners install',
+			waitable: true,
+			alwaysHeld: true
+		}
 	),
 	act(
 		'fleet_runners_action',
 		'machines',
 		'FL-18',
 		'FLEET_ACTIONS_RUNNERS_ENABLED',
-		'planned',
+		'live',
 		confirm('machine.admin'),
 		{
 			phase: 'P3',
 			route: POST('/api/fleet/nodes/{id}/runners/{runnerId}/{action}'),
 			cli: 'fleet runners action',
 			waitable: true,
-			confirmationNote: 'plain to start; confirm to stop and restart'
+			confirmationNote: "plain to start; confirm to stop and restart (an Agent's stop or restart is held for the owner)"
 		}
 	),
 	act(
@@ -805,9 +813,15 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'machines',
 		'FL-18',
 		'FLEET_ACTIONS_RUNNERS_ENABLED',
-		'planned',
+		'live',
 		typed('write.destructive'),
-		{ phase: 'P3', route: DELETE('/api/fleet/nodes/{id}/runners/{runnerId}'), cli: 'fleet runners remove' }
+		{
+			phase: 'P3',
+			route: POST('/api/fleet/nodes/{id}/runners/{runnerId}/remove'),
+			cli: 'fleet runners remove',
+			waitable: true,
+			alwaysHeld: true
+		}
 	),
 	act(
 		'fleet_runners_cancel_run',
@@ -816,11 +830,13 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'FLEET_ACTIONS_RUNNERS_ENABLED',
 		'planned',
 		confirm('machine.admin'),
-		{ phase: 'P3', route: POST('/api/fleet/runners/jobs/{jobId}/cancel'), cli: 'fleet runners cancel-run' }
+		{ phase: 'P3', route: POST('/api/fleet/runners/jobs/cancel'), cli: 'fleet runners cancel-run' }
 	),
 
-	// ── usage (FL-20) ──
-	read('fleet_usage_get', 'view', 'FL-20', 'FLEET_USAGE_SCAN_ENABLED', 'planned', {
+	// ── usage (FL-20) ── P1 shipped: the Usage object (totals, by model, by computer, busiest
+	// checkouts, sessions) every surface renders, read-only, with the payer sentence in `note`.
+	read('fleet_usage_get', 'view', 'FL-20', 'FLEET_USAGE_SCAN_ENABLED', 'live', {
+		phase: 'P3',
 		route: GET('/api/fleet/usage'),
 		cli: 'fleet usage'
 	}),

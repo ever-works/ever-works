@@ -603,6 +603,15 @@ describe('the node link’s tags and consents (FL-02)', () => {
 		expect(description.capabilities).toEqual(expect.arrayContaining(['managed', 'terminal']));
 	});
 
+	it('advertises `usage-scan` only under --usage-scan with a record folder, and keeps it through an older selection (FL-20)', async () => {
+		const plain = await detectCapabilities(runnerWith([]), environment());
+		expect(plain).not.toContain('usage-scan');
+		const scan = await detectCapabilities(runnerWith([]), environment({ usageScan: true }));
+		expect(scan).toContain('usage-scan');
+		const description = await describeSelf(runnerWith([]), environment({ usageScan: true }), '0.3.0', ['terminal']);
+		expect(description.capabilities).toEqual(expect.arrayContaining(['usage-scan', 'terminal']));
+	});
+
 	it('carries the four consents as literal booleans when a source is wired, and none otherwise', async () => {
 		const withConsents = await describeSelf(runnerWith([]), environment(), '0.3.0', null, {
 			consents: () => ({ work: true, attend: false, manage: true, usageScan: false })

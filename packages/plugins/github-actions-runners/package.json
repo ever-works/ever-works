@@ -1,0 +1,68 @@
+{
+	"name": "@ever-works/github-actions-runners-plugin",
+	"version": "1.0.0",
+	"description": "GitHub Actions self-hosted runners for Ever Works Fleet computers: the runner builds and their checksums, one-time registration and remove tokens, runners and jobs, through the Ever Works GitHub App",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^26.6.4",
+		"tsup": "^8.4.0",
+		"typescript": "^5.9.3",
+		"vitest": "^5.0.5"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "github-actions-runners",
+			"name": "GitHub Actions runners",
+			"version": "1.0.0",
+			"category": "integration",
+			"capabilities": [
+				"actions-runners"
+			],
+			"description": "Turns computers of your Fleet into GitHub Actions self-hosted runners for repositories and organisations the Ever Works GitHub App is installed on: the runner builds and their checksums, one-time registration and remove tokens, runner status, queued and running jobs, and Cancel workflow run. It talks to GitHub with a short-lived installation token the platform mints for each call; it holds no credential of its own and never asks for a personal token.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": true,
+			"systemPlugin": true,
+			"visibility": "user-only",
+			"distribution": "core"
+		}
+	}
+}

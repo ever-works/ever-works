@@ -81,7 +81,13 @@ describe('the management lane — as it ships', () => {
 		// owns the kinds (its work lane never leases them) and leases none.
 		expect(MANAGEMENT_LANE_EXECUTORS).toEqual([]);
 		const plan = planManagementLane({ work: true, attend: true, manage: true, usageScan: true });
-		expect(plan).toEqual({ kinds: [], ownedKinds: ['vm-create', 'vm-control'], executors: [] });
+		// FL-20 appended `usage-scan` (its executor needs --usage-scan and a state folder);
+		// FL-18 appended `runner-install` / `runner-control` (built only with a runners folder).
+		expect(plan).toEqual({
+			kinds: [],
+			ownedKinds: ['vm-create', 'vm-control', 'usage-scan', 'runner-install', 'runner-control'],
+			executors: []
+		});
 		const runtime = createNodeRuntime(config(), platform().io, { workerEnabled: true, manageEnabled: true });
 		expect(runtime.management).toBeUndefined();
 	});
@@ -97,6 +103,44 @@ describe('the management lane — as it ships', () => {
 			virtualDataDir: '/var/lib/ever-works-node/virtual'
 		});
 		expect(without.management).toBeUndefined();
+	});
+
+	it('starts with `usage-scan` alone under --usage-scan with a state folder (FL-20), never under --manage', () => {
+		const scan = createNodeRuntime(config(), platform().io, {
+			usageScanEnabled: true,
+			usageStateDir: '/var/lib/ever-works-node/usage'
+		});
+		expect(scan.management?.kinds).toEqual(['usage-scan']);
+		expect(scan.consents.usageScan).toBe(true);
+		const manageOnly = createNodeRuntime(config(), platform().io, {
+			manageEnabled: true,
+			usageStateDir: '/var/lib/ever-works-node/usage'
+		});
+		expect(manageOnly.management).toBeUndefined();
+		expect(manageOnly.consents.usageScan).toBe(false);
+		// No state folder (an embedder): no executor, so the lane does not lease the scan.
+		const noState = createNodeRuntime(config(), platform().io, { usageScanEnabled: true });
+		expect(noState.management).toBeUndefined();
+	});
+
+	it('starts with the runner kinds under --work with a runners folder (FL-18), never without --work', () => {
+		const runtime = createNodeRuntime(config(), platform().io, {
+			workerEnabled: true,
+			runnersDataDir: '/var/lib/ever-works-node/actions-runners'
+		});
+		expect(runtime.management?.kinds).toEqual(['runner-install', 'runner-control']);
+		const both = createNodeRuntime(config(), platform().io, {
+			workerEnabled: true,
+			manageEnabled: true,
+			virtualDataDir: '/var/lib/ever-works-node/virtual',
+			runnersDataDir: '/var/lib/ever-works-node/actions-runners'
+		});
+		expect(both.management?.kinds).toEqual(['vm-create', 'vm-control', 'runner-install', 'runner-control']);
+		const manageOnly = createNodeRuntime(config(), platform().io, {
+			manageEnabled: true,
+			runnersDataDir: '/var/lib/ever-works-node/actions-runners'
+		});
+		expect(manageOnly.management).toBeUndefined();
 	});
 
 	it('leaves the work lane exactly as it was (no extra excluded kind)', async () => {
