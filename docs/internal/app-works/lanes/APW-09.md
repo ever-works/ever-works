@@ -5,13 +5,15 @@ Spec: [`docs/specs/features/app-works/APW-09-upstream-pull-requests/`](../../../
 
 ## Plan of record
 
-| Phase | Tasks                                                                 | What                                                                                                                                                                                                                                                                                                                                                                                                                                   | Status                      |
-| ----- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| 1     | T6, T7, T35 (record half)                                             | Contracts (`packages/contracts/src/apps/upstream-pull-request.types.ts`), Activity family `app_upstream_pr` + feed-kind rule, the three entities + migrations (`1792090100000` / `0200000` / `0300000`), `UpstreamPullRequestRepository`, `UpstreamPullRequestRecordService`, and the direct `POST /api/works/:id/upstream-pr` writing the record (claim before the provider call, `409 activeProposal`, `opening → open` / `failed`). | merged (#2963)              |
-| 2     | T8 (limits half), T9 (DB-level), T10, T11, T19 (no-credential routes) | FR-26 / FR-39 rate limits enforced server-side (direct route included), eligibility, `GET /api/works/:id/upstream-pull-requests`, `…/eligibility`, `…/:prId`, `POST …/:prId/withdraw`, `POST …/:prId/acknowledge-extra-files`, the Task's **Propose upstream** button.                                                                                                                                                                 | PR #2966                    |
-| 3     | T20, Upstream-tab section                                             | Opt-in setting read, Upstream tab PR list.                                                                                                                                                                                                                                                                                                                                                                                             | not started (see Next step) |
+| Phase | Tasks                                                                 | What                                                                                                                                                                                                                                                                                                                                                                                                                                   | Status                       |
+| ----- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| 1     | T6, T7, T35 (record half)                                             | Contracts (`packages/contracts/src/apps/upstream-pull-request.types.ts`), Activity family `app_upstream_pr` + feed-kind rule, the three entities + migrations (`1792090100000` / `0200000` / `0300000`), `UpstreamPullRequestRepository`, `UpstreamPullRequestRecordService`, and the direct `POST /api/works/:id/upstream-pr` writing the record (claim before the provider call, `409 activeProposal`, `opening → open` / `failed`). | merged (#2963)               |
+| 2     | T8 (limits half), T9 (DB-level), T10, T11, T19 (no-credential routes) | FR-26 / FR-39 rate limits enforced server-side (direct route included), eligibility, `GET /api/works/:id/upstream-pull-requests`, `…/eligibility`, `…/:prId`, `POST …/:prId/withdraw`, `POST …/:prId/acknowledge-extra-files`, the Task's **Propose upstream** button.                                                                                                                                                                 | merged (#2966)               |
+| 3     | T20, Upstream-tab section                                             | Opt-in setting read, Upstream tab PR list.                                                                                                                                                                                                                                                                                                                                                                                             | section: PR; T20 not started |
 
 MERGED: #2963 → `develop` at `d3ea42ec1` (phase 1).
+MERGED: #2966 → `develop` at `df6307e52` (phase 2; CodeRabbit's four findings fixed in `43084bc7f` and answered on the threads).
+Phase 3 (part): the Upstream-tab **Upstream pull requests** section — read-only list in the APW-02 slot.
 
 ## Decisions
 
@@ -64,10 +66,10 @@ MERGED: #2963 → `develop` at `d3ea42ec1` (phase 1).
 
 ## Next step
 
-1. Phase 3 (not started): T20 `UpstreamSettingService` (toggle → App spec change through `commitFiles`, pending state
-   in `work_upstream_pr_settings`), and the Upstream-tab **Upstream pull requests** section
-   (`apps/web/src/components/works/detail/upstream/UpstreamPullRequestsSection.tsx`, list + state/checks chips, a
-   **Withdraw** button over `POST …/:prId/withdraw`) appended to the APW-02 upstream page.
+1. T20 (not started): `UpstreamSettingService` — the toggle writes the App spec change through `commitFiles` (a
+   setup pull request where R-4 needs one), pending state in `work_upstream_pr_settings` (the table exists), the
+   toggle in the Upstream-tab section. The section itself is read-only today; a **Withdraw** button over
+   `POST …/:prId/withdraw` (a server action + client button) is the next small step once proposals exist.
 2. T8 rest: `summarize-upstream-checks.ts`, `upstream-fingerprint.ts`. T9 rest: the provider reads (archived,
    network root, pull requests disabled, interaction limit, push permission, maintainer opt-out) with the member token.
 3. T13–T19 prepare → approve → open → track (needs the T5 spike on a throwaway GitHub pair), then mount
