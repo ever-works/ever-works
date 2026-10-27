@@ -21,8 +21,17 @@ import { requestAppChangeAction } from '@/app/actions/dashboard/app-changes';
 /** The longest request the API accepts (`EvolveWorkDto.request`). */
 export const APP_CHANGE_REQUEST_MAX = 4000;
 
-/** The refusal codes the dialog has its own copy for; anything else reads as `generic`. */
-const KNOWN_ERRORS = new Set([
+/** The refusal copy the dialog has, one key per `dashboard.workDetail.appChange.errors` leaf. */
+export type AppChangeErrorKey =
+    | 'agentRequired'
+    | 'switchOff'
+    | 'appSpecMissing'
+    | 'agentNotEligible'
+    | 'notAppWork'
+    | 'invalid'
+    | 'generic';
+
+const KNOWN_ERRORS: ReadonlySet<string> = new Set<AppChangeErrorKey>([
     'agentRequired',
     'switchOff',
     'appSpecMissing',
@@ -32,9 +41,9 @@ const KNOWN_ERRORS = new Set([
 ]);
 
 /** Which copy a refusal gets: the API's own code when the dialog knows it. */
-export function appChangeErrorKey(code: string | undefined): string {
+export function appChangeErrorKey(code: string | undefined): AppChangeErrorKey {
     if (code === 'invalid_request' || code === 'invalidRequest') return 'invalid';
-    return code && KNOWN_ERRORS.has(code) ? code : 'generic';
+    return code && KNOWN_ERRORS.has(code) ? (code as AppChangeErrorKey) : 'generic';
 }
 
 type Outcome =
@@ -45,7 +54,7 @@ type Outcome =
           awaitingOwner: boolean;
           cloudPushOff: boolean;
       }
-    | { kind: 'refused'; errorKey: string };
+    | { kind: 'refused'; errorKey: AppChangeErrorKey };
 
 /**
  * APW-08 T27 (`RequestChangeDialog`) — **Request a change** on the App Work overview: one text

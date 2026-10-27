@@ -31,6 +31,7 @@ export const appChangesAPI = {
             // `channel` is one of the DTO's own values (`chat` | `card` | `api`): this is the card.
             data: { request: body.request, channel: 'card' },
             method: 'POST',
+            wrapInData: false,
         }),
 
     cost: async (workId: string): Promise<WorkCostRollup> =>
