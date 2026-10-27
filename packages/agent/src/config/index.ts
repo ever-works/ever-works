@@ -1626,6 +1626,33 @@ export const config = {
             },
 
             /**
+             * Owner decision 2026-10-27 — how many App Works an owner on a **paid** plan may run on
+             * **Ever Works Apps** (`EVER_WORKS_APPS_MAX_PER_PAID_USER`). The owner's rule: "max 3
+             * managed apps per owner of an UNPAID plan … paid plans can host more than 3 apps", so
+             * {@link getMaxPerUser} is the cap of a free/unpaid owner and this is the operator's
+             * optional bound for a paid one.
+             *
+             * - Unset or blank ⇒ `null`: **no limit** for a paid owner (the documented default).
+             * - A positive integer ⇒ that bound, but never below {@link getMaxPerUser} — a paid
+             *   plan never runs FEWER Apps than a free one.
+             * - Anything else (`0`, negative, non-numeric, `10x`) ⇒ {@link getMaxPerUser}. The
+             *   operator wrote a bound, so a typo must never read as "unlimited"; it degrades to
+             *   the free cap rather than to `NaN` or `0`.
+             *
+             * Read at call time; the paid/unpaid decision itself is the eligibility service's
+             * (`AppsTierEligibilityService`, `SubscriptionService.resolvePlanForUser`).
+             */
+            getMaxPerPaidUser(): number | null {
+                const value = (process.env.EVER_WORKS_APPS_MAX_PER_PAID_USER ?? '').trim();
+                const freeCap = this.getMaxPerUser();
+                if (!value) return null;
+                if (!/^[0-9]+$/.test(value)) return freeCap;
+                const parsed = Number.parseInt(value, 10);
+                if (!Number.isFinite(parsed) || parsed <= 0) return freeCap;
+                return Math.max(parsed, freeCap);
+            },
+
+            /**
              * APW-06 T19 — the DNS zone the managed records are written into
              * (`EVER_WORKS_APPS_DNS_ZONE_ID`, plan §8.3:1130; **not a secret**).
              *

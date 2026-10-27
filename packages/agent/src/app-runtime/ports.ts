@@ -141,11 +141,19 @@ export interface AppsTierPolicy {
      * (`capReached`) can count the owner's OTHER App Works on the tier — a redeploy of one of them is
      * never refused. Without it the cap is not evaluated. `counted` / `max` are optional extras an
      * implementation may answer with (the counted Works' slugs, the configured cap).
+     * `paidPlanAllowsMore` (additive, 2026-10-27): `true` beside `capReached` when the owner is on
+     * an unpaid plan and a paid plan would admit the App (the refusal says upgrading lifts it).
      */
     eligibility(
         userId: string,
         opts?: { workId?: string | null },
-    ): Promise<{ eligible: boolean; reasons: string[]; counted?: string[]; max?: number }>;
+    ): Promise<{
+        eligible: boolean;
+        reasons: string[];
+        counted?: string[];
+        max?: number;
+        paidPlanAllowsMore?: boolean;
+    }>;
 }
 
 /** DI token for {@link AppsTierPolicy} — a single definition, bound once (`plan.md` §9.8:1519–1521). */
