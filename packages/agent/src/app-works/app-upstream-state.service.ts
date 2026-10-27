@@ -477,6 +477,55 @@ export interface AppSyncPullRequestCheck {
     readonly runId?: string | null;
 }
 
+/**
+ * The Activity actions the upstream sync WORKER may record through this service
+ * ({@link AppUpstreamStateService.recordWorkerActivity}) — the sync run's own one-time
+ * events and Actions hygiene's `app.actions.disabled`. A closed set: the worker's RPC hop
+ * can never write an Activity row of any other kind.
+ */
+export const APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS = [
+    'app.upstream.behind',
+    'app.upstream.unavailable',
+    'app.upstream.held',
+    'app.upstream.workflow_release_used',
+    'app.fork.missing',
+    'app.actions.disabled',
+] as const;
+
+/** One Activity entry as the worker hands it over (owner, workspace and type are re-derived here). */
+export interface AppUpstreamWorkerActivityEntry {
+    action: string;
+    status?: string | null;
+    summary?: string | null;
+    details?: Record<string, unknown> | null;
+}
+
+/** The largest `details` bag a worker Activity entry may carry, serialised. */
+const WORKER_ACTIVITY_MAX_DETAILS_BYTES = 16_384;
+
+/**
+ * The `ActivityLogService` the upstream sync worker is given (lane aw-safety's open item,
+ * 2026-10-26): the sync run and Actions hygiene call `log(entry)` exactly as in-process, and
+ * every call becomes {@link AppUpstreamStateService.recordWorkerActivity} over the state
+ * service's existing remote proxy — so the worker needs no database module and the API stays
+ * the only writer, stamping the Work's own owner and workspace.
+ */
+export function appUpstreamWorkerActivitySink(
+    states: Pick<AppUpstreamStateService, 'recordWorkerActivity'>,
+): Pick<ActivityLogService, 'log'> {
+    return {
+        log: (async (entry: CreateActivityLogDto) => {
+            await states.recordWorkerActivity(String(entry?.workId ?? ''), {
+                action: String(entry?.action ?? ''),
+                status: entry?.status ?? null,
+                summary: entry?.summary ?? null,
+                details: (entry?.details as Record<string, unknown> | undefined) ?? null,
+            });
+            return undefined;
+        }) as unknown as ActivityLogService['log'],
+    };
+}
+
 /** T47 — the dispatcher checks an open sync pull request at most every 10 minutes. */
 export const APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS = 600_000;
 
@@ -1294,6 +1343,56 @@ export class AppUpstreamStateService {
 
         const runId = await this.dispatchSync(workId, { workId, trigger: 'manual' });
         return { queued: true, runId };
+    }
+
+    /**
+     * The upstream sync worker's Activity rows (the worker has no `ActivityLogService`), via
+     * {@link appUpstreamWorkerActivitySink}. Only {@link APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS}
+     * are written; the type is derived from the action, the status is coerced into the closed
+     * enum, the owner and workspace are the Work's own ({@link emit}), and an oversized
+     * `details` bag is dropped rather than stored. Answers whether the row was handed over.
+     */
+    async recordWorkerActivity(
+        workId: string,
+        entry: AppUpstreamWorkerActivityEntry,
+    ): Promise<boolean> {
+        const action = typeof entry?.action === 'string' ? entry.action : '';
+        if (!isUuid(workId) || !(APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS as readonly string[]).includes(action)) {
+            this.logger.warn(
+                `App upstream: refused a worker Activity entry (${action || 'no action'}) for work ${String(workId)}.`,
+            );
+            return false;
+        }
+        const actionType = action.startsWith('app.fork.')
+            ? ActivityActionType.APP_FORK
+            : action.startsWith('app.actions.')
+              ? ActivityActionType.APP_ACTIONS
+              : ActivityActionType.APP_UPSTREAM;
+        const statuses = Object.values(ActivityStatus) as string[];
+        const status = (
+            typeof entry?.status === 'string' && statuses.includes(entry.status)
+                ? entry.status
+                : ActivityStatus.COMPLETED
+        ) as ActivityStatus;
+        let details: Record<string, unknown> | undefined;
+        if (entry?.details && typeof entry.details === 'object' && !Array.isArray(entry.details)) {
+            try {
+                const serialised = JSON.stringify(entry.details);
+                if (serialised.length <= WORKER_ACTIVITY_MAX_DETAILS_BYTES) {
+                    details = JSON.parse(serialised) as Record<string, unknown>;
+                }
+            } catch {
+                details = undefined;
+            }
+        }
+        await this.emit(workId, {
+            actionType,
+            action,
+            status,
+            summary: (typeof entry?.summary === 'string' ? entry.summary : action).slice(0, 300),
+            ...(details ? { details } : {}),
+        });
+        return true;
     }
 
     /**

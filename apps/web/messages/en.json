@@ -9085,6 +9085,81 @@
                 },
                 "editAccessRequired": "You need edit access to this App Work to try again."
             },
+            "appProvisioning": {
+                "title": "Provisioning",
+                "headline": {
+                    "notStarted": "Not provisioned yet. Provisioning inspects the repository and writes its App spec (.works/works.yml) through a pull request.",
+                    "blueprintSpec": "Not needed: this App's spec comes from its Blueprint.",
+                    "autoProvisionOff": "Not started: automatic provisioning was turned off when this App Work was created.",
+                    "awaitingOwner": "Waiting for the Work owner to start it.",
+                    "queued": "Queued — waiting for its Agent to start.",
+                    "running": "Provisioning is running.",
+                    "inReview": "A pull request with the App spec is ready for review.",
+                    "blocked": "Provisioning is blocked and needs your input on the Task.",
+                    "succeeded": "Provisioned.",
+                    "cancelled": "The last provisioning was cancelled."
+                },
+                "trigger": {
+                    "autoCreate": "Started when the App Work was created.",
+                    "manual": "Started by a member.",
+                    "smokeFailed": "Started because the smoke tests failed after an upstream sync.",
+                    "targetUpdated": "Started because the deploy target changed.",
+                    "buildFailed": "Started because the merged App spec failed to build or boot."
+                },
+                "status": {
+                    "backlog": "Backlog",
+                    "todo": "To do",
+                    "inProgress": "In progress",
+                    "inReview": "In review",
+                    "blocked": "Blocked",
+                    "done": "Done",
+                    "cancelled": "Cancelled",
+                    "unknown": "Unknown"
+                },
+                "banner": {
+                    "upstreamBroke": "The last upstream sync broke this App's smoke tests. A re-provisioning Task is looking at what changed upstream."
+                },
+                "awaitingOwnerNote": "Starting it runs the owner's Agent with the owner's credentials, so only the owner can press Run on the Task.",
+                "openTask": "Open Task {slug}",
+                "openPullRequest": "Open the pull request",
+                "actions": {
+                    "provision": "Provision",
+                    "reprovision": "Re-provision",
+                    "restart": "Start over",
+                    "cancel": "Cancel"
+                },
+                "dialog": {
+                    "back": "Back",
+                    "start": {
+                        "title": "Provision this App Work?",
+                        "description": "An Agent inspects the repository and opens a pull request that writes only .works/works.yml and .works/overlay/. Nothing else in the repository changes, and nothing is merged without you.",
+                        "confirm": "Provision"
+                    },
+                    "restart": {
+                        "title": "Start provisioning over?",
+                        "description": "A provisioning Task is already open. Starting over files a new provisioning Task; the open one is left as it is, so cancel it if you no longer need it.",
+                        "confirm": "Start over"
+                    },
+                    "cancel": {
+                        "title": "Cancel provisioning?",
+                        "description": "The running provisioning is stopped and its Task is cancelled. Anything it already pushed stays on its branch; no pull request is merged.",
+                        "confirm": "Cancel provisioning"
+                    }
+                },
+                "toasts": {
+                    "start": "Provisioning started.",
+                    "restart": "Provisioning started over.",
+                    "cancel": "Provisioning cancelled."
+                },
+                "errors": {
+                    "alreadyProvisioning": "A provisioning Task is already open.",
+                    "nothingToCancel": "No provisioning is running.",
+                    "cancelRefused": "The provisioning Task could not be cancelled. Open the Task to see why.",
+                    "notAppWork": "Only App Works can be provisioned.",
+                    "notFound": "This Work could not be found.",
+                    "failed": "That did not work. Try again in a moment."
+                }
+            },
             "builds": {
                 "title": "Builds",
                 "subtitle": "Built on GitHub-hosted runners in {repository} · image {imageRepository}",

@@ -210,3 +210,96 @@ export interface GitWebhookInput {
 	readonly secret: string;
 	readonly events: readonly string[];
 }
+
+// ── APW-02 T48 (FR-63, ACC-02-27) — a private copy's upstream sync ──────────
+//
+// A private copy is a repository the platform pushed one upstream branch into
+// (FR-21). It shares that branch's HISTORY with the upstream but not a fork
+// network, so the fork methods above cannot read or move it: a provider
+// compare cannot span two unrelated repositories, and a REST ref update cannot
+// name an upstream commit the copy has never received. These two shapes are
+// the private copy's half of the sync — counting how far it drifted, and
+// pushing one exact upstream commit onto the platform-owned sync branch.
+
+/** The default ceiling of {@link GitRepositoryCopyDivergenceInput.maxCommits}. */
+export const GIT_REPOSITORY_COPY_DIVERGENCE_MAX_COMMITS = 10_000;
+
+/**
+ * How far a private copy's branch has drifted from its upstream branch.
+ *
+ * `source*` is the upstream (the repository the copy was made from), `target*`
+ * the private copy and its tracked branch. `maxCommits` caps each of the two
+ * counts (default {@link GIT_REPOSITORY_COPY_DIVERGENCE_MAX_COMMITS}); a count
+ * that reached it is reported as the cap with `capped: true` ("10000+"), never
+ * as a smaller number. `maxSizeKb`, when given, is the size the caller has
+ * authorised for the two working copies the reading needs: a larger source or
+ * target is refused (`unprocessable` + `too_large`) before any git work.
+ */
+export interface GitRepositoryCopyDivergenceInput {
+	readonly sourceOwner: string;
+	readonly sourceRepo: string;
+	readonly sourceBranch: string;
+	readonly targetOwner: string;
+	readonly targetRepo: string;
+	readonly targetBranch: string;
+	readonly maxCommits?: number;
+	readonly maxSizeKb?: number;
+}
+
+/**
+ * The drift reading of a private copy — the same counts {@link GitForkDivergence}
+ * reports for a fork, measured from the two branches' merge base.
+ *
+ * `aheadBy` = commits on the copy's branch the upstream branch does not have;
+ * `behindBy` = commits on the upstream branch the copy does not have.
+ * `upstreamHeadSha` is the upstream branch head THIS reading counted to — the
+ * exact commit a sync acts on, never a later one.
+ */
+export interface GitRepositoryCopyDivergence {
+	readonly aheadBy: number;
+	readonly behindBy: number;
+	readonly upstreamHeadSha: string;
+	readonly copyHeadSha: string;
+	/** `null` ⇔ the two branches share no history at all. */
+	readonly mergeBaseSha: string | null;
+	/** `true` ⇔ either count reached `maxCommits`. */
+	readonly capped: boolean;
+}
+
+/**
+ * Point a branch of a private copy at ONE exact upstream commit, fast-forward only.
+ *
+ * `headSha` is the commit the caller already checked (the sync run's workflow
+ * hold and licence gate read the range up to exactly this sha); an
+ * implementation pushes that commit and never "whatever the upstream branch
+ * points at now". `sourceBranch` is where the commit is fetched from (it must be
+ * reachable from that branch's head); `targetBaseBranch` is the copy's own
+ * branch, used only as the local history the push is computed against.
+ * `branchName` is the copy's branch to move (APW-02: `ever-works/upstream-sync`).
+ */
+export interface GitRepositoryCopyBranchMoveInput {
+	readonly sourceOwner: string;
+	readonly sourceRepo: string;
+	readonly sourceBranch: string;
+	readonly targetOwner: string;
+	readonly targetRepo: string;
+	readonly targetBaseBranch: string;
+	readonly branchName: string;
+	readonly headSha: string;
+	readonly maxSizeKb?: number;
+}
+
+/**
+ * What moving a private copy's branch did.
+ *
+ * - `moved` — the branch now points at `headSha` (created, or fast-forwarded);
+ * - `up_to_date` — it already did, so nothing was pushed;
+ * - `not_fast_forward` — the branch holds a commit `headSha` does not descend
+ *   from (upstream rewrote its history), or `headSha` is no longer reachable
+ *   from the upstream branch. Nothing was pushed and nothing was forced: the
+ *   caller decides what a rewritten history means.
+ */
+export interface GitRepositoryCopyBranchMoveResult {
+	readonly outcome: 'moved' | 'up_to_date' | 'not_fast_forward';
+	readonly pushedSha: string | null;
+}

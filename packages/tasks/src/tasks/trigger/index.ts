@@ -151,3 +151,8 @@ export * from './app-upstream-sync.task';
 // `AppUpstreamSyncDispatcherService.dispatchDue()` over the internal RPC channel,
 // every `APP_UPSTREAM_SYNC_DISPATCHER_CRON` (default `*/10 * * * *`).
 export * from './app-upstream-sync-dispatcher.task';
+// APW-03 T28 (lane aw-blueprints) — one Blueprint apply-after-create or upgrade of one
+// App Work: the three-way merge proposed as ONE pull request. The run is API-side
+// (`AppBlueprintApplyRunner` over the internal RPC channel); `APP_BLUEPRINT_APPLY_DISPATCHER`
+// (agent `AppWorksModule`) queues it.
+export * from './app-blueprint-apply.task';

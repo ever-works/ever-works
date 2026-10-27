@@ -41,6 +41,16 @@ import { APP_PROVISIONING_SERVICE } from './app-source-initializer.service';
 import { APP_PROVISION_EVENTS_PORT } from './app-fork-readiness.service';
 import { AppBlueprintResolverService } from '../apps-catalog/app-blueprint-resolver.service';
 import { AppSourceCatalogAdapter } from '../apps-catalog/app-source-catalog.adapter';
+// APW-03 T28–T31 (lane aw-blueprints) — Blueprint apply-after-create and upgrades.
+import { AppBlueprintUpgradeService } from '../apps-catalog/app-blueprint-upgrade.service';
+import {
+    AppBlueprintApplyRunner,
+    AppBlueprintUpgradeListener,
+} from '../apps-catalog/app-blueprint-apply.runner';
+import {
+    APP_BLUEPRINT_APPLY_DISPATCHER,
+    buildAppBlueprintApplyDispatcherProvider,
+} from '../apps-catalog/app-blueprint-apply.job';
 import {
     JOB_RUNTIME_PROVIDER_REGISTRY,
     type JobRuntimeProviderRegistry,
@@ -439,6 +449,15 @@ export function buildAppPromptedValuesProvider(): FactoryProvider {
         // Blueprint is now offered and applied (see `app-blueprint-apply.service.ts`).
         AppBlueprintApplyService,
         { provide: APP_BLUEPRINT_APPLY_SERVICE, useExisting: AppBlueprintApplyService },
+        // APW-03 T28–T31 (lane aw-blueprints) — the Blueprint run after create (`apply`)
+        // and every later `upgrade`: the three-way merge proposed as ONE pull request.
+        // The dispatcher is bound here (the C10 visibility rule — its one consumer is
+        // declared here); the runner is the worker's RPC target; the listener records a
+        // merged proposal on `app.spec.applied`.
+        buildAppBlueprintApplyDispatcherProvider(),
+        AppBlueprintUpgradeService,
+        AppBlueprintApplyRunner,
+        AppBlueprintUpgradeListener,
         // APW-01 T36 — FR-53's five events. Its sink is the API's to bind (a global
         // alias); unbound, events are counted and dropped. See the docstring above.
         AppWorksTelemetryService,
@@ -499,6 +518,10 @@ export function buildAppPromptedValuesProvider(): FactoryProvider {
         // APW-03 T28 / T42 — see the providers above.
         AppBlueprintApplyService,
         APP_BLUEPRINT_APPLY_SERVICE,
+        // APW-03 T28–T31 — for the App spec routes, the RPC `remoteMap` and the cron.
+        AppBlueprintUpgradeService,
+        AppBlueprintApplyRunner,
+        APP_BLUEPRINT_APPLY_DISPATCHER,
         AppLicenseModule,
         // APW-01 T36 — exported so the API-side ready handler and `WorkModule`'s
         // `WorkLifecycleService` receive the same instance the services here do.

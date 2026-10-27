@@ -41,6 +41,11 @@ import type {
 	// hygiene pass and the webhooks.
 	GitRepositoryCopyInput,
 	GitRepositoryCopyResult,
+	// App Works fork lifecycle (APW-02 T48): the private copy's upstream sync.
+	GitRepositoryCopyDivergenceInput,
+	GitRepositoryCopyDivergence,
+	GitRepositoryCopyBranchMoveInput,
+	GitRepositoryCopyBranchMoveResult,
 	GitActionsPermissionsInput,
 	GitActionsPermissionsResult,
 	GitWorkflowRef,
@@ -59,7 +64,8 @@ import {
 	capDiffFiles,
 	deriveCiState,
 	resolveDiffCaps,
-	GitProviderRequestError
+	GitProviderRequestError,
+	GIT_REPOSITORY_COPY_DIVERGENCE_MAX_COMMITS
 } from '@ever-works/plugin/git';
 // Security (SSRF): the same lexical guard this plugin already applies to its own
 // configurable `apiBaseUrl` (see `github.plugin.ts`). A webhook URL is
@@ -485,6 +491,23 @@ const GITATTRIBUTES_PATH = '.gitattributes';
 /** The marker a `.gitattributes` must not carry for a private copy to be possible. */
 const LFS_FILTER_MARKER = 'filter=lfs';
 
+/**
+ * APW-02 T48 — the remote name a private copy's working copy files the upstream
+ * branch under. Never `origin`: `origin` is the copy itself, and the two
+ * histories must stay apart until the counts are taken.
+ */
+const COPY_SYNC_UPSTREAM_REMOTE = 'ever-works-upstream';
+
+/**
+ * APW-02 T48 — the LOCAL branch the exact upstream commit is pinned to before it
+ * is pushed onto the copy's sync branch. Local only; it is never pushed under
+ * this name.
+ */
+const COPY_SYNC_LOCAL_BRANCH = 'ever-works-copy-sync-push';
+
+/** A full commit sha — the only head a branch move accepts (APW-02 T48). */
+const FULL_SHA_PATTERN = /^[0-9a-f]{40}$/i;
+
 /** Workflows read per page. 100 is GitHub's maximum. */
 const ACTIONS_WORKFLOW_PAGE_SIZE = 100;
 
@@ -638,6 +661,78 @@ function usesLfsFilter(content: string): boolean {
  */
 async function removeClonedDirectory(dir: string): Promise<void> {
 	await fs.promises.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+}
+
+/**
+ * The `IGitOperations` members a private copy's sync is built from (APW-02 T48),
+ * materialised and checked before any provider call. Each is OPTIONAL on the
+ * contract, and a capability that cannot run must not read, let alone clone,
+ * first — the same posture `createRepositoryCopy` takes.
+ */
+type CopySyncOperations = Required<
+	Pick<
+		IGitOperations,
+		| 'cloneBranch'
+		| 'fetchBranch'
+		| 'resolveRef'
+		| 'hasCommit'
+		| 'findMergeBase'
+		| 'countCommitsBetween'
+		| 'writeBranchRef'
+	>
+> &
+	Pick<IGitOperations, 'push' | 'removeWorkingCopy'>;
+
+const COPY_SYNC_REQUIRED_OPERATIONS = [
+	'cloneBranch',
+	'fetchBranch',
+	'resolveRef',
+	'hasCommit',
+	'findMergeBase',
+	'countCommitsBetween',
+	'writeBranchRef',
+	'push'
+] as const;
+
+function copySyncOperations(gitOps: IGitOperations | undefined): CopySyncOperations {
+	if (!gitOps || COPY_SYNC_REQUIRED_OPERATIONS.some((name) => typeof gitOps[name] !== 'function')) {
+		throw refusalError('git_operations_unavailable');
+	}
+	return gitOps as CopySyncOperations;
+}
+
+/** `maxCommits` as asked, or the 10 000 default; never above the default, never below one. */
+function resolveMaxCommits(requested: number | undefined): number {
+	return typeof requested === 'number' && Number.isFinite(requested) && requested >= 1
+		? Math.min(Math.floor(requested), GIT_REPOSITORY_COPY_DIVERGENCE_MAX_COMMITS)
+		: GIT_REPOSITORY_COPY_DIVERGENCE_MAX_COMMITS;
+}
+
+/** Remove a copy-sync working copy — through the contract's own member when it has one. */
+async function removeCopySyncDirectory(ops: CopySyncOperations, dir: string): Promise<void> {
+	if (typeof ops.removeWorkingCopy === 'function') {
+		await ops.removeWorkingCopy(dir).catch(() => removeClonedDirectory(dir));
+		return;
+	}
+	await removeClonedDirectory(dir);
+}
+
+/**
+ * Was this push refused for not being a fast-forward? Both halves: the client's
+ * own refusal (isomorphic-git checks the remote's old head is an ancestor before
+ * it sends anything) and the server's (`non-fast-forward`, `fetch first`, a
+ * stale old head).
+ */
+function isNotFastForwardPush(err: unknown): boolean {
+	const shaped = err as { code?: unknown; data?: { reason?: unknown }; message?: unknown } | null;
+	if (shaped?.code === 'PushRejectedError') return shaped.data?.reason === 'not-fast-forward';
+	const message = typeof shaped?.message === 'string' ? shaped.message.toLowerCase() : '';
+	return (
+		message.includes('not-fast-forward') ||
+		message.includes('non-fast-forward') ||
+		message.includes('fetch first') ||
+		message.includes('stale info')
+	);
 }
 
 /** The `config` object both hook endpoints take — one shape, two call sites. */
@@ -3069,6 +3164,235 @@ export class GitHubApiService {
 			// On every path out of the copy, error included: the working copy is this
 			// call's own and holds a full checkout of the source.
 			await removeClonedDirectory(dir);
+		}
+	}
+
+	/**
+	 * How far a private copy's branch has drifted from its upstream branch
+	 * (APW-02 T48 — FR-63, ACC-02-27).
+	 *
+	 * A private copy shares the upstream branch's history but not a fork
+	 * network, so GitHub's compare cannot span the two repositories. The reading
+	 * is therefore taken locally: the copy's branch is cloned into a working
+	 * copy of its own, the upstream branch is fetched next to it under a
+	 * separate remote, and the two `exclude..include` ranges are counted from
+	 * the merge base, each capped at `maxCommits` (`capped: true` ⇒ "10000+").
+	 * `upstreamHeadSha` is the upstream head THIS reading counted to — the
+	 * exact commit the caller's next steps act on.
+	 *
+	 * Refused before any git work when the git operations it needs are absent
+	 * (`git_operations_unavailable`) or when either repository is over the
+	 * caller's `maxSizeKb` (`too_large`). The working copy is removed on every
+	 * path out, error included.
+	 */
+	async getRepositoryCopyDivergence(
+		input: GitRepositoryCopyDivergenceInput,
+		token: string,
+		baseUrl?: string,
+		gitOps?: IGitOperations
+	): Promise<GitRepositoryCopyDivergence> {
+		const ops = copySyncOperations(gitOps);
+		const maxCommits = resolveMaxCommits(input.maxCommits);
+		await this.assertCopySyncSizes(input, token, baseUrl);
+
+		let dir: string;
+		try {
+			dir = await ops.cloneBranch({
+				owner: input.targetOwner,
+				repo: input.targetRepo,
+				branch: input.targetBranch,
+				token
+			});
+		} catch (err) {
+			throw toGitProviderError(err);
+		}
+
+		try {
+			const copyHead = await ops.resolveRef(dir, 'HEAD');
+			if (!copyHead) throw new GitProviderRequestError('not_found', 404);
+			const upstreamHead = await ops.fetchBranch({
+				dir,
+				owner: input.sourceOwner,
+				repo: input.sourceRepo,
+				branch: input.sourceBranch,
+				token,
+				remote: COPY_SYNC_UPSTREAM_REMOTE
+			});
+			if (!upstreamHead) throw new GitProviderRequestError('not_found', 404);
+
+			// One walk at a time: the machine running this also runs everything else.
+			const behind = await ops.countCommitsBetween(dir, {
+				include: upstreamHead,
+				exclude: copyHead,
+				max: maxCommits
+			});
+			const ahead = await ops.countCommitsBetween(dir, {
+				include: copyHead,
+				exclude: upstreamHead,
+				max: maxCommits
+			});
+			let mergeBaseSha: string | null = null;
+			try {
+				mergeBaseSha = await ops.findMergeBase(dir, [copyHead, upstreamHead]);
+			} catch {
+				// The base is reported for the log only; the counts above already stand.
+				mergeBaseSha = null;
+			}
+
+			return {
+				aheadBy: ahead.count,
+				behindBy: behind.count,
+				upstreamHeadSha: upstreamHead,
+				copyHeadSha: copyHead,
+				mergeBaseSha,
+				capped: ahead.capped || behind.capped
+			};
+		} catch (err) {
+			throw toGitProviderError(err);
+		} finally {
+			await removeCopySyncDirectory(ops, dir);
+		}
+	}
+
+	/**
+	 * Point a private copy's branch at ONE exact upstream commit, fast-forward
+	 * only (APW-02 T48 — FR-63, ACC-02-27).
+	 *
+	 * Why not `createRepositoryCopy({ branchName })`: that pushes the upstream
+	 * branch's LIVE head, and the sync run has already checked a specific commit
+	 * (the workflow-change hold and the licence gate read the range up to
+	 * exactly `headSha`). An upstream that moved between the check and the push
+	 * would land commits nobody checked — the race the fork path closed by
+	 * moving its tracked branch to the checked sha. So this method pins the
+	 * commit: the copy's own branch is cloned, the upstream branch is fetched
+	 * next to it, `headSha` is written to a local branch and pushed onto
+	 * `branchName` with no `force` member at all.
+	 *
+	 * Answers, not throws: `up_to_date` when the branch already points at
+	 * `headSha` (nothing is cloned), `not_fast_forward` when the branch holds a
+	 * commit `headSha` does not descend from or `headSha` is not present after
+	 * the upstream fetch any more (upstream rewrote its history). Refused before
+	 * any git work for a sha that is not a full commit id, for a target branch
+	 * that is the copy's tracked branch (this method never moves it), for absent
+	 * git operations and for a repository over `maxSizeKb`.
+	 */
+	async moveRepositoryCopyBranch(
+		input: GitRepositoryCopyBranchMoveInput,
+		token: string,
+		baseUrl?: string,
+		gitOps?: IGitOperations
+	): Promise<GitRepositoryCopyBranchMoveResult> {
+		const ops = copySyncOperations(gitOps);
+		if (!FULL_SHA_PATTERN.test(input.headSha ?? '')) {
+			throw refusalError('invalid_head_sha');
+		}
+		if (!input.branchName || input.branchName === input.targetBaseBranch) {
+			throw refusalError('branch_not_movable');
+		}
+		await this.assertCopySyncSizes(input, token, baseUrl);
+
+		const octokit = this.createOctokit(token, baseUrl);
+		const current = await this.readBranchHeadOrNone(octokit, input.targetOwner, input.targetRepo, input.branchName);
+		if (current !== undefined && current.toLowerCase() === input.headSha.toLowerCase()) {
+			return { outcome: 'up_to_date', pushedSha: current };
+		}
+
+		let dir: string;
+		try {
+			dir = await ops.cloneBranch({
+				owner: input.targetOwner,
+				repo: input.targetRepo,
+				branch: input.targetBaseBranch,
+				token
+			});
+		} catch (err) {
+			throw toGitProviderError(err);
+		}
+
+		try {
+			const upstreamHead = await ops.fetchBranch({
+				dir,
+				owner: input.sourceOwner,
+				repo: input.sourceRepo,
+				branch: input.sourceBranch,
+				token,
+				remote: COPY_SYNC_UPSTREAM_REMOTE
+			});
+			if (!upstreamHead) throw new GitProviderRequestError('not_found', 404);
+			if (!(await ops.hasCommit(dir, input.headSha))) {
+				// The checked commit is gone from the upstream branch: its history was
+				// rewritten. Nothing is pushed — the caller decides what that means.
+				return { outcome: 'not_fast_forward', pushedSha: null };
+			}
+			// Present is not reachable: the copy's own base history can hold an upstream
+			// commit the upstream branch no longer contains. Only a `headSha` that is an
+			// ancestor of (or equal to) the fetched upstream head is upstream's history.
+			if (!(await this.isAncestorOrSelf(ops, dir, input.headSha, upstreamHead))) {
+				return { outcome: 'not_fast_forward', pushedSha: null };
+			}
+
+			await ops.writeBranchRef(dir, COPY_SYNC_LOCAL_BRANCH, input.headSha);
+			try {
+				// No `force` member: a branch that cannot be fast-forwarded is an answer
+				// for the caller, never history to rewrite.
+				await ops.push({
+					dir,
+					token,
+					ref: COPY_SYNC_LOCAL_BRANCH,
+					remoteRef: input.branchName,
+					owner: input.targetOwner,
+					repo: input.targetRepo
+				});
+			} catch (err) {
+				if (isNotFastForwardPush(err)) return { outcome: 'not_fast_forward', pushedSha: null };
+				throw err;
+			}
+			return { outcome: 'moved', pushedSha: input.headSha };
+		} catch (err) {
+			throw toGitProviderError(err);
+		} finally {
+			await removeCopySyncDirectory(ops, dir);
+		}
+	}
+
+	/**
+	 * Whether `oid` is `head` or one of its ancestors — their merge base is `oid`
+	 * itself (compared case-insensitively). A merge base that cannot be computed
+	 * proves nothing, so it answers `false`: the move then refuses rather than
+	 * pushing a commit it could not place in upstream's history.
+	 */
+	private async isAncestorOrSelf(ops: CopySyncOperations, dir: string, oid: string, head: string): Promise<boolean> {
+		if (oid.toLowerCase() === head.toLowerCase()) return true;
+		try {
+			const base = await ops.findMergeBase(dir, [oid, head]);
+			return typeof base === 'string' && base.toLowerCase() === oid.toLowerCase();
+		} catch {
+			return false;
+		}
+	}
+
+	/**
+	 * The `maxSizeKb` ceiling of a copy-sync call, checked against both
+	 * repositories before any git work. No ceiling ⇒ no check (the caller has
+	 * already authorised the size); an UNREPORTED size under a ceiling is refused,
+	 * exactly as `createRepositoryCopy` refuses one.
+	 */
+	private async assertCopySyncSizes(
+		input: { sourceOwner: string; sourceRepo: string; targetOwner: string; targetRepo: string; maxSizeKb?: number },
+		token: string,
+		baseUrl?: string
+	): Promise<void> {
+		if (input.maxSizeKb === undefined) return;
+		const repositories: ReadonlyArray<readonly [string, string]> = [
+			[input.sourceOwner, input.sourceRepo],
+			[input.targetOwner, input.targetRepo]
+		];
+		for (const [owner, repo] of repositories) {
+			const repository = await this.getRepository(owner, repo, token, baseUrl);
+			if (!repository) throw new GitProviderRequestError('not_found', 404);
+			if (repository.sizeKb === undefined || repository.sizeKb > input.maxSizeKb) {
+				throw refusalError('too_large');
+			}
 		}
 	}
 

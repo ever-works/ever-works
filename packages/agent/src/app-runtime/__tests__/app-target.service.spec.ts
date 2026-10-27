@@ -14,7 +14,10 @@ import { AppTargetService, parseSettings, runtimeStateOf } from '../app-target.s
 
 const KUBECONFIG = 'apiVersion: v1\nkind: Config\nclusters: []\n# sentinel-secret-7f3a\n';
 
-function harness(row: Record<string, unknown> | null = { target: 'none', targetSettings: {} }) {
+function harness(
+    row: Record<string, unknown> | null = { target: 'none', targetSettings: {} },
+    tier: unknown = new ConfigAppsTierPolicy({}),
+) {
     let state = row ? { ...row } : null;
     const states = {
         getOrCreate: jest.fn(async () => (state ? { ...state } : null)),
@@ -61,7 +64,7 @@ function harness(row: Record<string, unknown> | null = { target: 'none', targetS
         registry as never,
         settings as never,
         ops,
-        new ConfigAppsTierPolicy({}),
+        tier as never,
     );
     return { service, states, works, deployments, settings, ops, registry, k8s, work };
 }
@@ -168,6 +171,21 @@ describe('AppTargetService.putTarget / getTarget (PUT/GET app-target)', () => {
         expect(ops.dispatch).toHaveBeenCalledWith(
             expect.objectContaining({ op: 'prepare-namespace' }),
         );
+    });
+
+    it("judges choosing the managed tier like a deploy to it: the cap counts the owner's OTHER App Works", async () => {
+        const eligibility = jest.fn(async () => ({ eligible: false, reasons: ['capReached'] }));
+        const { service, states } = harness(undefined, { isOpen: () => true, eligibility });
+
+        const result = await service.putTarget('w-1', 'u-1', { target: 'ever-works-apps' });
+
+        // Without the Work id the per-owner cap is not evaluated at all (ports.ts `eligibility` opts).
+        expect(eligibility).toHaveBeenCalledWith('u-1', { workId: 'w-1' });
+        expect(result).toMatchObject({
+            ok: false,
+            refusal: { httpStatus: 422, code: 'APP_TARGET_REFUSED', unmet: [{ code: 'managed_ineligible' }] },
+        });
+        expect(states.patchRuntimeState).not.toHaveBeenCalled();
     });
 
     it('refuses the managed target while the tier is closed (422 APP_TARGET_REFUSED managed_disabled)', async () => {
