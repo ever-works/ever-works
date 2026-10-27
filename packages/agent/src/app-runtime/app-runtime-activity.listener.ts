@@ -10,6 +10,7 @@
  * | `app.deploy.*` | `app_deploy` |
  * | `app.job.*` | `app_job` |
  * | `app.smoke.*` | `app_smoke` |
+ * | `app.dependency.*` | `app_dependency` (lane aw-builds-bindings, 2026-10-27) |
  *
  * `action` is the dotted event name, `metadata` its ids and names only (`deploymentId`, `buildId`,
  * `target`, `phase`, `code`, `names`) — never a value, an env entry or a log line (ACC-06-41;
@@ -43,6 +44,13 @@ const METADATA_KEYS = [
     'kept',
     'mayRemain',
 ] as const;
+
+/**
+ * Lane aw-builds-bindings (2026-10-27) — the extra ids and names an `app.dependency.*` row
+ * carries (CONTRACTS §6, APW-07): the dependency kind, the provider id and the version a provider
+ * reported. Read for the `app_dependency` family only, so no other family's metadata changes.
+ */
+const DEPENDENCY_METADATA_KEYS = ['kind', 'providerId', 'actualVersion'] as const;
 
 /** The `details.reason` of an App Work's deletion (`app-runtime-deletion.service.ts`). */
 const APP_WORK_DELETED_REASON = 'app_work_deleted';
@@ -130,6 +138,31 @@ export class AppRuntimeActivityListener {
         await this.write(ActivityActionType.APP_HEALTH, payload, 'app.health.unreachable');
     }
 
+    // Lane aw-builds-bindings (2026-10-27) — APW-07's dependency lifecycle rows (CONTRACTS §6:
+    // `app.dependency.provisioned`, `.failed`, `.released`, `.data_deleted`). The owner's own
+    // actions on the Dependencies card already write `app_dependency` rows from the controller;
+    // these are the provider's answers, relayed from the worker (and emitted in-process by the
+    // API's copy of `AppDependenciesService`, whose sink the API ports module binds).
+    @OnEvent('app.dependency.provisioned', { async: true })
+    async onDependencyProvisioned(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_DEPENDENCY, payload, 'app.dependency.provisioned');
+    }
+
+    @OnEvent('app.dependency.failed', { async: true })
+    async onDependencyFailed(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_DEPENDENCY, payload, 'app.dependency.failed');
+    }
+
+    @OnEvent('app.dependency.released', { async: true })
+    async onDependencyReleased(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_DEPENDENCY, payload, 'app.dependency.released');
+    }
+
+    @OnEvent('app.dependency.data_deleted', { async: true })
+    async onDependencyDataDeleted(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_DEPENDENCY, payload, 'app.dependency.data_deleted');
+    }
+
     /** One row for one relayed event. */
     async write(
         actionType: ActivityActionType,
@@ -146,7 +179,11 @@ export class AppRuntimeActivityListener {
             if (!userId) return false;
 
             const metadata: Record<string, unknown> = {};
-            for (const key of METADATA_KEYS) {
+            const keys: readonly string[] =
+                actionType === ActivityActionType.APP_DEPENDENCY
+                    ? [...METADATA_KEYS, ...DEPENDENCY_METADATA_KEYS]
+                    : METADATA_KEYS;
+            for (const key of keys) {
                 const value = payload?.[key];
                 if (value === undefined || value === null || value === '') continue;
                 metadata[key] = Array.isArray(value)
@@ -240,6 +277,20 @@ function summaryFor(
                     ? `: ${(metadata.names as string[]).join(', ')}`
                     : '')
             );
+        case ActivityActionType.APP_DEPENDENCY: {
+            // Lane aw-builds-bindings — the provider's answer in words, with the kind it was for.
+            const kind = metadata.kind ? String(metadata.kind) : 'Dependency';
+            switch (verb) {
+                case 'provisioned':
+                    return `${kind} is ready${metadata.actualVersion ? ` (version ${String(metadata.actualVersion)})` : ''}`;
+                case 'released':
+                    return `${kind} released: kept, no longer managed`;
+                case 'data_deleted':
+                    return `${kind} data deleted`;
+                default:
+                    return `${kind} failed${metadata.reason ? ` (${String(metadata.reason)})` : ''}`;
+            }
+        }
         case ActivityActionType.APP_JOB:
             return `Job ${Array.isArray(metadata.names) ? (metadata.names as string[]).join(', ') : ''} ${verb}`
                 .replace(/\s+/g, ' ')

@@ -1014,6 +1014,78 @@ describe('AppEnvResolver (T14, plan §2.2:110-150, §4.6:422-464)', () => {
         });
     });
 
+    // Lane aw-builds-bindings (2026-10-27) — APW-06 §9.3's `APP_HEALTH_EGRESS_SOURCE` read.
+    describe('resolveEgressHosts — the health poll’s every-10th re-resolution', () => {
+        it('answers the same hosts a full resolution opens, hosts only, without reading the env', async () => {
+            await storeDependency('postgres', {
+                providerId: 'k8s-inline-postgres',
+                outputs: outputsFor('postgres'),
+            });
+            await storeDependency('smtp', {
+                providerId: 'smtp-external',
+                outputs: outputsFor('smtp'),
+            });
+            await storeDependency('objectStorage', {
+                providerId: 's3-external',
+                outputs: outputsFor('objectStorage'),
+            });
+            const spec = specSource();
+            const resolver = makeResolver({ spec });
+
+            const hosts = await resolver.resolveEgressHosts(WORK, 'your-cluster');
+            const full = await resolver.resolveRuntime(WORK, { target: 'your-cluster' });
+
+            expect(hosts).toEqual(['s3.example.test', 'smtp.mail.test']);
+            expect(hosts).toEqual(full.egress.map((destination) => destination.host));
+            // Never a value, a port or an output beside the host.
+            expect(JSON.stringify(hosts)).not.toContain(S3_SECRET);
+            // The spec (the env's own source) is read by the full resolution only.
+            expect(spec.read).toHaveBeenCalledTimes(1);
+        });
+
+        it('answers [] on the managed tier, whose destinations are the zone’s', async () => {
+            await storeDependency('smtp', {
+                providerId: 'smtp-external',
+                outputs: outputsFor('smtp'),
+            });
+            expect(await makeResolver().resolveEgressHosts(WORK, 'ever-works-apps')).toEqual([]);
+        });
+
+        it('answers [] for a Work with no external dependency — a real "none"', async () => {
+            await storeDependency('postgres', {
+                providerId: 'k8s-inline-postgres',
+                outputs: outputsFor('postgres'),
+            });
+            expect(await makeResolver().resolveEgressHosts(WORK, 'your-cluster')).toEqual([]);
+        });
+
+        it('answers null — never [] — when the question cannot be answered', async () => {
+            // No dependency store in this process.
+            expect(
+                await makeResolver({ dependencyRowsRepo: null }).resolveEgressHosts(
+                    WORK,
+                    'your-cluster',
+                ),
+            ).toBeNull();
+            // A target it cannot judge.
+            expect(await makeResolver().resolveEgressHosts(WORK, 'none')).toBeNull();
+            expect(await makeResolver().resolveEgressHosts(WORK, null)).toBeNull();
+            expect(await makeResolver().resolveEgressHosts(WORK)).toBeNull();
+            // A failed row read.
+            const failing = {
+                find: async () => {
+                    throw new Error('connection reset');
+                },
+            } as unknown as Repository<WorkAppDependency>;
+            expect(
+                await makeResolver({ dependencyRowsRepo: failing }).resolveEgressHosts(
+                    WORK,
+                    'your-cluster',
+                ),
+            ).toBeNull();
+        });
+    });
+
     describe('the generate pass and stored-read failures (plan §4.2:366, §9.2:949-950)', () => {
         it('runs ensureGenerated once at the start of a resolve and then reads the row it wrote', async () => {
             const ensureGenerated = jest.fn(async () => {
