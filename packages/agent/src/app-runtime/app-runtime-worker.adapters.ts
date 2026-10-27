@@ -860,3 +860,55 @@ export function workerAppWorkDeletionCompletion(
         },
     };
 }
+
+/* -------------------------------------------------------------------------- *
+ * APPS_TIER_POLICY eligibility in the worker (APW-10 T27 / APW-06 T45, lane aw-safety 2026-10-26)
+ * -------------------------------------------------------------------------- */
+
+/** The ONE member of the API's `AppsTierEligibilityService` the worker may dial. */
+export interface AppsTierEligibilityRemote {
+    evaluate(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible?: boolean; reasons?: unknown; counted?: unknown; max?: unknown } | null | undefined>;
+}
+
+/**
+ * The worker's eligibility source for its `ConfigAppsTierPolicy`: the API's
+ * `AppsTierEligibilityService.evaluate` over the internal channel (`remoteMap`), because the facts
+ * (the account, the plan, the owner's other App Works) are rows the worker cannot read.
+ *
+ * Narrow (one method, the answer rebuilt field by field). A malformed answer THROWS, and the
+ * worker's policy is built with `onSourceFailure: 'admit'` — the API already ran the authoritative
+ * check when the Deployment was requested; the worker's re-check exists to catch a concurrent
+ * Deployment, and must not refuse everything during an API/worker rollout skew.
+ */
+export function workerAppsTierEligibilitySource(remote: AppsTierEligibilityRemote): {
+    evaluate(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible: boolean; reasons: string[]; counted?: string[]; max?: number }>;
+} {
+    return {
+        async evaluate(userId: string, opts?: { workId?: string | null }) {
+            const workId = typeof opts?.workId === 'string' && opts.workId ? opts.workId : null;
+            const answer = await remote.evaluate(String(userId ?? ''), workId ? { workId } : {});
+            if (!answer || typeof answer.eligible !== 'boolean') {
+                throw new Error('The API answered no eligibility verdict.');
+            }
+            const out: { eligible: boolean; reasons: string[]; counted?: string[]; max?: number } = {
+                eligible: answer.eligible === true,
+                reasons: Array.isArray(answer.reasons)
+                    ? answer.reasons.map((reason) => String(reason)).slice(0, 10)
+                    : [],
+            };
+            if (Array.isArray(answer.counted)) {
+                out.counted = answer.counted.map((name) => String(name)).slice(0, 20);
+            }
+            if (typeof answer.max === 'number') {
+                out.max = answer.max;
+            }
+            return out;
+        },
+    };
+}
