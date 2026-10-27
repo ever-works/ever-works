@@ -67,6 +67,13 @@ export {
     isAppEnvEditorRefusal,
     toVariableView,
     type AppEnvEditorViewer,
+    // Lane aw-ops (2026-10-27) — `.env` import preview and rotation (APW-07 T24/T28).
+    previewDotenv,
+    readDotenvText,
+    isImportBody,
+    type AppEnvImportPreview,
+    type AppEnvImportPreviewLine,
+    type AppEnvRotateResponse,
 } from './app-env-editor.service';
 export { AppEnvActivityService } from './app-env.activity';
 export {
