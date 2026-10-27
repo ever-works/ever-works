@@ -17,7 +17,7 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { appRuntimeOpsClient } from '@/lib/api/app-runtime-ops.client';
 import type { AppJobRunView, AppStatusRequestView } from '@/lib/api/app-runtime.types';
-import { codeLeaf, durationSeconds } from './app-ops-format';
+import { durationSeconds } from './app-ops-format';
 
 export interface AppJobsListProps {
     workId: string;
@@ -34,7 +34,7 @@ export interface AppJobsListProps {
 }
 
 /** The refusal codes the run dialog explains in its own words → their `refusals.*` leaf. */
-const RUN_REFUSALS: Readonly<Record<string, string>> = {
+const RUN_REFUSALS = {
     job_active: 'jobActive',
     deploy_in_progress: 'deployInProgress',
     job_confirmation_required: 'confirmRequired',
@@ -42,7 +42,15 @@ const RUN_REFUSALS: Readonly<Record<string, string>> = {
     APP_WORK_DELETING: 'deleting',
     invalid_job_name: 'invalidName',
     forbidden: 'forbidden',
-};
+} as const;
+type RunRefusalLeaf = (typeof RUN_REFUSALS)[keyof typeof RUN_REFUSALS];
+
+/** A job's `when` → its `when.*` leaf. */
+const WHEN_LEAF = {
+    'pre-deploy': 'preDeploy',
+    'first-deploy': 'firstDeploy',
+    'post-deploy': 'postDeploy',
+} as const satisfies Record<AppJobRunView['when'], string>;
 
 /**
  * Lane aw-ops (APW-06 T38, FR-51) — the App spec's jobs with their last run, **Logs** and
@@ -83,9 +91,9 @@ export function AppJobsList({ workId, jobs, canEdit, requests, deploying, onLogs
                             <div className="min-w-0 space-y-0.5">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                     <code className="text-xs font-semibold">{job.name}</code>
-                                    {last?.when && (
+                                    {last?.when && WHEN_LEAF[last.when] && (
                                         <span className="rounded border border-card-border px-1.5 text-[10px] text-text-muted dark:border-white/9">
-                                            {t(`when.${codeLeaf(last.when)}`)}
+                                            {t(`when.${WHEN_LEAF[last.when]}`)}
                                         </span>
                                     )}
                                 </div>
@@ -195,7 +203,9 @@ export function AppJobRunDialog({ workId, job, onOpenChange, onRan }: AppJobRunD
                 onRan();
                 return;
             }
-            const leaf = result.code ? RUN_REFUSALS[result.code] : undefined;
+            const leaf = result.code
+                ? (RUN_REFUSALS as Readonly<Record<string, RunRefusalLeaf>>)[result.code]
+                : undefined;
             setMessage(
                 leaf
                     ? t(`refusals.${leaf}`)

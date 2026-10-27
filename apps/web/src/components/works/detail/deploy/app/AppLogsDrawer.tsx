@@ -40,7 +40,7 @@ export const APP_LOGS_FOLLOW_MS = 15_000;
 const LINE_CHOICES = [100, 200, 500] as const;
 
 /** The failure codes with their own sentence → their `logs.errors.*` leaf. */
-const LOG_ERRORS: Readonly<Record<string, string>> = {
+const LOG_ERRORS = {
     cluster_unreachable: 'clusterUnreachable',
     worker_unavailable: 'workerUnavailable',
     redaction_unavailable: 'redactionUnavailable',
@@ -50,7 +50,8 @@ const LOG_ERRORS: Readonly<Record<string, string>> = {
     app_work_deleting: 'deleting',
     APP_WORK_DELETING: 'deleting',
     forbidden: 'forbidden',
-};
+} as const;
+type LogErrorLeaf = (typeof LOG_ERRORS)[keyof typeof LOG_ERRORS];
 
 type DrawerState =
     | { phase: 'idle' }
@@ -96,7 +97,7 @@ export function AppLogsDrawer({ workId, open, onOpenChange, components, jobs, in
         (code: string | undefined, status: number) => {
             if (status === 404) return t('errors.expired');
             if (status === 429) return t('errors.tooMany');
-            const leaf = code ? LOG_ERRORS[code] : undefined;
+            const leaf = code ? (LOG_ERRORS as Readonly<Record<string, LogErrorLeaf>>)[code] : undefined;
             return leaf ? t(`errors.${leaf}`) : t('errors.failed', { code: code ?? String(status) });
         },
         [t],

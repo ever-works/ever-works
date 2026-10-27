@@ -28,20 +28,22 @@ export interface AppLiveCardProps {
 const STALE_MINUTES = 3;
 
 /** An op id → its `live.requests.*` leaf. */
-const REQUEST_LEAF: Readonly<Record<string, string>> = {
+const REQUEST_LEAF = {
     'status-refresh': 'refresh',
     'job-run': 'job',
     smoke: 'smoke',
-};
+} as const;
+type RequestLeaf = (typeof REQUEST_LEAF)[keyof typeof REQUEST_LEAF];
 
 /** Refusals of Refresh / Run smoke checks with their own sentence → `live.refusals.*`. */
-const ACTION_REFUSALS: Readonly<Record<string, string>> = {
+const ACTION_REFUSALS = {
     app_not_deployed: 'notDeployed',
     app_paused: 'paused',
     deploy_in_progress: 'deployInProgress',
     APP_WORK_DELETING: 'deleting',
     forbidden: 'forbidden',
-};
+} as const;
+type ActionRefusalLeaf = (typeof ACTION_REFUSALS)[keyof typeof ACTION_REFUSALS];
 
 /**
  * Lane aw-ops (APW-06 T38, spec §6.3 "Deploy tab — live", FR-46) — what is running now: the
@@ -102,7 +104,9 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
                 toast.error(t('refreshWait', { seconds: wait }));
                 return;
             }
-            const leaf = result.code ? ACTION_REFUSALS[result.code] : undefined;
+            const leaf = result.code
+                ? (ACTION_REFUSALS as Readonly<Record<string, ActionRefusalLeaf>>)[result.code]
+                : undefined;
             toast.error(
                 leaf ? t(`refusals.${leaf}`) : t('actionFailed', { reason: result.message ?? result.code ?? '' }),
             );
@@ -240,8 +244,13 @@ export function AppLiveCard({ workId, status, canEdit, onReload }: AppLiveCardPr
     );
 }
 
-function requestLabel(request: AppStatusRequestView, t: ReturnType<typeof useTranslations>): string {
-    const leaf = REQUEST_LEAF[request.op];
-    if (!leaf) return request.op;
-    return t(`requests.${leaf}`, { name: request.jobName ?? '' });
+function requestLabel(
+    request: AppStatusRequestView,
+    t: ReturnType<typeof useTranslations<'dashboard.workDetail.appDeploy.live'>>,
+): string {
+    const leaf = (REQUEST_LEAF as Readonly<Record<string, RequestLeaf>>)[request.op];
+    if (leaf === 'job') return t('requests.job', { name: request.jobName ?? '' });
+    if (leaf === 'refresh') return t('requests.refresh');
+    if (leaf === 'smoke') return t('requests.smoke');
+    return request.op;
 }
