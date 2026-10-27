@@ -25,6 +25,11 @@
 //! The injector is opened on the first input only, so a helper that is only
 //! watched never asks the OS for input access. An input that was not injected
 //! is answered `inputResult` with a code (never the typed text).
+//!
+//! After a crash during control (owner question 14): the node sends a FRESH
+//! helper `releaseHeld` before anything else, which lets go of every modifier
+//! key and mouse button the OS reports held; and a helper that panics after
+//! injecting anything does the same from its panic hook before it aborts.
 
 mod capture;
 mod input;
@@ -75,6 +80,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     }
+    install_release_on_panic();
     match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -82,6 +88,20 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// A panic (built `panic = abort`) must not leave a controller's keys held: after the
+/// usual report, a helper that injected anything releases what the OS reports held.
+fn install_release_on_panic() {
+    let report = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        report(info);
+        if input::injected()
+            && let Ok(mut injector) = input::open()
+        {
+            let _ = input::release_held(injector.as_mut());
+        }
+    }));
 }
 
 fn spawn_reader() -> Receiver<Inbound> {
@@ -273,6 +293,44 @@ impl<W: Write> Helper<W> {
                 self.release_all();
                 Ok(())
             }
+            Command::ReleaseHeld => self.release_held(),
+        }
+    }
+
+    /// The injector, opened on first use; the reason input is unavailable otherwise.
+    fn open_injector(&mut self) -> Result<(), &'static str> {
+        if self.injector.is_some() {
+            return Ok(());
+        }
+        if let Some(reason) = self.injector_refused {
+            return Err(reason);
+        }
+        match input::open() {
+            Ok(injector) => {
+                self.injector = Some(injector);
+                Ok(())
+            }
+            Err(reason) => {
+                self.injector_refused = Some(reason);
+                Err(reason)
+            }
+        }
+    }
+
+    /// Owner question 14: let go of what this helper pressed, then of every modifier and
+    /// button the OS still reports held (a previous helper may have died holding them).
+    /// Only ever releases. Answered only when it could not be done.
+    fn release_held(&mut self) -> io::Result<()> {
+        if let Err(reason) = self.open_injector() {
+            return self.input_result("refused", reason);
+        }
+        let Some(injector) = self.injector.as_mut() else {
+            return Ok(());
+        };
+        self.pressed.release_all(injector.as_mut());
+        match input::release_held(injector.as_mut()) {
+            Ok(_) => Ok(()),
+            Err(_) => self.input_result("refused", "inject-failed"),
         }
     }
 
@@ -291,21 +349,14 @@ impl<W: Write> Helper<W> {
         let Some(rect) = rect else {
             return self.input_result("refused", "unknown-display");
         };
-        if self.injector.is_none() {
-            if let Some(reason) = self.injector_refused {
-                return self.input_result("refused", reason);
-            }
-            match input::open() {
-                Ok(injector) => self.injector = Some(injector),
-                Err(reason) => {
-                    self.injector_refused = Some(reason);
-                    return self.input_result("refused", reason);
-                }
-            }
+        if let Err(reason) = self.open_injector() {
+            return self.input_result("refused", reason);
         }
         let Some(injector) = self.injector.as_mut() else {
             return Ok(());
         };
+        // From here on a panic releases what the OS reports held.
+        input::mark_injected();
         match self.pressed.apply(injector.as_mut(), rect, &frame) {
             InputOutcome::Injected => Ok(()),
             InputOutcome::Blocked => self.input_result("blocked", "blocked-shortcut"),

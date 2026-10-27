@@ -41,6 +41,11 @@ export const HELPER_MESSAGES = {
 	listDisplays: 0x06,
 	input: 0x10,
 	releaseAll: 0x11,
+	/**
+	 * Owner question 14: let go of every modifier key and mouse button the OS reports held,
+	 * whoever pressed them — sent to a FRESH helper after one died during control. Only releases.
+	 */
+	releaseHeld: 0x12,
 	hello: 0x81,
 	frame: 0x82,
 	tiles: 0x83,

@@ -7,8 +7,15 @@
 //! display (honouring its scale, FR-38), refuses the blocked shortcuts a second
 //! time, and remembers every key and button it pressed so `releaseAll` lets
 //! them all go (FR-39, U13).
+//!
+//! A helper that dies mid-control takes that memory with it (owner question
+//! 14). So `releaseHeld` — sent by the node to a FRESH helper after one died
+//! while it was controlled — and the helper's own panic hook let go of every
+//! modifier key and mouse button the OS reports held ([`release_held`]),
+//! whoever pressed it. They only ever release; nothing is pressed.
 
 use std::collections::BTreeSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde::Deserialize;
 
@@ -37,6 +44,58 @@ pub trait Injector {
     /// A physical key by its `KeyboardEvent.code`; Err for a code this OS table lacks.
     fn key(&mut self, code: &str, down: bool) -> Result<(), String>;
     fn text(&mut self, text: &str) -> Result<(), String>;
+    /// Which of [`RELEASABLE_MODIFIERS`] and the three buttons the OS reports held NOW,
+    /// whoever pressed them (owner question 14).
+    fn held(&mut self) -> Result<Held, String>;
+}
+
+/// The modifier keys a blind release lets go of. Never the system key: the helper refuses to press it.
+pub const RELEASABLE_MODIFIERS: [&str; 6] = [
+    "ShiftLeft",
+    "ShiftRight",
+    "ControlLeft",
+    "ControlRight",
+    "AltLeft",
+    "AltRight",
+];
+
+/// What the OS reports held (see [`Injector::held`]).
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct Held {
+    pub keys: Vec<&'static str>,
+    pub buttons: Vec<Button>,
+}
+
+/// Let go of every modifier key and mouse button the OS reports held — the
+/// release a fresh helper does after one died mid-control. Answers how many
+/// were released; Err only when the OS could not be asked.
+pub fn release_held(injector: &mut dyn Injector) -> Result<usize, String> {
+    let held = injector.held()?;
+    let mut released = 0;
+    for code in held.keys.iter().rev() {
+        if injector.key(code, false).is_ok() {
+            released += 1;
+        }
+    }
+    for button in &held.buttons {
+        if injector.button(*button, false).is_ok() {
+            released += 1;
+        }
+    }
+    Ok(released)
+}
+
+/// Set once this process has injected anything: its panic hook then releases what the OS reports held.
+static INJECTED: AtomicBool = AtomicBool::new(false);
+
+/// Note that this process has injected input (or is about to).
+pub fn mark_injected() {
+    INJECTED.store(true, Ordering::SeqCst);
+}
+
+/// Whether this process has injected input.
+pub fn injected() -> bool {
+    INJECTED.load(Ordering::SeqCst)
 }
 
 /// Open the injector for this session, or the reason input is unavailable.
@@ -313,6 +372,8 @@ mod tests {
     #[derive(Default)]
     struct Recorder {
         events: Vec<String>,
+        /// What `held` reports (the OS's view in the real injectors).
+        held: Held,
     }
 
     impl Injector for Recorder {
@@ -337,6 +398,9 @@ mod tests {
         fn text(&mut self, text: &str) -> Result<(), String> {
             self.events.push(format!("text {text}"));
             Ok(())
+        }
+        fn held(&mut self) -> Result<Held, String> {
+            Ok(self.held.clone())
         }
     }
 
@@ -464,6 +528,38 @@ mod tests {
             InputOutcome::Injected
         );
         assert_eq!(recorder.events.last().unwrap(), "scroll 0,10000");
+    }
+
+    #[test]
+    fn a_blind_release_lets_go_of_what_the_os_reports_held_and_presses_nothing() {
+        let mut recorder = Recorder {
+            held: Held {
+                keys: vec!["ControlLeft", "ShiftRight"],
+                buttons: vec![Button::Left],
+            },
+            ..Recorder::default()
+        };
+        assert_eq!(release_held(&mut recorder), Ok(3));
+        assert_eq!(
+            recorder.events,
+            vec!["ShiftRight up", "ControlLeft up", "Left up"]
+        );
+        assert!(recorder.events.iter().all(|event| event.ends_with(" up")));
+
+        let mut idle = Recorder::default();
+        assert_eq!(release_held(&mut idle), Ok(0));
+        assert!(idle.events.is_empty());
+    }
+
+    #[test]
+    fn the_releasable_modifiers_are_mapped_on_every_os_and_exclude_the_system_key() {
+        for code in RELEASABLE_MODIFIERS {
+            assert_ne!(modifier_of(code), 0, "{code} is a modifier");
+            assert_ne!(modifier_of(code), MOD_META, "{code} is not the system key");
+            assert!(keys::windows_vk(code).is_some(), "win {code}");
+            assert!(keys::x11_keysym(code).is_some(), "x11 {code}");
+            assert!(keys::mac_keycode(code).is_some(), "mac {code}");
+        }
     }
 
     #[test]
