@@ -57,7 +57,8 @@ export function ProposeUpstreamAction({ view }: { view: ProposeUpstreamActionVie
     ) {
         reason = t('limits.window', { count, time });
     } else if (view.code && (UPSTREAM_REFUSAL_CODES as readonly string[]).includes(view.code)) {
-        reason = refusals(view.code, {
+        // `view.code` was just checked against the closed refusal set; every value has a key.
+        reason = refusals(view.code as Parameters<typeof refusals>[0], {
             upstream,
             fork,
             count,
@@ -79,7 +80,7 @@ export function ProposeUpstreamAction({ view }: { view: ProposeUpstreamActionVie
         <div className="flex flex-col items-end gap-0.5" data-testid="propose-upstream-action">
             <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 disabled={!enabled}
                 aria-disabled={!enabled}
