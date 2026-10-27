@@ -1,3 +1,6 @@
+// @vitest-environment node
+// The socket client has no DOM (e383974b5). Under jsdom 29 `TextEncoder` is jsdom's own, so the
+// frames it encodes are another realm's `Uint8Array` and the contracts codec refuses them.
 import { describe, expect, it, vi } from 'vitest';
 import {
     decodeFleetLinkFrame,
