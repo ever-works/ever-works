@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
 import { appRuntimeAPI, appRuntimeActionsAPI } from '@/lib/api/app-runtime';
@@ -34,7 +35,7 @@ import { APP_DEPLOY_TARGET_CHOICES } from '@ever-works/contracts';
 /** The API caps the kubeconfig at 64 KiB (plan §9.1). */
 const KUBECONFIG_MAX_BYTES = 64 * 1024;
 
-const workIdSchema = z.string().uuid();
+const workIdSchema = z.guid();
 
 function unauthorized<T>(): AppRuntimeActionResult<T> {
     return { success: false, error: 'unauthorized', code: 'unauthorized', httpStatus: 401 };
@@ -113,9 +114,12 @@ export async function saveAppTargetAction(
             target: z.enum(APP_DEPLOY_TARGET_CHOICES),
             settings: settingsSchema.optional(),
         })
-        .safeParse({ workId, target: input?.target, settings: input?.settings });
+        .safeParse(
+            { workId, target: input?.target, settings: input?.settings },
+            ZOD3_ERROR_MESSAGES,
+        );
     if (!parsed.success) {
-        return { success: false, error: parsed.error.errors[0]?.message, code: 'invalid_input' };
+        return { success: false, error: parsed.error.issues[0]?.message, code: 'invalid_input' };
     }
 
     try {
@@ -180,12 +184,12 @@ export async function requestAppDeployAction(
     const parsed = z
         .object({
             workId: workIdSchema,
-            buildId: z.string().uuid().optional(),
+            buildId: z.guid().optional(),
             confirmClusterChange: z.boolean().optional(),
         })
-        .safeParse({ workId, ...input });
+        .safeParse({ workId, ...input }, ZOD3_ERROR_MESSAGES);
     if (!parsed.success) {
-        return { success: false, error: parsed.error.errors[0]?.message, code: 'invalid_input' };
+        return { success: false, error: parsed.error.issues[0]?.message, code: 'invalid_input' };
     }
 
     try {
@@ -220,12 +224,12 @@ export async function rollbackAppAction(
     const parsed = z
         .object({
             workId: workIdSchema,
-            deploymentId: z.string().uuid(),
+            deploymentId: z.guid(),
             runPreDeployJobs: z.boolean().optional(),
         })
-        .safeParse({ workId, ...input });
+        .safeParse({ workId, ...input }, ZOD3_ERROR_MESSAGES);
     if (!parsed.success) {
-        return { success: false, error: parsed.error.errors[0]?.message, code: 'invalid_input' };
+        return { success: false, error: parsed.error.issues[0]?.message, code: 'invalid_input' };
     }
 
     try {
@@ -264,9 +268,9 @@ export async function appLifecycleAction(
             deleteData: z.boolean().optional(),
             confirmSlug: z.string().max(200).optional(),
         })
-        .safeParse({ workId, ...input });
+        .safeParse({ workId, ...input }, ZOD3_ERROR_MESSAGES);
     if (!parsed.success) {
-        return { success: false, error: parsed.error.errors[0]?.message, code: 'invalid_input' };
+        return { success: false, error: parsed.error.issues[0]?.message, code: 'invalid_input' };
     }
 
     try {

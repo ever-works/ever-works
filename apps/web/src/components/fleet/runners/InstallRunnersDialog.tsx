@@ -441,6 +441,17 @@ export function InstallRunnersDialog({
                             </span>
                         </label>
 
+                        {target?.scope === 'repo' ? (
+                            // A repository's permission is only known when the token is minted
+                            // (at install), so say up front what the App needs and what to accept.
+                            <p
+                                className="text-xs text-text-muted dark:text-text-muted-dark"
+                                data-testid="fleet-runners-install-repo-permission"
+                            >
+                                {t('repoPermissionHint')}
+                            </p>
+                        ) : null}
+
                         {permissionMissing && target ? (
                             <GrantAccessCard
                                 account={target.accountLogin || target.target}

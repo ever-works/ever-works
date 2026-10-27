@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import * as yaml from 'yaml';
 import type { ManifestValidationError, WorksManifestV1 } from '@ever-works/contracts/api';
 
@@ -213,7 +214,7 @@ export class WorksManifestService {
             };
         }
 
-        const result = WorksManifestV1Schema.safeParse(parsed);
+        const result = WorksManifestV1Schema.safeParse(parsed, ZOD3_ERROR_MESSAGES);
         if (!result.success) {
             return {
                 kind: 'failure',

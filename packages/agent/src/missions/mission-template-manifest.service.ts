@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as path from 'node:path';
 import YAML from 'yaml';
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 
 /**
  * Phase 8 PR JJ — Mission Template manifest parser
@@ -181,7 +182,7 @@ export class MissionTemplateManifestService {
             return { ok: true, manifest: { ...EMPTY_MISSION_TEMPLATE_MANIFEST } };
         }
 
-        const result = manifestSchema.safeParse(raw);
+        const result = manifestSchema.safeParse(raw, ZOD3_ERROR_MESSAGES);
         if (!result.success) {
             const issues = result.error.issues;
             const summary = issues

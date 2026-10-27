@@ -85,6 +85,38 @@ spec:
         expect(result.ok).toBe(false);
     });
 
+    it('keeps the zod 3 messages and the source_type subcode API clients match on', () => {
+        const yamlText = `
+apiVersion: works.ever.works/v1
+kind: Work
+metadata: {}
+spec:
+  pipeline: standard-pipeline
+  domain: software
+  items:
+    sources:
+      - type: telepathic
+        query: hi
+`;
+        const result = service.parseAndValidate(yamlText);
+        expect(result.ok).toBe(false);
+        if (result.kind === 'failure') {
+            expect(result.errors).toEqual([
+                {
+                    path: 'metadata.name',
+                    message: 'Required',
+                    subcode: 'manifest.metadata.name_required',
+                },
+                {
+                    path: 'spec.items.sources.0.type',
+                    message:
+                        "Invalid discriminator value. Expected 'awesome-readme' | 'web-search' | 'data-repo' | 'inline'",
+                    subcode: 'manifest.items.source_type',
+                },
+            ]);
+        }
+    });
+
     it('rejects invalid domain enum', () => {
         const yamlText = minimalValid.replace('domain: software', 'domain: spaceship');
         const result = service.parseAndValidate(yamlText);

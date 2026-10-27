@@ -1,7 +1,6 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { z } from 'zod';
 import type { ReasoningEffort } from '@ever-works/contracts';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import type {
     AskJsonOptions,
     AskJsonResponse,
@@ -81,6 +80,26 @@ export class TranscriptionNotConfiguredError extends AiFacadeError {
         super(message, 'transcribe', provider);
         this.name = 'TranscriptionNotConfiguredError';
     }
+}
+
+/**
+ * The JSON Schema quoted in the fallback prompt for plugins without `askJson`.
+ * zod 4 converts natively; the options keep the shape `zod-to-json-schema` gave
+ * under zod 3 (draft-07, transforms described by their input, plain objects
+ * closed with `additionalProperties: false`).
+ */
+function toPromptJsonSchema(schema: z.ZodType): Record<string, unknown> {
+    return z.toJSONSchema(schema, {
+        target: 'draft-07',
+        io: 'input',
+        unrepresentable: 'any',
+        override: (ctx) => {
+            const def = (ctx.zodSchema as { _zod?: { def?: { type?: string } } })._zod?.def;
+            if (def?.type === 'object' && ctx.jsonSchema.additionalProperties === undefined) {
+                ctx.jsonSchema.additionalProperties = false;
+            }
+        },
+    }) as Record<string, unknown>;
 }
 
 @Injectable()
@@ -467,7 +486,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
         }
 
         // Fallback for plugins without askJson
-        const jsonSchema = JSON.stringify(zodToJsonSchema(schema));
+        const jsonSchema = JSON.stringify(toPromptJsonSchema(schema));
         const response = await plugin.createChatCompletion({
             model: opts.model,
             messages: [

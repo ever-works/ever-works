@@ -121,7 +121,7 @@ export function createGenerateItemsTool(userConfirmed?: UserConfirmationCheck) {
                 .optional()
                 .describe('What to generate. If omitted, reuses the original prompt.'),
             providers: z
-                .record(z.string())
+                .record(z.string(), z.string())
                 .optional()
                 .describe(
                     'Provider selections from user (e.g., { pipeline: "sim-ai", ai: "openrouter" }). Pass what the user chose from listAvailablePipelines.',

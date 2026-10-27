@@ -9,6 +9,7 @@ import { openLogsForSource } from '../logs/logs-tab.registry';
 import {
     formatClock,
     runnerLabelChips,
+    runnerMissingAppPermission,
     runnerStatus,
     runnerUpdateAvailable,
     type RunnerTone,
@@ -55,6 +56,9 @@ export function RunnerRow({
     const checked = formatClock(runner.lastCheckAt);
     // P3 (FR-28): GitHub publishes a newer build for this runner's platform; Reinstall takes it.
     const update = runnerUpdateAvailable(runner);
+    // FL-18 A16 (owner decision 2026-10-27): a runner that failed because the GitHub App lacks
+    // a permission says exactly what to accept on GitHub.
+    const missingPermission = runnerMissingAppPermission(runner);
     const source =
         runner.stateSource === 'github'
             ? t('sourceGithub')
@@ -125,6 +129,11 @@ export function RunnerRow({
                     </span>
                 ) : null}
             </div>
+            {missingPermission ? (
+                <p className="text-xs text-warning" data-testid="fleet-runner-accept-permission">
+                    {t('acceptPermission', { permission: missingPermission })}
+                </p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {actions}
                 <Link
