@@ -18,6 +18,7 @@ export interface NewAccountDeletionRequest {
     consumedAt?: Date | null;
     completedAt?: Date | null;
     summary?: AccountDeletionSummary | null;
+    failureCode?: string | null;
 }
 
 export type AccountDeletionRequestPatch = Partial<

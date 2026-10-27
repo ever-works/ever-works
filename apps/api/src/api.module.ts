@@ -141,6 +141,7 @@ import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requ
 // Anonymous usage statistics — imported only when EVER_STATS_ENABLED is `true`
 // (off by default); with it off the module is absent (no route, no timer, no request).
 import { instanceStatsModuleImports } from './instance-stats';
+import { AccountDeletionModule } from './account-deletion/account-deletion.module';
 import {
     PluginsModule as AgentPluginsModule,
     PluginBootstrapService,
@@ -528,6 +529,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // contract integrations such as Ever Gauzy code against. Additive;
         // reachable only with an `ew_int_` integration key.
         IntegrationsApiV1Module,
+        // Self-serve account deletion — Settings → Danger Zone and the public
+        // email-link flow (`/api/account-deletion/*`).
+        AccountDeletionModule,
     ],
     providers: [
         {
