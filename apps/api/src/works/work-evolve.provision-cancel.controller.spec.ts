@@ -123,3 +123,55 @@ describe('WorkEvolveController — POST :id/provision/cancel', () => {
         expect(provisioning.cancel).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * APW-04 T25/T36 — `GET /api/works/:id/provisioning` gains three additive fields the
+ * card reads: each row's `trigger` (read back from the provisioner's own brief line) and
+ * `awaitingOwner`, and the top-level `upstreamSmokeBroken` banner flag.
+ */
+describe('WorkEvolveController — GET :id/provisioning (additive fields)', () => {
+    const work = { id: 'w1', userId: 'owner', kind: 'app', sourceRepository: {} };
+
+    function build(rows: Array<Record<string, unknown>>) {
+        const ownership = { ensureCanView: jest.fn(async () => ({ work, role: 'viewer' })) };
+        const tasks = { findByUserIdFiltered: jest.fn(async () => ({ rows, total: rows.length })) };
+        const controller = new WorkEvolveController(
+            ownership as never,
+            {} as never,
+            {} as never,
+            tasks as never,
+            {} as never,
+        );
+        return controller;
+    }
+
+    const row = (over: Record<string, unknown>) => ({
+        id: 't1',
+        slug: 'T-1',
+        title: 'Provision',
+        status: 'in_progress',
+        labels: ['app-provision'],
+        description: 'Provision the App Work.\n\nTrigger: `smoke-failed`.\n\nmore',
+        ...over,
+    });
+
+    it('reads the trigger and the owner hold, and raises the banner for an open smoke-failed Task', async () => {
+        const state = await build([
+            row({ labels: ['app-provision', 'awaiting-owner'] }),
+        ]).provisioningState({ userId: 'viewer' } as AuthenticatedUser, 'w1');
+        expect(state.recent[0]).toMatchObject({ trigger: 'smoke-failed', awaitingOwner: true });
+        expect(state.upstreamSmokeBroken).toBe(true);
+        expect(state.canEdit).toBe(false);
+    });
+
+    it('no banner once the newest Task is not a smoke-failed re-provision, and no echo of free text', async () => {
+        const state = await build([
+            row({ status: 'done', description: 'Trigger: `manual`.' }),
+            row({ id: 't0', description: 'Trigger: `smoke-failed`. <script>' }),
+        ]).provisioningState({ userId: 'viewer' } as AuthenticatedUser, 'w1');
+        expect(state.recent[0].trigger).toBe('manual');
+        // A line that is not exactly the provisioner's is not read.
+        expect(state.recent[1].trigger).toBeNull();
+        expect(state.upstreamSmokeBroken).toBe(false);
+    });
+});

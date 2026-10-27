@@ -325,6 +325,12 @@ export class WorkEvolveController {
             prState: task.prState ?? null,
             createdAt: task.createdAt ?? null,
             updatedAt: task.updatedAt ?? null,
+            // APW-04 T25/T36 (additive) — why the Task was filed, read back from the brief
+            // the provisioner wrote (`Trigger: \`smoke-failed\`.`), and whether it is held
+            // for the Work owner (`awaiting-owner`). The card's headline and banner read
+            // these; nothing else changes.
+            trigger: provisioningTriggerOf(task.description),
+            awaitingOwner: Array.isArray(task.labels) && task.labels.includes('awaiting-owner'),
         }));
         const active = recent.find((task) => !['done', 'cancelled'].includes(task.status)) ?? null;
         // Live e2e 2026-10-18 — an empty list is now explained instead of looking like a
@@ -348,6 +354,10 @@ export class WorkEvolveController {
             active,
             recent,
             canEdit: access.role !== 'viewer',
+            // APW-04 T36 (additive) — the newest provisioning Task reacts to an upstream sync
+            // that broke the smoke tests and is still open: the card shows the banner.
+            upstreamSmokeBroken:
+                !!active && active === recent[0] && active.trigger === 'smoke-failed',
             notStartedReason,
             ...(notStartedReason === 'blueprintSpec'
                 ? { blueprintId: source.blueprintId ?? null }
@@ -427,6 +437,17 @@ export class WorkEvolveController {
         }
         return access;
     }
+}
+
+/**
+ * The trigger a provisioning Task was filed for, as `AppProvisioningService`'s brief
+ * records it (`Trigger: \`<trigger>\`.`), or `null`. A closed set of word characters
+ * and dashes, so nothing a member typed elsewhere in the description is echoed.
+ */
+function provisioningTriggerOf(description: unknown): string | null {
+    if (typeof description !== 'string') return null;
+    const match = /^Trigger: `([a-z][a-z-]{0,39})`\.$/m.exec(description);
+    return match ? match[1] : null;
 }
 
 /** The `@Res({ passthrough: true })` surface this controller needs — nothing else. */
