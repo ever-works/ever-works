@@ -1,4 +1,14 @@
-import { Controller, Get, HttpCode, HttpException, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpException,
+    HttpStatus,
+    Optional,
+    Param,
+    Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { AppUpstreamStateResponse } from '@ever-works/contracts';
@@ -9,8 +19,11 @@ import {
     type AppUpstreamDispatchResult,
     type AppUpstreamErrorCode,
 } from '@ever-works/agent/app-works';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
+import { APP_OWNER_REQUIRED_CODE, requireAppWorkOwnerSession } from '../works/app-owner-gate';
+import { AppUpstreamSyncDto } from './dto/app-upstream-sync.dto';
 
 /**
  * APW-02 T27 — the three Upstream routes (plan §4.1, `plan.md:487-516`).
@@ -58,6 +71,10 @@ export class AppUpstreamController {
     constructor(
         private readonly upstream: AppUpstreamStateService,
         private readonly dispatcher: AppUpstreamSyncDispatcherService,
+        // APW-02 T46 — the owner-and-session gate of "Sync anyway". `@Optional()` so a
+        // context that does not provide it still boots; absent ⇒ every release is refused
+        // `403 ownerRequired` (fail closed), never admitted.
+        @Optional() private readonly ownership?: WorkOwnershipService,
     ) {}
 
     /**
@@ -132,7 +149,8 @@ export class AppUpstreamController {
     @ApiResponse({ status: 404, description: '`not_found`.' })
     @ApiResponse({
         status: 409,
-        description: '`not_ready` · `sync_paused` (+ `details.reason`) · `sync_in_progress`.',
+        description:
+            '`not_ready` · `sync_paused` (+ `details.reason`) · `sync_in_progress` · `workflow_confirmation_required` / `workflow_hold_changed` (+ `details.headSha`, `details.paths`) · `no_workflow_hold`.',
     })
     @ApiResponse({ status: 422, description: '`no_upstream` — the App Work is a link.' })
     @ApiResponse({
@@ -142,8 +160,48 @@ export class AppUpstreamController {
     async syncUpstream(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
+        @Body() body: AppUpstreamSyncDto = {},
     ): Promise<AppUpstreamDispatchResult> {
-        return this.translate(() => this.upstream.requestSync(id, auth.userId));
+        const confirmWorkflowChanges = body?.confirmWorkflowChanges === true;
+        if (confirmWorkflowChanges) {
+            // APW-02 T46 — the security rule of #2802/#2806 stands: only the Work OWNER, in a
+            // signed-in session, may accept upstream workflow changes. A member (editor,
+            // manager), the owner's own API key, an integration key, a fleet-run token or an
+            // Agent is refused here, before the service is even asked.
+            await this.requireOwnerSession(id, auth);
+        }
+        return this.translate(() =>
+            this.upstream.requestSync(id, auth.userId, {
+                ...(confirmWorkflowChanges ? { confirmWorkflowChanges: true } : {}),
+                ...(typeof body?.workflowHeadSha === 'string'
+                    ? { workflowHeadSha: body.workflowHeadSha }
+                    : {}),
+            }),
+        );
+    }
+
+    /**
+     * T46 — the owner-and-session gate. Visibility first (the service's own read answers
+     * the same `404` a stranger always gets), then the shared App Works owner gate.
+     */
+    private async requireOwnerSession(id: string, auth: AuthenticatedUser): Promise<void> {
+        await this.translate(() => this.upstream.get(id, auth.userId));
+        if (!this.ownership) {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: APP_OWNER_REQUIRED_CODE,
+                    message: 'Only the Work owner can accept upstream workflow changes.',
+                },
+                HttpStatus.FORBIDDEN,
+            );
+        }
+        await requireAppWorkOwnerSession(
+            this.ownership,
+            id,
+            auth,
+            'accept upstream workflow changes',
+        );
     }
 
     /**

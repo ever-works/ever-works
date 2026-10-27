@@ -9,6 +9,7 @@ import {
     APP_UPSTREAM_SYNC_BRANCH,
     APP_UPSTREAM_SYNC_MAX_PROVIDER_CALLS,
     APP_UPSTREAM_UNAVAILABLE_RECHECK_MS,
+    APP_UPSTREAM_WORKFLOW_HOLD_MAX_PATHS,
     appRateLimitAllowsSync,
     type AppLicenseEvaluationReason,
     type AppSpec,
@@ -25,7 +26,10 @@ import {
     ActivityStatus,
     type CreateActivityLogDto,
 } from '../entities/activity-log.types';
-import type { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+import type {
+    WorkUpstreamState,
+    WorkUpstreamWorkflowRelease,
+} from '../entities/work-upstream-state.entity';
 import { GitFacadeService, GitOperationNotSupportedError } from '../facades/git.facade';
 import {
     AppActionsHygieneService,
@@ -135,10 +139,15 @@ import {
  * compare cannot be read, or cannot prove it is the whole range — it moves
  * nothing, opens nothing, records `skipped` / `held_for_workflow_review`, and
  * emits one `app.upstream.held` naming the paths (never their content). Every
- * trigger takes the same branch: scheduled, manual and retried. The only way
- * past it is an operator listing the Work in
- * `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS` — never the App spec, which the
- * upstream author can write.
+ * trigger takes the same branch: scheduled, manual and retried. There are two
+ * ways past it, and the App spec — which the upstream author can write — is
+ * neither: an operator listing the Work in
+ * `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS`, or (T46, 2026-10-27) the Work
+ * OWNER's recorded release of that exact held head ("Sync anyway",
+ * `workflowRelease`), which only `AppUpstreamStateService.requestSync` writes,
+ * behind the owner-and-signed-in-session gate of the API route — never a member,
+ * an API key, a run token or an Agent. The release covers one upstream head and
+ * nothing the owner was not shown (`workflowReleaseCovers`).
  *
  * ## Fail-closed everywhere a seam is missing
  *
@@ -466,6 +475,7 @@ interface SyncEvent {
         | 'app.upstream.behind'
         | 'app.upstream.unavailable'
         | 'app.upstream.held'
+        | 'app.upstream.workflow_release_used'
         | 'app.fork.missing';
     actionType: ActivityActionType;
     status: ActivityStatus;
@@ -969,6 +979,26 @@ export class AppUpstreamSyncService {
 
         const changes = await this.readUpstreamWorkflowChanges(context, row, headSha);
         if (!holdsForWorkflowReview(changes)) {
+            // T46: the range is clean, so a hold recorded by an earlier run no longer
+            // describes anything — clear it with the rest of this run's row patch.
+            if (row.workflowHold) {
+                base.rowPatch = { ...(base.rowPatch ?? {}), workflowHold: null };
+            }
+            return null;
+        }
+
+        // T46 (FR-60/FR-61) — the owner's "Sync anyway". Honoured only for the EXACT head
+        // the owner released, and only while this compare shows nothing the owner was not
+        // shown (see `workflowReleaseCovers`). Written by `AppUpstreamStateService.requestSync`
+        // behind the owner-and-signed-in-session gate; never by the App spec, a member, an
+        // API key, a run token or an Agent.
+        if (workflowReleaseCovers(row.workflowRelease ?? null, headSha, changes)) {
+            this.logger.warn(
+                `App upstream sync: work ${context.workId} — the upstream range to ${headSha} changes ${changes.pathCount} workflow/action path(s) and is synced on the owner's recorded release (${row.workflowRelease?.releasedByUserId ?? 'unknown'} at ${row.workflowRelease?.releasedAt ?? 'unknown'}).`,
+            );
+            context.workflowReleaseUsed = true;
+            base.rowPatch = { ...(base.rowPatch ?? {}), workflowHold: null };
+            base.events = [...(base.events ?? []), workflowReleaseUsedEvent(headSha, changes, row)];
             return null;
         }
 
@@ -987,6 +1017,18 @@ export class AppUpstreamSyncService {
             ...base,
             result: 'skipped',
             reason: 'held_for_workflow_review',
+            // T46: what the Upstream card shows and what the owner releases — the exact
+            // head and the paths (never their content).
+            rowPatch: {
+                ...(base.rowPatch ?? {}),
+                workflowHold: {
+                    headSha: headSha || '',
+                    paths: changes.paths.slice(0, APP_UPSTREAM_WORKFLOW_HOLD_MAX_PATHS),
+                    pathCount: changes.pathCount,
+                    complete: changes.complete === true,
+                    heldAt: new Date(context.now()).toISOString(),
+                },
+            },
             events: [
                 ...(base.events ?? []),
                 ...(alreadyHeld ? [] : [workflowHeldEvent(headSha, changes)]),
@@ -1755,6 +1797,14 @@ export class AppUpstreamSyncService {
         if (outcome.trackedBranchChanged === true) {
             result.licenseRequested = await this.requestLicense(workId, 'upstream_synced');
             result.hygiene = await this.runHygiene(workId);
+        } else if (
+            context.workflowReleaseUsed === true &&
+            RELEASED_MOVE_RESULTS.has(String(outcome.result))
+        ) {
+            // T46 — a released range moved `ever-works/upstream-sync`, so new upstream
+            // workflows may now exist in the repository: disable them as soon as the
+            // platform can see them (best effort, never fatal — FR-30).
+            result.hygiene = await this.runHygiene(workId);
         }
     }
 
@@ -1952,6 +2002,13 @@ interface RunContext {
     ownerScope: OwnershipScope | null;
     settings: AppUpstreamSyncSettings;
     result: AppUpstreamSyncRunResult;
+    /**
+     * APW-02 T46 — `true` ⇔ this run let a held range through on the owner's recorded
+     * release (`workflowRelease`) for the exact head it checked. Settle then runs Actions
+     * hygiene even on the pull-request path, so the newly arrived workflows are disabled
+     * as soon as the platform can see them.
+     */
+    workflowReleaseUsed?: boolean;
 }
 
 /** §9.2: `mergeable` is re-read up to three times, 5 s apart. */
@@ -2046,6 +2103,77 @@ function workflowHeldEvent(headSha: string, changes: UpstreamWorkflowChanges): S
             pathCount: changes.pathCount,
             complete: changes.complete,
             optIn: APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS_ENV,
+        },
+    };
+}
+
+/** T46 — the outcomes in which a released range moved the sync branch or the tracked branch. */
+const RELEASED_MOVE_RESULTS: ReadonlySet<string> = new Set([
+    'fast_forwarded',
+    'pull_request_opened',
+    'pull_request_updated',
+    'conflict',
+]);
+
+/**
+ * APW-02 T46 — whether the owner's recorded release covers THIS range.
+ *
+ * 1. **Same head, exactly.** The release names one upstream commit; a newer head is a
+ *    new range the owner has not seen, so it is held again.
+ * 2. **Nothing the owner was not shown.** A release made on a complete compare covers a
+ *    complete compare whose protected paths are all among the released ones (and no more
+ *    of them than were counted). A compare that is now incomplete — the range grew past
+ *    what the owner reviewed — is not covered.
+ * 3. A release made on an INCOMPLETE compare (the range was too large to prove clean,
+ *    and the owner accepted it anyway) covers that same head whatever this compare says.
+ *
+ * Pure; exported for the spec.
+ */
+export function workflowReleaseCovers(
+    release: WorkUpstreamWorkflowRelease | null | undefined,
+    headSha: string,
+    changes: UpstreamWorkflowChanges,
+): boolean {
+    if (!release || typeof release.headSha !== 'string') return false;
+    const released = release.headSha.trim().toLowerCase();
+    const head = String(headSha ?? '')
+        .trim()
+        .toLowerCase();
+    if (!released || !head || released !== head) return false;
+    if (typeof release.releasedByUserId !== 'string' || !release.releasedByUserId) return false;
+
+    if (release.complete === false) {
+        return true;
+    }
+    if (changes.complete !== true) {
+        return false;
+    }
+    const releasedPaths = new Set(Array.isArray(release.paths) ? release.paths : []);
+    const releasedCount =
+        typeof release.pathCount === 'number' ? release.pathCount : releasedPaths.size;
+    if (changes.pathCount > releasedCount) return false;
+    return changes.paths.every((path) => releasedPaths.has(path));
+}
+
+/** T46 — the audit row for a range synced on the owner's release (paths and counts only). */
+function workflowReleaseUsedEvent(
+    headSha: string,
+    changes: UpstreamWorkflowChanges,
+    row: WorkUpstreamState,
+): SyncEvent {
+    return {
+        action: 'app.upstream.workflow_release_used',
+        actionType: ActivityActionType.APP_UPSTREAM,
+        status: ActivityStatus.COMPLETED,
+        summary: 'Upstream workflow changes synced on the owner release',
+        details: {
+            reason: 'workflow_release_used',
+            upstreamHeadSha: headSha || null,
+            paths: changes.paths,
+            pathCount: changes.pathCount,
+            complete: changes.complete,
+            releasedByUserId: row.workflowRelease?.releasedByUserId ?? null,
+            releasedAt: row.workflowRelease?.releasedAt ?? null,
         },
     };
 }

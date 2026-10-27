@@ -16,6 +16,7 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AppUpstreamController } from './app-upstream.controller';
 import { AppLicenseRegistryCronService } from '../app-license/app-license-registry-cron.service';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 
 /**
  * APW-02 T27 — the API-side App Works module: the three upstream routes of plan §4.1
@@ -177,6 +178,10 @@ import { DistributedTaskLockService } from '@ever-works/agent/cache';
         // Its per-tick lease (the cache module is not global; provided locally, as the agent
         // `AppWorksModule` and `AppSpecModule` do).
         DistributedTaskLockService,
+        // APW-02 T46 (2026-10-27) — the owner gate of the Upstream controller's "Sync anyway"
+        // (`requireAppWorkOwnerSession`). Provided locally, as `AppBuildsModule` and
+        // `ComparisonGeneratorModule` do; its two repositories come from `DatabaseModule`.
+        WorkOwnershipService,
     ],
     exports: [
         AgentAppWorksModule,
