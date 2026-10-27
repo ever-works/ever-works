@@ -16,6 +16,9 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AppUpstreamController } from './app-upstream.controller';
 import { AppLicenseRegistryCronService } from '../app-license/app-license-registry-cron.service';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import { WorkOwnershipService } from '@ever-works/agent/services';
+import { AppRuntimePortsModule } from './app-runtime-ports.module';
+import { AppWorkDeletionController } from './app-work-deletion.controller';
 
 /**
  * APW-02 T27 — the API-side App Works module: the three upstream routes of plan §4.1
@@ -159,8 +162,16 @@ import { DistributedTaskLockService } from '@ever-works/agent/cache';
         FacadesModule,
         ActivityLogModule,
         AppSpecModule,
+        // Lane aw-safety (2026-10-26) — APW-06 §9.8's `@Global()` ports module: binds
+        // `APP_WORK_DELETION_PORT` for APW-01's `WorkLifecycleService.deleteWork`, so deleting an
+        // App Work removes what it runs. Imported here (once) so the root module is untouched.
+        AppRuntimePortsModule,
     ],
-    controllers: [AppUpstreamController],
+    controllers: [
+        AppUpstreamController,
+        // APW-06 T59 — `GET /api/works/:id/app-deletion-preview` (owner only).
+        AppWorkDeletionController,
+    ],
     providers: [
         AppForkReadinessService,
         AppForkReadinessRunner,
@@ -177,6 +188,9 @@ import { DistributedTaskLockService } from '@ever-works/agent/cache';
         // Its per-tick lease (the cache module is not global; provided locally, as the agent
         // `AppWorksModule` and `AppSpecModule` do).
         DistributedTaskLockService,
+        // APW-06 T59's owner check, provided locally over `DatabaseModule`'s two repositories (the
+        // `AppBuildsModule` precedent) — importing `WorkModule` here would close a cycle.
+        WorkOwnershipService,
     ],
     exports: [
         AgentAppWorksModule,

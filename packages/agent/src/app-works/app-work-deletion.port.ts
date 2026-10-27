@@ -73,3 +73,38 @@ export interface AppWorkDeletionPort {
 
 /** The injection token. Unbound ⇒ no App runtime exists yet ⇒ deletion is taken as `done`. */
 export const APP_WORK_DELETION_PORT = Symbol('APP_WORK_DELETION_PORT');
+
+/**
+ * Lane aw-safety (2026-10-26) — the `pending` reasons that mean **nothing was started**.
+ *
+ * `pending` normally means "the App runtime claimed the deletion and dispatched the removal, so
+ * keep the row; it reads **Deleting…**". Three reasons say the opposite — no claim was taken and
+ * no removal was dispatched — and treating them as `pending` would answer `200 { deleting: true }`
+ * for a Work that is not deleting at all (and, worse, after the repository steps ran):
+ *
+ * - `dispatcher_unavailable` — no isolated App runtime worker can be reached to run the removal;
+ * - `runtime_state_unreadable` — the runtime-state row could not be read, so whether anything is
+ *   running is unknown;
+ * - `deploy_in_progress` — a Deployment holds the deploy lock; deleting now would race it into a
+ *   namespace it is still writing.
+ *
+ * `WorkLifecycleService.deleteWork` refuses the whole delete on these, **before any repository
+ * step**, so nothing is deleted and the member can try again (never a silent "done" that leaves
+ * the App running with no Work to manage it).
+ */
+export const APP_WORK_DELETION_NOT_STARTED_REASONS = [
+    'dispatcher_unavailable',
+    'runtime_state_unreadable',
+    'deploy_in_progress',
+] as const;
+
+export type AppWorkDeletionNotStartedReason = (typeof APP_WORK_DELETION_NOT_STARTED_REASONS)[number];
+
+/** `true` when a `pending` outcome means the removal was never started (see above). */
+export function isAppWorkDeletionNotStarted(outcome: AppWorkDeletionOutcome | null | undefined): boolean {
+    return (
+        outcome?.status === 'pending' &&
+        typeof outcome.reason === 'string' &&
+        (APP_WORK_DELETION_NOT_STARTED_REASONS as readonly string[]).includes(outcome.reason)
+    );
+}
