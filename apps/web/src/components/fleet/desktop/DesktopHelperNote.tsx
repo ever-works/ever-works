@@ -8,7 +8,9 @@ import type { FleetHelperStatusView, FleetHelperTrust } from '@ever-works/contra
  * Desktop view & control (FL-07, FR-17, R-8) — the "Reduced trust" note: the
  * screen helper on this computer is hash-pinned (the owner checked its
  * fingerprint), not signed. Shown on the Desktop tab whenever that is the
- * helper's trust; a signed helper shows nothing (P3).
+ * helper's trust; a signed helper shows nothing (P3, T-44). When this node
+ * version publishes a signed helper for the machine (`signedAvailable`), the
+ * note says so and names the command that approves it by its signature.
  */
 export function DesktopHelperNote({
     nodeName,
@@ -33,6 +35,17 @@ export function DesktopHelperNote({
                     ? ` ${t('fingerprint', { prefix: helper.fingerprintPrefix })}`
                     : ''}
                 {helper?.published === false ? ` ${t('unpublished')}` : ''}
+                {helper?.signedAvailable ? (
+                    <>
+                        {' '}
+                        <span data-testid="desktop-signed-available">
+                            {t('signedAvailable')}{' '}
+                            <code className="rounded bg-muted px-1 font-mono text-xs">
+                                ever-works-node helper admit --signed
+                            </code>
+                        </span>
+                    </>
+                ) : null}
             </span>
         </p>
     );

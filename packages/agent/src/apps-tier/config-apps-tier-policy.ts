@@ -191,6 +191,7 @@ export class ConfigAppsTierPolicy implements AppsTierPolicy {
             };
             if (Array.isArray(answer.counted)) out.counted = answer.counted.map((n) => String(n));
             if (typeof answer.max === 'number') out.max = answer.max;
+            if (answer.paidPlanAllowsMore === true) out.paidPlanAllowsMore = true;
             if (!out.eligible && out.reasons.length === 0) {
                 out.reasons.push(APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON);
             }

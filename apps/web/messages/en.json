@@ -9450,6 +9450,9 @@
                     "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
                     "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
                     "unknown": "Not eligible ({reason})."
+                },
+                "hints": {
+                    "capReachedPaidPlan": "A paid plan allows more Apps on Ever Works Apps. Upgrade your plan to lift this limit."
                 }
             },
             "appDeploy": {
@@ -15917,7 +15920,8 @@
             "helper": {
                 "reducedTrust": "Reduced trust — the screen helper on {name} is hash-pinned, not signed.",
                 "fingerprint": "Fingerprint {prefix}…",
-                "unpublished": "It is a build its owner approved themselves."
+                "unpublished": "It is a build its owner approved themselves.",
+                "signedAvailable": "A signed helper is available for it — on that computer, run"
             },
             "stage": {
                 "label": "Desktop of {name}, watching"
@@ -16017,6 +16021,17 @@
                 }
             },
             "recordings": {
+                "settings": {
+                    "title": "Desktop recordings",
+                    "body": "A Desktop view of this computer is always recorded while someone controls it.",
+                    "watch": "Record watching sessions",
+                    "watchHint": "Also record views that only watch. Off by default.",
+                    "retention": "Keep recordings for",
+                    "days": "{count, plural, one {# day} other {# days}}",
+                    "retentionHint": "A new value applies to recordings that stop from now on.",
+                    "saved": "Saved.",
+                    "failed": "Could not save the recording settings."
+                },
                 "title": "Recordings of {name}",
                 "none": "Nothing recorded yet. A view is recorded whenever someone has control.",
                 "error": "The recordings could not be read.",

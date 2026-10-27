@@ -23,7 +23,7 @@ export function isValidRedirectUrl(url: string | undefined): boolean {
 
     // Comprehensive URL regex pattern for absolute URLs
     const urlRegex =
-        /^https?:\/\/(([a-zA-Z0-9\-._~]+(?:\.[a-zA-Z0-9\-._~]+)*)|(\[[0-9a-fA-F:]+\]))(?::([0-9]+))?(\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*)?$/;
+        /^https?:\/\/(([a-zA-Z0-9\-._~]+)|(\[[0-9a-fA-F:]+\]))(?::([0-9]+))?(\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*)?$/;
 
     if (!urlRegex.test(url)) {
         return false;

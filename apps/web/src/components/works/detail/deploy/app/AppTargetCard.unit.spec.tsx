@@ -107,6 +107,54 @@ describe('AppTargetCard', () => {
         expect(managed.getAttribute('aria-describedby')).toBe(reason.id);
     });
 
+    it('tells a free owner at the cap that a paid plan allows more (owner decision 2026-10-27)', () => {
+        wrap(
+            <AppTargetCard
+                workId={WORK_ID}
+                target={view({
+                    eligibility: {
+                        managed: {
+                            eligible: false,
+                            reasons: ['capReached'],
+                            paidPlanAllowsMore: true,
+                        },
+                    },
+                })}
+                canEdit
+                onConnectCluster={vi.fn()}
+                onSaved={vi.fn()}
+            />,
+        );
+
+        const reason = screen.getByTestId('app-target-managed-reason').textContent ?? '';
+        expect(reason).toContain(
+            'This account already runs as many Apps on Ever Works Apps as it may.',
+        );
+        expect(reason).toContain(
+            messages.dashboard.workDetail.appsTierEligibility.hints.capReachedPaidPlan,
+        );
+    });
+
+    it('says nothing about a paid plan to an owner at the cap whom a paid plan would not admit', () => {
+        wrap(
+            <AppTargetCard
+                workId={WORK_ID}
+                target={view({
+                    eligibility: { managed: { eligible: false, reasons: ['capReached'] } },
+                })}
+                canEdit
+                onConnectCluster={vi.fn()}
+                onSaved={vi.fn()}
+            />,
+        );
+
+        const reason = screen.getByTestId('app-target-managed-reason').textContent ?? '';
+        expect(reason).toContain(
+            'This account already runs as many Apps on Ever Works Apps as it may.',
+        );
+        expect(reason).not.toContain('paid plan');
+    });
+
     it('saves a changed target and reports it', async () => {
         const saved = view({ target: 'your-cluster' });
         saveAppTargetActionMock.mockResolvedValue({ success: true, data: saved });

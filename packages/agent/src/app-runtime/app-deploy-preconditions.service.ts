@@ -999,7 +999,11 @@ export class AppDeployPreconditionsService {
                         // The counted Works when the tier names them (APW-06 T45: "4th App Work
                         // refused with the three counted Works named"), else the reason itself.
                         names: counted.length > 0 ? counted : reasons,
-                        message: quotaExceededMessage(max, counted),
+                        message: quotaExceededMessage(
+                            max,
+                            counted,
+                            eligibility.paidPlanAllowsMore === true,
+                        ),
                     });
                 }
 
@@ -1529,16 +1533,29 @@ export const MANAGED_CAP_REACHED_REASON = 'capReached';
 /** Lane aw-safety — the reason a fact behind the tier's eligibility could not be read. */
 export const MANAGED_ELIGIBILITY_UNAVAILABLE_REASON = 'eligibilityUnavailable';
 
-/** Lane aw-safety (2026-10-26) — `quota_exceeded`'s message: the cap and the counted Works. */
-export function quotaExceededMessage(max: number | null, counted: readonly string[]): string {
+/**
+ * Lane aw-safety (2026-10-26) — `quota_exceeded`'s message: the cap and the counted Works.
+ *
+ * `paidPlanAllowsMore` (owner decision 2026-10-27): the owner is on an unpaid plan and a paid plan
+ * would admit the App, so the message also says that upgrading lifts the limit.
+ */
+export function quotaExceededMessage(
+    max: number | null,
+    counted: readonly string[],
+    paidPlanAllowsMore = false,
+): string {
     const head =
         max !== null
             ? `This account already runs ${max} App Work${max === 1 ? '' : 's'} on Ever Works Apps, its limit`
             : 'This account has reached its Ever Works Apps limit';
     const which = counted.length > 0 ? ` (${counted.join(', ')})` : '';
+    const upgrade = paidPlanAllowsMore
+        ? ' A paid plan allows more App Works on Ever Works Apps: upgrade to lift this limit.'
+        : '';
     return (
         `${head}${which}, so no further App Work may be deployed there. ` +
-        'Remove one of them, or deploy this one to your own cluster.'
+        'Remove one of them, or deploy this one to your own cluster.' +
+        upgrade
     );
 }
 

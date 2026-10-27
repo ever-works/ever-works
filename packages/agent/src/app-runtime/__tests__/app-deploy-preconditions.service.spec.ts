@@ -907,6 +907,29 @@ describe('AppDeployPreconditionsService — the managed tier (§5.1)', () => {
         expect(entry.names).toEqual(['cal', 'umami', 'ghost']);
         expect(entry.message).toContain('3 App Works');
         expect(entry.message).toContain('cal, umami, ghost');
+        // Not a free owner a paid plan would admit: no upgrade sentence.
+        expect(entry.message).not.toContain('paid plan');
+    });
+
+    it('tells a free owner at the cap that a paid plan lifts it (owner decision 2026-10-27)', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        harness.tier.eligibility = (async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            counted: ['cal', 'umami', 'ghost'],
+            max: 3,
+            paidPlanAllowsMore: true,
+        })) as never;
+
+        const result = await harness.service.evaluate(request());
+
+        const entry = entryFor(result, 'quota_exceeded');
+        // Still the one `quota_exceeded` row with the counted Works — the hint is in the message.
+        expect(codes(result)).toEqual(['quota_exceeded']);
+        expect(entry.names).toEqual(['cal', 'umami', 'ghost']);
+        expect(entry.message).toContain('A paid plan allows more App Works on Ever Works Apps');
     });
 
     it('says why in managed_ineligible — one sentence per reason', async () => {
