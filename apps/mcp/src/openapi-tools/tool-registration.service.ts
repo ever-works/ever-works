@@ -76,8 +76,9 @@ async function refuseReservedTaskLabelChange(
 		const id = typeof args.id === 'string' || typeof args.id === 'number' ? `${args.id}` : '';
 		if (!id) throw new ApiError(400, 'update_task needs the Task id to check its labels.');
 		const current = await apiClient.request<{ labels?: unknown } | null>('GET', `/tasks/${encodeURIComponent(id)}`);
-		before = Array.isArray(current?.labels)
-			? (current!.labels as unknown[]).filter((label): label is string => typeof label === 'string')
+		const labels: unknown = current?.labels;
+		before = Array.isArray(labels)
+			? labels.filter((label: unknown): label is string => typeof label === 'string')
 			: [];
 	}
 	const change = reservedTaskLabelChanges(before, after);
