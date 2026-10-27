@@ -24,14 +24,15 @@ export interface AppEnvRotateDialogProps {
 }
 
 /** The refusals with their own sentence → `environment.rotate.refusals.*`. */
-const ROTATE_REFUSALS: Readonly<Record<string, string>> = {
+const ROTATE_REFUSALS = {
     rotateConfirmationMismatch: 'mismatch',
     notGenerated: 'notGenerated',
     generatorUnavailable: 'generatorUnavailable',
     secureStorageUnavailable: 'secureStorageUnavailable',
     rotateRateLimited: 'rateLimited',
     editAccessRequired: 'forbidden',
-};
+} as const;
+type RotateRefusalLeaf = (typeof ROTATE_REFUSALS)[keyof typeof ROTATE_REFUSALS];
 
 /**
  * Lane aw-ops (APW-07 T24, FR-13/FR-15, S6) — **Rotate** a generated value: Ever Works makes a
@@ -66,7 +67,9 @@ export function AppEnvRotateDialog({ workId, entry, onOpenChange, onRotated }: A
                 setMessage(t('refusals.rateLimited'));
                 return;
             }
-            const leaf = result.code ? ROTATE_REFUSALS[result.code] : undefined;
+            const leaf = result.code
+                ? (ROTATE_REFUSALS as Readonly<Record<string, RotateRefusalLeaf>>)[result.code]
+                : undefined;
             setMessage(leaf ? t(`refusals.${leaf}`) : t('failed', { reason: result.error ?? result.code ?? '' }));
         } finally {
             inFlight.current = false;

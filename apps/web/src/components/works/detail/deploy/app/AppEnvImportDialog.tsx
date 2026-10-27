@@ -28,7 +28,7 @@ export interface AppEnvImportDialogProps {
 }
 
 /** The refusals with their own sentence → `environment.import.refusals.*`. */
-const IMPORT_REFUSALS: Readonly<Record<string, string>> = {
+const IMPORT_REFUSALS = {
     undeclaredName: 'undeclaredName',
     specUnavailable: 'specUnavailable',
     secureStorageUnavailable: 'secureStorageUnavailable',
@@ -37,7 +37,8 @@ const IMPORT_REFUSALS: Readonly<Record<string, string>> = {
     tooManyValues: 'tooMany',
     editAccessRequired: 'forbidden',
     invalidBody: 'invalid',
-};
+} as const;
+type ImportRefusalLeaf = (typeof IMPORT_REFUSALS)[keyof typeof IMPORT_REFUSALS];
 
 /**
  * Lane aw-ops (APW-07 T28, FR-28…FR-30) — **Import .env**: paste (or pick) a `.env`, see per line
@@ -61,7 +62,7 @@ export function AppEnvImportDialog({ workId, onOpenChange, onImported }: AppEnvI
     const tooLarge = new TextEncoder().encode(text).length > APP_ENV_IMPORT_MAX_BYTES;
 
     const refusal = (code: string | undefined, error: string | undefined) => {
-        const leaf = code ? IMPORT_REFUSALS[code] : undefined;
+        const leaf = code ? (IMPORT_REFUSALS as Readonly<Record<string, ImportRefusalLeaf>>)[code] : undefined;
         return leaf ? t(`refusals.${leaf}`) : t('failed', { reason: error ?? code ?? '' });
     };
 

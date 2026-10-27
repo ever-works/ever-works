@@ -26,7 +26,7 @@ export interface AppDependencyConfigureDialogProps {
 }
 
 /** The refusals with their own sentence → `dependencies.configure.refusals.*`. */
-const CONFIGURE_REFUSALS: Readonly<Record<string, string>> = {
+const CONFIGURE_REFUSALS = {
     providerNotSupported: 'providerNotSupported',
     sizeShrink: 'sizeShrink',
     volumeShrink: 'sizeShrink',
@@ -35,7 +35,8 @@ const CONFIGURE_REFUSALS: Readonly<Record<string, string>> = {
     editAccessRequired: 'forbidden',
     invalidBody: 'invalid',
     leaseHeld: 'leaseHeld',
-};
+} as const;
+type ConfigureRefusalLeaf = (typeof CONFIGURE_REFUSALS)[keyof typeof CONFIGURE_REFUSALS];
 
 /**
  * Lane aw-ops (APW-07 T29) — **Configure** a dependency: pick a provider among the ones this
@@ -96,7 +97,9 @@ export function AppDependencyConfigureDialog({
                 onConfigured();
                 return;
             }
-            const leaf = result.code ? CONFIGURE_REFUSALS[result.code] : undefined;
+            const leaf = result.code
+                ? (CONFIGURE_REFUSALS as Readonly<Record<string, ConfigureRefusalLeaf>>)[result.code]
+                : undefined;
             setMessage(leaf ? t(`refusals.${leaf}`) : t('failed', { reason: result.error ?? result.code ?? '' }));
         } finally {
             inFlight.current = false;
