@@ -1,4 +1,17 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    ParseUUIDPipe,
+    Post,
+    Put,
+    Query,
+    Req,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetActionsRunnersService } from '@ever-works/agent/fleet';
@@ -12,7 +25,10 @@ import type {
     FleetActionsRunnersListView,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
-import { refuseMachinePrincipalAction, type MachinePrincipalRequest } from '../../auth/machine-principal';
+import {
+    refuseMachinePrincipalAction,
+    type MachinePrincipalRequest,
+} from '../../auth/machine-principal';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
@@ -25,7 +41,8 @@ import {
 } from './dto/fleet-actions-runners.dto';
 import { FleetActionsRunnersEnabledGuard } from './fleet-actions-runners-enabled.guard';
 
-const REFUSAL_WHY = 'an Agent installs and controls Actions runners through its tools, where each act waits for its owner.';
+const REFUSAL_WHY =
+    'an Agent installs and controls Actions runners through its tools, where each act waits for its owner.';
 
 /**
  * Actions runners on computers (FL-18, plan §5, CONTRACTS §11.2) — GitHub
@@ -50,10 +67,14 @@ export class FleetActionsRunnersController {
     constructor(private readonly runners: FleetActionsRunnersService) {}
 
     @Get('runners')
-    @ApiOperation({ summary: 'Every Actions runner the caller may see, grouped by the computer it runs on.' })
+    @ApiOperation({
+        summary: 'Every Actions runner the caller may see, grouped by the computer it runs on.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
-    async all(@CurrentUser() auth: AuthenticatedUser): Promise<{ computers: FleetActionsRunnersListView[] }> {
+    async all(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<{ computers: FleetActionsRunnersListView[] }> {
         return { computers: await this.runners.listAll({ kind: 'user', userId: auth.userId }) };
     }
 
@@ -66,12 +87,21 @@ export class FleetActionsRunnersController {
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
-    async jobs(@CurrentUser() auth: AuthenticatedUser, @Query('targets') targets?: string): Promise<FleetActionsJobsView> {
-        return this.runners.jobs({ kind: 'user', userId: auth.userId }, parseTargetsQuery(targets));
+    async jobs(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query('targets') targets?: string,
+    ): Promise<FleetActionsJobsView> {
+        return this.runners.actionsJobs(
+            { kind: 'user', userId: auth.userId },
+            parseTargetsQuery(targets),
+        );
     }
 
     @Put('runners/jobs/watched')
-    @ApiOperation({ summary: 'Set the repositories and organisations the Actions jobs panel watches (each must be covered by your GitHub App). An empty list goes back to the default: every target you have runners for.' })
+    @ApiOperation({
+        summary:
+            'Set the repositories and organisations the Actions jobs panel watches (each must be covered by your GitHub App). An empty list goes back to the default: every target you have runners for.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async setWatched(
@@ -84,7 +114,10 @@ export class FleetActionsRunnersController {
     }
 
     @Post('runners/jobs/cancel')
-    @ApiOperation({ summary: 'Cancel a whole workflow run of a repository your GitHub App covers. Send `confirm: true` (409 `confirmation_required` carries "Cancel workflow run #N of owner/repo? Every job in it stops."). Answers 202.' })
+    @ApiOperation({
+        summary:
+            'Cancel a whole workflow run of a repository your GitHub App covers. Send `confirm: true` (409 `confirmation_required` carries "Cancel workflow run #N of owner/repo? Every job in it stops."). Answers 202.',
+    })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async cancelRun(
@@ -93,16 +126,22 @@ export class FleetActionsRunnersController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<{ repository: string; runId: number; cancelled: true }> {
         refuseMachinePrincipalAction(auth, req, 'cancel a workflow run', REFUSAL_WHY);
-        return this.runners.cancelRun({ kind: 'user', userId: auth.userId }, {
-            repository: body.repository,
-            runId: body.runId,
-            runNumber: body.runNumber ?? null,
-            fields: runnerConfirmFields(body),
-        });
+        return this.runners.cancelRun(
+            { kind: 'user', userId: auth.userId },
+            {
+                repository: body.repository,
+                runId: body.runId,
+                runNumber: body.runNumber ?? null,
+                fields: runnerConfirmFields(body),
+            },
+        );
     }
 
     @Get('runners/jobs/permission')
-    @ApiOperation({ summary: 'Whether your GitHub App installation may manage runners for a repository or organisation; when not, the exact permission and the installation page (Grant access).' })
+    @ApiOperation({
+        summary:
+            'Whether your GitHub App installation may manage runners for a repository or organisation; when not, the exact permission and the installation page (Grant access).',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async permission(
@@ -182,7 +221,13 @@ export class FleetActionsRunnersController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetActionsRunnerOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'remove an Actions runner', REFUSAL_WHY);
-        return this.runners.control({ kind: 'user', userId: auth.userId }, id, runnerId, 'remove', runnerConfirmFields(body));
+        return this.runners.control(
+            { kind: 'user', userId: auth.userId },
+            id,
+            runnerId,
+            'remove',
+            runnerConfirmFields(body),
+        );
     }
 
     @Post('nodes/:id/runners/:runnerId/:action')
@@ -201,6 +246,12 @@ export class FleetActionsRunnersController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetActionsRunnerOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'control an Actions runner', REFUSAL_WHY);
-        return this.runners.control({ kind: 'user', userId: auth.userId }, id, runnerId, action, runnerConfirmFields(body));
+        return this.runners.control(
+            { kind: 'user', userId: auth.userId },
+            id,
+            runnerId,
+            action,
+            runnerConfirmFields(body),
+        );
     }
 }

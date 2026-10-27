@@ -45,12 +45,16 @@ export function splitRepository(repository: string): [string, string] {
 	if (parts.length !== 2 || !/^[A-Za-z0-9-]{1,39}$/.test(parts[0]) || !/^[A-Za-z0-9._-]{1,100}$/.test(parts[1])) {
 		throw new ActionsRunnersApiError('not a repository (owner/repo)', 'failed', null);
 	}
-	if (parts[1] === '.' || parts[1] === '..') throw new ActionsRunnersApiError('not a repository (owner/repo)', 'failed', null);
+	if (parts[1] === '.' || parts[1] === '..')
+		throw new ActionsRunnersApiError('not a repository (owner/repo)', 'failed', null);
 	return [parts[0], parts[1]];
 }
 
 /** GitHub's rate-limit headers → the instant reads may resume, or null when not rate-limited. */
-export function rateLimitedUntilOf(response: Pick<Response, 'status' | 'headers'>, now: number = Date.now()): string | null {
+export function rateLimitedUntilOf(
+	response: Pick<Response, 'status' | 'headers'>,
+	now: number = Date.now()
+): string | null {
 	const remaining = response.headers.get('x-ratelimit-remaining');
 	const reset = response.headers.get('x-ratelimit-reset');
 	const retryAfter = response.headers.get('retry-after');
@@ -80,13 +84,19 @@ async function messageOf(response: Response): Promise<string> {
 export async function refusalOf(response: Response, what: string): Promise<ActionsRunnersApiError> {
 	const rateLimitedUntil = rateLimitedUntilOf(response);
 	if (rateLimitedUntil) {
-		return new ActionsRunnersApiError(`GitHub is rate-limiting ${what}`, 'rate_limited', response.status, rateLimitedUntil);
+		return new ActionsRunnersApiError(
+			`GitHub is rate-limiting ${what}`,
+			'rate_limited',
+			response.status,
+			rateLimitedUntil
+		);
 	}
 	const message = await messageOf(response);
 	if (response.status === 401 || response.status === 403) {
 		return new ActionsRunnersApiError(`GitHub refused ${what}: ${message}`, 'permission', response.status);
 	}
-	if (response.status === 404) return new ActionsRunnersApiError(`GitHub has no ${what}: ${message}`, 'not_found', 404);
+	if (response.status === 404)
+		return new ActionsRunnersApiError(`GitHub has no ${what}: ${message}`, 'not_found', 404);
 	if (response.status === 409 || response.status === 422) {
 		return new ActionsRunnersApiError(`GitHub could not do ${what}: ${message}`, 'conflict', response.status);
 	}
@@ -139,7 +149,9 @@ export class GitHubRunnersApi {
 		} catch {
 			const aborted = controller.signal.aborted;
 			throw new ActionsRunnersApiError(
-				aborted ? `GitHub did not answer ${options.what} in time` : `GitHub could not be reached for ${options.what}`,
+				aborted
+					? `GitHub did not answer ${options.what} in time`
+					: `GitHub could not be reached for ${options.what}`,
 				'failed',
 				null
 			);
@@ -171,13 +183,18 @@ export class GitHubRunnersApi {
 			const filename = str(raw.filename);
 			const sha256 = str(raw.sha256_checksum)?.toLowerCase() ?? null;
 			// A build without GitHub's checksum is never offered: the node verifies before it extracts.
-			if (!os || !architecture || !downloadUrl || !filename || !sha256 || !/^[0-9a-f]{64}$/.test(sha256)) continue;
+			if (!os || !architecture || !downloadUrl || !filename || !sha256 || !/^[0-9a-f]{64}$/.test(sha256))
+				continue;
 			out.push({ os, architecture, downloadUrl, filename, sha256 });
 		}
 		return out;
 	}
 
-	private async oneTimeToken(target: ActionsRunnerTarget, token: string, kind: 'registration' | 'remove'): Promise<ActionsRunnerOneTimeToken> {
+	private async oneTimeToken(
+		target: ActionsRunnerTarget,
+		token: string,
+		kind: 'registration' | 'remove'
+	): Promise<ActionsRunnerOneTimeToken> {
 		const what = kind === 'registration' ? 'a runner registration token' : 'a runner remove token';
 		const response = await this.request('POST', `${runnersPath(target)}/${kind}-token`, token, { what });
 		if (!response.ok) throw await refusalOf(response, what);
@@ -195,7 +212,11 @@ export class GitHubRunnersApi {
 		return this.oneTimeToken(target, token, 'remove');
 	}
 
-	async listRunners(target: ActionsRunnerTarget, token: string, options: { etag?: string | null } = {}): Promise<ActionsRunnersPage> {
+	async listRunners(
+		target: ActionsRunnerTarget,
+		token: string,
+		options: { etag?: string | null } = {}
+	): Promise<ActionsRunnersPage> {
 		const what = `the runners of ${target.target}`;
 		const runners: ActionsRunnerRemote[] = [];
 		let first: ActionsRunnersReadMeta | null = null;
@@ -221,7 +242,9 @@ export class GitHubRunnersApi {
 				const name = str(raw.name);
 				if (id === null || !name) continue;
 				const labels = Array.isArray(raw.labels)
-					? (raw.labels as Array<Record<string, unknown>>).map((label) => str(label?.name)).filter((label): label is string => !!label)
+					? (raw.labels as Array<Record<string, unknown>>)
+							.map((label) => str(label?.name))
+							.filter((label): label is string => !!label)
 					: [];
 				runners.push({
 					id,
@@ -235,7 +258,10 @@ export class GitHubRunnersApi {
 			const total = num(body?.total_count) ?? runners.length;
 			if (rows.length < 100 || runners.length >= total) break;
 		}
-		return { ...(first ?? { etag: null, notModified: false, rateLimitedUntil: null, rateLimitRemaining: null }), runners };
+		return {
+			...(first ?? { etag: null, notModified: false, rateLimitedUntil: null, rateLimitRemaining: null }),
+			runners
+		};
 	}
 
 	async deleteRunner(target: ActionsRunnerTarget, runnerId: number, token: string): Promise<void> {
@@ -256,39 +282,58 @@ export class GitHubRunnersApi {
 	): Promise<ActionsJobsPage> {
 		const repositories = target.scope === 'repo' ? [target.target] : [...(options.repositories ?? [])];
 		const jobs: ActionsJob[] = [];
-		let meta: ActionsRunnersReadMeta = { etag: null, notModified: false, rateLimitedUntil: null, rateLimitRemaining: null };
+		let meta: ActionsRunnersReadMeta = {
+			etag: null,
+			notModified: false,
+			rateLimitedUntil: null,
+			rateLimitRemaining: null
+		};
 		for (const repository of repositories) {
 			const [owner, repo] = splitRepository(repository);
 			const base = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions`;
 			for (const status of ['queued', 'in_progress'] as const) {
 				const what = `the ${status === 'queued' ? 'queued' : 'running'} workflow runs of ${repository}`;
-				const response = await this.request('GET', `${base}/runs?status=${status}&per_page=${MAX_RUNS_PER_STATUS}`, token, {
-					what,
-					// One ETag per target: the queued list of the only (or first) repository.
-					etag: repositories.length === 1 && status === 'queued' ? options.etag : null
-				});
+				const response = await this.request(
+					'GET',
+					`${base}/runs?status=${status}&per_page=${MAX_RUNS_PER_STATUS}`,
+					token,
+					{
+						what,
+						// One ETag per target: the queued list of the only (or first) repository.
+						etag: repositories.length === 1 && status === 'queued' ? options.etag : null
+					}
+				);
 				if (response.status === 304) {
 					meta = { ...meta, notModified: true, etag: options.etag ?? null };
 					continue;
 				}
 				if (!response.ok) {
 					const refusal = await refusalOf(response, what);
-					if (refusal.code === 'rate_limited') return { ...meta, rateLimitedUntil: refusal.rateLimitedUntil, jobs };
+					if (refusal.code === 'rate_limited')
+						return { ...meta, rateLimitedUntil: refusal.rateLimitedUntil, jobs };
 					throw refusal;
 				}
 				if (repositories.length === 1 && status === 'queued') meta = this.meta(response);
 				const body = (await response.json()) as { workflow_runs?: unknown };
-				const runs = Array.isArray(body?.workflow_runs) ? (body.workflow_runs as Array<Record<string, unknown>>) : [];
+				const runs = Array.isArray(body?.workflow_runs)
+					? (body.workflow_runs as Array<Record<string, unknown>>)
+					: [];
 				for (const run of runs) {
 					const runId = num(run.id);
 					if (runId === null) continue;
 					const jobsWhat = `the jobs of workflow run ${runId}`;
-					const jobsResponse = await this.request('GET', `${base}/runs/${runId}/jobs?filter=latest&per_page=100`, token, {
-						what: jobsWhat
-					});
+					const jobsResponse = await this.request(
+						'GET',
+						`${base}/runs/${runId}/jobs?filter=latest&per_page=100`,
+						token,
+						{
+							what: jobsWhat
+						}
+					);
 					if (!jobsResponse.ok) {
 						const refusal = await refusalOf(jobsResponse, jobsWhat);
-						if (refusal.code === 'rate_limited') return { ...meta, rateLimitedUntil: refusal.rateLimitedUntil, jobs };
+						if (refusal.code === 'rate_limited')
+							return { ...meta, rateLimitedUntil: refusal.rateLimitedUntil, jobs };
 						continue;
 					}
 					const jobsBody = (await jobsResponse.json()) as { jobs?: unknown };
@@ -304,7 +349,8 @@ export class GitHubRunnersApi {
 	}
 
 	async cancelRun(repository: string, runId: number, token: string): Promise<void> {
-		if (!Number.isSafeInteger(runId) || runId <= 0) throw new ActionsRunnersApiError('not a workflow run id', 'failed', null);
+		if (!Number.isSafeInteger(runId) || runId <= 0)
+			throw new ActionsRunnersApiError('not a workflow run id', 'failed', null);
 		const [owner, repo] = splitRepository(repository);
 		const what = `workflow run ${runId} of ${repository}`;
 		const response = await this.request(
@@ -318,7 +364,9 @@ export class GitHubRunnersApi {
 
 	/** A cheap read of the target's runners: 2xx → allowed; 401 / 403 / 404 → the permission is missing. */
 	async canManage(target: ActionsRunnerTarget, token: string): Promise<boolean> {
-		const response = await this.request('GET', `${runnersPath(target)}?per_page=1`, token, { what: 'the runner list' });
+		const response = await this.request('GET', `${runnersPath(target)}?per_page=1`, token, {
+			what: 'the runner list'
+		});
 		if (response.ok) return true;
 		const refusal = await refusalOf(response, 'the runner list');
 		if (refusal.code === 'permission' || refusal.code === 'not_found') return false;
@@ -327,12 +375,18 @@ export class GitHubRunnersApi {
 }
 
 /** One job of a workflow run, when it is queued or in progress AND targets self-hosted runners. */
-export function toJob(raw: Record<string, unknown>, repository: string, run: Record<string, unknown>): ActionsJob | null {
+export function toJob(
+	raw: Record<string, unknown>,
+	repository: string,
+	run: Record<string, unknown>
+): ActionsJob | null {
 	const status = raw.status === 'queued' || raw.status === 'in_progress' ? raw.status : null;
 	const jobId = num(raw.id);
 	const runId = num(raw.run_id) ?? num(run.id);
 	if (!status || jobId === null || runId === null) return null;
-	const labels = Array.isArray(raw.labels) ? (raw.labels as unknown[]).filter((label): label is string => typeof label === 'string') : [];
+	const labels = Array.isArray(raw.labels)
+		? (raw.labels as unknown[]).filter((label): label is string => typeof label === 'string')
+		: [];
 	if (!labels.some((label) => label.toLowerCase() === 'self-hosted')) return null;
 	return {
 		repository,

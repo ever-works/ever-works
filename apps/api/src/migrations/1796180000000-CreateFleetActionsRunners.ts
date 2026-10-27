@@ -123,7 +123,10 @@ export class CreateFleetActionsRunners1796180000000 implements MigrationInterfac
         // indexes are created last so a rebuild never re-creates them.
         for (const foreignKey of CreateFleetActionsRunners1796180000000.FOREIGN_KEYS) {
             const current = await queryRunner.getTable(table);
-            if (current && !current.foreignKeys.some((existing) => existing.name === foreignKey.name)) {
+            if (
+                current &&
+                !current.foreignKeys.some((existing) => existing.name === foreignKey.name)
+            ) {
                 await queryRunner.createForeignKey(table, foreignKey);
             }
         }
@@ -137,7 +140,12 @@ export class CreateFleetActionsRunners1796180000000 implements MigrationInterfac
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         if (await queryRunner.hasTable(CreateFleetActionsRunners1796180000000.TABLE)) {
-            await queryRunner.dropTable(CreateFleetActionsRunners1796180000000.TABLE, true, true, true);
+            await queryRunner.dropTable(
+                CreateFleetActionsRunners1796180000000.TABLE,
+                true,
+                true,
+                true,
+            );
         }
     }
 }

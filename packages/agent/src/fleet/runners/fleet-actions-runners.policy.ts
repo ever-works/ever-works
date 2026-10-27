@@ -19,19 +19,28 @@ import type { FleetNode } from '../../entities/fleet-node.entity';
  */
 
 /** The facts of a Node the eligibility rule reads. */
-export type RunnerHostFacts = Pick<FleetNode, 'kind' | 'status' | 'lastHeartbeatAt' | 'capabilities' | 'name'> & {
+export type RunnerHostFacts = Pick<
+    FleetNode,
+    'kind' | 'status' | 'lastHeartbeatAt' | 'capabilities' | 'name'
+> & {
     consents?: FleetConsents | null;
 };
 
 /** `os:*` / `arch:*` off a capability list. */
-export function capabilityValue(capabilities: readonly string[] | null | undefined, prefix: 'os' | 'arch'): string | null {
+export function capabilityValue(
+    capabilities: readonly string[] | null | undefined,
+    prefix: 'os' | 'arch',
+): string | null {
     for (const tag of capabilities ?? []) {
         if (tag.startsWith(`${prefix}:`)) return tag.slice(prefix.length + 1) || null;
     }
     return null;
 }
 
-export function isRunnerHostOnline(node: Pick<RunnerHostFacts, 'status' | 'lastHeartbeatAt'>, offlineCutoffMs: number): boolean {
+export function isRunnerHostOnline(
+    node: Pick<RunnerHostFacts, 'status' | 'lastHeartbeatAt'>,
+    offlineCutoffMs: number,
+): boolean {
     if (node.status !== 'online') return false;
     const at = node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).getTime() : NaN;
     return Number.isFinite(at) && at >= offlineCutoffMs;
@@ -59,8 +68,13 @@ export function runnerHostReason(input: {
     if (!input.allowed) return 'permission-denied';
     if (!isRunnerHostOnline(node, input.offlineCutoffMs)) return 'offline';
     if (node.consents?.work !== true) return 'consent-missing';
-    if (!(node.capabilities ?? []).includes(FLEET_ACTIONS_RUNNER_CAPABILITY)) return 'no-service-manager';
-    if (input.existing !== null && input.existing + (input.adding ?? 1) > FLEET_ACTIONS_RUNNERS_MAX_PER_NODE) return 'limit';
+    if (!(node.capabilities ?? []).includes(FLEET_ACTIONS_RUNNER_CAPABILITY))
+        return 'no-service-manager';
+    if (
+        input.existing !== null &&
+        input.existing + (input.adding ?? 1) > FLEET_ACTIONS_RUNNERS_MAX_PER_NODE
+    )
+        return 'limit';
     return null;
 }
 
@@ -91,7 +105,9 @@ export function runnerHostReasonHint(
 ): string {
     switch (reason) {
         case 'offline':
-            return extra.lastSeen ? `${node.name} last heartbeated ${extra.lastSeen} ago` : `${node.name} is offline`;
+            return extra.lastSeen
+                ? `${node.name} last heartbeated ${extra.lastSeen} ago`
+                : `${node.name} is offline`;
         case 'consent-missing':
             return `start the node with --work on ${node.name}`;
         case 'no-service-manager':
@@ -108,7 +124,10 @@ export function runnerHostReasonHint(
 }
 
 /** "2 h", "12 min" since an instant, or null. */
-export function describeAgo(at: Date | string | null | undefined, now: number = Date.now()): string | null {
+export function describeAgo(
+    at: Date | string | null | undefined,
+    now: number = Date.now(),
+): string | null {
     const ms = at ? now - new Date(at).getTime() : NaN;
     if (!Number.isFinite(ms) || ms < 0) return null;
     const minutes = Math.round(ms / 60_000);
@@ -145,7 +164,9 @@ export function fleetActionsRunnerViewOf(
         name: row.name,
         scope: row.scope,
         target: row.target,
-        labels: Array.isArray(row.labels) ? row.labels.filter((label) => typeof label === 'string') : [],
+        labels: Array.isArray(row.labels)
+            ? row.labels.filter((label) => typeof label === 'string')
+            : [],
         defaultLabels: fleetActionsRunnerDefaultLabels(os, arch),
         mode: row.mode,
         state: row.state,

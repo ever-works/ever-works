@@ -38,7 +38,10 @@ describe('diagnoseFleetActionsJob (FR-22)', () => {
 			detail: 'acme/web'
 		});
 		// An organisation runner covers every repository of the organisation.
-		expect(diagnoseFleetActionsJob(job(['self-hosted'], 'acme/web'), [runner({ scope: 'org', target: 'acme' })]).diagnosis).toBeNull();
+		expect(
+			diagnoseFleetActionsJob(job(['self-hosted'], 'acme/web'), [runner({ scope: 'org', target: 'acme' })])
+				.diagnosis
+		).toBeNull();
 	});
 
 	it('missing-label: names the first label no runner has (case-insensitive match)', () => {
@@ -54,7 +57,9 @@ describe('diagnoseFleetActionsJob (FR-22)', () => {
 			diagnosis: 'offline-matching-runner',
 			detail: 'build-01-1'
 		});
-		expect(diagnoseFleetActionsJob(job(), [runner({ state: 'stopped' })]).diagnosis).toBe('offline-matching-runner');
+		expect(diagnoseFleetActionsJob(job(), [runner({ state: 'stopped' })]).diagnosis).toBe(
+			'offline-matching-runner'
+		);
 	});
 
 	it('all-busy: every online matching runner is working (not a problem)', () => {
@@ -64,7 +69,10 @@ describe('diagnoseFleetActionsJob (FR-22)', () => {
 	});
 
 	it('a job in progress has no diagnosis; removed runners do not count', () => {
-		expect(diagnoseFleetActionsJob({ ...job(), status: 'in_progress' }, [])).toEqual({ diagnosis: null, detail: null });
+		expect(diagnoseFleetActionsJob({ ...job(), status: 'in_progress' }, [])).toEqual({
+			diagnosis: null,
+			detail: null
+		});
 		expect(diagnoseFleetActionsJob(job(), [runner({ state: 'removed' })]).diagnosis).toBe('wrong-scope');
 	});
 
@@ -78,10 +86,38 @@ describe('diagnoseFleetActionsJob (FR-22)', () => {
 describe('job-unassignable (FR-24)', () => {
 	const now = new Date('2026-10-26T10:00:00Z');
 	it('after five minutes queued with a problem diagnosis only', () => {
-		expect(isFleetActionsJobUnassignable({ status: 'queued', diagnosis: 'missing-label', queuedAt: '2026-10-26T09:55:00Z', now })).toBe(true);
-		expect(isFleetActionsJobUnassignable({ status: 'queued', diagnosis: 'missing-label', queuedAt: '2026-10-26T09:56:00Z', now })).toBe(false);
-		expect(isFleetActionsJobUnassignable({ status: 'queued', diagnosis: 'all-busy', queuedAt: '2026-10-26T09:00:00Z', now })).toBe(false);
-		expect(isFleetActionsJobUnassignable({ status: 'in_progress', diagnosis: 'wrong-scope', queuedAt: '2026-10-26T09:00:00Z', now })).toBe(false);
+		expect(
+			isFleetActionsJobUnassignable({
+				status: 'queued',
+				diagnosis: 'missing-label',
+				queuedAt: '2026-10-26T09:55:00Z',
+				now
+			})
+		).toBe(true);
+		expect(
+			isFleetActionsJobUnassignable({
+				status: 'queued',
+				diagnosis: 'missing-label',
+				queuedAt: '2026-10-26T09:56:00Z',
+				now
+			})
+		).toBe(false);
+		expect(
+			isFleetActionsJobUnassignable({
+				status: 'queued',
+				diagnosis: 'all-busy',
+				queuedAt: '2026-10-26T09:00:00Z',
+				now
+			})
+		).toBe(false);
+		expect(
+			isFleetActionsJobUnassignable({
+				status: 'in_progress',
+				diagnosis: 'wrong-scope',
+				queuedAt: '2026-10-26T09:00:00Z',
+				now
+			})
+		).toBe(false);
 	});
 
 	it('one item id per job', () => {
@@ -106,7 +142,10 @@ describe('normalizeFleetActionsWatchedTargets (FR-21)', () => {
 	it('refuses anything that is not a target, and more than the cap', () => {
 		expect(normalizeFleetActionsWatchedTargets([{ scope: 'repo', target: 'not-a-repo' }])).toBeNull();
 		expect(normalizeFleetActionsWatchedTargets('acme/api')).toBeNull();
-		const many = Array.from({ length: FLEET_ACTIONS_MAX_WATCHED_TARGETS + 1 }, (_, i) => ({ scope: 'repo', target: `acme/r${i}` }));
+		const many = Array.from({ length: FLEET_ACTIONS_MAX_WATCHED_TARGETS + 1 }, (_, i) => ({
+			scope: 'repo',
+			target: `acme/r${i}`
+		}));
 		expect(normalizeFleetActionsWatchedTargets(many)).toBeNull();
 	});
 });

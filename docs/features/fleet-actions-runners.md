@@ -34,9 +34,9 @@ Ever Works GitHub App configured (the same App the GitHub integration uses).
   allowed to run the runners' own `svc.sh` without one. When it is not, the install is refused with the exact one-time
   command to run on the machine — it allows only `svc.sh` under the node's runners folder:
 
-  ```bash
-  echo '<user> ALL=(root) NOPASSWD: <config dir>/actions-runners/*/svc.sh' | sudo tee /etc/sudoers.d/ever-works-actions-runners >/dev/null && sudo chmod 0440 /etc/sudoers.d/ever-works-actions-runners
-  ```
+    ```bash
+    echo '<user> ALL=(root) NOPASSWD: <config dir>/actions-runners/*/svc.sh' | sudo tee /etc/sudoers.d/ever-works-actions-runners >/dev/null && sudo chmod 0440 /etc/sudoers.d/ever-works-actions-runners
+    ```
 
 - **Windows:** the node must run elevated (as Administrator) to install a Windows service; the runner's own service
   mode is the only mode on Windows.
@@ -116,14 +116,14 @@ dialog, Ever Works checks it first; when it is missing, the dialog names the exa
 
 ## Agents, MCP and the API
 
-| Tool                    | What it does                                                                | Confirmation                       |
-| ----------------------- | --------------------------------------------------------------------------- | ---------------------------------- |
-| `fleet_runners_list`    | The runners on one computer, or on all of them                              | read-only                          |
-| `fleet_runners_install` | Install 1–16 runners for a repository or organisation                       | `confirm: true`                    |
-| `fleet_runners_action`  | Start, stop or restart one runner                                           | `confirm: true` for stop / restart |
-| `fleet_runners_remove`  | Remove one runner (deregister, uninstall, delete its folder)                | `confirmName` = its name           |
-| `fleet_runners_jobs`    | The Actions jobs of the watched targets, each with why no runner takes it  | read-only                          |
-| `fleet_runners_cancel_run` | Cancel a whole workflow run of one of your repositories                  | `confirm: true`                    |
+| Tool                       | What it does                                                              | Confirmation                       |
+| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------- |
+| `fleet_runners_list`       | The runners on one computer, or on all of them                            | read-only                          |
+| `fleet_runners_install`    | Install 1–16 runners for a repository or organisation                     | `confirm: true`                    |
+| `fleet_runners_action`     | Start, stop or restart one runner                                         | `confirm: true` for stop / restart |
+| `fleet_runners_remove`     | Remove one runner (deregister, uninstall, delete its folder)              | `confirmName` = its name           |
+| `fleet_runners_jobs`       | The Actions jobs of the watched targets, each with why no runner takes it | read-only                          |
+| `fleet_runners_cancel_run` | Cancel a whole workflow run of one of your repositories                   | `confirm: true`                    |
 
 An Agent's install, stop, restart, remove and cancel are held for your approval; the same names are the MCP tools. The routes:
 

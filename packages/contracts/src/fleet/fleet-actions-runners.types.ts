@@ -211,7 +211,10 @@ export function fleetActionsRunnerSettingsUrl(scope: FleetActionsRunnerScope, ta
 }
 
 /** The labels GitHub adds itself (`self-hosted`, the OS, the architecture), for display and for the duplicate check. */
-export function fleetActionsRunnerDefaultLabels(os: string | null | undefined, arch: string | null | undefined): string[] {
+export function fleetActionsRunnerDefaultLabels(
+	os: string | null | undefined,
+	arch: string | null | undefined
+): string[] {
 	const out = ['self-hosted'];
 	const osLabel =
 		os === 'linux'
@@ -264,7 +267,10 @@ export function normalizeFleetActionsRunnerLabels(
 export function fleetActionsRunnerNameStem(computerName: string | null | undefined): string {
 	// Bounded first, then trimmed with index scans rather than an end-anchored `-+$`
 	// (polynomial on a long run of dashes).
-	const cleaned = (computerName ?? '').trim().slice(0, 200).replace(/[^A-Za-z0-9._-]+/g, '-');
+	const cleaned = (computerName ?? '')
+		.trim()
+		.slice(0, 200)
+		.replace(/[^A-Za-z0-9._-]+/g, '-');
 	let start = 0;
 	while (start < cleaned.length && !isAsciiAlphanumeric(cleaned.charCodeAt(start))) start += 1;
 	let end = cleaned.length;
@@ -820,7 +826,12 @@ export const FLEET_ACTIONS_JOBS_CACHE_MS = 30_000;
  *  - `wrong-scope` — "no runner is registered to <repository or organisation>";
  *  - `all-busy` — "waiting for <runner>" (not a problem: every matching runner is working).
  */
-export const FLEET_ACTIONS_JOB_DIAGNOSES = ['offline-matching-runner', 'missing-label', 'wrong-scope', 'all-busy'] as const;
+export const FLEET_ACTIONS_JOB_DIAGNOSES = [
+	'offline-matching-runner',
+	'missing-label',
+	'wrong-scope',
+	'all-busy'
+] as const;
 
 export type FleetActionsJobDiagnosis = (typeof FLEET_ACTIONS_JOB_DIAGNOSES)[number];
 
@@ -858,7 +869,10 @@ export interface FleetActionsJobDiagnosisResult {
 }
 
 /** True when a runner registered at `scope`/`target` can take a job of `repository`. */
-export function fleetActionsRunnerCovers(runner: Pick<FleetActionsDiagnosisRunner, 'scope' | 'target'>, repository: string): boolean {
+export function fleetActionsRunnerCovers(
+	runner: Pick<FleetActionsDiagnosisRunner, 'scope' | 'target'>,
+	repository: string
+): boolean {
 	const repo = repository.toLowerCase();
 	const target = runner.target.toLowerCase();
 	if (runner.scope === 'repo') return target === repo;

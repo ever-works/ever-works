@@ -151,7 +151,7 @@ export interface AgentFleetToolSource {
      */
     runners?: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'> &
         // P2: `fleet_runners_jobs` / `fleet_runners_cancel_run` are offered when the binding carries them.
-        Partial<Pick<FleetActionsRunnersService, 'jobs' | 'cancelRun'>>;
+        Partial<Pick<FleetActionsRunnersService, 'actionsJobs' | 'cancelRun'>>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'

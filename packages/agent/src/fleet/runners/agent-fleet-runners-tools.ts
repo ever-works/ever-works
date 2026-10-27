@@ -66,7 +66,10 @@ type ToolError = { error: FleetLinkError };
 function toolError(error: unknown): ToolError {
     const known = readFleetMachineError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -77,7 +80,9 @@ function invalid(field: string, hint: string): ToolError {
 function stringList(value: unknown, max: number): string[] | null {
     if (value === undefined || value === null) return [];
     if (!Array.isArray(value)) return null;
-    const out = value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim());
+    const out = value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim());
     return out.length === value.length ? out.slice(0, max) : null;
 }
 
@@ -88,14 +93,17 @@ export function buildFleetRunnersTools(args: {
     runId: string | null;
     service: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'> &
         // P2: the Actions jobs read and Cancel workflow run, offered when the binding carries them.
-        Partial<Pick<FleetActionsRunnersService, 'jobs' | 'cancelRun'>>;
+        Partial<Pick<FleetActionsRunnersService, 'actionsJobs' | 'cancelRun'>>;
     /** The approval seam for held acts; null = held acts are refused (fail closed). */
     proposals: AgentProposalToolSource | null;
 }): TaskToolDescriptor[] {
     const caller = { kind: 'agent' as const, agentId: args.agentId, ownerUserId: args.userId };
     const out: TaskToolDescriptor[] = [];
 
-    const hold = async (payload: Omit<FleetRunnersActionProposalPayload, 'kind' | 'agentId'>, title: string) => {
+    const hold = async (
+        payload: Omit<FleetRunnersActionProposalPayload, 'kind' | 'agentId'>,
+        title: string,
+    ) => {
         if (!args.proposals) {
             return {
                 error: {
@@ -147,7 +155,8 @@ export function buildFleetRunnersTools(args: {
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
             try {
-                if (typeof a.nodeId === 'string' && a.nodeId) return await args.service.list(caller, a.nodeId);
+                if (typeof a.nodeId === 'string' && a.nodeId)
+                    return await args.service.list(caller, a.nodeId);
                 return { computers: await args.service.listAll(caller) };
             } catch (error) {
                 return toolError(error);
@@ -164,24 +173,46 @@ export function buildFleetRunnersTools(args: {
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 scope: { type: 'string', description: 'repo or org.' },
-                target: { type: 'string', description: 'owner/repo (scope repo) or the organisation (scope org).' },
+                target: {
+                    type: 'string',
+                    description: 'owner/repo (scope repo) or the organisation (scope org).',
+                },
                 count: { type: 'number', description: '1–16 (default 1).' },
-                names: { type: 'array', items: { type: 'string' }, description: 'Optional: one name per runner (default <computer>-<n>).' },
-                labels: { type: 'array', items: { type: 'string' }, description: 'Optional: extra labels (GitHub adds self-hosted, the OS and the architecture).' },
+                names: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional: one name per runner (default <computer>-<n>).',
+                },
+                labels: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description:
+                        'Optional: extra labels (GitHub adds self-hosted, the OS and the architecture).',
+                },
             },
             required: ['nodeId', 'scope', 'target'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetActionsRunnerScope(a.scope)) return invalid('scope', 'scope must be repo or org');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetActionsRunnerScope(a.scope))
+                return invalid('scope', 'scope must be repo or org');
             if (!isFleetActionsRunnerTarget(a.scope, a.target)) {
-                return invalid('target', a.scope === 'org' ? 'target must be an organisation' : 'target must be owner/repo');
+                return invalid(
+                    'target',
+                    a.scope === 'org'
+                        ? 'target must be an organisation'
+                        : 'target must be owner/repo',
+                );
             }
             const count = clampFleetActionsRunnerCount(a.count ?? 1);
             const names = stringList(a.names, 16);
             if (names === null || names.some((name) => !isFleetActionsRunnerName(name))) {
-                return invalid('names', 'names must be runner names (letters, digits, dots, dashes, underscores)');
+                return invalid(
+                    'names',
+                    'names must be runner names (letters, digits, dots, dashes, underscores)',
+                );
             }
             const labels = stringList(a.labels, 20);
             if (labels === null) return invalid('labels', 'labels must be a list of strings');
@@ -196,7 +227,9 @@ export function buildFleetRunnersTools(args: {
                 // Without `confirm`: the whole chain runs and answers with the summary.
                 await args.service.install(caller, a.nodeId, { ...input, fields: {} });
                 // Not reachable: an install always needs `confirm`. Belt: never report success without it.
-                return { error: { code: 'internal' as const, hint: 'the install was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the install was not confirmed' },
+                };
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
@@ -223,9 +256,14 @@ export function buildFleetRunnersTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (typeof a.runnerId !== 'string' || !a.runnerId) return invalid('runnerId', 'runnerId is required');
-            if (!isFleetActionsRunnerControlAction(a.action) || (a.action !== 'start' && a.action !== 'stop' && a.action !== 'restart')) {
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (typeof a.runnerId !== 'string' || !a.runnerId)
+                return invalid('runnerId', 'runnerId is required');
+            if (
+                !isFleetActionsRunnerControlAction(a.action) ||
+                (a.action !== 'start' && a.action !== 'stop' && a.action !== 'restart')
+            ) {
                 return invalid('action', 'action must be start, stop or restart');
             }
             const action = a.action;
@@ -235,7 +273,12 @@ export function buildFleetRunnersTools(args: {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
                 return hold(
-                    { verb: action === 'restart' ? 'restart' : 'stop', nodeId: a.nodeId, runnerId: a.runnerId, args: {} },
+                    {
+                        verb: action === 'restart' ? 'restart' : 'stop',
+                        nodeId: a.nodeId,
+                        runnerId: a.runnerId,
+                        args: {},
+                    },
                     summary || `${action === 'restart' ? 'Restart' : 'Stop'} an Actions runner`,
                 );
             }
@@ -257,18 +300,28 @@ export function buildFleetRunnersTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (typeof a.runnerId !== 'string' || !a.runnerId) return invalid('runnerId', 'runnerId is required');
-            if (!isFleetActionsRunnerName(a.name)) return invalid('name', 'the name is not a runner name');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (typeof a.runnerId !== 'string' || !a.runnerId)
+                return invalid('runnerId', 'runnerId is required');
+            if (!isFleetActionsRunnerName(a.name))
+                return invalid('name', 'the name is not a runner name');
             try {
                 // Without `confirmName`: the chain runs (busy, permission, kill switch) and answers with the summary.
                 await args.service.control(caller, a.nodeId, a.runnerId, 'remove', {});
-                return { error: { code: 'internal' as const, hint: 'the remove was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the remove was not confirmed' },
+                };
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
                 return hold(
-                    { verb: 'remove', nodeId: a.nodeId, runnerId: a.runnerId, args: { name: a.name } },
+                    {
+                        verb: 'remove',
+                        nodeId: a.nodeId,
+                        runnerId: a.runnerId,
+                        args: { name: a.name },
+                    },
                     summary || `Remove ${a.name}`,
                 );
             }
@@ -276,8 +329,8 @@ export function buildFleetRunnersTools(args: {
     } as TaskToolDescriptor);
 
     // ── P2 (FR-20 – FR-23): the Actions jobs read and Cancel workflow run ──
-    if (args.service.jobs) {
-        const jobs = args.service.jobs.bind(args.service);
+    if (args.service.actionsJobs) {
+        const jobs = args.service.actionsJobs.bind(args.service);
         out.push({
             name: 'fleet_runners_jobs',
             description:
@@ -288,7 +341,8 @@ export function buildFleetRunnersTools(args: {
                     targets: {
                         type: 'array',
                         items: { type: 'string' },
-                        description: 'Optional: owner/repo or org names to read instead of the watched list.',
+                        description:
+                            'Optional: owner/repo or org names to read instead of the watched list.',
                     },
                 },
                 required: [],
@@ -296,8 +350,15 @@ export function buildFleetRunnersTools(args: {
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { targets?: unknown };
                 const list = stringList(a.targets, 20);
-                if (list === null) return invalid('targets', 'targets must be a list of owner/repo or organisation names');
-                const targets = list.map((entry) => ({ scope: entry.includes('/') ? 'repo' : 'org', target: entry }));
+                if (list === null)
+                    return invalid(
+                        'targets',
+                        'targets must be a list of owner/repo or organisation names',
+                    );
+                const targets = list.map((entry) => ({
+                    scope: entry.includes('/') ? 'repo' : 'org',
+                    target: entry,
+                }));
                 try {
                     return await jobs(caller, targets.length > 0 ? targets : null);
                 } catch (error) {
@@ -317,25 +378,47 @@ export function buildFleetRunnersTools(args: {
                 type: 'object',
                 properties: {
                     repository: { type: 'string', description: 'owner/repo.' },
-                    runId: { type: 'number', description: 'The workflow run id (from fleet_runners_jobs).' },
-                    runNumber: { type: 'number', description: 'Optional: the run number, for the confirmation sentence.' },
+                    runId: {
+                        type: 'number',
+                        description: 'The workflow run id (from fleet_runners_jobs).',
+                    },
+                    runNumber: {
+                        type: 'number',
+                        description: 'Optional: the run number, for the confirmation sentence.',
+                    },
                 },
                 required: ['repository', 'runId'],
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as Record<string, unknown>;
-                if (!isFleetActionsRunnerTarget('repo', a.repository)) return invalid('repository', 'repository must be owner/repo');
+                if (!isFleetActionsRunnerTarget('repo', a.repository))
+                    return invalid('repository', 'repository must be owner/repo');
                 const runId = typeof a.runId === 'number' ? a.runId : Number(a.runId);
-                if (!Number.isSafeInteger(runId) || runId <= 0) return invalid('runId', 'runId must be a workflow run id');
-                const runNumber = typeof a.runNumber === 'number' && Number.isSafeInteger(a.runNumber) ? a.runNumber : null;
+                if (!Number.isSafeInteger(runId) || runId <= 0)
+                    return invalid('runId', 'runId must be a workflow run id');
+                const runNumber =
+                    typeof a.runNumber === 'number' && Number.isSafeInteger(a.runNumber)
+                        ? a.runNumber
+                        : null;
                 try {
-                    await cancelRun(caller, { repository: a.repository as string, runId, runNumber, fields: {} });
-                    return { error: { code: 'internal' as const, hint: 'the cancel was not confirmed' } };
+                    await cancelRun(caller, {
+                        repository: a.repository as string,
+                        runId,
+                        runNumber,
+                        fields: {},
+                    });
+                    return {
+                        error: { code: 'internal' as const, hint: 'the cancel was not confirmed' },
+                    };
                 } catch (error) {
                     const summary = confirmationSummary(error);
                     if (summary === null) return toolError(error);
-                        return hold(
-                        { verb: 'cancel-run', nodeId: '', args: { repository: a.repository, runId, runNumber } },
+                    return hold(
+                        {
+                            verb: 'cancel-run',
+                            nodeId: '',
+                            args: { repository: a.repository, runId, runNumber },
+                        },
                         summary || `Cancel workflow run ${runId} of ${String(a.repository)}`,
                     );
                 }

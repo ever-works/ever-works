@@ -51,7 +51,11 @@ export class ActionsRunnersFacadeError extends FacadeError {
         message: string,
         operation: string,
         readonly reason: ActionsRunnersFailureReason,
-        readonly extra: { missing?: string; grantUrl?: string | null; rateLimitedUntil?: string | null } = {},
+        readonly extra: {
+            missing?: string;
+            grantUrl?: string | null;
+            rateLimitedUntil?: string | null;
+        } = {},
     ) {
         super(message, operation);
         this.name = 'ActionsRunnersFacadeError';
@@ -74,7 +78,11 @@ export interface ActionsRunnersTarget {
 }
 
 /** What a token is minted for — each maps to the narrowest permission that works (plan §3). */
-export type ActionsRunnersTokenPurpose = 'runners-read' | 'runners-write' | 'jobs-read' | 'runs-write';
+export type ActionsRunnersTokenPurpose =
+    | 'runners-read'
+    | 'runners-write'
+    | 'jobs-read'
+    | 'runs-write';
 
 /** The permission object for one purpose on one scope (spec FR-7: the narrowest that works). */
 export function actionsRunnersPermissionsFor(
@@ -83,9 +91,13 @@ export function actionsRunnersPermissionsFor(
 ): Record<string, string> {
     switch (purpose) {
         case 'runners-read':
-            return scope === 'org' ? { organization_self_hosted_runners: 'read' } : { administration: 'read' };
+            return scope === 'org'
+                ? { organization_self_hosted_runners: 'read' }
+                : { administration: 'read' };
         case 'runners-write':
-            return scope === 'org' ? { organization_self_hosted_runners: 'write' } : { administration: 'write' };
+            return scope === 'org'
+                ? { organization_self_hosted_runners: 'write' }
+                : { administration: 'write' };
         case 'jobs-read':
             return { actions: 'read' };
         case 'runs-write':
@@ -94,14 +106,21 @@ export function actionsRunnersPermissionsFor(
 }
 
 /** The GitHub permission's display name, for "needs the permission …" (spec S7, U8). */
-export function actionsRunnersPermissionLabel(scope: 'org' | 'repo', purpose: ActionsRunnersTokenPurpose): string {
+export function actionsRunnersPermissionLabel(
+    scope: 'org' | 'repo',
+    purpose: ActionsRunnersTokenPurpose,
+): string {
     if (purpose === 'jobs-read') return 'Actions: Read-only';
     if (purpose === 'runs-write') return 'Actions: Read and write';
-    return scope === 'org' ? 'Self-hosted runners: Read and write' : 'Administration: Read and write';
+    return scope === 'org'
+        ? 'Self-hosted runners: Read and write'
+        : 'Administration: Read and write';
 }
 
 /** The installation's page on GitHub, where its permissions are granted ("Grant access", spec §5.6). */
-export function actionsRunnersGrantUrl(installation: Pick<GitHubAppInstallation, 'installationId' | 'accountLogin' | 'targetType'>): string {
+export function actionsRunnersGrantUrl(
+    installation: Pick<GitHubAppInstallation, 'installationId' | 'accountLogin' | 'targetType'>,
+): string {
     const id = encodeURIComponent(installation.installationId);
     return installation.targetType === 'Organization'
         ? `https://github.com/organizations/${encodeURIComponent(installation.accountLogin)}/settings/installations/${id}`
@@ -166,7 +185,9 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
     async liveInstallations(userId: string): Promise<GitHubAppInstallation[]> {
         if (!this.installations) return [];
         const rows = await this.installations.listByCreatedByUserId(userId).catch(() => []);
-        return rows.filter((row) => !row.deletedAt && !row.suspendedAt && row.createdByUserId === userId);
+        return rows.filter(
+            (row) => !row.deletedAt && !row.suspendedAt && row.createdByUserId === userId,
+        );
     }
 
     /**
@@ -196,7 +217,9 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
                 out.push(this.targetOf(installation, 'repo', repo.fullName, repo.githubRepoId));
             }
         }
-        return out.sort((a, b) => (a.scope === b.scope ? a.target.localeCompare(b.target) : a.scope === 'repo' ? -1 : 1));
+        return out.sort((a, b) =>
+            a.scope === b.scope ? a.target.localeCompare(b.target) : a.scope === 'repo' ? -1 : 1,
+        );
     }
 
     /**
@@ -205,7 +228,11 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
      * is refused too: which one's audit trail a registration lands in must not
      * be decided by listing order.
      */
-    async resolveTarget(userId: string, scope: 'org' | 'repo', target: string): Promise<ActionsRunnersTarget> {
+    async resolveTarget(
+        userId: string,
+        scope: 'org' | 'repo',
+        target: string,
+    ): Promise<ActionsRunnersTarget> {
         const wanted = target.toLowerCase();
         const matches = (await this.listTargets(userId)).filter(
             (entry) => entry.scope === scope && entry.target.toLowerCase() === wanted,
@@ -254,12 +281,17 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
     ): Promise<string> {
         const credentials = this.appCredentials();
         if (!credentials) {
-            throw new ActionsRunnersFacadeError('the GitHub App is not configured on this deployment', 'mintToken', 'not-configured');
+            throw new ActionsRunnersFacadeError(
+                'the GitHub App is not configured on this deployment',
+                'mintToken',
+                'not-configured',
+            );
         }
         const ids = repositoryIds ?? (resolved.repositoryId ? [resolved.repositoryId] : []);
         const scope: GitHubAppInstallationTokenScope = {
             permissions: actionsRunnersPermissionsFor(resolved.scope, purpose),
-            ...(ids.length > 0 && (resolved.scope === 'repo' || purpose === 'jobs-read' || purpose === 'runs-write')
+            ...(ids.length > 0 &&
+            (resolved.scope === 'repo' || purpose === 'jobs-read' || purpose === 'runs-write')
                 ? { repositoryIds: [...ids] }
                 : {}),
         };
@@ -284,21 +316,35 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
                     },
                 );
             }
-            this.logger.warn(`actions runners: installation token for ${resolved.target} not minted (${message.slice(0, 120)})`);
-            throw new ActionsRunnersFacadeError('GitHub did not hand over an installation token', 'mintToken', 'github');
+            this.logger.warn(
+                `actions runners: installation token for ${resolved.target} not minted (${message.slice(0, 120)})`,
+            );
+            throw new ActionsRunnersFacadeError(
+                'GitHub did not hand over an installation token',
+                'mintToken',
+                'github',
+            );
         }
     }
 
     // ─── Plugin calls (each with its own narrowed token) ─────────────────
 
-    async listDownloads(userId: string, resolved: ActionsRunnersTarget): Promise<ActionsRunnerDownload[]> {
+    async listDownloads(
+        userId: string,
+        resolved: ActionsRunnersTarget,
+    ): Promise<ActionsRunnerDownload[]> {
         const plugin = await this.resolveTypedPlugin(userId);
         const token = await this.mintToken(resolved, 'runners-read');
-        return this.call('listDownloads', resolved, () => plugin.listDownloads(this.pluginTarget(resolved), token));
+        return this.call('listDownloads', resolved, () =>
+            plugin.listDownloads(this.pluginTarget(resolved), token),
+        );
     }
 
     /** The runner's one-time registration token — handed to the node once, never stored or logged. */
-    async mintRegistrationToken(userId: string, resolved: ActionsRunnersTarget): Promise<ActionsRunnerOneTimeToken> {
+    async mintRegistrationToken(
+        userId: string,
+        resolved: ActionsRunnersTarget,
+    ): Promise<ActionsRunnerOneTimeToken> {
         const plugin = await this.resolveTypedPlugin(userId);
         const token = await this.mintToken(resolved, 'runners-write');
         return this.call('mintRegistrationToken', resolved, () =>
@@ -307,19 +353,34 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
     }
 
     /** The runner's one-time remove token — handed to the node once, never stored or logged. */
-    async mintRemoveToken(userId: string, resolved: ActionsRunnersTarget): Promise<ActionsRunnerOneTimeToken> {
+    async mintRemoveToken(
+        userId: string,
+        resolved: ActionsRunnersTarget,
+    ): Promise<ActionsRunnerOneTimeToken> {
         const plugin = await this.resolveTypedPlugin(userId);
         const token = await this.mintToken(resolved, 'runners-write');
-        return this.call('mintRemoveToken', resolved, () => plugin.mintRemoveToken(this.pluginTarget(resolved), token));
+        return this.call('mintRemoveToken', resolved, () =>
+            plugin.mintRemoveToken(this.pluginTarget(resolved), token),
+        );
     }
 
-    async listRunners(userId: string, resolved: ActionsRunnersTarget, etag?: string | null): Promise<ActionsRunnersPage> {
+    async listRunners(
+        userId: string,
+        resolved: ActionsRunnersTarget,
+        etag?: string | null,
+    ): Promise<ActionsRunnersPage> {
         const plugin = await this.resolveTypedPlugin(userId);
         const token = await this.mintToken(resolved, 'runners-read');
-        return this.call('listRunners', resolved, () => plugin.listRunners(this.pluginTarget(resolved), token, { etag }));
+        return this.call('listRunners', resolved, () =>
+            plugin.listRunners(this.pluginTarget(resolved), token, { etag }),
+        );
     }
 
-    async deleteRunner(userId: string, resolved: ActionsRunnersTarget, githubRunnerId: number): Promise<void> {
+    async deleteRunner(
+        userId: string,
+        resolved: ActionsRunnersTarget,
+        githubRunnerId: number,
+    ): Promise<void> {
         const plugin = await this.resolveTypedPlugin(userId);
         const token = await this.mintToken(resolved, 'runners-write');
         await this.call('deleteRunner', resolved, () =>
@@ -335,7 +396,10 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
     async listJobs(
         userId: string,
         resolved: ActionsRunnersTarget,
-        options: { etag?: string | null; repositories?: Array<{ fullName: string; githubRepoId: string }> } = {},
+        options: {
+            etag?: string | null;
+            repositories?: Array<{ fullName: string; githubRepoId: string }>;
+        } = {},
     ): Promise<ActionsJobsPage> {
         const plugin = await this.resolveTypedPlugin(userId);
         const ids =
@@ -354,14 +418,23 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
     }
 
     /** Cancel a whole workflow run of a repository the person's installation covers (P2, R-37). */
-    async cancelRun(userId: string, resolvedRepository: ActionsRunnersTarget, runId: number): Promise<void> {
+    async cancelRun(
+        userId: string,
+        resolvedRepository: ActionsRunnersTarget,
+        runId: number,
+    ): Promise<void> {
         const plugin = await this.resolveTypedPlugin(userId);
         const token = await this.mintToken(resolvedRepository, 'runs-write');
-        await this.call('cancelRun', resolvedRepository, () => plugin.cancelRun(resolvedRepository.target, runId, token));
+        await this.call('cancelRun', resolvedRepository, () =>
+            plugin.cancelRun(resolvedRepository.target, runId, token),
+        );
     }
 
     /** Whether the installation may manage runners for the target (FR-26): a narrowed mint is the probe. */
-    async checkPermission(userId: string, resolved: ActionsRunnersTarget): Promise<ActionsRunnersPermissionCheck> {
+    async checkPermission(
+        userId: string,
+        resolved: ActionsRunnersTarget,
+    ): Promise<ActionsRunnersPermissionCheck> {
         try {
             const plugin = await this.resolveTypedPlugin(userId);
             const token = await this.mintToken(resolved, 'runners-read');
@@ -369,7 +442,9 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
             if (answer.ok) return { ok: true };
             return {
                 ok: false,
-                missing: answer.missing ?? actionsRunnersPermissionLabel(resolved.scope, 'runners-write'),
+                missing:
+                    answer.missing ??
+                    actionsRunnersPermissionLabel(resolved.scope, 'runners-write'),
                 grantUrl: actionsRunnersGrantUrl({
                     installationId: resolved.installationId,
                     accountLogin: resolved.accountLogin,
@@ -377,18 +452,31 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
                 }),
             };
         } catch (error) {
-            if (error instanceof ActionsRunnersFacadeError && error.reason === 'permission-missing') {
-                return { ok: false, missing: error.extra.missing, grantUrl: error.extra.grantUrl ?? undefined };
+            if (
+                error instanceof ActionsRunnersFacadeError &&
+                error.reason === 'permission-missing'
+            ) {
+                return {
+                    ok: false,
+                    missing: error.extra.missing,
+                    grantUrl: error.extra.grantUrl ?? undefined,
+                };
             }
             throw error;
         }
     }
 
     /** The snapshot repositories of an installation (an organisation's jobs read, P2). */
-    async repositoriesOf(installationEntityId: string): Promise<Array<{ fullName: string; githubRepoId: string }>> {
+    async repositoriesOf(
+        installationEntityId: string,
+    ): Promise<Array<{ fullName: string; githubRepoId: string }>> {
         if (!this.installationRepos) return [];
-        const rows = await this.installationRepos.listForInstallation(installationEntityId).catch(() => []);
-        return rows.filter((row) => row.selected !== false).map((row) => ({ fullName: row.fullName, githubRepoId: row.githubRepoId }));
+        const rows = await this.installationRepos
+            .listForInstallation(installationEntityId)
+            .catch(() => []);
+        return rows
+            .filter((row) => row.selected !== false)
+            .map((row) => ({ fullName: row.fullName, githubRepoId: row.githubRepoId }));
     }
 
     // ─── Watched targets (P2, FR-21) — the person's own plugin setting ────
@@ -400,7 +488,9 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
      * then watches every target the person has runners for) or no provider is
      * enabled. Entries are `repo:owner/name` or `org:login`.
      */
-    async getWatchedTargets(userId: string): Promise<Array<{ scope: 'org' | 'repo'; target: string }> | null> {
+    async getWatchedTargets(
+        userId: string,
+    ): Promise<Array<{ scope: 'org' | 'repo'; target: string }> | null> {
         if (!this.settingsService) return null;
         let plugin: IActionsRunnersPlugin;
         try {
@@ -408,7 +498,9 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
         } catch {
             return null;
         }
-        const settings = await this.settingsService.getSettings(plugin.id, { userId }).catch(() => null);
+        const settings = await this.settingsService
+            .getSettings(plugin.id, { userId })
+            .catch(() => null);
         const raw = settings?.watchedTargets;
         if (!Array.isArray(raw)) return null;
         const out: Array<{ scope: 'org' | 'repo'; target: string }> = [];
@@ -424,9 +516,16 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
     }
 
     /** Save (or, with `null`, clear back to the default) this person's watched targets. */
-    async setWatchedTargets(userId: string, targets: ReadonlyArray<{ scope: 'org' | 'repo'; target: string }> | null): Promise<void> {
+    async setWatchedTargets(
+        userId: string,
+        targets: ReadonlyArray<{ scope: 'org' | 'repo'; target: string }> | null,
+    ): Promise<void> {
         if (!this.settingsService) {
-            throw new ActionsRunnersFacadeError('settings are not available on this deployment', 'setWatchedTargets', 'not-configured');
+            throw new ActionsRunnersFacadeError(
+                'settings are not available on this deployment',
+                'setWatchedTargets',
+                'not-configured',
+            );
         }
         const plugin = await this.resolveTypedPlugin(userId);
         await this.settingsService.updateUserSettings(plugin.id, userId, {
@@ -453,7 +552,10 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
         };
     }
 
-    private pluginTarget(resolved: ActionsRunnersTarget): { scope: 'org' | 'repo'; target: string } {
+    private pluginTarget(resolved: ActionsRunnersTarget): {
+        scope: 'org' | 'repo';
+        target: string;
+    } {
         return { scope: resolved.scope, target: resolved.target };
     }
 
@@ -462,16 +564,28 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
         try {
             plugin = await this.resolvePlugin<IPlugin>(undefined, userId);
         } catch {
-            throw new ActionsRunnersFacadeError('Actions runners are not available on this deployment', 'resolve', 'no-provider');
+            throw new ActionsRunnersFacadeError(
+                'Actions runners are not available on this deployment',
+                'resolve',
+                'no-provider',
+            );
         }
         if (!isActionsRunnersPlugin(plugin)) {
-            throw new ActionsRunnersFacadeError(`Plugin ${plugin.id} does not implement actions-runners`, 'resolve', 'no-provider');
+            throw new ActionsRunnersFacadeError(
+                `Plugin ${plugin.id} does not implement actions-runners`,
+                'resolve',
+                'no-provider',
+            );
         }
         return plugin;
     }
 
     /** Run one plugin call, mapping its typed refusal; the token never reaches a message. */
-    private async call<T>(operation: string, resolved: ActionsRunnersTarget, run: () => Promise<T>): Promise<T> {
+    private async call<T>(
+        operation: string,
+        resolved: ActionsRunnersTarget,
+        run: () => Promise<T>,
+    ): Promise<T> {
         try {
             return await run();
         } catch (error) {
@@ -482,16 +596,22 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
                     });
                 }
                 if (error.code === 'permission') {
-                    throw new ActionsRunnersFacadeError(error.message, operation, 'permission-missing', {
-                        missing: actionsRunnersPermissionLabel(resolved.scope, 'runners-write'),
-                        grantUrl: actionsRunnersGrantUrl({
-                            installationId: resolved.installationId,
-                            accountLogin: resolved.accountLogin,
-                            targetType: resolved.targetType,
-                        }),
-                    });
+                    throw new ActionsRunnersFacadeError(
+                        error.message,
+                        operation,
+                        'permission-missing',
+                        {
+                            missing: actionsRunnersPermissionLabel(resolved.scope, 'runners-write'),
+                            grantUrl: actionsRunnersGrantUrl({
+                                installationId: resolved.installationId,
+                                accountLogin: resolved.accountLogin,
+                                targetType: resolved.targetType,
+                            }),
+                        },
+                    );
                 }
-                if (error.code === 'not_found') throw new ActionsRunnersFacadeError(error.message, operation, 'not-found');
+                if (error.code === 'not_found')
+                    throw new ActionsRunnersFacadeError(error.message, operation, 'not-found');
                 throw new ActionsRunnersFacadeError(error.message, operation, 'github');
             }
             throw error;

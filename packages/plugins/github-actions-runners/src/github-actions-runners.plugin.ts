@@ -100,7 +100,11 @@ export class GitHubActionsRunnersPlugin implements IActionsRunnersPlugin {
 		return this.api.mintRemoveToken(target, token);
 	}
 
-	listRunners(target: ActionsRunnerTarget, token: string, options?: { etag?: string | null }): Promise<ActionsRunnersPage> {
+	listRunners(
+		target: ActionsRunnerTarget,
+		token: string,
+		options?: { etag?: string | null }
+	): Promise<ActionsRunnersPage> {
 		return this.api.listRunners(target, token, options);
 	}
 

@@ -14,7 +14,9 @@ import { FleetActionsRunnerRepository } from './fleet-actions-runner.repository'
 import { FleetActionsRunnersService } from './fleet-actions-runners.service';
 
 /** The diagnosis sentence of an item (spec §5.5, FR-22). */
-export function fleetActionsJobDiagnosisSentence(job: Pick<FleetActionsJobView, 'diagnosis' | 'diagnosisDetail' | 'repository'>): string {
+export function fleetActionsJobDiagnosisSentence(
+    job: Pick<FleetActionsJobView, 'diagnosis' | 'diagnosisDetail' | 'repository'>,
+): string {
     switch (job.diagnosis) {
         case 'missing-label':
             return `needs label ${job.diagnosisDetail ?? 'a label no runner has'}`;
@@ -52,16 +54,23 @@ export function jobUnassignableItems(
     const items: NeedsALookItem[] = [];
     for (const job of jobs) {
         if (!job.unassignable) continue;
-        const host = own.find((runner) => fleetActionsRunnerCovers(runner, job.repository)) ?? own[0];
+        const host =
+            own.find((runner) => fleetActionsRunnerCovers(runner, job.repository)) ?? own[0];
         const run = job.runNumber ? ` #${job.runNumber}` : '';
         items.push({
             id: fleetActionsJobItemId(job.repository, job.jobId),
             nodeId: host.nodeId,
             severity: 'warn',
             kind: 'job-unassignable',
-            title: `${job.repository} workflow${run} — no runner can take "${job.name}"`.slice(0, 200),
+            title: `${job.repository} workflow${run} — no runner can take "${job.name}"`.slice(
+                0,
+                200,
+            ),
             detail: fleetActionsJobDiagnosisSentence(job).slice(0, 500),
-            action: { label: 'Cancel workflow run…', route: `/fleet?actionsJob=${encodeURIComponent(`${job.repository}#${job.runId}`)}` },
+            action: {
+                label: 'Cancel workflow run…',
+                route: `/fleet?actionsJob=${encodeURIComponent(`${job.repository}#${job.runId}`)}`,
+            },
             since: job.queuedAt ?? new Date().toISOString(),
         });
     }
@@ -83,7 +92,10 @@ export class FleetActionsJobsNeedsALookProducer implements NeedsALookProducer, O
         this.registry?.register(this);
     }
 
-    async produce(nodes: readonly FleetNodeView[], context: NeedsALookContext): Promise<NeedsALookItem[]> {
+    async produce(
+        nodes: readonly FleetNodeView[],
+        context: NeedsALookContext,
+    ): Promise<NeedsALookItem[]> {
         if (!config.fleet.isActionsRunnersEnabled() || nodes.length === 0) return [];
         const jobs = this.service.cachedJobs(context.userId);
         if (!jobs || jobs.length === 0) return [];

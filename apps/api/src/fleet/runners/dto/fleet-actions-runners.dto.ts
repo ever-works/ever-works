@@ -43,7 +43,10 @@ export class FleetActionsRunnerTargetDto {
     @IsIn([...FLEET_ACTIONS_RUNNER_SCOPES])
     scope: FleetActionsRunnerScope;
 
-    @ApiProperty({ maxLength: 200, description: '`owner/repo` (scope repo) or the organisation (scope org).' })
+    @ApiProperty({
+        maxLength: 200,
+        description: '`owner/repo` (scope repo) or the organisation (scope org).',
+    })
     @IsString()
     @MaxLength(200)
     target: string;
@@ -61,7 +64,11 @@ export class FleetActionsRunnerInstallDto {
     @Max(64)
     count: number;
 
-    @ApiProperty({ required: false, type: [String], description: 'One name per runner (default `<computer>-<n>`).' })
+    @ApiProperty({
+        required: false,
+        type: [String],
+        description: 'One name per runner (default `<computer>-<n>`).',
+    })
     @IsOptional()
     @IsArray()
     @ArrayMaxSize(FLEET_ACTIONS_RUNNERS_MAX_PER_NODE)
@@ -69,7 +76,11 @@ export class FleetActionsRunnerInstallDto {
     @MaxLength(64, { each: true })
     names?: string[];
 
-    @ApiProperty({ required: false, type: [String], description: 'Extra labels; GitHub adds self-hosted, the OS and the architecture.' })
+    @ApiProperty({
+        required: false,
+        type: [String],
+        description: 'Extra labels; GitHub adds self-hosted, the OS and the architecture.',
+    })
     @IsOptional()
     @IsArray()
     @ArrayMaxSize(FLEET_ACTIONS_RUNNER_MAX_LABELS)
@@ -82,12 +93,18 @@ export class FleetActionsRunnerInstallDto {
     @IsIn([...FLEET_ACTIONS_RUNNER_MODES])
     mode?: FleetActionsRunnerMode;
 
-    @ApiProperty({ required: false, description: 'Phase 3, Docker mode only: share the host Docker daemon (runs as root).' })
+    @ApiProperty({
+        required: false,
+        description: 'Phase 3, Docker mode only: share the host Docker daemon (runs as root).',
+    })
     @IsOptional()
     @IsBoolean()
     shareDockerDaemon?: boolean;
 
-    @ApiProperty({ required: false, description: 'Satisfies the `confirm` class (CONTRACTS §2.2).' })
+    @ApiProperty({
+        required: false,
+        description: 'Satisfies the `confirm` class (CONTRACTS §2.2).',
+    })
     @IsOptional()
     @IsBoolean()
     confirm?: boolean;
@@ -95,19 +112,28 @@ export class FleetActionsRunnerInstallDto {
 
 /** `POST …/runners/:runnerId/:action` — the CONTRACTS §2.2 fields. */
 export class FleetActionsRunnerControlDto {
-    @ApiProperty({ required: false, description: 'Stop and restart are `confirm`-class: send `confirm: true`.' })
+    @ApiProperty({
+        required: false,
+        description: 'Stop and restart are `confirm`-class: send `confirm: true`.',
+    })
     @IsOptional()
     @IsBoolean()
     confirm?: boolean;
 
-    @ApiProperty({ required: false, maxLength: 64, description: 'Remove is `confirm-destructive`: the runner’s exact name.' })
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        description: 'Remove is `confirm-destructive`: the runner’s exact name.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(64)
     confirmName?: string;
 }
 
-export function runnerConfirmFields(body: { confirm?: boolean; confirmName?: string } | null | undefined): FleetActionConfirmFields {
+export function runnerConfirmFields(
+    body: { confirm?: boolean; confirmName?: string } | null | undefined,
+): FleetActionConfirmFields {
     const fields: FleetActionConfirmFields = {};
     if (body?.confirm === true) fields.confirm = true;
     if (typeof body?.confirmName === 'string') fields.confirmName = body.confirmName;
@@ -116,7 +142,10 @@ export function runnerConfirmFields(body: { confirm?: boolean; confirmName?: str
 
 /** The node's credential + the runner job it holds (the `push-credential` posture). */
 export class FleetActionsRunnerNodeJobDto extends FleetJobNodeCredentialDto {
-    @ApiProperty({ format: 'uuid', description: 'The runner-install / runner-control job this node holds.' })
+    @ApiProperty({
+        format: 'uuid',
+        description: 'The runner-install / runner-control job this node holds.',
+    })
     @IsUUID()
     jobId: string;
 
@@ -127,7 +156,10 @@ export class FleetActionsRunnerNodeJobDto extends FleetJobNodeCredentialDto {
 }
 
 export class FleetActionsRunnerTokenDto extends FleetActionsRunnerNodeJobDto {
-    @ApiProperty({ enum: ['register', 'remove'], description: 'Which one-time token the runner needs.' })
+    @ApiProperty({
+        enum: ['register', 'remove'],
+        description: 'Which one-time token the runner needs.',
+    })
     @IsIn(['register', 'remove'])
     kind: 'register' | 'remove';
 }
@@ -169,7 +201,8 @@ export class FleetActionsRunnerProgressDto extends FleetActionsRunnerNodeJobDto 
 
     @ApiProperty({
         required: false,
-        description: 'A remove: whether the runner deregistered itself at GitHub (false → the platform deletes it by its id).',
+        description:
+            'A remove: whether the runner deregistered itself at GitHub (false → the platform deletes it by its id).',
     })
     @IsOptional()
     @IsBoolean()
@@ -179,7 +212,8 @@ export class FleetActionsRunnerProgressDto extends FleetActionsRunnerNodeJobDto 
 /** `PUT /api/fleet/runners/jobs/watched` (FR-21). Each entry is re-validated by the service. */
 export class FleetActionsWatchedTargetsDto {
     @ApiProperty({
-        description: 'The repositories ({ scope: "repo", target: "owner/repo" }) and organisations ({ scope: "org", target: "acme" }) to watch; empty = every target you have runners for.',
+        description:
+            'The repositories ({ scope: "repo", target: "owner/repo" }) and organisations ({ scope: "org", target: "acme" }) to watch; empty = every target you have runners for.',
         type: 'array',
         items: { type: 'object' },
         maxItems: FLEET_ACTIONS_MAX_WATCHED_TARGETS,
@@ -201,7 +235,11 @@ export class FleetActionsCancelRunDto {
     @Min(1)
     runId: number;
 
-    @ApiProperty({ required: false, minimum: 1, description: 'The run number, for the confirmation sentence.' })
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        description: 'The run number, for the confirmation sentence.',
+    })
     @IsOptional()
     @IsInt()
     @Min(1)
@@ -217,12 +255,17 @@ export class FleetActionsCancelRunDto {
  * `?targets=acme/api,acme` → watched-target entries (a `/` names a repository,
  * else an organisation); validated by the service. Absent or empty → null.
  */
-export function parseTargetsQuery(raw: string | undefined): Array<{ scope: 'org' | 'repo'; target: string }> | null {
+export function parseTargetsQuery(
+    raw: string | undefined,
+): Array<{ scope: 'org' | 'repo'; target: string }> | null {
     if (typeof raw !== 'string' || !raw.trim()) return null;
     return raw
         .split(',')
         .map((entry) => entry.trim())
         .filter((entry) => entry.length > 0)
         .slice(0, FLEET_ACTIONS_MAX_WATCHED_TARGETS + 1)
-        .map((target) => ({ scope: target.includes('/') ? ('repo' as const) : ('org' as const), target }));
+        .map((target) => ({
+            scope: target.includes('/') ? ('repo' as const) : ('org' as const),
+            target,
+        }));
 }

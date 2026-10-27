@@ -54,6 +54,10 @@ export class FleetActionsRunnersPollService {
         FleetActionsJobsNeedsALookProducer,
         FleetActionsRunnersProposalListener,
     ],
-    exports: [FleetActionsRunnerRepository, FleetActionsRunnersService, FleetActionsRunnersPollService],
+    exports: [
+        FleetActionsRunnerRepository,
+        FleetActionsRunnersService,
+        FleetActionsRunnersPollService,
+    ],
 })
 export class FleetActionsRunnersModule {}
