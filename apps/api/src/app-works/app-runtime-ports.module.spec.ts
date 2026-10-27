@@ -1,6 +1,8 @@
 // The module looks `WorkLifecycleService` up lazily and only as a class token; the real barrel
 // drags the whole auth stack (an ESM-only dependency) into this spec, so it is a bare class here.
-jest.mock('@ever-works/agent/services', () => ({ WorkLifecycleService: class WorkLifecycleService {} }));
+jest.mock('@ever-works/agent/services', () => ({
+    WorkLifecycleService: class WorkLifecycleService {},
+}));
 
 import { APP_RUNTIME_EVENT_SINK, APP_RUNTIME_TARGET } from '@ever-works/agent/app-runtime';
 import { AppRuntimePortsModule } from './app-runtime-ports.module';
@@ -28,7 +30,9 @@ function factoryFor(token: symbol): FactoryProvider {
 describe('AppRuntimePortsModule — the event sink and the runtime target (§9.8)', () => {
     it('exports both tokens, so the global module reaches AppDependenciesModule', () => {
         const exported = (Reflect.getMetadata('exports', AppRuntimePortsModule) ?? []) as unknown[];
-        expect(exported).toEqual(expect.arrayContaining([APP_RUNTIME_EVENT_SINK, APP_RUNTIME_TARGET]));
+        expect(exported).toEqual(
+            expect.arrayContaining([APP_RUNTIME_EVENT_SINK, APP_RUNTIME_TARGET]),
+        );
     });
 
     it('binds the event sink to the catalogue-checking relay over the API emitter', async () => {

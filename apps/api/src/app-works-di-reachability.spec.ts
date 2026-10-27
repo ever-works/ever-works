@@ -208,11 +208,9 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
     // `AppEnvModule | AppEnvService | APP_ENV_ACTIVITY` left this list on 2026-10-18 (lane
     // aw-env-smtp): `AppEnvModule` binds it to `AppEnvActivityService` (APW-07 T26), so every env
     // change through `PUT /api/works/:id/app-env` writes its `app_env` Activity row.
-    {
-        key: 'AppEnvModule | AppEnvService | APP_ENV_ACTOR_NAMES',
-        reason: 'Provisional: the swap is `useExisting: WorkMemberService`, which has no `nameOf` yet.',
-        source: 'packages/agent/src/app-env/app-env.service.ts:246-260 (owned by APW-01)',
-    },
+    // `AppEnvModule | AppEnvService | APP_ENV_ACTOR_NAMES` left this list on 2026-10-27 (lane
+    // aw-builds-bindings): `AppEnvModule` binds it to `appEnvActorNames` (a lazy read over the Work,
+    // its members and the users — the owner's or a member's display name, never an email).
     {
         key: 'AppEnvModule | AppEnvService | APP_ENV_BUILD_FINGERPRINTS',
         reason: 'Provisional: the swap target (`WorkBuildService`) does not exist; FR-24 build flag reads the resolver meanwhile.',

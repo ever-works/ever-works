@@ -658,7 +658,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       self-skips and the run is green.
       **Done when**: the probe's recorded responses are committed as fixtures and T16–T21's specs read them.
 
-- [ ] **T45 (P1, lands with T12–T13). Classify new tables for workspace backup (R-25).**
+- [x] **T45 (P1, lands with T12–T13). Classify new tables for workspace backup (R-25).** _(2026-10-27, #2964: `works/upstream-states.jsonl`, parent Work ids, nothing redacted.)_
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain,
       after `works.jsonl`:
       `{ file: 'upstream-states.jsonl', entity: 'WorkUpstreamState', scope: { by: 'parent', column: 'workId', from: 'workIds' } }`.

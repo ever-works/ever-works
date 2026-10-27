@@ -28,6 +28,7 @@ import { PluginSettingsService } from '../plugins/services/plugin-settings.servi
 import { AppBuildPrepareRunner } from './app-build-prepare.runner';
 import { AppBuildWatchRunner } from './app-build-watch.runner';
 import { AppBuildSweepService } from './app-build-sweep.service';
+import { AppBuildsTelemetry, AppBuildsTelemetryListener } from './app-builds.telemetry';
 import {
     APP_BUILD_EDIT_ACCESS,
     APP_BUILD_PLUGIN_RESOLVER,
@@ -234,6 +235,12 @@ import { GitFacadeService } from '../facades/git.facade';
         // APW-05 T21 (first slice) — the sweep's re-drive and never-adopted `lost`
         // passes; see the class docstring's T21 section.
         AppBuildSweepService,
+        // APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — plan §9.1's Builds telemetry over
+        // APW-01's `APP_WORKS_TELEMETRY_SINK` (bound by the API's global
+        // `AppWorksTelemetryBindingModule`; unbound anywhere else, so every event is dropped
+        // there), and the listener that turns `app.build.*` into recorded/terminal events.
+        AppBuildsTelemetry,
+        AppBuildsTelemetryListener,
         // APW-05 T16 — the resolver four services in this epic inject and nothing
         // provided until 2026-09-21, so every one of them took its
         // `pluginUnavailable` branch and no Build could be requested at all.
