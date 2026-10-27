@@ -520,7 +520,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       adapter spec satisfies APW-01's `AppSourceCatalogPort` interface for every `null` case and a match, and
       resolving writes no Activity.
 
-- [ ] **T27 (parallel). Three-way spec merge.**
+- [x] **T27 (parallel). Three-way spec merge.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2919): done** — `app-spec-merge.ts` (pure, `source` from ours, `blueprint` from theirs, unknown base ⇒ two-way) plus a comment-preserving render; `__tests__/app-spec-merge.spec.ts` (47 cases, ACC-03-29).
       **Create** `packages/agent/src/apps-catalog/app-spec-merge.ts` — key-wise merge, named-array merge by
       `name`, conflict list, `source` from ours.
       **Test**: `packages/agent/src/apps-catalog/__tests__/app-spec-merge.spec.ts` — user change kept, both
@@ -528,6 +529,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: the merge is pure (no I/O) and `source` never comes from `theirs`.
 
 - [ ] **T28. Apply and upgrade job.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2919): the apply-after-create and upgrade halves are done** — `AppBlueprintUpgradeService` (`packages/agent/src/apps-catalog/app-blueprint-upgrade.service.ts`), job `app-blueprint-apply` (`packages/tasks/src/tasks/trigger/app-blueprint-apply.task.ts`, runner over `remoteMap`), dispatcher bound in the agent `AppWorksModule`, the landing recorded on `app.spec.applied`. The create-time apply stays the inline path of 2026-10-17. Open: overlays (`overlay.yml`, the add-only files) and `APP_SOURCE_APPLY_REPORTER`.
       **Create** `packages/agent/src/apps-catalog/app-blueprint-apply.service.ts`,
       `packages/agent/src/tasks/app-blueprint-apply.types.ts`, `packages/agent/src/tasks/app-blueprint-apply-dispatcher.ts`
       (`APP_BLUEPRINT_APPLY_DISPATCHER`), `packages/tasks/src/tasks/trigger/app-blueprint-apply.task.ts`.

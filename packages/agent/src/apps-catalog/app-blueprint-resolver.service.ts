@@ -172,6 +172,32 @@ export interface AppBlueprintDocument {
     readonly defaultBranch: string | null;
 }
 
+/**
+ * APW-03 T28 (lane aw-blueprints) — one RELEASE of a Blueprint: its `.works/works.yml`
+ * at a named version (the base and the target of an upgrade). Like
+ * {@link AppBlueprintDocument} it is never cached and never travels with a match.
+ */
+export interface AppBlueprintRelease {
+    readonly hit: AppBlueprintResolveHit;
+    readonly text: string;
+    /** What the text was read at: a `v<version>` / `<version>` tag, or a commit sha. */
+    readonly ref: string;
+    /** The commit sha, when the read named one (a sha ref, or the default branch's head). */
+    readonly sha: string | null;
+}
+
+/**
+ * The reads one {@link AppBlueprintResolverService.readBlueprintRelease} may make: the
+ * repository, a pinned sha, two tag spellings, the default branch's head and its file.
+ */
+export const BLUEPRINT_RELEASE_MAX_READS = 6;
+
+/** A version string the release read is willing to turn into a tag name. */
+const RELEASE_VERSION_PATTERN = /^[0-9A-Za-z][0-9A-Za-z.+-]{0,31}$/;
+
+/** A full commit sha. */
+const COMMIT_SHA_PATTERN = /^[0-9a-f]{40}$/;
+
 export interface AppBlueprintResolveMiss {
     status: 'none';
     reason: 'notListed' | 'lookupFailed' | 'blueprintNotFound';
@@ -355,6 +381,132 @@ export class AppBlueprintResolverService {
         }
     }
 
+    /**
+     * APW-03 T28 (lane aw-blueprints) — the Blueprint's `.works/works.yml` at one
+     * version, for the upgrade's base (the version applied) and target (the new one).
+     *
+     * Tried in order, first acceptable answer wins, every acceptance rule of the class
+     * docstring applied at each ref:
+     *
+     *  1. `opts.sha` (a 40-hex commit the App Work recorded at apply time);
+     *  2. the release tags `v<version>` then `<version>` (`ever-works/templates`'
+     *     `release.yml` tags `vX.Y.Z`, `catalog.md` T33);
+     *  3. the default branch's head, read AT its sha so text and sha agree.
+     *
+     * With a `version`, an answer must declare exactly that `spec.blueprint.version` —
+     * a tag that moved, or a default branch already past it, is not that release. With
+     * no version, the default branch's head is the latest release. `null` for every
+     * miss; {@link AppsCatalogCredentialUnavailableError} when no platform credential
+     * exists. Uncached: an upgrade is rare and must see the repository as it is now.
+     */
+    async readBlueprintRelease(
+        blueprintId: string,
+        opts: { sourceOwner?: string | null; version?: string | null; sha?: string | null } = {},
+    ): Promise<AppBlueprintRelease | null> {
+        if (typeof blueprintId !== 'string' || !BLUEPRINT_ID_PATTERN.test(blueprintId)) {
+            return null;
+        }
+        const version =
+            typeof opts.version === 'string' && RELEASE_VERSION_PATTERN.test(opts.version)
+                ? opts.version
+                : null;
+        if (opts.version != null && version === null) {
+            return null;
+        }
+        const facade = this.gitFacade;
+        const token = facade ? await this.resolveToken(facade) : null;
+        if (!facade || !token) {
+            throw new AppsCatalogCredentialUnavailableError();
+        }
+        const budget = new ReadBudget(BLUEPRINT_RELEASE_MAX_READS);
+        try {
+            const repository = await this.readRepository(
+                facade,
+                token,
+                `${blueprintId}-template`,
+                budget,
+                allowsPrivateBlueprint(opts.sourceOwner),
+            );
+            if (!repository) {
+                return null;
+            }
+            const accept = (spec: AppSpec): boolean =>
+                spec.blueprint?.id === blueprintId &&
+                (version === null || spec.blueprint?.version === version);
+
+            const refs: Array<{ ref: string; sha: string | null }> = [];
+            if (typeof opts.sha === 'string' && COMMIT_SHA_PATTERN.test(opts.sha)) {
+                refs.push({ ref: opts.sha, sha: opts.sha });
+            }
+            if (version !== null) {
+                refs.push({ ref: `v${version}`, sha: null });
+                refs.push({ ref: version, sha: null });
+            }
+            for (const candidate of refs) {
+                const read = await this.readBlueprintSpec(
+                    facade,
+                    token,
+                    repository,
+                    budget,
+                    candidate.ref,
+                );
+                if (read && accept(read.spec)) {
+                    return {
+                        hit: this.toHit('explicit', repository, read.spec),
+                        text: read.text,
+                        ref: candidate.ref,
+                        sha: candidate.sha,
+                    };
+                }
+            }
+
+            const branch = repository.defaultBranch || null;
+            if (!branch) {
+                return null;
+            }
+            budget.take();
+            const head = await facade.getLatestCommit(
+                APP_BLUEPRINT_OWNER,
+                repository.name,
+                branch,
+                {
+                    token,
+                    providerId: 'github',
+                },
+            );
+            const headSha =
+                typeof head?.sha === 'string' && COMMIT_SHA_PATTERN.test(head.sha)
+                    ? head.sha
+                    : null;
+            const read = await this.readBlueprintSpec(
+                facade,
+                token,
+                repository,
+                budget,
+                headSha ?? branch,
+            );
+            if (!read || !accept(read.spec)) {
+                return null;
+            }
+            return {
+                hit: this.toHit('explicit', repository, read.spec),
+                text: read.text,
+                ref: headSha ?? branch,
+                sha: headSha,
+            };
+        } catch (error) {
+            if (error instanceof ReadBudgetExhausted) {
+                return null;
+            }
+            this.logger.warn(
+                `Reading release ${opts.version ?? 'latest'} of Blueprint "${blueprintId}" failed (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return null;
+        }
+    }
+
     /** FR-81: `ever-works/<blueprintId>-template`, and the file must name that id. */
     private async resolveExplicit(
         facade: GitFacadeService,
@@ -457,9 +609,12 @@ export class AppBlueprintResolverService {
         token: string,
         repository: GitRepositoryWithPermissions,
         budget: ReadBudget,
+        // APW-03 T28 (lane aw-blueprints) — a tag or commit to read instead of the
+        // default branch. Every acceptance rule below applies at that ref unchanged.
+        atRef?: string,
     ): Promise<{ spec: AppSpec; text: string } | null> {
         budget.take();
-        const ref = repository.defaultBranch || undefined;
+        const ref = atRef || repository.defaultBranch || undefined;
         const file = await facade.getFileContent(
             APP_BLUEPRINT_OWNER,
             repository.name,

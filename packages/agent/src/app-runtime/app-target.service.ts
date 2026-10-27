@@ -360,7 +360,7 @@ export class AppTargetService {
 
     async getTarget(workId: string, userId: string): Promise<AppTargetBody> {
         const row = await this.readState(workId);
-        return this.targetBody(row, userId);
+        return this.targetBody(row, userId, workId);
     }
 
     /* ---------------------------------------------------------------------- *
@@ -392,7 +392,7 @@ export class AppTargetService {
         }
 
         if (target === 'ever-works-apps') {
-            const unmet = await this.managedRefusals(userId);
+            const unmet = await this.managedRefusals(userId, workId);
             if (unmet.length > 0) {
                 return {
                     ok: false,
@@ -440,7 +440,7 @@ export class AppTargetService {
             await this.dispatchOp({ op: 'prepare-namespace', workId, userId });
         }
 
-        return { ok: true, body: await this.targetBody(await this.readState(workId), userId) };
+        return { ok: true, body: await this.targetBody(await this.readState(workId), userId, workId) };
     }
 
     /* ---------------------------------------------------------------------- *
@@ -1262,13 +1262,15 @@ export class AppTargetService {
     private async targetBody(
         row: AppTargetStateRow | null,
         userId: string,
+        workId?: string,
     ): Promise<AppTargetBody> {
         const target = (TARGETS.find((choice) => choice === row?.target) ??
             'none') as AppDeployTarget;
         let eligibility: AppTargetBody['eligibility'] = null;
         if (this.tier?.eligibility) {
             try {
-                const answer = await this.tier.eligibility(userId);
+                // `workId` lets the per-owner cap count the owner's OTHER App Works (lane aw-safety, #2914).
+                const answer = await this.tier.eligibility(userId, { workId: workId ?? null });
                 eligibility = {
                     managed: {
                         eligible: answer?.eligible === true && this.tier.isOpen() === true,
@@ -1296,7 +1298,7 @@ export class AppTargetService {
         };
     }
 
-    private async managedRefusals(userId: string): Promise<AppPrecondition[]> {
+    private async managedRefusals(userId: string, workId?: string): Promise<AppPrecondition[]> {
         const open = (() => {
             try {
                 return this.tier?.isOpen?.() === true;
@@ -1313,7 +1315,8 @@ export class AppTargetService {
             ];
         }
         try {
-            const answer = await this.tier!.eligibility(userId);
+            // Choosing the managed tier is judged like a deploy to it: the cap counts the owner's other App Works.
+            const answer = await this.tier!.eligibility(userId, { workId: workId ?? null });
             if (answer?.eligible !== true) {
                 return [
                     {
