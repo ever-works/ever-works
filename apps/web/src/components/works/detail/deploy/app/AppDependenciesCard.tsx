@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Database, RotateCcw, Trash2 } from 'lucide-react';
+import { Database, RotateCcw, Settings2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     APP_DEPENDENCY_REASON_MESSAGE_LEAVES,
@@ -38,6 +38,23 @@ import {
 import { isAppEnvDependencyKindLeaf } from '@/lib/api/app-env.types';
 import { isAppOwnerRequired } from '@/lib/api/app-runtime.types';
 import { cn } from '@/lib/utils/cn';
+import { AppDependencyConfigureDialog } from './AppDependencyConfigureDialog';
+
+/**
+ * Lane aw-ops (APW-07 T29) — whether **Configure** applies: a dependency the App spec still uses,
+ * not being deleted, that offers something to choose or set (a provider choice, a prompted
+ * setting, or a volume to grow).
+ */
+export function canConfigureAppDependency(entry: AppDependencyEntry): boolean {
+    if (!entry.inSpec || entry.status === 'deleting') return false;
+    const providers = entry.availableProviders ?? [];
+    return (
+        providers.length > 1 ||
+        providers.some((provider) => provider.promptFields.length > 0) ||
+        typeof entry.sizeGiB === 'number' ||
+        entry.awaitingConfig === true
+    );
+}
 
 type CardState =
     | { kind: 'loading' }
@@ -78,6 +95,8 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
         initial ? { kind: 'ready', data: initial } : { kind: 'loading' },
     );
     const [deleting, setDeleting] = useState<AppDependencyEntry | null>(null);
+    // Lane aw-ops (APW-07 T29) — the Configure dialog's dependency.
+    const [configuring, setConfiguring] = useState<AppDependencyEntry | null>(null);
     const [busyKind, setBusyKind] = useState<string | null>(null);
     const inFlight = useRef(false);
 
@@ -217,6 +236,7 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
                             disabled={busyKind !== null}
                             onRetry={() => void retry(entry)}
                             onDeleteData={() => setDeleting(entry)}
+                            onConfigure={() => setConfiguring(entry)}
                         />
                     ))}
                 </ul>
@@ -247,6 +267,21 @@ export function AppDependenciesCard({ work, initial = null }: AppDependenciesCar
                     }}
                 />
             )}
+
+            {configuring && (
+                <AppDependencyConfigureDialog
+                    workId={work.id}
+                    entry={configuring}
+                    kindLabel={kindLabel(configuring.kind)}
+                    onOpenChange={(open) => {
+                        if (!open) setConfiguring(null);
+                    }}
+                    onConfigured={() => {
+                        setConfiguring(null);
+                        void load();
+                    }}
+                />
+            )}
         </section>
     );
 }
@@ -267,6 +302,7 @@ function DependencyRow({
     disabled,
     onRetry,
     onDeleteData,
+    onConfigure,
 }: {
     entry: AppDependencyEntry;
     kindLabel: string;
@@ -279,6 +315,8 @@ function DependencyRow({
     disabled: boolean;
     onRetry: () => void;
     onDeleteData: () => void;
+    /** Lane aw-ops — opens the Configure dialog. */
+    onConfigure?: () => void;
 }) {
     const t = useTranslations('dashboard.workDetail.appDeploy.dependencies');
     const tDeps = useTranslations('dashboard.workDetail.appDependencies');
@@ -344,8 +382,26 @@ function DependencyRow({
                     </p>
                 )}
             </div>
-            {canEdit && (canRetryAppDependency(entry) || canDeleteAppDependencyDataOf(entry)) && (
+            {canEdit &&
+                (canRetryAppDependency(entry) ||
+                    canDeleteAppDependencyDataOf(entry) ||
+                    (onConfigure && canConfigureAppDependency(entry))) && (
                 <div className="flex flex-wrap gap-2">
+                    {onConfigure && canConfigureAppDependency(entry) && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant={entry.awaitingConfig ? 'primary' : 'ghost'}
+                            className="gap-1"
+                            onClick={onConfigure}
+                            disabled={disabled}
+                            data-testid="app-dependency-configure-open"
+                            aria-label={t('configure.aria', { kind: kindLabel })}
+                        >
+                            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            {t('configure.open')}
+                        </Button>
+                    )}
                     {canRetryAppDependency(entry) && (
                         <Button
                             type="button"

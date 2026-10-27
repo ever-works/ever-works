@@ -9563,6 +9563,58 @@
                         "undeclaredName": "The App spec doesn't declare this name.",
                         "specUnavailable": "This app has no usable App spec yet.",
                         "failed": "The value couldn't be saved. Try again."
+                    },
+                    "import": {
+                        "open": "Import .env",
+                        "title": "Import a .env file",
+                        "description": "Paste the contents of a .env file, or pick one. Only names the App spec declares are imported, and generated values are never overwritten. Values are sent once and never shown again.",
+                        "pasteLabel": "Contents",
+                        "fileLabel": "Or pick a file:",
+                        "preview": "Preview changes",
+                        "import": "{count, plural, =0 {Nothing to import} one {Import # change} other {Import # changes}}",
+                        "cancel": "Cancel",
+                        "imported": "{count, plural, =0 {Nothing changed} one {# value imported} other {# values imported}}",
+                        "failed": "Couldn't import: {reason}",
+                        "summary": "{add} new · {replace} replaced · {remove} removed · {refused} refused",
+                        "undeclared": "The App spec doesn't declare {names}. Remove those lines to import the rest.",
+                        "line": "line {line}",
+                        "actions": {
+                            "add": "will be added",
+                            "replace": "will replace the stored value",
+                            "remove": "will remove the stored value",
+                            "skipped": "skipped",
+                            "refused": "refused"
+                        },
+                        "refusals": {
+                            "undeclaredName": "Some lines name values the App spec doesn't declare. Remove them and try again.",
+                            "specUnavailable": "This app has no usable App spec yet.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so values can't be saved.",
+                            "storeUnavailable": "The environment store isn't available right now. Nothing was changed.",
+                            "tooLarge": "This file is larger than 1 MiB.",
+                            "tooMany": "This file has more lines than allowed.",
+                            "forbidden": "You need edit access to this App to import values.",
+                            "invalid": "This isn't a .env file Ever Works can read."
+                        }
+                    },
+                    "rotate": {
+                        "open": "Rotate",
+                        "aria": "Rotate {name}",
+                        "title": "Rotate {name}?",
+                        "description": "Ever Works generates a fresh value. The app uses it from its next Deployment.",
+                        "warning": "Data the app encrypted or signed with the current value may become unreadable, and sessions or tokens made with it stop working. This can't be undone.",
+                        "typeToConfirm": "Type {name} to confirm",
+                        "confirm": "Rotate",
+                        "cancel": "Cancel",
+                        "rotated": "{name} rotated.",
+                        "failed": "Couldn't rotate: {reason}",
+                        "refusals": {
+                            "mismatch": "The name you typed doesn't match.",
+                            "notGenerated": "This value isn't generated, so it can't be rotated.",
+                            "generatorUnavailable": "This value's generator isn't available on this installation.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation.",
+                            "rateLimited": "Too many rotations. Try again later.",
+                            "forbidden": "You need edit access to this App to rotate values."
+                        }
                     }
                 },
                 "dependencies": {
@@ -9596,7 +9648,34 @@
                         "requested": "Deleting the {kind} data.",
                         "failed": "The data couldn't be deleted. {reason}"
                     },
-                    "deleteDataOwnerOnly": "Only the Work owner can delete this data."
+                    "deleteDataOwnerOnly": "Only the Work owner can delete this data.",
+                    "configure": {
+                        "open": "Configure",
+                        "aria": "Configure {kind}",
+                        "title": "Configure {kind}",
+                        "description": "Choose where it runs and give its settings. Secret settings are sent once and never shown again.",
+                        "provider": "Provider",
+                        "size": "Volume size (GiB)",
+                        "sizeHint": "Leave empty to use the default size.",
+                        "sizeGrowOnly": "Currently {size} GiB. A volume can only grow.",
+                        "sizeTooSmall": "The size must be a whole number of at least {size} GiB.",
+                        "required": "required",
+                        "stored": "A value is set.",
+                        "secretStored": "A value is stored. Type a new one to replace it, or leave this empty to keep it.",
+                        "save": "Save and provision",
+                        "cancel": "Cancel",
+                        "saved": "{kind}: settings saved. A new provisioning attempt is scheduled.",
+                        "failed": "Couldn't save: {reason}",
+                        "refusals": {
+                            "providerNotSupported": "That provider can't serve this dependency here.",
+                            "sizeShrink": "A volume can't be made smaller.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so settings can't be saved.",
+                            "notDeclared": "The App spec doesn't declare this dependency.",
+                            "forbidden": "You need edit access to this App to configure dependencies.",
+                            "invalid": "Check the settings and try again.",
+                            "leaseHeld": "This dependency is being provisioned right now. Try again in a moment."
+                        }
+                    }
                 },
                 "ownerRequired": "Only the Work owner can do this.",
                 "ownerConfirmCluster": "Another member saved this cluster connection, so the Work owner has to deploy once to confirm it.",
