@@ -1,3 +1,9 @@
+// The controller is built with doubles below, so its service's module graph is never needed —
+// and loading it reaches the API's NotificationsModule → AuthModule → the ESM-only `better-auth`,
+// which this CJS Jest cannot parse (this spec, added in f2debe925, never loaded). Mocked the way
+// `user-research.listener.spec.ts` mocks it.
+jest.mock('./work-proposals.service', () => ({ WorkProposalsApiService: class {} }));
+
 import { NotFoundException } from '@nestjs/common';
 import { WorkProposalsController } from './work-proposals.controller';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
