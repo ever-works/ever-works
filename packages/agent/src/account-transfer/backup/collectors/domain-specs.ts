@@ -455,6 +455,26 @@ export const BACKUP_DOMAIN_SPECS: readonly BackupDomainSpec[] = Object.freeze([
                 entity: 'WorkAppDependency',
                 scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
             },
+            // APW-09 (R-25, plan §3 preamble) — the upstream pull request records (proposals
+            // and directly-opened pull requests), the Upstream pull requests toggle's
+            // in-flight state, and FR-34's suggestions. Nothing is redacted: no column holds a
+            // credential (the record never stores a token) — the `refusalDetail` text is the
+            // provider's own message with the member's token removed before it is written.
+            {
+                file: 'upstream-pull-requests.jsonl',
+                entity: 'UpstreamPullRequest',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            {
+                file: 'upstream-pr-settings.jsonl',
+                entity: 'WorkUpstreamPrSetting',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
+            {
+                file: 'upstream-pr-suggestions.jsonl',
+                entity: 'UpstreamPrSuggestion',
+                scope: { by: 'parent' as const, column: 'workId', from: 'workIds' },
+            },
         ]),
     },
 

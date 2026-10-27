@@ -12,7 +12,7 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import {
     AppTargetService,
     type AppStatusBody,
@@ -175,6 +175,30 @@ export class WorkAppRuntimeController {
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({ summary: 'Roll an App Work back to an earlier Live Deployment' })
     @ApiParam({ name: 'id', description: 'Work ID' })
+    // Lane B1 (chat and MCP parity): describe the inline body so the generated MCP tool
+    // `rollback_app` has its arguments (it omits `confirmClusterChange`, a person's decision).
+    @ApiBody({
+        schema: {
+            type: 'object',
+            // `deployment_id_required` otherwise.
+            required: ['deploymentId'],
+            properties: {
+                deploymentId: {
+                    type: 'string',
+                    description: 'The earlier Live Deployment to roll back to.',
+                },
+                runPreDeployJobs: {
+                    type: 'boolean',
+                    description: "Run the App spec's pre-deploy jobs again.",
+                },
+                confirmClusterChange: {
+                    type: 'boolean',
+                    description:
+                        'The member accepts that the cluster changed since the last check (owner, signed-in session).',
+                },
+            },
+        },
+    })
     async rollbackApp(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -243,6 +267,36 @@ export class WorkAppRuntimeController {
         summary: 'Pause, resume, remove or cancel the running Deployment of an App Work',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
+    // Lane B1 (chat and MCP parity): describe the inline body so the generated MCP tool
+    // `change_app_lifecycle` has its `action` (it omits `deleteData` / `confirmSlug`).
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['action'],
+            properties: {
+                action: { type: 'string', enum: ['pause', 'resume', 'remove', 'cancel-deploy'] },
+                deleteData: {
+                    type: 'boolean',
+                    description:
+                        "With `remove`: also delete the App's stored data. Needs `confirmSlug`.",
+                },
+                confirmSlug: {
+                    type: 'string',
+                    description: 'The App Work slug, typed by the member, with `deleteData`.',
+                },
+            },
+            // `deleteData: true` (remove only) needs `confirmSlug`; the handler still checks that
+            // it equals the Work's slug (`422` otherwise).
+            oneOf: [
+                { properties: { action: { enum: ['pause', 'resume', 'cancel-deploy'] } } },
+                { properties: { action: { enum: ['remove'] }, deleteData: { enum: [false] } } },
+                {
+                    properties: { action: { enum: ['remove'] }, deleteData: { enum: [true] } },
+                    required: ['deleteData', 'confirmSlug'],
+                },
+            ],
+        },
+    })
     async lifecycleApp(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

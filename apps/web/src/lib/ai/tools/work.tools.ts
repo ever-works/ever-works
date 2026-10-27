@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { tool } from 'ai';
+import { APP_REPOSITORY_MODES, type AppSourceInspectResponse } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 import { workAPI, type Work } from '@/lib/api/work';
 import {
@@ -12,10 +13,11 @@ import {
     fetchWorkGenerationHistory,
     analyzeRepository,
     importWork,
+    inspectAppSourceAction,
 } from '@/app/actions/dashboard/works';
 import { resolveGenerationConfig } from './utils';
 import type { UserConfirmationCheck } from './generated/confirmation';
-import { requireUserConfirmation } from './confirm-gate';
+import { CONFIRMED_FIELD_DESCRIPTION, requireUserConfirmation } from './confirm-gate';
 
 // Work-kind chip vocabulary (mirrors `InitialWorkKind` in
 // works/new/new-work-client.tsx and the server action's aiWorkKindSchema).
@@ -29,23 +31,119 @@ const workKindEnum = z.enum([
     'directory',
     'awesome-repo',
     'repo',
+    // APW-01 T25 — an App Work: a running open-source app built from an existing
+    // GitHub repository (linked, forked or copied). Created behind confirmation.
+    'app',
 ]);
 
 const workKindSchema = workKindEnum.describe(
     'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). ' +
-        '"repo" registers an EXISTING code repository as a Work (needs repositoryUrl; use createWorkManual, never the AI creator). Omit if unclear.',
+        '"repo" registers an EXISTING code repository as a Work (needs repositoryUrl; use createWorkManual, never the AI creator). ' +
+        '"app" creates an App Work — a running app — from an existing GitHub repository: call inspectAppSource first, ' +
+        'then createWorkManual with repositoryUrl, repositoryMode and (for fork / private-copy) targetOwner. Omit if unclear.',
 );
 
 // The AI creator cannot collect a repositoryUrl, so a `repo` Work is not
 // something it can validly ask for — the description used to say so and hope.
 // Excluding it from the schema means a model that tries anyway gets a
-// validation error instead of a Work that fails registration.
+// validation error instead of a Work that fails registration. The same goes
+// for `app` (APW-01 T25): it needs a repository, a mode and the user's
+// confirmation, none of which the AI creator collects.
 const aiWorkKindSchema = workKindEnum
-    .exclude(['repo'])
+    .exclude(['repo', 'app'])
     .describe(
         'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). ' +
-            'To register an EXISTING code repository, use createWorkManual with kind "repo" and a repositoryUrl. Omit if unclear.',
+            'To register an EXISTING code repository, use createWorkManual with kind "repo" and a repositoryUrl; ' +
+            'to run an existing open-source app, use createWorkManual with kind "app". Omit if unclear.',
     );
+
+const repositoryModeSchema = z
+    .enum(APP_REPOSITORY_MODES)
+    .describe(
+        'App Work only (kind "app"): how the repository becomes the App Work’s repository — "link" (use it as is; ' +
+            'needs push access), "fork" (fork it into targetOwner) or "private-copy" (a private copy in targetOwner). ' +
+            'Use a mode inspectAppSource reports as available; its defaultMode when the user did not choose.',
+    );
+
+/**
+ * APW-01 T32 — what the model sees of an inspection: the repository's facts, the modes with their
+ * reasons, the default mode, the owners a fork or copy can go to, the Blueprint and the licence.
+ * No URL is echoed beyond `fullName` (the user pasted it; the provider's other URLs add nothing), and
+ * the Blueprint's prompts are counted, not listed — their answers are set in the Deploy tab.
+ */
+export function summarizeAppSourceInspection(preview: AppSourceInspectResponse) {
+    const { repository, blueprint } = preview;
+    return {
+        repository: {
+            fullName: repository.fullName,
+            description: repository.description,
+            defaultBranch: repository.defaultBranch,
+            stars: repository.stars,
+            visibility: repository.visibility,
+            archived: repository.archived,
+            isFork: repository.isFork,
+            ...(repository.parent ? { parent: repository.parent } : {}),
+        },
+        access: preview.access,
+        modes: preview.modes,
+        defaultMode: preview.defaultMode,
+        targetOwners: preview.targetOwners.map((owner) => ({
+            login: owner.login,
+            type: owner.type,
+            available: owner.available,
+            ...(owner.reason ? { reason: owner.reason } : {}),
+            ...(owner.existingFork ? { existingFork: owner.existingFork.fullName } : {}),
+        })),
+        blueprint: {
+            status: blueprint.status,
+            ...(blueprint.id ? { id: blueprint.id } : {}),
+            ...(blueprint.name ? { name: blueprint.name } : {}),
+            ...(blueprint.version ? { version: blueprint.version } : {}),
+            ...(blueprint.verified !== undefined ? { verified: blueprint.verified } : {}),
+            promptCount: blueprint.prompts?.length ?? 0,
+        },
+        license: preview.license,
+        deployTargets: Object.fromEntries(
+            Object.entries(preview.deployTargets).map(([target, availability]) => [
+                target,
+                {
+                    available: availability.available,
+                    ...(availability.reason ? { reason: availability.reason } : {}),
+                },
+            ]),
+        ),
+        ...(preview.existingAppWork ? { existingAppWork: preview.existingAppWork } : {}),
+        scanIncomplete: preview.scanIncomplete,
+        ...(preview.retryAfter ? { retryAfter: preview.retryAfter } : {}),
+    };
+}
+
+/**
+ * APW-01 T25/T42 — the confirmation card's sentence for an App Work create: which repository is
+ * created (a fork or a private copy, and where) or which one a setup pull request is opened on (a
+ * link), and the Blueprint the server will apply when one matched — so a Blueprint is never applied
+ * unseen.
+ */
+export function describeAppWorkCreate(
+    preview: AppSourceInspectResponse,
+    mode: (typeof APP_REPOSITORY_MODES)[number],
+    targetOwner: string | undefined,
+): string {
+    const source = preview.repository.fullName;
+    const repo = preview.repository.repo;
+    let sentence: string;
+    if (mode === 'link') {
+        sentence = `Create an App Work from ${source} (linked as is; a setup pull request is opened on ${source})`;
+    } else if (mode === 'fork') {
+        sentence = `Create an App Work by forking ${source} into ${targetOwner}/${repo}`;
+    } else {
+        sentence = `Create an App Work as a private copy of ${source} in ${targetOwner}`;
+    }
+    if (preview.blueprint.status === 'matched') {
+        sentence += ` with the ${preview.blueprint.name ?? preview.blueprint.id ?? 'matched'} App Blueprint`;
+    }
+    return `${sentence}.`;
+}
 
 // ────────────────────────────────────────────────────────────────
 // Read
@@ -193,44 +291,252 @@ export const getWorkConfig = tool({
 // Create
 // ────────────────────────────────────────────────────────────────
 
-export const createWorkManual = tool({
+/**
+ * APW-01 T32 — `inspectAppSource`: the create form's "Check repository", read-only. It writes
+ * nothing (no repository, no row, no Activity — FR-5), so it needs no confirmation.
+ */
+export const inspectAppSource = tool({
     description: [
-        'Create a Work manually WITHOUT generating content.',
-        'Just creates the repository structure. User can add items later.',
-        'REQUIRES git provider — call checkGitConnection first.',
+        'Check a GitHub repository before creating an App Work (a running open-source app) from it.',
+        'Read-only — writes nothing.',
+        'Answers which modes are available (link / fork / private-copy) and why not, the default mode,',
+        'the accounts a fork or copy can go to, the matched App Blueprint and the licence.',
+        'Use it for "can I run / self-host / fork github.com/…?" and always before createWorkManual with kind "app".',
     ].join(' '),
     inputSchema: z.object({
-        name: z.string().describe('Work name'),
-        slug: z.string().describe('URL-friendly slug (lowercase, hyphens only)'),
-        description: z.string().optional().describe('Work description'),
-        gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
-        kind: workKindSchema.optional(),
         repositoryUrl: z
             .string()
+            .describe('The https://github.com/<owner>/<repo> URL the user gave'),
+        gitProvider: z
+            .string()
             .optional()
-            .describe(
-                'Repository Work only (kind "repo"): the existing https://github.com/<owner>/<repo> to register as the Work\'s data repository.',
-            ),
+            .describe('Git provider ID from checkGitConnection (optional)'),
     }),
-    execute: async ({ name, slug, description, gitProvider, kind, repositoryUrl }) => {
-        const result = await createWork({
-            name,
-            slug,
-            description: description ?? '',
-            gitProvider,
-            organization: false,
-            kind,
+    execute: async ({ repositoryUrl, gitProvider }) => {
+        const result = await inspectAppSourceAction({
             repositoryUrl,
+            ...(gitProvider ? { gitProvider } : {}),
         });
-        return {
-            success: result.success,
-            workId: result.work?.id,
-            message: result.message,
-            error: result.error,
-            url: result.work ? ROUTES.DASHBOARD_WORK(result.work.id) : undefined,
-        };
+        if (!result.success) {
+            return {
+                success: false,
+                error: result.error,
+                ...(result.code ? { code: result.code } : {}),
+                ...(result.details ? { details: result.details } : {}),
+            };
+        }
+        return { success: true, ...summarizeAppSourceInspection(result.data) };
     },
 });
+
+/**
+ * Build `createWorkManual`.
+ *
+ * Every kind but `app` is created at once, as before. An App Work (APW-01 T25/T42) forks or
+ * copies a repository into the user's account, or opens a setup pull request on theirs, so it is
+ * behind the same confirmation handshake as the generated tools: the tool inspects the repository
+ * first (read-only), refuses a mode the inspection says is unavailable, and returns a card that
+ * names the repository to be created — or the one a setup pull request is opened on — and the App
+ * Blueprint the server will apply. Only a `confirmed: true` call backed by the user's own latest
+ * message (`userConfirmed`) creates it. No `blueprintId` is ever sent: the server picks the
+ * Blueprint from its resolution order, the same one the card named.
+ */
+export function createCreateWorkManualTool(userConfirmed?: UserConfirmationCheck) {
+    return tool({
+        description: [
+            'Create a Work manually WITHOUT generating content.',
+            'Just creates the repository structure. User can add items later.',
+            'REQUIRES git provider — call checkGitConnection first.',
+            'For an App Work (kind "app"): call inspectAppSource first; the call returns a confirmation card —',
+            'call once without `confirmed`, then again with `confirmed: true` only after the user agrees.',
+        ].join(' '),
+        inputSchema: z.object({
+            name: z.string().describe('Work name'),
+            slug: z.string().describe('URL-friendly slug (lowercase, hyphens only)'),
+            description: z.string().optional().describe('Work description'),
+            gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
+            kind: workKindSchema.optional(),
+            repositoryUrl: z
+                .string()
+                .optional()
+                .describe(
+                    'Repository Work (kind "repo"): the existing https://github.com/<owner>/<repo> to register as the Work\'s data repository. ' +
+                        'App Work (kind "app"): the repository the app is built from.',
+                ),
+            repositoryMode: repositoryModeSchema.optional(),
+            targetOwner: z
+                .string()
+                .optional()
+                .describe(
+                    'App Work only, for "fork" / "private-copy": the account (a login from inspectAppSource targetOwners) the repository is created in.',
+                ),
+            confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
+        }),
+        execute: async ({
+            name,
+            slug,
+            description,
+            gitProvider,
+            kind,
+            repositoryUrl,
+            repositoryMode,
+            targetOwner,
+            confirmed,
+        }) => {
+            if (kind === 'app') {
+                return createAppWork(
+                    {
+                        name,
+                        slug,
+                        description,
+                        gitProvider,
+                        repositoryUrl,
+                        repositoryMode,
+                        targetOwner,
+                    },
+                    confirmed,
+                    userConfirmed,
+                );
+            }
+            const result = await createWork({
+                name,
+                slug,
+                description: description ?? '',
+                gitProvider,
+                organization: false,
+                kind,
+                repositoryUrl,
+            });
+            return {
+                success: result.success,
+                workId: result.work?.id,
+                message: result.message,
+                error: result.error,
+                url: result.work ? ROUTES.DASHBOARD_WORK(result.work.id) : undefined,
+            };
+        },
+    });
+}
+
+interface AppWorkCreateInput {
+    name: string;
+    slug: string;
+    description?: string;
+    gitProvider: string;
+    repositoryUrl?: string;
+    repositoryMode?: (typeof APP_REPOSITORY_MODES)[number];
+    targetOwner?: string;
+}
+
+/** The App Work branch of `createWorkManual`: inspect → refuse or card → create once confirmed. */
+async function createAppWork(
+    input: AppWorkCreateInput,
+    confirmed: boolean | undefined,
+    userConfirmed: UserConfirmationCheck | undefined,
+) {
+    const repositoryUrl = input.repositoryUrl?.trim();
+    if (!repositoryUrl || !input.repositoryMode) {
+        return {
+            success: false,
+            error:
+                'An App Work needs repositoryUrl and repositoryMode. Call inspectAppSource with the repository first ' +
+                'and use one of the modes it reports as available.',
+        };
+    }
+    const mode = input.repositoryMode;
+    const targetOwner = mode === 'link' ? undefined : input.targetOwner?.trim() || undefined;
+
+    const inspection = await inspectAppSourceAction({
+        repositoryUrl,
+        gitProvider: input.gitProvider,
+    });
+    if (!inspection.success) {
+        return {
+            success: false,
+            error: inspection.error,
+            ...(inspection.code ? { code: inspection.code } : {}),
+            ...(inspection.details ? { details: inspection.details } : {}),
+        };
+    }
+    const preview = inspection.data;
+    const availability = preview.modes[mode];
+    if (!availability?.available) {
+        return {
+            success: false,
+            error: `The "${mode}" mode is not available for ${preview.repository.fullName}.`,
+            ...(availability?.reason ? { code: availability.reason } : {}),
+            modes: preview.modes,
+            defaultMode: preview.defaultMode,
+        };
+    }
+    if (mode !== 'link') {
+        const owner = targetOwner
+            ? preview.targetOwners.find((candidate) => candidate.login === targetOwner)
+            : undefined;
+        if (!owner?.available) {
+            return {
+                success: false,
+                error: targetOwner
+                    ? `${targetOwner} cannot receive the ${mode} of ${preview.repository.fullName}.`
+                    : `A ${mode} needs targetOwner: one of the available accounts inspectAppSource lists.`,
+                ...(owner?.reason ? { code: owner.reason } : {}),
+                targetOwners: preview.targetOwners
+                    .filter((candidate) => candidate.available)
+                    .map((candidate) => candidate.login),
+            };
+        }
+    }
+
+    // The card binds to exactly these arguments (everything the model passed but `confirmed`).
+    const cardArgs: Record<string, unknown> = {
+        name: input.name,
+        slug: input.slug,
+        gitProvider: input.gitProvider,
+        kind: 'app',
+        repositoryUrl,
+        repositoryMode: mode,
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(targetOwner ? { targetOwner } : {}),
+    };
+    const card = requireUserConfirmation({
+        toolName: 'createWorkManual',
+        action: describeAppWorkCreate(preview, mode, targetOwner),
+        target: preview.repository.fullName,
+        args: cardArgs,
+        confirmed,
+        userConfirmed,
+    });
+    if (card) return card;
+
+    const description =
+        input.description?.trim() ||
+        preview.repository.description?.trim() ||
+        preview.repository.fullName;
+    const result = await createWork({
+        name: input.name,
+        slug: input.slug,
+        description,
+        gitProvider: input.gitProvider,
+        organization: false,
+        kind: 'app',
+        repositoryUrl: preview.repository.url,
+        repositoryMode: mode,
+        ...(targetOwner ? { targetOwner } : {}),
+    });
+    return {
+        success: result.success,
+        workId: result.work?.id,
+        message: result.message,
+        error: result.error,
+        ...(result.code ? { code: result.code } : {}),
+        ...(result.alreadyExisted ? { alreadyExisted: true } : {}),
+        ...(result.appSource ? { appSource: result.appSource } : {}),
+        url: result.work ? ROUTES.DASHBOARD_WORK(result.work.id) : undefined,
+    };
+}
+
+/** Legacy flag-only instance (no user-turn check) — kept for existing imports. */
+export const createWorkManual = createCreateWorkManualTool();
 
 export const createWorkWithAITool = tool({
     description: [
