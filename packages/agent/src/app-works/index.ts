@@ -143,6 +143,10 @@ export {
     type AppChangeVerdict,
 } from './app-change-guard';
 
+// APW-04 T10/T57 — what an App provisioning run may write (FR-28/FR-29/FR-30), enforced
+// by the guard above and by the agent git tools before they write.
+export * from './app-provisioning-output.guard';
+
 // APW-08 T17 — the change gate `TasksDomainModule` binds to `APP_WORK_CHANGE_GATE`.
 export { AppWorkChangeGateService } from './app-work-change-gate.service';
 

@@ -14,6 +14,8 @@ import { resolveTaskRepository } from '../tasks-domain/task-repository';
 import { TasksService } from '../tasks-domain/tasks.service';
 import { AWAITING_OWNER_LABEL } from '../tasks-domain/awaiting-owner';
 import { AppSpecService, isUsableAppSpecStatus } from '../app-spec/app-spec.service';
+import { AGENT_RUN_CANCELLER, type AgentRunCanceller } from '../agents/agent-run-canceller';
+import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { getOptionalProvider } from '../utils/optional-provider.util';
 import { fenceUntrusted } from '../utils/untrusted-content';
 import { validateAppSpecDocument } from '../works-config/schema/app-spec.validate';
@@ -99,6 +101,13 @@ export interface AppProvisioningStartInput {
     /** The feedback loop's iteration number, carried onto the new Task as a label. */
     readonly attempt?: number;
     /**
+     * APW-04 T36/T40 — the upstream range an automatic re-provision reacts to (the
+     * sync that broke the smoke tests). `upstreamToSha` is what "at most one per sync
+     * commit" counts; both are carried into the brief through `note`.
+     */
+    readonly upstreamFromSha?: string | null;
+    readonly upstreamToSha?: string | null;
+    /**
      * Works-security (2026-10-18) — the caller is PLATFORM code reacting to an
      * event (the initializer's hand-off, an upstream smoke failure, a failed
      * build of a merged spec), not a person. A start with no `userId` is no
@@ -139,6 +148,50 @@ export interface AppProvisioningInspection {
     readonly draftIssues: ReadonlyArray<{ code: string; path: string; message: string }>;
     /** Text of the files read, keyed by path (capped), for the AI path's context. */
     readonly files: Readonly<Record<string, string>>;
+}
+
+/**
+ * APW-04 T40 (FR-54) — the automatic re-provision limits: at most
+ * {@link APP_REPROVISION_MAX_PER_COMMIT} per upstream sync commit and
+ * {@link APP_REPROVISION_MAX_PER_WINDOW} per rolling {@link APP_REPROVISION_WINDOW_MS}.
+ * They count automatic re-provision Tasks only — the creation hand-off
+ * (`auto-create`) and every start a person made are never limited.
+ */
+export const APP_REPROVISION_MAX_PER_COMMIT = 1;
+export const APP_REPROVISION_MAX_PER_WINDOW = 2;
+export const APP_REPROVISION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * How many recent provisioning Tasks the limits read — far more than the limits
+ * themselves, so a burst of manual starts cannot push an automatic one out of view.
+ */
+const REPROVISION_HISTORY_ROWS = 50;
+
+/** Triggers that are an automatic RE-provision (the limits apply to these, never to `auto-create`). */
+const AUTO_REPROVISION_TRIGGERS: ReadonlySet<AppProvisioningTrigger> =
+    new Set<AppProvisioningTrigger>(['smoke-failed', 'target-updated']);
+
+/** The run statuses a cancel stops (the goal orchestrator's set). */
+const LIVE_RUN_STATUSES: readonly string[] = ['queued', 'running'];
+
+/** What {@link AppProvisioningService.cancel} answers — the route sets `httpStatus` verbatim. */
+export interface AppProvisioningCancelResult {
+    readonly status: 'cancelled' | 'refused';
+    readonly httpStatus: number;
+    readonly code?:
+        | 'workNotFound'
+        | 'notAppWork'
+        | 'nothingToCancel'
+        | 'cancelRefused'
+        | 'dependenciesUnavailable';
+    readonly message?: string;
+    /** The provisioning Task that is (now) cancelled. */
+    readonly taskId: string | null;
+    readonly taskSlug?: string | null;
+    /** `true` ⇔ nothing was open and the latest provisioning Task was already cancelled (idempotent repeat). */
+    readonly alreadyCancelled: boolean;
+    /** The live runs of the Task this call stopped. */
+    readonly cancelledRunIds: readonly string[];
 }
 
 /** Statuses that mean a provisioning Task is still open. */
@@ -323,6 +376,23 @@ export class AppProvisioningService implements AppProvisioningCapability {
         const holdAutomatic = automatic && !automaticAllowed;
         const holdMember = !automatic && !ownerAsked;
 
+        // ── APW-04 T40 — the automatic re-provision limits ────────────────────
+        // Counted before anything is inspected, spent or filed: a limited start
+        // writes nothing. Held starts count too — each one files a Task the owner
+        // is told about, and an upstream that keeps breaking the smoke tests must
+        // not fill their board.
+        const autoReprovision = automatic && AUTO_REPROVISION_TRIGGERS.has(input.trigger);
+        const upstreamToSha = shaOf(input.upstreamToSha);
+        if (autoReprovision) {
+            const limited = await this.autoReprovisionLimit(work, upstreamToSha);
+            if (limited) {
+                this.logger.log(
+                    `App provisioning: automatic re-provision of work ${work.id} (${input.trigger}) not started — ${limited}.`,
+                );
+                return { started: false, reason: limited };
+            }
+        }
+
         const inspection = await this.inspect(work);
 
         // ── the Agent ─────────────────────────────────────────────────────────
@@ -368,6 +438,8 @@ export class AppProvisioningService implements AppProvisioningCapability {
                     draftValid,
                     draftOrigin,
                     pullRequestUrl,
+                    // APW-04 T40 — the per-commit limit reads this line back.
+                    ...(autoReprovision && upstreamToSha ? { upstreamToSha } : {}),
                 }),
                 labels: [
                     PROVISION_LABEL,
@@ -461,6 +533,203 @@ export class AppProvisioningService implements AppProvisioningCapability {
             return read.spec as unknown as Record<string, unknown>;
         } catch {
             return null;
+        }
+    }
+
+    /**
+     * APW-04 T40 — why an automatic re-provision may not start, or `null` when it may.
+     *
+     * Reads this Work's recent provisioning Tasks and counts only those whose
+     * server-written origin is `app-provisioning` and whose brief (written by
+     * {@link provisionBrief}, never by the member) names an automatic re-provision
+     * trigger — and, for the per-commit limit, the same upstream sync commit.
+     * History that cannot be read is a refusal, never an unlimited start; a context
+     * with no Task repository at all (a lean CLI or unit construction) is not
+     * limited, as {@link openProvisionTask} is not.
+     */
+    private async autoReprovisionLimit(
+        work: Work,
+        upstreamToSha: string | null,
+    ): Promise<string | null> {
+        if (!this.taskRepository) return null;
+        try {
+            const { rows } = await this.taskRepository.findByUserIdFiltered(
+                work.userId,
+                { workId: work.id, label: PROVISION_LABEL, limit: REPROVISION_HISTORY_ROWS },
+                ownershipScopeOf(work),
+            );
+            const automatic = (rows ?? []).filter(
+                (task) =>
+                    task.origin === TASK_ORIGIN_APP_PROVISIONING &&
+                    (task.workId ?? work.id) === work.id &&
+                    isAutoReprovisionBrief(task.description),
+            );
+            if (
+                upstreamToSha &&
+                automatic.filter((task) => briefUpstreamCommit(task.description) === upstreamToSha)
+                    .length >= APP_REPROVISION_MAX_PER_COMMIT
+            ) {
+                return 'reprovisionLimitPerCommit';
+            }
+            const since = Date.now() - APP_REPROVISION_WINDOW_MS;
+            const inWindow = automatic.filter((task) => {
+                const at = task.createdAt ? new Date(task.createdAt).getTime() : Number.NaN;
+                // A row whose time cannot be read counts: the limit errs towards fewer runs.
+                return !Number.isFinite(at) || at >= since;
+            });
+            return inWindow.length >= APP_REPROVISION_MAX_PER_WINDOW
+                ? 'reprovisionLimitPerWeek'
+                : null;
+        } catch (error) {
+            this.logger.warn(
+                `App provisioning: the re-provision history of work ${work.id} could not be read (${errorText(error)}); the automatic start is refused.`,
+            );
+            return 'reprovisionLimitUnknown';
+        }
+    }
+
+    /**
+     * `POST /api/works/:id/provision/cancel` (APW-04, plan §4) — stop the open
+     * provisioning Task: its live runs are cancelled the way `POST
+     * /api/agents/:id/runs/:runId/cancel` cancels one (the repository CAS first,
+     * then the remote job), and the Task moves to `cancelled` through the Task
+     * state machine (history row, notifications, dependents unblocked).
+     *
+     * Idempotent: with nothing open and the latest provisioning Task already
+     * `cancelled`, it answers that Task again with `alreadyCancelled: true`. The
+     * caller has already been authorised for EDIT access; the Task is moved as its
+     * owner (the Work owner, who filed it), exactly as `start` files it.
+     */
+    async cancel(input: { workId: string; userId: string }): Promise<AppProvisioningCancelResult> {
+        if (!this.works || !this.tasks || !this.taskRepository) {
+            return cancelRefusal(
+                422,
+                'dependenciesUnavailable',
+                'Provisioning cannot be cancelled on this install.',
+            );
+        }
+        const work = await this.works.findById(input.workId);
+        if (!work) return cancelRefusal(404, 'workNotFound', `Work ${input.workId} not found.`);
+        if (!isAppWorkKind(work.kind)) {
+            return cancelRefusal(422, 'notAppWork', `Work ${input.workId} is not an App Work.`);
+        }
+        const scope = ownershipScopeOf(work);
+
+        const open = await this.openProvisionTask(work);
+        if (!open) {
+            const latest = await this.latestProvisionTask(work);
+            if (latest && String(latest.status) === TaskStatus.CANCELLED) {
+                return {
+                    status: 'cancelled',
+                    httpStatus: 202,
+                    taskId: latest.id,
+                    taskSlug: latest.slug ?? null,
+                    alreadyCancelled: true,
+                    cancelledRunIds: [],
+                };
+            }
+            return cancelRefusal(
+                409,
+                'nothingToCancel',
+                'No provisioning is running for this App Work.',
+            );
+        }
+
+        const cancelledRunIds = await this.cancelLiveRuns(work, open);
+        try {
+            await this.tasks.transition(work.userId, open.id, TaskStatus.CANCELLED, {}, scope);
+        } catch (error) {
+            return {
+                ...cancelRefusal(
+                    409,
+                    'cancelRefused',
+                    `The provisioning Task could not be cancelled: ${errorText(error)}`,
+                ),
+                taskId: open.id,
+                taskSlug: open.slug ?? null,
+                cancelledRunIds,
+            };
+        }
+        this.logger.log(
+            `App provisioning for work ${work.id} cancelled by user ${input.userId}: Task ${open.id}` +
+                `${cancelledRunIds.length ? `, runs ${cancelledRunIds.join(', ')}` : ''}.`,
+        );
+        return {
+            status: 'cancelled',
+            httpStatus: 202,
+            taskId: open.id,
+            taskSlug: open.slug ?? null,
+            alreadyCancelled: false,
+            cancelledRunIds,
+        };
+    }
+
+    /** The newest provisioning Task of the Work, any status. */
+    private async latestProvisionTask(work: Work): Promise<Task | null> {
+        if (!this.taskRepository) return null;
+        try {
+            const { rows } = await this.taskRepository.findByUserIdFiltered(
+                work.userId,
+                { workId: work.id, label: PROVISION_LABEL, limit: 1 },
+                ownershipScopeOf(work),
+            );
+            return rows[0] ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Cancel the Task's live runs — the agents controller's three halves: the
+     * repository CAS (authoritative), then the remote job through
+     * `AGENT_RUN_CANCELLER`. Best-effort per run: a run that cannot be stopped
+     * here still finds its Task cancelled. Both collaborators are resolved lazily
+     * (`moduleRef`, non-strict).
+     */
+    private async cancelLiveRuns(work: Work, task: Task): Promise<string[]> {
+        // Resolved per call, never injected: this module's graph (and the App Works
+        // DI-reachability pins) gain nothing, and an install without the agents module
+        // still cancels the Task.
+        const runs = this.lazy<AgentRunRepository>(AgentRunRepository);
+        if (!runs || typeof runs.findRecentForTask !== 'function') return [];
+        const canceller = this.lazy<AgentRunCanceller>(AGENT_RUN_CANCELLER);
+        const cancelled: string[] = [];
+        let recent: Awaited<ReturnType<AgentRunRepository['findRecentForTask']>> = [];
+        try {
+            recent = await runs.findRecentForTask(task.id, 10);
+        } catch (error) {
+            this.logger.warn(
+                `App provisioning: the runs of Task ${task.id} could not be read (${errorText(error)}).`,
+            );
+            return [];
+        }
+        for (const run of recent) {
+            if (!LIVE_RUN_STATUSES.includes(String(run.status))) continue;
+            try {
+                const result = await runs.cancel(run.id, work.userId, ownershipScopeOf(work));
+                const wasLive =
+                    result.found && LIVE_RUN_STATUSES.includes(String(result.previousStatus));
+                if (!wasLive) continue;
+                cancelled.push(run.id);
+                if (result.triggerRunId && canceller) {
+                    await canceller.cancel(result.triggerRunId).catch(() => 'failed');
+                }
+            } catch (error) {
+                this.logger.warn(
+                    `App provisioning: run ${run.id} of Task ${task.id} could not be cancelled (${errorText(error)}).`,
+                );
+            }
+        }
+        return cancelled;
+    }
+
+    /** A provider from anywhere in the graph, or `undefined` (never a throw). */
+    private lazy<T>(token: unknown): T | undefined {
+        if (!this.moduleRef) return undefined;
+        try {
+            return getOptionalProvider<T>(this.moduleRef, token as never);
+        } catch {
+            return undefined;
         }
     }
 
@@ -781,6 +1050,9 @@ export class AppProvisionEventsService implements AppForkProvisionEventsPort {
             workId,
             trigger: 'smoke-failed',
             systemTrigger: true,
+            // APW-04 T40 — "at most one automatic re-provision per sync commit" counts this.
+            upstreamFromSha: fromSha,
+            upstreamToSha: toSha,
             note: `The smoke tests failed after the upstream sync ${fromSha ?? '(unknown)'}..${toSha}. Find what changed upstream and update the App spec (or explain what source change is needed).`,
         });
     }
@@ -796,6 +1068,52 @@ export class AppProvisionEventsService implements AppForkProvisionEventsPort {
 /* -------------------------------------------------------------------------- *
  * Pure helpers
  * -------------------------------------------------------------------------- */
+
+/** The brief line the per-commit limit reads back (APW-04 T40). */
+const REPROVISION_UPSTREAM_COMMIT_LINE = 'Upstream sync commit: ';
+
+/** Does a provisioning brief name an automatic re-provision trigger? */
+function isAutoReprovisionBrief(description: string | null | undefined): boolean {
+    if (typeof description !== 'string') return false;
+    for (const trigger of AUTO_REPROVISION_TRIGGERS) {
+        if (description.includes(`Trigger: \`${trigger}\`.`)) return true;
+    }
+    return false;
+}
+
+/** The upstream sync commit a provisioning brief names, or `null`. */
+function briefUpstreamCommit(description: string | null | undefined): string | null {
+    if (typeof description !== 'string') return null;
+    const at = description.indexOf(REPROVISION_UPSTREAM_COMMIT_LINE);
+    if (at < 0) return null;
+    const match = /^`([0-9a-f]{7,64})`/.exec(
+        description.slice(at + REPROVISION_UPSTREAM_COMMIT_LINE.length),
+    );
+    return match ? match[1] : null;
+}
+
+/** A commit sha as the brief records it: hex only, lower-case, or `null`. */
+function shaOf(value: string | null | undefined): string | null {
+    const text = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return /^[0-9a-f]{7,64}$/.test(text) ? text : null;
+}
+
+/** A refused cancel, in the shape the route sets verbatim. */
+function cancelRefusal(
+    httpStatus: number,
+    code: NonNullable<AppProvisioningCancelResult['code']>,
+    message: string,
+): AppProvisioningCancelResult {
+    return {
+        status: 'refused',
+        httpStatus,
+        code,
+        message,
+        taskId: null,
+        alreadyCancelled: false,
+        cancelledRunIds: [],
+    };
+}
 
 const AI_SYSTEM_PROMPT = [
     'You write Ever Works App specs: a `.works/works.yml` with `version: 2`, `kind: app`, `name`, and a `spec` block',
@@ -887,6 +1205,8 @@ export function provisionBrief(input: {
     draftValid: boolean;
     draftOrigin: 'detection' | 'ai';
     pullRequestUrl: string | null;
+    /** APW-04 T40 — the upstream sync commit an automatic re-provision reacts to. */
+    upstreamToSha?: string | null;
 }): string {
     const { inspection } = input;
     const repo = inspection.repository
@@ -897,6 +1217,9 @@ export function provisionBrief(input: {
         '',
         `Trigger: \`${input.trigger}\`.`,
         '',
+        ...(input.upstreamToSha
+            ? [`${REPROVISION_UPSTREAM_COMMIT_LINE}\`${input.upstreamToSha}\`.`, '']
+            : []),
         ...fencedProvisionNote(input.note),
         '## What the platform detected',
         '',
