@@ -1096,3 +1096,7 @@ A computer can also keep **sessions** — a shell, Claude Code or Codex in a fol
 See also [Checkouts on computers](./fleet-checkouts.md) — every git clone and worktree on your computers.
 
 See also [Files on computers](./fleet-files.md) — browse the folders a computer shares, download, upload and delete through its link.
+
+## Desktop view & control
+
+A computer's **Desktop** tab shows its whole desktop live, lets someone take control of its mouse and keyboard when its owner allows it on the machine, and keeps recordings to re-watch — through a native screen helper the owner approves on the machine. Off by default (`FLEET_DESKTOP_ENABLED`). See [Desktop view & control](./fleet-desktop.md).

@@ -38,6 +38,10 @@ import { getOptionalProvider } from '@ever-works/agent/utils';
  * the tier, and — behind `EVER_WORKS_APPS_MANAGED_REQUIRE_PAID_PLAN` (default off) — a paid plan.
  * Before this, an open tier answered "eligible" for every account and the cap had no caller.
  *
+ * Owner decision 2026-10-27: that cap binds an owner on an UNPAID plan only; a paid owner is held
+ * to `EVER_WORKS_APPS_MAX_PER_PAID_USER` (unset = no limit). The plan comes from the same lazy
+ * `APPS_TIER_PLAN_READER` below, and a plan that cannot be read keeps the unpaid cap.
+ *
  * The service is provided and exported HERE (global), so `AppDeployRequestModule`'s own policy
  * binding and `TriggerInternalController`'s `AppsTierEligibilityService` remote target (the worker's
  * re-check) reach the one instance. The plan read is lazy (`SubscriptionService` through
