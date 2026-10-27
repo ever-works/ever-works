@@ -1543,7 +1543,13 @@ const ACTIONS_RUNNERS_EXPORTS = [
 	'diagnoseFleetActionsJob',
 	'isFleetActionsJobUnassignable',
 	'normalizeFleetActionsWatchedTargets',
-	'fleetActionsJobItemId'
+	'fleetActionsJobItemId',
+	// P3 (Docker-isolated runners, versions).
+	'FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY',
+	'FLEET_ACTIONS_RUNNER_DOWNLOADS_CACHE_MS',
+	'compareFleetActionsRunnerVersions',
+	'fleetActionsRunnerUpdateAvailable',
+	'FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL'
 ] as const;
 
 /** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
@@ -2228,7 +2234,9 @@ const FUNCTION_EXPORTS = [
 	'diagnoseFleetActionsJob',
 	'isFleetActionsJobUnassignable',
 	'normalizeFleetActionsWatchedTargets',
-	'fleetActionsJobItemId'
+	'fleetActionsJobItemId',
+	'compareFleetActionsRunnerVersions',
+	'fleetActionsRunnerUpdateAvailable'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -2348,7 +2356,8 @@ describe('fleet barrel', () => {
 		// → +4 with FL-17 P3 (site tag, reconcile requester), same module (`CLOUD_P3_EXPORTS`).
 		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
 		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70);
+		// → +5 with FL-18 P3 (Docker-isolated runners, versions): same module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 5);
 	});
 
 	it.each([

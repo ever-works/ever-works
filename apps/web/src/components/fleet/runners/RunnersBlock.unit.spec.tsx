@@ -274,4 +274,24 @@ describe('RunnersBlock', () => {
         expect(screen.queryByTestId('fleet-runners-install')).toBeNull();
         expect(options).not.toHaveBeenCalled();
     });
+
+    it('notes a newer runner build and names the container mode (P3)', async () => {
+        list.mockResolvedValue({
+            ok: true,
+            data: view({
+                runners: [
+                    runner({
+                        mode: 'docker',
+                        runnerVersion: '2.321.0',
+                        updateAvailable: '2.322.0',
+                    }),
+                ],
+            }),
+        });
+        render(<RunnersBlock nodes={[node()]} flags={{}} />);
+        expect(await screen.findByTestId('fleet-runner-update')).toHaveTextContent(
+            'Update available: 2.322.0',
+        );
+        expect(screen.getByTestId('fleet-runner-row')).toHaveTextContent('container-isolated');
+    });
 });
