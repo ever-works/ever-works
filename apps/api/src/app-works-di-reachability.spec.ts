@@ -244,6 +244,11 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         source: 'apps/api/src/app-launcher/platform-catalog.service.ts:127-132',
     },
     {
+        key: 'AppWorksModule[agent] | AppProvisioningService | AppSpecService',
+        reason: "The agent module deliberately does not import AppSpecModule (see the AppSourceInitializerService row); the service reads the effective spec through its own non-strict ModuleRef fallback, which finds the API's AppSpecService. Red on develop since 7fa3daadc (the opt-in read was added without a row); placed 2026-10-26 by lane aw-safety.",
+        source: 'packages/agent/src/app-works/app-provisioning.service.ts:451-457 (effectiveSpecOf: `this.specs ?? getOptionalProvider(this.moduleRef, AppSpecService)`)',
+    },
+    {
         key: 'AppWorksModule[agent] | AppSourceInitializerService | AppSpecService',
         reason: "The agent module's COPY, which deliberately imports neither AppSpecModule nor WorkModule; the wired copy is the API module's.",
         source: 'apps/api/src/app-works/app-works.module.ts:138-144 (APW-01 T15)',
