@@ -36,7 +36,28 @@ import { PostHogProvider as PHProvider } from 'posthog-js/react';
  * silently no-ops — this is fail-open by design for OSS forks that
  * don't run PostHog.
  */
-if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+/**
+ * Pages that must run without analytics: the self-serve account deletion
+ * request form and its email-link confirm page (the link's token sits in the
+ * URL fragment until the page strips it). PostHog is never started on a
+ * full load of these paths and records no pageview for them; the app links
+ * to them with plain `<a href>` (a full load), so an earlier SPA session
+ * does not carry over either.
+ */
+export const ANALYTICS_EXCLUDED_PATH_PREFIXES = ['/delete-account'] as const;
+
+export function isAnalyticsExcludedPath(pathname: string | null | undefined): boolean {
+    if (!pathname) return false;
+    return ANALYTICS_EXCLUDED_PATH_PREFIXES.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
+}
+
+if (
+    typeof window !== 'undefined' &&
+    process.env.NEXT_PUBLIC_POSTHOG_KEY &&
+    !isAnalyticsExcludedPath(window.location.pathname)
+) {
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
         api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com',
         // We capture $pageview manually below so SPA route changes count.
@@ -86,6 +107,7 @@ export function PostHogPageview() {
     useEffect(() => {
         if (!process.env.NEXT_PUBLIC_POSTHOG_KEY) return;
         if (!pathname) return;
+        if (isAnalyticsExcludedPath(pathname)) return;
 
         let url = window.origin + pathname;
         const qs = searchParams?.toString();

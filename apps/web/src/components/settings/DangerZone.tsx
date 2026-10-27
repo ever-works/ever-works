@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
-import { deleteAccount } from '@/app/actions/settings';
+import { deleteMyAccount, getMyAccountDeletionPreview } from '@/app/actions/account-deletion';
 import { toast } from 'sonner';
-import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
+import type { AccountDeletionPreview } from '@/lib/api/account-deletion';
+import { AccountDeletionSummary } from './AccountDeletionSummary';
 
 interface DangerZoneProps {
     user: {
@@ -16,25 +17,42 @@ interface DangerZoneProps {
 }
 
 export function DangerZone({ user }: DangerZoneProps) {
-    const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [confirmEmail, setConfirmEmail] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [preview, setPreview] = useState<AccountDeletionPreview | null>(null);
+    const [previewError, setPreviewError] = useState('');
     const t = useTranslations('dashboard.dangerZone');
+    // Case-insensitive, like the server check.
+    const emailMatches = confirmEmail.trim().toLowerCase() === user.email.trim().toLowerCase();
+
+    const openDeleteConfirm = () => {
+        setShowDeleteConfirm(true);
+        setPreviewError('');
+        void getMyAccountDeletionPreview().then((result) => {
+            if (result.success) {
+                setPreview(result.data);
+            } else {
+                setPreviewError(result.error);
+            }
+        });
+    };
 
     const handleDeleteAccount = () => {
-        if (confirmEmail !== user.email) {
+        if (!emailMatches) {
             toast.error(t('messages.confirmEmail'));
             return;
         }
 
         startTransition(async () => {
             try {
-                const result = await deleteAccount();
+                const result = await deleteMyAccount(confirmEmail.trim());
 
                 if (result.success) {
                     toast.success(t('messages.deleteSuccess'));
-                    router.push(ROUTES.AUTH_REGISTER);
+                    // A full page load: the session cookie is gone, and the
+                    // signed-in shell must not keep rendering from memory.
+                    window.location.assign(`${ROUTES.AUTH_LOGIN}?accountDeleted=1`);
                 } else {
                     toast.error(result.error || t('messages.deleteFailed'));
                 }
@@ -96,7 +114,8 @@ export function DangerZone({ user }: DangerZoneProps) {
 
                         {!showDeleteConfirm ? (
                             <button
-                                onClick={() => setShowDeleteConfirm(true)}
+                                onClick={openDeleteConfirm}
+                                data-testid="danger-zone-delete-open"
                                 className={cn(
                                     'shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors',
                                     'bg-danger/10 dark:bg-danger/15 text-danger border border-danger/20',
@@ -107,18 +126,23 @@ export function DangerZone({ user }: DangerZoneProps) {
                             </button>
                         ) : (
                             <div className="w-full space-y-4 pt-1">
-                                <div className="p-3.5 rounded-lg bg-danger/5 dark:bg-danger/8 border border-danger/15">
-                                    <p className="text-xs font-semibold text-danger mb-2">
-                                        {t('delete.confirmTitle')}
-                                    </p>
-                                    <ul className="text-xs text-text-muted dark:text-text-muted-dark space-y-1 pl-4 list-disc">
-                                        <li>{t('delete.confirmItems.0')}</li>
-                                        <li>{t('delete.confirmItems.1')}</li>
-                                        <li>{t('delete.confirmItems.2')}</li>
-                                        <li>{t('delete.confirmItems.3')}</li>
-                                        <li>{t('delete.confirmItems.4')}</li>
-                                    </ul>
-                                </div>
+                                {preview ? (
+                                    <AccountDeletionSummary preview={preview} />
+                                ) : (
+                                    <div className="p-3.5 rounded-lg bg-danger/5 dark:bg-danger/8 border border-danger/15">
+                                        <p className="text-xs font-semibold text-danger mb-2">
+                                            {t('delete.confirmTitle')}
+                                        </p>
+                                        <ul className="text-xs text-text-muted dark:text-text-muted-dark space-y-1 pl-4 list-disc">
+                                            <li>{t('delete.confirmItems.0')}</li>
+                                            <li>{t('delete.confirmItems.1')}</li>
+                                            <li>{t('delete.confirmItems.2')}</li>
+                                            <li>{t('delete.confirmItems.3')}</li>
+                                            <li>{t('delete.confirmItems.4')}</li>
+                                        </ul>
+                                        {previewError && <p className="text-xs text-danger mt-2">{previewError}</p>}
+                                    </div>
+                                )}
 
                                 <div>
                                     <label className="block text-xs font-medium text-text dark:text-text-dark mb-1.5">
@@ -128,6 +152,7 @@ export function DangerZone({ user }: DangerZoneProps) {
                                         type="email"
                                         value={confirmEmail}
                                         onChange={(e) => setConfirmEmail(e.target.value)}
+                                        data-testid="danger-zone-delete-email"
                                         className={cn(
                                             'w-full px-3 py-2 rounded-lg text-xs',
                                             'bg-surface dark:bg-surface-dark',
@@ -143,11 +168,12 @@ export function DangerZone({ user }: DangerZoneProps) {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handleDeleteAccount}
-                                        disabled={isPending || confirmEmail !== user.email}
+                                        disabled={isPending || !emailMatches}
+                                        data-testid="danger-zone-delete-confirm"
                                         className={cn(
                                             'px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors',
                                             'bg-danger text-white',
-                                            confirmEmail === user.email
+                                            emailMatches
                                                 ? 'hover:bg-danger/90'
                                                 : 'opacity-40 cursor-not-allowed',
                                         )}
@@ -173,6 +199,16 @@ export function DangerZone({ user }: DangerZoneProps) {
                                         {t('delete.cancel')}
                                     </button>
                                 </div>
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('delete.emailLinkHint')}{' '}
+                                    {/* Full page load: the public pages run without analytics. */}
+                                    <a
+                                        href={ROUTES.DELETE_ACCOUNT}
+                                        className="text-primary hover:text-primary-hover font-medium"
+                                    >
+                                        {t('delete.emailLinkAction')}
+                                    </a>
+                                </p>
                             </div>
                         )}
                     </div>

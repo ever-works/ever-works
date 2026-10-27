@@ -124,6 +124,22 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
     return response;
 }
 
+/**
+ * Self-serve account deletion pages (`/delete-account`, `/delete-account/confirm`).
+ * Never cached anywhere, and they send no `Referer` (the page metadata also
+ * sets `<meta name="referrer" content="no-referrer">`). The confirm page's
+ * token travels in the URL fragment, which never reaches this function.
+ */
+function isAccountDeletionPage(pathname: string): boolean {
+    return pathname === ROUTES.DELETE_ACCOUNT || pathname.startsWith(`${ROUTES.DELETE_ACCOUNT}/`);
+}
+
+function applyAccountDeletionHeaders(response: NextResponse): NextResponse {
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    return response;
+}
+
 function isPublicRoute(pathname: string): boolean {
     return PUBLIC_ROUTES.some((route) => {
         const matcher = match(route);
@@ -275,7 +291,8 @@ export default async function proxy(req: NextRequest) {
 
     // 3) Public routes need no auth check.
     if (isPublicRoute(pathname)) {
-        return applySecurityHeaders(intlResponse);
+        const response = applySecurityHeaders(intlResponse);
+        return isAccountDeletionPage(pathname) ? applyAccountDeletionHeaders(response) : response;
     }
 
     // 4) Static assets and API routes pass through. `isStaticAssetPath`

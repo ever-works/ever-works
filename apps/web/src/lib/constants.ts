@@ -430,6 +430,13 @@ export const ROUTES = {
     // Public (the token is the proof); the page confirms only on a click, so
     // a mail scanner that prefetches the link confirms nothing.
     EMAIL_ADDRESS_VERIFY: '/email-address/verify/:token',
+    // Self-serve account deletion by email link. Both pages are reached
+    // SIGNED OUT (the request form from the sign-in page or a public site,
+    // the confirm page straight from the email), so both are PUBLIC_ROUTES.
+    // The confirm page reads its token from the URL fragment, which never
+    // reaches this server; it deletes only on an explicit confirm click.
+    DELETE_ACCOUNT: '/delete-account',
+    DELETE_ACCOUNT_CONFIRM: '/delete-account/confirm',
 
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
@@ -500,6 +507,9 @@ export const PUBLIC_ROUTES = [
     ROUTES.ORG_INVITE,
     // EW-P4-3 — tenant email address confirmation link (see ROUTES).
     ROUTES.EMAIL_ADDRESS_VERIFY,
+    // Self-serve account deletion — request form and email-link confirm page.
+    ROUTES.DELETE_ACCOUNT,
+    ROUTES.DELETE_ACCOUNT_CONFIRM,
     // EW-617 zero-friction onboarding landing page — public so anonymous
     // visitors from the marketing site can mint a guest session client-side.
     ROUTES.ONBOARDING,
