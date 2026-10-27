@@ -1,4 +1,8 @@
-import { FLEET_VIRTUAL_HOST_REASONS, fleetVirtualSystem } from '@ever-works/contracts';
+import {
+    FLEET_VIRTUAL_HOST_REASONS,
+    FLEET_VIRTUAL_WINDOWS_CAPABILITY,
+    fleetVirtualSystem,
+} from '@ever-works/contracts';
 import {
     autoPickHost,
     capabilityValue,
@@ -101,11 +105,29 @@ describe('hostEligibility (spec FR-4, FR-5, FR-6, FR-9, FR-10)', () => {
                         'managed',
                         'virtual-host',
                         'kvm',
+                        FLEET_VIRTUAL_WINDOWS_CAPABILITY,
                     ],
                 }),
                 windows,
             ),
         ).toBeNull();
+        // P2 (lane decision 14): kvm alone is not enough — the host's operator must
+        // also have configured an installer image (`virtual-windows`).
+        expect(
+            judge(
+                host({
+                    capabilities: [
+                        'os:linux',
+                        'arch:x64',
+                        'docker',
+                        'managed',
+                        'virtual-host',
+                        'kvm',
+                    ],
+                }),
+                windows,
+            ),
+        ).toBe('no-windows-image');
         expect(
             judge(
                 host({
