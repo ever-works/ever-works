@@ -9,9 +9,11 @@ import {
     HttpCode,
     HttpStatus,
     Header,
+    Res,
     UseGuards,
 } from '@nestjs/common';
 import { IntegrationForbiddenGuard } from '../auth/integration/integration-forbidden.guard';
+import { streamAccountExport, type ExportResponse } from './account-export-stream';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -110,14 +112,27 @@ export class AccountController {
         @Query('includeSkills') includeSkills?: string,
         @Query('includeTasks') includeTasks?: string,
         @Query('includeTaskChat') includeTaskChat?: string,
+        // Appended last so every positional caller keeps its meaning. Nest
+        // always injects it for a real request; a direct call without it
+        // (the unit specs, any in-process caller) gets the payload back
+        // exactly as before.
+        @Res() res?: ExportResponse,
     ) {
-        return this.exportService.exportAccountData(auth.userId, {
+        const options = {
             includeSecrets: includeSecrets === 'true',
             includeAgents: includeAgents === 'true',
             includeSkills: includeSkills === 'true',
             includeTasks: includeTasks === 'true',
             includeTaskChat: includeTaskChat === 'true',
-        });
+        };
+        if (!res) {
+            return this.exportService.exportAccountData(auth.userId, options);
+        }
+        await streamAccountExport(
+            res,
+            this.exportService.exportAccountDataChunks(auth.userId, options),
+        );
+        return undefined;
     }
 
     // ─── Import ─────────────────────────────────────────────────

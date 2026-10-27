@@ -45,6 +45,12 @@ export interface WorkRepoContent {
     markdownTemplate?: ExportedMarkdownTemplate;
 }
 
+/**
+ * How many Works' data repos one account export reads at once. See
+ * {@link AccountExportService.exportWorksInOrder}.
+ */
+const ACCOUNT_EXPORT_WORK_CONCURRENCY = 2;
+
 @Injectable()
 export class AccountExportService {
     private readonly logger = new Logger(AccountExportService.name);
@@ -79,12 +85,137 @@ export class AccountExportService {
 
         const works = await this.workRepository.findByUser(userId);
 
-        const exportedWorks: ExportedWork[] = await Promise.all(
-            works.map((dir) => this.exportWork(dir.id, dir, includeSecrets)),
-        );
+        // In order, a couple at a time — see `exportWorksInOrder`. This used
+        // to be one `Promise.all` over every Work, i.e. a clone-or-pull of
+        // every data repo at once on the API's single event loop.
+        const exportedWorks: ExportedWork[] = [];
+        for await (const exported of this.exportWorksInOrder(works, includeSecrets)) {
+            exportedWorks.push(exported);
+        }
 
+        const exportedUserPlugins = await this.exportUserPlugins(userId, includeSecrets);
+        const { tailAgents, tailSkills, tailTasks } = await this.exportTailSections(
+            userId,
+            options,
+        );
+        const hasTailRows = !!(tailAgents || tailSkills || tailTasks);
+
+        return {
+            version: hasTailRows ? 2 : 1,
+            exportedAt: new Date().toISOString(),
+            includesSecrets: includeSecrets,
+            data: {
+                profile: this.exportProfile(user),
+                works: exportedWorks,
+                userPlugins: exportedUserPlugins,
+                ...(tailAgents ? { agents: tailAgents } : {}),
+                ...(tailSkills ? { skills: tailSkills } : {}),
+                ...(tailTasks ? { tasks: tailTasks } : {}),
+            },
+        };
+    }
+
+    /**
+     * The same payload as {@link exportAccountData}, as the fragments of its
+     * JSON text — so `GET /api/account/export` can start answering at once
+     * and keep bytes flowing while each Work's data repo is read.
+     *
+     * The export used to be built whole and then sent: every Work's repo
+     * read, every item held in memory, one `JSON.stringify` of the lot, and
+     * only then a first byte. On a large account that took longer than the
+     * 100 s an edge proxy waits for a response, so the owner got a 524 and
+     * nothing at all. Here the account, its plugins and the v2 tail — all
+     * database reads — come first, so every failure the endpoint has always
+     * answered with an error status still happens before the first fragment;
+     * then each Work is serialised and released as it is read, a couple at a
+     * time and in order.
+     *
+     * Joined, the fragments are exactly `JSON.stringify` of the payload
+     * `exportAccountData` returns for the same data (same keys, same order),
+     * so every consumer that parses the body sees the same document. Fragment
+     * boundaries always fall between JSON tokens, so a caller may write
+     * insignificant whitespace between two of them to keep a connection busy.
+     */
+    async *exportAccountDataChunks(
+        userId: string,
+        options: ExportOptions = {},
+    ): AsyncGenerator<string, void, undefined> {
+        const { includeSecrets = false } = options;
+
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new Error('User not found');
+        }
+        const works = await this.workRepository.findByUser(userId);
+        const exportedUserPlugins = await this.exportUserPlugins(userId, includeSecrets);
+        const { tailAgents, tailSkills, tailTasks } = await this.exportTailSections(
+            userId,
+            options,
+        );
+        const hasTailRows = !!(tailAgents || tailSkills || tailTasks);
+
+        yield `{"version":${hasTailRows ? 2 : 1},"exportedAt":${JSON.stringify(
+            new Date().toISOString(),
+        )},"includesSecrets":${JSON.stringify(includeSecrets)},"data":{"profile":${JSON.stringify(
+            this.exportProfile(user),
+        )},"works":[`;
+
+        let index = 0;
+        for await (const exported of this.exportWorksInOrder(works, includeSecrets)) {
+            yield `${index > 0 ? ',' : ''}${JSON.stringify(exported)}`;
+            index += 1;
+        }
+
+        let tail = `],"userPlugins":${JSON.stringify(exportedUserPlugins)}`;
+        if (tailAgents) tail += `,"agents":${JSON.stringify(tailAgents)}`;
+        if (tailSkills) tail += `,"skills":${JSON.stringify(tailSkills)}`;
+        if (tailTasks) tail += `,"tasks":${JSON.stringify(tailTasks)}`;
+        yield `${tail}}}`;
+    }
+
+    /**
+     * Every Work's export, in the order given, with at most
+     * {@link ACCOUNT_EXPORT_WORK_CONCURRENCY} being read at once.
+     *
+     * Each one costs a clone or pull of the Work's data repo — pure-JS git on
+     * the API's only event loop — and holds that Work's whole content in
+     * memory until it is serialised. All of them at once froze the process
+     * and held the whole account in memory; one at a time would leave the
+     * network idle while a repo is indexed. A small window keeps the order,
+     * bounds both, and lets a consumer that stops reading stop the walk.
+     *
+     * A Work whose export rejects rejects this walk where it stands, exactly
+     * as the `Promise.all` it replaces did; the others still in flight are
+     * claimed so none of them surfaces as an unhandled rejection.
+     */
+    private async *exportWorksInOrder(
+        works: readonly any[],
+        includeSecrets: boolean,
+    ): AsyncGenerator<ExportedWork, void, undefined> {
+        const inFlight: Promise<ExportedWork>[] = [];
+        let next = 0;
+        const startNext = () => {
+            if (next >= works.length) return;
+            const dir = works[next++];
+            const pending = this.exportWork(dir.id, dir, includeSecrets);
+            pending.catch(() => undefined);
+            inFlight.push(pending);
+        };
+
+        for (let i = 0; i < ACCOUNT_EXPORT_WORK_CONCURRENCY; i += 1) startNext();
+        while (inFlight.length > 0) {
+            const exported = await inFlight.shift()!;
+            startNext();
+            yield exported;
+        }
+    }
+
+    private async exportUserPlugins(
+        userId: string,
+        includeSecrets: boolean,
+    ): Promise<ExportedUserPlugin[]> {
         const userPlugins = await this.userPluginRepository.findByUser(userId);
-        const exportedUserPlugins: ExportedUserPlugin[] = userPlugins.map((up) => {
+        return userPlugins.map((up) => {
             const exported: ExportedUserPlugin = {
                 pluginId: up.pluginId,
                 enabled: up.enabled,
@@ -97,12 +228,22 @@ export class AccountExportService {
             }
             return exported;
         });
+    }
 
-        // Phase 19.6 — collect the v2 tail when toggles are set + the
-        // tail service is bound. Each section is opt-in; the tail is
-        // populated only when the corresponding flag is true AND the
-        // resulting array has rows, so the payload stays v1-shaped for
-        // legacy users.
+    /**
+     * Phase 19.6 — collect the v2 tail when toggles are set + the tail
+     * service is bound. Each section is opt-in; the tail is populated only
+     * when the corresponding flag is true AND the resulting array has rows,
+     * so the payload stays v1-shaped for legacy users.
+     */
+    private async exportTailSections(
+        userId: string,
+        options: ExportOptions,
+    ): Promise<{
+        tailAgents: AccountExportPayload['data']['agents'];
+        tailSkills: AccountExportPayload['data']['skills'];
+        tailTasks: AccountExportPayload['data']['tasks'];
+    }> {
         const wantsTail =
             (options.includeAgents || options.includeSkills || options.includeTasks) === true;
         let tailAgents: AccountExportPayload['data']['agents'];
@@ -129,21 +270,7 @@ export class AccountExportService {
                 );
             }
         }
-        const hasTailRows = !!(tailAgents || tailSkills || tailTasks);
-
-        return {
-            version: hasTailRows ? 2 : 1,
-            exportedAt: new Date().toISOString(),
-            includesSecrets: includeSecrets,
-            data: {
-                profile: this.exportProfile(user),
-                works: exportedWorks,
-                userPlugins: exportedUserPlugins,
-                ...(tailAgents ? { agents: tailAgents } : {}),
-                ...(tailSkills ? { skills: tailSkills } : {}),
-                ...(tailTasks ? { tasks: tailTasks } : {}),
-            },
-        };
+        return { tailAgents, tailSkills, tailTasks };
     }
 
     /**
