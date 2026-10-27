@@ -1315,5 +1315,219 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/agent-plugins/updates',
 		toolName: 'list_agent_plugin_updates',
 		annotations: { readOnlyHint: true }
+	},
+	// App Works (32) — chat and MCP parity (APW-01 T19, lane B1 aw-chat-mcp, 2026-10-27).
+	//
+	// The decision per route is docs/specs/features/app-works/contracts/agent-surfaces.md §3.2:
+	// a route is a tool only when it spends nothing, deletes nothing, publishes nothing outside
+	// the platform, changes no security posture, accepts no legal obligation and carries no
+	// secret in either direction (rules T1–T5). So:
+	//
+	//  - the reads are here, with `readOnlyHint` (env answers names and set/unset, never a
+	//    value; a log tail is redacted with the App's secret env values; the deletion preview is
+	//    names and sizes);
+	//  - three read-shaped dispatches change nothing about the app (`refresh_app_status`,
+	//    `request_app_logs`, `validate_app_spec`);
+	//  - the state-changing dispatches §3.2 exposes (smoke, cancel a Build or provisioning,
+	//    Blueprint apply / upgrade / dismiss, upstream sync, readiness retry, rollback,
+	//    pause / resume / remove) are listed in `MCP_PRIVILEGED_TOOLS`: off unless the operator
+	//    turns privileged tools on;
+	//  - the human-only gates stay out of the request even then: "Sync anyway"
+	//    (`confirmWorkflowChanges` / `workflowHeadSha`, the owner's acceptance of upstream
+	//    workflow code), a cluster change (`confirmClusterChange`), a fork of a fork inheriting
+	//    a Blueprint (`confirmForkMatch`) and destroying stored data
+	//    (`deleteData` / `confirmSlug`) are `omitArgs` — and the API refuses them to an API key
+	//    besides (`requireHumanSession`, `requireAppWorkOwnerSession`).
+	//
+	// Deliberately NOT tools (R-32 human-only, pinned absent by
+	// test/whitelist-app-works.spec.ts): requesting a Build, deploying an App Work, running an
+	// App job (the route asks for the member's `confirmFirstDeploy`), provisioning, any env
+	// write (set, `.env` import, rotation), dependency configure / retry / data deletion, the
+	// deploy target and kubeconfig, the registry pull token, licence attestation and the
+	// upstream pull request.
+	{
+		method: 'POST',
+		path: '/api/works/app-source/inspect',
+		toolName: 'inspect_app_source',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-status',
+		toolName: 'get_app_status',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-status/refresh',
+		toolName: 'refresh_app_status'
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-deployments',
+		toolName: 'list_app_deployments',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-logs',
+		toolName: 'request_app_logs'
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-logs/{requestId}',
+		toolName: 'get_app_logs',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-target',
+		toolName: 'get_app_target',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-deletion-preview',
+		toolName: 'get_app_deletion_preview',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-smoke',
+		toolName: 'run_app_smoke'
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-rollback',
+		toolName: 'rollback_app',
+		omitArgs: ['confirmClusterChange']
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-lifecycle',
+		toolName: 'change_app_lifecycle',
+		omitArgs: ['deleteData', 'confirmSlug'],
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/builds',
+		toolName: 'list_app_builds',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/builds/{buildId}',
+		toolName: 'get_app_build',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/builds/{buildId}/cancel',
+		toolName: 'cancel_app_build'
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-env',
+		toolName: 'get_app_env',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-dependencies',
+		toolName: 'list_app_dependencies',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-spec',
+		toolName: 'get_app_spec',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-spec/validate',
+		toolName: 'validate_app_spec'
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-spec/blueprint',
+		toolName: 'apply_app_blueprint',
+		// A fork of a fork inheriting a Blueprint nobody chose is the member's confirmation.
+		omitArgs: ['confirmForkMatch']
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-spec/blueprint/upgrade',
+		toolName: 'upgrade_app_blueprint'
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/app-spec/blueprint/dismiss',
+		toolName: 'dismiss_app_blueprint_upgrade'
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/app-license',
+		toolName: 'get_app_license',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/apps-catalog',
+		toolName: 'list_app_catalog_entries',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/apps-catalog/blueprints',
+		toolName: 'list_app_blueprints',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/apps-catalog/licenses',
+		toolName: 'list_app_licenses',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/apps-catalog/{id}',
+		toolName: 'get_app_catalog_entry',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/provisioning',
+		toolName: 'get_app_provisioning',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/provision/cancel',
+		toolName: 'cancel_app_provisioning'
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/evolve',
+		toolName: 'list_app_changes',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/works/{id}/upstream',
+		toolName: 'get_app_upstream',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/upstream/sync',
+		toolName: 'sync_app_upstream',
+		omitArgs: ['confirmWorkflowChanges', 'workflowHeadSha']
+	},
+	{
+		method: 'POST',
+		path: '/api/works/{id}/upstream/readiness/retry',
+		toolName: 'retry_app_readiness'
 	}
 ];
