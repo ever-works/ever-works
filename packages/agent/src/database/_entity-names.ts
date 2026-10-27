@@ -107,6 +107,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ExternalIssueLink',
     // Integration API v1 (EW-P1-4) — Ever Works record ↔ external record links.
     'ExternalRecordLink',
+    // Actions runners on computers (FL-18) — GitHub Actions self-hosted runners on a Node
+    'FleetActionsRunner',
     'FleetAgentNodeAffinity',
     'FleetAudit',
     // Commands on computers (FL-12) — one-off Commands and their runs
@@ -128,6 +130,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'FleetPortTunnel',
     // Sessions on computers (FL-04) — persistent processes on a Node
     'FleetSession',
+    // Usage & cost on the fleet (FL-20) — hourly token samples per computer
+    'FleetUsageSample',
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',

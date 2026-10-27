@@ -151,6 +151,7 @@ export * from './run-window-stats';
 export * from './run-cost-breakdown-reader';
 export * from './run-ledger.service';
 export * from './run-receipt.service';
+export * from './run-receipt-fleet-usage-reader';
 export * from './run-ledger.module';
 export { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 export type {

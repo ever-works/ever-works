@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { agentsAPI } from '@/lib/api/agents';
 import { AgentBudgetsClient } from '@/components/agents/AgentBudgetsClient';
+import { AgentFleetUsageRows } from '@/components/agents/AgentFleetUsageRows';
+import { readFleetFeatureFlags } from '@/lib/fleet-flags';
 
 type Params = Promise<{ id: string; locale: string }>;
 
@@ -26,5 +28,17 @@ export default async function AgentBudgetsPage({ params }: { params: Params }) {
         currency: 'USD',
     }));
 
-    return <AgentBudgetsClient agentId={id} initial={budget} />;
+    // FL-20 P2 (spec FR-14, FR-15): the Agent's fleet work per computer, at list price.
+    const fleetUsage = readFleetFeatureFlags(['FLEET_USAGE_SCAN_ENABLED'] as const).FLEET_USAGE_SCAN_ENABLED === true;
+
+    return (
+        <>
+            <AgentBudgetsClient agentId={id} initial={budget} />
+            {fleetUsage && (
+                <div className="px-6 pb-6 max-w-screen-2xl mx-auto">
+                    <AgentFleetUsageRows agentId={id} />
+                </div>
+            )}
+        </>
+    );
 }

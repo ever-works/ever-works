@@ -158,7 +158,12 @@ const PRE_IDENTITY_CATEGORIES = [
  * is still counted exactly once, and a member that disappears or is renamed
  * still fails the total.
  */
-const LATER_CAPABILITIES: readonly string[] = ['apps-tier', 'domain-event-subscriber', 'machine-provider'];
+const LATER_CAPABILITIES: readonly string[] = [
+	'apps-tier',
+	'domain-event-subscriber',
+	'machine-provider',
+	'actions-runners'
+];
 
 /**
  * Every category a LATER epic appended behind `identity`, in the tuple's own

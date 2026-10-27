@@ -14,13 +14,22 @@ import type {
 	FleetRunEnvFileContent,
 	FleetRunEnvFileRequestRef,
 	FleetVirtualEnrollTokenResponse,
-	FleetVirtualPhase,
-	FleetVirtualState
+	FleetVirtualProgressReport,
+	FleetActionsRunnerPhase,
+	FleetActionsRunnerState,
+	FleetActionsRunnerTokenKind,
+	FleetActionsRunnerTokenResponse
 } from '@ever-works/contracts';
 import { FleetClientError, joinUrl, normalizeApiUrl, type FetchLike, type FetchRequestInit } from './fleet-client';
 import type { Logger } from './logger';
 import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH } from './types';
 import { extractRunEnvSecretValues } from './workspaces/run-env-files';
+
+/** The fields of a virtual-computer progress report the host fills in (the credential and job ride beside them). */
+export type FleetVirtualProgressFields = Omit<
+	FleetVirtualProgressReport,
+	'nodeId' | 'secret' | 'jobId' | 'leaseGeneration'
+>;
 
 /**
  * HTTP client for the three node-facing fleet-job endpoints:
@@ -451,13 +460,7 @@ export class FleetJobClient {
 	async reportVirtualProgress(
 		childNodeId: string,
 		jobId: string,
-		report: {
-			phase?: FleetVirtualPhase;
-			state?: FleetVirtualState;
-			error?: string | null;
-			image?: { ref: string; digest: string | null } | null;
-			activated?: boolean | null;
-		},
+		report: FleetVirtualProgressFields,
 		leaseGeneration?: number
 	): Promise<void> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret, jobId, ...report };
@@ -467,6 +470,69 @@ export class FleetJobClient {
 			'virtual-progress',
 			body
 		);
+	}
+
+	// ── Actions runners on computers (FL-18) — the node's two calls while it installs or controls a runner ──
+	//
+	// Under `api/internal/fleet/runners`, the push-credential posture exactly:
+	// the node credential in the body, the `runner-*` job this node holds and its
+	// lease generation, one undifferentiated 401 for every refusal, 409 stale-lease.
+
+	/**
+	 * Actions runners (FL-18, spec FR-7) — the node is ready to register (or
+	 * remove) a runner: mint its one-time token NOW. Returned once; protected in
+	 * the logger before this method returns, never stored on this client, and
+	 * handed to the runner only through its environment input.
+	 */
+	async mintRunnerToken(
+		runnerId: string,
+		jobId: string,
+		kind: FleetActionsRunnerTokenKind,
+		leaseGeneration?: number
+	): Promise<FleetActionsRunnerTokenResponse> {
+		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret, jobId, kind };
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
+		const payload = (await this.post(
+			`api/internal/fleet/runners/${encodeURIComponent(runnerId)}/token`,
+			'runner-token',
+			body
+		)) as FleetActionsRunnerTokenResponse;
+		if (!payload || typeof payload.token !== 'string' || payload.token.length < 8) {
+			throw new FleetClientError('malformed', 'Runner token response did not contain a token');
+		}
+		this.logger?.protect(payload.token);
+		return {
+			token: payload.token,
+			expiresAt: typeof payload.expiresAt === 'string' ? payload.expiresAt : null,
+			replace: payload.replace === true
+		};
+	}
+
+	/** Actions runners (FL-18) — one progress report (phase, service state, first failure line, version, GitHub id). */
+	async reportRunnerProgress(
+		runnerId: string,
+		jobId: string,
+		report: {
+			phase?: FleetActionsRunnerPhase;
+			state?: FleetActionsRunnerState;
+			error?: string | null;
+			runnerVersion?: string | null;
+			serviceUnit?: string | null;
+			githubRunnerId?: number | null;
+			deregistered?: boolean;
+		},
+		leaseGeneration?: number
+	): Promise<void> {
+		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret, jobId };
+		if (report.phase !== undefined) body.phase = report.phase;
+		if (report.state !== undefined) body.state = report.state;
+		if (report.error !== undefined) body.error = report.error;
+		if (report.runnerVersion !== undefined && report.runnerVersion !== null) body.runnerVersion = report.runnerVersion;
+		if (report.serviceUnit !== undefined && report.serviceUnit !== null) body.serviceUnit = report.serviceUnit;
+		if (report.githubRunnerId !== undefined && report.githubRunnerId !== null) body.githubRunnerId = report.githubRunnerId;
+		if (report.deregistered !== undefined) body.deregistered = report.deregistered;
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
+		await this.post(`api/internal/fleet/runners/${encodeURIComponent(runnerId)}/progress`, 'runner-progress', body);
 	}
 
 	// ── Agent computers — the live-view publish leg ─────────────────────

@@ -103,6 +103,8 @@ An alert without refusal (overage allowed):
 
 Plugin price lists are baked into each plugin's `package.json` under `everworks.plugin.pricing`. When a plugin returns token counts, the platform multiplies them by the per-1K-token price to produce a cents value. Plugins that don't surface usage (e.g. cached responses) record zero-cost rows so the operation still has an audit trail.
 
+Model work an Agent does on **your own computers** (Claude Code and Codex on a Fleet node, paid by the machine's own sign-in) is counted from the computer's opt-in usage scan and priced at **list price** — see [Usage and cost on your Fleet](./fleet-usage.md). It counts toward the Agent's Budget as a non-debiting row; no credit is ever debited for it.
+
 ## API
 
 | Verb               | Endpoint                                |

@@ -34,11 +34,17 @@ import {
 	type ManagementLaneTables
 } from './management-lane';
 import { abortableSleep, createVirtualExecutors } from './executors/virtual';
+import { anyUsageRootExists, createUsageScanExecutors, nodeUsageFs, resolveUsageRoots, type UsageFs } from './usage';
 import { createVirtualModule } from './link/modules/virtual';
 import { defaultStdinRunner } from './link/modules/virtual/host';
 import { defaultVirtualStateFs, VirtualState } from './link/modules/virtual/state';
 import type { SecretStore } from './secret-store';
 import { kvmUsable, WindowsPasswordStore } from './link/modules/virtual/windows';
+import { createRunnerExecutors } from './executors/runners';
+import { createRunnersModule } from './link/modules/runners';
+import { defaultRunnerExec, type RunnerHostDeps } from './link/modules/runners/host';
+import { listRunnerLogSources, newestRunnerDiagLog } from './link/modules/runners/logs';
+import { RunnerState } from './link/modules/runners/state';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { defaultSessionConfigFs, runAgentTaskJob } from './executors/agent-task';
@@ -109,6 +115,7 @@ import { SessionHookOverlay } from './sessions/hook-overlay';
 import { SessionStatusPipeline } from './sessions/session-status';
 import { spawn as spawnProcess } from 'node:child_process';
 import { homedir as osHomedir, userInfo as osUserInfo } from 'node:os';
+import { existsSync } from 'node:fs';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -691,6 +698,32 @@ export interface CreateNodeRuntimeOptions {
 	 */
 	virtualSecrets?: SecretStore | null;
 	/**
+	 * Usage & cost on the fleet (FL-20, CONTRACTS §1.1) — the machine owner's
+	 * `--usage-scan` switch: the periodic transcript scan (counts only, never
+	 * content). Process-scoped like `--manage`; reported as
+	 * `consents.usageScan` on every beat. Off by default.
+	 */
+	usageScanEnabled?: boolean;
+	/**
+	 * Usage & cost on the fleet (FL-20) — the scan's own state folder
+	 * (`<config dir>/usage`). With it and `usageScanEnabled`, the management
+	 * lane runs `usage-scan`; absent (the desktop shell, tests, embedders), it
+	 * does not.
+	 */
+	usageStateDir?: string;
+	/** Test seam: the filesystem the scan reads through. */
+	usageFs?: UsageFs;
+	/**
+	 * Actions runners on computers (FL-18) — the node's runners folder
+	 * (`<config dir>/actions-runners`, owner-only). With it, the `runners` link
+	 * module (`runner.list`, `runner.status`, the `actions-runner` tag under
+	 * `--work` where a service manager exists), the runners' diagnostic logs as
+	 * FL-08 sources and the management lane's `runner-install` /
+	 * `runner-control` executors are composed. Absent (the desktop shell, tests,
+	 * embedders): none is.
+	 */
+	runnersDataDir?: string;
+	/**
 	 * Fleet node link (FL-02 T-25) — the opt-in self-update's report for the
 	 * heartbeat (`selfUpdate`). The CLI passes its controller's `report`; an
 	 * embedder without self-update leaves it unset and the field is absent.
@@ -852,12 +885,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const attendedCapture = options.attendEnabled ? selectAttendedCapture(io.environment, options) : null;
 	// Fleet node link (FL-02): the four consents this process holds. Process-
 	// scoped like `--attend`, so they ride the environment and the heartbeat,
-	// never the stored config. `usageScan` stays false until FL-20 adds its flag.
+	// never the stored config. `usageScan` is FL-20's `--usage-scan`.
 	const consents: FleetConsents = {
 		work: options.workerEnabled === true,
 		attend: attendedCapture !== null,
 		manage: options.manageEnabled === true,
-		usageScan: false
+		usageScan: options.usageScanEnabled === true
 	};
 	// Computer health, second phase (FL-03): this machine's primary interface,
 	// read fresh on every call (a laptop changes networks). Reported on the
@@ -1067,6 +1100,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// the standard log directories, ready checkouts (FL-14's registry), the
 	// workspace root and the `--files-root` folders, never the home directory.
 	let logsLinkModule: NodeModule | null = null;
+	// Actions runners on computers (FL-18): the runners folder, read by the logs
+	// module (`runner:<name>` sources) and the `runners` module below.
+	const runnerState = options.runnersDataDir ? new RunnerState(options.runnersDataDir) : null;
 	if (consents.manage) {
 		const platform = io.environment.platform;
 		const homedir = osHomedir();
@@ -1090,6 +1126,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		logsLinkModule = createLogsLinkModule({
 			io: logIo,
 			nodeName: config.name?.trim() || 'this computer',
+			// FL-18 (FR-18): each Actions runner's newest diagnostic log, `runner:<name>`.
+			...(runnerState
+				? {
+						runners: {
+							sources: () => listRunnerLogSources(runnerState),
+							logPath: (name: string) => newestRunnerDiagLog(runnerState, name)
+						}
+					}
+				: {}),
 			roots: async () => {
 				const checkouts = checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [];
 				const resolved = await resolveCanonicalAllowedRoots(
@@ -1179,7 +1224,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			.install(entries)
 			.then((result) => {
 				for (const skipped of result.skipped) {
-					io.logger.warn(`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`);
+					io.logger.warn(
+						`Schedules: ${skipped.id} is not in the ${nativeScheduler.kind} fallback: ${skipped.reason}`
+					);
 				}
 			})
 			.catch((error: unknown) => {
@@ -1205,7 +1252,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						? {
 								onHeld: (definitions) =>
 									installNative(
-										definitions.map((definition) => ({ id: definition.id, cadence: definition.cadence }))
+										definitions.map((definition) => ({
+											id: definition.id,
+											cadence: definition.cadence
+										}))
 									)
 							}
 						: {})
@@ -1247,6 +1297,48 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				passwords: virtualPasswords
 			})
 		: null;
+	// Actions runners on computers (FL-18): what the `runners` module and the
+	// management lane's runner executors share — the runners folder, the child
+	// process runner (the ONE way a registration token reaches a runner: its
+	// environment), this machine's service manager and privileges.
+	let runnerUser = 'this user';
+	try {
+		runnerUser = osUserInfo().username || runnerUser;
+	} catch {
+		// no passwd entry: the sudoers hint names no account
+	}
+	let runnerElevated: Promise<boolean> | null = null;
+	const runnerHostDeps: RunnerHostDeps | null = runnerState
+		? {
+				state: runnerState,
+				exec: defaultRunnerExec,
+				// Built lazily: the shared job client exists once the lanes do.
+				client: () => jobClientFor(),
+				platform: io.environment.platform,
+				arch: io.environment.arch,
+				user: runnerUser,
+				isRoot: () => typeof process.getuid === 'function' && process.getuid() === 0,
+				isElevated: () => {
+					if (!runnerElevated) {
+						runnerElevated =
+							io.environment.platform === 'win32'
+								? createMachineCommandRunner()
+										.run('net', ['session'], { timeoutMs: 5_000 })
+										.then((result) => result.code === 0)
+										.catch(() => false)
+								: Promise.resolve(typeof process.getuid === 'function' && process.getuid() === 0);
+					}
+					return runnerElevated;
+				},
+				hasSystemd: () => io.environment.platform === 'linux' && existsSync('/run/systemd/system'),
+				fetch: globalThis.fetch.bind(globalThis),
+				sleep: abortableSleep,
+				now: io.now ?? Date.now,
+				logger: io.logger,
+				nodeName: config.name?.trim() || 'this computer'
+			}
+		: null;
+	const runnersModule = runnerHostDeps ? createRunnersModule(runnerHostDeps) : null;
 	const linkModules = composeNodeLinkModules({
 		extra: [
 			healthLinkModule,
@@ -1254,6 +1346,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(filesLinkModule ? [filesLinkModule] : []),
 			...(clipLinkModule ? [clipLinkModule] : []),
 			...(virtualModule ? [virtualModule] : []),
+			...(runnersModule ? [runnersModule] : []),
 			...(options.linkModules ?? [])
 		],
 		...(sessions ? { session: sessions.module } : {}),
@@ -1317,10 +1410,30 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		...(consents.manage ? { managed: true } : {}),
 		...(linkModuleTags.length > 0 ? { linkModuleTags } : {})
 	};
+	// Usage & cost on the fleet (FL-20, CONTRACTS §1.2): `usage-scan` is
+	// advertised while `--usage-scan` is on AND a Claude Code or Codex record
+	// folder exists here — re-read every beat, so installing a CLI later needs
+	// no restart. The job requires the tag, so the platform never asks a
+	// machine whose owner did not opt in.
+	const usageFs = options.usageFs ?? nodeUsageFs;
+	const usageRootsInput = () => ({
+		env: options.env ?? process.env,
+		homedir: osHomedir(),
+		platform: io.environment.platform
+	});
+	const usageScanAvailable = (): boolean => {
+		if (!consents.usageScan) return false;
+		try {
+			return anyUsageRootExists(resolveUsageRoots(usageRootsInput()), usageFs);
+		} catch {
+			return false;
+		}
+	};
 	const currentEnvironment = (): CapabilityEnvironment => {
 		const tags = linkModules.tags(moduleEnvironment);
 		const { linkModuleTags: _previous, ...rest } = environment;
-		return tags.length > 0 ? { ...rest, linkModuleTags: tags } : rest;
+		const base: CapabilityEnvironment = tags.length > 0 ? { ...rest, linkModuleTags: tags } : rest;
+		return usageScanAvailable() ? { ...base, usageScan: true } : base;
 	};
 	telemetry.consents = () => consents;
 	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
@@ -1349,9 +1462,36 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				passwords: virtualPasswords
 			})
 		: [];
+	// Usage & cost on the fleet (FL-20): the `usage-scan` executor, for a
+	// process started with --usage-scan that has a state folder.
+	const usageExecutors: ManagementLaneExecutor[] =
+		consents.usageScan && options.usageStateDir
+			? createUsageScanExecutors({
+					enabled: () => consents.usageScan,
+					stateDir: options.usageStateDir,
+					platform: io.environment.platform,
+					fs: usageFs,
+					roots: usageRootsInput,
+					// A folder leaves this machine only as a ready checkout or an allowed root (R-18, R-41).
+					allowedRoots: async () =>
+						resolveAllowedRoots({
+							workspaceRoot,
+							checkouts: checkoutsModule ? await checkoutsModule.readyPaths().catch(() => []) : [],
+							...(options.filesRoots ? { extraRoots: options.filesRoots } : {}),
+							purpose: 'files',
+							platform: io.environment.platform
+						}),
+					...(io.now ? { now: io.now } : {}),
+					logger: io.logger
+				})
+			: [];
+	// Actions runners on computers (FL-18): `runner-install` / `runner-control`,
+	// leased only under `--work` (the plan filters on the consent).
+	const runnerExecutors: ManagementLaneExecutor[] = runnerHostDeps ? createRunnerExecutors(runnerHostDeps) : [];
+	const laneExecutors = [...virtualExecutors, ...usageExecutors, ...runnerExecutors];
 	const managementPlan = planManagementLane(
 		consents,
-		options.managementLane ?? (virtualExecutors.length > 0 ? { executors: virtualExecutors } : undefined)
+		options.managementLane ?? (laneExecutors.length > 0 ? { executors: laneExecutors } : undefined)
 	);
 	// What the last beat advertised: the link's hello carries the same list,
 	// so the two can never disagree and the hello costs no second probe.
@@ -1900,7 +2040,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			environment,
 			jobClientFor(),
 			attendedCapture,
-			computerLegs
+			computerLegs,
+			pasteTargets
 		);
 		runtime.attended = lane;
 		// The live-view lane leases through the same endpoint, so the same
@@ -2013,7 +2154,8 @@ function createAttendedLane(
 	environment: CapabilityEnvironment,
 	jobClient: FleetJobClient,
 	capture: AttendedCapture,
-	computerLegs: ComputerLegBroker | null = null
+	computerLegs: ComputerLegBroker | null = null,
+	pasteTargets: PasteTargets | null = null
 ): NonNullable<NodeRuntime['attended']> {
 	const { webSocketFactory, captureBackend } = capture;
 	const terminalHost = options.terminalHost === undefined ? new PtyLocalPlugin() : options.terminalHost;

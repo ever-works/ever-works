@@ -142,7 +142,12 @@ describe('MCP privileged tools switch', () => {
 		'delete_mission',
 		'delete_task',
 		'discard_task_branch',
-		'delete_inbox_item'
+		'delete_inbox_item',
+		// FL-17 cloud computers: the owner's own provider bill.
+		'fleet_cloud_create',
+		'fleet_cloud_power',
+		'fleet_cloud_destroy',
+		'fleet_cloud_idle_policy'
 	])('%s is privileged', (name) => {
 		expect(MCP_PRIVILEGED_TOOLS[name]).toBeTruthy();
 	});

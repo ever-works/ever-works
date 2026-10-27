@@ -268,6 +268,14 @@ export interface FleetCloudMeta {
 	ipv4?: string | null;
 	/** When the last "never came online" item was raised for this machine (deduplication). */
 	unenrolledNoticeAt?: string | null;
+	/**
+	 * P2 (spec FR-27) — the attention key of the idle window the policy already
+	 * acted on (`fleet-node:<id>:cloud-idle:<windowStart>`): exactly one item,
+	 * one Inbox notice and at most one power-off per window.
+	 */
+	idleNotifiedKey?: string | null;
+	/** P2 (spec S7) — when the idle policy powered the machine off; cleared when it runs again. */
+	poweredOffByPolicyAt?: string | null;
 }
 
 // ─── Money ──────────────────────────────────────────────────────────────────
@@ -625,6 +633,10 @@ export interface FleetNodeCloudView {
 	idleSince: string | null;
 	cost: FleetCloudCostSnapshot;
 	goneAt: string | null;
+	/** P2 (spec S6): the idle window has reached the policy's hours (and the policy is not `nothing`). */
+	idleWindowReached?: boolean;
+	/** P2 (spec S7): when the idle policy powered it off (still billing while off where the provider does). */
+	poweredOffByPolicyAt?: string | null;
 	/** True when a machine exists (or existed) at the provider. */
 	hasMachine: boolean;
 	/** CONTRACTS R-36: whether "Remove from Fleet" may run now. */
@@ -646,6 +658,20 @@ export interface FleetCloudUsageRow {
 	destroyedAt: string | null;
 }
 
+/**
+ * P2 (spec FR-23) — the provider's OWN month-to-date figure for the owner's
+ * whole account at that provider, where its plugin can read it. Shown beside
+ * the estimate and labelled as the provider's; never added to the estimate
+ * (it covers everything on the account, not only Ever Works machines).
+ */
+export interface FleetCloudProviderMonthToDate {
+	providerPluginId: string;
+	providerName: string;
+	monthToDateCents: number;
+	/** ISO-8601 instant the cost job read it. */
+	computedAt: string;
+}
+
 /** `GET /api/fleet/cloud/usage` and the `usage` of `GET /api/fleet/cloud` (spec S8, FR-23). */
 export interface FleetCloudUsageView {
 	hourlyCents: number;
@@ -656,10 +682,41 @@ export interface FleetCloudUsageView {
 	estimate: true;
 	machines: FleetCloudUsageRow[];
 	computedAt: string;
+	/** P2 (FR-23): the providers' own month-to-date figures for the caller's accounts, when readable. */
+	providerMonthToDate?: FleetCloudProviderMonthToDate[];
 }
+
+/** P2 (spec FR-21): a cost snapshot younger than this is not recomputed (two overlapping fires write once). */
+export const FLEET_CLOUD_USAGE_FRESH_MS = 5 * 60 * 1000;
 
 /** `GET /api/fleet/cloud` — the caller's cloud computers and their usage. */
 export interface FleetCloudListView {
 	machines: FleetNodeView[];
 	usage: FleetCloudUsageView;
+}
+
+// ─── Idle policy, P2 (spec FR-25 – FR-28) ───────────────────────────────────
+
+/** `requestedBy` of the audit row the idle policy writes when it powers a machine off (CONTRACTS §2.3). */
+export const FLEET_CLOUD_IDLE_REQUESTER = 'system:idle-policy';
+
+/** The attention key one idle window is deduplicated on (spec FR-27). */
+export function fleetCloudIdleAttentionKey(nodeId: string, windowStart: string): string {
+	return `fleet-node:${nodeId}:cloud-idle:${windowStart}`;
+}
+
+/** Session states that keep a machine busy (spec FR-26: no Session in `working` or `needs_you`). */
+export const FLEET_CLOUD_BUSY_SESSION_STATES: readonly string[] = ['starting', 'working', 'needs_you'];
+
+/** `PUT` / `PATCH /api/fleet/cloud/:id/idle-policy` (spec FR-25). */
+export interface FleetCloudIdlePolicyRequest {
+	mode: FleetCloudIdlePolicyMode;
+	afterHours: number;
+}
+
+/** "Idle for 4 h", in hours, from the window start — or null when not idle. */
+export function fleetCloudIdleHours(idleSince: string | null | undefined, nowMs: number = Date.now()): number | null {
+	const at = idleSince ? Date.parse(idleSince) : NaN;
+	if (!Number.isFinite(at) || nowMs < at) return null;
+	return Math.floor((nowMs - at) / HOUR_MS);
 }

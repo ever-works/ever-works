@@ -7,7 +7,9 @@ import {
     HttpStatus,
     Param,
     ParseUUIDPipe,
+    Patch,
     Post,
+    Put,
     Req,
     UseGuards,
 } from '@nestjs/common';
@@ -27,7 +29,13 @@ import { CurrentUser } from '../../auth/decorators/user.decorator';
 import { refuseMachinePrincipalAction, type MachinePrincipalRequest } from '../../auth/machine-principal';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { cloudConfirmFields, FleetCloudCreateDto, FleetCloudDestroyDto, FleetCloudPowerDto } from './dto/fleet-cloud.dto';
+import {
+    cloudConfirmFields,
+    FleetCloudCreateDto,
+    FleetCloudDestroyDto,
+    FleetCloudIdlePolicyDto,
+    FleetCloudPowerDto,
+} from './dto/fleet-cloud.dto';
 import { FleetCloudEnabledGuard } from './fleet-cloud-enabled.guard';
 
 const REFUSAL_WHY = 'an Agent creates, powers and destroys cloud computers through its tools, where each act waits for its owner.';
@@ -56,6 +64,8 @@ function pluginParam(plugin: string): string {
  *  - `POST   …/cloud/:id/power` — `on` · `off` (`confirm: true`); 202
  *  - `POST   …/cloud/:id/destroy` (and `DELETE …/cloud/:id`) — `confirmName`; 202
  *  - `POST   …/cloud/:id/retry-enrollment`
+ *  - `PUT    …/cloud/:id/idle-policy` (and `PATCH`) — P2: nothing · tell-me · power-off after N h
+ *  - `POST   …/cloud/:id/keep-running` — P2: start a new idle window now
  *
  * "Remove from Fleet" (`DELETE /api/fleet/nodes/:id`) is refused for a cloud
  * computer whose machine may still bill (CONTRACTS R-36) — that guard lives in
@@ -212,6 +222,54 @@ export class FleetCloudController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetCloudOperationResponse> {
         return this.destroy(auth, id, body ?? {}, req);
+    }
+
+    @Put('cloud/:id/idle-policy')
+    @ApiOperation({
+        summary:
+            'Set a cloud computer’s idle policy: nothing, tell me after N hours (the default, 3) or power off after N hours (1–72). Idle means no session working, no job running and the CPU under 5 % the whole time. Ever Works never destroys a cloud computer on its own.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setIdlePolicy(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetCloudIdlePolicyDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetNodeView> {
+        refuseMachinePrincipalAction(auth, req, 'change a cloud computer’s idle policy', REFUSAL_WHY);
+        return this.cloud.setIdlePolicy({ kind: 'user', userId: auth.userId }, id, {
+            mode: body.mode,
+            afterHours: body.afterHours,
+        });
+    }
+
+    @Patch('cloud/:id/idle-policy')
+    @ApiOperation({ summary: 'The same as `PUT /api/fleet/cloud/:id/idle-policy` (FL-19 catalogue route).' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async patchIdlePolicy(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: FleetCloudIdlePolicyDto,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetNodeView> {
+        return this.setIdlePolicy(auth, id, body, req);
+    }
+
+    @Post('cloud/:id/keep-running')
+    @ApiOperation({
+        summary: 'Keep an idle cloud computer running: the idle window starts again, so the policy waits its hours again.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async keepRunning(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Req() req?: MachinePrincipalRequest,
+    ): Promise<FleetNodeView> {
+        refuseMachinePrincipalAction(auth, req, 'keep a cloud computer running', REFUSAL_WHY);
+        return this.cloud.keepRunning({ kind: 'user', userId: auth.userId }, id);
     }
 
     @Post('cloud/:id/retry-enrollment')

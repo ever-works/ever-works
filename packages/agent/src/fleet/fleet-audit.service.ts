@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import type { FleetAuditAction, FleetAuditView } from '@ever-works/contracts';
 import { FLEET_AUDIT_DEFAULT_LIMIT, FLEET_AUDIT_MAX_LIMIT } from '@ever-works/contracts';
 import { FleetAudit } from '../entities/fleet-audit.entity';
@@ -180,6 +180,27 @@ export class FleetAuditService {
     ): Promise<FleetAuditView[]> {
         const rows = await this.repository.find({
             where: { ownerUserId, nodeId },
+            order: { occurredAt: 'DESC' },
+            take: clampLimit(limit),
+        });
+        return rows.map(toAuditView);
+    }
+
+    /**
+     * Cloud computers (FL-17 P2, spec FR-22) — one owner's rows of ONE action
+     * since an instant, newest first: the usage block counts machines destroyed
+     * this month from their `node.cloud.destroy` rows (the registration is gone,
+     * the audit row is the only record of what they cost). Owner-scoped like
+     * {@link recentForOwnerNode}; bounded by `FLEET_AUDIT_MAX_LIMIT`.
+     */
+    async forOwnerActionSince(
+        ownerUserId: string,
+        action: FleetAuditAction,
+        since: Date,
+        limit: number = FLEET_AUDIT_MAX_LIMIT,
+    ): Promise<FleetAuditView[]> {
+        const rows = await this.repository.find({
+            where: { ownerUserId, action, occurredAt: MoreThanOrEqual(since) },
             order: { occurredAt: 'DESC' },
             take: clampLimit(limit),
         });

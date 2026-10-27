@@ -9,13 +9,13 @@ sidebar_position: 9
 
 Ever Works ships five layered Compose files at the repository root, so you can pick the right stack for what you're doing:
 
-| File                         | Purpose                                                            | Use when                                                             |
-| ---------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| `docker-compose.demo.yml`    | Minimal SQLite showcase, pre-built images. No infra deps.          | First-time evaluator, "clone and run" to kick the tires.             |
-| `docker-compose.infra.yml`   | PostgreSQL + Redis only. No application services.                  | Running the platform apps locally with `pnpm dev` against real deps. |
-| `docker-compose.yml`         | Full platform from pre-built GHCR images + bundled Postgres/Redis. | Production-shaped self-host, no local Docker build.                  |
-| `docker-compose.build.yml`   | Same as above, but builds api/web/mcp/docs from source.            | Hacking on the apps, or building your own registry images.           |
-| `docker-compose.trigger.yml` | Optional self-hosted Trigger.dev (profile-gated, off by default).  | Local Trigger.dev webapp for background jobs.                        |
+| File                         | Purpose                                                            | Use when                                                                  |
+| ---------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| `docker-compose.demo.yml`    | Minimal SQLite showcase, pre-built images. No infra deps.          | First-time evaluator, "clone and run" to kick the tires.                  |
+| `docker-compose.infra.yml`   | PostgreSQL + Redis only. No application services.                  | Running the platform apps locally with `pnpm dev:apps` against real deps. |
+| `docker-compose.yml`         | Full platform from pre-built GHCR images + bundled Postgres/Redis. | Production-shaped self-host, no local Docker build.                       |
+| `docker-compose.build.yml`   | Same as above, but builds api/web/mcp/docs from source.            | Hacking on the apps, or building your own registry images.                |
+| `docker-compose.trigger.yml` | Optional self-hosted Trigger.dev (profile-gated, off by default).  | Local Trigger.dev webapp for background jobs.                             |
 
 The infra file is `include:`d by both `docker-compose.yml` and `docker-compose.build.yml`, so Postgres and Redis come up automatically with either flavour.
 
@@ -54,14 +54,14 @@ docker compose -f docker-compose.build.yml up --build -d
 
 Same services as `docker-compose.yml`, but each application image is built from the Dockerfiles under `.deploy/docker/`. The build context is the monorepo root so `turbo prune` can see every workspace. First build takes a few minutes; layer caching makes subsequent builds fast.
 
-## Just the infra (run platform apps with `pnpm dev`)
+## Just the infra (run platform apps with `pnpm dev:apps`)
 
 ```bash
 docker compose -f docker-compose.infra.yml --env-file .env.compose up -d
 
 # In another terminal, run the apps natively against the containers
 pnpm install
-pnpm dev
+pnpm dev:apps
 ```
 
 The apps will reach Postgres at `localhost:5432` and Redis at `localhost:6379` using the values in `.env.compose`.
