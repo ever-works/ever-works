@@ -1,0 +1,73 @@
+{
+	"name": "@ever-works/ever-email-router-plugin",
+	"version": "1.0.0",
+	"description": "Ever Email Router plugin (inbound) for Ever Works platform — receive mail for @ever.email addresses from the shared Cloudflare router",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"postal-mime": "^4.1.4"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.4",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^5.0.5"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "ever-email-router",
+			"name": "Ever Email Router",
+			"version": "1.0.0",
+			"category": "email-provider",
+			"capabilities": [
+				"email-inbound"
+			],
+			"description": "Ever Email Router — receive mail for @ever.email addresses from the shared Cloudflare router.",
+			"settings": {
+				"type": "object",
+				"properties": {
+					"inboundWebhookSecret": {
+						"type": "string",
+						"title": "Router webhook secret (HMAC-SHA256)",
+						"x-secret": true,
+						"x-envVar": "EVER_EMAIL_ROUTER_SECRET",
+						"x-adminOnly": true
+					}
+				}
+			},
+			"distribution": "registry"
+		}
+	},
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org"
+	}
+}

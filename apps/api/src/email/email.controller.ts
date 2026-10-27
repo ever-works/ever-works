@@ -27,6 +27,7 @@ import {
     type AgentInboundEmailDispatcher,
 } from '@ever-works/agent/notifications';
 import type { EmailAddressDirection } from '@ever-works/agent/entities';
+import type { EmailInboundAckCounts } from '@ever-works/plugin';
 import { CurrentUser, AuthSessionGuard, Public } from '../auth';
 import { requireHumanSession } from '../auth/machine-principal';
 import { toPublicEmailAddress, toPublicEmailAddresses } from './email-address.projection';
@@ -68,6 +69,20 @@ type WebhookRequest = {
     body?: unknown;
     rawBody?: Buffer;
 };
+
+/**
+ * The `counts` acknowledgement of one inbound delivery (see
+ * `EmailInboundAckMode` in `@ever-works/plugin`): delivered → `accepted`,
+ * already delivered → `duplicates`, anything else (no registered address, no
+ * inbound assignment, not deliverable, no dispatcher bound) → `dropped`.
+ */
+export function inboundAckCounts(
+    dispatch: { handled: boolean; reason?: string } | undefined,
+): EmailInboundAckCounts {
+    if (dispatch?.reason === 'duplicate') return { accepted: 0, duplicates: 1, dropped: 0 };
+    if (dispatch?.handled) return { accepted: 1, duplicates: 0, dropped: 0 };
+    return { accepted: 0, duplicates: 0, dropped: 1 };
+}
 
 /**
  * EW-650 / EW-669 — Email surface REST API.
@@ -361,7 +376,9 @@ export class EmailController {
         // verified for (`authenticatedRecipient`), never one re-derived from
         // the payload's `to` list — a tenant signing with their own per-user
         // key could otherwise name a victim's address beside their own.
-        let dispatch: { handled: boolean; agentId?: string; mode?: string } | undefined;
+        let dispatch:
+            | { handled: boolean; agentId?: string; mode?: string; reason?: string }
+            | undefined;
         if (this.inboundDispatcher) {
             dispatch = await this.inboundDispatcher.dispatch({
                 pluginId,
@@ -399,6 +416,18 @@ export class EmailController {
                 `mode=${dispatch?.mode ?? 'none'}`,
         );
 
+        // A plugin that opted into `inboundAck: 'counts'` (the Ever Email
+        // Router) is answered with what became of the message, so its sender
+        // can tell "taken" from "no such mailbox here" and try the next
+        // product on a drop. This keeps EW-718's no-leak goal: the counts are
+        // only reached AFTER `parseInbound` verified the signature (a bad one
+        // is a 401 above, before any lookup is revealed), and such a plugin's
+        // secret is `x-adminOnly` — the deployment's own — so the caller has
+        // already proven it is the trusted router. No id, agent or mode is
+        // returned, only three counts. Every other plugin keeps the minimal ack.
+        if (message.inboundAck === 'counts') {
+            return inboundAckCounts(dispatch);
+        }
         return { received: true };
     }
 

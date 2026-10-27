@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Raw, Repository } from 'typeorm';
 import {
     TenantEmailAddress,
     EmailAddressDirection,
@@ -85,6 +85,25 @@ export class TenantEmailAddressRepository {
             order: { createdAt: 'ASC' },
         });
         return rows.find((r) => directions.includes(r.direction)) ?? null;
+    }
+
+    /**
+     * Every ENABLED inbound (or `both`) row for this mailbox — any user, any
+     * plugin — compared case-insensitively, oldest first: the rows the inbound
+     * binding ({@link findByAddress}) picks among. Read by the API's
+     * allocation guard for addresses that must have ONE owner per deployment
+     * (the Ever Email Router's `@ever.email` mailboxes).
+     */
+    async findEnabledInboundByAddress(address: string): Promise<TenantEmailAddress[]> {
+        const lowered = address.trim().toLowerCase();
+        return this.repository.find({
+            where: {
+                address: Raw((column) => `LOWER(${column}) = :lowered`, { lowered }),
+                disabledAt: IsNull(),
+                direction: In(['inbound', 'both']),
+            },
+            order: { createdAt: 'ASC', id: 'ASC' },
+        });
     }
 
     async findByVerificationToken(token: string): Promise<TenantEmailAddress | null> {
