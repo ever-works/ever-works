@@ -261,6 +261,7 @@ describe('App Works chat rows are reachable, and stay out of unrelated turns', (
         expect(select('what is going on here', '/en/works/abc/upstream')).toContain(
             'get_app_upstream',
         );
+        expect(select('what is going on here', '/en/works/abc/deploy')).toContain('get_app_status');
     });
 
     it.each(['rotate my api key', 'approve the pending item', 'what happened yesterday', 'hello'])(

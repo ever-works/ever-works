@@ -170,6 +170,9 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
         'sync anyway',
         'fork',
         'github.com/',
+        // The Deploy tab's page path (`/works/:id/deploy`). With the slash, so a plain "deploy"
+        // in a message stays the `deploy` domain's alone.
+        '/deploy',
     ],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],

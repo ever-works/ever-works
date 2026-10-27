@@ -103,6 +103,9 @@ export class WorkAppOpsController {
     @ApiBody({
         schema: {
             type: 'object',
+            // Exactly one target: the handler refuses neither (`log_target_required`) and both
+            // (`log_target_ambiguous`).
+            oneOf: [{ required: ['component'] }, { required: ['job'] }],
             properties: {
                 component: {
                     type: 'string',

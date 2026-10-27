@@ -180,6 +180,8 @@ export class WorkAppRuntimeController {
     @ApiBody({
         schema: {
             type: 'object',
+            // `deployment_id_required` otherwise.
+            required: ['deploymentId'],
             properties: {
                 deploymentId: {
                     type: 'string',
@@ -283,6 +285,16 @@ export class WorkAppRuntimeController {
                     description: 'The App Work slug, typed by the member, with `deleteData`.',
                 },
             },
+            // `deleteData: true` (remove only) needs `confirmSlug`; the handler still checks that
+            // it equals the Work's slug (`422` otherwise).
+            oneOf: [
+                { properties: { action: { enum: ['pause', 'resume', 'cancel-deploy'] } } },
+                { properties: { action: { enum: ['remove'] }, deleteData: { enum: [false] } } },
+                {
+                    properties: { action: { enum: ['remove'] }, deleteData: { enum: [true] } },
+                    required: ['deleteData', 'confirmSlug'],
+                },
+            ],
         },
     })
     async lifecycleApp(
