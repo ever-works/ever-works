@@ -671,12 +671,14 @@ describe('EmailController — Ever Email Router over HTTP', () => {
             .overrideGuard(AuthSessionGuard)
             .useValue({ canActivate: () => true })
             .compile();
-        app = moduleRef.createNestApplication({ logger: false });
+        // Raw-body capture on, as in production (main.ts keeps the bytes the
+        // signature covers): the route must verify THOSE, not a re-serialization.
+        app = moduleRef.createNestApplication({ logger: false, rawBody: true });
         await app.init();
         return app;
     }
 
-    /** Compact JSON: the route re-serializes a parsed body to the same bytes. */
+    /** A router delivery body (compact JSON, as the Worker sends it). */
     function delivery(to = 'agent@ever.email'): string {
         return JSON.stringify({
             raw: Buffer.from(MIME).toString('base64'),
@@ -767,6 +769,25 @@ describe('EmailController — Ever Email Router over HTTP', () => {
         expect(res.status).toBe(401);
         expect(res.body).toEqual({ statusCode: 401, message: 'Invalid webhook signature' });
         expect(dispatcher.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('verifies the bytes received, not a re-serialization of the parsed body', async () => {
+        const server = await serve();
+        dispatcher.dispatch.mockResolvedValue({
+            handled: false,
+            reason: 'no matching inbound address',
+        });
+        // Pretty-printed: JSON.stringify of the parsed body would differ byte for byte.
+        const body = JSON.stringify(JSON.parse(delivery('nobody@ever.email')), null, 2);
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Content-Type', 'application/json')
+            .set('x-ever-email-signature', signature(body))
+            .send(body);
+
+        expect(res.status).toBe(202);
+        expect(res.body).toEqual({ accepted: 0, duplicates: 0, dropped: 1 });
     });
 
     it('answers duplicates for a retried delivery', async () => {

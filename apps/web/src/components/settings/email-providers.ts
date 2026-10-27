@@ -41,7 +41,7 @@ export const EMAIL_PROVIDERS: readonly EmailProviderOption[] = [
         inbound: true,
         outbound: false,
         inboundSecret:
-            'Use a name@ever.email address (one owner per mailbox). The shared router already posts to this URL once the operator sets EVER_EMAIL_ROUTER_SECRET; there is nothing to register yourself.',
+            'Use an address on the router domain: @ever.email unless the operator set EVER_EMAIL_DOMAIN (one owner per mailbox). The shared router already posts to this URL once the operator sets EVER_EMAIL_ROUTER_SECRET; there is nothing to register yourself.',
     },
     { id: 'resend', name: 'Resend', inbound: false, outbound: true },
     { id: 'sendgrid', name: 'SendGrid', inbound: false, outbound: true },

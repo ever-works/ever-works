@@ -70,7 +70,7 @@ Addresses are backed by **email-provider plugins**, enabled and configured per t
 | SendGrid                           | `sendgrid`                | Outbound only          |
 | Mailchimp Transactional (Mandrill) | `mailchimp-transactional` | Outbound only          |
 
-Only **Postmark**, **Mailgun** and the **Ever Email Router** can receive mail. Resend's plugin says why in its own manifest — inbound is deferred until Resend's inbound API is generally available. So an inbound address, and therefore anything on this page that begins with an arriving email, needs a Postmark, Mailgun or Ever Email Router address. The Ever Email Router receives `@ever.email` mail (the `EVER_EMAIL_DOMAIN` domain) from a shared Cloudflare Worker, needs nothing registered by the tenant, and gives each mailbox one owner per deployment — see `packages/plugins/ever-email-router/README.md`.
+Only **Postmark**, **Mailgun** and the **Ever Email Router** can receive mail. Resend's plugin says why in its own manifest — inbound is deferred until Resend's inbound API is generally available. So an inbound address, and therefore anything on this page that begins with an arriving email, needs a Postmark, Mailgun or Ever Email Router address. The Ever Email Router receives mail for the domain the operator configures in `EVER_EMAIL_DOMAIN` (default `ever.email`; an address on any other domain is refused) from a shared Cloudflare Worker, needs nothing registered by the tenant, and gives each mailbox one owner per deployment — see `packages/plugins/ever-email-router/README.md`.
 
 Each plugin's `providerSettings` schema is small and every secret is marked `x-secret` with an env-var fallback:
 
