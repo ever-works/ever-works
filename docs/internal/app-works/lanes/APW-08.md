@@ -12,10 +12,12 @@ Spec: [`docs/specs/features/app-works/APW-08-evolve-loop/`](../../../specs/featu
 | 2     | T49             | The operator kill switches `EVER_WORKS_APP_CHANGES_ENABLED` / `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED`, read by every dispatcher that exists.                                                      |
 | 3     | T18             | The run brief from the App rules at the base commit, instruction files fenced as untrusted (cloud and fleet).                                                                                  |
 | 4     | T24 (cost), T56 | `GET /api/tasks/:id/cost`, `GET /api/works/:id/cost`, the plan §3.4 types. The delivery routes, `allow-containment` and the web surfaces wait for the delivery chain (T7–T9, T20–T23) and T48. |
+| 5     | T27 (part)      | `RequestChangeDialog` and `WorkCostSummary` on the App Work overview, over `POST /evolve` and `GET /api/works/:id/cost`.                                                                       |
 
 MERGED: #2961 → `develop` at `c400452a4` (phase 1, T47).
 MERGED: #2965 → `develop` at `a104e182a` (phase 2, T49).
 MERGED: #2967 → `develop` at `ff2ecee5d` (phase 3, T18).
+MERGED: #2972 → `develop` at `336f2e0d4` (phase 4, T24 cost half + T56 read; CodeQL's type-confusion finding fixed in `24584e2b9`).
 
 ## Decisions
 
@@ -73,5 +75,5 @@ MERGED: #2967 → `develop` at `ff2ecee5d` (phase 3, T18).
 The delivery chain (T7–T9, T20–T23: `mergeCommitSha` on the git contract, the six `tasks` delivery columns in the
 `179208…` block, `TaskDeliveryService`, the PR-status hook, `app-change-delivery`) unlocks `GET /api/tasks/:id/delivery`
 and its close / follow-up routes, the web delivery chips, `ChatChangeCard`, and the APW08-G25 defaults (to be built
-behind a flag). `RequestChangeDialog` (S) and `WorkCostSummary` can be built now over `POST /evolve` and
-`GET /api/works/:id/cost`. P2 (T31–T37) has not started.
+behind a flag). `RequestChangeDialog` and `WorkCostSummary` are built (phase 5); the delivery chips, the Task page's
+Delivery and Cost sections and `ChatChangeCard` are not. P2 (T31–T37) has not started.
