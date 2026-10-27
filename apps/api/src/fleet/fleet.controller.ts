@@ -873,6 +873,13 @@ export class FleetController {
             selfUpdate: body.selfUpdate,
             // Schedules on computers (FL-13): the machine's time zone, validated by the service.
             timeZone: body.timeZone,
+            // Desktop view & control (FL-07): the screen helper's trust and state, the
+            // displays, the desktop reasons and the admission events, re-normalised by the service.
+            helperTrust: body.helperTrust,
+            helper: body.helper,
+            displays: body.displays,
+            desktopReasons: body.desktopReasons,
+            helperEvents: body.helperEvents,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -930,6 +937,13 @@ export class FleetController {
             selfUpdate: body.selfUpdate,
             // Schedules on computers (FL-13): the machine's time zone, validated by the service.
             timeZone: body.timeZone,
+            // Desktop view & control (FL-07): the screen helper's trust and state, the
+            // displays, the desktop reasons and the admission events, re-normalised by the service.
+            helperTrust: body.helperTrust,
+            helper: body.helper,
+            displays: body.displays,
+            desktopReasons: body.desktopReasons,
+            helperEvents: body.helperEvents,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

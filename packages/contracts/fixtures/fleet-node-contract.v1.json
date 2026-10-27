@@ -562,7 +562,12 @@
 			"lanId",
 			"daemon",
 			"selfUpdate",
-			"timeZone"
+			"timeZone",
+			"helperTrust",
+			"helper",
+			"displays",
+			"desktopReasons",
+			"helperEvents"
 		],
 		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
 		"nodeEmitsOptional": [
@@ -583,7 +588,12 @@
 			"lanId",
 			"daemon",
 			"selfUpdate",
-			"timeZone"
+			"timeZone",
+			"helperTrust",
+			"helper",
+			"displays",
+			"desktopReasons",
+			"helperEvents"
 		],
 		"controllerForwards": {
 			"enroll": [
@@ -610,7 +620,12 @@
 				"lanId",
 				"daemon",
 				"selfUpdate",
-				"timeZone"
+				"timeZone",
+				"helperTrust",
+				"helper",
+				"displays",
+				"desktopReasons",
+				"helperEvents"
 			],
 			"heartbeat": [
 				"platform",
@@ -636,7 +651,12 @@
 				"lanId",
 				"daemon",
 				"selfUpdate",
-				"timeZone"
+				"timeZone",
+				"helperTrust",
+				"helper",
+				"displays",
+				"desktopReasons",
+				"helperEvents"
 			]
 		}
 	},

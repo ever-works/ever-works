@@ -46,6 +46,7 @@ import {
     fleetConsentsDiffer,
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
+    normalizeFleetHelperTrust,
     normalizeFleetNodeSelfUpdate,
     isFleetTimeZone,
     normalizeFleetNodeWorkerState,
@@ -63,6 +64,7 @@ import {
 } from '@ever-works/contracts';
 import { fleetVirtualViewOf } from './virtual/fleet-virtual.view';
 import { fleetCloudRemovableNode, fleetCloudViewOf } from './cloud/fleet-cloud.view';
+import { applyReportedDesktop, fleetNodeDesktopViewOf, helperEventAudit } from './desktop/fleet-desktop-facts';
 import type {
     FleetAuditAction,
     FleetNodeHealthStored,
@@ -302,6 +304,17 @@ export interface EnrollInput {
      * unusable leaves the stored zone alone.
      */
     timeZone?: unknown;
+    /**
+     * Desktop view & control (FL-07, CONTRACTS §1.1, R-8) — the screen
+     * helper's trust and state, the displays, the desktop reasons and the
+     * admission events. Untrusted: re-normalised by `applyReportedDesktop`;
+     * a beat carrying none of them leaves the stored facts alone.
+     */
+    helperTrust?: unknown;
+    helper?: unknown;
+    displays?: unknown;
+    desktopReasons?: unknown;
+    helperEvents?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -785,6 +798,10 @@ export class FleetService {
         if (isFleetTimeZone(refresh.timeZone) && node.timeZone !== refresh.timeZone) {
             patch.timeZone = refresh.timeZone;
         }
+        // Desktop view & control (FL-07): the helper's trust and the desktop
+        // facts; admission events not seen before are audited after the write.
+        const desktopReport = applyReportedDesktop(node, refresh, receivedAt);
+        if (desktopReport) Object.assign(patch, desktopReport.patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -819,6 +836,18 @@ export class FleetService {
         // with both sets. The first report of a daemon is not a change, and
         // an unchanged beat writes nothing — one row per node per minute is
         // the firehose the header above refuses.
+        // Desktop view & control (FL-07, FR-16, FR-19, U3): one row per admission
+        // event id — admit, revoke, verify-failed — never a second for a re-send.
+        for (const event of desktopReport?.newEvents ?? []) {
+            const row = helperEventAudit(event);
+            await this.tryAuditNode({
+                action: row.action,
+                actorUserId: null,
+                ownerUserId: node.userId,
+                nodeId: node.id,
+                extra: row.extra,
+            });
+        }
         if (consentChange?.before) {
             await this.tryAuditNode({
                 action: 'node.consent.change',
@@ -2415,6 +2444,9 @@ export class FleetService {
             // (provider, region, size, power, phase, cost, R-36 removability).
             providerPluginId: node.providerPluginId ?? null,
             cloud: fleetCloudViewOf(node),
+            // Desktop view & control (FL-07): the helper's trust and the desktop facts.
+            helperTrust: normalizeFleetHelperTrust(node.helperTrust),
+            desktop: fleetNodeDesktopViewOf(node),
         };
     }
 
@@ -2691,6 +2723,13 @@ function toSharedView(
         // no unit name. The disk floor and the resource ceilings stay withheld,
         // so a shared reader's "disk low" is the percentage rule only.
         health: view.health ?? null,
+        // Desktop view & control (FL-07) — DECIDED shared: the helper's trust is
+        // the "Reduced trust" label every surface shows (FR-17), and the `view`
+        // audience sees the Desktop tab and its reason (FR-27); the block holds
+        // display names and sizes and an 8-digit fingerprint prefix, never a
+        // hash, a path or a picture.
+        helperTrust: view.helperTrust ?? 'none',
+        desktop: view.desktop ?? null,
     };
 }
 
@@ -2723,6 +2762,8 @@ export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
     'providerPluginId',
     'cloud',
     'health',
+    'helperTrust',
+    'desktop',
 ];
 
 /**
