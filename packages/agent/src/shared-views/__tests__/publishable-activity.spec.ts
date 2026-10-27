@@ -58,6 +58,8 @@ describe('shared view activity classification', () => {
         ActivityActionType.MEMBER_INVITED,
         ActivityActionType.SHARED_VIEW_ENABLED,
         ActivityActionType.SHARED_VIEW_REGENERATED,
+        // APW-09 (R-34) — its narration names a repository and a pull-request number.
+        ActivityActionType.APP_UPSTREAM_PR,
     ])('never publishes %s', (action) => {
         expect(isActivityPublishable(action)).toBe(false);
         expect(NEVER_PUBLISH_ACTIVITY_ACTIONS).toContain(action);

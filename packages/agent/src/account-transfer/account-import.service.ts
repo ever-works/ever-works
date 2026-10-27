@@ -87,6 +87,17 @@ function claimsAppWorkKind(value: unknown): boolean {
 }
 
 /**
+ * APW-11 FR-19 — `appLauncherExposed` is applied only as one of its three real
+ * states: `true`, `false`, or `null` (the kind default, a permanent state of its
+ * own). `undefined` (an old payload) leaves the existing Work alone, and any
+ * other value is dropped rather than coerced, the same drop-if-unrecognized
+ * posture as `normalizeImportedWorkKind`.
+ */
+function isImportableLauncherExposure(value: unknown): value is boolean | null {
+    return typeof value === 'boolean' || value === null;
+}
+
+/**
  * Quality-gate fields arrive from user-supplied JSON, so they follow the
  * same posture as `normalizeImportedWorkKind`: drop-if-unrecognized, never
  * default-if-unrecognized. A tampered `checksPolicy` must not be able to
@@ -772,6 +783,12 @@ export class AccountImportService {
                 if (typeof dir.providerRepositoryEnabled === 'boolean') {
                     updateData.providerRepositoryEnabled = dir.providerRepositoryEnabled;
                 }
+                // App Launcher exposure (APW-11): an explicit boolean, or an
+                // explicit null (= kind default) that must overwrite an
+                // explicit choice. Absent → leave alone; anything else → drop.
+                if (isImportableLauncherExposure(dir.appLauncherExposed)) {
+                    updateData.appLauncherExposed = dir.appLauncherExposed;
+                }
                 if (
                     typeof dir.taskIsolation === 'string' &&
                     ['off', 'worktree'].includes(dir.taskIsolation)
@@ -861,6 +878,9 @@ export class AccountImportService {
         }
         if (typeof dir.providerRepositoryEnabled === 'boolean') {
             createData.providerRepositoryEnabled = dir.providerRepositoryEnabled;
+        }
+        if (isImportableLauncherExposure(dir.appLauncherExposed)) {
+            createData.appLauncherExposed = dir.appLauncherExposed;
         }
         if (
             typeof dir.taskIsolation === 'string' &&

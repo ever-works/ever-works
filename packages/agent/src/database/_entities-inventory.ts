@@ -195,6 +195,11 @@ import { AppLauncherPreference } from '../entities/app-launcher-preference.entit
 // never the barrel: see the module docstring.
 import { WorkAppRuntimeState } from '../entities/work-app-runtime-state.entity';
 import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+// APW-09 Upstream pull requests — the record, the toggle's in-flight state and
+// FR-34's suggestions. Concrete paths, never the barrel.
+import { UpstreamPullRequest } from '../entities/upstream-pull-request.entity';
+import { WorkUpstreamPrSetting } from '../entities/work-upstream-pr-setting.entity';
+import { UpstreamPrSuggestion } from '../entities/upstream-pr-suggestion.entity';
 // APW-07 App env & dependencies — one encrypted value per (Work, name), and one
 // row per (Work, kind) recording what a dependency provider provisioned.
 import { WorkAppEnvValue } from '../entities/work-app-env-value.entity';
@@ -546,6 +551,12 @@ export const ENTITIES = [
     // APW-02 Fork lifecycle — the Upstream state of one App Work: readiness,
     // Actions hygiene, schedule, divergence and the manual-sync allowance.
     WorkUpstreamState,
+    // APW-09 Upstream pull requests — one record per upstream pull request
+    // (proposal or direct, partial unique active row per source Task), the
+    // Upstream pull requests toggle's in-flight state, and FR-34's suggestions.
+    UpstreamPullRequest,
+    WorkUpstreamPrSetting,
+    UpstreamPrSuggestion,
     // APW-07 App env & dependencies — the stored Environment values of one App
     // Work, and the dependency rows a provider provisions and reports on.
     WorkAppEnvValue,

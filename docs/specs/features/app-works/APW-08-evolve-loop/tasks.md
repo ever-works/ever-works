@@ -969,7 +969,8 @@ _Delivers FR-56…FR-60._
 _Numbered from T47 so every earlier task id stays stable. All are P1 except where noted, and each one is an
 **addition**: no task above is removed, renumbered or narrowed._
 
-- [ ] **T47. The App Work Task tool policy (XC-05, FR-69).**
+- [x] **T47. The App Work Task tool policy (XC-05, FR-69).**
+      **Status (2026-10-27, lane B2 `aw-evolve`, PR #2961): done** — `app-work-task-tool-policy.ts` is an allow-list (`ask_human`, `commitToRepo`, `openPullRequest`, `submitTaskReview`, every `read.internal` tool) reported under the five spec groups plus an additive sixth, `platform-action` (every other acting tool, and any tool nobody has classified); names compare case-insensitively. Applied last in `resolveAllowedTools`; `resolveGrantedTools` skips the MCP source and reports the withheld names by group. `AgentRunService` classifies the run through `APP_WORK_RUN_CLASSIFIER` (Task's Work, or the Agent's Work unless it is the owner's own Conversation turn; fail closed), writes the per-group counter as one WARN run-log row, and re-checks the final list at dispatch (a violation refuses the run: `app_work_tool_policy` on the run row, an ERROR row, an `agent_run_failed` Activity row). The fleet planner withholds the MCP bridge from an App Work run. The spec is `app-work-tool-policy.spec.ts` (21 cases) plus `fleet-agent-task-planner.app-work-policy.spec.ts`. Residual: a fleet node CLI's own built-in web tools (T48, node side).
       **Create** `packages/agent/src/app-works/app-work-task-tool-policy.ts` (new) — `APP_WORK_TASK_TOOL_POLICY` and
       the constants of plan §3.4: deny outbound messaging (`sendEmail`, channel notifications, agent-to-agent
       messages), web fetch and search, every MCP tool, sub-agents and delegation, and every App Works mutation tool

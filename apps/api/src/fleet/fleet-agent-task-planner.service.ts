@@ -1,6 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PromptAssemblerService } from '@ever-works/agent/agents';
+import {
+    APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+    appWorkTaskToolPolicyApplies,
+} from '@ever-works/agent/app-works';
 import { config } from '@ever-works/agent/config';
 import {
     AgentRepository,
@@ -834,7 +838,19 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // promises Tasks/Inbox tools to a run with no bridge produces a
         // model that hunts for them and gives up, and a bridge nobody
         // told the model about is a credential minted for nothing.
-        const mcp = resolveMcpBridge(agent, settings);
+        //
+        // APW-08 T47 (FR-69) — an App Work run gets NO platform tools on a node either: the
+        // bridge IS the run's MCP tool surface, and the App Work Task tool policy denies every
+        // MCP tool. Re-checked here, at dispatch, from the Task's and the Agent's Work rows,
+        // whatever the three bridge switches say (the run-credential mint refuses a job whose
+        // payload carries no bridge, so no run token can be minted for it either).
+        const appWorkRun = await this.isAppWorkRun(task, work, agent);
+        const mcp = appWorkRun ? null : resolveMcpBridge(agent, settings);
+        if (appWorkRun && resolveMcpBridge(agent, settings)) {
+            this.logger.log(
+                `Task ${task.slug ?? task.id}: App Work run — the platform-MCP bridge is withheld (${APP_WORK_TOOL_POLICY_REFUSAL_CODE}).`,
+            );
+        }
         const { instructions, continuation } = await this.composeInstructions({
             agent,
             task,
@@ -887,6 +903,16 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         );
         if (resume) execution.resume = resume;
 
+        // APW-08 T47 — the last look before the payload is sealed: an App Work run's job never
+        // carries a bridge. Unreachable today (the bridge is withheld above); it is what keeps
+        // a later edit between the two from shipping one.
+        if (appWorkRun && mcp) {
+            throw new FleetAgentTaskPlanError(
+                `${APP_WORK_TOOL_POLICY_REFUSAL_CODE}: Task ${task.slug ?? task.id} works on an App Work, and its fleet job would ` +
+                    'have carried platform MCP tools, which the App Work Task tool policy denies. The run was refused before any job was written.',
+            );
+        }
+
         return {
             execution,
             workspace,
@@ -908,6 +934,38 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             // job changes shape because this slice exists.
             ...(mcp ? { mcp } : {}),
         };
+    }
+
+    /**
+     * APW-08 T47 (FR-69) — does the App Work Task tool policy apply to this run? The Task's own
+     * Work (already loaded by {@link plan}) or the Agent's scope Work being an App Work. Fail
+     * closed: a Work id that resolves to nothing, or a read that throws, answers `true` — the
+     * run then plans without the bridge, which only ever removes tools.
+     */
+    private async isAppWorkRun(
+        task: Pick<Task, 'workId'>,
+        taskWork: { kind?: string | null } | null,
+        agent: Pick<Agent, 'workId'>,
+    ): Promise<boolean> {
+        if (task.workId && !taskWork) return true;
+        let agentWorkKind: string | null = null;
+        if (agent.workId && agent.workId !== task.workId) {
+            try {
+                const agentWork = await this.works.findById(agent.workId);
+                if (!agentWork) return true;
+                agentWorkKind = agentWork.kind ?? null;
+            } catch {
+                return true;
+            }
+        } else if (agent.workId) {
+            agentWorkKind = taskWork?.kind ?? null;
+        }
+        return appWorkTaskToolPolicyApplies({
+            taskWorkKind: taskWork?.kind ?? null,
+            agentWorkKind,
+            // A fleet run is never its owner's own Conversation turn.
+            ownerConversationTurn: false,
+        });
     }
 
     /**
