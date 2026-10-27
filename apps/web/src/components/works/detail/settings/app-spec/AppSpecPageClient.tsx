@@ -8,6 +8,7 @@ import { useWorkPermissions } from '../../WorkDetailContext';
 import { APP_SPEC_BLUEPRINT_SLOT_ID, AppSpecStatusBanner } from './AppSpecStatusBanner';
 import { AppSpecProblemsList } from './AppSpecProblemsList';
 import { AppSpecSections } from './AppSpecSections';
+import { AppBlueprintCard, blueprintRunActive } from './AppBlueprintCard';
 
 /**
  * APW-03 T17 — the App spec tab's layout and its poll (plan §5.2,
@@ -19,7 +20,7 @@ import { AppSpecSections } from './AppSpecSections';
  *  ├──────────────────────────────────────────────────────────────┤
  *  │ AppSpecProblemsList        (sort, filter, open at the line)   │
  *  ├──────────────────────────────────────────────────────────────┤
- *  │ AppBlueprintCard           ← T31's slot, deliberately empty   │
+ *  │ AppBlueprintCard           (T31, lane aw-blueprints)          │
  *  │ AppLicenseCard             ← T45's slot, deliberately empty   │
  *  ├──────────────────────────────────────────────────────────────┤
  *  │ AppSpecSections            (collapsible, default-marked)      │
@@ -100,9 +101,13 @@ export function AppSpecPageClient({ workId, initialState }: AppSpecPageClientPro
     }, [workId]);
 
     const pending = state.evaluationPending;
+    // APW-03 T31 — a Blueprint apply / upgrade run that is queued or running is followed by
+    // the same poll, so the card turns into the pull request without a reload.
+    const blueprintRunning = blueprintRunActive(state);
+    const polling = pending || blueprintRunning;
 
     useEffect(() => {
-        if (!pending) {
+        if (!polling) {
             return;
         }
 
@@ -117,13 +122,13 @@ export function AppSpecPageClient({ workId, initialState }: AppSpecPageClientPro
             polls.current += 1;
             const next = await refresh();
 
-            if (next && next.evaluationPending !== true) {
+            if (next && next.evaluationPending !== true && !blueprintRunActive(next)) {
                 window.clearInterval(interval);
             }
         }, APP_SPEC_POLL_INTERVAL_MS);
 
         return () => window.clearInterval(interval);
-    }, [pending, refresh]);
+    }, [polling, refresh]);
 
     const onRecheck = async () => {
         setFailure(null);
@@ -184,7 +189,14 @@ export function AppSpecPageClient({ workId, initialState }: AppSpecPageClientPro
              * exported by the banner, which anchors the missing state's **Browse
              * Blueprints** action at it — so the two cannot drift apart.
              */}
-            <div id={APP_SPEC_BLUEPRINT_SLOT_ID} data-testid="app-spec-blueprint-slot" />
+            <div id={APP_SPEC_BLUEPRINT_SLOT_ID} data-testid="app-spec-blueprint-slot">
+                <AppBlueprintCard
+                    workId={workId}
+                    state={state}
+                    canEdit={permissions.canEdit}
+                    onStateChange={(patch) => setState((current) => ({ ...current, ...patch }))}
+                />
+            </div>
 
             {/*
              * T45's slot: the licence card — headline, mixed evidence,
