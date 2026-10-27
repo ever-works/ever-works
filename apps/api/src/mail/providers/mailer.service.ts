@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { createHash } from 'crypto';
 import * as fs from 'fs/promises';
 import Handlebars from 'handlebars';
 import { Resend } from 'resend';
@@ -103,9 +104,18 @@ export class MailerService {
      * if it sent. Without it the behaviour is unchanged for every existing
      * caller (an SMTP failure already throws; a Resend error is now logged).
      */
-    async sendMail(data: SendMailOptions, options: { strict?: boolean } = {}): Promise<void> {
+    async sendMail(
+        data: SendMailOptions,
+        options: { strict?: boolean; redactRecipient?: boolean } = {},
+    ): Promise<void> {
         const provider = config.mail.provider();
-        const recipient = data.to ? this.getDestination(data.to).join(', ') : 'unknown';
+        // `redactRecipient` — flows whose logs must not carry the address in
+        // clear (self-serve account deletion) log a short SHA-256 handle of it.
+        const recipient = data.to
+            ? this.getDestination(data.to)
+                  .map((to) => (options.redactRecipient ? redactAddress(String(to)) : to))
+                  .join(', ')
+            : 'unknown';
 
         switch (provider) {
             case 'smtp':
@@ -119,7 +129,9 @@ export class MailerService {
                     this.logger.warn(
                         `Resend client not initialized (missing RESEND_APIKEY?), falling back to faker for to=${recipient}`,
                     );
-                    await this.fakerMailerService.sendMail(data);
+                    await this.fakerMailerService.sendMail(
+                        options.redactRecipient ? { ...data, to: recipient } : data,
+                    );
                     break;
                 }
 
@@ -160,7 +172,9 @@ export class MailerService {
 
             default:
                 this.logger.debug(`No mail provider configured, using faker for to=${recipient}`);
-                await this.fakerMailerService.sendMail(data);
+                await this.fakerMailerService.sendMail(
+                    options.redactRecipient ? { ...data, to: recipient } : data,
+                );
                 break;
         }
     }
@@ -210,4 +224,10 @@ export class MailerService {
 
         return '';
     }
+}
+
+/** `email#<first 12 hex of sha256(lower(address))>` — a log-safe handle for an address. */
+function redactAddress(address: string): string {
+    const digest = createHash('sha256').update(address.trim().toLowerCase(), 'utf8').digest('hex');
+    return `email#${digest.slice(0, 12)}`;
 }

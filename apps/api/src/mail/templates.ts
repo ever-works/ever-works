@@ -54,6 +54,7 @@ export const TEMPLATES_DIR = path.resolve(__dirname, '..', 'templates');
  * `.hbs` file without registering it here fails too.
  */
 export const KNOWN_EMAIL_TEMPLATES = [
+    'account-deleted',
     'account-deletion',
     'budget-alert',
     'forgot-password',

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your account was deleted</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8fafc;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .logo-section {
+            padding: 40px 20px 30px;
+            text-align: center;
+        }
+        .logo-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0;
+        }
+        .logo-subtitle {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 5px 0 0;
+        }
+        .main-card {
+            margin: 0 20px 40px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px 30px;
+        }
+        .icon {
+            text-align: center;
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+        .title {
+            font-size: 24px;
+            color: #1e293b;
+            font-weight: 600;
+            text-align: center;
+            margin: 0 0 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #64748b;
+            margin: 0 0 20px;
+            font-size: 16px;
+        }
+        .details-box {
+            background-color: #f8fafc;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .details-text {
+            font-size: 14px;
+            color: #64748b;
+            margin: 0;
+            line-height: 1.8;
+        }
+        .security-alert {
+            text-align: center;
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 30px 0 0;
+        }
+        .button {
+            display: inline-block;
+            text-decoration: none;
+            background-color: #ef4444;
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 10px 24px;
+            border-radius: 6px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .button-container {
+            text-align: center;
+            margin: 20px 0 0;
+        }
+        .footer {
+            padding: 0 20px 40px;
+            text-align: center;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #94a3b8;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Logo Section -->
+        <div class="logo-section">
+            <h1 class="logo-title">{{appName}}</h1>
+            <p class="logo-subtitle">by {{companyOwner}}</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="main-card">
+            <div class="icon">🗑️</div>
+
+            <h2 class="title">Your account was deleted</h2>
+
+            <p class="subtitle">
+                Your {{appName}} account and the personal data tied to it were deleted on {{deletedAt}}.
+            </p>
+
+            <div class="details-box">
+                <p class="details-text">
+                    {{#if workspaceDeleted}}<strong>Workspace:</strong> deleted with its organizations and works.<br>{{/if}}
+                    {{#if workspaceTransferred}}<strong>Workspace:</strong> handed over to another member, who keeps its content.<br>{{/if}}
+                    {{#if worksDeleted}}<strong>Works deleted:</strong> {{worksDeleted}}<br>{{/if}}
+                    {{#if membershipsRemoved}}<strong>Organization memberships removed:</strong> {{membershipsRemoved}}<br>{{/if}}
+                    <strong>Sessions and API keys:</strong> revoked<br>
+                    {{#if subscriptionsCanceled}}<strong>Subscription:</strong> canceled (no further charges)<br>{{/if}}
+                </p>
+            </div>
+
+            <p class="security-alert">
+                We keep only what the law or our payment provider requires: invoices and payment records,
+                and a record of this deletion that holds no name or email address in clear text. Encrypted
+                backups roll over and are gone within their retention period. Git repositories in your own
+                GitHub account were not touched.
+            </p>
+
+            <p class="security-alert">
+                If you did not ask for this, reply to this email right away.
+            </p>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p class="footer-text">
+                © {{currentYear}} {{companyOwner}} All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -48,6 +48,8 @@ const SOURCE_TEMPLATES_DIR = path.join(API_ROOT, 'src', 'templates');
 
 /** Every template `MailService` asks `MailerService` to render. */
 const TEMPLATES_USED_BY_MAIL_SERVICE = [
+    // Self-serve account deletion — sent by AccountDeletionMailer.
+    'account-deleted',
     'account-deletion',
     'budget-alert',
     'forgot-password',
