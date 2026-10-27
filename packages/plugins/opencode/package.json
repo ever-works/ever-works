@@ -36,7 +36,7 @@
 		"@ever-works/plugin": "workspace:*"
 	},
 	"dependencies": {
-		"extract-zip": "^2.0.1",
+		"@electron-internal/extract-zip": "^1.0.6",
 		"tar": "^7.5.21"
 	},
 	"devDependencies": {
