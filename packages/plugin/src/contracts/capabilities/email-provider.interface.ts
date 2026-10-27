@@ -297,11 +297,44 @@ export interface EmailInboundAckCounts {
 }
 
 /**
+ * Rules for the tenant addresses registered with an inbound plugin — see
+ * {@link IEmailInboundPlugin.inboundAddressPolicy}.
+ */
+export interface EmailInboundAddressPolicy {
+	/**
+	 * The only domain an address of this plugin may use (`name@<domain>`),
+	 * e.g. the one domain a shared router delivers. Compared lower-cased;
+	 * the platform stores such addresses lower-cased too.
+	 */
+	readonly domain: string;
+	/**
+	 * One owner per mailbox across the whole deployment: an address another
+	 * account already holds for inbound mail (with any plugin) is refused.
+	 * For a plugin whose deliveries all come from one shared sender, where a
+	 * second registration of a mailbox would otherwise silently lose its mail.
+	 */
+	readonly exclusive: boolean;
+}
+
+/**
  * Inbound capability — provider exposes a public webhook that the
  * platform parses + signature-verifies. Maps to
  * `PLUGIN_CAPABILITIES.EMAIL_INBOUND`.
  */
 export interface IEmailInboundPlugin extends IPlugin {
+	/**
+	 * Optional: rules the platform enforces when an address is registered
+	 * (or re-enabled) with this plugin ({@link EmailInboundAddressPolicy}):
+	 * the domain is checked (400) and, when `exclusive`, so is the mailbox's
+	 * single owner (409). Absent means no rule — every existing plugin's
+	 * addresses are registered exactly as before.
+	 *
+	 * Read from the plugin's loaded instance (it may be a getter that reads
+	 * the environment); a registered plugin that cannot load at registration
+	 * time refuses the registration (503) rather than skipping its rules.
+	 */
+	readonly inboundAddressPolicy?: EmailInboundAddressPolicy;
+
 	/**
 	 * Optional: how the webhook acknowledges a verified delivery
 	 * ({@link EmailInboundAckMode}). Absent means `received`, so every

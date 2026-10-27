@@ -86,6 +86,24 @@ describe('EverEmailRouterPlugin', () => {
 		});
 	});
 
+	describe('inboundAddressPolicy', () => {
+		afterEach(() => {
+			delete process.env.EVER_EMAIL_DOMAIN;
+		});
+
+		it('holds addresses to ever.email with one owner per deployment by default', () => {
+			delete process.env.EVER_EMAIL_DOMAIN;
+			expect(plugin.inboundAddressPolicy).toEqual({ domain: 'ever.email', exclusive: true });
+		});
+
+		it('follows EVER_EMAIL_DOMAIN (lower-cased, trimmed), read on every call', () => {
+			process.env.EVER_EMAIL_DOMAIN = ' Mail.Example.ORG ';
+			expect(plugin.inboundAddressPolicy).toEqual({ domain: 'mail.example.org', exclusive: true });
+			process.env.EVER_EMAIL_DOMAIN = '   ';
+			expect(plugin.inboundAddressPolicy.domain).toBe('ever.email');
+		});
+	});
+
 	describe('verifyWebhookSignature', () => {
 		it('accepts a valid signature over the exact raw body', () => {
 			const raw = body();

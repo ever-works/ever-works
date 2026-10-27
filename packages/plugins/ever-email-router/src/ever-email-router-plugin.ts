@@ -3,6 +3,7 @@ import PostalMime from 'postal-mime';
 import type { Address, Email, Mailbox } from 'postal-mime';
 import type {
 	IEmailInboundPlugin,
+	EmailInboundAddressPolicy,
 	EmailInboundMessage,
 	EmailOptions,
 	EmailAttachment,
@@ -30,6 +31,18 @@ export const EVER_EMAIL_MIN_SECRET_LENGTH = 24;
  * `(pluginId, providerMessageId)` unique index answers as a duplicate.
  */
 export const EVER_EMAIL_MAX_SKEW_SECONDS = 300;
+
+/** The domain the router delivers when `EVER_EMAIL_DOMAIN` is unset. */
+export const DEFAULT_EVER_EMAIL_DOMAIN = 'ever.email';
+
+/**
+ * The one domain the shared router delivers: `EVER_EMAIL_DOMAIN`
+ * (lower-cased), else {@link DEFAULT_EVER_EMAIL_DOMAIN}. Read on every call,
+ * so the policy follows the deployment's environment.
+ */
+export function everEmailDomain(env: Readonly<Record<string, string | undefined>> = process.env): string {
+	return (env.EVER_EMAIL_DOMAIN ?? '').trim().toLowerCase() || DEFAULT_EVER_EMAIL_DOMAIN;
+}
 
 /** Longest `email_messages.providerMessageId` the column holds (varchar 200). */
 const PROVIDER_MESSAGE_ID_MAX_LENGTH = 200;
@@ -220,6 +233,16 @@ export class EverEmailRouterPlugin implements IEmailInboundPlugin {
 	readonly category: PluginCategory = 'email-provider';
 	readonly capabilities = [PLUGIN_CAPABILITIES.EMAIL_INBOUND] as const;
 	readonly inboundAck = 'counts' as const;
+
+	/**
+	 * The router delivers ONE domain, and every mailbox's mail comes from it:
+	 * an address of this plugin must be on that domain, with one owner per
+	 * deployment (a second registration of the same mailbox would never
+	 * receive anything). The platform enforces both on registration.
+	 */
+	get inboundAddressPolicy(): EmailInboundAddressPolicy {
+		return { domain: everEmailDomain(), exclusive: true };
+	}
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {

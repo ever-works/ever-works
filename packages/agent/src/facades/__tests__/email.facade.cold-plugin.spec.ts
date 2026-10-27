@@ -906,3 +906,99 @@ describe('EmailFacadeService — Ever Email Router over a lazy proxy', () => {
         }
     });
 });
+
+/**
+ * `EmailFacadeService.inboundAddressPolicy` — the address rules the API
+ * enforces on registration, read from the plugin's LOADED instance (the
+ * router's policy is a getter over `EVER_EMAIL_DOMAIN`; a cold proxy answers a
+ * forwarding function for it). A registered inbound plugin that cannot load
+ * refuses (503) rather than letting its rules be skipped.
+ */
+describe('EmailFacadeService.inboundAddressPolicy', () => {
+    const { EverEmailRouterPlugin } = jest.requireActual<{ EverEmailRouterPlugin: PluginClass }>(
+        '../../../../plugins/ever-email-router/src/ever-email-router-plugin',
+    );
+    const savedDomain = process.env.EVER_EMAIL_DOMAIN;
+
+    afterEach(() => {
+        if (savedDomain === undefined) delete process.env.EVER_EMAIL_DOMAIN;
+        else process.env.EVER_EMAIL_DOMAIN = savedDomain;
+    });
+
+    function world() {
+        const registry = createRegistry();
+        registerRealLazy(registry, new EverEmailRouterPlugin());
+        registerRealLazy(registry, new PostmarkPlugin());
+        const { service } = realSettings(registry, {});
+        return { registry, facade: facadeFor(registry, service) };
+    }
+
+    it("answers the router's policy from the loaded instance on a cold proxy, following EVER_EMAIL_DOMAIN", async () => {
+        delete process.env.EVER_EMAIL_DOMAIN;
+        const { registry, facade } = world();
+        const cold = registry
+            .getByCapability('email-inbound')
+            .find((entry) => entry.plugin.id === 'ever-email-router')!.plugin as unknown as Record<
+            string,
+            unknown
+        >;
+        // What a read through the cold proxy would see — never the policy.
+        expect(typeof cold.inboundAddressPolicy).toBe('function');
+
+        await expect(facade.inboundAddressPolicy('ever-email-router')).resolves.toEqual({
+            domain: 'ever.email',
+            exclusive: true,
+        });
+        process.env.EVER_EMAIL_DOMAIN = 'Mail.Example.org';
+        await expect(facade.inboundAddressPolicy('ever-email-router')).resolves.toEqual({
+            domain: 'mail.example.org',
+            exclusive: true,
+        });
+    });
+
+    it('answers null for a plugin without a policy, and for an id that is no registered inbound plugin', async () => {
+        const { facade } = world();
+        await expect(facade.inboundAddressPolicy('postmark')).resolves.toBeNull();
+        await expect(facade.inboundAddressPolicy('resend')).resolves.toBeNull();
+        await expect(facade.inboundAddressPolicy('no-such-plugin')).resolves.toBeNull();
+    });
+
+    it.each([
+        ['its import fails', { failing: true }],
+        ['its first load (onLoad) fails', { onLoadFails: true }],
+    ])('refuses (503) — never skips the rules — when %s', async (_case, failure) => {
+        const registry = createRegistry();
+        const { members } = inboundMembers({
+            inboundAddressPolicy: { domain: 'ever.email', exclusive: true },
+        });
+        registerColdInbound(registry, { members, ...failure });
+        const { service } = realSettings(registry, {});
+        const facade = facadeFor(registry, service);
+
+        await expect(facade.inboundAddressPolicy(FIXTURE_ID)).rejects.toMatchObject({
+            status: 503,
+        });
+    });
+
+    it('refuses (503) a policy that names no domain, and normalizes a valid one', async () => {
+        const registry = createRegistry();
+        const { members } = inboundMembers({
+            inboundAddressPolicy: { domain: '  ', exclusive: true },
+        });
+        registerColdInbound(registry, { members });
+        const { service } = realSettings(registry, {});
+        await expect(
+            facadeFor(registry, service).inboundAddressPolicy(FIXTURE_ID),
+        ).rejects.toMatchObject({ status: 503 });
+
+        const other = createRegistry();
+        const valid = inboundMembers({
+            inboundAddressPolicy: { domain: ' Ever.Email ', exclusive: 1 },
+        });
+        registerColdInbound(other, { members: valid.members });
+        const settings = realSettings(other, {});
+        await expect(
+            facadeFor(other, settings.service).inboundAddressPolicy(FIXTURE_ID),
+        ).resolves.toEqual({ domain: 'ever.email', exclusive: false });
+    });
+});

@@ -12,5 +12,7 @@ export {
 	everEmailRouterPlugin,
 	EVER_EMAIL_SIGNATURE_HEADER,
 	EVER_EMAIL_MIN_SECRET_LENGTH,
-	EVER_EMAIL_MAX_SKEW_SECONDS
+	EVER_EMAIL_MAX_SKEW_SECONDS,
+	DEFAULT_EVER_EMAIL_DOMAIN,
+	everEmailDomain
 } from './ever-email-router-plugin.js';

@@ -12,7 +12,7 @@ Ever Email Router plugin for Ever Works — receive mail for `@ever.email` addre
 | ---------------------- | ------ | ---------- | -------------------------- | -------- |
 | `inboundWebhookSecret` | yes    | yes        | `EVER_EMAIL_ROUTER_SECRET` | yes      |
 
-The API also reads `EVER_EMAIL_DOMAIN` (default `ever.email`): the only domain an address registered with this plugin may use.
+The plugin also reads `EVER_EMAIL_DOMAIN` (default `ever.email`): the only domain an address registered with it may use, declared through its `inboundAddressPolicy`.
 
 ## Contract
 
@@ -51,7 +51,7 @@ Answers:
 - **Counts only after verification.** The platform's other inbound webhooks answer `{"received":true}` whatever happened (EW-718: no routing leak). The counts are answered only once the signature passed — the caller has proven it holds the deployment's secret — and carry no id, Agent or mode.
 - **Bound to the envelope.** The message is routed to the envelope recipient (inside the signed body), never to the sender-written `To` header.
 - **Replays are harmless.** Inside the 300 s window a captured request can only re-deliver the same message to the same recipient, which the `(pluginId, providerMessageId)` unique index answers as a duplicate.
-- **One owner per mailbox.** The API refuses (`400`) an address of this plugin outside `EVER_EMAIL_DOMAIN`, and (`409`) a mailbox another account already holds for inbound mail — under any plugin, since the inbound binding picks the oldest such row. Re-enabling a disabled address is checked the same way. Addresses are stored lower-cased.
+- **One owner per mailbox.** The plugin declares `inboundAddressPolicy: { domain: EVER_EMAIL_DOMAIN || 'ever.email', exclusive: true }`, and the API (which never names the plugin) enforces it: an address outside the domain is refused (`400`), and so is (`409`) a mailbox another account already holds for inbound mail — under any plugin, since the inbound binding picks the oldest such row. Re-enabling a disabled address is checked the same way, addresses are stored lower-cased, and if the plugin cannot be loaded when an address is registered the registration is refused (`503`) rather than left unchecked.
 
 ## Parsing
 
