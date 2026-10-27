@@ -28,9 +28,13 @@ import {
     APP_HOSTS_APPS_DOMAIN,
     APP_HOSTS_DEPLOY_REQUESTER,
     APP_HOSTS_DEPLOYMENT_STORE,
+    APP_HOSTS_REBUILD_REQUESTER,
     APP_HOSTS_WORK_STORE,
     AppHostsService,
 } from './app-hosts.service';
+import { appHostsRebuildRequester, type AppBuildsRebuildLike } from './app-hosts-rebuild.requester';
+import { AppBuildsService } from '../app-builds/app-builds.service';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import { AppDomainsService } from './app-domains.service';
 import { APP_DEPLOY_HOST_SOURCE } from './app-deploy-preconditions.service';
 import { ConfigAppsTierPolicy } from '../apps-tier/config-apps-tier-policy';
@@ -296,6 +300,22 @@ import {
         {
             provide: APP_HOSTS_APPS_DOMAIN,
             useValue: { getDomain: (): string | null => config.everWorks.apps.getDomain() },
+        },
+        // Lane aw-safety (2026-10-26) — APW-05's rebuild, LAZILY (this module and `AppBuildsModule`
+        // must not import each other). Unbound before, so a primary-domain change under the
+        // `rebuild` policy answered `rebuild_unavailable` for every App Work.
+        {
+            provide: APP_HOSTS_REBUILD_REQUESTER,
+            useFactory: (moduleRef: ModuleRef, works?: WorkRepository) =>
+                appHostsRebuildRequester(
+                    () =>
+                        getOptionalProvider<AppBuildsRebuildLike>(
+                            moduleRef,
+                            AppBuildsService,
+                        ) as AppBuildsRebuildLike | undefined,
+                    works,
+                ),
+            inject: [ModuleRef, { token: WorkRepository, optional: true }],
         },
     ],
     exports: [

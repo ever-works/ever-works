@@ -25,6 +25,8 @@ import {
     type FleetActionsJobView,
     type FleetActionsJobsView,
     type FleetActionsWatchedTarget,
+    fleetActionsRunnerReinstallSummary,
+    fleetActionsRunnerUpdateAvailable,
 } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 import type { ConfirmDialogModel } from '../machine/machine-actions.shared';
@@ -264,6 +266,69 @@ export function runnerActDialog(
     }
 }
 
+// ─── Versions and Reinstall (P3, spec FR-28) ────────────────────────────────
+
+/**
+ * The newer runner build to show as "Update available" (FR-28): the API's
+ * `updateAvailable`, kept only when it is newer than the installed version
+ * (the contracts' comparison); when the installed version is unknown, the
+ * API's word stands. Updating is the owner's act — Reinstall — never automatic.
+ */
+export function runnerUpdateAvailable(
+    runner: Pick<FleetActionsRunnerView, 'runnerVersion'> & { updateAvailable?: string | null },
+): string | null {
+    const latest = runner.updateAvailable?.trim() || null;
+    if (!latest) return null;
+    return runner.runnerVersion
+        ? fleetActionsRunnerUpdateAvailable(runner.runnerVersion, latest)
+        : latest;
+}
+
+/**
+ * Whether a row offers **Reinstall…** (FR-28): while it is idle, offline,
+ * stopped or failed — a failed install's **Retry** is this act. Never mid-job,
+ * mid-install, while unknown or while a remove runs; the server still decides.
+ */
+export function runnerReinstallAvailability(
+    runner: Pick<FleetActionsRunnerView, 'state' | 'phase'>,
+): RunnerActAvailability {
+    if (runner.phase === 'removing') return 'hidden';
+    return runner.state === 'idle' ||
+        runner.state === 'offline' ||
+        runner.state === 'stopped' ||
+        runner.state === 'failed'
+        ? 'enabled'
+        : 'hidden';
+}
+
+/** The confirmation of **Reinstall…** (`confirm`, CONTRACTS §2.2), naming the build it installs when one is newer. */
+export function runnerReinstallDialog(
+    runner: Pick<FleetActionsRunnerView, 'name' | 'runnerVersion'> & {
+        updateAvailable?: string | null;
+    },
+): ConfirmDialogModel {
+    return {
+        class: 'confirm',
+        ...splitSummary(
+            fleetActionsRunnerReinstallSummary(runner.name, runnerUpdateAvailable(runner)),
+        ),
+    };
+}
+
+/**
+ * Where a row puts **Reinstall…**: in the row itself when it matters now (a
+ * failed install's **Retry**, or a newer build), else in the ⋯ menu beside
+ * Remove runner….
+ */
+export function runnerReinstallPlacement(
+    runner: Pick<FleetActionsRunnerView, 'state' | 'runnerVersion'> & {
+        updateAvailable?: string | null;
+    },
+): 'retry' | 'inline' | 'menu' {
+    if (runner.state === 'failed') return 'retry';
+    return runnerUpdateAvailable(runner) ? 'inline' : 'menu';
+}
+
 // ─── The Install dialog (spec §5.1, FR-2, FR-3, FR-30) ──────────────────────
 
 /** True for a Windows computer (`win32`, as nodes report it). */
@@ -271,8 +336,12 @@ export function isWindowsOs(os: string | null | undefined): boolean {
     return os === 'win32' || os === 'windows';
 }
 
-/** Container-isolated runners (mode `docker`) are phase 3: P1 never offers them, whatever the server lists. */
-export const RUNNER_DOCKER_SHIPPED = false;
+/**
+ * Container-isolated runners (mode `docker`) shipped with phase 3 (FR-27): the
+ * dialog offers them wherever the server lists them (Linux computers that
+ * advertise `actions-runner-docker`). P1 kept this gate off; it stays a gate.
+ */
+export const RUNNER_DOCKER_SHIPPED = true;
 
 /**
  * The run modes the dialog offers (FR-3, FR-9, FR-27): those the server
@@ -408,6 +477,8 @@ export interface RunnerInstallForm {
     names: string[];
     labelsText: string;
     mode: FleetActionsRunnerMode;
+    /** P3, container mode only (FR-27): share the host's container daemon — an explicit, unticked-by-default opt-in. */
+    shareDockerDaemon?: boolean;
 }
 
 /** The request Install sends (the dialog IS the confirmation: `confirm: true`). */
@@ -423,6 +494,8 @@ export function installRequestFrom(
         ...(names.length === form.count ? { names } : {}),
         ...(labels.length > 0 ? { labels: [...labels] } : {}),
         mode: form.mode,
+        // P3 (FR-27): the opt-in travels only with the container mode, exactly as ticked.
+        ...(form.mode === 'docker' ? { shareDockerDaemon: form.shareDockerDaemon === true } : {}),
         confirm: true,
     };
 }

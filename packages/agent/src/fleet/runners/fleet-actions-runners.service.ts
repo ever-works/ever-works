@@ -2,6 +2,11 @@ import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/com
 import {
     clampFleetActionsRunnerCount,
     diagnoseFleetActionsJob,
+    FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY,
+    FLEET_ACTIONS_RUNNER_DOWNLOADS_CACHE_MS,
+    fleetActionsRunnerReinstallSummary,
+    fleetActionsRunnerUpdateAvailable,
+    type FleetActionsRunnerDownload,
     FLEET_ACTIONS_JOBS_CACHE_MS,
     FLEET_ACTIONS_MAX_LISTED_JOBS,
     FLEET_ACTIONS_MAX_WATCHED_TARGETS,
@@ -172,6 +177,11 @@ export class FleetActionsRunnersService {
     private readonly nodeRefreshedAt = new Map<string, number>();
     /** `ownerUserId|scope|target` → that watched target's jobs (P2; one API replica's memory, a cache only). */
     private readonly jobsCache = new Map<string, JobsCacheEntry>();
+    /** `ownerUserId|scope|target` → GitHub's runner builds, for "Update available" (P3, kept an hour). */
+    private readonly downloadsCache = new Map<
+        string,
+        { at: number; downloads: FleetActionsRunnerDownload[] }
+    >();
     /** ownerUserId → the jobs the last panel / poll read found (what `job-unassignable` reads). */
     private readonly jobsByOwner = new Map<string, { at: number; jobs: FleetActionsJobView[] }>();
 
@@ -276,7 +286,11 @@ export class FleetActionsRunnersService {
                 hasServiceManager: (node.capabilities ?? []).includes(
                     FLEET_ACTIONS_RUNNER_CAPABILITY,
                 ),
-                hasDocker: (node.capabilities ?? []).includes('docker'),
+                // P3 (FR-27): Docker-isolated runners on a Linux computer whose node can run them.
+                hasDocker: (node.capabilities ?? []).includes(
+                    FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY,
+                ),
+                dockerShipped: true,
             }),
             defaultLabels: fleetActionsRunnerDefaultLabels(os, arch),
             maxPerNode: FLEET_ACTIONS_RUNNERS_MAX_PER_NODE,
@@ -360,15 +374,28 @@ export class FleetActionsRunnersService {
             });
         }
         if (mode === 'docker') {
-            // Docker-isolated runners are phase 3 (FR-27); Windows never offers them.
-            throw fleetMachineError(
-                'unsupported_on_node',
-                'Docker-isolated runners are not available yet; install them as services',
-                {
-                    field: 'mode',
-                },
-            );
+            // P3 (FR-27): only where the computer advertises the container executor — Linux with a
+            // Docker daemon its node reaches; Windows never offers it.
+            const offered = fleetActionsRunnerModesFor({
+                os: capabilityValue(node.capabilities, 'os'),
+                hasServiceManager: (node.capabilities ?? []).includes(
+                    FLEET_ACTIONS_RUNNER_CAPABILITY,
+                ),
+                hasDocker: (node.capabilities ?? []).includes(
+                    FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY,
+                ),
+                dockerShipped: true,
+            });
+            if (!offered.includes('docker')) {
+                throw fleetMachineError(
+                    'unsupported_on_node',
+                    `${node.name} cannot run container-isolated runners (Linux with Docker and an up-to-date node); install them as services`,
+                    { field: 'mode' },
+                );
+            }
         }
+        // The labelled opt-in (FR-27): the host's Docker daemon, which runs as root. Docker mode only.
+        const shareDockerDaemon = mode === 'docker' && input.shareDockerDaemon === true;
         const names = this.namesFor(node, count, input.names, existing);
         const os = capabilityValue(node.capabilities, 'os');
         const arch = capabilityValue(node.capabilities, 'arch');
@@ -455,6 +482,7 @@ export class FleetActionsRunnersService {
             labels,
             mode,
             download,
+            ...(mode === 'docker' ? { shareDockerDaemon } : {}),
         };
         let job;
         try {
@@ -463,7 +491,10 @@ export class FleetActionsRunnersService {
                 organizationId: node.organizationId ?? null,
                 kind: 'runner-install',
                 payload: payload as unknown as Record<string, unknown>,
-                requiredCapabilities: [FLEET_ACTIONS_RUNNER_CAPABILITY],
+                requiredCapabilities:
+                    mode === 'docker'
+                        ? [FLEET_ACTIONS_RUNNER_CAPABILITY, FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY]
+                        : [FLEET_ACTIONS_RUNNER_CAPABILITY],
                 maxAttempts: INSTALL_MAX_ATTEMPTS,
                 idempotencyKey: `runner-install:${created[0].id}`,
             });
@@ -503,14 +534,10 @@ export class FleetActionsRunnersService {
     ): Promise<FleetActionsRunnerOperationResponse> {
         this.requireEnabled();
         if (!isFleetActionsRunnerControlAction(action)) {
-            throw fleetMachineError('invalid', 'action must be start, stop, restart or remove', {
-                field: 'action',
-            });
-        }
-        if (action === 'reinstall') {
             throw fleetMachineError(
-                'unsupported_on_node',
-                'reinstalling a runner is not available yet; remove it and install it again',
+                'invalid',
+                'action must be start, stop, restart, reinstall or remove',
+                { field: 'action' },
             );
         }
         const userId = fleetMachineCallerUserId(caller);
@@ -573,7 +600,7 @@ export class FleetActionsRunnersService {
                 state: runner.state,
             });
         }
-        if (action === 'remove' && runner.state === 'working') {
+        if ((action === 'remove' || action === 'reinstall') && runner.state === 'working') {
             const job = runner.currentJob?.name ? ` job ${runner.currentJob.name}` : ' a job';
             throw await refuse(
                 'busy',
@@ -583,6 +610,29 @@ export class FleetActionsRunnersService {
                 },
             );
         }
+        // P3 (FR-28): a reinstall takes GitHub's current build for this computer (the owner's act,
+        // never automatic) and registers the same name and labels again.
+        let reinstallDownload: FleetActionsRunnerDownload | null = null;
+        if (action === 'reinstall') {
+            const resolved = await this.resolveTarget(userId, runner.scope, runner.target);
+            const downloads = await this.facadeCall(() =>
+                this.requireFacade().listDownloads(userId, resolved),
+            );
+            reinstallDownload = pickFleetActionsRunnerDownload(
+                downloads,
+                capabilityValue(node.capabilities, 'os'),
+                capabilityValue(node.capabilities, 'arch'),
+            );
+            if (
+                !reinstallDownload ||
+                !isFleetActionsRunnerDownloadUrl(reinstallDownload.downloadUrl)
+            ) {
+                throw await refuse(
+                    'unsupported_on_node',
+                    `GitHub publishes no runner for this system on ${node.name}`,
+                );
+            }
+        }
         const summary =
             action === 'stop'
                 ? fleetActionsRunnerStopSummary(runner.name)
@@ -590,7 +640,12 @@ export class FleetActionsRunnersService {
                   ? fleetActionsRunnerRestartSummary(runner.name)
                   : action === 'remove'
                     ? fleetActionsRunnerRemoveSummary(runner.name, runner.target, node.name)
-                    : `Start ${runner.name}?`;
+                    : action === 'reinstall'
+                      ? fleetActionsRunnerReinstallSummary(
+                            runner.name,
+                            fleetActionsRunnerVersionOf(reinstallDownload?.filename),
+                        )
+                      : `Start ${runner.name}?`;
         this.requireConfirmation(action, runner.name, summary, fields);
 
         const payload: FleetRunnerControlPayload = {
@@ -602,19 +657,38 @@ export class FleetActionsRunnersService {
             target: runner.target,
             mode: runner.mode,
             githubRunnerId: githubRunnerIdOf(runner.githubRunnerId),
+            ...(reinstallDownload
+                ? {
+                      download: reinstallDownload,
+                      url: fleetActionsRunnerRegistrationUrl(runner.scope, runner.target),
+                      labels: Array.isArray(runner.labels) ? runner.labels : [],
+                  }
+                : {}),
         };
         const job = await this.jobs.enqueue({
             userId: node.userId,
             organizationId: node.organizationId ?? null,
             kind: 'runner-control',
             payload: payload as unknown as Record<string, unknown>,
-            requiredCapabilities: [FLEET_ACTIONS_RUNNER_CAPABILITY],
+            requiredCapabilities:
+                runner.mode === 'docker'
+                    ? [FLEET_ACTIONS_RUNNER_CAPABILITY, FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY]
+                    : [FLEET_ACTIONS_RUNNER_CAPABILITY],
             maxAttempts: CONTROL_MAX_ATTEMPTS,
         });
         const patch: Partial<FleetActionsRunner> = { lastJobId: job.id };
         if (action === 'stop') patch.stoppedByOwner = true;
         if (action === 'start' || action === 'restart') patch.stoppedByOwner = false;
         if (action === 'remove') patch.phase = 'removing';
+        if (action === 'reinstall') {
+            // Back to `installing` until the node reports the new build idle (FR-28).
+            patch.state = 'installing';
+            patch.phase = 'queued';
+            patch.lastError = null;
+            patch.stoppedByOwner = false;
+            patch.runnerVersion =
+                fleetActionsRunnerVersionOf(reinstallDownload?.filename) ?? runner.runnerVersion;
+        }
         await this.runners.update(runner.id, patch);
         await this.record(auditAction, caller, node, runner.id, {
             targetName: runner.name,
@@ -1167,6 +1241,39 @@ export class FleetActionsRunnersService {
         return { owners: owners.length, runners, changed };
     }
 
+    /** GitHub's newest build for this runner's computer, from the downloads cache (P3, FR-28), or null. */
+    private latestRunnerVersion(row: FleetActionsRunner, node: FleetNode): string | null {
+        const entry = this.downloadsCache.get(
+            `${row.ownerUserId}|${row.scope}|${row.target.toLowerCase()}`,
+        );
+        if (!entry) return null;
+        const download = pickFleetActionsRunnerDownload(
+            entry.downloads,
+            capabilityValue(node.capabilities, 'os'),
+            capabilityValue(node.capabilities, 'arch'),
+        );
+        return fleetActionsRunnerVersionOf(download?.filename);
+    }
+
+    /** Refresh GitHub's runner builds of one target at most hourly (P3). Never throws. */
+    private async refreshDownloads(ownerUserId: string, row: FleetActionsRunner): Promise<void> {
+        if (!this.facade) return;
+        const key = `${ownerUserId}|${row.scope}|${row.target.toLowerCase()}`;
+        const cached = this.downloadsCache.get(key);
+        if (cached && Date.now() - cached.at < FLEET_ACTIONS_RUNNER_DOWNLOADS_CACHE_MS) return;
+        try {
+            const resolved = await this.facade.resolveTarget(ownerUserId, row.scope, row.target);
+            const downloads = await this.facade.listDownloads(ownerUserId, resolved);
+            this.downloadsCache.set(key, { at: Date.now(), downloads });
+        } catch (error) {
+            // Keep the last list; try again in an hour rather than on every page read.
+            this.downloadsCache.set(key, { at: Date.now(), downloads: cached?.downloads ?? [] });
+            this.logger.debug(
+                `actions runners: builds of ${row.target} not read (${error instanceof Error ? error.message : String(error)})`,
+            );
+        }
+    }
+
     /** Delete a runner at GitHub by its id (the remove fallback, FR-16). Never throws. */
     private async deregisterAtGitHub(runner: FleetActionsRunner): Promise<void> {
         const githubRunnerId = githubRunnerIdOf(runner.githubRunnerId);
@@ -1213,6 +1320,7 @@ export class FleetActionsRunnersService {
             const key = `${ownerUserId}|${row.scope}|${row.target.toLowerCase()}`;
             if (github.has(key)) continue;
             github.set(key, await this.readTarget(ownerUserId, row, key));
+            await this.refreshDownloads(ownerUserId, row);
         }
         // The nodes, per online computer.
         const facts = new Map<string, Map<string, FleetActionsRunnerNodeFact> | null>();
@@ -1370,7 +1478,14 @@ export class FleetActionsRunnersService {
         }
         return {
             node: { id: node.id, name: node.name },
-            runners: rows.map((row) => fleetActionsRunnerViewOf(row, node)),
+            runners: rows.map((row) =>
+                fleetActionsRunnerViewOf(row, node, {
+                    updateAvailable: fleetActionsRunnerUpdateAvailable(
+                        row.runnerVersion,
+                        this.latestRunnerVersion(row, node),
+                    ),
+                }),
+            ),
             checkedAt: checkedAt !== null ? new Date(checkedAt).toISOString() : null,
             rateLimitedUntil:
                 rateLimitedUntil !== null ? new Date(rateLimitedUntil).toISOString() : null,
