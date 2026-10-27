@@ -50,6 +50,10 @@ import type {
 	GitForkDivergence,
 	// App Works fork lifecycle (APW-02 T19/T20/T21).
 	GitRepositoryCopyInput,
+	GitRepositoryCopyDivergenceInput,
+	GitRepositoryCopyDivergence,
+	GitRepositoryCopyBranchMoveInput,
+	GitRepositoryCopyBranchMoveResult,
 	GitRepositoryCopyResult,
 	GitActionsPermissionsInput,
 	GitActionsPermissionsResult,
@@ -389,6 +393,28 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		// operations use.
 		this.ensureGitOps();
 		return this.apiService.createRepositoryCopy(input, token, settings.apiBaseUrl, this.gitOps);
+	}
+
+	// App Works fork lifecycle (APW-02 T48, FR-63) — the private copy's upstream
+	// sync: the drift reading and the pinned sync-branch move. Same shape as
+	// `createRepositoryCopy`: settings first, then the plugin's own `GitOperations`.
+
+	async getRepositoryCopyDivergence(
+		input: GitRepositoryCopyDivergenceInput,
+		token: string
+	): Promise<GitRepositoryCopyDivergence> {
+		const settings = await this.getSettings();
+		this.ensureGitOps();
+		return this.apiService.getRepositoryCopyDivergence(input, token, settings.apiBaseUrl, this.gitOps);
+	}
+
+	async moveRepositoryCopyBranch(
+		input: GitRepositoryCopyBranchMoveInput,
+		token: string
+	): Promise<GitRepositoryCopyBranchMoveResult> {
+		const settings = await this.getSettings();
+		this.ensureGitOps();
+		return this.apiService.moveRepositoryCopyBranch(input, token, settings.apiBaseUrl, this.gitOps);
 	}
 
 	async setActionsPermissions(

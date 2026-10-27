@@ -11,8 +11,10 @@ import { WorkMemberRole } from '../../entities/types';
 import { Work } from '../../entities/work.entity';
 import { WorkUpstreamState } from '../../entities/work-upstream-state.entity';
 import {
+    APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS,
     AppUpstreamRefusalError,
     AppUpstreamStateService,
+    appUpstreamWorkerActivitySink,
     isAppUpstreamRefusalError,
 } from '../app-upstream-state.service';
 
@@ -395,6 +397,88 @@ describe('AppUpstreamStateService — T46 release and T47 sync pull request chec
             await seedState();
 
             expect(await states.claimSyncPullRequestChecks(Date.now(), 600_000, 50)).toHaveLength(0);
+        });
+    });
+
+    // ── the worker's Activity rows (lane aw-safety's open item, 2026-10-27) ──
+
+    describe('recordWorkerActivity — the upstream sync worker Activity sink', () => {
+        it('writes an allowed action as the Work owner, with the type derived from the action', async () => {
+            await seedState();
+
+            const sink = appUpstreamWorkerActivitySink(service());
+            await sink.log({
+                userId: 'someone-else',
+                workId: WORK_ID,
+                actionType: 'not-a-type',
+                action: 'app.upstream.held',
+                status: 'pending',
+                summary: 'Upstream changed its workflows.',
+                details: { paths: [WORKFLOW], pathCount: 1 },
+            } as never);
+
+            const [entry] = events('app.upstream.held');
+            expect(entry).toMatchObject({
+                userId: OWNER,
+                workId: WORK_ID,
+                actionType: 'app_upstream',
+                status: 'pending',
+                details: { paths: [WORKFLOW], pathCount: 1 },
+            });
+        });
+
+        it('maps fork and Actions actions to their own types and coerces an unknown status', async () => {
+            await seedState();
+
+            await service().recordWorkerActivity(WORK_ID, {
+                action: 'app.fork.missing',
+                status: 'exploded',
+            });
+            await service().recordWorkerActivity(WORK_ID, { action: 'app.actions.disabled' });
+
+            expect(events('app.fork.missing')[0]).toMatchObject({
+                actionType: 'app_fork',
+                status: 'completed',
+            });
+            expect(events('app.actions.disabled')[0]).toMatchObject({ actionType: 'app_actions' });
+        });
+
+        it('refuses any action outside the closed set, and a malformed Work id', async () => {
+            await seedState();
+
+            expect(
+                await service().recordWorkerActivity(WORK_ID, { action: 'auth.login' }),
+            ).toBe(false);
+            expect(
+                await service().recordWorkerActivity('not-a-uuid', { action: 'app.upstream.held' }),
+            ).toBe(false);
+            expect(activity.log).not.toHaveBeenCalled();
+        });
+
+        it('drops an oversized details bag rather than storing it', async () => {
+            await seedState();
+
+            await service().recordWorkerActivity(WORK_ID, {
+                action: 'app.upstream.behind',
+                details: { blob: 'x'.repeat(20_000) },
+            });
+
+            const [entry] = events('app.upstream.behind');
+            expect(entry).toBeDefined();
+            expect(entry.details).toBeUndefined();
+        });
+
+        it('allows exactly the six worker actions', () => {
+            expect([...APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS].sort()).toEqual(
+                [
+                    'app.actions.disabled',
+                    'app.fork.missing',
+                    'app.upstream.behind',
+                    'app.upstream.held',
+                    'app.upstream.unavailable',
+                    'app.upstream.workflow_release_used',
+                ].sort(),
+            );
         });
     });
 });
