@@ -20,6 +20,14 @@ const commit = (cwd: string, message: string): void => {
 	git(cwd, '-c', 'user.name=Seed', '-c', 'user.email=seed@test.local', 'commit', '--quiet', '-m', message);
 };
 
+/** The committed contents of the two filtered files. */
+const PAYLOAD = 'raw blob content\n';
+const INNER = 'inner\n';
+
+/** `text` cut or padded to `committed`'s length, so the size the index records still matches. */
+const sameLength = (committed: string, text: string): string =>
+	`${text.slice(0, committed.length - 1).padEnd(committed.length - 1, '.')}\n`;
+
 let root: string;
 let repo: string;
 let markers: string;
@@ -32,7 +40,7 @@ beforeAll(() => {
 	mkdirSync(repo);
 	git(repo, 'init', '--quiet', '--initial-branch', 'main');
 	writeFileSync(join(repo, '.gitattributes'), 'payload.txt filter=evil\n');
-	writeFileSync(join(repo, 'payload.txt'), 'raw blob content\n');
+	writeFileSync(join(repo, 'payload.txt'), PAYLOAD);
 	git(repo, 'add', '-A');
 	commit(repo, 'seed');
 	// A populated submodule the run made: its own repository, whose config
@@ -41,7 +49,7 @@ beforeAll(() => {
 	mkdirSync(sub);
 	git(sub, 'init', '--quiet', '--initial-branch', 'main');
 	writeFileSync(join(sub, '.gitattributes'), 'inner.txt filter=inner\n');
-	writeFileSync(join(sub, 'inner.txt'), 'inner\n');
+	writeFileSync(join(sub, 'inner.txt'), INNER);
 	git(sub, 'add', '-A');
 	commit(sub, 'inner seed');
 	git(sub, 'config', 'filter.inner.clean', `echo ran >> '${shPath(join(markers, 'inner-clean'))}'; cat`);
@@ -68,9 +76,11 @@ function statusWith(env: Record<string, string> | null, args: readonly string[])
 describe('statusHardeningEnv + HARDENED_DIRTY_STATUS_ARGS', () => {
 	it('reports a modified file without running the planted filter or entering the submodule', async () => {
 		// Stat data that no longer matches the index is what makes Git run
-		// `clean` to hash the file.
-		writeFileSync(join(repo, 'payload.txt'), 'edited by a model\n');
-		writeFileSync(join(repo, 'sub', 'inner.txt'), 'inner, edited\n');
+		// `clean` to hash the file, but only while the SIZE still matches: a
+		// size change reads as modified without hashing, so no filter runs and
+		// the check proves nothing. Each edit keeps the committed length.
+		writeFileSync(join(repo, 'payload.txt'), sameLength(PAYLOAD, 'edited by a model'));
+		writeFileSync(join(repo, 'sub', 'inner.txt'), sameLength(INNER, 'edit'));
 		const env = await statusHardeningEnv(repo);
 		const out = statusWith(env, HARDENED_DIRTY_STATUS_ARGS);
 		expect(out).toContain('payload.txt');
@@ -84,8 +94,10 @@ describe('statusHardeningEnv + HARDENED_DIRTY_STATUS_ARGS', () => {
 	}, 300_000);
 
 	it('control: a plain status runs both planted drivers', () => {
-		writeFileSync(join(repo, 'payload.txt'), 'edited again\n');
-		writeFileSync(join(repo, 'sub', 'inner.txt'), 'inner, edited again\n');
+		// Same-length edits (see above). a20406050's edits changed the size, so
+		// Git never hashed the files, ran neither driver, and this control failed.
+		writeFileSync(join(repo, 'payload.txt'), sameLength(PAYLOAD, 'edited again'));
+		writeFileSync(join(repo, 'sub', 'inner.txt'), sameLength(INNER, 'again'));
 		statusWith(null, ['status', '--porcelain', '--untracked-files=all']);
 		expect(existsSync(join(markers, 'clean'))).toBe(true);
 		expect(existsSync(join(markers, 'inner-clean'))).toBe(true);
