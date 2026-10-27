@@ -224,6 +224,15 @@ describe('DesktopRecordingService — writing', () => {
     });
 });
 
+describe('DesktopRecordingService — starting twice at once', () => {
+    it('starts one recording and writes one start row', async () => {
+        const { audit, start } = setup();
+        const [first, second] = await Promise.all([start(), start()]);
+        expect(first && second).toBe(true);
+        expect(actions(audit)).toEqual(['node.desktop.recording.start']);
+    });
+});
+
 describe('DesktopRecordingService — reading and deleting', () => {
     it('lists and reads a recording without ever showing a storage key', async () => {
         const { service, start } = setup();

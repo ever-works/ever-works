@@ -116,6 +116,8 @@ export interface DesktopRecordingStart {
 export class DesktopRecordingService implements OnApplicationShutdown {
     private readonly logger = new Logger(DesktopRecordingService.name);
     private readonly live = new Map<string, LiveRecording>();
+    /** Starts in flight, by view. */
+    private readonly starting = new Map<string, Promise<boolean>>();
     /** Why a view's recording could not start or stopped on a failure (this replica; the row says it too). */
     private readonly failures = new Map<string, string>();
 
@@ -155,6 +157,16 @@ export class DesktopRecordingService implements OnApplicationShutdown {
      * when it cannot record — no storage — after writing why on the row.
      */
     async start(input: DesktopRecordingStart): Promise<boolean> {
+        if (this.isRecording(input.viewId)) return true;
+        // A take and its driver socket both ask at once: one start, one audit row.
+        const pending = this.starting.get(input.viewId);
+        if (pending) return pending;
+        const started = this.begin(input).finally(() => this.starting.delete(input.viewId));
+        this.starting.set(input.viewId, started);
+        return started;
+    }
+
+    private async begin(input: DesktopRecordingStart): Promise<boolean> {
         if (this.isRecording(input.viewId)) return true;
         if (!this.storage) {
             this.failures.set(input.viewId, 'storage-unavailable');
