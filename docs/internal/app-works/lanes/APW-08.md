@@ -18,6 +18,7 @@ MERGED: #2961 → `develop` at `c400452a4` (phase 1, T47).
 MERGED: #2965 → `develop` at `a104e182a` (phase 2, T49).
 MERGED: #2967 → `develop` at `ff2ecee5d` (phase 3, T18).
 MERGED: #2972 → `develop` at `336f2e0d4` (phase 4, T24 cost half + T56 read; CodeQL's type-confusion finding fixed in `24584e2b9`).
+MERGED: #2975 → `develop` at `7807e78d7` (phase 5, T27 part: `RequestChangeDialog` + `WorkCostSummary`).
 
 ## Decisions
 
