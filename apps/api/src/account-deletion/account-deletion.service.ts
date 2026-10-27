@@ -26,7 +26,7 @@ import { AUTH_PROVIDER } from '../auth/providers/auth-provider.constants';
 import { AccountDeletionRequestStore } from './account-deletion-request.store';
 import { AccountDeletionMailer } from './account-deletion.mailer';
 import { hashDeletionEmail, maskEmail } from './account-deletion.tokens';
-import { TENANT_CONTENT_OWNER_COLUMNS } from './account-deletion.inventory';
+import { PERSONAL_ROWS_WITHOUT_FK, TENANT_CONTENT_OWNER_COLUMNS } from './account-deletion.inventory';
 import { getActiveStorageBackend } from '../uploads/storage-backend.factory';
 
 /** What happens to one workspace (Tenant) the account belongs to. */
@@ -185,7 +185,18 @@ export class AccountDeletionService {
             // 4. Uploaded files (outside the database).
             summary.filesDeleted = await this.deleteFiles(user.id);
 
-            // 5. Sessions, then the row (API keys, memberships and personal data cascade).
+            // 5. Personal rows no foreign key would remove (settings, credentials, consents).
+            const keptOrgIds = keptTenants.size
+                ? (
+                      await this.dataSource.getRepository(Organization).find({
+                          where: { tenantId: In([...keptTenants]) },
+                          select: ['id'],
+                      })
+                  ).map((o) => o.id)
+                : [];
+            await this.deletePersonalRows(user.id, [...keptTenants], keptOrgIds);
+
+            // 6. Sessions, then the row (API keys, memberships and personal data cascade).
             summary.sessionsRevoked = await this.revokeSessions(user.id);
             summary.apiKeysRevoked = await this.dataSource
                 .getRepository(ApiKey)
@@ -198,6 +209,14 @@ export class AccountDeletionService {
             summary.workspaceDeleted = deletedPlans.length > 0;
 
             await this.dataSource.transaction(async (manager) => {
+                // A workspace that goes is removed explicitly: on the migrated
+                // schema `tenants.ownerUserId` and `organizations.tenantId` would
+                // cascade anyway, but a synchronize-built schema (SQLite, local
+                // dev) has no such constraints and would leave both behind.
+                for (const plan of deletedPlans) {
+                    await manager.getRepository(Organization).delete({ tenantId: plan.tenant.id });
+                    await manager.getRepository(Tenant).delete({ id: plan.tenant.id });
+                }
                 await manager.getRepository(User).delete({ id: user.id });
             });
         } catch (error) {
@@ -507,6 +526,50 @@ export class AccountDeletionService {
             }
         }
         return going.length;
+    }
+
+    /**
+     * Delete {@link PERSONAL_ROWS_WITHOUT_FK}. Rows inside a workspace that
+     * stays are left alone. Two passes, so a row another listed row depends
+     * on is retried once the dependant is gone; a table that still refuses is
+     * logged and left (its id points at nothing once the account is gone).
+     */
+    private async deletePersonalRows(userId: string, keptTenantIds: string[], keptOrgIds: string[]): Promise<void> {
+        const manager = this.dataSource.manager;
+        const escape = (name: string) => manager.connection.driver.escape(name);
+        let pending = PERSONAL_ROWS_WITHOUT_FK.filter((target) => {
+            const meta = manager.connection.entityMetadatas.find((m) => m.tableName === target.table);
+            if (!meta) return false;
+            const has = (name: string) => meta.columns.some((c) => c.databaseName === name);
+            return has(target.column) && (!target.scope || has(target.scope));
+        });
+        for (let pass = 0; pass < 2 && pending.length > 0; pass += 1) {
+            const failed: typeof pending = [];
+            for (const target of pending) {
+                try {
+                    const qb = manager
+                        .createQueryBuilder()
+                        .delete()
+                        .from(target.table)
+                        .where(escape(target.column) + ' = :userId', { userId });
+                    const kept = target.scope === 'tenantId' ? keptTenantIds : target.scope ? keptOrgIds : [];
+                    if (target.scope && kept.length > 0) {
+                        const col = escape(target.scope);
+                        qb.andWhere('(' + col + ' IS NULL OR ' + col + ' NOT IN (:...kept))', { kept });
+                    }
+                    await qb.execute();
+                } catch (error) {
+                    failed.push(target);
+                    if (pass === 1) {
+                        this.logger.warn(
+                            'account-deletion: ' + target.table + ' rows could not be removed (' +
+                                (error instanceof Error ? error.name : 'error') + ')',
+                        );
+                    }
+                }
+            }
+            pending = failed;
+        }
     }
 
     private async deleteFiles(userId: string): Promise<number> {
