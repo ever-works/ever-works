@@ -163,7 +163,10 @@ export function DesktopRecordingPlayer({
 
     useEffect(() => {
         if (!playing) return;
+        let painting = false;
         const timer = setInterval(() => {
+            // One step at a time: a slow chunk fetch holds the clock instead of piling up paints.
+            if (painting) return;
             const next = positionRef.current + PLAY_TICK_MS;
             if (next >= duration) {
                 setPlaying(false);
@@ -171,7 +174,10 @@ export function DesktopRecordingPlayer({
             }
             positionRef.current = next;
             setPosition(next);
-            void playbackRef.current?.advance(next);
+            painting = true;
+            void (playbackRef.current?.advance(next) ?? Promise.resolve()).finally(() => {
+                painting = false;
+            });
         }, PLAY_TICK_MS);
         return () => clearInterval(timer);
     }, [duration, playing]);
