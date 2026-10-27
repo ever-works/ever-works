@@ -850,7 +850,7 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
     const t = await getTranslations('actions.works');
 
     const schema = z.object({
-        workId: z.guid(t('invalidId')),
+        workId: z.string().guid(t('invalidId')),
         websiteTemplateId: z.string().nullable(),
     });
 
@@ -960,7 +960,7 @@ export async function deleteWork(workId: string, options?: DeleteWorkDto) {
 
     // Delete work validation schema
     const deleteWorkSchema = z.object({
-        id: z.guid(t('invalidId')),
+        id: z.string().guid(t('invalidId')),
     });
 
     try {
@@ -2133,7 +2133,7 @@ export async function setWorkAppLauncherExposureAction(
     const t = await getTranslations('actions.works');
 
     const schema = z.object({
-        workId: z.guid(t('invalidId')),
+        workId: z.string().guid(t('invalidId')),
         appLauncherExposed: z.boolean().nullable(),
     });
 

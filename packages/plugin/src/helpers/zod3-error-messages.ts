@@ -37,6 +37,8 @@ export interface Zod3MessageIssue {
 	readonly options?: readonly unknown[];
 	readonly divisor?: number;
 	readonly inst?: unknown;
+	/** The key's own issues on an `invalid_key` (record key) issue, already finalized. */
+	readonly issues?: readonly { readonly message: string }[];
 }
 
 /** zod 3's `getParsedType`, which named the `received` side of its messages. */
@@ -103,6 +105,8 @@ const ZOD4_ONLY_FORMATS = new Set(['lowercase', 'uppercase', 'e164', 'ksuid', 'x
 
 function invalidType(issue: Zod3MessageIssue): string {
 	if (issue.input === undefined) return 'Required';
+	// zod 3 had its own code for a Date object holding an invalid time.
+	if (issue.expected === 'date' && issue.input instanceof Date) return 'Invalid date';
 	const received = zod3ParsedType(issue.input);
 	if (issue.expected === 'int') {
 		// zod 3's `.int()` reported a non-integer number as a float.
@@ -209,6 +213,11 @@ export function zod3ErrorMessage(issue: Zod3MessageIssue): string | undefined {
 			return `Number must be a multiple of ${issue.divisor}`;
 		case 'custom':
 			return 'Invalid input';
+		case 'invalid_key':
+			// zod 3 reported a record key's own issue at the key's path; zod 4 wraps it.
+			// The wrapped issues were finalized with this same map, so their message is
+			// already zod 3's.
+			return issue.issues?.[0]?.message;
 		default:
 			return undefined;
 	}

@@ -57,7 +57,16 @@ describe('zod3ErrorMessage — zod 3 default messages under zod 4', () => {
 		],
 		['refine', z.string().refine(() => false), 'x', ':Invalid input'],
 		['record value', z.record(z.string(), z.number()), { a: 'x' }, 'a:Expected number, received string'],
-		['email or empty', z.string().email().nullable().optional().or(z.literal('')), 'bad', ':Invalid email']
+		['email or empty', z.string().email().nullable().optional().or(z.literal('')), 'bad', ':Invalid email'],
+		[
+			'record key',
+			z.record(z.string().max(3), z.string()),
+			{ toolong: 'x' },
+			'toolong:String must contain at most 3 character(s)'
+		],
+		['invalid date', z.date(), new Date('not a date'), ':Invalid date'],
+		['guid check keeps Required', z.object({ id: z.string().guid('Bad id') }), {}, 'id:Required'],
+		['guid check message', z.object({ id: z.string().guid('Bad id') }), { id: 'x' }, 'id:Bad id']
 	];
 
 	it.each(cases)('%s', (_label, schema, input, expected) => {
@@ -77,6 +86,5 @@ describe('zod3ErrorMessage — zod 3 default messages under zod 4', () => {
 
 	it('falls through to zod 4 for checks zod 3 never had', () => {
 		expect(zod3ErrorMessage({ code: 'invalid_format', format: 'lowercase' })).toBeUndefined();
-		expect(zod3ErrorMessage({ code: 'invalid_key' })).toBeUndefined();
 	});
 });
