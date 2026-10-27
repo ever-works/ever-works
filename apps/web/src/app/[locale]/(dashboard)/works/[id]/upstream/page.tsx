@@ -3,6 +3,8 @@ import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { workAPI } from '@/lib/api';
 import { AppUpstreamCard } from '@/components/works/app/AppUpstreamCard';
+import { upstreamPullRequestsAPI } from '@/lib/api/upstream-pull-requests';
+import { UpstreamPullRequestsSection } from '@/components/works/detail/upstream/UpstreamPullRequestsSection';
 
 /**
  * APW-02 T30 — the Upstream tab: `/works/:id/upstream`, one address, one card
@@ -28,6 +30,14 @@ import { AppUpstreamCard } from '@/components/works/app/AppUpstreamCard';
  *    says the tab MUST NOT be shown for it. The tab strip already withholds it
  *    (`WorkTabs.tsx`); the address is withheld too, so a bookmark cannot render a
  *    card about an upstream that does not exist.
+ *
+ * ## APW-09's section (lane aw-upstream-prs)
+ *
+ * The slot now holds the **Upstream pull requests** section. Its list
+ * (`GET /api/works/:id/upstream-pull-requests`) is read beside the card's read, never
+ * instead of it: a failed list renders the section's own one-line notice (`rows: null`)
+ * and never turns the tab into a 404, and it is started before the card's read is
+ * awaited so the two run in parallel.
  */
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.workDetail.upstream');
@@ -38,6 +48,12 @@ type Params = { params: Promise<{ id: string }> };
 
 export default async function WorkUpstreamPage({ params }: Params) {
     const { id } = await params;
+
+    // Started first so it runs beside the card's read; a failure is `null`, never a throw.
+    const pullRequests = upstreamPullRequestsAPI.list(id, { limit: 20 }).then(
+        (answer) => answer?.data ?? [],
+        () => null,
+    );
 
     let state;
 
@@ -56,13 +72,20 @@ export default async function WorkUpstreamPage({ params }: Params) {
             <AppUpstreamCard workId={id} variant="tab" initialState={state} />
 
             {/*
-             * APW-09's slot. It is intentionally empty here: this epic owns the
-             * tab and the card, APW-09 adds the "Upstream pull requests" section
-             * *below* it in the same tab (R-8, `plan.md:621-622`). A second tab or
-             * a second route would break the one Upstream surface the resolution
-             * fixes.
+             * APW-09's slot: this epic owns the tab and the card, APW-09 adds the
+             * "Upstream pull requests" section *below* it in the same tab (R-8,
+             * `plan.md:621-622`). A second tab or a second route would break the one
+             * Upstream surface the resolution fixes.
              */}
-            <div data-testid="app-upstream-pull-requests-slot" />
+            <div data-testid="app-upstream-pull-requests-slot">
+                <UpstreamPullRequestsSection
+                    rows={await pullRequests}
+                    relation={state.relation}
+                    upstream={
+                        state.upstream ? `${state.upstream.owner}/${state.upstream.repo}` : null
+                    }
+                />
+            </div>
         </div>
     );
 }
