@@ -15,6 +15,7 @@ import {
 	parseFleetSessionAttentionMessage,
 	parseFleetSessionStatusMessage,
 	type FleetSessionEvidence,
+	type FleetSessionMergeContext,
 	type FleetSessionStatusSnapshot
 } from '../fleet-session-status.types.js';
 
@@ -24,7 +25,7 @@ const shell = { sessionId: SESSION, provider: 'shell' as const };
 
 function run(
 	events: Array<Partial<FleetSessionEvidence> & Pick<FleetSessionEvidence, 'event'>>,
-	ctx = claude,
+	ctx: FleetSessionMergeContext = claude,
 	start: FleetSessionStatusSnapshot = initialFleetSessionStatus(0)
 ) {
 	let snapshot = start;
