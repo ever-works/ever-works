@@ -10,14 +10,20 @@ import { AppUpstreamSyncDto } from './dto/app-upstream-sync.dto';
 /**
  * APW-02 T46 (2026-10-27) — the route half of "Sync anyway".
  *
- * The security rule of #2802/#2806 stands: only the Work OWNER, from a signed-in SESSION,
- * may accept upstream workflow changes — never a member (editor/manager), the owner's own
- * API key, an integration key, a fleet-run token or an Agent. The gate runs before the
- * service is asked; the service re-checks the owner (`owner_required`) as defence in depth.
+ * The security rule of #2802/#2806 stands, widened by the owner's decision of 2026-10-27:
+ * only the Work OWNER or an OWNER of the Work's Organization, from a signed-in SESSION, may
+ * accept upstream workflow changes — never a member of another role (Work editor/manager,
+ * Organization Admin/Member), an API key, an integration key, a fleet-run token or an Agent.
+ * The gate runs before the service is asked; the service re-checks who is releasing
+ * (`owner_required`) as defence in depth.
  */
 const WORK_ID = '22222222-2222-4222-8222-222222222201';
 const OWNER = '11111111-1111-4111-8111-111111111101';
 const EDITOR = '11111111-1111-4111-8111-111111111103';
+/** The Owner of the Work's Organization (the Tenant owner) — not the Work's creator. */
+const ORG_OWNER = '11111111-1111-4111-8111-111111111104';
+/** An Organization Admin with edit access to the Work. */
+const ORG_ADMIN = '11111111-1111-4111-8111-111111111105';
 const HEAD = 'b'.repeat(40);
 
 function user(userId: string, authMethod?: AuthenticatedUser['authMethod']): AuthenticatedUser {
@@ -39,8 +45,11 @@ function user(userId: string, authMethod?: AuthenticatedUser['authMethod']): Aut
 function build() {
     const upstream = {
         get: jest.fn().mockResolvedValue({ workId: WORK_ID }),
-        // The creator check (visibility first, inside the service).
-        isWorkOwner: jest.fn(async (_workId: string, userId: string) => userId === OWNER),
+        // The release check (visibility first, inside the service): the creator or an Owner
+        // of the Work's Organization.
+        mayReleaseWorkflowChanges: jest.fn(
+            async (_workId: string, userId: string) => userId === OWNER || userId === ORG_OWNER,
+        ),
         requestSync: jest.fn().mockResolvedValue({ queued: true, runId: 'run-1' }),
         retryReadiness: jest.fn(),
     };
@@ -76,11 +85,58 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
             }),
         ).resolves.toEqual({ queued: true, runId: 'run-1' });
 
-        expect(h.upstream.isWorkOwner).toHaveBeenCalledWith(WORK_ID, OWNER);
+        expect(h.upstream.mayReleaseWorkflowChanges).toHaveBeenCalledWith(WORK_ID, OWNER);
         expect(h.upstream.requestSync).toHaveBeenCalledWith(WORK_ID, OWNER, {
             confirmWorkflowChanges: true,
             workflowHeadSha: HEAD,
         });
+    });
+
+    it('lets an Owner of the Work’s Organization, in a signed-in session, release the held head', async () => {
+        const h = build();
+
+        await expect(
+            h.controller.syncUpstream(user(ORG_OWNER, 'session'), WORK_ID, {
+                confirmWorkflowChanges: true,
+                workflowHeadSha: HEAD,
+            }),
+        ).resolves.toEqual({ queued: true, runId: 'run-1' });
+
+        expect(h.upstream.mayReleaseWorkflowChanges).toHaveBeenCalledWith(WORK_ID, ORG_OWNER);
+        expect(h.upstream.requestSync).toHaveBeenCalledWith(WORK_ID, ORG_OWNER, {
+            confirmWorkflowChanges: true,
+            workflowHeadSha: HEAD,
+        });
+    });
+
+    it('refuses an Organization Admin — 403 ownerRequired, the service is never asked', async () => {
+        const h = build();
+
+        const refusal = await statusOf(
+            h.controller.syncUpstream(user(ORG_ADMIN, 'session'), WORK_ID, {
+                confirmWorkflowChanges: true,
+            }),
+        );
+
+        expect(refusal.status).toBe(403);
+        expect(refusal.body).toMatchObject({ code: 'ownerRequired' });
+        expect(h.upstream.requestSync).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['an API key', 'api-key'],
+        ['an integration key', 'integration'],
+        ['a delegated token', 'ever-id-delegated'],
+        ['a credential path with no stamp (fails closed)', undefined],
+    ] as const)('refuses %s of the Organization Owner too', async (_label, method) => {
+        const h = build();
+
+        const call = h.controller.syncUpstream(user(ORG_OWNER, method), WORK_ID, {
+            confirmWorkflowChanges: true,
+        });
+
+        await expect(call).rejects.toBeDefined();
+        expect(h.upstream.requestSync).not.toHaveBeenCalled();
     });
 
     it('refuses a member with edit access — 403 ownerRequired, the service is never asked', async () => {
@@ -115,7 +171,7 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
 
     it('refuses a co-owner member too — the release runs with the creator’s secrets', async () => {
         const h = build();
-        h.upstream.isWorkOwner.mockResolvedValue(false);
+        h.upstream.mayReleaseWorkflowChanges.mockResolvedValue(false);
 
         const refusal = await statusOf(
             h.controller.syncUpstream(user(OWNER, 'session'), WORK_ID, {
@@ -130,7 +186,7 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
 
     it('answers a stranger 404 before the owner gate (visibility first)', async () => {
         const h = build();
-        h.upstream.isWorkOwner.mockRejectedValue(
+        h.upstream.mayReleaseWorkflowChanges.mockRejectedValue(
             new AppUpstreamRefusalError('not_found', 404, 'No such App Work.'),
         );
 
@@ -149,7 +205,7 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
 
         await h.controller.syncUpstream(user(EDITOR, 'api-key'), WORK_ID, {});
 
-        expect(h.upstream.isWorkOwner).not.toHaveBeenCalled();
+        expect(h.upstream.mayReleaseWorkflowChanges).not.toHaveBeenCalled();
         expect(h.upstream.requestSync).toHaveBeenCalledWith(WORK_ID, EDITOR, {});
     });
 
