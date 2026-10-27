@@ -931,7 +931,32 @@ export const NODE_UNGRANTABLE_ENV_PATTERN = /^(FLEET_|EVER_WORKS_|PLUGIN_|AUTH_|
 
 const NODE_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const MAX_ENV_PASSTHROUGH = 32;
-const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
+/** `scheme://user:password@` anywhere in a value (a credential in a URL), in linear time. */
+export function hasCredentialedUrl(value: string): boolean {
+	// Same rule as the former `/[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i`, which was polynomial
+	// on long scheme-like runs (CodeQL js/polynomial-redos): a scheme (a letter in the run of
+	// [a-z0-9+.-] just before `://`), then an authority with no `/`, whitespace or `@` that holds a
+	// `:` with at least one character after it, ended by `@`.
+	let from = 0;
+	for (;;) {
+		const sep = value.indexOf('://', from);
+		if (sep < 0) return false;
+		from = sep + 3;
+		let hasLetter = false;
+		for (let i = sep - 1; i >= 0 && /[a-z0-9+.-]/i.test(value[i]!); i -= 1) {
+			if (/[a-z]/i.test(value[i]!)) hasLetter = true;
+		}
+		if (!hasLetter) continue;
+		let firstColon = -1;
+		let j = sep + 3;
+		for (; j < value.length; j += 1) {
+			const ch = value[j]!;
+			if (ch === '/' || ch === '@' || /\s/.test(ch)) break;
+			if (ch === ':' && firstColon < 0) firstColon = j;
+		}
+		if (j < value.length && value[j] === '@' && firstColon >= 0 && firstColon < j - 1) return true;
+	}
+}
 
 /**
  * THE control that makes an exact-match command allow-list mean anything
@@ -1213,7 +1238,7 @@ export function normalizeGrantedPlatformOwnedNames(names: readonly string[] | nu
 function isSafeInheritedValue(name: string, value: string): boolean {
 	if (NODE_SECRETISH_ENV_KEY_PATTERN.test(name)) return false;
 	if (NODE_PLATFORM_OWNED_ENV_PATTERN.test(name)) return false;
-	return !CREDENTIALED_URL_PATTERN.test(value);
+	return !hasCredentialedUrl(value);
 }
 
 function hasName(env: Record<string, string>, name: string): boolean {
