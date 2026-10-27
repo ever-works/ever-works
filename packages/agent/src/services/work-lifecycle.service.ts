@@ -97,6 +97,8 @@ import { ActivityActionType, ActivityStatus } from '@src/entities/activity-log.t
 import { AppWorkCreateService } from '@src/app-works/app-work-create.service';
 import {
     APP_WORK_DELETION_PORT,
+    isAppWorkDeletionNotStarted,
+    type AppWorkDeletionNotStartedReason,
     type AppWorkDeletionOutcome,
     type AppWorkDeletionPort,
 } from '@src/app-works/app-work-deletion.port';
@@ -2244,6 +2246,23 @@ export class WorkLifecycleService {
                 deleteStoredData,
             });
         } catch (error) {
+            // Lane aw-safety (2026-10-26): the App runtime's TYPED refusal (its own
+            // `AppWorkDeletionRefusalError`, a code plus an HTTP status) is a decision, not a
+            // fault, and it is final: the delete is refused here, before any repository step, so
+            // nothing is deleted. Only an untyped throw keeps the plan's "taken as done" (§7).
+            const refusal = typedDeletionRefusal(error);
+            if (refusal) {
+                throw new HttpException(
+                    {
+                        status: 'error',
+                        code: refusal.code,
+                        message:
+                            `Work "${work.name}" was not deleted: the App runtime refused to remove its ` +
+                            `workloads (${refusal.code}). Nothing was deleted.`,
+                    },
+                    refusal.status,
+                );
+            }
             const target = appDeployTargetOf(work);
             const code = describeFailureCode(error);
             this.logger.error(`App Work ${work.id} could not be removed from ${target}: ${code}`);
@@ -2256,6 +2275,34 @@ export class WorkLifecycleService {
 
         if (outcome.status !== 'pending') {
             return false;
+        }
+
+        // Lane aw-safety (2026-10-26): `pending` with a not-started reason means NO claim was
+        // taken and NO removal dispatched (`APP_WORK_DELETION_NOT_STARTED_REASONS`). Answering
+        // `200 { deleting: true }` then would be a lie — the Work is not deleting — and the
+        // repository steps below would already have run. The delete is refused instead, before
+        // any of them, so nothing is deleted and the member can simply try again.
+        if (isAppWorkDeletionNotStarted(outcome)) {
+            const reason = outcome.reason as AppWorkDeletionNotStartedReason;
+            const target = describeAppTarget(outcome.target);
+            if (reason === 'deploy_in_progress') {
+                throw new ConflictException({
+                    status: 'error',
+                    code: 'app_deploy_in_progress',
+                    message:
+                        `Work "${work.name}" was not deleted: a Deployment of the App is running on ${target}. ` +
+                        'Cancel it from the Deploy tab (or wait for it to finish), then delete again. Nothing was deleted.',
+                });
+            }
+            throw new ServiceUnavailableException({
+                status: 'error',
+                code: 'app_runtime_unavailable',
+                reason,
+                message:
+                    `Work "${work.name}" was not deleted: its App could not be removed from ${target} right now ` +
+                    `(${reason}), and deleting the Work first would leave the App running with nothing to manage it. ` +
+                    'Nothing was deleted — try again in a few minutes.',
+            });
         }
 
         // The runtime owns the rest; a reason code, never a value.
@@ -2403,6 +2450,37 @@ function appDeployTargetOf(work: Work): AppWorkDeletionOutcome['target'] {
         return 'none';
     }
     return persisted.toLowerCase() === 'ever-works-apps' ? 'ever-works-apps' : 'your-cluster';
+}
+
+/** The target as the member reads it, for a refusal message (names only, never a host). */
+function describeAppTarget(target: AppWorkDeletionOutcome['target'] | undefined): string {
+    if (target === 'ever-works-apps') {
+        return 'Ever Works Apps';
+    }
+    if (target === 'your-cluster') {
+        return 'your cluster';
+    }
+    return 'its deploy target';
+}
+
+/**
+ * Lane aw-safety (2026-10-26) — the App runtime's typed refusal, read by shape: a real `Error`
+ * named `AppWorkDeletionRefusalError` carrying a string `code` and an HTTP `status` in 4xx/5xx
+ * (`app-runtime-deletion.service.ts`). Read by shape rather than `instanceof` so this file does
+ * not import the App runtime (which would close an import cycle through `app-works`).
+ */
+function typedDeletionRefusal(error: unknown): { code: string; status: number } | null {
+    if (!(error instanceof Error) || error.name !== 'AppWorkDeletionRefusalError') {
+        return null;
+    }
+    const { code, status } = error as Error & { code?: unknown; status?: unknown };
+    if (typeof code !== 'string' || !code || typeof status !== 'number') {
+        return null;
+    }
+    if (!Number.isInteger(status) || status < 400 || status > 599) {
+        return null;
+    }
+    return { code, status };
 }
 
 /**

@@ -396,6 +396,8 @@ const WORKER_BOUND: readonly string[] = [
     'APP_HOSTS_WORK_STORE',
     'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
     'APP_IMAGE_REFERENCE_RESOLVER',
+    // 2026-10-21 (#2826) — the registry `USER` pre-check, bound in the worker only.
+    'APP_IMAGE_USER_INSPECTOR',
     'APP_PROVISION_EVENTS_PORT',
     'APP_RUNTIME_DELETION_FACADE',
     'APP_RUNTIME_ENV_SOURCE',
@@ -408,6 +410,10 @@ const WORKER_BOUND: readonly string[] = [
     'APP_UPSTREAM_STATE_READER',
     'APP_VERIFICATION_SINK',
     'APP_VERIFICATION_SPEC_SOURCE',
+    // Lane aw-safety (2026-10-26) — the deletion's completion edge, a one-member proxy of the API's
+    // `AppRuntimeDeletionService.finishDeletion` (`workerAppWorkDeletionCompletion`). Still in
+    // UNBOUND below: no module of THIS package provides it (the API's ports module does).
+    'APP_WORK_DELETION_COMPLETION',
     'WORK_APP_RUNTIME_STATES',
 ];
 
@@ -438,6 +444,11 @@ const UNBOUND: readonly string[] = [
     'APP_HOSTS_REBUILD_REQUESTER',
     'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
     'APP_IMAGE_REFERENCE_RESOLVER',
+    // 2026-10-21 (#2826) — the registry `USER` pre-check (`APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`,
+    // default off) landed declared but unclassified, so the case that classifies every token went
+    // red on `develop`. No module of THIS package provides it; the worker does (see WORKER_BOUND).
+    // Placed by lane aw-safety on 2026-10-26.
+    'APP_IMAGE_USER_INSPECTOR',
     // `APP_PROMPTED_VALUES_PORT` left this list on 2026-10-18 (lane aw-live-fix): the
     // live e2e on prod logged every `appEnv` answer as dropped, so `AppWorksModule`
     // binds it to `AppEnvPromptedValuesAdapter` (the creator is the actor; an empty
@@ -584,7 +595,9 @@ describe('App Works port dormancy register (§5.10)', () => {
         // `AppEnvModule` to `AppEnvActivityService` (APW-07 T26).
         // 28/46 → 28/47 the same day (#2783): `BUILD_REPOSITORY_VISIBILITY_PROBE` is a new
         // port, born bound by `AppBuildsModule` — nothing moved from UNBOUND.
-        expect(UNBOUND).toHaveLength(28);
+        // 28/47 → 29/47 on 2026-10-26 (lane aw-safety): `APP_IMAGE_USER_INSPECTOR` (#2826) was
+        // declared but classified nowhere; it is provided by the worker only — nothing was bound.
+        expect(UNBOUND).toHaveLength(29);
         expect(BOUND).toHaveLength(47);
     });
 

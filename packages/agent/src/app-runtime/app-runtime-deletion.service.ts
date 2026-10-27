@@ -112,7 +112,10 @@ import { isAppWorkKind, type AppDeployTarget } from '@ever-works/contracts';
 import type { AppDestroyResult, AppTargetRef } from '@ever-works/plugin';
 
 import type { Work } from '../entities/work.entity';
+import { WorkMemberRole } from '../entities/types';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkMemberRepository } from '../database/repositories/work-member.repository';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import { WORK_APP_RUNTIME_STATES } from '../app-launcher/app-launcher.service';
 // APW-01 T39 — the deletion port and its DI token, IMPORTED from the file that owns them. This
 // import is the swap the old provisional block promised: while this module declared its own
@@ -145,6 +148,16 @@ export const APP_WORK_DELETION_MAX_ATTEMPTS = 3;
  */
 export const APP_WORK_DELETION_ATTEMPT_WINDOW_MS =
     APP_WORK_DELETION_MAX_ATTEMPTS * APP_WORK_DELETION_RETRY_DELAY_MS;
+
+/**
+ * Lane aw-safety (2026-10-26) — when a recorded deletion claim counts as **stale**: the three
+ * attempts' fifteen-minute window, plus one `app-cluster-op` run's 900 s budget, plus slack.
+ *
+ * A claim older than this whose Work still exists means the removal never finished — the op was
+ * lost, the worker died mid-run, or the completion hop failed — so a repeated delete re-dispatches
+ * it (atomically, see `reclaimStaleDeletion`) instead of answering `already_deleting` forever.
+ */
+export const APP_WORK_DELETION_STALE_AFTER_MS = 30 * 60_000;
 
 /** The op name T70's router routes here (§9.2:1247, §9.10:1572). */
 export const APP_DELETE_WORK_OP = 'delete-app-work' as const;
@@ -223,7 +236,19 @@ export type AppWorkDeletionCode =
     /** The op was handed a Work whose runtime state does not record a deletion in progress. */
     | 'not_deleting'
     | 'attempts_exhausted'
-    | 'window_exhausted';
+    | 'window_exhausted'
+    /**
+     * Lane aw-safety (2026-10-26): a Deployment holds the deploy lock, so the claim is not taken
+     * (§9.7's "only when unset and no `deployLockId`") and APW-01 refuses the delete — deleting a
+     * Work mid-deploy would race the deploy into a namespace nobody owns any more.
+     */
+    | 'deploy_in_progress'
+    /**
+     * Lane aw-safety (2026-10-26): a repeated delete found a claim older than
+     * {@link APP_WORK_DELETION_STALE_AFTER_MS} (the op was lost, the worker died, or the
+     * completion never arrived) and dispatched a fresh `delete-app-work` for it.
+     */
+    | 'redispatched';
 
 /**
  * The typed refusal `requestDeletion` throws — shape follows `AppUpstreamRefusalError`
@@ -260,6 +285,29 @@ export interface AppDeletionPreview {
     /** What is kept when the checkbox stays unticked. */
     keeps: AppDeletionPreviewEntry[];
     /** What the **Also delete stored data** path additionally destroys. */
+    destroysWithData: AppDeletionPreviewEntry[];
+}
+
+/**
+ * Lane aw-safety (2026-10-26) — `GET /api/works/:id/app-deletion-preview`, as the delete dialog
+ * renders it ({@link AppRuntimeDeletionService.describeDeletion}). Names, kinds and sizes only.
+ */
+export interface AppDeletionDescription {
+    /** Where the App runs — what the dialog names ("removed from your cluster"). */
+    target: AppDeployTarget;
+    /** `true` when a Deployment or a namespace is recorded, so there is something to remove. */
+    deployed: boolean;
+    /** `true` while a removal is already in progress (the Work reads **Deleting…**). */
+    deleting: boolean;
+    /** `true` when the runtime state could not be read — the dialog says so instead of guessing. */
+    stateUnreadable: boolean;
+    /** `true` while a Deployment holds the deploy lock — deleting is refused until it ends. */
+    deployInProgress: boolean;
+    /** Removed on every path: the workloads (by component) and the managed DNS record. */
+    removes: AppDeletionPreviewEntry[];
+    /** Kept unless **Also delete stored data** is ticked: the App's dependencies and their data. */
+    keeps: AppDeletionPreviewEntry[];
+    /** What **Also delete stored data** additionally destroys. */
     destroysWithData: AppDeletionPreviewEntry[];
 }
 
@@ -329,9 +377,30 @@ export type { AppWorkDeletionOutcome, AppWorkDeletionPort, AppWorkDeletionReques
 // then the token is unbound (`app-works-port-dormancy.spec.ts` lists it) and a finished removal
 // keeps the Work row — the fail-closed answer the table in this file's header gives.
 
+/**
+ * What the removal reports to the completion — names, kinds and reason codes only (§9.4:1307).
+ * Lane aw-safety (2026-10-26): the API's completion (`AppWorkDeletionCompletionService`) reads it
+ * to tell the owner what may remain and where (FR-40a: "the member MUST be told what may remain on
+ * which target"), because the Work row — and with it the Deploy tab — is gone right after.
+ */
+export interface AppWorkDeletionCompletionReport {
+    mayRemain?: readonly AppDeletionObjectRef[];
+    kept?: readonly AppDeletionObjectRef[];
+    target?: AppDeployTarget;
+    code?: AppWorkDeletionCode;
+}
+
 /** APW-01 T39: the completion that deletes the Work row and its local checkout, idempotently. */
 export interface AppWorkDeletionCompletion {
-    completeAppWorkDeletion(workId: string): Promise<void> | void;
+    /**
+     * `report` is optional and additive (lane aw-safety): APW-01's own
+     * `WorkLifecycleService.completeAppWorkDeletion(workId)` ignores it; the API's guarded
+     * completion and the worker's proxy of it read it.
+     */
+    completeAppWorkDeletion(
+        workId: string,
+        report?: AppWorkDeletionCompletionReport,
+    ): Promise<unknown> | unknown;
 }
 
 /** DI token for {@link AppWorkDeletionCompletion} — bound to APW-01's `WorkLifecycleService`. */
@@ -433,6 +502,18 @@ export interface WorkAppRuntimeStateDeletionStore {
     ): Promise<boolean>;
     /** §9.7:1509 — record an attempt so the row's `deletionAttempts` reflects the retries. */
     recordDeletionAttempt(workId: string): Promise<number | void>;
+    /**
+     * Lane aw-safety — undo a claim this request took when the dispatch that should follow it
+     * could not be made, so the Work is not left reading **Deleting…** with nothing running the
+     * removal. Optional: a store without it keeps the claim, and the stale re-dispatch recovers it.
+     */
+    releaseDeletionClaim?(workId: string): Promise<boolean>;
+    /**
+     * Lane aw-safety — the atomic re-claim of a claim older than `staleBefore` (compare-and-set on
+     * `deletionRequestedAt`), so two repeated deletes cannot both re-dispatch. Optional: a store
+     * without it never re-dispatches (the pre-2026-10-26 behaviour).
+     */
+    reclaimStaleDeletion?(workId: string, staleBefore: Date): Promise<boolean>;
 }
 
 // ── provisional — APW-06 T20, the facade that assembles cluster access ───────
@@ -563,6 +644,13 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
         @Optional()
         @Inject(APP_WORK_DELETION_COMPLETION)
         private readonly completion?: AppWorkDeletionCompletion,
+        // Lane aw-safety (2026-10-26) — appended LAST and `@Optional()` (the positional-arity rule
+        // above). Used for ONE read: whether a caller who is not the Work's creator holds the
+        // `owner` member role (`WorkMemberRepository`, resolved lazily so neither process gains a
+        // constructor edge to the database layer). `WorkLifecycleService.deleteWork` admits a
+        // member owner (`ensureIsOwner`), and before this the port refused them `not_found`, which
+        // APW-01 took as "done" — the row went and the workloads stayed.
+        @Optional() private readonly moduleRef?: ModuleRef,
     ) {}
 
     /* ---------------------------------------------------------------------- *
@@ -655,8 +743,18 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
         const target: AppDeployTarget = state?.target ?? 'none';
 
         if (hasDeletionRequest(state)) {
-            // §9.7's second row: already deleting — nothing new is claimed or dispatched.
-            return { status: 'pending', target, reason: 'already_deleting' };
+            // §9.7's second row: already deleting — nothing new is claimed or dispatched, unless
+            // the claim is stale (lane aw-safety): then exactly one fresh op is dispatched for it.
+            return this.redispatchIfStale(workId, target, state);
+        }
+
+        if (state?.deployLockId) {
+            // Lane aw-safety (2026-10-26): §9.7's claim is legal "only when … no `deployLockId`".
+            // Before this check a Work whose FIRST Deployment was still running (lock held, no
+            // namespace recorded yet) fell through to the `done` row below: APW-01 deleted the row
+            // and the Deployment went on to create a namespace nobody owned. Nothing is claimed; the
+            // member cancels the Deployment (or waits for it) and deletes again.
+            return { status: 'pending', target, reason: 'deploy_in_progress' };
         }
 
         if (!isDeployed(state)) {
@@ -666,11 +764,12 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
             return { status: 'done', target, reason: 'nothing_deployed' };
         }
 
-        if (!this.dispatcher) {
+        if (!this.dispatcherAvailable()) {
             // Fail-closed: the Work row stays, the claim is not taken, and the member can retry once
-            // the worker is back. Nothing is reported as removed.
+            // the worker is back. Nothing is reported as removed — and APW-01 refuses the delete on
+            // this reason (`isAppWorkDeletionNotStarted`), so no repository step runs either.
             this.logger.warn(
-                `No app-cluster-op dispatcher is bound: deletion of work ${workId} stays pending.`,
+                `No app-cluster-op dispatcher is available: deletion of work ${workId} not started.`,
             );
             return { status: 'pending', target, reason: 'dispatcher_unavailable' };
         }
@@ -681,25 +780,203 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
             return { status: 'pending', target, reason: 'runtime_state_unreadable' };
         }
 
-        const claimed = await this.runtimeStates.claimDeletion(workId, {
-            deleteStoredData,
-            requestedByUserId: userId,
-        });
+        let claimed: boolean;
+        try {
+            claimed = await this.runtimeStates.claimDeletion(workId, {
+                deleteStoredData,
+                requestedByUserId: userId,
+            });
+        } catch (error) {
+            // A claim that could not be written is a claim that was not taken: the truth on the row
+            // is unknown, so the answer is the not-started one, never APW-01's "a throw is done".
+            this.logger.warn(
+                `The deletion claim of work ${workId} could not be written: ${errorText(error)}`,
+            );
+            return { status: 'pending', target, reason: 'runtime_state_unreadable' };
+        }
         if (!claimed) {
-            // A concurrent request won, or a Deployment still holds the lock (§9.7's "only when
-            // unset and no `deployLockId`"). Either way this call dispatches nothing.
+            // A concurrent request won, or a Deployment took the lock between the read and the claim
+            // (§9.7's "only when unset and no `deployLockId`"). Either way this call dispatches
+            // nothing; the second case is told apart so APW-01 refuses instead of saying "deleting".
+            const again = await this.readStateOrNull(workId, 'request');
+            if (!hasDeletionRequest(again.state) && again.state?.deployLockId) {
+                return { status: 'pending', target, reason: 'deploy_in_progress' };
+            }
             return { status: 'pending', target, reason: 'already_deleting' };
         }
 
         const requestedAtMs = this.nowMs();
-        await this.dispatcher.dispatch({
-            op: APP_DELETE_WORK_OP,
-            workId,
-            attempt: 1,
-            requestedAtMs,
-        });
+        const runId = await this.dispatchDeleteOp(workId, requestedAtMs);
+        if (!runId) {
+            // Lane aw-safety: the gate answered `null` (no job runtime, or production without the
+            // isolation attestation) or threw. Before this the claim stayed and the Work read
+            // **Deleting…** forever with nothing running the removal. The claim is released, so the
+            // Work is exactly as it was, and APW-01 refuses the delete (`dispatcher_unavailable`).
+            await this.releaseClaim(workId);
+            return { status: 'pending', target, reason: 'dispatcher_unavailable' };
+        }
 
         return { status: 'pending', target };
+    }
+
+    /**
+     * Lane aw-safety (2026-10-26) — what the delete dialog lists, in the dialog's own vocabulary:
+     * what is **removed** whatever the member chooses (the workloads and the managed DNS record),
+     * what is **kept** unless they tick **Also delete stored data**, and what that box additionally
+     * destroys. Names, kinds and sizes only.
+     *
+     * Additive beside {@link preview}, whose shape §9.7 fixes (and whose `keeps[]` lists the
+     * workloads too — the components it names are removed, not kept, which is why the dialog reads
+     * this method instead).
+     */
+    async describeDeletion(workId: string): Promise<AppDeletionDescription> {
+        const read = await this.readStateOrNull(workId, 'preview');
+        const state = read.state;
+        const target: AppDeployTarget = state?.target ?? 'none';
+
+        const removes: AppDeletionPreviewEntry[] = [];
+        for (const component of state?.statusSnapshot?.components ?? []) {
+            if (component?.name) {
+                removes.push({ kind: 'Component', name: component.name });
+            }
+        }
+        const deployed = isDeployed(state);
+        if (deployed) {
+            // The managed record is removed on every path (§9.7 step 3); it is named by its role,
+            // never by its hostname (the same rule `removeManagedRecord` keeps).
+            removes.push({ kind: 'DnsRecord', label: 'managed-subdomain' });
+        }
+
+        const keeps: AppDeletionPreviewEntry[] = [];
+        const destroysWithData: AppDeletionPreviewEntry[] = [];
+        for (const dependency of await this.listDependencies(workId)) {
+            const entry: AppDeletionPreviewEntry = { kind: dependency.kind };
+            if (dependency.label) {
+                entry.label = dependency.label;
+            }
+            if (typeof dependency.sizeGiB === 'number') {
+                entry.sizeGiB = dependency.sizeGiB;
+            }
+            keeps.push(entry);
+            destroysWithData.push({ ...entry });
+        }
+
+        return {
+            target,
+            deployed,
+            deleting: hasDeletionRequest(state),
+            stateUnreadable: read.failed,
+            deployInProgress: Boolean(state?.deployLockId),
+            removes,
+            keeps,
+            destroysWithData,
+        };
+    }
+
+    /**
+     * Lane aw-safety — §9.7's second row, with a recovery: a claim older than
+     * {@link APP_WORK_DELETION_STALE_AFTER_MS} whose Work still exists never finished (the op was
+     * lost, the worker died, or the completion hop failed). The store's compare-and-set re-claim
+     * decides which ONE repeated request dispatches a fresh op; every other answer is the
+     * idempotent `already_deleting` of the plan.
+     */
+    private async redispatchIfStale(
+        workId: string,
+        target: AppDeployTarget,
+        state: WorkAppRuntimeStateDeletionView | null,
+    ): Promise<AppWorkDeletionOutcome> {
+        const claimedAt = toEpochMs(state?.deletionRequestedAt);
+        const now = this.nowMs();
+        const stale =
+            claimedAt !== null && now - claimedAt > APP_WORK_DELETION_STALE_AFTER_MS;
+        const store = this.runtimeStates;
+
+        if (!stale || !store || typeof store.reclaimStaleDeletion !== 'function') {
+            return { status: 'pending', target, reason: 'already_deleting' };
+        }
+        if (!this.dispatcherAvailable()) {
+            return { status: 'pending', target, reason: 'already_deleting' };
+        }
+
+        let reclaimed = false;
+        try {
+            reclaimed = await store.reclaimStaleDeletion(
+                workId,
+                new Date(now - APP_WORK_DELETION_STALE_AFTER_MS),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `The stale deletion claim of work ${workId} could not be re-taken: ${errorText(error)}`,
+            );
+        }
+        if (!reclaimed) {
+            return { status: 'pending', target, reason: 'already_deleting' };
+        }
+
+        const runId = await this.dispatchDeleteOp(workId, now);
+        if (!runId) {
+            // The re-claim stays (the Work IS deleting — the member asked for it earlier); the next
+            // repeat after the stale window tries again.
+            return { status: 'pending', target, reason: 'already_deleting' };
+        }
+        this.logger.log(`Re-dispatched the stale deletion of work ${workId}.`);
+        return { status: 'pending', target, reason: 'redispatched' };
+    }
+
+    /** `true` when a dispatcher is bound and does not say it is switched off. */
+    private dispatcherAvailable(): boolean {
+        if (!this.dispatcher) {
+            return false;
+        }
+        const gate = this.dispatcher as AppClusterOpDispatcher & { isEnabled?: () => boolean };
+        if (typeof gate.isEnabled === 'function') {
+            try {
+                return gate.isEnabled() !== false;
+            } catch {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** One attempt-1 `delete-app-work` dispatch; `null` when the gate refused or threw. */
+    private async dispatchDeleteOp(workId: string, requestedAtMs: number): Promise<string | null> {
+        if (!this.dispatcher) {
+            return null;
+        }
+        try {
+            const runId = await this.dispatcher.dispatch({
+                op: APP_DELETE_WORK_OP,
+                workId,
+                attempt: 1,
+                requestedAtMs,
+            });
+            return typeof runId === 'string' && runId.length > 0 ? runId : null;
+        } catch (error) {
+            this.logger.warn(
+                `delete-app-work could not be dispatched for work ${workId}: ${errorText(error)}`,
+            );
+            return null;
+        }
+    }
+
+    /** Best-effort release of a claim this request took (see {@link requestDeletion}). */
+    private async releaseClaim(workId: string): Promise<void> {
+        const store = this.runtimeStates;
+        if (!store || typeof store.releaseDeletionClaim !== 'function') {
+            this.logger.warn(
+                `The deletion claim of work ${workId} cannot be released by this store; a repeated ` +
+                    'delete re-dispatches it once it is stale.',
+            );
+            return;
+        }
+        try {
+            await store.releaseDeletionClaim(workId);
+        } catch (error) {
+            this.logger.warn(
+                `The deletion claim of work ${workId} could not be released: ${errorText(error)}`,
+            );
+        }
     }
 
     /* ---------------------------------------------------------------------- *
@@ -773,6 +1050,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
                 workId,
                 attempt,
                 target,
+                userId: state.deletionRequestedByUserId,
                 state: 'done',
                 code: 'nothing_deployed',
                 removal: {
@@ -817,13 +1095,21 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
                 workId,
                 attempt,
                 target,
+                userId: state?.deletionRequestedByUserId,
                 state: 'may-remain',
                 code: 'dependencies_remaining',
                 removal: { ...removal, kept: [...removal.kept, ...kept] },
             });
         }
 
-        return this.finish({ workId, attempt, target, state: 'done', removal });
+        return this.finish({
+            workId,
+            attempt,
+            target,
+            userId: state?.deletionRequestedByUserId,
+            state: 'done',
+            removal,
+        });
     }
 
     /**
@@ -835,7 +1121,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
      */
     async finishDeletion(
         workId: string,
-        opts?: { mayRemain?: readonly AppDeletionObjectRef[] },
+        opts?: AppWorkDeletionCompletionReport,
     ): Promise<{ completed: boolean; reason?: AppWorkDeletionCode }> {
         if (!this.completion) {
             this.logger.warn(
@@ -845,7 +1131,14 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
         }
 
         try {
-            await this.completion.completeAppWorkDeletion(workId);
+            // Lane aw-safety: the report travels with the call (names and codes only) — in the
+            // worker this is the proxy of the API's guarded completion, which tells the owner what
+            // may remain before the Work row goes.
+            if (opts) {
+                await this.completion.completeAppWorkDeletion(workId, completionReport(opts));
+            } else {
+                await this.completion.completeAppWorkDeletion(workId);
+            }
         } catch (error) {
             this.logger.warn(
                 `completeAppWorkDeletion failed for work ${workId}: ${errorText(error)}`,
@@ -977,6 +1270,8 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
         state: 'done' | 'may-remain';
         code?: AppWorkDeletionCode;
         removal: RuntimeRemoval;
+        /** Who asked (the claim's `deletionRequestedByUserId`) — the Activity row's user. */
+        userId?: string | null;
     }): Promise<AppWorkDeletionOpResult> {
         const { workId, target, removal } = input;
 
@@ -988,9 +1283,17 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
             mayRemain: removal.mayRemain,
             deletedCount: removal.deleted.length,
             code: input.code,
+            // Lane aw-safety: carried so the Activity row is attributed without reading the Work,
+            // which the completion is about to delete (`AppRuntimeActivityListener.ownerOf`).
+            userId: input.userId,
         });
 
-        const completed = await this.finishDeletion(workId, { mayRemain: removal.mayRemain });
+        const completed = await this.finishDeletion(workId, {
+            mayRemain: removal.mayRemain,
+            kept: removal.kept,
+            target,
+            code: input.code,
+        });
 
         return {
             state: input.state,
@@ -1052,6 +1355,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
             workId,
             attempt,
             target,
+            userId: state?.deletionRequestedByUserId,
             state: 'may-remain',
             code: code === 'cluster_unreachable' ? exhausted : code,
             removal: {
@@ -1083,7 +1387,7 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
         let scheduled = false;
 
         if (this.dispatcher) {
-            await this.dispatcher.dispatch(
+            const runId = await this.dispatcher.dispatch(
                 {
                     op: APP_DELETE_WORK_OP,
                     workId: input.workId,
@@ -1092,7 +1396,10 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
                 },
                 { delayMs: input.retryInMs },
             );
-            scheduled = true;
+            // Lane aw-safety: the API gate answers `null` when it refused (no job runtime, no
+            // attestation). Reported as not scheduled — the claim stays and a repeated delete
+            // re-dispatches it once it is stale — rather than as a retry nobody will run.
+            scheduled = runId !== null;
         }
 
         return {
@@ -1283,11 +1590,35 @@ export class AppRuntimeDeletionService implements AppWorkDeletionPort {
         }
 
         const work = await this.works.findById(workId);
-        if (!work || !isAppWorkKind(work.kind) || work.userId !== userId) {
+        if (!work || !isAppWorkKind(work.kind)) {
+            throw new AppWorkDeletionRefusalError('not_found', 404, 'No App Work to delete.');
+        }
+        if (work.userId !== userId && !(await this.isMemberOwner(workId, userId))) {
             throw new AppWorkDeletionRefusalError('not_found', 404, 'No App Work to delete.');
         }
 
         return work;
+    }
+
+    /**
+     * Lane aw-safety — the `owner` member role, the second way `WorkOwnershipService.ensureIsOwner`
+     * admits a caller (`work-ownership.service.ts`, `getUserRole`). One read, resolved lazily; an
+     * absent repository or a failed read answers `false` (the refusal), never an assumption.
+     */
+    private async isMemberOwner(workId: string, userId: string): Promise<boolean> {
+        if (!this.moduleRef) {
+            return false;
+        }
+        try {
+            const members = getOptionalProvider<WorkMemberRepository>(this.moduleRef, WorkMemberRepository);
+            const member = await members?.findMember(workId, userId);
+            return member?.role === WorkMemberRole.OWNER;
+        } catch (error) {
+            this.logger.warn(
+                `The member role of a caller on work ${workId} could not be read: ${errorText(error)}`,
+            );
+            return false;
+        }
     }
 
     /**
@@ -1418,6 +1749,32 @@ class AppWorkDeletionTransientError extends Error {
         super(`App Work deletion is not possible right now: ${code}`);
         this.name = 'AppWorkDeletionTransientError';
     }
+}
+
+/**
+ * The completion report, rebuilt field by field — kinds, names and codes only, at most 50 refs per
+ * list — so whatever crosses the internal hop (and lands in the owner's notification) can carry
+ * nothing a caller added to the object.
+ */
+function completionReport(report: AppWorkDeletionCompletionReport): AppWorkDeletionCompletionReport {
+    const out: AppWorkDeletionCompletionReport = {};
+    const refs = (list?: readonly AppDeletionObjectRef[]) =>
+        dedupeRefs(list ?? [])
+            .slice(0, 50)
+            .map((ref) => ({ kind: String(ref.kind).slice(0, 80), name: String(ref.name).slice(0, 120) }));
+    if (report.mayRemain) {
+        out.mayRemain = refs(report.mayRemain);
+    }
+    if (report.kept) {
+        out.kept = refs(report.kept);
+    }
+    if (report.target) {
+        out.target = report.target;
+    }
+    if (report.code) {
+        out.code = report.code;
+    }
+    return out;
 }
 
 /** `true` while §9.7's deletion claim is recorded on the row. */
