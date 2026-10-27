@@ -1,5 +1,7 @@
 import {
+    APP_WORK_RUN_CLASSIFIER,
     AppChangeRequestService,
+    AppWorkRunClassifierService,
     AppWorksModule as AgentAppWorksModule,
     appProvisioningTaskOrigin,
 } from '@ever-works/agent/app-works';
@@ -657,6 +659,18 @@ async function assertRealWriteTarget(
         // claims them — unless this binding is BOTH global AND exported.
         // `SafetyModule` (imported above) exports SafetyGateService.
         { provide: SAFETY_GATE, useExisting: SafetyGateService },
+        // APW-08 T47 (FR-69) — "is this an App Work run?" for `AgentRunService`, which
+        // reads the token through an @Optional() @Inject() and filters an App Work run's
+        // tools through `APP_WORK_TASK_TOOL_POLICY`. Same posture as SAFETY_GATE above:
+        // unless this binding is BOTH global AND exported, the injection resolves to
+        // `undefined` and no run is ever classified. TaskRepository (TasksDomainModule)
+        // and WorkRepository (DatabaseModule) come from this module's own imports.
+        {
+            provide: APP_WORK_RUN_CLASSIFIER,
+            useFactory: (tasks: TaskRepository, works: WorkRepository) =>
+                new AppWorkRunClassifierService({ tasks, works }),
+            inject: [TaskRepository, WorkRepository],
+        },
         // Streaming terminal — the two halves of the session dispatch.
         //
         // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
@@ -2612,6 +2626,7 @@ async function assertRealWriteTarget(
         TERMINAL_SESSION_STARTER,
         RUN_KILL_SWITCH,
         SAFETY_GATE,
+        APP_WORK_RUN_CLASSIFIER,
     ],
 })
 export class AgentsModule {}
