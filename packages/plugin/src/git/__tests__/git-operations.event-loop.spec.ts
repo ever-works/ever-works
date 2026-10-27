@@ -51,11 +51,7 @@ function busy(ms: number): void {
  * What isomorphic-git's `GitPackIndex.fromPack` does with a pack it holds in memory: a long run of
  * CPU work whose only `await` per percent is `onProgress`, and whose other `await`s are microtasks.
  */
-async function indexPack(
-	onProgress: (() => Promise<void>) | undefined,
-	totalMs: number,
-	slices = 100
-): Promise<void> {
+async function indexPack(onProgress: (() => Promise<void>) | undefined, totalMs: number, slices = 100): Promise<void> {
 	for (let percent = 0; percent < slices; percent += 1) {
 		if (onProgress) await onProgress();
 		busy(totalMs / slices);

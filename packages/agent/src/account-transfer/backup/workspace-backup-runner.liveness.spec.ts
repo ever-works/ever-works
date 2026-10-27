@@ -186,7 +186,9 @@ function harness(
                         at: Date.now(),
                     });
                     if (options.slowPagesFor?.entity === target) {
-                        await new Promise((resolve) => setTimeout(resolve, options.slowPagesFor!.ms));
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, options.slowPagesFor!.ms),
+                        );
                     }
                     return matching()
                         .slice(offset, take === undefined ? undefined : offset + take)
@@ -344,9 +346,7 @@ describe('the Works domain of a large workspace', () => {
         expect(result.status).toBe('ready');
 
         const works = h.during('works');
-        const pages = works.filter(
-            (e): e is Extract<Event, { kind: 'page' }> => e.kind === 'page',
-        );
+        const pages = works.filter((e): e is Extract<Event, { kind: 'page' }> => e.kind === 'page');
         // No query ever asked for more than one page.
         expect(pages.length).toBeGreaterThan(0);
         expect(Math.max(...pages.map((p) => p.take))).toBeLessThanOrEqual(PAGE_SIZE);
@@ -355,9 +355,7 @@ describe('the Works domain of a large workspace', () => {
 
         // The Work file itself walked 0, 500, …, 2500.
         const workOffsets = pages.filter((p) => p.entity === 'Work').map((p) => p.offset);
-        expect(workOffsets).toEqual(
-            expect.arrayContaining([0, 500, 1000, 1500, 2000, 2500]),
-        );
+        expect(workOffsets).toEqual(expect.arrayContaining([0, 500, 1000, 1500, 2000, 2500]));
 
         // Between two consecutive full pages of the same file there is always
         // a heartbeat: one long file is never one silent step.
@@ -521,7 +519,9 @@ describe('the Works content pass — one data repo per Work', () => {
         expect(domain.status).toBe('partial');
         expect(domain.error?.code).toBe('work_content_unavailable');
         // The Work ROWS still shipped, all six.
-        expect(domain.files.find((file) => file.name === 'data/works/works.jsonl')?.records).toBe(6);
+        expect(domain.files.find((file) => file.name === 'data/works/works.jsonl')?.records).toBe(
+            6,
+        );
         expect(domain.files.some((file) => file.name.includes('/content/'))).toBe(false);
     }, 30_000);
 

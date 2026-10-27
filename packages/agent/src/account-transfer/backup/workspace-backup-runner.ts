@@ -1083,7 +1083,8 @@ export class WorkspaceBackupRunner {
         let records = outcome.records;
         let degraded = false;
         const timeoutMs = workContentTimeoutMs(tuning);
-        const timeoutBudget = tuning?.workContentTimeoutBudget ?? DEFAULT_WORK_CONTENT_TIMEOUT_BUDGET;
+        const timeoutBudget =
+            tuning?.workContentTimeoutBudget ?? DEFAULT_WORK_CONTENT_TIMEOUT_BUDGET;
         let timedOut = 0;
         let skipped = 0;
 

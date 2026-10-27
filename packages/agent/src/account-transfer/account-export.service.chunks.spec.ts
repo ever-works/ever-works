@@ -233,9 +233,9 @@ describe('AccountExportService — a large account', () => {
 
     it('rejects the first fragment, before any byte, for an account that is not there', async () => {
         const h = harness({ works: 1, itemsPerWork: 1 });
-        (h.service as unknown as { userRepository: { findById: jest.Mock } }).userRepository.findById.mockResolvedValue(
-            null,
-        );
+        (
+            h.service as unknown as { userRepository: { findById: jest.Mock } }
+        ).userRepository.findById.mockResolvedValue(null);
 
         await expect(h.service.exportAccountDataChunks('missing').next()).rejects.toThrow(
             'User not found',
