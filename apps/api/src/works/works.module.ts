@@ -58,6 +58,8 @@ import { AppSourceController } from './app-source.controller';
 import { WorkAppDeployController } from './work-app-deploy.controller';
 // APW-06 T33 (lane aw-deploy-2) — GET/PUT app-target, POST app-target/check, GET app-status.
 import { WorkAppRuntimeController } from './work-app-runtime.controller';
+// Lane aw-ops — refresh status, logs, run a job, run smoke checks, the Deployment history.
+import { WorkAppOpsController } from './work-app-ops.controller';
 import { WorkEvolveController } from './work-evolve.controller';
 import { UpstreamPullRequestsModule } from '@ever-works/agent/upstream-pull-requests';
 import { WorkAppSpecController } from './work-app-spec.controller';
@@ -222,6 +224,9 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // APW-03 T15 — the App spec tab's two routes.
         WorkAppDeployController,
         WorkAppRuntimeController,
+        // Lane aw-ops (APW-06 §9.1) — `POST app-status/refresh`, `POST/GET app-logs`,
+        // `POST app-jobs/:name/run`, `POST app-smoke`, `GET app-deployments`.
+        WorkAppOpsController,
         WorkAppSpecController,
         // Lane aw-env-smtp (APW-07 T24) — `GET`/`PUT /api/works/:id/app-env`.
         WorkAppEnvController,

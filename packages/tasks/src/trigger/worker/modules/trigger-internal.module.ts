@@ -55,6 +55,7 @@ import {
     FleetSessionSweepService,
     FleetVirtualReconcileService,
     FleetCloudSweepService,
+    FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { SkillReadinessService } from '@ever-works/agent/skills';
@@ -325,13 +326,23 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
                 createRemoteProxy(apiClient, 'FleetVirtualReconcileService'),
             inject: [TriggerInternalApiClient],
         },
-        // Cloud computers (FL-17) — the fleet-cloud-reconcile and
-        // fleet-cloud-bootstrap-watch crons call the two sweeps over the internal
-        // RPC channel; the repositories and the provider facade live API-side.
+        // Cloud computers (FL-17) — the fleet-cloud-reconcile,
+        // fleet-cloud-bootstrap-watch and (P2) fleet-cloud-usage / fleet-cloud-idle
+        // crons call the four sweeps over the internal RPC channel; the
+        // repositories and the provider facade live API-side.
         {
             provide: FleetCloudSweepService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'FleetCloudSweepService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Actions runners on computers (FL-18) — the fleet-runners-poll cron calls
+        // reconcile() over the internal RPC channel; GitHub, the repositories and the
+        // node link live API-side.
+        {
+            provide: FleetActionsRunnersPollService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetActionsRunnersPollService'),
             inject: [TriggerInternalApiClient],
         },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
@@ -654,6 +665,7 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         FleetCheckoutReconcileService,
         FleetVirtualReconcileService,
         FleetCloudSweepService,
+        FleetActionsRunnersPollService,
         TaskGateRunnerService,
         TaskGateJudgeService,
         WorkRepository,

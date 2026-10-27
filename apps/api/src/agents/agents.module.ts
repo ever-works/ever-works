@@ -134,6 +134,8 @@ import {
     FleetMachineActionsService,
     FleetVirtualService,
     FleetCloudService,
+    FleetUsageViewService,
+    FleetActionsRunnersService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2197,6 +2199,15 @@ async function assertRealWriteTarget(
                 // (positional), optional: unbound (or FLEET_CLOUD_ENABLED off) the six
                 // tools are not offered; create / power / destroy only ever file an approval.
                 { token: FleetCloudService, optional: true },
+                // Usage & cost on the fleet (FL-20) — backs the read-only `fleet_usage_get`.
+                // APPENDED LAST (positional), optional: unbound (or FLEET_USAGE_SCAN_ENABLED
+                // off) the tool is not offered.
+                { token: FleetUsageViewService, optional: true },
+                // Actions runners on computers (FL-18) — backs `fleet_runners_*`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_ACTIONS_RUNNERS_ENABLED off)
+                // the tools are not offered; install / stop / restart / remove only ever file
+                // an approval.
+                { token: FleetActionsRunnersService, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2239,6 +2250,8 @@ async function assertRealWriteTarget(
                 fleetSessionActions?: FleetSessionActionService | null,
                 fleetPullRequests?: FleetPullRequestService | null,
                 fleetCloud?: FleetCloudService | null,
+                fleetUsage?: FleetUsageViewService | null,
+                fleetRunners?: FleetActionsRunnersService | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2284,6 +2297,8 @@ async function assertRealWriteTarget(
                           }
                         : {}),
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
+                    ...(fleetUsage && config.fleet.isUsageScanEnabled() ? { usage: fleetUsage } : {}),
+                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled() ? { runners: fleetRunners } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                     ...(fleetSessionActions && config.fleet.isSessionsEnabled()
                         ? {

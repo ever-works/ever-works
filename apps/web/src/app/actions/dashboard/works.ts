@@ -16,6 +16,7 @@ import {
     GitProviderConnectionInfo,
 } from '@/lib/api';
 import type { Work } from '@/lib/api/types-only';
+import type { AppDeletionPreviewResponse } from '@/lib/api/work';
 import type {
     MergePolicyOverride,
     TaskAcceptanceCheck,
@@ -916,6 +917,34 @@ export async function getAppDeleteTarget(workId: string): Promise<{
     }
 }
 
+/**
+ * APW-06 T59 (lane aw-safety, 2026-10-26) — the delete dialog's preview of what deleting an App
+ * Work removes, keeps, and (with **Also delete stored data**) destroys. A Server Action for the
+ * same reason as {@link getAppDeleteTarget}: the API client is `server-only`. A failure answers
+ * `success: false`, and the dialog says the preview is unavailable instead of listing nothing.
+ */
+export async function getAppDeletionPreview(workId: string): Promise<{
+    success: boolean;
+    preview?: AppDeletionPreviewResponse;
+    error?: string;
+}> {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const preview = await workAPI.getAppDeletionPreview(workId);
+        return { success: true, preview };
+    } catch (error) {
+        console.error('Failed to read the App Work deletion preview:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to read the deletion preview',
+        };
+    }
+}
+
 export async function deleteWork(workId: string, options?: DeleteWorkDto) {
     // Security: verify authentication at the server-action boundary.
     const user = await getAuthFromCookie();
@@ -940,11 +969,19 @@ export async function deleteWork(workId: string, options?: DeleteWorkDto) {
             };
         }
 
-        await workAPI.delete(validation.data.id, options || {});
+        const result = await workAPI.delete(validation.data.id, options || {});
+
+        // Lane aw-safety (APW-01 T39 / R-15): an App Work whose removal the App runtime took over
+        // keeps its row until the workloads are gone (`deleting: true`). Say so, instead of the
+        // plain "deleted" — the Work is still listed, reading **Deleting…**, for a few minutes.
+        const deleting =
+            (result as { deleting?: unknown; status?: unknown } | undefined)?.deleting === true ||
+            (result as { status?: unknown } | undefined)?.status === 'pending';
 
         return {
             success: true,
-            message: t('deleteSuccess'),
+            deleting,
+            message: deleting ? t('deletePending') : t('deleteSuccess'),
         };
     } catch (error) {
         console.error('Failed to delete Work:', error);

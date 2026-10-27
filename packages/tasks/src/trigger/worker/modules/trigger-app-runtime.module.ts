@@ -61,6 +61,10 @@ import {
     RegistryAppImageReferenceResolver,
     RegistryAppImageUserInspector,
     workerAppDeployDispatcher,
+    // Lane aw-safety (2026-10-26) — APW-06 T58 / §9.8's completion edge.
+    APP_WORK_DELETION_COMPLETION,
+    workerAppWorkDeletionCompletion,
+    type AppRuntimeDeletionFinishRemote,
 } from '@ever-works/agent/app-runtime';
 import { APP_DEPLOY_HOST_SOURCE } from '@ever-works/agent/app-runtime';
 import {
@@ -251,7 +255,10 @@ import { createRemoteProxy } from '../remote-proxy';
  *   for it, so whether this worker may request a Deployment over the internal channel is open.
  * - `APP_WORK_DELETION_COMPLETION` — deletes the Work row; its binding is owed in the API
  *   (`app-runtime-deletion.service.ts`, APW-06 T33/T58) and, here, would be a proxy to a destructive
- *   method. Unbound, a finished removal keeps the row (fail-closed).
+ *   method. Unbound, a finished removal keeps the row (fail-closed). **Bound 2026-10-26 (lane
+ *   aw-safety)** to `workerAppWorkDeletionCompletion` — a one-member proxy of the API's
+ *   `AppRuntimeDeletionService.finishDeletion`, whose API-side completion refuses unless the row
+ *   records a deletion, so the proxy cannot delete a Work nobody asked to delete.
  * - `APP_DEPENDENCIES_SERVICE` — APW-07's service must run HERE (its provider calls dial the
  *   cluster), and its row writes go through `@InjectRepository(WorkAppDependency)`, which cannot cross
  *   the internal channel; with `app-dependency-provision.task.ts`'s module, it waits on that design.
@@ -364,6 +371,9 @@ export const APP_RUNTIME_REMOTE_PROXIES = [
     // APW-03 T42 — the license gate's one read (`getHostingEligibility`), see
     // `workerAppLicenseService`.
     'AppLicenseService',
+    // APW-06 T58 / §9.8 (lane aw-safety, 2026-10-26) — the deletion's completion edge: the API's
+    // `AppRuntimeDeletionService.finishDeletion`, a one-member facade on `remoteMap`.
+    'AppRuntimeDeletionService',
 ] as const;
 
 /**
@@ -570,6 +580,22 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
             provide: APP_CLUSTER_OP_DISPATCHER,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'AppClusterOpDispatchRelay'),
+            inject: [TriggerInternalApiClient],
+        },
+        // APW-06 T58 / §9.8 (lane aw-safety, 2026-10-26): the completion edge. After the
+        // `delete-app-work` op removed the runtime, `finishDeletion` dials the API's
+        // `AppRuntimeDeletionService.finishDeletion` (guarded there: the row must record a
+        // deletion), which deletes the Work row. Unbound before this, so a finished removal kept
+        // the Work row forever. Fail-closed: anything but `completed: true` throws, and the row stays.
+        {
+            provide: APP_WORK_DELETION_COMPLETION,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                workerAppWorkDeletionCompletion(
+                    createRemoteProxy(
+                        apiClient,
+                        'AppRuntimeDeletionService',
+                    ) as unknown as AppRuntimeDeletionFinishRemote,
+                ),
             inject: [TriggerInternalApiClient],
         },
         // T47/T48 (lane aw-deploy-2): the deletion path removes the managed subdomain's record

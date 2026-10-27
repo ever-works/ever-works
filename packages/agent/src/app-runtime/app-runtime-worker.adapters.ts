@@ -28,7 +28,11 @@ import type { AppLimitRangeInput, AppTargetRef } from '@ever-works/plugin';
 import { NotificationCategory, NotificationType } from '../entities/notification.types';
 import type { AppDeployBuildSource } from './app-deploy-preconditions.service';
 import { APP_DEPLOY_DISPATCHER } from './app-deploy-request.service';
-import { APP_CLUSTER_OP_DISPATCHER } from './app-runtime-deletion.service';
+import {
+    APP_CLUSTER_OP_DISPATCHER,
+    type AppWorkDeletionCompletion,
+    type AppWorkDeletionCompletionReport,
+} from './app-runtime-deletion.service';
 import type {
     AppCommitAncestry,
     AppDeployOrchestratorDispatcher,
@@ -806,4 +810,53 @@ export class AppClusterOpDispatchRelay {
             return null;
         return this.gate.dispatch(payload, opts);
     }
+}
+
+/* -------------------------------------------------------------------------- *
+ * APP_WORK_DELETION_COMPLETION in the worker (APW-06 T58 / §9.8, lane aw-safety 2026-10-26)
+ * -------------------------------------------------------------------------- */
+
+/** The ONE member of the API's `AppRuntimeDeletionService` the worker may dial. */
+export interface AppRuntimeDeletionFinishRemote {
+    finishDeletion(
+        workId: string,
+        report?: AppWorkDeletionCompletionReport,
+    ): Promise<{ completed?: boolean; reason?: string } | null | undefined>;
+}
+
+/**
+ * The worker's `APP_WORK_DELETION_COMPLETION`: §9.8's "remote proxy of
+ * `AppRuntimeDeletionService.finishDeletion(workId, { mayRemain })`" — the method runs in the API,
+ * where the guarded completion (`AppWorkDeletionCompletionService`) checks that the row really
+ * records a deletion, tells the owner what may remain, and only then asks APW-01 to delete the row.
+ *
+ * Unbound before 2026-10-26, so a finished removal kept the Work row forever (the fail-closed
+ * answer of the deletion service's header table).
+ *
+ * - **Narrow**: one method over a one-member remote facade, never the raw proxy.
+ * - **Fail-closed**: an answer that is not `completed: true` — a refusal, an unbound API side, a
+ *   failed hop — THROWS, which the worker's `finishDeletion` reports as `completed: false`; the
+ *   Work row is kept and a repeated delete re-dispatches once the claim is stale. Never a
+ *   "completed" that did not happen.
+ */
+export function workerAppWorkDeletionCompletion(
+    remote: AppRuntimeDeletionFinishRemote,
+): AppWorkDeletionCompletion {
+    return {
+        async completeAppWorkDeletion(
+            workId: string,
+            report?: AppWorkDeletionCompletionReport,
+        ): Promise<void> {
+            const answer = report
+                ? await remote.finishDeletion(workId, report)
+                : await remote.finishDeletion(workId);
+            if (answer?.completed !== true) {
+                throw new Error(
+                    `The API did not complete the deletion of work ${workId} (${String(
+                        answer?.reason ?? 'no_answer',
+                    ).slice(0, 60)}).`,
+                );
+            }
+        },
+    };
 }

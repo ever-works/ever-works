@@ -2,12 +2,14 @@ import 'server-only';
 import type {
     FleetCloudCreateRequest,
     FleetCloudCreateResponse,
+    FleetCloudIdlePolicy,
     FleetCloudListView,
     FleetCloudOperationResponse,
     FleetCloudOptionsView,
     FleetCloudPowerAction,
     FleetCloudProvidersView,
     FleetCloudUsageView,
+    FleetNodeView,
 } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
@@ -39,6 +41,24 @@ export const fleetCloudAPI = {
         serverMutation<FleetCloudOperationResponse>({
             endpoint: `/fleet/cloud/${encodeURIComponent(nodeId)}/power`,
             data: { action, ...(confirm ? { confirm: true } : {}) },
+            method: 'POST',
+            wrapInData: false,
+        }),
+
+    /** P2 (spec FR-25) — nothing · tell me after N h · power off after N h; N 1–72. */
+    setIdlePolicy: async (nodeId: string, policy: FleetCloudIdlePolicy) =>
+        serverMutation<FleetNodeView>({
+            endpoint: `/fleet/cloud/${encodeURIComponent(nodeId)}/idle-policy`,
+            data: { mode: policy.mode, afterHours: policy.afterHours },
+            method: 'PUT',
+            wrapInData: false,
+        }),
+
+    /** P2 (spec S6) — the idle window starts again now. */
+    keepRunning: async (nodeId: string) =>
+        serverMutation<FleetNodeView>({
+            endpoint: `/fleet/cloud/${encodeURIComponent(nodeId)}/keep-running`,
+            data: {},
             method: 'POST',
             wrapInData: false,
         }),

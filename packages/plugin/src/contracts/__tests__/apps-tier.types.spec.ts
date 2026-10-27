@@ -143,7 +143,9 @@ const LATER_CAPABILITY_ENTRIES: ReadonlyArray<[string, string]> = [
 	// Domain events (EW-P1-1).
 	['DOMAIN_EVENT_SUBSCRIBER', 'domain-event-subscriber'],
 	// Cloud computers (FL-17).
-	['MACHINE_PROVIDER', 'machine-provider']
+	['MACHINE_PROVIDER', 'machine-provider'],
+	// Actions runners on computers (FL-18).
+	['ACTIONS_RUNNERS', 'actions-runners']
 ];
 
 /**

@@ -7905,6 +7905,18 @@
                 "deleteAppTargetNone": "None",
                 "deleteAppTargetYourCluster": "your cluster",
                 "deleteAppTargetEverWorksApps": "Ever Works Apps",
+                "deleteAppPreviewTitle": "What happens to the running App",
+                "deleteAppPreviewLoading": "Checking what is running…",
+                "deleteAppPreviewUnavailable": "What is running could not be checked right now. Deleting still removes the App from where it runs first; if that cannot be done, nothing is deleted.",
+                "deleteAppPreviewNothingDeployed": "Nothing is deployed, so there is nothing to remove from a cluster.",
+                "deleteAppPreviewDeleting": "A deletion is already in progress. Deleting again re-checks it.",
+                "deleteAppPreviewDeployInProgress": "A Deployment is running. Cancel it from the Deploy tab, or wait for it to finish, before deleting.",
+                "deleteAppPreviewRemoves": "Removed from {target}",
+                "deleteAppPreviewKeeps": "Kept unless you also delete stored data",
+                "deleteAppPreviewDestroysWithData": "Also deleted, with their data",
+                "deleteAppPreviewComponent": "Workload {name}",
+                "deleteAppPreviewManagedDns": "Its managed subdomain record",
+                "deleteAppPreviewSize": "{size} GiB",
                 "deleteConfirm": "Are you absolutely sure?",
                 "deleteConfirmDetail": "This action cannot be undone. The Work and selected repositories will be permanently deleted.",
                 "confirmWorkName": "Type Work name to confirm",
@@ -12359,6 +12371,7 @@
             "aiGenerationStarted": "Work created — AI is generating content…",
             "invalidId": "Invalid Work ID",
             "deleteSuccess": "Work deleted successfully",
+            "deletePending": "Deleting… the App is being removed from where it runs. The Work disappears once that is done.",
             "deleteFailed": "Failed to delete Work",
             "fetchFailed": "Failed to fetch works",
             "organization": {
@@ -14860,7 +14873,8 @@
                 "system": "system log",
                 "file": "file",
                 "container": "container",
-                "service": "service"
+                "service": "service",
+                "runner": "Actions runner"
             },
             "sources": {
                 "title": "Sources",
@@ -15518,7 +15532,12 @@
                 "idleTellMe": "Tell me after {hours} h",
                 "idlePowerOff": "Power off after {hours} h",
                 "address": "Public address {ip} (Ever Works never connects in; the machine connects out).",
-                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer."
+                "pluginDisabled": "{provider} plugin is disabled — enable it to power or destroy this computer.",
+                "idleFor": "idle for {duration}",
+                "keepRunning": "Keep running",
+                "keptRunning": "{name} keeps running; the idle policy waits its hours again.",
+                "poweredOffByPolicy": "Powered off by the idle policy {duration} ago, after {hours} h idle.",
+                "changeIdlePolicy": "Change"
             },
             "power": {
                 "off": "Power off",
@@ -15555,6 +15574,258 @@
                 "newCloud": "New cloud computer",
                 "powerOff": "Power off {name}",
                 "powerOn": "Power on {name}"
+            },
+            "idlePolicy": {
+                "title": "Idle policy",
+                "modes": {
+                    "nothing": "Nothing",
+                    "tellMe": "Tell me after",
+                    "powerOff": "Power off after"
+                },
+                "hours": "hours",
+                "hoursLabel": "Hours of idleness for “{mode}”",
+                "range": "Enter a whole number of hours from {min} to {max}.",
+                "meaning": "Idle means: no session working, no job running, CPU under 5 % for the whole time.",
+                "neverDestroys": "Ever Works never destroys a cloud computer on its own.",
+                "save": "Save",
+                "cancel": "Cancel",
+                "saved": "The idle policy of {name} is saved; it counts from now.",
+                "failed": "The idle policy could not be saved."
+            },
+            "usage": {
+                "title": "Cloud computers",
+                "totals": "now {hour}/h · this month {month} · projected {projected} (list prices)",
+                "providerMtd": "{provider} reports {amount} this month for your whole account.",
+                "caption": "What each cloud computer costs this month",
+                "columns": {
+                    "name": "Computer",
+                    "where": "Provider · region · size",
+                    "hourly": "Per hour",
+                    "month": "This month",
+                    "state": "State"
+                },
+                "destroyedName": "{name} (destroyed {date})",
+                "states": {
+                    "provisioning": "creating",
+                    "running": "running",
+                    "off": "off",
+                    "gone": "gone",
+                    "unknown": "unknown",
+                    "destroyed": "destroyed — still counted this month"
+                },
+                "disclaimer": "Estimates from the providers' list prices; your bill may differ. Machine costs are not counted in model-spend Budgets.",
+                "failed": "Cloud computer costs could not be loaded."
+            }
+        },
+        "usage": {
+            "payerNote": "List price — what this would cost on a pay-as-you-go key. The machine's own sign-in paid for it; Ever Works charged nothing.",
+            "chip": {
+                "cost": "{cost} · list",
+                "tokensOnly": "tokens only · {tokens}",
+                "tokensOnlyModel": "tokens only · {model} · {tokens}"
+            },
+            "receipt": {
+                "line": "Model work on {computer} · {cost} at list price (v{version}) · {in} in · {out} out · {cache} cache",
+                "lineTokensOnly": "Model work on {computer} · tokens only · {in} in · {out} out · {cache} cache",
+                "unknownModels": "Not in the price list (tokens only, no dollar figure): {models}"
+            },
+            "overview": {
+                "title": "Usage",
+                "loading": "Loading usage…",
+                "line": "Usage 7 d · {cost} · scan on · last scan {age} ago",
+                "lineNoScan": "Usage 7 d · {cost} · scan on · no scan yet",
+                "tokensOnly": "tokens only",
+                "offline": "offline",
+                "catchingUp": "catching up · {pct} % scanned",
+                "open": "Open usage",
+                "off": "Usage scan is off — run `ever-works-node start --usage-scan` on {computer}",
+                "unsupported": "Update the node on {computer} to report usage",
+                "error": "Could not load usage — {hint}"
+            },
+            "tab": {
+                "periodLabel": "Period",
+                "periods": {
+                    "today": "Today",
+                    "d7": "7 days",
+                    "d30": "30 days",
+                    "d90": "90 days"
+                },
+                "totals": "{cost} at list price · {tokens} tokens · {requests} requests",
+                "topModel": "top model {model}",
+                "tokensOnly": "tokens only",
+                "unknownModels": "excludes {count} requests on unknown models ({models}) — tokens only",
+                "excludedNodes": "Not shown: {count} computer(s) you may not see",
+                "otherHidden": "Not shown: sessions not started from Ever Works on computers you do not own",
+                "priceList": "Priced at model list prices v{version}.",
+                "priceListMixed": "Priced at model list prices {versions}; v{version} in effect since {since}.",
+                "catchingUp": "catching up · {pct} % scanned on {computer}",
+                "byModel": "By model",
+                "nothingYet": "Nothing counted in this period yet.",
+                "unknownModel": "(unknown) {model}",
+                "requests": "{count} req",
+                "byComputer": "By computer",
+                "offline": "offline",
+                "scannedAgo": "scanned {age} ago",
+                "noScanYet": "no scan yet",
+                "scanOff": "Usage scan is off",
+                "rescan": "Scan now",
+                "rescanQueued": "scan requested",
+                "busiestCheckouts": "Busiest checkouts",
+                "otherFolders": "other folders",
+                "onComputer": "on {computer}",
+                "sessions": "Sessions",
+                "agentSessions": "{name} {count}",
+                "unknownAgent": "an Agent",
+                "ownerSessions": "owner sessions {count}",
+                "otherSessions": "other (not started from Ever Works) {count}",
+                "otherNotShown": "other: not shown",
+                "filterComputer": "Computer: {computer}",
+                "filterModel": "Model: {model}",
+                "clearFilter": "Clear filter",
+                "failed": "Could not load usage",
+                "empty": {
+                    "title": "No computer is reporting usage yet",
+                    "command": "Switch it on on a computer:",
+                    "promise": "The scan reads {sentence}."
+                }
+            },
+            "agent": {
+                "title": "Fleet work by computer — last 30 days, at list price",
+                "row": "{cost} · {requests} requests",
+                "tokensOnly": "tokens only",
+                "none": "No fleet work counted for this Agent in the last 30 days.",
+                "error": "Could not load fleet usage — {hint}"
+            },
+            "schedule": {
+                "cost": "last run {last} · 30 d {month} · list",
+                "none": "—"
+            },
+            "palette": {
+                "usage": "Fleet usage",
+                "usageOn": "Usage on {name}"
+            }
+        },
+        "runners": {
+            "block": {
+                "title": "Actions runners",
+                "titleCount": "Actions runners ({count})",
+                "listLabel": "Actions runners on {name}",
+                "loading": "Loading runners…",
+                "loadFailed": "The runners could not be read.",
+                "lastKnown": "Last known state — {reason}",
+                "checked": "checked {time}",
+                "notChecked": "not checked yet",
+                "rateLimited": "GitHub is rate-limiting; next check {time}",
+                "rateLimitedWait": "GitHub is rate-limiting; the next check waits until it allows one",
+                "killSwitch": "All computers are stopped — runners keep running; installing and controlling them is paused.",
+                "cannotInstall": "Runners cannot be installed on {name} right now.",
+                "empty": "No Actions runners on {name}",
+                "emptyHint": "Install runners to let {name} run GitHub Actions jobs for a repository or organisation your GitHub App covers. Runners cost nothing in Ever Works."
+            },
+            "row": {
+                "states": {
+                    "installing": "installing",
+                    "idle": "idle",
+                    "working": "working",
+                    "offline": "offline",
+                    "stopped": "stopped",
+                    "stoppedByYou": "stopped (by you)",
+                    "failed": "failed",
+                    "removed": "removed",
+                    "unknown": "unknown",
+                    "removing": "removing…"
+                },
+                "phases": {
+                    "queued": "queued",
+                    "downloading": "downloading",
+                    "verifying": "verifying",
+                    "awaitingToken": "waiting to register",
+                    "registering": "registering",
+                    "installingService": "installing service",
+                    "starting": "starting",
+                    "done": "done",
+                    "removing": "removing"
+                },
+                "modes": {
+                    "service": "service",
+                    "docker": "container-isolated"
+                },
+                "sourceGithub": "as GitHub reports it",
+                "sourceNode": "as {name} reports it",
+                "job": "“{job}”",
+                "jobRun": "“{job}” run #{run}",
+                "labels": "Labels",
+                "version": "runner {version}",
+                "checked": "checked {time}",
+                "logs": "Logs",
+                "logsOf": "Logs of {name}",
+                "openJob": "Open job on GitHub",
+                "openOnGitHub": "Open on GitHub"
+            },
+            "actions": {
+                "start": "Start",
+                "stop": "Stop",
+                "restart": "Restart",
+                "more": "More for {name}",
+                "notAllowed": "Only the people allowed to change computers on {computer} can control its runners",
+                "paused": "Paused while all computers are stopped",
+                "starting": "Starting {name}…",
+                "stopping": "Stopping {name}…",
+                "restarting": "Restarting {name}…",
+                "failed": "The runner could not be changed."
+            },
+            "remove": {
+                "button": "Remove runner…",
+                "confirm": "Remove",
+                "removing": "Removing {name}…",
+                "failed": "The runner could not be removed."
+            },
+            "install": {
+                "button": "Install runners",
+                "title": "Install Actions runners on {name}",
+                "description": "The computer runs GitHub Actions jobs for the repository or organisation you choose.",
+                "loading": "Loading repositories and organisations…",
+                "loadFailed": "The install options could not be read.",
+                "cannotHost": "Runners cannot be installed on {name} right now.",
+                "noApp": "Install the Ever Works GitHub App on a repository or organisation first.",
+                "noTargets": "Your GitHub App does not cover a repository or organisation yet.",
+                "openAppSettings": "Open GitHub App settings",
+                "target": "Register with",
+                "targetHint": "Repositories and organisations your GitHub App covers",
+                "repositories": "Repositories",
+                "organisations": "Organisations",
+                "permissionMissing": "Registering runners for {target} needs one more permission for the Ever Works GitHub App on {account}.",
+                "grantAccess": "Grant access",
+                "checkAgain": "Check again",
+                "count": "How many",
+                "countHint": "up to {max}",
+                "names": "Names",
+                "nameLabel": "Name of runner {n}",
+                "nameInvalid": "A name is up to 64 letters, digits, dots, hyphens or underscores, starting with a letter or digit.",
+                "nameDuplicate": "Each runner needs its own name.",
+                "labels": "Extra labels",
+                "labelsPlaceholder": "gpu, large",
+                "labelsAdded": "GitHub adds:",
+                "labelInvalid": "“{label}” is not a label: use letters, digits and . _ : / + - without spaces.",
+                "labelsTooMany": "At most {max} extra labels.",
+                "mode": "Run as",
+                "modes": {
+                    "service": "Service — starts at boot, restarts on failure",
+                    "serviceWindows": "Windows service — the only mode on Windows",
+                    "docker": "Container-isolated — each runner in its own container"
+                },
+                "noModes": "This computer offers no way to run a runner as a service.",
+                "assurance": "The runner is downloaded from GitHub and its checksum verified. Registration happens through your GitHub App; you never handle a token. Runners cost nothing in Ever Works.",
+                "rootRequired": "Installing a service on {name} needs elevated rights for the node’s user. Run this once on {name}:",
+                "copy": "Copy the command",
+                "copied": "Copied",
+                "cancel": "Cancel",
+                "submit": "{count, plural, one {Install # runner} other {Install # runners}}",
+                "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
+                "failed": "The runners could not be installed."
+            },
+            "palette": {
+                "install": "Install Actions runners on {name}"
             }
         }
     }
