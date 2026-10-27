@@ -21,6 +21,10 @@ export type {
 	GitCloneOptions,
 	GitCloneBranchOptions,
 	GitPushOptions,
+	// APW-02 T48 — the private copy's sync (optional `IGitOperations` members).
+	GitFetchBranchOptions,
+	GitCommitRangeOptions,
+	GitCommitRangeCount,
 	CreateRepoOptions,
 	UpdateRepoOptions,
 	ForkRepositoryOptions,
@@ -81,13 +85,24 @@ export type {
 	GitForkDivergence,
 	GitRepositoryCopyInput,
 	GitRepositoryCopyResult,
+	// APW-02 T48 — the private copy's divergence and sync-branch move.
+	GitRepositoryCopyDivergenceInput,
+	GitRepositoryCopyDivergence,
+	GitRepositoryCopyBranchMoveInput,
+	GitRepositoryCopyBranchMoveResult,
 	GitWorkflowRef,
 	GitActionsPermissionsInput,
 	GitActionsPermissionsResult,
 	GitWebhookInput
 } from '../contracts/capabilities/git-provider.app-forks.js';
 
-export { GitProviderRequestError } from '../contracts/capabilities/git-provider.app-forks.js';
+export {
+	GitProviderRequestError,
+	GIT_REPOSITORY_COPY_DIVERGENCE_MAX_COMMITS
+} from '../contracts/capabilities/git-provider.app-forks.js';
+
+// APW-02 T48 — the pure `exclude..include` commit counter `GitOperations.countCommitsBetween` runs.
+export { countCommitRange, type CommitParentsReader } from './commit-range.js';
 
 // PR insights (kanban M5/M6) — the pure CI rollup + diff-cap rules every
 // git-provider implementation shares.
