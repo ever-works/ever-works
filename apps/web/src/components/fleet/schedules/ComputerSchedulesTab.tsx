@@ -20,5 +20,7 @@ export default async function ComputerSchedulesTab({ node, flags }: FleetCompute
         nodes = [node];
     }
     // FL-20 P2 (spec FR-16): the Agent-session rows' list-price cost, while the usage scan is on.
-    return <SchedulesPanel node={node} nodes={nodes} usage={flags.FLEET_USAGE_SCAN_ENABLED === true} />;
+    return (
+        <SchedulesPanel node={node} nodes={nodes} usage={flags.FLEET_USAGE_SCAN_ENABLED === true} />
+    );
 }

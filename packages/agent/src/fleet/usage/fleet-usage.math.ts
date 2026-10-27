@@ -80,18 +80,33 @@ export interface MergedBucket {
 }
 
 export function mergeBucket(
-    stored: { tokens: FleetUsageTokens; requests: number; firstAt: Date | null; lastAt: Date | null } | null,
+    stored: {
+        tokens: FleetUsageTokens;
+        requests: number;
+        firstAt: Date | null;
+        lastAt: Date | null;
+    } | null,
     row: FleetUsageRow,
 ): MergedBucket {
     const rowFirst = new Date(row.firstAt);
     const rowLast = new Date(row.lastAt);
     if (!stored) {
-        return { tokens: { ...row.tokens }, requests: row.requests, firstAt: rowFirst, lastAt: rowLast, changed: true };
+        return {
+            tokens: { ...row.tokens },
+            requests: row.requests,
+            firstAt: rowFirst,
+            lastAt: rowLast,
+            changed: true,
+        };
     }
     const tokens = maxFleetUsageTokens(stored.tokens, row.tokens);
     const requests = Math.max(stored.requests, row.requests);
-    const firstAt = stored.firstAt && stored.firstAt.getTime() <= rowFirst.getTime() ? stored.firstAt : rowFirst;
-    const lastAt = stored.lastAt && stored.lastAt.getTime() >= rowLast.getTime() ? stored.lastAt : rowLast;
+    const firstAt =
+        stored.firstAt && stored.firstAt.getTime() <= rowFirst.getTime()
+            ? stored.firstAt
+            : rowFirst;
+    const lastAt =
+        stored.lastAt && stored.lastAt.getTime() >= rowLast.getTime() ? stored.lastAt : rowLast;
     const changed =
         tokens.in !== stored.tokens.in ||
         tokens.out !== stored.tokens.out ||
@@ -146,7 +161,10 @@ export interface PricedUsage {
  * current version), summed per model, rounded ONCE. A model the list does not
  * know is tokens only and excluded from every dollar figure (FR-8).
  */
-export function priceUsageGroups(groups: readonly UsageGroup[], prices: ModelListPrices): PricedUsage {
+export function priceUsageGroups(
+    groups: readonly UsageGroup[],
+    prices: ModelListPrices,
+): PricedUsage {
     const byModel = new Map<string, PricedModel>();
     const unknown = new Map<string, number>();
     const versions = new Set<number>();
@@ -185,7 +203,9 @@ export function priceUsageGroups(groups: readonly UsageGroup[], prices: ModelLis
     let unknownRequests = 0;
     for (const value of unknown.values()) unknownRequests += value;
     return {
-        byModel: [...byModel.values()].sort((a, b) => (b.cents ?? -1) - (a.cents ?? -1) || b.requests - a.requests),
+        byModel: [...byModel.values()].sort(
+            (a, b) => (b.cents ?? -1) - (a.cents ?? -1) || b.requests - a.requests,
+        ),
         costCents: anyPriced ? Math.round(cents) : null,
         cents,
         unknownModels: [...unknown.keys()].sort(),
@@ -210,7 +230,10 @@ export function toFleetSessionUsage(priced: PricedUsage, now: Date): FleetSessio
     }
     return {
         byModel,
-        priceListVersion: priced.versionsUsed.length > 0 ? priced.versionsUsed[priced.versionsUsed.length - 1] : null,
+        priceListVersion:
+            priced.versionsUsed.length > 0
+                ? priced.versionsUsed[priced.versionsUsed.length - 1]
+                : null,
         unknownModels: priced.unknownModels,
         requests: priced.requests,
         firstAt: priced.firstAt ? priced.firstAt.toISOString() : null,

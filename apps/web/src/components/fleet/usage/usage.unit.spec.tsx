@@ -11,9 +11,11 @@ import { computerUsageLineState, sessionCostChipModel, usageAge, usageMoney } fr
 vi.mock('next-intl', () => ({
     useTranslations: (namespace: string) => (key: string, vars?: Record<string, unknown>) => {
         let node: unknown = en;
-        for (const part of `${namespace}.${key}`.split('.')) node = (node as Record<string, unknown>)?.[part];
+        for (const part of `${namespace}.${key}`.split('.'))
+            node = (node as Record<string, unknown>)?.[part];
         let text = typeof node === 'string' ? node : key;
-        for (const [name, value] of Object.entries(vars ?? {})) text = text.replace(`{${name}}`, String(value));
+        for (const [name, value] of Object.entries(vars ?? {}))
+            text = text.replace(`{${name}}`, String(value));
         return text;
     },
 }));
@@ -48,7 +50,16 @@ describe('SessionCostChip', () => {
         render(
             <SessionCostChip
                 costCents={null}
-                tokens={usage({ 'local-7b': { in: 1000, out: 500, cacheRead: 0, cacheWrite: 0, requests: 3, costCents: null } })}
+                tokens={usage({
+                    'local-7b': {
+                        in: 1000,
+                        out: 500,
+                        cacheRead: 0,
+                        cacheWrite: 0,
+                        requests: 3,
+                        costCents: null,
+                    },
+                })}
             />,
         );
         const chip = screen.getByTestId('fleet-session-cost-chip');
@@ -105,11 +116,21 @@ describe('usage.shared', () => {
         expect(usageAge('2026-10-19T12:00:00.000Z', now)).toBe('2 d');
         expect(computerUsageLineState(null, null, now)).toEqual({ kind: 'unsupported' });
         expect(
-            computerUsageLineState({ state: 'off', online: true, lastScanAt: null, backlogPct: null, hint: 'x' }, null, now),
+            computerUsageLineState(
+                { state: 'off', online: true, lastScanAt: null, backlogPct: null, hint: 'x' },
+                null,
+                now,
+            ),
         ).toEqual({ kind: 'off' });
         expect(
             computerUsageLineState(
-                { state: 'on', online: false, lastScanAt: '2026-10-21T11:56:00.000Z', backlogPct: 58, hint: null },
+                {
+                    state: 'on',
+                    online: false,
+                    lastScanAt: '2026-10-21T11:56:00.000Z',
+                    backlogPct: 58,
+                    hint: null,
+                },
                 2210,
                 now,
             ),

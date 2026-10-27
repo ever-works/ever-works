@@ -14,5 +14,9 @@ export const DIGEST_FLEET_USAGE_READER = 'DIGEST_FLEET_USAGE_READER' as const;
 
 export interface DigestFleetUsageReader {
     /** The user's computers' model work in `[since, until)`, or null when there is none. */
-    fleetUsageForDigest(userId: string, since: Date, until: Date): Promise<FleetUsageDigestLine | null>;
+    fleetUsageForDigest(
+        userId: string,
+        since: Date,
+        until: Date,
+    ): Promise<FleetUsageDigestLine | null>;
 }

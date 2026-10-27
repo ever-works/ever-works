@@ -32,13 +32,16 @@ function query(input: FleetUsageQuery): string {
 }
 
 export const fleetUsageAPI = {
-    view: async (input: FleetUsageQuery = {}) => serverFetch<FleetUsageView>(`/fleet/usage${query(input)}`),
+    view: async (input: FleetUsageQuery = {}) =>
+        serverFetch<FleetUsageView>(`/fleet/usage${query(input)}`),
 
     prices: async () => serverFetch<FleetUsagePricesView>('/fleet/usage/prices'),
 
     /** P2 — recurring Tasks' last-run and 30-day cost (the schedule rows). */
     taskCosts: async (taskIds: readonly string[]) =>
-        serverFetch<FleetUsageTaskCostsView>(`/fleet/usage/tasks?ids=${encodeURIComponent(taskIds.join(','))}`),
+        serverFetch<FleetUsageTaskCostsView>(
+            `/fleet/usage/tasks?ids=${encodeURIComponent(taskIds.join(','))}`,
+        ),
 
     rescan: async (nodeId: string) =>
         serverMutation<FleetUsageRescanResult>({

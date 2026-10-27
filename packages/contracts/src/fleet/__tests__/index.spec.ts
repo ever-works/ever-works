@@ -1449,11 +1449,7 @@ const CLOUD_P2_EXPORTS = [
 	'fleetCloudIdleHours'
 ] as const;
 
-const MODEL_LIST_PRICES_EXPORTS = [
-	'MODEL_TOKEN_CLASSES',
-	'findModelListPriceEntry',
-	'priceModelTokensCents'
-] as const;
+const MODEL_LIST_PRICES_EXPORTS = ['MODEL_TOKEN_CLASSES', 'findModelListPriceEntry', 'priceModelTokensCents'] as const;
 
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,

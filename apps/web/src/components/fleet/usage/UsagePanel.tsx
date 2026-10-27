@@ -40,7 +40,9 @@ type Loaded = { key: string; view: FleetUsageView | null; error: FleetLinkError 
 export default function UsagePanel({ nodes }: FleetHubTabProps) {
     const t = useTranslations('fleet.usage.tab');
     const search = useSearchParams();
-    const [days, setDays] = useState<FleetUsagePeriodDays>(() => usagePeriodFrom(search?.get('days')));
+    const [days, setDays] = useState<FleetUsagePeriodDays>(() =>
+        usagePeriodFrom(search?.get('days')),
+    );
     const [node, setNode] = useState<string | null>(() => search?.get('node') || null);
     const [model, setModel] = useState<string | null>(() => search?.get('model') || null);
     const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -51,10 +53,15 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
         getFleetUsageAction({ days, node, model })
             .then((result) => {
                 if (cancelled) return;
-                setLoaded(result.ok ? { key, view: result.data, error: null } : { key, view: null, error: result.error });
+                setLoaded(
+                    result.ok
+                        ? { key, view: result.data, error: null }
+                        : { key, view: null, error: result.error },
+                );
             })
             .catch(() => {
-                if (!cancelled) setLoaded({ key, view: null, error: { code: 'internal', hint: '' } });
+                if (!cancelled)
+                    setLoaded({ key, view: null, error: { code: 'internal', hint: '' } });
             });
         return () => {
             cancelled = true;
@@ -64,7 +71,11 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
     const onKey = useCallback((event: KeyboardEvent) => {
         const target = event.target as HTMLElement | null;
         if (event.metaKey || event.ctrlKey || event.altKey) return;
-        if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return;
+        if (
+            target &&
+            (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+        )
+            return;
         const period = usagePeriodForKey(event.key);
         if (period) setDays(period);
     }, []);
@@ -88,7 +99,8 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
                             className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark px-2 py-0.5"
                             onClick={() => setNode(null)}
                         >
-                            {t('filterComputer', { computer: nodeName })} <X className="w-3 h-3" aria-label={t('clearFilter')} />
+                            {t('filterComputer', { computer: nodeName })}{' '}
+                            <X className="w-3 h-3" aria-label={t('clearFilter')} />
                         </button>
                     )}
                     {model && (
@@ -97,7 +109,8 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
                             className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark px-2 py-0.5"
                             onClick={() => setModel(null)}
                         >
-                            {t('filterModel', { model })} <X className="w-3 h-3" aria-label={t('clearFilter')} />
+                            {t('filterModel', { model })}{' '}
+                            <X className="w-3 h-3" aria-label={t('clearFilter')} />
                         </button>
                     )}
                     {/* P3 — the object on screen as one CSV. */}
@@ -119,10 +132,16 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
                     {current.error.hint ? ` — ${current.error.hint}` : ` — ${t('failed')}`}
                 </p>
             ) : view && usageTabState(view) === 'empty' ? (
-                <div className="rounded-lg border border-dashed border-border dark:border-border-dark p-6 text-sm space-y-2" data-testid="fleet-usage-empty">
+                <div
+                    className="rounded-lg border border-dashed border-border dark:border-border-dark p-6 text-sm space-y-2"
+                    data-testid="fleet-usage-empty"
+                >
                     <p className="font-medium">{t('empty.title')}</p>
                     <p>
-                        {t('empty.command')} <code className="font-mono text-xs">ever-works-node start --usage-scan</code>
+                        {t('empty.command')}{' '}
+                        <code className="font-mono text-xs">
+                            ever-works-node start --usage-scan
+                        </code>
                     </p>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
                         {t('empty.promise', { sentence: FLEET_USAGE_PRIVACY_SENTENCE })}
@@ -135,7 +154,12 @@ export default function UsagePanel({ nodes }: FleetHubTabProps) {
                     <UsageCatchingUp view={view} />
                     <div className="grid gap-3 md:grid-cols-2">
                         <UsageByModel view={view} onModel={setModel} />
-                        <UsageByComputer view={view} nodes={nodes} onNode={setNode} now={Date.now()} />
+                        <UsageByComputer
+                            view={view}
+                            nodes={nodes}
+                            onNode={setNode}
+                            now={Date.now()}
+                        />
                     </div>
                     <UsageBusiestCheckouts view={view} />
                     <UsageSessionsBreakdown view={view} />

@@ -8,9 +8,11 @@ import { UsagePriceHistory } from './UsagePriceHistory';
 vi.mock('next-intl', () => ({
     useTranslations: (namespace: string) => (key: string, vars?: Record<string, unknown>) => {
         let node: unknown = en;
-        for (const part of `${namespace}.${key}`.split('.')) node = (node as Record<string, unknown>)?.[part];
+        for (const part of `${namespace}.${key}`.split('.'))
+            node = (node as Record<string, unknown>)?.[part];
         let text = typeof node === 'string' ? node : key;
-        for (const [name, value] of Object.entries(vars ?? {})) text = text.split(`{${name}}`).join(String(value));
+        for (const [name, value] of Object.entries(vars ?? {}))
+            text = text.split(`{${name}}`).join(String(value));
         return text;
     },
 }));
@@ -20,7 +22,13 @@ vi.mock('@/app/actions/fleet/usage', () => ({
         data: {
             version: 2,
             effectiveFrom: '2026-12-01',
-            entries: [{ model: 'claude-sonnet-4-5', provider: 'claude-code', perMillionUsd: { in: 3, out: 15, cacheRead: 0.3, cacheWrite: 3.75 } }],
+            entries: [
+                {
+                    model: 'claude-sonnet-4-5',
+                    provider: 'claude-code',
+                    perMillionUsd: { in: 3, out: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+                },
+            ],
             history: [
                 { version: 1, effectiveFrom: '2026-10-26' },
                 { version: 2, effectiveFrom: '2026-12-01' },
@@ -43,7 +51,9 @@ describe('UsagePriceHistory', () => {
         render(<UsagePriceHistory view={view} />);
         fireEvent.click(screen.getByText('Price list v2 — in effect since 2026-12-01'));
         await waitFor(() => expect(screen.getByTestId('fleet-usage-prices-history')).toBeTruthy());
-        expect(screen.getByTestId('fleet-usage-prices-history').textContent).toContain('v1 (2026-10-26) · v2 (2026-12-01)');
+        expect(screen.getByTestId('fleet-usage-prices-history').textContent).toContain(
+            'v1 (2026-10-26) · v2 (2026-12-01)',
+        );
         const table = screen.getByTestId('fleet-usage-prices').textContent ?? '';
         expect(table).toContain('claude-sonnet-4-5');
         expect(table).toContain('$15.00');

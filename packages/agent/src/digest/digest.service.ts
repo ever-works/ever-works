@@ -19,7 +19,10 @@ import { Task, TaskStatus } from '../entities/task.entity';
 import type { AgentRun } from '../entities/agent-run.entity';
 import type { GoalDto } from '../goals/types';
 import type { AgentEscalationDto, FleetUsageDigestLine } from '@ever-works/contracts';
-import { DIGEST_FLEET_USAGE_READER, type DigestFleetUsageReader } from './digest-fleet-usage-reader';
+import {
+    DIGEST_FLEET_USAGE_READER,
+    type DigestFleetUsageReader,
+} from './digest-fleet-usage-reader';
 import {
     ComposeDigestOptions,
     ComposeOrgDigestOptions,
@@ -814,13 +817,12 @@ export class DigestService {
         }
     }
 
-    /**
-     * Judgment layer G3 - open escalations raised in this window.
-     * Best-effort: the digest is a read path and an escalation-store
-     * hiccup must degrade to "no section", never to no digest.
-     */
     /** FL-20 P3 — the fleet line; a failing read never fails the digest. */
-    private async loadFleetUsage(userId: string, since: Date, until: Date): Promise<FleetUsageDigestLine | null> {
+    private async loadFleetUsage(
+        userId: string,
+        since: Date,
+        until: Date,
+    ): Promise<FleetUsageDigestLine | null> {
         if (!this.fleetUsage) return null;
         try {
             return await this.fleetUsage.fleetUsageForDigest(userId, since, until);
@@ -832,6 +834,11 @@ export class DigestService {
         }
     }
 
+    /**
+     * Judgment layer G3 - open escalations raised in this window.
+     * Best-effort: the digest is a read path and an escalation-store
+     * hiccup must degrade to "no section", never to no digest.
+     */
     private async loadOpenEscalations(userId: string, since: Date): Promise<AgentEscalationDto[]> {
         if (!this.escalations) return [];
         try {

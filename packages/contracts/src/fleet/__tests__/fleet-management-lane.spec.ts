@@ -27,7 +27,10 @@ describe('the management lane', () => {
 			'usage-scan'
 		]);
 		// --manage never leases the scan: the transcript scan is its own consent (CONTRACTS §1.1).
-		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, manage: true })).toEqual(['vm-create', 'vm-control']);
+		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, manage: true })).toEqual([
+			'vm-create',
+			'vm-control'
+		]);
 	});
 
 	it('needs manage for a kind the table does not name (the safest reading)', () => {

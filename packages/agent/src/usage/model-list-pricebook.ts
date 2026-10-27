@@ -95,8 +95,9 @@ const V1: ModelListPriceListVersion = Object.freeze({
 });
 
 /** Every published version, by number. Append-only. */
-export const MODEL_LIST_PRICEBOOK_HISTORY: Readonly<Record<number, Readonly<ModelListPriceListVersion>>> =
-    Object.freeze({ 1: V1 });
+export const MODEL_LIST_PRICEBOOK_HISTORY: Readonly<
+    Record<number, Readonly<ModelListPriceListVersion>>
+> = Object.freeze({ 1: V1 });
 
 /** The version new figures are priced at. */
 export const MODEL_LIST_PRICEBOOK_VERSION = 1;

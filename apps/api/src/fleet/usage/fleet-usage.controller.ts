@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Post,
+    Query,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetUsageScanService, FleetUsageViewService } from '@ever-works/agent/fleet';
@@ -11,7 +20,11 @@ import type {
 import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FleetUsageQueryDto, FleetUsageRescanDto, FleetUsageTaskCostsQueryDto } from './dto/fleet-usage.dto';
+import {
+    FleetUsageQueryDto,
+    FleetUsageRescanDto,
+    FleetUsageTaskCostsQueryDto,
+} from './dto/fleet-usage.dto';
 import { FleetUsageEnabledGuard } from './fleet-usage-enabled.guard';
 
 /**
@@ -45,7 +58,10 @@ export class FleetUsageController {
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
-    async view(@CurrentUser() auth: AuthenticatedUser, @Query() query: FleetUsageQueryDto): Promise<FleetUsageView> {
+    async view(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: FleetUsageQueryDto,
+    ): Promise<FleetUsageView> {
         return this.views.view(auth.userId, {
             days: query.days,
             nodeId: query.node ?? null,

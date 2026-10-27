@@ -17,26 +17,47 @@ import { getFleetUsagePricesAction } from '@/app/actions/fleet/usage';
 export function UsagePriceHistory({ view }: { view: FleetUsageView }) {
     const t = useTranslations('fleet.usage.prices');
     const [open, setOpen] = useState(false);
-    const [state, setState] = useState<{ data: FleetUsagePricesView | null; error: FleetLinkError | null } | null>(null);
+    const [state, setState] = useState<{
+        data: FleetUsagePricesView | null;
+        error: FleetLinkError | null;
+    } | null>(null);
 
     const toggle = () => {
         const next = !open;
         setOpen(next);
         if (next && !state) {
             void getFleetUsagePricesAction().then((result) =>
-                setState(result.ok ? { data: result.data, error: null } : { data: null, error: result.error }),
+                setState(
+                    result.ok
+                        ? { data: result.data, error: null }
+                        : { data: null, error: result.error },
+                ),
             );
         }
     };
 
-    const usd = (value: number) => `$${value < 1 ? value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : value.toFixed(2)}`;
+    const usd = (value: number) =>
+        `$${value < 1 ? value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '') : value.toFixed(2)}`;
 
     return (
-        <section className="rounded-lg border border-border dark:border-border-dark p-4 text-sm space-y-2" data-testid="fleet-usage-prices">
-            <button type="button" className="font-medium hover:underline" aria-expanded={open} onClick={toggle}>
-                {t('title', { version: view.priceList.version, since: view.priceList.effectiveFrom })}
+        <section
+            className="rounded-lg border border-border dark:border-border-dark p-4 text-sm space-y-2"
+            data-testid="fleet-usage-prices"
+        >
+            <button
+                type="button"
+                className="font-medium hover:underline"
+                aria-expanded={open}
+                onClick={toggle}
+            >
+                {t('title', {
+                    version: view.priceList.version,
+                    since: view.priceList.effectiveFrom,
+                })}
             </button>
-            {open && !state && <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('loading')}</p>}
+            {open && !state && (
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('loading')}</p>
+            )}
             {open && state?.error && (
                 <p role="alert" className="text-xs">
                     {state.error.hint || state.error.code}
@@ -44,9 +65,14 @@ export function UsagePriceHistory({ view }: { view: FleetUsageView }) {
             )}
             {open && state?.data && (
                 <div className="space-y-2">
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-usage-prices-history">
+                    <p
+                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                        data-testid="fleet-usage-prices-history"
+                    >
                         {t('history', {
-                            versions: state.data.history.map((entry) => `v${entry.version} (${entry.effectiveFrom})`).join(' · '),
+                            versions: state.data.history
+                                .map((entry) => `v${entry.version} (${entry.effectiveFrom})`)
+                                .join(' · '),
                         })}
                     </p>
                     <table className="w-full text-xs tabular-nums">
@@ -71,7 +97,9 @@ export function UsagePriceHistory({ view }: { view: FleetUsageView }) {
                             ))}
                         </tbody>
                     </table>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('perMillion')}</p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('perMillion')}
+                    </p>
                 </div>
             )}
         </section>

@@ -221,7 +221,8 @@ export function isFleetUsageOtherFolder(value: string | null | undefined): boole
 }
 
 function count(value: unknown): number | null {
-	if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > FLEET_USAGE_MAX_TOKENS) return null;
+	if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > FLEET_USAGE_MAX_TOKENS)
+		return null;
 	return Math.floor(value);
 }
 
@@ -681,9 +682,26 @@ export function fleetUsageCsv(view: FleetUsageView): string {
 		]);
 	}
 	for (const agent of view.sessions.agents) {
-		rows.push(['agent', agent.name ?? agent.agentId, null, null, null, null, null, null, csvDollars(agent.costCents)]);
+		rows.push([
+			'agent',
+			agent.name ?? agent.agentId,
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+			csvDollars(agent.costCents)
+		]);
 	}
-	rows.push(['total', `last ${view.days} day(s)`, null, view.totals.requests, ...tokenCells(view.totals.tokens), csvDollars(view.totals.costCents)]);
+	rows.push([
+		'total',
+		`last ${view.days} day(s)`,
+		null,
+		view.totals.requests,
+		...tokenCells(view.totals.tokens),
+		csvDollars(view.totals.costCents)
+	]);
 	rows.push(['note', view.note, null, null, null, null, null, null, null]);
 	return rows.map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
@@ -691,7 +709,10 @@ export function fleetUsageCsv(view: FleetUsageView): string {
 /** `fleet-usage-30d-2026-10-27.csv` (plus the computer or model filter when set). */
 export function fleetUsageCsvFilename(view: FleetUsageView): string {
 	const day = view.to.slice(0, 10);
-	const scope = [view.nodeId ? `node-${view.nodeId.slice(0, 8)}` : null, view.model ? view.model.replace(/[^A-Za-z0-9.-]/g, '_') : null]
+	const scope = [
+		view.nodeId ? `node-${view.nodeId.slice(0, 8)}` : null,
+		view.model ? view.model.replace(/[^A-Za-z0-9.-]/g, '_') : null
+	]
 		.filter(Boolean)
 		.join('-');
 	return `fleet-usage-${view.days}d${scope ? `-${scope}` : ''}-${day}.csv`;
