@@ -411,7 +411,15 @@ export const FLEET_LINK_VERB_CONSENT_OVERRIDES: Readonly<Record<string, FleetLin
 	 * worktree needs only `--work`; any other checkout's needs `--manage`,
 	 * which the verb checks on the machine and the platform narrows to.
 	 */
-	'checkouts.changes': 'work-or-manage'
+	'checkouts.changes': 'work-or-manage',
+	/**
+	 * Actions runners on computers (FL-18, CONTRACTS §1.1, §3.3): runner jobs
+	 * are work, so a `--work` node lists its runners and their service state
+	 * without `--manage`. Read-only verbs; everything that changes a runner is a
+	 * durable job.
+	 */
+	'runner.list': 'work',
+	'runner.status': 'work'
 };
 
 /** The consent one `machine` verb needs: its exception, else the family's. */

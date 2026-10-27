@@ -77,6 +77,7 @@ import {
     FleetSessionSweepService,
     FleetVirtualReconcileService,
     FleetCloudSweepService,
+    FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
@@ -750,6 +751,11 @@ export class TriggerInternalController implements OnModuleInit {
         // sweeps only. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly fleetCloudSweepService?: FleetCloudSweepService,
+        // Actions runners on computers (FL-18) — backs the `fleet-runners-poll` cron:
+        // the worker proxy calls `reconcile()`, the facade's only member.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly fleetActionsRunnersPollService?: FleetActionsRunnersPollService,
         // APW-06 T58 / §9.8 (lane aw-safety, 2026-10-26) — the completion edge of an App Work's
         // deletion: the isolated worker's `APP_WORK_DELETION_COMPLETION` dials
         // `AppRuntimeDeletionService.finishDeletion` here (provided by the `@Global()`
@@ -921,6 +927,13 @@ export class TriggerInternalController implements OnModuleInit {
                       refreshUsage: () => this.fleetCloudSweepService!.refreshUsage(),
                       evaluateIdle: () => this.fleetCloudSweepService!.evaluateIdle(),
                   }
+                : undefined,
+            // Actions runners on computers (FL-18) — `fleet-runners-poll` calls
+            // `reconcile()` here, and only that: `FleetActionsRunnersPollService` is a
+            // one-member facade over `FleetActionsRunnersService` (whose install /
+            // control / token mint must never reach the worker).
+            FleetActionsRunnersPollService: this.fleetActionsRunnersPollService
+                ? { reconcile: () => this.fleetActionsRunnersPollService!.reconcile() }
                 : undefined,
             // Memory consolidation cadence (memory upgrades M9) —
             // `memory-consolidation-tick` calls `dispatchDue()` here

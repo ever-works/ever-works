@@ -137,7 +137,14 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	// Cloud computers (FL-17, CONTRACTS §7).
 	'node.cloud.create',
 	'node.cloud.power',
-	'node.cloud.destroy'
+	'node.cloud.destroy',
+	// Actions runners on computers (FL-18, CONTRACTS §7).
+	'node.runner.install',
+	'node.runner.start',
+	'node.runner.stop',
+	'node.runner.restart',
+	'node.runner.remove',
+	'node.runner.job.cancel'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */

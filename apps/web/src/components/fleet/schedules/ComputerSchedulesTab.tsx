@@ -12,12 +12,13 @@ import { SchedulesPanel } from './SchedulesPanel';
  * Registered through `modules/fl-13-schedules.ts`; the registry slot carries
  * `FLEET_COMMANDS_ENABLED` and the `--manage` consent.
  */
-export default async function ComputerSchedulesTab({ node }: FleetComputerTabProps) {
+export default async function ComputerSchedulesTab({ node, flags }: FleetComputerTabProps) {
     let nodes: FleetNodeView[] = [];
     try {
         nodes = await fleetAPI.listVisibleNodes();
     } catch {
         nodes = [node];
     }
-    return <SchedulesPanel node={node} nodes={nodes} />;
+    // FL-20 P2 (spec FR-16): the Agent-session rows' list-price cost, while the usage scan is on.
+    return <SchedulesPanel node={node} nodes={nodes} usage={flags.FLEET_USAGE_SCAN_ENABLED === true} />;
 }

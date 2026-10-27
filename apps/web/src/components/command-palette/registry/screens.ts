@@ -23,7 +23,10 @@ import {
     Target,
     Users,
     Folder,
+    Workflow,
 } from 'lucide-react';
+import { FLEET_ACTIONS_RUNNER_CAPABILITY } from '@ever-works/contracts';
+import { runnersInstallHref } from '@/components/fleet/runners/runners.shared';
 import { ROUTES } from '@/lib/constants';
 import { getWorkIdFromPath } from '@/lib/utils/work-route';
 import type { PaletteScreen, PaletteTranslator } from './types';
@@ -518,6 +521,63 @@ export function fleetCloudScreens(
         });
     }
     return screens;
+}
+
+/**
+ * Usage & cost on the fleet (FL-20 P2, spec §5.6) — "Fleet usage" (the hub's
+ * Usage tab) and "Usage on <computer>" (the tab filtered to it) for every
+ * computer the viewer may see. Only while `FLEET_USAGE_SCAN_ENABLED` is on.
+ */
+export function fleetUsageScreens(
+    computers: ReadonlyArray<{ id: string; name: string }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    const screens: PaletteScreen[] = [
+        {
+            id: 'fleet.usage',
+            href: ROUTES.DASHBOARD_FLEET_USAGE,
+            icon: Server,
+            title: (t: PaletteTranslator) => t('fleet.usage.palette.usage'),
+            breadcrumb: fleet,
+        },
+    ];
+    for (const computer of computers) {
+        screens.push({
+            id: `fleet.usage.${computer.id}`,
+            href: `${ROUTES.DASHBOARD_FLEET_USAGE}?node=${encodeURIComponent(computer.id)}`,
+            icon: Monitor,
+            title: (t: PaletteTranslator) => t('fleet.usage.palette.usageOn', { name: computer.name }),
+            breadcrumb: fleet,
+        });
+    }
+    return screens;
+}
+
+/**
+ * Actions runners on computers (FL-18, spec §5.7) — "Install Actions runners on
+ * <name>" for every computer the viewer may see that advertises
+ * `actions-runner` (a node with `--work` and a service manager), opening its
+ * Overview with the Install dialog open (the dialog, its confirmation and the
+ * server decide the rest). Only while `FLEET_ACTIONS_RUNNERS_ENABLED` is on.
+ */
+export function fleetRunnersScreens(
+    computers: ReadonlyArray<{ id: string; name: string; capabilities?: readonly string[] }>,
+    enabled: boolean,
+): PaletteScreen[] {
+    if (!enabled) return [];
+    return computers
+        .filter(
+            (computer) => computer.capabilities?.includes(FLEET_ACTIONS_RUNNER_CAPABILITY) ?? false,
+        )
+        .map((computer) => ({
+            id: `fleet.runners.${computer.id}.install`,
+            href: runnersInstallHref(computer.id),
+            icon: Workflow,
+            title: (t: PaletteTranslator) =>
+                t('fleet.runners.palette.install', { name: computer.name }),
+            breadcrumb: fleet,
+        }));
 }
 
 /** What decides which screens exist beyond the fixed list. */
