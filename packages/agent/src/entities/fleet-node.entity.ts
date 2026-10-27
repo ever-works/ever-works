@@ -14,6 +14,8 @@ import type {
     FleetNodeVirtualKind,
     FleetVirtualMeta,
     FleetCloudMeta,
+    FleetHelperTrust,
+    FleetNodeDesktopFacts,
 } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
@@ -111,6 +113,8 @@ export { COMPUTER_CONTROL_POLICIES as FLEET_NODE_CONTROL_POLICIES } from '@ever-
 // Cloud computers (FL-17): one Node per provider machine. A plain unique index:
 // NULLs never collide on Postgres or SQLite, so every other Node is unaffected.
 @Index('idx_fleet_nodes_provider_machine', ['providerPluginId', 'providerMachineRef'], { unique: true })
+// Desktop view & control (FL-07): the Computers list filters on the helper's trust.
+@Index('idx_fleet_nodes_helper_trust', ['helperTrust'])
 export class FleetNode {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -781,6 +785,29 @@ export class FleetNode {
      */
     @Column({ type: 'simple-json', nullable: true })
     selfUpdate?: FleetNodeSelfUpdateReport | null;
+
+    /**
+     * Desktop view & control (FL-07, CONTRACTS §4.1, R-8) — how far the
+     * machine's native screen helper may be trusted, as its last heartbeat
+     * reported it: `none` · `hash-pinned` ("Reduced trust") · `signed`. A
+     * validated `varchar` like every fleet enum column; normalised on write
+     * (`normalizeFleetHelperTrust` — anything unknown reads `none`).
+     * Migration: `1796070000000-AddFleetNodeHelperTrust`.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'none' })
+    helperTrust: FleetHelperTrust;
+
+    /**
+     * Desktop view & control (FL-07) — what the last heartbeat said about the
+     * desktop: the helper's state (an 8-digit fingerprint prefix, never a
+     * hash), the displays, the desktop reasons, the receipt time, and the
+     * admission event ids already audited. NULL = never reported.
+     *
+     * `simple-json` in a `text` column like {@link consents}.
+     * Migration: `1796070000000-AddFleetNodeHelperTrust`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    desktopFacts?: FleetNodeDesktopFacts | null;
 
     @CreateDateColumn()
     createdAt: Date;

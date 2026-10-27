@@ -488,6 +488,23 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (typeof source.timeZone === 'string') {
 		out.timeZone = source.timeZone;
 	}
+	// Desktop view & control (FL-07): the five desktop fields, already
+	// normalised by `describeSelf`; copied as is. Heartbeat-only in practice.
+	if (typeof source.helperTrust === 'string') {
+		out.helperTrust = source.helperTrust;
+	}
+	if (source.helper !== undefined) {
+		out.helper = source.helper;
+	}
+	if (Array.isArray(source.displays)) {
+		out.displays = source.displays;
+	}
+	if (Array.isArray(source.desktopReasons)) {
+		out.desktopReasons = source.desktopReasons;
+	}
+	if (Array.isArray(source.helperEvents)) {
+		out.helperEvents = source.helperEvents;
+	}
 	return out;
 }
 

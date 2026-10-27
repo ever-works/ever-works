@@ -118,6 +118,58 @@ export class WorkAppRuntimeStateRepository implements WorkAppRuntimeStatePort {
      * person can see, including ones that have never been deployed, and writing
      * a row per rendered tile would turn a read into a write storm.
      */
+    /**
+     * APW-06 T45 / plan §9.5 (lane aw-safety, 2026-10-26) — how many of one owner's App Works
+     * OCCUPY Ever Works Apps, for the per-owner cap (`EVER_WORKS_APPS_MAX_PER_USER`).
+     *
+     * Counted: the owner's `app` Works whose row is on `ever-works-apps`, not removed
+     * (`removedAt IS NULL`), and holding something on the tier — a Deployment recorded, a namespace
+     * recorded, or the deploy lock (a first Deployment in flight). Paused Apps count (their data
+     * and dependencies are still there); removed ones do not; a Work merely pointed at the tier
+     * with nothing deployed does not. `excludeWorkId` — the Work being deployed — is never counted
+     * against itself, so a redeploy is never refused.
+     *
+     * Two reads instead of a join, so the query is the same on Postgres and SQLite.
+     *
+     * @returns the count and the counted Works' slugs (names only).
+     */
+    async countManagedForOwner(
+        ownerUserId: string,
+        opts: { excludeWorkId?: string | null } = {},
+    ): Promise<{ count: number; names: string[] }> {
+        const owner = typeof ownerUserId === 'string' ? ownerUserId.trim() : '';
+        if (!owner) {
+            return { count: 0, names: [] };
+        }
+        const works = await this.works
+            .createQueryBuilder('work')
+            .select(['work.id', 'work.slug'])
+            .where('work.userId = :owner', { owner })
+            .andWhere('work.kind = :kind', { kind: 'app' })
+            .getMany();
+        const exclude = opts.excludeWorkId ? String(opts.excludeWorkId) : null;
+        const slugById = new Map(
+            works.filter((work) => work.id !== exclude).map((work) => [work.id, work.slug]),
+        );
+        const ids = [...slugById.keys()];
+        if (ids.length === 0) {
+            return { count: 0, names: [] };
+        }
+        const rows = await this.repository
+            .createQueryBuilder('state')
+            .where('state.workId IN (:...ids)', { ids })
+            .andWhere('state.target = :target', { target: 'ever-works-apps' })
+            .andWhere('state.removedAt IS NULL')
+            .andWhere(
+                '(state.currentDeploymentId IS NOT NULL OR state.namespace IS NOT NULL OR state.deployLockId IS NOT NULL)',
+            )
+            .getMany();
+        return {
+            count: rows.length,
+            names: rows.map((row) => String(slugById.get(row.workId) ?? row.workId)),
+        };
+    }
+
     async findStateForWorks(workIds: string[]): Promise<Map<string, WorkAppRuntimeState>> {
         const ids = [...new Set((workIds ?? []).filter(Boolean))];
         if (ids.length === 0) {

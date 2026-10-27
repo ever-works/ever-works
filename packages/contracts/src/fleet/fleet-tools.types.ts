@@ -352,7 +352,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/nodes/{id}/desktop/screenshot'),
 		cli: 'fleet desktop screenshot'
 	}),
-	read('fleet_desktop_displays', 'desktop', 'FL-07', 'FLEET_DESKTOP_ENABLED', 'planned', {
+	read('fleet_desktop_displays', 'desktop', 'FL-07', 'FLEET_DESKTOP_ENABLED', 'live', {
 		route: GET('/api/fleet/nodes/{id}/desktop/displays'),
 		cli: 'fleet desktop displays'
 	}),

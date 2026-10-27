@@ -834,6 +834,22 @@ export const config = {
             );
         },
         /**
+         * Desktop view & control (FL-07, CONTRACTS §9) — `FLEET_DESKTOP_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/nodes/:id/desktop/views|availability|displays|screenshot`
+         * route answers 404 and no Desktop-source channel is opened. A desktop
+         * view rides the node link, so `FLEET_NODE_LINK_ENABLED` still gates
+         * the machine on its own. Read per call: flipping it needs no restart.
+         * The heartbeat keeps storing the helper's trust either way (a fact
+         * about the machine, never an act).
+         */
+        isDesktopEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_DESKTOP_ENABLED === 'true'
+            );
+        },
+        /**
          * Cloud computers (FL-17, CONTRACTS §9) — `FLEET_CLOUD_ENABLED`. Off
          * unless set to `true`, and never without `FLEET_ENABLED`: with it off
          * every `/api/fleet/providers/**` and `/api/fleet/cloud/**` route answers

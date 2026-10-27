@@ -966,29 +966,40 @@ export class AppDeployPreconditionsService {
         }
 
         const userId = request?.userId ? String(request.userId) : null;
-        if (!userId || typeof this.tier.eligibility !== 'function') {
-            if (!userId) {
-                warnings.push({
-                    code: 'managed_eligibility_unchecked',
-                    message:
-                        'The requesting user was not supplied, so tier eligibility was not evaluated.',
-                });
-            }
+        const workId = request?.workId ? String(request.workId) : null;
+        if (typeof this.tier.eligibility !== 'function') {
+            return;
+        }
+        if (!userId && !workId) {
+            warnings.push({
+                code: 'managed_eligibility_unchecked',
+                message:
+                    'The requesting user was not supplied, so tier eligibility was not evaluated.',
+            });
             return;
         }
 
         try {
-            const eligibility = await this.tier.eligibility(userId);
+            // Lane aw-safety (2026-10-26): the Work is passed so the per-owner cap counts the
+            // owner's OTHER App Works on the tier (a redeploy is never counted against itself), and
+            // an event-driven Deployment (a green Build, an env or spec change, `userId: null`) is
+            // judged as the Work's owner instead of skipping the check. Before this, every
+            // auto-deploy bypassed eligibility, and with it the cap.
+            const eligibility = await this.tier.eligibility(userId ?? '', { workId });
             if (eligibility && eligibility.eligible !== true) {
                 const reasons = (eligibility.reasons ?? []).map((reason) => String(reason));
+                const counted = Array.isArray(eligibility.counted)
+                    ? eligibility.counted.map((name) => String(name))
+                    : [];
+                const max = typeof eligibility.max === 'number' ? eligibility.max : null;
 
                 if (reasons.includes(MANAGED_CAP_REACHED_REASON)) {
                     unmet.push({
                         code: 'quota_exceeded',
-                        names: reasons,
-                        message:
-                            'This account has reached its Ever Works Apps limit, so no further App ' +
-                            'Work may be deployed there. Your own cluster remains available.',
+                        // The counted Works when the tier names them (APW-06 T45: "4th App Work
+                        // refused with the three counted Works named"), else the reason itself.
+                        names: counted.length > 0 ? counted : reasons,
+                        message: quotaExceededMessage(max, counted),
                     });
                 }
 
@@ -1005,10 +1016,7 @@ export class AppDeployPreconditionsService {
                         // ride in `names` — the plural field the contract added for exactly
                         // "one code about several things".
                         names: blocking.length > 0 ? blocking : reasons,
-                        message:
-                            'This account is not eligible for Ever Works Apps' +
-                            (blocking.length > 0 ? ` (${blocking.join(', ')})` : '') +
-                            '. Your own cluster remains available.',
+                        message: managedIneligibleMessage(blocking),
                     });
                 }
             }
@@ -1018,6 +1026,13 @@ export class AppDeployPreconditionsService {
                     error instanceof Error ? error.message : String(error)
                 }).`,
             );
+            // Lane aw-safety (2026-10-26): fail CLOSED. Before this a throwing eligibility read
+            // only warned, so the managed Deployment went ahead unchecked.
+            unmet.push({
+                code: 'managed_ineligible',
+                names: [MANAGED_ELIGIBILITY_UNAVAILABLE_REASON],
+                message: managedIneligibleMessage([MANAGED_ELIGIBILITY_UNAVAILABLE_REASON]),
+            });
         }
     }
 
@@ -1510,6 +1525,59 @@ export const APP_DEPLOY_SPEC_ISSUE_NAMES_MAX = 10;
 
 /** APW-10's reason code whose presentation is APW-06's cap (`APW-10/plan.md:715`). */
 export const MANAGED_CAP_REACHED_REASON = 'capReached';
+
+/** Lane aw-safety — the reason a fact behind the tier's eligibility could not be read. */
+export const MANAGED_ELIGIBILITY_UNAVAILABLE_REASON = 'eligibilityUnavailable';
+
+/** Lane aw-safety (2026-10-26) — `quota_exceeded`'s message: the cap and the counted Works. */
+export function quotaExceededMessage(max: number | null, counted: readonly string[]): string {
+    const head =
+        max !== null
+            ? `This account already runs ${max} App Work${max === 1 ? '' : 's'} on Ever Works Apps, its limit`
+            : 'This account has reached its Ever Works Apps limit';
+    const which = counted.length > 0 ? ` (${counted.join(', ')})` : '';
+    return (
+        `${head}${which}, so no further App Work may be deployed there. ` +
+        'Remove one of them, or deploy this one to your own cluster.'
+    );
+}
+
+/**
+ * Lane aw-safety (2026-10-26) — `managed_ineligible`'s message, one clear sentence per FR-35 reason
+ * (the codes stay in `names` for the web's own copy). Reason codes only, never a value.
+ */
+export function managedIneligibleMessage(reasons: readonly string[]): string {
+    const sentences: string[] = [];
+    for (const reason of reasons) {
+        switch (reason) {
+            case 'emailUnverified':
+                sentences.push('Verify the email address of your account first.');
+                break;
+            case 'planRequired':
+                sentences.push('Ever Works Apps needs a paid plan.');
+                break;
+            case 'ownerQuarantined':
+                sentences.push('An App Work of this account is quarantined.');
+                break;
+            case MANAGED_ELIGIBILITY_UNAVAILABLE_REASON:
+                sentences.push(
+                    'Your eligibility could not be checked right now; try again in a few minutes.',
+                );
+                break;
+            case 'tierClosed':
+            case 'managedTierDisabled':
+                sentences.push('Ever Works Apps is not open on this installation.');
+                break;
+            default:
+                sentences.push(`Not eligible (${String(reason).slice(0, 60)}).`);
+        }
+    }
+    return (
+        'This account cannot deploy to Ever Works Apps. ' +
+        (sentences.length > 0 ? `${sentences.join(' ')} ` : '') +
+        'Your own cluster remains available.'
+    );
+}
 
 /** What `readSpec` resolved, in the shape the later checks need. */
 interface ResolvedSpec {

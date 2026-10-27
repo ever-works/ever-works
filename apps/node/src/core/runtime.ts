@@ -83,6 +83,10 @@ import {
 import { createLogsLinkModule, createNodeLogIo, type LogIo } from './link/modules/logs';
 import { createFilesLinkModule, createNodeFilesIo, type FilesIo, type FilesLinkModule } from './link/modules/files';
 import { createClipLinkModule, PasteTargets } from './link/modules/clip';
+import { createDesktopHelperTagsModule, createDesktopSourceOpener } from './link/modules/desktop/desktop-source';
+import { DesktopHelperHost } from './screen/desktop-helper-backend';
+import type { HelperSpawner } from './screen/helper/helper-process';
+import { createHelperFs, type HelperFs, type HelperPaths } from './screen/helper/helper-trust';
 import { resolveCanonicalAllowedRoots, standardLogDirs } from './link/allowed-roots';
 import { resolveNetworkIdentity, type LocalNetworkIdentity, type NetworkInterfaceMap } from './network-identity';
 import type { NodeModule } from './link/modules/registry';
@@ -788,6 +792,16 @@ export interface CreateNodeRuntimeOptions {
 	/** Owner-only ACL for a file (Windows): the session daemon's token. */
 	restrictFile?: (file: string) => Promise<void> | void;
 	/**
+	 * Desktop view & control (FL-07) — the screen helper's admission record,
+	 * event log and install path (beside the config). With them and `--attend`,
+	 * the `desktop` family serves the Desktop source and the heartbeat reports
+	 * the helper. Absent: the Desktop source is refused `unsupported_on_node`.
+	 */
+	screenHelperPaths?: HelperPaths;
+	/** Desktop view & control (FL-07) — the helper's filesystem and spawner (tests inject fakes). */
+	screenHelperFs?: HelperFs;
+	screenHelperSpawner?: HelperSpawner;
+	/**
 	 * Checkouts on computers (FL-14) — where the node-local checkout registry
 	 * lives (`checkouts.json` beside the config). Absent (the desktop shell,
 	 * tests, embedders): no checkouts module, so `checkouts.*` answers
@@ -1196,6 +1210,26 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	const clipLinkModule = consents.attend
 		? createClipLinkModule({ targets: pasteTargets, nodeName: config.name?.trim() || 'this computer' })
 		: null;
+	// Desktop view & control (FL-07): the native screen helper behind the
+	// Desktop source, under --attend only. Verified against the owner's
+	// admission record before every start; its facts ride the heartbeat.
+	const desktopHelper =
+		consents.attend && options.screenHelperPaths
+			? new DesktopHelperHost({
+					paths: options.screenHelperPaths,
+					fs:
+						options.screenHelperFs ??
+						createHelperFs({
+							platform: io.environment.platform,
+							...(options.restrictFile ? { restrict: options.restrictFile } : {})
+						}),
+					platform: io.environment.platform,
+					env: options.env ?? process.env,
+					...(options.screenHelperSpawner ? { spawner: options.screenHelperSpawner } : {}),
+					logger: io.logger
+				})
+			: null;
+	if (desktopHelper) void desktopHelper.refresh();
 	// Schedules on computers (FL-13): the `schedule` family and the machine's own
 	// timer loop, for a process started with --manage. The loop starts now —
 	// independent of the link (FR-12) — and follows the kill switch once a
@@ -1351,6 +1385,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(logsLinkModule ? [logsLinkModule] : []),
 			...(filesLinkModule ? [filesLinkModule] : []),
 			...(clipLinkModule ? [clipLinkModule] : []),
+			...(desktopHelper ? [createDesktopHelperTagsModule(desktopHelper)] : []),
 			...(virtualModule ? [virtualModule] : []),
 			...(runnersModule ? [runnersModule] : []),
 			...(options.linkModules ?? [])
@@ -1378,7 +1413,16 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				}
 			: {}),
 		...(scheduleModule ? { schedule: scheduleModule } : {}),
-		...(portsModule ? { ports: portsModule, desktopSources: { preview: portsModule.previewSource } } : {}),
+		...(portsModule ? { ports: portsModule } : {}),
+		// The `desktop` family's sources: FL-10's preview browser, FL-07's Desktop.
+		...(portsModule || desktopHelper
+			? {
+					desktopSources: {
+						...(portsModule ? { preview: portsModule.previewSource } : {}),
+						...(desktopHelper ? { desktop: createDesktopSourceOpener({ host: desktopHelper }) } : {})
+					}
+				}
+			: {}),
 		...(computerLegs ? { computerLegs } : {}),
 		...(checkoutsModule ? { checkouts: checkoutsModule } : {}),
 		// FL-09 — services and processes (their verbs need --manage on this machine).
@@ -1445,6 +1489,13 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	if (options.selfUpdateReport) telemetry.selfUpdate = options.selfUpdateReport;
 	// Schedules on computers (FL-13): the zone this machine's schedules fire in.
 	telemetry.timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;
+	// Desktop view & control (FL-07): the helper re-verified, its facts reported.
+	if (desktopHelper) {
+		telemetry.desktop = async () => {
+			await desktopHelper.refresh();
+			return desktopHelper.report();
+		};
+	}
 	// The management lane (CONTRACTS R-34): which of its kinds this process may
 	// lease, and every kind it owns — the work lane below never leases those.
 	const virtualExecutors: ManagementLaneExecutor[] = virtualState

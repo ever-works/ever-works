@@ -7202,6 +7202,16 @@
                     "open": "Abrir Compilaciones"
                 }
             },
+            "appsTierEligibility": {
+                "reasons": {
+                    "emailUnverified": "Verify the email address of your account first.",
+                    "planRequired": "Ever Works Apps needs a paid plan.",
+                    "ownerQuarantined": "An App of this account is quarantined.",
+                    "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
+                    "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
+                    "unknown": "Not eligible ({reason})."
+                }
+            },
             "appDeploy": {
                 "title": "Implementar",
                 "notRunning": "Esta app todavía no se está ejecutando en ningún sitio.",

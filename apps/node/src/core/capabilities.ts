@@ -5,6 +5,14 @@ import {
 	FLEET_PUSH_CAPABILITY,
 	FLEET_PUSH_MIN_GIT_VERSION,
 	FLEET_SCREEN_CAPABILITY,
+	FLEET_HELPER_SCREEN_CAPABILITY,
+	FLEET_SCREEN_BROWSER_CAPABILITY,
+	FLEET_SCREEN_DESKTOP_CAPABILITY,
+	normalizeFleetDesktopReasons,
+	normalizeFleetDisplays,
+	normalizeFleetHelperEvents,
+	normalizeFleetHelperStatus,
+	normalizeFleetHelperTrust,
 	normalizeFleetLanId,
 	normalizeFleetMacAddress,
 	FLEET_SESSIONS_CAPABILITY,
@@ -14,6 +22,11 @@ import {
 	normalizeFleetSessionDaemonReport,
 	sanitizeFleetNodeHealthSnapshot,
 	type FleetConsents,
+	type FleetDesktopReason,
+	type FleetDisplayView,
+	type FleetHelperEvent,
+	type FleetHelperStatusView,
+	type FleetHelperTrust,
 	type FleetNodeHealthSnapshot,
 	type FleetNodeSelfUpdateReport,
 	type FleetSessionDaemonReport
@@ -380,6 +393,11 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		environment.attended === true && isScreenCaptureAvailable(environment, environment.captureBackends)
 			? FLEET_SCREEN_CAPABILITY
 			: null,
+		// Desktop view & control (FL-07, CONTRACTS §1.2): `screen:browser` is the
+		// `screen` tag under its source's name — advertised exactly with it.
+		environment.attended === true && isScreenCaptureAvailable(environment, environment.captureBackends)
+			? FLEET_SCREEN_BROWSER_CAPABILITY
+			: null,
 		// Fleet node link (FL-02): the module tags, LAST, so a node that already
 		// advertised everything above keeps advertising exactly that.
 		...(environment.linkModuleTags ?? []),
@@ -427,6 +445,12 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	// Sessions on computers (FL-04): `sessions` exists only while the session
 	// daemon a consent started answers — the consent IS the opt-in.
 	FLEET_SESSIONS_CAPABILITY,
+	// Desktop view & control (FL-07): all three exist only under `--attend` (and
+	// the two helper tags only after the owner admitted a helper on the machine),
+	// which IS the opt-in; a selection written before them must not withhold them.
+	FLEET_SCREEN_BROWSER_CAPABILITY,
+	FLEET_SCREEN_DESKTOP_CAPABILITY,
+	FLEET_HELPER_SCREEN_CAPABILITY,
 	// Usage & cost on the fleet (FL-20): `usage-scan` exists only under
 	// --usage-scan, which IS the opt-in.
 	FLEET_USAGE_SCAN_CAPABILITY
@@ -586,6 +610,22 @@ export interface SelfDescriptionTelemetry {
 	 * leaves the field ABSENT.
 	 */
 	timeZone?: () => string | null;
+	/**
+	 * Desktop view & control (FL-07, CONTRACTS §1.1, R-8) — the screen helper's
+	 * trust and state, the displays, why the Desktop source is unavailable, and
+	 * the admission events the platform audits. Heartbeat only, in the newest
+	 * strip tier; null or a throw leaves all five fields ABSENT.
+	 */
+	desktop?: () => Promise<NodeDesktopTelemetry | null> | NodeDesktopTelemetry | null;
+}
+
+/** What the desktop probe reports (each field re-read at the wire boundary). */
+export interface NodeDesktopTelemetry {
+	helperTrust: FleetHelperTrust;
+	helper: FleetHelperStatusView;
+	displays: FleetDisplayView[];
+	desktopReasons: FleetDesktopReason[];
+	helperEvents: FleetHelperEvent[];
 }
 
 /**
@@ -736,6 +776,18 @@ export async function describeSelf(
 	// Schedules on computers (FL-13): the zone, validated at the wire boundary.
 	const timeZone = await resolveTelemetry(telemetry.timeZone);
 	if (isFleetTimeZone(timeZone)) description.timeZone = timeZone;
+	// Desktop view & control (FL-07): the five desktop fields together, each
+	// re-normalised here at the wire boundary for the reason the housekeeping
+	// block gives (only known values, within their bounds, ever reach the pipe).
+	const desktop = await resolveTelemetry(telemetry.desktop);
+	if (desktop) {
+		const helper = normalizeFleetHelperStatus(desktop.helper);
+		description.helperTrust = normalizeFleetHelperTrust(desktop.helperTrust);
+		if (helper) description.helper = { ...helper };
+		description.displays = normalizeFleetDisplays(desktop.displays);
+		description.desktopReasons = normalizeFleetDesktopReasons(desktop.desktopReasons);
+		description.helperEvents = normalizeFleetHelperEvents(desktop.helperEvents);
+	}
 	return description;
 }
 

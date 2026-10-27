@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { createInterface } from 'node:readline/promises';
 import { runCli, type CliDeps } from './cli/program';
 import { createLogger } from './core/logger';
 import {
@@ -75,8 +76,24 @@ function buildDeps(): CliDeps {
 		...(process.argv[1] ? { sessionDaemonCommand: { command: process.execPath, args: [process.argv[1]] } } : {}),
 		...(process.platform === 'win32' ? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) } : {}),
 		// Fleet node link (FL-02 T-25): what `--auto-update` identifies the install by.
-		entryPath: resolveEntryPath()
+		entryPath: resolveEntryPath(),
+		// Desktop view & control (FL-07): `helper admit` reads the typed word from
+		// a person at this keyboard — only when stdin IS a terminal.
+		arch: process.arch,
+		...(process.stdin.isTTY ? { readLine: readTypedLine } : {})
 	};
+}
+
+/** One line typed at the terminal (FL-07 `helper admit`). */
+async function readTypedLine(prompt: string): Promise<string | null> {
+	const terminal = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+	try {
+		return await terminal.question(prompt);
+	} catch {
+		return null;
+	} finally {
+		terminal.close();
+	}
 }
 
 async function main(): Promise<void> {
