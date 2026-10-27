@@ -656,14 +656,15 @@ export class AppUpstreamSyncService {
         const { workId, trigger } = context;
 
         // ── step 3: the spec gate (FR-64, ACC-02-28) ─────────────────────────
-        // T47: `merged` is bookkeeping for a pull request the MEMBER merged — finishing it is
-        // never "a sync the spec turned off", so neither spec gate applies to it.
-        if (context.settings.modeHonoured !== true && trigger !== 'merged') {
+        if (context.settings.modeHonoured !== true) {
             // A `mode` this epic cannot carry out is refused whatever the trigger: the
             // spec asks for a desync the platform does not implement, and pretending to
             // merge is worse than saying so (plan §6.4).
             return { result: 'skipped', reason: 'disabled_by_spec' };
         }
+        // T47: `merged` finishing a pull request the MEMBER merged is bookkeeping, never "a
+        // sync the spec turned off" — so its `enabled` gate is decided once the row says
+        // whether there is a pull request to finish (below).
         if (trigger !== 'manual' && trigger !== 'merged' && context.settings.enabled !== true) {
             // FR-64: the *scheduled* path is off. A manual **Sync now** deliberately
             // ignores this — a person is never locked out of their own repository.
@@ -676,6 +677,13 @@ export class AppUpstreamSyncService {
             return { result: 'failed', reason: 'state_not_found' };
         }
         context.row = row;
+
+        // T47: a `merged` dispatch with no sync pull request on record has nothing to finish —
+        // it is an ordinary scheduled-style run, so the spec's `enabled` applies to it.
+        const finishing = trigger === 'merged' && typeof row.syncPullRequestNumber === 'number';
+        if (trigger === 'merged' && !finishing && context.settings.enabled !== true) {
+            return { result: 'skipped', reason: 'disabled_by_spec' };
+        }
 
         if (row.relation === 'link' || !row.upstreamOwner || !row.upstreamRepo) {
             // `beginSync` refuses a link, so this is the "no upstream coordinates" case
@@ -712,8 +720,10 @@ export class AppUpstreamSyncService {
         context.ownerUserId = ownerUserId;
         context.ownerScope = owner.scope;
 
-        // T47 (FR-62): the finish path — and NOT the compare-and-open path.
-        if (trigger === 'merged') {
+        // T47 (FR-62): the finish path — and NOT the compare-and-open path. Without a pull
+        // request on record (the first finish already cleared it) the dispatch falls through
+        // to the ordinary run, where the workflow hold applies exactly as on every other path.
+        if (finishing) {
             return await this.finishMergedPullRequest(context, row);
         }
 
