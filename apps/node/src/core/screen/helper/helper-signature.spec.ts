@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	windowsPowerShellPath,
 	authenticodeCommand,
 	checkHelperSignature,
 	codesignIsDeveloperId,
@@ -41,7 +42,10 @@ describe('macOS', () => {
 			ok: true,
 			signer: 'ABCDE12345'
 		});
-		expect(fake.calls[0]).toEqual({ command: 'codesign', args: ['--verify', '--strict', '/x/ever-works-screen'] });
+		expect(fake.calls[0]).toEqual({
+			command: '/usr/bin/codesign',
+			args: ['--verify', '--strict', '/x/ever-works-screen']
+		});
 	});
 
 	it('refuses another team, an unsigned file, a broken signature and an ad-hoc one', async () => {
@@ -81,7 +85,7 @@ describe('Windows', () => {
 			ok: true,
 			signer: SUBJECT
 		});
-		expect(fake.calls[0].command).toBe('powershell.exe');
+		expect(fake.calls[0].command).toMatch(/\\System32\\WindowsPowerShell\\v1\.0\\powershell\.exe$/);
 		expect(fake.calls[0].args).toContain('-EncodedCommand');
 		expect(fake.calls[0].args.join(' ')).not.toContain('ever-works-screen.exe');
 	});
@@ -112,5 +116,11 @@ describe('elsewhere', () => {
 		expect(await checkHelperSignature(runner([{ code: 1, spawnError: 'ENOENT' }]) as never, 'darwin', '/x', 'A')).toMatchObject({
 			reason: 'tool-missing'
 		});
+	});
+
+	it('runs the tools by their system paths, never a PATH lookup', () => {
+		expect(windowsPowerShellPath('D:\\Win')).toBe('D:\\Win\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+		expect(windowsPowerShellPath('relative')).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
+		expect(windowsPowerShellPath(undefined)).toMatch(/^[A-Za-z]:\\.*\\powershell\.exe$/);
 	});
 });

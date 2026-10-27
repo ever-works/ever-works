@@ -9,6 +9,7 @@ import { ComputerMachineSettings } from '../ComputerMachineSettings';
 import { UpgradeRequiredSection } from '../../link/UpgradeRequiredSection';
 import { PreviewBrowserSwitch } from '../../ports/PreviewBrowserSwitch';
 import { GitIdentityCard } from '../../git/GitIdentityCard';
+import { DesktopRecordingSettings } from '../../desktop/DesktopRecordingSettings';
 
 /**
  * Fleet hub (FL-01, spec §5.10) — a computer's Settings tab, FL-01's part:
@@ -35,6 +36,10 @@ export default function SettingsTab({
             <PolicyFamiliesEditor node={node} />
             {/* Servers and ports (FL-10): the preview browser switch, owner only. */}
             {isOwner && <PreviewBrowserSwitch node={node} />}
+            {/* Desktop view & control (FL-07 P3): the recording settings, owner only. */}
+            {isOwner && flags?.FLEET_DESKTOP_ENABLED === true && (
+                <DesktopRecordingSettings node={node} />
+            )}
             {/* Tasks on computers (FL-15 P2): Git on <computer>, behind FLEET_CHECKOUTS_ENABLED. */}
             {flags?.FLEET_CHECKOUTS_ENABLED === true && <GitIdentityCard node={node} />}
             {isOwner && machine && <ComputerMachineSettings node={node} {...machine} />}

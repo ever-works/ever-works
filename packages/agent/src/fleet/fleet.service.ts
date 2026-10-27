@@ -1431,6 +1431,88 @@ export class FleetService {
     }
 
     /**
+     * Desktop view & control (FL-07 P3, spec §5.9, FR-48 / FR-52) — the
+     * recording settings of a computer, the first writer of AW-11's two
+     * columns: **Record watching sessions** (`recordWatchSessions`, default
+     * off; a view under control is always recorded) and **Keep recordings
+     * for** (`recordingRetentionDays`, 1–90, default 14). Owner only (anyone
+     * else who may see the node is refused `permission_denied`). Each change
+     * writes one `node.policy.change` audit row `{ setting, from, to }`; a
+     * write that changes nothing writes nothing. A new retention applies to
+     * recordings that stop from now on.
+     */
+    async setDesktopRecordingSettingsForUser(
+        userId: string,
+        nodeId: string,
+        settings: { recordWatchSessions?: unknown; recordingRetentionDays?: unknown },
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
+        const wanted: { recordWatchSessions?: boolean; recordingRetentionDays?: number } = {};
+        if (settings.recordWatchSessions !== undefined) {
+            if (typeof settings.recordWatchSessions !== 'boolean') {
+                throw new BadRequestException('recordWatchSessions must be true or false');
+            }
+            wanted.recordWatchSessions = settings.recordWatchSessions;
+        }
+        if (settings.recordingRetentionDays !== undefined) {
+            const days = settings.recordingRetentionDays;
+            if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) {
+                throw new BadRequestException(
+                    'recordingRetentionDays must be a whole number of days from 1 to 90',
+                );
+            }
+            wanted.recordingRetentionDays = days;
+        }
+        const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
+        const changes: Array<{ setting: 'recordWatchSessions' | 'recordingRetentionDays'; from: unknown; to: unknown }> = [];
+        if (
+            wanted.recordWatchSessions !== undefined &&
+            Boolean(node.recordWatchSessions) !== wanted.recordWatchSessions
+        ) {
+            changes.push({
+                setting: 'recordWatchSessions',
+                from: Boolean(node.recordWatchSessions),
+                to: wanted.recordWatchSessions,
+            });
+        }
+        const storedDays = toOptionalNumber(node.recordingRetentionDays) ?? 14;
+        if (wanted.recordingRetentionDays !== undefined && storedDays !== wanted.recordingRetentionDays) {
+            changes.push({
+                setting: 'recordingRetentionDays',
+                from: storedDays,
+                to: wanted.recordingRetentionDays,
+            });
+        }
+        if (changes.length === 0) return this.toView(node);
+        const write: Partial<FleetNode> = {};
+        if (changes.some((change) => change.setting === 'recordWatchSessions')) {
+            write.recordWatchSessions = wanted.recordWatchSessions;
+        }
+        if (changes.some((change) => change.setting === 'recordingRetentionDays')) {
+            write.recordingRetentionDays = wanted.recordingRetentionDays;
+        }
+        await this.repository.update(node.id, write);
+        const actor = ctx.actorUserId === undefined ? userId : ctx.actorUserId;
+        for (const change of changes) {
+            await this.auditLifecycle('node.policy.change', userId, node, ctx, {
+                before: { [change.setting]: change.from },
+                after: { [change.setting]: change.to },
+                extra: {
+                    family: 'desktop',
+                    setting: change.setting,
+                    from: change.from,
+                    to: change.to,
+                    target: change.setting,
+                    requestedBy: actor ? `user:${actor}` : 'system:fleet',
+                    confirmationClass: 'plain',
+                    outcome: 'success',
+                },
+            });
+        }
+        return this.toView({ ...node, ...write } as FleetNode);
+    }
+
+    /**
      * Fleet hub (FL-01) — change who may act in one or more action families
      * (CONTRACTS §2.1). Owner only. `families` is a PARTIAL map: families it
      * names change, the rest keep what they had.

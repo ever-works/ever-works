@@ -1,3 +1,4 @@
+import { win32 as windowsPath } from 'node:path';
 import type { CommandRunner } from '../../capabilities';
 
 /**
@@ -13,7 +14,10 @@ import type { CommandRunner } from '../../capabilities';
  *   - **Linux**: there is no signed level — a helper there is always
  *     hash-pinned.
  *
- * `codesign` is handed the file path as ONE argument — never a shell string;
+ * Both tools are run by their absolute system path — `/usr/bin/codesign`,
+ * `%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe` — never looked
+ * up on `PATH`, so a program of the same name earlier on `PATH` cannot answer
+ * for them. `codesign` is handed the file path as ONE argument — never a shell string;
  * PowerShell gets it as a quoted literal inside an encoded command (see
  * {@link authenticodeCommand}). Every failure is a reason,
  * never a throw. The signer identity is compared exactly; what a signed
@@ -24,6 +28,15 @@ import type { CommandRunner } from '../../capabilities';
 export type HelperSignatureCheck =
 	| { ok: true; signer: string }
 	| { ok: false; reason: 'unsupported' | 'unsigned' | 'invalid' | 'wrong-signer' | 'tool-missing'; detail?: string };
+
+/** macOS's signature tool, by its system path. */
+export const CODESIGN_PATH = '/usr/bin/codesign';
+
+/** Windows PowerShell under the system root (`SystemRoot`, else `C:\Windows`) — never a `PATH` lookup. */
+export function windowsPowerShellPath(systemRoot: string | undefined = process.env.SystemRoot): string {
+	const root = systemRoot && windowsPath.isAbsolute(systemRoot) ? systemRoot : 'C:\\Windows';
+	return windowsPath.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+}
 
 /** How long one signature tool may take. */
 export const HELPER_SIGNATURE_TIMEOUT_MS = 15_000;
@@ -76,7 +89,7 @@ export async function checkHelperSignature(
 ): Promise<HelperSignatureCheck> {
 	try {
 		if (platform === 'darwin') {
-			const verify = await runner.run('codesign', ['--verify', '--strict', path], {
+			const verify = await runner.run(CODESIGN_PATH, ['--verify', '--strict', path], {
 				timeoutMs: HELPER_SIGNATURE_TIMEOUT_MS
 			});
 			if (verify.spawnError === 'ENOENT') return { ok: false, reason: 'tool-missing', detail: 'codesign' };
@@ -85,7 +98,7 @@ export async function checkHelperSignature(
 				return /not signed/i.test(text) ? { ok: false, reason: 'unsigned' } : { ok: false, reason: 'invalid' };
 			}
 			// `--display` writes what it found to stderr.
-			const display = await runner.run('codesign', ['--display', '--verbose=2', path], {
+			const display = await runner.run(CODESIGN_PATH, ['--display', '--verbose=2', path], {
 				timeoutMs: HELPER_SIGNATURE_TIMEOUT_MS
 			});
 			const text = `${display.stderr}\n${display.stdout}`;
@@ -95,7 +108,7 @@ export async function checkHelperSignature(
 		}
 		if (platform === 'win32') {
 			const result = await runner.run(
-				'powershell.exe',
+				windowsPowerShellPath(),
 				['-NoProfile', '-NonInteractive', '-EncodedCommand', authenticodeCommand(path)],
 				{ timeoutMs: HELPER_SIGNATURE_TIMEOUT_MS }
 			);

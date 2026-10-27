@@ -53,6 +53,8 @@ describe('FleetController', () => {
         listVisibleForUser: jest.Mock;
         setFavoriteForUser: jest.Mock;
         setControlPolicyFamiliesForUser: jest.Mock;
+        // Desktop view & control (FL-07 P3) — the recording settings, owner only.
+        setDesktopRecordingSettingsForUser: jest.Mock;
         // Fleet hub (FL-01, FR-22) — who a machines-family act runs as. The
         // caller owns the node here; fleet-hub.controller.spec.ts covers the
         // organisation roles.
@@ -133,6 +135,11 @@ describe('FleetController', () => {
             ]),
             setFavoriteForUser: jest.fn(async () => ({ ...nodeView, isFavorite: true })),
             setControlPolicyFamiliesForUser: jest.fn(async () => nodeView),
+            setDesktopRecordingSettingsForUser: jest.fn(async () => ({
+                ...nodeView,
+                recordWatchSessions: true,
+                recordingRetentionDays: 30,
+            })),
             resolveMachinesActor: jest.fn(async (userId: string) => ({
                 ownerUserId: userId,
                 role: 'owner',
@@ -360,6 +367,23 @@ describe('FleetController', () => {
         });
     });
 
+    // Desktop view & control (FL-07 P3) — the recording settings ride the PATCH, owner only.
+    it('update forwards the recording settings to their owner-only writer', async () => {
+        const view = await controller.update(auth, nodeView.id, {
+            recordWatchSessions: true,
+            recordingRetentionDays: 30,
+        } as never);
+        expect(service.setDesktopRecordingSettingsForUser).toHaveBeenCalledWith('user-1', nodeView.id, {
+            recordWatchSessions: true,
+            recordingRetentionDays: 30,
+        });
+        expect(view).toMatchObject({ recordWatchSessions: true, recordingRetentionDays: 30 });
+        await controller.update(auth, nodeView.id, { recordingRetentionDays: 7 } as never);
+        expect(service.setDesktopRecordingSettingsForUser).toHaveBeenLastCalledWith('user-1', nodeView.id, {
+            recordingRetentionDays: 7,
+        });
+    });
+
     it('remove is owner-scoped', async () => {
         await controller.remove(auth, nodeView.id);
         expect(service.deleteForUser).toHaveBeenCalledWith('user-1', nodeView.id);
@@ -567,6 +591,18 @@ describe('FleetController', () => {
                     'health',
                     // Fleet node link (FL-02).
                     'consents',
+                    // Desktop view & control (FL-07): the screen helper's report.
+                    'helper',
+                    'helperTrust',
+                    'helperEvents',
+                    'displays',
+                    'desktopReasons',
+                    // Mapped by later epics (self-update, sessions, wake, time zone).
+                    'selfUpdate',
+                    'daemon',
+                    'lanId',
+                    'macAddress',
+                    'timeZone',
                 ].sort(),
             );
             expect(result.secret).toBe('node-secret');

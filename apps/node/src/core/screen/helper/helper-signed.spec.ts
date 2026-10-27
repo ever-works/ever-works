@@ -137,4 +137,27 @@ describe('verifying a signed admission (before every start)', () => {
 		await host.refresh();
 		expect((await host.report()).helper).toMatchObject({ trust: 'hash-pinned', signedAvailable: true });
 	});
+
+	it('asks the OS once per bytes for heartbeats, and again when the file changes', async () => {
+		const fs = await admitted();
+		let calls = 0;
+		const counting: HelperSignatureChecker = async (path, expected, sha256) => {
+			calls += 1;
+			return signedBy(TEAM)(path, expected, sha256);
+		};
+		const host = new DesktopHelperHost({
+			paths,
+			fs,
+			platform: 'darwin',
+			env: {},
+			spawner: fakeHelperSpawner().spawner,
+			checkSignature: counting
+		});
+		await host.refresh();
+		await host.refresh();
+		expect(calls).toBe(1);
+		await fs.writeExecutable(paths.installPath, new TextEncoder().encode('signed v3'));
+		await host.refresh();
+		expect(calls).toBe(2);
+	});
 });

@@ -228,6 +228,39 @@ export class UpdateFleetNodeDto {
     @IsOptional()
     @IsBoolean()
     previewProfileEnabled?: boolean;
+
+    /**
+     * Desktop view & control (FL-07 P3, spec §5.9, FR-48) — record a
+     * watch-only Desktop view of this computer too (a view under control is
+     * always recorded). Owner only; audited `node.policy.change`.
+     */
+    @ApiProperty({
+        required: false,
+        description:
+            'Desktop view & control — also record Desktop views of this computer that are only watched (views under control are always recorded). Owner only.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    recordWatchSessions?: boolean;
+
+    /**
+     * Desktop view & control (FL-07 P3, FR-52) — how many days a recording of
+     * this computer is kept after its view ended, 1–90 (default 14). Owner
+     * only; audited `node.policy.change`. Applies to recordings that stop
+     * from now on.
+     */
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        maximum: 90,
+        description:
+            'Desktop view & control — days a recording of this computer is kept after its view ended (1–90, default 14). Applies to recordings that stop from now on. Owner only.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(90)
+    recordingRetentionDays?: number;
 }
 
 /**

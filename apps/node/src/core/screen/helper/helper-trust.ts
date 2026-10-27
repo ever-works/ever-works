@@ -217,7 +217,7 @@ export async function verifyHelper(
 	}
 	if (record.level === 'signed') {
 		if (!checkSignature || !record.signer) return { ok: false, reason: 'helper-untrusted', record, present: true };
-		const signature = await checkSignature(record.path, record.signer).catch(() => null);
+		const signature = await checkSignature(record.path, record.signer, sha256).catch(() => null);
 		if (!signature?.ok || signature.signer !== record.signer) {
 			return { ok: false, reason: 'helper-untrusted', record, present: true };
 		}
@@ -229,8 +229,15 @@ export async function verifyHelper(
 	return { ok: true, trust: 'hash-pinned', record, sha256, verifiedAt: new Date(now()).toISOString() };
 }
 
-/** Check a file's OS signature against an expected signer (`checkHelperSignature`, bound to a runner). */
-export type HelperSignatureChecker = (path: string, expectedSigner: string) => Promise<HelperSignatureCheck>;
+/**
+ * Check a file's OS signature against an expected signer (`checkHelperSignature`, bound to a runner).
+ * `sha256`: the bytes being checked, when the caller hashed them (a cache may key on it).
+ */
+export type HelperSignatureChecker = (
+	path: string,
+	expectedSigner: string,
+	sha256?: string
+) => Promise<HelperSignatureCheck>;
 
 /** Read the event log (newest last); unreadable reads as empty. */
 export async function readHelperEvents(fs: HelperFs, eventsPath: string): Promise<FleetHelperEvent[]> {
