@@ -4327,7 +4327,8 @@
             "more": "他 {n} 件",
             "source": {
                 "work": "ワーク",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9715,7 +9716,8 @@
                 "missionTick": "Mission のティック",
                 "sourceValidation": "ソースの検証",
                 "dataSync": "データ同期",
-                "inboundTrigger": "受信トリガー"
+                "inboundTrigger": "受信トリガー",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "アクティブ",

@@ -165,6 +165,7 @@ const TODAY_KIND_KEY: Record<HomeScheduleKind, string> = {
     data_sync: 'dataSync',
     inbound_trigger: 'inboundTrigger',
     node_schedule: 'nodeSchedule',
+    app_upstream_sync: 'appUpstreamSync',
 };
 
 /**

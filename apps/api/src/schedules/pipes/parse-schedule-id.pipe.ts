@@ -10,6 +10,8 @@ const SOURCE_TYPES = new Set([
     'inbound_trigger',
     // Schedules on computers (FL-13): `node_schedule:<commandId>`.
     'node_schedule',
+    // APW-02 T53: an App Work's upstream sync, `app_upstream_sync:<workId>` (read only).
+    'app_upstream_sync',
 ]);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

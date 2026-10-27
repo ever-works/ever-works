@@ -85,6 +85,8 @@ const SOURCE_TYPES: readonly ScheduleSourceType[] = [
     'data_sync',
     'inbound_trigger',
     'node_schedule',
+    // APW-02 T53 — read-only: every control answers `managedOnWork`.
+    'app_upstream_sync',
 ];
 
 /** Split `${sourceType}:${ownerKey}`; null when the shape is wrong. */

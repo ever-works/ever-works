@@ -4327,7 +4327,8 @@
             "more": "+{n} और",
             "source": {
                 "work": "कार्य",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9715,7 +9716,8 @@
                 "missionTick": "Mission टिक",
                 "sourceValidation": "स्रोत सत्यापन",
                 "dataSync": "डेटा सिंक",
-                "inboundTrigger": "इनकमिंग ट्रिगर"
+                "inboundTrigger": "इनकमिंग ट्रिगर",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "सक्रिय",

@@ -4327,7 +4327,8 @@
             "more": "+{n} lainnya",
             "source": {
                 "work": "Karya",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9715,7 +9716,8 @@
                 "missionTick": "Tick Mission",
                 "sourceValidation": "Validasi sumber",
                 "dataSync": "Sinkronisasi data",
-                "inboundTrigger": "Pemicu masuk"
+                "inboundTrigger": "Pemicu masuk",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Aktif",

@@ -4327,7 +4327,8 @@
             "more": "+{n} altri",
             "source": {
                 "work": "Lavoro",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9715,7 +9716,8 @@
                 "missionTick": "Tick Mission",
                 "sourceValidation": "Validazione sorgente",
                 "dataSync": "Sincronizzazione dati",
-                "inboundTrigger": "Trigger in entrata"
+                "inboundTrigger": "Trigger in entrata",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Attivo",

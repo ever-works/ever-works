@@ -4327,7 +4327,8 @@
             "more": "+{n} เพิ่มเติม",
             "source": {
                 "work": "งาน",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9715,7 +9716,8 @@
                 "missionTick": "ทิกของ Mission",
                 "sourceValidation": "การตรวจสอบแหล่งที่มา",
                 "dataSync": "การซิงค์ข้อมูล",
-                "inboundTrigger": "ทริกเกอร์ขาเข้า"
+                "inboundTrigger": "ทริกเกอร์ขาเข้า",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "ใช้งานอยู่",

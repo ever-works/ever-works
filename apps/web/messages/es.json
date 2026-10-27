@@ -2517,7 +2517,8 @@
                 "missionTick": "Tick de Mission",
                 "sourceValidation": "Validación de fuente",
                 "dataSync": "Sincronización de datos",
-                "inboundTrigger": "Disparador entrante"
+                "inboundTrigger": "Disparador entrante",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Activo",
@@ -4395,7 +4396,8 @@
             "more": "+{n} más",
             "source": {
                 "work": "Trabajo",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
