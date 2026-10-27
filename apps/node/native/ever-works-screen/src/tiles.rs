@@ -237,7 +237,15 @@ mod tests {
         for (i, byte) in f.data.iter_mut().enumerate() {
             *byte = i as u8;
         }
-        let tile = extract(&f, TileRect { x: 1, y: 0, w: 2, h: 2 });
+        let tile = extract(
+            &f,
+            TileRect {
+                x: 1,
+                y: 0,
+                w: 2,
+                h: 2,
+            },
+        );
         assert_eq!(tile, vec![3, 4, 5, 6, 7, 8, 12, 13, 14, 15, 16, 17]);
     }
 
@@ -245,8 +253,18 @@ mod tests {
     fn tiles_payload_matches_the_contract_layout() {
         let f = frame(128, 64, 100);
         let rects = vec![
-            TileRect { x: 0, y: 0, w: 64, h: 64 },
-            TileRect { x: 64, y: 0, w: 64, h: 64 },
+            TileRect {
+                x: 0,
+                y: 0,
+                w: 64,
+                h: 64,
+            },
+            TileRect {
+                x: 64,
+                y: 0,
+                w: 64,
+                h: 64,
+            },
         ];
         let payloads = tiles_payloads(&f, &rects, 50, MAX_PUBLISH_BYTES).unwrap();
         assert_eq!(payloads.len(), 1);

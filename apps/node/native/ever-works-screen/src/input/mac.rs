@@ -19,7 +19,12 @@ struct CGPoint {
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
     fn CGPreflightPostEventAccess() -> bool;
-    fn CGEventCreateMouseEvent(source: *const c_void, kind: u32, point: CGPoint, button: u32) -> *mut c_void;
+    fn CGEventCreateMouseEvent(
+        source: *const c_void,
+        kind: u32,
+        point: CGPoint,
+        button: u32,
+    ) -> *mut c_void;
     fn CGEventCreateKeyboardEvent(source: *const c_void, keycode: u16, down: bool) -> *mut c_void;
     fn CGEventCreateScrollWheelEvent2(
         source: *const c_void,
@@ -70,7 +75,10 @@ pub fn open() -> Result<Box<dyn Injector>, &'static str> {
     if !unsafe { CGPreflightPostEventAccess() } {
         return Err("permission-accessibility");
     }
-    Ok(Box::new(QuartzInjector { at: CGPoint { x: 0.0, y: 0.0 }, held: None }))
+    Ok(Box::new(QuartzInjector {
+        at: CGPoint { x: 0.0, y: 0.0 },
+        held: None,
+    }))
 }
 
 fn post(event: *mut c_void) -> Result<(), String> {
@@ -114,12 +122,16 @@ impl Injector for QuartzInjector {
             (Button::Middle, false) => OTHER_UP,
         };
         self.held = if down { Some(button) } else { None };
-        post(unsafe { CGEventCreateMouseEvent(std::ptr::null(), kind, self.at, button_number(button)) })
+        post(unsafe {
+            CGEventCreateMouseEvent(std::ptr::null(), kind, self.at, button_number(button))
+        })
     }
 
     fn scroll(&mut self, dx: i32, dy: i32) -> Result<(), String> {
         // Pixel units; up is positive on macOS, down is positive in a browser.
-        post(unsafe { CGEventCreateScrollWheelEvent2(std::ptr::null(), SCROLL_UNIT_PIXEL, 2, -dy, -dx, 0) })
+        post(unsafe {
+            CGEventCreateScrollWheelEvent2(std::ptr::null(), SCROLL_UNIT_PIXEL, 2, -dy, -dx, 0)
+        })
     }
 
     fn key(&mut self, code: &str, down: bool) -> Result<(), String> {
