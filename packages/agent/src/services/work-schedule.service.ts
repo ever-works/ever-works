@@ -32,6 +32,7 @@ import type { ScheduleRunOutcome } from './types/trigger-context.types';
 import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
 import { supportsWorkSourceSync } from '@src/import/source-sync-support';
 import { assertNotRepositoryWork } from '@src/works/repository-work-guard';
+import { assertNotAppWork } from '@src/works/app-work-guard';
 
 type WorkScheduleReadiness = {
     featureEnabled: boolean;
@@ -109,6 +110,8 @@ export class WorkScheduleService {
         // schedule page; this is the API / MCP boundary
         // (`PUT /works/:id/schedule`, `update_schedule`).
         assertNotRepositoryWork(work, 'scheduling updates');
+        // APW-01 T10 (lane aw-safety) — content updates never run against application code.
+        assertNotAppWork(work, 'scheduling updates');
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const existing = await this.scheduleRepository.findByWorkId(work.id);
         const plan = await this.subscriptionService.resolvePlanForUser(user);
