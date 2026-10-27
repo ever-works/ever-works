@@ -130,6 +130,8 @@ export function buildScheduleControls(row: RowState): ScheduleControls {
         case 'work_schedule':
         case 'source_validation':
         case 'data_sync':
+        // APW-02 T53: the upstream sync is spec-owned; Sync now is on the Work's Upstream tab.
+        case 'app_upstream_sync':
         default: {
             runNow = 'managedOnWork';
             pause = 'managedOnWork';

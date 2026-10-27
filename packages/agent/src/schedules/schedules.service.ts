@@ -17,6 +17,7 @@ import { Agent, AgentStatus } from '../entities/agent.entity';
 import { Mission, MissionType, MissionStatus } from '../entities/mission.entity';
 import { WorkSchedule } from '../entities/work-schedule.entity';
 import { Work } from '../entities/work.entity';
+import { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
@@ -98,6 +99,8 @@ const SOURCE_TYPES: ScheduleSourceType[] = [
     'inbound_trigger',
     // Schedules on computers (FL-13): Command schedules, read through `NODE_SCHEDULE_PORT`.
     'node_schedule',
+    // APW-02 T53: the App Works' upstream sync (read only).
+    'app_upstream_sync',
 ];
 
 const STATUSES: ScheduleStatus[] = ['active', 'paused', 'disabled', 'error', 'ended'];
@@ -186,6 +189,13 @@ function decodeCursor(raw: string | null | undefined): PageCursor | null {
  * `getHealthSummary` read the very same projection rather than a second
  * list.
  */
+/**
+ * APW-02 T53 — the upstream sync's documented default (Mondays 06:00 UTC, FR-32), the cron a
+ * row shows when the sync run has not recorded the effective one yet. The same literal as
+ * `APP_UPSTREAM_SYNC_DEFAULT_SCHEDULE` in `@ever-works/contracts`.
+ */
+const APP_UPSTREAM_SYNC_DEFAULT_CRON = '0 6 * * 1';
+
 @Injectable()
 export class SchedulesService {
     private readonly logger = new Logger(SchedulesService.name);
@@ -221,6 +231,11 @@ export class SchedulesService {
         @Optional()
         @InjectRepository(FleetNode)
         private readonly fleetNodeRepo?: Repository<FleetNode>,
+        // APW-02 T53 — the App Works' upstream sync rows. Appended LAST + @Optional():
+        // unbound, the source is empty and the other eight are untouched.
+        @Optional()
+        @InjectRepository(WorkUpstreamState)
+        private readonly upstreamStateRepo?: Repository<WorkUpstreamState>,
     ) {}
 
     async getSchedules(
@@ -431,6 +446,7 @@ export class SchedulesService {
             dataSync,
             triggers,
             nodeSchedules,
+            upstreamSyncs,
         ] = await Promise.all([
             this.recurringTasks(scope, now, degraded, mode),
             this.agentHeartbeats(scope, degraded, mode),
@@ -440,6 +456,7 @@ export class SchedulesService {
             this.dataSync(scope, now, degraded, mode),
             this.inboundTriggers(scope, degraded, mode),
             this.nodeSchedules(scope, degraded),
+            this.appUpstreamSyncs(scope, degraded, mode),
         ]);
 
         const rows = [
@@ -451,6 +468,7 @@ export class SchedulesService {
             ...dataSync,
             ...triggers,
             ...nodeSchedules,
+            ...upstreamSyncs,
         ];
         for (const row of rows) {
             const health = evaluateScheduleHealth({ ...row.facts, now });
@@ -1175,6 +1193,86 @@ export class SchedulesService {
             });
         } catch (error) {
             this.warn('node_schedule', error, degraded);
+            return [];
+        }
+    }
+
+    /**
+     * APW-02 T53 (FR-32, ACC-E2E-05) — one read-only row per App Work whose upstream sync is
+     * scheduled (`nextSyncAt` set) or paused (archived / unreachable upstream, a missing Work
+     * Repository). A link has no upstream sync (FR-44) and a Work whose readiness has not
+     * finished has no slot yet, so neither has a row. The cron is the effective one the sync
+     * run records (`syncSchedule`), or the documented default when none was recorded — the
+     * same value the next slot was computed from. Its own try/catch, like every source: an
+     * unreadable upstream table degrades to an empty slice.
+     */
+    private async appUpstreamSyncs(
+        scope: ScheduleScope,
+        degraded: ScheduleSourceType[],
+        mode: SourceReadMode,
+    ): Promise<ProjectedRow[]> {
+        if (!this.upstreamStateRepo) return [];
+        try {
+            const where: FindOptionsWhere<Work> = {
+                ...this.scopeWhere<Work>(scope),
+                kind: 'app',
+            } as FindOptionsWhere<Work>;
+            const works = await this.readSource(mode, (batch) =>
+                this.workRepo.find(this.findOptions(where, batch)),
+            );
+            if (works.length === 0) return [];
+            const byId = new Map(works.map((work) => [work.id, work]));
+            const states: WorkUpstreamState[] = [];
+            for (const ids of chunked([...byId.keys()], MAX_PER_SOURCE)) {
+                const rows = await this.upstreamStateRepo.find({ where: { workId: In(ids) } });
+                states.push(...(rows ?? []));
+            }
+
+            const out: ProjectedRow[] = [];
+            for (const state of states) {
+                const work = byId.get(state.workId);
+                if (!work || state.relation === 'link') continue;
+                const paused =
+                    state.upstreamStatus === 'archived' ||
+                    state.upstreamStatus === 'unavailable' ||
+                    state.dataRepositoryStatus === 'missing' ||
+                    state.lastSyncResult === 'paused';
+                const nextRunAt = toIso(state.nextSyncAt);
+                if (!paused && !nextRunAt) continue;
+                const cron = state.syncSchedule || APP_UPSTREAM_SYNC_DEFAULT_CRON;
+                const view: ScheduleView = {
+                    id: `app_upstream_sync:${work.id}`,
+                    sourceType: 'app_upstream_sync',
+                    ownerType: 'app_work',
+                    ownerId: work.id,
+                    ownerName: work.name,
+                    ownerLink: `/works/${work.id}/upstream`,
+                    cadenceRaw: cron,
+                    cadenceHuman: describeCron(cron),
+                    nextRunAt: paused ? null : nextRunAt,
+                    lastRunAt: toIso(state.syncFinishedAt),
+                    lastRunStatus: state.lastSyncResult ?? null,
+                    status: paused ? 'paused' : 'active',
+                    enabled: !paused,
+                    agentId: null,
+                    agentName: null,
+                    pausedAt: null,
+                    nextRunReasonKey: paused ? 'paused' : null,
+                };
+                out.push({
+                    view,
+                    facts: {
+                        sourceType: 'app_upstream_sync',
+                        cadenceKind: 'cron',
+                        cadence: cron,
+                        paused,
+                        ownerArchived: work.status === 'archived',
+                    },
+                });
+            }
+            return out;
+        } catch (error) {
+            this.warn('app_upstream_sync', error, degraded);
             return [];
         }
     }

@@ -80,6 +80,7 @@ function pageOf(names: string[], nextCursor: string | null = null): SchedulePage
             data_sync: 0,
             inbound_trigger: names.length,
             node_schedule: 0,
+            app_upstream_sync: 0,
         },
         // The PRE-filter breakdown the source chips are built from: it stays
         // complete while a filter narrows `countsBySourceType`.
@@ -92,6 +93,7 @@ function pageOf(names: string[], nextCursor: string | null = null): SchedulePage
             data_sync: 0,
             inbound_trigger: names.length,
             node_schedule: 0,
+            app_upstream_sync: 0,
         },
         countsByStatus: { active: names.length, paused: 0, disabled: 0, error: 0, ended: 0 },
         healthCounts: { ok: names.length, neverRuns: 0 },

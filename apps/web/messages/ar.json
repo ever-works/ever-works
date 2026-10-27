@@ -2517,7 +2517,8 @@
                 "missionTick": "نبضة Mission",
                 "sourceValidation": "التحقق من المصدر",
                 "dataSync": "مزامنة البيانات",
-                "inboundTrigger": "مشغّل وارد"
+                "inboundTrigger": "مشغّل وارد",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "نشط",
@@ -4395,7 +4396,8 @@
             "more": "+{n} إضافية",
             "source": {
                 "work": "عمل",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {

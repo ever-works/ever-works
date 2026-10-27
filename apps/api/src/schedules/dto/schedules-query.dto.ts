@@ -12,9 +12,11 @@ const SOURCE_TYPES = [
     'data_sync',
     'inbound_trigger',
     'node_schedule',
+    // APW-02 T53 — appended.
+    'app_upstream_sync',
 ] as const;
 
-const OWNER_TYPES = ['task', 'agent', 'work', 'mission', 'trigger', 'node'] as const;
+const OWNER_TYPES = ['task', 'agent', 'work', 'mission', 'trigger', 'node', 'app_work'] as const;
 
 /**
  * Query filters for `GET /api/schedules`. Validated by the global
