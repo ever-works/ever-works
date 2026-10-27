@@ -312,8 +312,17 @@ export function sanitizeFleetLogLine(value: unknown): FleetLogLine | null {
 	if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
 	const record = value as Record<string, unknown>;
 	if (typeof record.text !== 'string') return null;
-	const ts = typeof record.ts === 'string' && record.ts.length <= 64 && !Number.isNaN(Date.parse(record.ts)) ? record.ts : null;
-	const src = typeof record.src === 'number' && Number.isInteger(record.src) && record.src >= 0 && record.src < FLEET_LOGS_MAX_MERGED_SOURCES ? record.src : 0;
+	const ts =
+		typeof record.ts === 'string' && record.ts.length <= 64 && !Number.isNaN(Date.parse(record.ts))
+			? record.ts
+			: null;
+	const src =
+		typeof record.src === 'number' &&
+		Number.isInteger(record.src) &&
+		record.src >= 0 &&
+		record.src < FLEET_LOGS_MAX_MERGED_SOURCES
+			? record.src
+			: 0;
 	const redactions =
 		typeof record.redactions === 'number' && Number.isInteger(record.redactions) && record.redactions >= 0
 			? Math.min(record.redactions, 10_000)
@@ -413,12 +422,14 @@ const NEGATED =
 const STRUCTURED_LEVEL = /\b(?:level|lvl|severity|loglevel)["']?\s*[:=]\s*["']?([A-Za-z]+)/i;
 
 /** `[ERROR]`, `<warn>`, `(Fatal)`. */
-const BRACKETED_LEVEL = /[[<(]\s*(emerg|alert|crit|critical|fatal|panic|error|err|warn|warning|notice|info|debug|trace)\s*[\]>)]/i;
+const BRACKETED_LEVEL =
+	/[[<(]\s*(emerg|alert|crit|critical|fatal|panic|error|err|warn|warning|notice|info|debug|trace)\s*[\]>)]/i;
 
 /** An upper-case level word standing alone: ` ERROR `, `WARN:`. */
 const SHOUTED_LEVEL = /(?:^|[\s|])(FATAL|PANIC|CRITICAL|CRIT|ERROR|ERR|WARNING|WARN)(?=$|[\s:|\]])/;
 
-const ERROR_WORDS = /\b(?:error|errors|fatal|failed|failure|exception|panic|traceback|segfault|segmentation fault|critical|denied|refused|timed out|unreachable)\b/i;
+const ERROR_WORDS =
+	/\b(?:error|errors|fatal|failed|failure|exception|panic|traceback|segfault|segmentation fault|critical|denied|refused|timed out|unreachable)\b/i;
 
 const WARNING_WORDS = /\b(?:warn|warning|warnings|deprecated|deprecation|retrying|retry)\b/i;
 

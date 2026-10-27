@@ -64,16 +64,26 @@ export class FleetScheduleLinkAdapter implements FleetScheduleNodePort {
         params: FleetScheduleSyncParams,
         caller: FleetCommandPortCaller,
     ): Promise<FleetScheduleSyncResult> {
-        const result = await this.call(nodeId, 'schedule.sync', params as unknown as Record<string, unknown>, caller, {
-            stateChanging: true,
-            timeoutMs: FLEET_SCHEDULE_SYNC_TIMEOUT_MS,
-        });
+        const result = await this.call(
+            nodeId,
+            'schedule.sync',
+            params as unknown as Record<string, unknown>,
+            caller,
+            {
+                stateChanging: true,
+                timeoutMs: FLEET_SCHEDULE_SYNC_TIMEOUT_MS,
+            },
+        );
         const parsed = parseFleetScheduleSyncResult(result);
         if (!parsed) throw unreadable('schedule.sync');
         return parsed;
     }
 
-    async runs(nodeId: string, since: string | null, caller: FleetCommandPortCaller): Promise<FleetScheduleRunsResult> {
+    async runs(
+        nodeId: string,
+        since: string | null,
+        caller: FleetCommandPortCaller,
+    ): Promise<FleetScheduleRunsResult> {
         const result = await this.call(nodeId, 'schedule.runs', { since }, caller, {
             stateChanging: false,
             timeoutMs: FLEET_SCHEDULE_RUNS_TIMEOUT_MS,
@@ -94,7 +104,9 @@ export class FleetScheduleLinkAdapter implements FleetScheduleNodePort {
             target: params.id,
         });
         const record =
-            typeof result === 'object' && result !== null ? (result as Record<string, unknown>) : {};
+            typeof result === 'object' && result !== null
+                ? (result as Record<string, unknown>)
+                : {};
         return {
             runId: typeof record.runId === 'string' ? record.runId : params.runId,
             startedAt:
@@ -195,6 +207,9 @@ function toLinkCaller(caller: FleetCommandPortCaller): FleetLinkCaller {
 
 function unreadable(verb: string): FleetCommandException {
     return new FleetCommandException(
-        makeFleetLinkError('operation_failed', `the computer answered ${verb} in a way this platform does not understand`),
+        makeFleetLinkError(
+            'operation_failed',
+            `the computer answered ${verb} in a way this platform does not understand`,
+        ),
     );
 }

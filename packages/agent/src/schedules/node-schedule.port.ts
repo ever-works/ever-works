@@ -14,7 +14,10 @@ import type { FleetScheduleView } from '@ever-works/contracts';
  */
 export interface NodeScheduleSource {
     /** The person's Command schedules (not deleted), optionally on one computer. */
-    listForUser(actor: { userId: string }, options?: { nodeId?: string }): Promise<FleetScheduleView[]>;
+    listForUser(
+        actor: { userId: string },
+        options?: { nodeId?: string },
+    ): Promise<FleetScheduleView[]>;
 }
 
 export interface NodeScheduleControl {

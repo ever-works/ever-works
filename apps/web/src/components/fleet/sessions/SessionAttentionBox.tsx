@@ -43,9 +43,10 @@ export function SessionAttentionBox({
     const t = useTranslations('fleet.sessions.attention');
     const [busy, setBusy] = useState(false);
     const [text, setText] = useState('');
-    const [problem, setProblem] = useState<{ key: 'alreadyAnswered' | 'unreachable' | 'killSwitch' | 'other'; hint: string | null } | null>(
-        null,
-    );
+    const [problem, setProblem] = useState<{
+        key: 'alreadyAnswered' | 'unreachable' | 'killSwitch' | 'other';
+        hint: string | null;
+    } | null>(null);
     const lastAnswer = useRef<{ optionId?: string; text?: string } | null>(null);
     const disabled = busy || killSwitchOn || problem?.key === 'alreadyAnswered';
     const permission = attention.reason === 'permission';
@@ -122,9 +123,14 @@ export function SessionAttentionBox({
         <div
             role="group"
             aria-label={attention.prompt || t('fallbackLabel')}
-            className={cn('space-y-2', variant === 'detail' && 'rounded-lg border border-warning/50 bg-warning/10 p-3')}
+            className={cn(
+                'space-y-2',
+                variant === 'detail' && 'rounded-lg border border-warning/50 bg-warning/10 p-3',
+            )}
             onKeyDown={onKeyDown}
-            data-testid={variant === 'detail' ? 'fleet-session-prompt-card' : 'fleet-session-attention-box'}
+            data-testid={
+                variant === 'detail' ? 'fleet-session-prompt-card' : 'fleet-session-attention-box'
+            }
             data-reason={attention.reason}
         >
             {variant === 'detail' && (
@@ -146,10 +152,14 @@ export function SessionAttentionBox({
                     </Button>
                 ))}
                 {variant === 'detail' && permission && deny && (
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('escDeny')}</span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('escDeny')}
+                    </span>
                 )}
                 {variant === 'detail' && !permission && (
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('escKeep')}</span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('escKeep')}
+                    </span>
                 )}
             </div>
             {attention.allowsText && (
@@ -178,7 +188,11 @@ export function SessionAttentionBox({
             )}
             {killSwitchOn && <p className="text-xs text-danger">{t('killSwitch')}</p>}
             {problem && (
-                <p role="status" className="flex flex-wrap items-center gap-2 text-xs text-danger" data-testid="fleet-session-answer-problem">
+                <p
+                    role="status"
+                    className="flex flex-wrap items-center gap-2 text-xs text-danger"
+                    data-testid="fleet-session-answer-problem"
+                >
                     <span>
                         {problem.key === 'alreadyAnswered'
                             ? t('alreadyAnswered')
@@ -189,7 +203,11 @@ export function SessionAttentionBox({
                                 : (problem.hint ?? t('failed'))}
                     </span>
                     {problem.key === 'unreachable' && lastAnswer.current && (
-                        <Button size="sm" variant="ghost" onClick={() => void send(lastAnswer.current ?? {})}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void send(lastAnswer.current ?? {})}
+                        >
                             {t('retry')}
                         </Button>
                     )}

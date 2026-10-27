@@ -32,42 +32,64 @@ export class FleetVirtualProposalListener {
         if (event.decidedVia !== 'user' || !event.decidedById) return;
         const payload = (event.payload ?? {}) as Record<string, unknown>;
         if (payload.kind !== FLEET_VIRTUAL_ACTION_PROPOSAL_KIND) return;
-        if (payload.agentId !== event.agentId || typeof payload.hostNodeId !== 'string' || !payload.hostNodeId) {
-            this.logger.warn(`Approved virtual-computer act ${event.proposalId} names another Agent or no host; not run`);
+        if (
+            payload.agentId !== event.agentId ||
+            typeof payload.hostNodeId !== 'string' ||
+            !payload.hostNodeId
+        ) {
+            this.logger.warn(
+                `Approved virtual-computer act ${event.proposalId} names another Agent or no host; not run`,
+            );
             return;
         }
         const args = (payload.args ?? {}) as Record<string, unknown>;
-        const caller = { kind: 'agent' as const, agentId: event.agentId, ownerUserId: event.userId };
+        const caller = {
+            kind: 'agent' as const,
+            agentId: event.agentId,
+            ownerUserId: event.userId,
+        };
         try {
             if (payload.verb === 'create') {
                 if (!isFleetVirtualName(args.name) || !isFleetVirtualSystemId(args.systemId)) {
-                    this.logger.warn(`Approved virtual-computer create ${event.proposalId} is invalid; not run`);
+                    this.logger.warn(
+                        `Approved virtual-computer create ${event.proposalId} is invalid; not run`,
+                    );
                     return;
                 }
                 await this.virtual.create(caller, payload.hostNodeId, {
                     name: args.name,
                     systemId: args.systemId,
                     ...(isFleetVirtualCpus(args.cpus) ? { cpus: args.cpus } : {}),
-                    ...(isFleetVirtualMemoryGiB(args.memoryGiB) ? { memoryGiB: args.memoryGiB } : {}),
+                    ...(isFleetVirtualMemoryGiB(args.memoryGiB)
+                        ? { memoryGiB: args.memoryGiB }
+                        : {}),
                     ...(isFleetVirtualDiskGiB(args.diskGiB) ? { diskGiB: args.diskGiB } : {}),
                     fields: { confirm: true },
                 });
                 return;
             }
             if (typeof payload.childNodeId !== 'string' || !payload.childNodeId) {
-                this.logger.warn(`Approved virtual-computer act ${event.proposalId} names no virtual computer; not run`);
+                this.logger.warn(
+                    `Approved virtual-computer act ${event.proposalId} names no virtual computer; not run`,
+                );
                 return;
             }
             if (payload.verb === 'stop') {
-                await this.virtual.power(caller, payload.hostNodeId, payload.childNodeId, 'stop', { confirm: true });
+                await this.virtual.power(caller, payload.hostNodeId, payload.childNodeId, 'stop', {
+                    confirm: true,
+                });
                 return;
             }
             if (payload.verb === 'destroy') {
                 if (!isFleetVirtualName(args.name)) {
-                    this.logger.warn(`Approved virtual-computer destroy ${event.proposalId} has no name; not run`);
+                    this.logger.warn(
+                        `Approved virtual-computer destroy ${event.proposalId} has no name; not run`,
+                    );
                     return;
                 }
-                await this.virtual.destroy(caller, payload.hostNodeId, payload.childNodeId, { confirmName: args.name });
+                await this.virtual.destroy(caller, payload.hostNodeId, payload.childNodeId, {
+                    confirmName: args.name,
+                });
             }
         } catch (error) {
             this.logger.warn(

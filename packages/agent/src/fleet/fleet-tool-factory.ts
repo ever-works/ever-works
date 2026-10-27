@@ -12,7 +12,11 @@ import {
 } from '@ever-works/contracts';
 import type { TaskToolDescriptor } from '../tasks-domain/agent-task-tools';
 import type { FleetService } from './fleet.service';
-import type { FleetOperationsToolPort, FleetStatusReaderPort, FleetWakeToolPort } from './fleet-status';
+import type {
+    FleetOperationsToolPort,
+    FleetStatusReaderPort,
+    FleetWakeToolPort,
+} from './fleet-status';
 import { FLEET_NODES_WAKE_TOOL } from './agent-fleet-health-tools';
 
 /**
@@ -61,11 +65,16 @@ function codeFromMessage(message: string): FleetLinkErrorCode {
     const text = message.toLowerCase();
     if (text.includes('not found') || text.includes('no such')) return 'not_found';
     if (text.includes('kill switch') || text.includes('stopped')) return 'kill_switch';
-    if (text.includes('consent') || text.includes('--manage') || text.includes('--work')) return 'consent_missing';
+    if (text.includes('consent') || text.includes('--manage') || text.includes('--work'))
+        return 'consent_missing';
     if (text.includes('not allowed') || text.includes('forbidden') || text.includes('permission')) {
         return 'permission_denied';
     }
-    if (text.includes('offline') || text.includes('unreachable') || text.includes('not connected')) {
+    if (
+        text.includes('offline') ||
+        text.includes('unreachable') ||
+        text.includes('not connected')
+    ) {
         return 'unreachable';
     }
     if (text.includes('invalid') || text.includes('must be')) return 'invalid';
@@ -88,7 +97,9 @@ export function normalizeFleetToolReply(reply: unknown): unknown {
 /** A throw from a family service as the typed envelope (an `HttpException` body, else `internal`). */
 export function fleetToolErrorFromThrow(err: unknown): { error: FleetToolErrorBody } {
     const response = (err as { getResponse?: () => unknown } | null)?.getResponse?.();
-    const envelope = (response as { error?: { code?: unknown; hint?: unknown; details?: unknown } } | null)?.error;
+    const envelope = (
+        response as { error?: { code?: unknown; hint?: unknown; details?: unknown } } | null
+    )?.error;
     if (envelope && typeof envelope.code === 'string') {
         const body: FleetToolErrorBody = {
             code: envelope.code as FleetLinkErrorCode,
@@ -102,9 +113,11 @@ export function fleetToolErrorFromThrow(err: unknown): { error: FleetToolErrorBo
     const status = (err as { getStatus?: () => number } | null)?.getStatus?.();
     const message = err instanceof Error ? err.message : String(err);
     if (status === 404) return { error: { code: 'not_found', hint: 'no such computer' } };
-    if (status === 403) return { error: { code: 'permission_denied', hint: message.slice(0, 300) } };
+    if (status === 403)
+        return { error: { code: 'permission_denied', hint: message.slice(0, 300) } };
     if (status === 400) return { error: { code: 'invalid', hint: message.slice(0, 300) } };
-    if (status === 423) return { error: { code: 'kill_switch', hint: 'clear it under Settings → Fleet' } };
+    if (status === 423)
+        return { error: { code: 'kill_switch', hint: 'clear it under Settings → Fleet' } };
     return { error: { code: codeFromMessage(message), hint: message.slice(0, 300) } };
 }
 
@@ -187,16 +200,29 @@ export function buildFleetCoreTools(args: BuildFleetCoreToolsArgs): TaskToolDesc
         parameters: {
             type: 'object',
             properties: {
-                kind: { type: 'string', description: 'Optional kind filter: desktop-node, node or k8s.' },
-                status: { type: 'string', description: 'Optional status filter: enrolling, online, offline or disabled.' },
-                scope: { type: 'string', description: 'own (only my computers) or visible (default: also shared ones).' },
-                limit: { type: 'integer', description: 'Max computers (default 50, capped at 100).' },
+                kind: {
+                    type: 'string',
+                    description: 'Optional kind filter: desktop-node, node or k8s.',
+                },
+                status: {
+                    type: 'string',
+                    description: 'Optional status filter: enrolling, online, offline or disabled.',
+                },
+                scope: {
+                    type: 'string',
+                    description: 'own (only my computers) or visible (default: also shared ones).',
+                },
+                limit: {
+                    type: 'integer',
+                    description: 'Max computers (default 50, capped at 100).',
+                },
             },
             required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as FleetNodesListArgs;
-            if (a.kind !== undefined && !NODE_KINDS.includes(a.kind)) return invalid('kind', 'kind is desktop-node, node or k8s');
+            if (a.kind !== undefined && !NODE_KINDS.includes(a.kind))
+                return invalid('kind', 'kind is desktop-node, node or k8s');
             if (a.status !== undefined && !NODE_STATUSES.includes(a.status)) {
                 return invalid('status', 'status is enrolling, online, offline or disabled');
             }
@@ -205,7 +231,8 @@ export function buildFleetCoreTools(args: BuildFleetCoreToolsArgs): TaskToolDesc
             }
             const limit = Math.min(Math.max(Number(a.limit) || 50, 1), 100);
             let nodes = await args.service.listVisibleForUser(args.userId);
-            if (a.scope === 'own') nodes = nodes.filter((node) => (node.viewerRole ?? 'owner') === 'owner');
+            if (a.scope === 'own')
+                nodes = nodes.filter((node) => (node.viewerRole ?? 'owner') === 'owner');
             if (a.kind) nodes = nodes.filter((node) => node.kind === a.kind);
             if (a.status) nodes = nodes.filter((node) => node.status === a.status);
             return { nodes: nodes.slice(0, limit), total: nodes.length };
@@ -219,13 +246,17 @@ export function buildFleetCoreTools(args: BuildFleetCoreToolsArgs): TaskToolDesc
         parameters: {
             type: 'object',
             properties: {
-                nodeId: { type: 'string', description: 'The computer (its id, from fleet_nodes_list or fleet_status).' },
+                nodeId: {
+                    type: 'string',
+                    description: 'The computer (its id, from fleet_nodes_list or fleet_status).',
+                },
             },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
-            if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId)) return invalid('nodeId', 'nodeId must be a computer id');
+            if (typeof a.nodeId !== 'string' || !UUID.test(a.nodeId))
+                return invalid('nodeId', 'nodeId must be a computer id');
             const { view, role } = await args.service.getVisibleForUser(args.userId, a.nodeId);
             return { node: view, role };
         },
@@ -236,15 +267,24 @@ export function buildFleetCoreTools(args: BuildFleetCoreToolsArgs): TaskToolDesc
         out.push({
             name: 'fleet_operations_get',
             description:
-                'A long operation on one of the user\'s computers (started by a tool that answered with an operationId): its state — running, done, failed, cancelled or interrupted — progress, and the result or the error. An interrupted operation never reads done. Read-only; poll it every few seconds while it is running.',
+                "A long operation on one of the user's computers (started by a tool that answered with an operationId): its state — running, done, failed, cancelled or interrupted — progress, and the result or the error. An interrupted operation never reads done. Read-only; poll it every few seconds while it is running.",
             parameters: {
                 type: 'object',
-                properties: { operationId: { type: 'string', description: 'The operation id a tool answered with.' } },
+                properties: {
+                    operationId: {
+                        type: 'string',
+                        description: 'The operation id a tool answered with.',
+                    },
+                },
                 required: ['operationId'],
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { operationId?: unknown };
-                if (typeof a.operationId !== 'string' || a.operationId.length === 0 || a.operationId.length > 100) {
+                if (
+                    typeof a.operationId !== 'string' ||
+                    a.operationId.length === 0 ||
+                    a.operationId.length > 100
+                ) {
                     return invalid('operationId', 'operationId is the id a tool answered with');
                 }
                 const view = operations.get(a.operationId, args.userId);
@@ -259,18 +299,31 @@ export function buildFleetCoreTools(args: BuildFleetCoreToolsArgs): TaskToolDesc
             parameters: {
                 type: 'object',
                 properties: {
-                    state: { type: 'string', description: 'Optional: running, done, failed, cancelled or interrupted.' },
+                    state: {
+                        type: 'string',
+                        description: 'Optional: running, done, failed, cancelled or interrupted.',
+                    },
                     nodeId: { type: 'string', description: 'Optional: only this computer.' },
-                    limit: { type: 'integer', description: 'Max operations (default 20, capped at 100).' },
+                    limit: {
+                        type: 'integer',
+                        description: 'Max operations (default 20, capped at 100).',
+                    },
                 },
                 required: [],
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { state?: string; nodeId?: string; limit?: number };
-                if (a.state !== undefined && !(FLEET_OPERATION_STATES as readonly string[]).includes(a.state)) {
-                    return invalid('state', 'state is running, done, failed, cancelled or interrupted');
+                if (
+                    a.state !== undefined &&
+                    !(FLEET_OPERATION_STATES as readonly string[]).includes(a.state)
+                ) {
+                    return invalid(
+                        'state',
+                        'state is running, done, failed, cancelled or interrupted',
+                    );
                 }
-                if (a.nodeId !== undefined && !UUID.test(a.nodeId)) return invalid('nodeId', 'nodeId must be a computer id');
+                if (a.nodeId !== undefined && !UUID.test(a.nodeId))
+                    return invalid('nodeId', 'nodeId must be a computer id');
                 const limit = Math.min(Math.max(Number(a.limit) || 20, 1), 100);
                 const list = operations.listForUser(args.userId, {
                     ...(a.state ? { state: a.state as FleetOperationState } : {}),
@@ -319,7 +372,9 @@ export function buildFleetActTools(args: BuildFleetActToolsArgs): TaskToolDescri
             description: FLEET_NODES_WAKE_TOOL.description,
             parameters: {
                 type: 'object',
-                properties: { nodeId: { type: 'string', description: 'The computer to wake (its id).' } },
+                properties: {
+                    nodeId: { type: 'string', description: 'The computer to wake (its id).' },
+                },
                 required: ['nodeId'],
             },
             invoke: async (raw) => {
@@ -340,12 +395,18 @@ export function buildFleetActTools(args: BuildFleetActToolsArgs): TaskToolDescri
                 'Ask the computer to stop a long operation that is still running (an operationId a tool answered with). It then reads cancelled; one that already ended is returned as it is. Plain: no confirmation.',
             parameters: {
                 type: 'object',
-                properties: { operationId: { type: 'string', description: 'The operation to stop.' } },
+                properties: {
+                    operationId: { type: 'string', description: 'The operation to stop.' },
+                },
                 required: ['operationId'],
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { operationId?: unknown };
-                if (typeof a.operationId !== 'string' || a.operationId.length === 0 || a.operationId.length > 100) {
+                if (
+                    typeof a.operationId !== 'string' ||
+                    a.operationId.length === 0 ||
+                    a.operationId.length > 100
+                ) {
                     return invalid('operationId', 'operationId is the id a tool answered with');
                 }
                 return cancel(a.operationId, args.userId);

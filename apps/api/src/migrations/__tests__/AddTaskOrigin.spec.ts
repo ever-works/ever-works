@@ -15,8 +15,9 @@ describe('1795169100000-AddTaskOrigin', () => {
     let dataSource: DataSource;
     const migration = new AddTaskOrigin1795169100000();
 
-    const columns = async (): Promise<Array<{ name: string; notnull: number; dflt_value: string | null }>> =>
-        dataSource.query(`PRAGMA table_info("tasks")`);
+    const columns = async (): Promise<
+        Array<{ name: string; notnull: number; dflt_value: string | null }>
+    > => dataSource.query(`PRAGMA table_info("tasks")`);
 
     beforeEach(async () => {
         dataSource = new DataSource({
@@ -60,7 +61,9 @@ describe('1795169100000-AddTaskOrigin', () => {
         });
         await metadataSource.initialize();
         try {
-            const column = metadataSource.getMetadata(Task).columns.find((c) => c.databaseName === 'origin');
+            const column = metadataSource
+                .getMetadata(Task)
+                .columns.find((c) => c.databaseName === 'origin');
             expect(column?.isNullable).toBe(true);
             expect(String(column?.length)).toBe('32');
         } finally {

@@ -34,7 +34,10 @@ describe('the platform base URL (CodeQL #284)', () => {
 			fetchFn
 		});
 		await client.mint('c1', 'read');
-		expect(fetchFn).toHaveBeenCalledWith('https://api.ever.works/api/fleet/checkouts/c1/credential', expect.anything());
+		expect(fetchFn).toHaveBeenCalledWith(
+			'https://api.ever.works/api/fleet/checkouts/c1/credential',
+			expect.anything()
+		);
 	});
 });
 
@@ -84,13 +87,21 @@ describe('the operation-scoped checkout credential (FL-14 spec FR-17, ACC-FL14-1
 		};
 		await withCheckoutCredential(
 			client,
-			{ checkoutId: '11111111-1111-1111-1111-111111111111', access: 'read', remoteUrl: 'https://github.com/acme/api' },
+			{
+				checkoutId: '11111111-1111-1111-1111-111111111111',
+				access: 'read',
+				remoteUrl: 'https://github.com/acme/api'
+			},
 			async () => 'done'
 		);
 		await expect(
 			withCheckoutCredential(
 				client,
-				{ checkoutId: '11111111-1111-1111-1111-111111111111', access: 'read', remoteUrl: 'https://github.com/acme/web' },
+				{
+					checkoutId: '11111111-1111-1111-1111-111111111111',
+					access: 'read',
+					remoteUrl: 'https://github.com/acme/web'
+				},
 				async () => 'never'
 			)
 		).rejects.toBeInstanceOf(CheckoutCredentialError);

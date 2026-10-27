@@ -10,10 +10,13 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
 import { appEnvAPI } from '@/lib/api/app-env';
 import {
+    APP_ENV_IMPORT_MAX_BYTES,
     APP_ENV_ROUTE_UNAVAILABLE,
     type AppEnvActionResult,
+    type AppEnvImportPreviewView,
     type AppEnvListResponse,
     type AppEnvPatchResponse,
+    type AppEnvRotateView,
 } from '@/lib/api/app-env.types';
 
 /**
@@ -107,5 +110,85 @@ export async function updateAppEnvAction(
         return { success: true, data: await appEnvAPI.put(workId, parsed.data) };
     } catch (error) {
         return failure('save the App environment', error);
+    }
+}
+
+/* -------------------------------------------------------------------------- *
+ * Lane aw-ops (APW-07 T24/T28, 2026-10-27) — `.env` import and Rotate
+ * -------------------------------------------------------------------------- */
+
+const nameSchema = z.string().regex(new RegExp(APP_ENV_NAME_PATTERN));
+
+/** A paste the API may parse — a string within FR-28's 1 MiB; anything else is `invalidBody`. */
+function readPaste(dotenv: unknown): string | null {
+    if (typeof dotenv !== 'string') return null;
+    if (Buffer.byteLength(dotenv, 'utf8') > APP_ENV_IMPORT_MAX_BYTES) return null;
+    return dotenv;
+}
+
+/** What a pasted `.env` would change — per line, by name; nothing is stored, no value returns. */
+export async function previewAppEnvImportAction(
+    workId: string,
+    dotenv: string,
+): Promise<AppEnvActionResult<AppEnvImportPreviewView>> {
+    const user = await getAuthFromCookie();
+    if (!user) return unauthorized();
+    if (!workIdSchema.safeParse(workId).success) {
+        return { success: false, error: 'invalid work id', code: 'invalid_work_id' };
+    }
+    const paste = readPaste(dotenv);
+    if (paste === null) {
+        return { success: false, error: 'invalid paste', code: 'valuesTooLarge', httpStatus: 400 };
+    }
+    try {
+        return { success: true, data: await appEnvAPI.previewImport(workId, paste) };
+    } catch (error) {
+        return failure('preview the .env import', error);
+    }
+}
+
+/** Import a pasted `.env`: every valid declared line is stored; the answer names, never values. */
+export async function importAppEnvAction(
+    workId: string,
+    dotenv: string,
+): Promise<AppEnvActionResult<AppEnvPatchResponse>> {
+    const user = await getAuthFromCookie();
+    if (!user) return unauthorized();
+    if (!workIdSchema.safeParse(workId).success) {
+        return { success: false, error: 'invalid work id', code: 'invalid_work_id' };
+    }
+    const paste = readPaste(dotenv);
+    if (paste === null) {
+        return { success: false, error: 'invalid paste', code: 'valuesTooLarge', httpStatus: 400 };
+    }
+    try {
+        return { success: true, data: await appEnvAPI.importDotenv(workId, paste) };
+    } catch (error) {
+        return failure('import the .env', error);
+    }
+}
+
+/** **Rotate** one generated value — the typed name is the acknowledgement. */
+export async function rotateAppEnvAction(
+    workId: string,
+    name: string,
+    confirmName: string,
+): Promise<AppEnvActionResult<AppEnvRotateView>> {
+    const user = await getAuthFromCookie();
+    if (!user) return unauthorized();
+    if (!workIdSchema.safeParse(workId).success) {
+        return { success: false, error: 'invalid work id', code: 'invalid_work_id' };
+    }
+    if (
+        !nameSchema.safeParse(name).success ||
+        typeof confirmName !== 'string' ||
+        confirmName.length > 256
+    ) {
+        return { success: false, error: 'invalid name', code: 'invalidBody', httpStatus: 400 };
+    }
+    try {
+        return { success: true, data: await appEnvAPI.rotate(workId, name, confirmName) };
+    } catch (error) {
+        return failure('rotate the App env value', error);
     }
 }

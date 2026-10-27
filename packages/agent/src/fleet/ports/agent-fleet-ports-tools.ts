@@ -69,14 +69,16 @@ export function buildFleetPortsTools(args: {
                 watch: {
                     type: 'array',
                     items: { type: 'integer' },
-                    description: 'Optional ports to watch for: listed as waiting until a server starts on them.',
+                    description:
+                        'Optional ports to watch for: listed as waiting until a server starts on them.',
                 },
             },
             required: ['nodeId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as FleetPortsToolArgs;
-            if (typeof a.nodeId !== 'string' || a.nodeId.length === 0) return { error: 'nodeId is required' };
+            if (typeof a.nodeId !== 'string' || a.nodeId.length === 0)
+                return { error: 'nodeId is required' };
             try {
                 const list = await args.service.list(a.nodeId, actor, { watch: a.watch });
                 const groups = groupFleetPorts(list.ports);
@@ -107,14 +109,16 @@ export function buildFleetPortsTools(args: {
                 port: { type: 'integer', description: 'The listening port, 1–65535.' },
                 target: {
                     type: 'string',
-                    description: 'Optional: desktop or preview-profile. Default: the desktop when available.',
+                    description:
+                        'Optional: desktop or preview-profile. Default: the desktop when available.',
                 },
             },
             required: ['nodeId', 'port'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as FleetPortsOpenToolArgs;
-            if (typeof a.nodeId !== 'string' || a.nodeId.length === 0) return { error: 'nodeId is required' };
+            if (typeof a.nodeId !== 'string' || a.nodeId.length === 0)
+                return { error: 'nodeId is required' };
             const port = Number(a.port);
             if (!isFleetPortNumber(port)) return { error: 'port must be a number from 1 to 65535' };
             const target = isFleetPortOpenTarget(a.target) ? a.target : undefined;
@@ -129,7 +133,12 @@ export function buildFleetPortsTools(args: {
                     target ? { target } : {},
                 );
                 // Never hand the Agent a viewer token: the picture is for a person.
-                return { opened: true, target: result.target, url: result.url, endsAt: result.endsAt ?? null };
+                return {
+                    opened: true,
+                    target: result.target,
+                    url: result.url,
+                    endsAt: result.endsAt ?? null,
+                };
             } catch (error) {
                 return failure(error);
             }
@@ -152,9 +161,11 @@ export function buildFleetPortsTools(args: {
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { nodeId?: string; port?: number };
-                if (typeof a.nodeId !== 'string' || a.nodeId.length === 0) return { error: 'nodeId is required' };
+                if (typeof a.nodeId !== 'string' || a.nodeId.length === 0)
+                    return { error: 'nodeId is required' };
                 const port = Number(a.port);
-                if (!isFleetPortNumber(port)) return { error: 'port must be a number from 1 to 65535' };
+                if (!isFleetPortNumber(port))
+                    return { error: 'port must be a number from 1 to 65535' };
                 try {
                     const { tunnel } = await tunnels.open(a.nodeId, port, actor);
                     // Never a hand-off: an Agent is never given a way into the tunnel (spec U15).
@@ -162,17 +173,22 @@ export function buildFleetPortsTools(args: {
                         opened: true,
                         url: tunnel.url,
                         endsAt: tunnel.endsAt,
-                        forOwner: 'Your owner opens it from the Ports tab (Preview in my browser) — the link works only in their browser.',
+                        forOwner:
+                            'Your owner opens it from the Ports tab (Preview in my browser) — the link works only in their browser.',
                     };
                 } catch (error) {
                     return failure(error);
                 }
             },
-        } satisfies TaskToolDescriptor<{ nodeId?: string; port?: number }, Record<string, unknown>>);
+        } satisfies TaskToolDescriptor<
+            { nodeId?: string; port?: number },
+            Record<string, unknown>
+        >);
 
         out.push({
             name: 'fleet_ports_preview_close',
-            description: "Close the preview of a fleet computer's port that was opened for your owner.",
+            description:
+                "Close the preview of a fleet computer's port that was opened for your owner.",
             parameters: {
                 type: 'object',
                 properties: {
@@ -183,9 +199,11 @@ export function buildFleetPortsTools(args: {
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as { nodeId?: string; port?: number };
-                if (typeof a.nodeId !== 'string' || a.nodeId.length === 0) return { error: 'nodeId is required' };
+                if (typeof a.nodeId !== 'string' || a.nodeId.length === 0)
+                    return { error: 'nodeId is required' };
                 const port = Number(a.port);
-                if (!isFleetPortNumber(port)) return { error: 'port must be a number from 1 to 65535' };
+                if (!isFleetPortNumber(port))
+                    return { error: 'port must be a number from 1 to 65535' };
                 try {
                     await tunnels.closeForUser(a.nodeId, port, actor);
                     return { closed: true };
@@ -193,7 +211,10 @@ export function buildFleetPortsTools(args: {
                     return failure(error);
                 }
             },
-        } satisfies TaskToolDescriptor<{ nodeId?: string; port?: number }, Record<string, unknown>>);
+        } satisfies TaskToolDescriptor<
+            { nodeId?: string; port?: number },
+            Record<string, unknown>
+        >);
     }
 
     return out;

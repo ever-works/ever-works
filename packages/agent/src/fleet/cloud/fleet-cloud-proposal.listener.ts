@@ -34,11 +34,17 @@ export class FleetCloudProposalListener {
         const payload = (event.payload ?? {}) as Record<string, unknown>;
         if (payload.kind !== FLEET_CLOUD_ACTION_PROPOSAL_KIND) return;
         if (payload.agentId !== event.agentId) {
-            this.logger.warn(`Approved cloud-computer act ${event.proposalId} names another Agent; not run`);
+            this.logger.warn(
+                `Approved cloud-computer act ${event.proposalId} names another Agent; not run`,
+            );
             return;
         }
         const args = (payload.args ?? {}) as Record<string, unknown>;
-        const caller = { kind: 'agent' as const, agentId: event.agentId, ownerUserId: event.userId };
+        const caller = {
+            kind: 'agent' as const,
+            agentId: event.agentId,
+            ownerUserId: event.userId,
+        };
         try {
             if (payload.verb === 'create') {
                 if (
@@ -48,7 +54,9 @@ export class FleetCloudProposalListener {
                     typeof args.sizeId !== 'string' ||
                     typeof args.acknowledgedPriceCents !== 'number'
                 ) {
-                    this.logger.warn(`Approved cloud-computer create ${event.proposalId} is invalid; not run`);
+                    this.logger.warn(
+                        `Approved cloud-computer create ${event.proposalId} is invalid; not run`,
+                    );
                     return;
                 }
                 await this.cloud.create(caller, {
@@ -63,7 +71,9 @@ export class FleetCloudProposalListener {
                 return;
             }
             if (typeof payload.nodeId !== 'string' || !payload.nodeId) {
-                this.logger.warn(`Approved cloud-computer act ${event.proposalId} names no computer; not run`);
+                this.logger.warn(
+                    `Approved cloud-computer act ${event.proposalId} names no computer; not run`,
+                );
                 return;
             }
             if (payload.verb === 'power') {
@@ -73,15 +83,22 @@ export class FleetCloudProposalListener {
             }
             if (payload.verb === 'idle-policy') {
                 if (!isFleetCloudIdlePolicyMode(args.mode) || typeof args.afterHours !== 'number') {
-                    this.logger.warn(`Approved cloud-computer idle policy ${event.proposalId} is invalid; not run`);
+                    this.logger.warn(
+                        `Approved cloud-computer idle policy ${event.proposalId} is invalid; not run`,
+                    );
                     return;
                 }
-                await this.cloud.setIdlePolicy(caller, payload.nodeId, { mode: args.mode, afterHours: args.afterHours });
+                await this.cloud.setIdlePolicy(caller, payload.nodeId, {
+                    mode: args.mode,
+                    afterHours: args.afterHours,
+                });
                 return;
             }
             if (payload.verb === 'destroy') {
                 if (!isFleetCloudName(args.name)) {
-                    this.logger.warn(`Approved cloud-computer destroy ${event.proposalId} has no name; not run`);
+                    this.logger.warn(
+                        `Approved cloud-computer destroy ${event.proposalId} has no name; not run`,
+                    );
                     return;
                 }
                 await this.cloud.destroy(caller, payload.nodeId, { confirmName: args.name });

@@ -111,6 +111,13 @@ export interface RunnerHostDeps {
 	logger?: Logger;
 	/** This node's own name, for the sentences a refusal carries ("… on build-01"). */
 	nodeName: string;
+	/**
+	 * P3 (FR-27): whether this machine can run Docker-isolated runners — Linux with a
+	 * Docker daemon the node's user reaches. Absent: never.
+	 */
+	hasDocker?: () => boolean;
+	/** P3: `uid:gid` of the node's user, which a runner's container runs as. Absent / null: refused. */
+	uidGid?: () => string | null;
 }
 
 /** A runner step that failed: the message is the first line a person reads (spec U4–U6). */
@@ -135,7 +142,9 @@ export async function reportRunner(
 	try {
 		await deps.client().reportRunnerProgress(runnerId, job.id, value, job.leaseGeneration);
 	} catch (error) {
-		deps.logger?.warn(`runner ${runnerId}: progress not delivered (${error instanceof Error ? error.message : String(error)})`);
+		deps.logger?.warn(
+			`runner ${runnerId}: progress not delivered (${error instanceof Error ? error.message : String(error)})`
+		);
 	}
 }
 
@@ -183,7 +192,10 @@ export async function fetchRunnerToken(
 			if (error instanceof RunnerHostError) throw error;
 			const kindOf = (error as { kind?: unknown })?.kind;
 			if (kindOf === 'invalid-request') {
-				throw new RunnerHostError('GitHub already has a runner with this name for another machine; choose another name', 'invalid');
+				throw new RunnerHostError(
+					'GitHub already has a runner with this name for another machine; choose another name',
+					'invalid'
+				);
 			}
 			if (typeof kindOf !== 'string' || !RETRYABLE_TOKEN_FAILURES.has(kindOf) || deps.now() >= deadline) {
 				throw new RunnerHostError(

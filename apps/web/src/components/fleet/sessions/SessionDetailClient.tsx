@@ -103,10 +103,18 @@ export function SessionDetailClient({
     const [recordingBusy, setRecordingBusy] = useState(false);
     const toggleRecording = async () => {
         setRecordingBusy(true);
-        const result = await sessionsClient.setRecording(session.id, session.recordingState !== 'recording');
+        const result = await sessionsClient.setRecording(
+            session.id,
+            session.recordingState !== 'recording',
+        );
         setRecordingBusy(false);
         if (result.ok) setSession(result.data);
-        else toast.error(result.error.hint ? t('actions.failed', { hint: result.error.hint }) : t('actions.failedGeneric'));
+        else
+            toast.error(
+                result.error.hint
+                    ? t('actions.failed', { hint: result.error.hint })
+                    : t('actions.failedGeneric'),
+            );
     };
     const takeKeyboardRef = useRef<HTMLDivElement | null>(null);
 
@@ -141,13 +149,18 @@ export function SessionDetailClient({
     const acknowledgedRef = useRef<string | null>(null);
     useEffect(() => {
         const attention = session.attention;
-        if (!attention || !isSessionUnread(session) || acknowledgedRef.current === attention.key) return;
+        if (!attention || !isSessionUnread(session) || acknowledgedRef.current === attention.key)
+            return;
         acknowledgedRef.current = attention.key;
         void sessionsClient.acknowledge(session.id, attention.key).then((result) => {
-            if (result.ok) setSession((current) => ({ ...current, attention: result.data.attention ?? null }));
+            if (result.ok)
+                setSession((current) => ({ ...current, attention: result.data.attention ?? null }));
         });
     }, [session]);
-    const prompt = live && session.state === 'needs_you' && isAnswerable(session.attention) ? session.attention : null;
+    const prompt =
+        live && session.state === 'needs_you' && isAnswerable(session.attention)
+            ? session.attention
+            : null;
 
     useEffect(() => {
         if (!live) return;
@@ -164,7 +177,9 @@ export function SessionDetailClient({
     const release = () => takeKeyboardRef.current?.focus();
     const copyLink = async () => {
         try {
-            await navigator.clipboard.writeText(`${window.location.origin}${ROUTES.DASHBOARD_FLEET_SESSION(session.id)}`);
+            await navigator.clipboard.writeText(
+                `${window.location.origin}${ROUTES.DASHBOARD_FLEET_SESSION(session.id)}`,
+            );
             toast.success(t('actions.linkCopied'));
         } catch {
             toast.error(t('actions.failedGeneric'));
@@ -173,14 +188,23 @@ export function SessionDetailClient({
     const restart = async () => {
         const result = await sessionsClient.restart(session.id);
         if (!result.ok) {
-            toast.error(result.error.hint ? t('actions.failed', { hint: result.error.hint }) : t('actions.failedGeneric'));
+            toast.error(
+                result.error.hint
+                    ? t('actions.failed', { hint: result.error.hint })
+                    : t('actions.failedGeneric'),
+            );
             return;
         }
         router.push(ROUTES.DASHBOARD_FLEET_SESSION(result.data.id));
     };
 
     const shortcut = (id: string, key: string, run: () => void, enabled = true) => ({
-        options: { id: `fleet.session.${id}`, scope: 'fleet-session', priority: SHORTCUT_PRIORITY.screen, enabled },
+        options: {
+            id: `fleet.session.${id}`,
+            scope: 'fleet-session',
+            priority: SHORTCUT_PRIORITY.screen,
+            enabled,
+        },
         match: (event: KeyboardEvent) =>
             event.key.toLowerCase() === key && !event.ctrlKey && !event.metaKey && !event.altKey,
         run,
@@ -210,7 +234,11 @@ export function SessionDetailClient({
     const roleWords = attach.role === 'driver' ? t('detail.driving') : t('detail.watching');
 
     return (
-        <div className="w-full space-y-4" data-testid="fleet-session-page" data-state={session.state}>
+        <div
+            className="w-full space-y-4"
+            data-testid="fleet-session-page"
+            data-state={session.state}
+        >
             <SessionHeader
                 session={session}
                 nodeName={nodeName}
@@ -249,7 +277,9 @@ export function SessionDetailClient({
                                 ? {
                                       hint: tGit('detail.offline', {
                                           node: nodeName,
-                                          age: relativeTime(node.lastHeartbeatAt, now, locale) ?? '—',
+                                          age:
+                                              relativeTime(node.lastHeartbeatAt, now, locale) ??
+                                              '—',
                                       }),
                                   }
                                 : null
@@ -265,7 +295,10 @@ export function SessionDetailClient({
             </div>
 
             {waiting && (
-                <Strip icon={<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />} testId="fleet-session-waiting">
+                <Strip
+                    icon={<Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                    testId="fleet-session-waiting"
+                >
                     {t('detail.waiting', { node: nodeName })}
                 </Strip>
             )}
@@ -284,12 +317,18 @@ export function SessionDetailClient({
                 </Strip>
             )}
             {live && attach.state === 'reconnecting' && (
-                <Strip icon={<RotateCw className="w-4 h-4 animate-spin" aria-hidden="true" />} testId="fleet-session-reconnecting">
+                <Strip
+                    icon={<RotateCw className="w-4 h-4 animate-spin" aria-hidden="true" />}
+                    testId="fleet-session-reconnecting"
+                >
                     {t('detail.reconnecting', { node: nodeName })}
                 </Strip>
             )}
             {attach.heldLines > 0 && (
-                <Strip icon={<AlertTriangle className="w-4 h-4 text-warning" aria-hidden="true" />} testId="fleet-session-held">
+                <Strip
+                    icon={<AlertTriangle className="w-4 h-4 text-warning" aria-hidden="true" />}
+                    testId="fleet-session-held"
+                >
                     <span>{t('detail.heldInput', { count: attach.heldLines })}</span>
                     <Button size="sm" onClick={attach.sendHeld}>
                         {t('detail.sendHeld')}
@@ -300,20 +339,33 @@ export function SessionDetailClient({
                 </Strip>
             )}
             {attach.paused !== null && (
-                <Strip icon={<PauseCircle className="w-4 h-4 text-warning" aria-hidden="true" />} testId="fleet-session-kill-switch">
+                <Strip
+                    icon={<PauseCircle className="w-4 h-4 text-warning" aria-hidden="true" />}
+                    testId="fleet-session-kill-switch"
+                >
                     {attach.paused
                         ? t('detail.killSwitch', { reason: attach.paused })
                         : t('detail.killSwitchNoReason')}
                 </Strip>
             )}
             {attach.drainEndsAt !== null && live && (
-                <Strip icon={<Timer className="w-4 h-4 text-warning" aria-hidden="true" />} testId="fleet-session-drain">
+                <Strip
+                    icon={<Timer className="w-4 h-4 text-warning" aria-hidden="true" />}
+                    testId="fleet-session-drain"
+                >
                     {t('detail.drainWarning', { countdown: countdown(attach.drainEndsAt - nowMs) })}
                 </Strip>
             )}
-            {attach.slow && <Strip icon={<AlertTriangle className="w-4 h-4" aria-hidden="true" />}>{t('detail.slowViewer')}</Strip>}
+            {attach.slow && (
+                <Strip icon={<AlertTriangle className="w-4 h-4" aria-hidden="true" />}>
+                    {t('detail.slowViewer')}
+                </Strip>
+            )}
             {attach.state === 'refused' && (
-                <Strip icon={<AlertTriangle className="w-4 h-4 text-danger" aria-hidden="true" />} testId="fleet-session-refused">
+                <Strip
+                    icon={<AlertTriangle className="w-4 h-4 text-danger" aria-hidden="true" />}
+                    testId="fleet-session-refused"
+                >
                     <span>{attach.error?.hint ?? t('detail.refusedGeneric')}</span>
                     <Button size="sm" variant="secondary" onClick={attach.reconnect}>
                         {t('detail.reconnect')}
@@ -330,24 +382,43 @@ export function SessionDetailClient({
                         attach.sendResize(cols, rows);
                     }}
                     onRelease={release}
-                    ariaLabel={t('a11y.pane', { title: session.title, node: nodeName, role: roleWords })}
+                    ariaLabel={t('a11y.pane', {
+                        title: session.title,
+                        node: nodeName,
+                        role: roleWords,
+                    })}
                 />
             ) : (
-                <section aria-label={t('detail.lastScreen', { node: nodeName })} className="space-y-2" data-testid="fleet-session-last-screen">
+                <section
+                    aria-label={t('detail.lastScreen', { node: nodeName })}
+                    className="space-y-2"
+                    data-testid="fleet-session-last-screen"
+                >
                     {session.lastScreen ? (
                         <pre className="max-h-[60vh] overflow-auto rounded-md bg-[#0b0f19] p-3 font-mono text-xs leading-5 text-gray-100 whitespace-pre-wrap">
                             {session.lastScreen}
                         </pre>
                     ) : (
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('detail.noLastScreen')}</p>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('detail.noLastScreen')}
+                        </p>
                     )}
                     {!rewatch && (
-                        <Button size="sm" variant="secondary" onClick={() => setRewatch(true)} data-testid="fleet-session-rewatch">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setRewatch(true)}
+                            data-testid="fleet-session-rewatch"
+                        >
                             {t('detail.rewatch')}
                         </Button>
                     )}
                     {ended && (
-                        <p className="text-sm text-text dark:text-text-dark" data-testid="fleet-session-ended-line" data-reason={session.endedReason ?? ''}>
+                        <p
+                            className="text-sm text-text dark:text-text-dark"
+                            data-testid="fleet-session-ended-line"
+                            data-reason={session.endedReason ?? ''}
+                        >
                             {t(`detail.${ended.key}`, {
                                 time: endedAt ?? relativeTime(session.endedAt, now, locale) ?? '',
                                 node: nodeName,
@@ -358,7 +429,13 @@ export function SessionDetailClient({
                 </section>
             )}
 
-            {rewatch && <SessionReplayPlayer sessionId={session.id} title={session.title} nodeName={nodeName} />}
+            {rewatch && (
+                <SessionReplayPlayer
+                    sessionId={session.id}
+                    title={session.title}
+                    nodeName={nodeName}
+                />
+            )}
 
             {/* FL-05 P2 (FR-31): while it asks, the approval / question card replaces the composer. */}
             {prompt ? (
@@ -374,12 +451,18 @@ export function SessionDetailClient({
                 live &&
                 agentCli &&
                 attach.role === 'driver' && (
-                    <SessionComposer providerName={providerName} disabled={attach.state !== 'attached' || attach.paused !== null} onSend={attach.sendInput} />
+                    <SessionComposer
+                        providerName={providerName}
+                        disabled={attach.state !== 'attached' || attach.paused !== null}
+                        onSend={attach.sendInput}
+                    />
                 )
             )}
 
             {/* FL-06 (spec FR-22): the actions sent so far, below the terminal. */}
-            {session.provider !== 'shell' ? <SessionActionsLedger sessionId={session.id} refreshKey={ledgerKey} /> : null}
+            {session.provider !== 'shell' ? (
+                <SessionActionsLedger sessionId={session.id} refreshKey={ledgerKey} />
+            ) : null}
 
             <SessionFooter
                 presence={session.presence}
@@ -389,12 +472,19 @@ export function SessionDetailClient({
                 recordingState={session.recordingState}
                 bytesPerSecond={attach.bytesPerSecond}
                 nodeName={nodeName}
-                isolatedAgentName={session.kind === 'agent' ? (agentName ?? t('kinds.agent')) : null}
+                isolatedAgentName={
+                    session.kind === 'agent' ? (agentName ?? t('kinds.agent')) : null
+                }
                 recordingSlot={
                     live ? (
-                        <span className="inline-flex items-center gap-2" data-testid="fleet-session-recording">
+                        <span
+                            className="inline-flex items-center gap-2"
+                            data-testid="fleet-session-recording"
+                        >
                             <span>
-                                {session.recordingState === 'recording' ? `● ${t('detail.recording')}` : t('detail.notRecordingNow')}
+                                {session.recordingState === 'recording'
+                                    ? `● ${t('detail.recording')}`
+                                    : t('detail.notRecordingNow')}
                             </span>
                             <button
                                 type="button"
@@ -403,7 +493,9 @@ export function SessionDetailClient({
                                 className="underline hover:no-underline disabled:opacity-50"
                                 data-testid="fleet-session-recording-toggle"
                             >
-                                {session.recordingState === 'recording' ? t('detail.recordOff') : t('detail.recordOn')}
+                                {session.recordingState === 'recording'
+                                    ? t('detail.recordOff')
+                                    : t('detail.recordOn')}
                             </button>
                         </span>
                     ) : null
@@ -418,7 +510,12 @@ export function SessionDetailClient({
                 agentName={agentName}
                 onEnded={(view) => setSession(view)}
             />
-            <SessionRenameDialog open={renaming} onOpenChange={setRenaming} session={session} onRenamed={(view) => setSession((current) => ({ ...current, title: view.title }))} />
+            <SessionRenameDialog
+                open={renaming}
+                onOpenChange={setRenaming}
+                session={session}
+                onRenamed={(view) => setSession((current) => ({ ...current, title: view.title }))}
+            />
             <SessionShortcutSheet open={sheet} onOpenChange={setSheet} />
             {node && <SessionStartDialog open={starting} onOpenChange={setStarting} node={node} />}
         </div>
@@ -433,7 +530,15 @@ function absoluteClock(iso: string | null, locale: string): string | null {
     return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(at);
 }
 
-function Strip({ icon, children, testId }: { icon: ReactNode; children: ReactNode; testId?: string }) {
+function Strip({
+    icon,
+    children,
+    testId,
+}: {
+    icon: ReactNode;
+    children: ReactNode;
+    testId?: string;
+}) {
     return (
         <div
             role="status"

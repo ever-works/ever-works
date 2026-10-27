@@ -9,7 +9,11 @@ import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 
 /** Query of `GET /api/fleet/nodes/:id/git/identity`. */
 export class FleetGitIdentityQueryDto {
-    @ApiProperty({ required: false, enum: ['1'], description: '`1` reads the computer again instead of the 60 s copy.' })
+    @ApiProperty({
+        required: false,
+        enum: ['1'],
+        description: '`1` reads the computer again instead of the 60 s copy.',
+    })
     @IsOptional()
     @IsIn(['1'])
     fresh?: '1';
@@ -19,7 +23,8 @@ export class FleetGitIdentityQueryDto {
 export class SetFleetGitIdentityDto {
     @ApiProperty({
         required: false,
-        description: 'Must be `true`: without it the call answers `confirmation_required` naming the computer.',
+        description:
+            'Must be `true`: without it the call answers `confirmation_required` naming the computer.',
     })
     @IsOptional()
     @IsBoolean()

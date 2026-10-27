@@ -11,7 +11,9 @@ vi.mock('next-intl', async () => {
 
 const control = vi.fn();
 const remove = vi.fn();
+const reinstall = vi.fn();
 vi.mock('@/app/actions/fleet/runners', () => ({
+    reinstallFleetActionsRunnerAction: (...args: unknown[]) => reinstall(...args),
     listFleetActionsRunnersAction: vi.fn(),
     fleetActionsRunnerOptionsAction: vi.fn(),
     installFleetActionsRunnersAction: vi.fn(),
@@ -74,6 +76,7 @@ function menu(row: FleetActionsRunnerView, onChanged = vi.fn()) {
 }
 
 beforeEach(() => {
+    reinstall.mockReset();
     control.mockReset();
     remove.mockReset();
     toast.success.mockReset();
@@ -177,6 +180,62 @@ describe('RunnerActionsMenu', () => {
         expect(screen.getByTestId('fleet-runner-stop')).toHaveAttribute(
             'title',
             'Only the people allowed to change computers on build-01 can control its runners',
+        );
+    });
+
+    // ─── P3 (FR-28): Reinstall ──────────────────────────────────────────────
+
+    it('retries a failed install as a Reinstall, confirmed, with confirm: true', async () => {
+        reinstall.mockResolvedValue(ACCEPTED);
+        const onChanged = menu(runner({ state: 'failed', lastError: 'checksum mismatch' }));
+        const retry = screen.getByTestId('fleet-runner-reinstall');
+        expect(retry).toHaveTextContent('Retry');
+        fireEvent.click(retry);
+        expect(await screen.findByText('Reinstall build-01-1?')).toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('fleet-machine-confirm'));
+        await waitFor(() => expect(reinstall).toHaveBeenCalledWith('n1', 'r1', true));
+        await waitFor(() => expect(onChanged).toHaveBeenCalled());
+        expect(toast.success).toHaveBeenCalledWith('Reinstalling build-01-1…');
+    });
+
+    it('offers Reinstall… in the row when GitHub has a newer build, naming it', async () => {
+        reinstall.mockResolvedValue(ACCEPTED);
+        menu(runner({ state: 'idle', runnerVersion: '2.321.0', updateAvailable: '2.322.0' }));
+        const button = screen.getByTestId('fleet-runner-reinstall');
+        expect(button).toHaveTextContent('Reinstall…');
+        fireEvent.click(button);
+        expect(
+            await screen.findByText('Reinstall build-01-1 with runner 2.322.0?'),
+        ).toBeInTheDocument();
+    });
+
+    it('keeps Reinstall… in the ⋯ menu otherwise, and never offers it mid-job', async () => {
+        menu(runner({ state: 'idle' }));
+        expect(screen.queryByTestId('fleet-runner-reinstall')).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'More for build-01-1' }));
+        expect(await screen.findByTestId('fleet-runner-reinstall-menu')).toHaveTextContent(
+            'Reinstall…',
+        );
+    });
+
+    it('does not offer Reinstall while a job runs', async () => {
+        menu(runner({ state: 'working', runnerVersion: '2.321.0', updateAvailable: '2.322.0' }));
+        expect(screen.queryByTestId('fleet-runner-reinstall')).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'More for build-01-1' }));
+        await screen.findByText('Remove runner…');
+        expect(screen.queryByTestId('fleet-runner-reinstall-menu')).toBeNull();
+    });
+
+    it('shows the server’s hint when a reinstall is refused', async () => {
+        reinstall.mockResolvedValue({
+            ok: false,
+            error: { code: 'busy', hint: 'build-01-1 is still being installed' },
+        });
+        menu(runner({ state: 'failed' }));
+        fireEvent.click(screen.getByTestId('fleet-runner-reinstall'));
+        fireEvent.click(await screen.findByTestId('fleet-machine-confirm'));
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith('build-01-1 is still being installed'),
         );
     });
 });

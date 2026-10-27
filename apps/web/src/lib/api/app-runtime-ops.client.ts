@@ -52,7 +52,11 @@ async function call<T>(
 
     if (response.ok) return { ok: true, status: response.status, data: payload as T };
 
-    const body = (payload ?? {}) as { code?: unknown; message?: unknown; retryAfterSeconds?: unknown };
+    const body = (payload ?? {}) as {
+        code?: unknown;
+        message?: unknown;
+        retryAfterSeconds?: unknown;
+    };
     const header = Number(response.headers.get('retry-after'));
     const retry =
         typeof body.retryAfterSeconds === 'number'
@@ -98,7 +102,8 @@ export const appRuntimeOpsClient = {
         }),
 
     /** **Run smoke checks** against the live Deployment. */
-    runSmoke: (workId: string) => call<AppOpsAcceptedView>(`${base(workId)}/app-smoke`, { method: 'POST' }),
+    runSmoke: (workId: string) =>
+        call<AppOpsAcceptedView>(`${base(workId)}/app-smoke`, { method: 'POST' }),
 
     /** The last 20 Deployments. */
     listDeployments: (workId: string) =>

@@ -70,7 +70,10 @@ type ToolError = { error: FleetLinkError };
 function toolError(error: unknown): ToolError {
     const known = readFleetMachineError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -83,7 +86,10 @@ export function buildFleetCloudTools(args: {
     userId: string;
     agentId: string;
     runId: string | null;
-    service: Pick<FleetCloudService, 'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'> &
+    service: Pick<
+        FleetCloudService,
+        'list' | 'options' | 'usage' | 'create' | 'power' | 'destroy'
+    > &
         Partial<Pick<FleetCloudService, 'previewIdlePolicy'>>;
     /** The approval seam for held acts; null = held acts are refused (fail closed). */
     proposals: AgentProposalToolSource | null;
@@ -91,7 +97,10 @@ export function buildFleetCloudTools(args: {
     const caller = { kind: 'agent' as const, agentId: args.agentId, ownerUserId: args.userId };
     const out: TaskToolDescriptor[] = [];
 
-    const hold = async (payload: Omit<FleetCloudActionProposalPayload, 'kind' | 'agentId'>, title: string) => {
+    const hold = async (
+        payload: Omit<FleetCloudActionProposalPayload, 'kind' | 'agentId'>,
+        title: string,
+    ) => {
         if (!args.proposals) {
             return {
                 error: {
@@ -152,14 +161,20 @@ export function buildFleetCloudTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                providerPluginId: { type: 'string', description: 'The machine-provider plugin id.' },
+                providerPluginId: {
+                    type: 'string',
+                    description: 'The machine-provider plugin id.',
+                },
             },
             required: ['providerPluginId'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { providerPluginId?: unknown };
             if (typeof a.providerPluginId !== 'string' || !a.providerPluginId) {
-                return invalid('providerPluginId', 'providerPluginId is required (see fleet_cloud_list)');
+                return invalid(
+                    'providerPluginId',
+                    'providerPluginId is required (see fleet_cloud_list)',
+                );
             }
             try {
                 return await args.service.options(caller, a.providerPluginId);
@@ -175,13 +190,21 @@ export function buildFleetCloudTools(args: {
             'What the owner’s cloud computers cost: per hour now, this month so far and projected for the month — estimates from the provider’s list prices (the bill may differ). With nodeId, one machine. Read-only.',
         parameters: {
             type: 'object',
-            properties: { nodeId: { type: 'string', description: 'Optional: one cloud computer (Fleet node id).' } },
+            properties: {
+                nodeId: {
+                    type: 'string',
+                    description: 'Optional: one cloud computer (Fleet node id).',
+                },
+            },
             required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
             try {
-                return await args.service.usage(caller, typeof a.nodeId === 'string' && a.nodeId ? a.nodeId : null);
+                return await args.service.usage(
+                    caller,
+                    typeof a.nodeId === 'string' && a.nodeId ? a.nodeId : null,
+                );
             } catch (error) {
                 return toolError(error);
             }
@@ -195,13 +218,20 @@ export function buildFleetCloudTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                providerPluginId: { type: 'string', description: 'The machine-provider plugin id.' },
-                name: { type: 'string', description: '2–39 lower-case letters, digits and hyphens.' },
+                providerPluginId: {
+                    type: 'string',
+                    description: 'The machine-provider plugin id.',
+                },
+                name: {
+                    type: 'string',
+                    description: '2–39 lower-case letters, digits and hyphens.',
+                },
                 regionId: { type: 'string', description: 'A region id from fleet_cloud_options.' },
                 sizeId: { type: 'string', description: 'A size id from fleet_cloud_options.' },
                 acknowledgedPriceCents: {
                     type: 'number',
-                    description: 'The size’s monthly price in cents, exactly as fleet_cloud_options reported it.',
+                    description:
+                        'The size’s monthly price in cents, exactly as fleet_cloud_options reported it.',
                 },
                 software: {
                     type: 'array',
@@ -217,12 +247,23 @@ export function buildFleetCloudTools(args: {
                 return invalid('providerPluginId', 'providerPluginId is required');
             }
             if (!isFleetCloudName(a.name)) {
-                return invalid('name', 'the name must be 2–39 lower-case letters, digits and hyphens');
+                return invalid(
+                    'name',
+                    'the name must be 2–39 lower-case letters, digits and hyphens',
+                );
             }
-            if (typeof a.regionId !== 'string' || !a.regionId) return invalid('regionId', 'regionId is required');
-            if (typeof a.sizeId !== 'string' || !a.sizeId) return invalid('sizeId', 'sizeId is required');
-            if (typeof a.acknowledgedPriceCents !== 'number' || !Number.isFinite(a.acknowledgedPriceCents)) {
-                return invalid('acknowledgedPriceCents', 'acknowledgedPriceCents (the monthly price you were shown) is required');
+            if (typeof a.regionId !== 'string' || !a.regionId)
+                return invalid('regionId', 'regionId is required');
+            if (typeof a.sizeId !== 'string' || !a.sizeId)
+                return invalid('sizeId', 'sizeId is required');
+            if (
+                typeof a.acknowledgedPriceCents !== 'number' ||
+                !Number.isFinite(a.acknowledgedPriceCents)
+            ) {
+                return invalid(
+                    'acknowledgedPriceCents',
+                    'acknowledgedPriceCents (the monthly price you were shown) is required',
+                );
             }
             const input = {
                 providerPluginId: a.providerPluginId,
@@ -235,7 +276,9 @@ export function buildFleetCloudTools(args: {
             try {
                 // Without `confirm`: the whole chain runs (price, limit, kill switch) and answers with the text.
                 await args.service.create(caller, { ...input, fields: {} });
-                return { error: { code: 'internal' as const, hint: 'the create was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the create was not confirmed' },
+                };
             } catch (error) {
                 const text = confirmationText(error);
                 if (text === null) return toolError(error);
@@ -258,11 +301,18 @@ export function buildFleetCloudTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetCloudPowerAction(a.action)) return invalid('action', 'action must be on or off');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetCloudPowerAction(a.action))
+                return invalid('action', 'action must be on or off');
             try {
                 await args.service.power(caller, a.nodeId, a.action, {});
-                return { error: { code: 'internal' as const, hint: 'the power change was not confirmed' } };
+                return {
+                    error: {
+                        code: 'internal' as const,
+                        hint: 'the power change was not confirmed',
+                    },
+                };
             } catch (error) {
                 const text = confirmationText(error);
                 if (text === null) return toolError(error);
@@ -288,15 +338,22 @@ export function buildFleetCloudTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetCloudName(a.name)) return invalid('name', 'the name is not a cloud computer name');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetCloudName(a.name))
+                return invalid('name', 'the name is not a cloud computer name');
             try {
                 await args.service.destroy(caller, a.nodeId, {});
-                return { error: { code: 'internal' as const, hint: 'the destroy was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the destroy was not confirmed' },
+                };
             } catch (error) {
                 const text = confirmationText(error);
                 if (text === null) return toolError(error);
-                return hold({ verb: 'destroy', nodeId: a.nodeId, args: { name: a.name } }, text || `Destroy ${a.name}`);
+                return hold(
+                    { verb: 'destroy', nodeId: a.nodeId, args: { name: a.name } },
+                    text || `Destroy ${a.name}`,
+                );
             }
         },
     } as TaskToolDescriptor);
@@ -320,8 +377,10 @@ export function buildFleetCloudTools(args: {
             },
             invoke: async (raw) => {
                 const a = (raw ?? {}) as Record<string, unknown>;
-                if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-                if (!isFleetCloudIdlePolicyMode(a.mode)) return invalid('mode', 'mode must be nothing, tell-me or power-off');
+                if (typeof a.nodeId !== 'string' || !a.nodeId)
+                    return invalid('nodeId', 'nodeId is required');
+                if (!isFleetCloudIdlePolicyMode(a.mode))
+                    return invalid('mode', 'mode must be nothing, tell-me or power-off');
                 const hours = a.afterHours;
                 if (
                     typeof hours !== 'number' ||
@@ -336,9 +395,16 @@ export function buildFleetCloudTools(args: {
                 }
                 try {
                     // Every gate (existence, the `machines` audience, the values) without a write.
-                    const checked = await preview(caller, a.nodeId, { mode: a.mode, afterHours: hours });
+                    const checked = await preview(caller, a.nodeId, {
+                        mode: a.mode,
+                        afterHours: hours,
+                    });
                     return hold(
-                        { verb: 'idle-policy', nodeId: checked.nodeId, args: { mode: a.mode, afterHours: hours } },
+                        {
+                            verb: 'idle-policy',
+                            nodeId: checked.nodeId,
+                            args: { mode: a.mode, afterHours: hours },
+                        },
                         checked.summary,
                     );
                 } catch (error) {

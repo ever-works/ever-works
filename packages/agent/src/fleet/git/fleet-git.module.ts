@@ -18,7 +18,12 @@ import { FleetGitIdentityService } from './fleet-git-identity.service';
 @Module({
     imports: [
         FleetModule,
-        TypeOrmModule.forFeature([User, GitHubAppUserLink, GitHubAppInstallation, GitHubAppInstallationRepositoryEntity]),
+        TypeOrmModule.forFeature([
+            User,
+            GitHubAppUserLink,
+            GitHubAppInstallation,
+            GitHubAppInstallationRepositoryEntity,
+        ]),
     ],
     providers: [FleetGitIdentityService],
     exports: [FleetGitIdentityService],

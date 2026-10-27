@@ -78,7 +78,11 @@ export function parsePorcelainV2Changes(output: string): PorcelainChange[] {
 			if (parts.length < 10) continue;
 			const previousPath = fields[index + 1] ?? null;
 			index += 1;
-			out.push({ path: parts.slice(9).join(' '), previousPath: previousPath || null, status: statusOf(parts[1]) });
+			out.push({
+				path: parts.slice(9).join(' '),
+				previousPath: previousPath || null,
+				status: statusOf(parts[1])
+			});
 		} else if (kind === 'u') {
 			// `u XY sub m1 m2 m3 mW h1 h2 h3 <path>`
 			const parts = field.split(' ');
@@ -93,7 +97,9 @@ export function parsePorcelainV2Changes(output: string): PorcelainChange[] {
 }
 
 /** Parse `git diff --numstat -z --no-renames`: `added\tremoved\tpath\0`; binary files read `-\t-`. */
-export function parseNumstatZ(output: string): Map<string, { added: number | null; removed: number | null; binary: boolean }> {
+export function parseNumstatZ(
+	output: string
+): Map<string, { added: number | null; removed: number | null; binary: boolean }> {
 	const out = new Map<string, { added: number | null; removed: number | null; binary: boolean }>();
 	for (const record of output.split('\0')) {
 		const match = /^(\d+|-)\t(\d+|-)\t([\s\S]+)$/.exec(record.replace(/^\n+/, ''));
@@ -272,4 +278,3 @@ export async function readCheckoutChanges(
 		at: new Date(now()).toISOString()
 	};
 }
-

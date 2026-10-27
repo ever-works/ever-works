@@ -99,14 +99,26 @@ export function RevealPasswordDialog({
                             <code className="rounded bg-surface-secondary dark:bg-surface-secondary-dark px-2 py-1 font-mono">
                                 {shown ? password : '•'.repeat(password.length)}
                             </code>
-                            <Button type="button" size="sm" variant="ghost" onClick={() => setShown((value) => !value)}>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setShown((value) => !value)}
+                            >
                                 {shown ? t('hide') : t('show')}
                             </Button>
-                            <Button type="button" size="sm" onClick={() => void copy()} data-testid="fleet-virtual-password-copy">
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => void copy()}
+                                data-testid="fleet-virtual-password-copy"
+                            >
                                 {t('copy')}
                             </Button>
                         </div>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('hidesIn', { seconds: left })}</p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('hidesIn', { seconds: left })}
+                        </p>
                     </div>
                 ) : null}
                 <DialogFooter>
@@ -114,7 +126,12 @@ export function RevealPasswordDialog({
                         {t('close')}
                     </Button>
                     {!password ? (
-                        <Button type="button" onClick={reveal} disabled={pending} data-testid="fleet-virtual-password-reveal">
+                        <Button
+                            type="button"
+                            onClick={reveal}
+                            disabled={pending}
+                            data-testid="fleet-virtual-password-reveal"
+                        >
                             {t('reveal')}
                         </Button>
                     ) : null}

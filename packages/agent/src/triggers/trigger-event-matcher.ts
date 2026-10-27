@@ -48,7 +48,10 @@ export function normalizeEventAudience(raw: unknown): InboundTriggerEventAudienc
     if (!Array.isArray(me)) return null;
     const kinds: EventAudienceKind[] = [];
     for (const value of me) {
-        if ((EVENT_AUDIENCE_KINDS as readonly string[]).includes(value as string) && !kinds.includes(value)) {
+        if (
+            (EVENT_AUDIENCE_KINDS as readonly string[]).includes(value as string) &&
+            !kinds.includes(value)
+        ) {
             kinds.push(value as EventAudienceKind);
         }
     }
@@ -56,7 +59,9 @@ export function normalizeEventAudience(raw: unknown): InboundTriggerEventAudienc
 }
 
 function sameLogin(left: unknown, right: string): boolean {
-    return typeof left === 'string' && left.trim().length > 0 && left.trim().toLowerCase() === right;
+    return (
+        typeof left === 'string' && left.trim().length > 0 && left.trim().toLowerCase() === right
+    );
 }
 
 /**
@@ -76,12 +81,17 @@ export function matchesAudience(
     event: MatchableEvent,
     context: MatchContext = {},
 ): boolean {
-    const login = typeof context.githubLogin === 'string' ? context.githubLogin.trim().toLowerCase() : '';
+    const login =
+        typeof context.githubLogin === 'string' ? context.githubLogin.trim().toLowerCase() : '';
     if (!login) return false;
     const payload = event.payload && typeof event.payload === 'object' ? event.payload : {};
     const action = typeof payload.action === 'string' ? payload.action : '';
     for (const kind of audience.me) {
-        if (kind === 'review-requested' && action === 'review_requested' && sameLogin(payload.requestedReviewer, login)) {
+        if (
+            kind === 'review-requested' &&
+            action === 'review_requested' &&
+            sameLogin(payload.requestedReviewer, login)
+        ) {
             return true;
         }
         if (kind === 'assigned' && action === 'assigned' && sameLogin(payload.assignee, login)) {

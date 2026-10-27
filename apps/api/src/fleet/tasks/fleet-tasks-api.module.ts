@@ -1,7 +1,12 @@
 import { Global, Module } from '@nestjs/common';
 import { AgentsModule as AgentAgentsModule } from '@ever-works/agent/agents';
 import { DatabaseModule } from '@ever-works/agent/database';
-import { FleetCheckoutsModule, FleetGitModule, FleetModule, FleetSessionsModule } from '@ever-works/agent/fleet';
+import {
+    FleetCheckoutsModule,
+    FleetGitModule,
+    FleetModule,
+    FleetSessionsModule,
+} from '@ever-works/agent/fleet';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { FleetCheckoutsEnabledGuard } from '../checkouts/fleet-checkouts-enabled.guard';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';

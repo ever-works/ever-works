@@ -48,7 +48,12 @@ describe('withWakeRoutes', () => {
         macAddress: '••:••:••:••:3f:9a',
         lanId: lan,
     });
-    const awake = view({ id: 'build-01', name: 'build-01', capabilities: ['wake', 'managed'], lanId: lan });
+    const awake = view({
+        id: 'build-01',
+        name: 'build-01',
+        capabilities: ['wake', 'managed'],
+        lanId: lan,
+    });
 
     it('names the sibling an asleep computer can be woken through', () => {
         const [target] = withWakeRoutes([sleeping, awake], NOW, WINDOW);
@@ -61,9 +66,12 @@ describe('withWakeRoutes', () => {
     });
 
     it('offers nothing without a hardware address or without a sibling advertising wake', () => {
-        expect(withWakeRoutes([{ ...sleeping, macAddress: null }, awake], NOW, WINDOW)[0]!.canWake).toBeNull();
         expect(
-            withWakeRoutes([sleeping, { ...awake, capabilities: ['managed'] }], NOW, WINDOW)[0]!.canWake,
+            withWakeRoutes([{ ...sleeping, macAddress: null }, awake], NOW, WINDOW)[0]!.canWake,
+        ).toBeNull();
+        expect(
+            withWakeRoutes([sleeping, { ...awake, capabilities: ['managed'] }], NOW, WINDOW)[0]!
+                .canWake,
         ).toBeNull();
     });
 

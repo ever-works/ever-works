@@ -150,17 +150,31 @@ export async function fleetContainerAction(
     nodeId: string,
     input: { container: string; action: FleetContainerAction; fields?: FleetActionConfirmFields },
 ): Promise<FleetMachineResult<Record<string, unknown>>> {
-    return run(() => fleetMachineAPI.containerAction(nodeId, input.container, input.action, confirmOnly(input.fields)));
+    return run(() =>
+        fleetMachineAPI.containerAction(
+            nodeId,
+            input.container,
+            input.action,
+            confirmOnly(input.fields),
+        ),
+    );
 }
 
 export async function runFleetContainerAction(
     nodeId: string,
     input: { request: unknown; fields?: FleetActionConfirmFields },
 ): Promise<FleetMachineResult<Record<string, unknown>>> {
-    return run(() => fleetMachineAPI.runContainer(nodeId, { ...confirmOnly(input.fields), request: input.request }));
+    return run(() =>
+        fleetMachineAPI.runContainer(nodeId, {
+            ...confirmOnly(input.fields),
+            request: input.request,
+        }),
+    );
 }
 
-export async function listFleetImagesAction(nodeId: string): Promise<FleetMachineResult<FleetImagesListResult>> {
+export async function listFleetImagesAction(
+    nodeId: string,
+): Promise<FleetMachineResult<FleetImagesListResult>> {
     return run(() => fleetMachineAPI.listImages(nodeId));
 }
 
@@ -168,7 +182,9 @@ export async function pullFleetImageAction(
     nodeId: string,
     input: { ref: string; fields?: FleetActionConfirmFields },
 ): Promise<FleetMachineResult<Record<string, unknown>>> {
-    return run(() => fleetMachineAPI.pullImage(nodeId, { ...confirmOnly(input.fields), ref: input.ref }));
+    return run(() =>
+        fleetMachineAPI.pullImage(nodeId, { ...confirmOnly(input.fields), ref: input.ref }),
+    );
 }
 
 export async function removeFleetImageAction(
@@ -186,7 +202,9 @@ export async function pruneFleetImagesAction(
 }
 
 /** One operation's record (pull, run, prune; Compose in P3), for the operation card. */
-export async function getFleetOperationAction(operationId: string): Promise<FleetMachineResult<FleetOperationView>> {
+export async function getFleetOperationAction(
+    operationId: string,
+): Promise<FleetMachineResult<FleetOperationView>> {
     return run(() => fleetMachineAPI.operation(operationId));
 }
 
@@ -198,7 +216,9 @@ export async function cancelFleetOperationAction(
 
 // ─── Compose and Shell inside (P3) ──────────────────────────────────────────
 
-export async function listFleetComposeAction(nodeId: string): Promise<FleetMachineResult<FleetComposeListResult>> {
+export async function listFleetComposeAction(
+    nodeId: string,
+): Promise<FleetMachineResult<FleetComposeListResult>> {
     return run(() => fleetMachineAPI.listCompose(nodeId));
 }
 
@@ -211,7 +231,12 @@ export async function describeFleetComposeAction(
 
 export async function fleetComposeAction(
     nodeId: string,
-    input: { project: string; action: FleetComposeAction; service?: string; fields?: FleetActionConfirmFields },
+    input: {
+        project: string;
+        action: FleetComposeAction;
+        service?: string;
+        fields?: FleetActionConfirmFields;
+    },
 ): Promise<FleetMachineResult<Record<string, unknown>>> {
     return run(() =>
         fleetMachineAPI.composeAction(nodeId, input.project, input.action, {

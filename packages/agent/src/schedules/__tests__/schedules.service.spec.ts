@@ -664,6 +664,10 @@ describe('SchedulesService — workspace additions', () => {
                 'recurring_task',
                 'source_validation',
                 'work_schedule',
+                // FL-13 added `node_schedule` without extending this pin (it was red on
+                // develop); APW-02 T53 adds `app_upstream_sync`. Both are known sources.
+                'node_schedule',
+                'app_upstream_sync',
             ].sort(),
         );
 
@@ -849,5 +853,159 @@ describe('SchedulesService — workspace reads are not capped at one source quer
             where: expect.objectContaining({ userId: 'user-1' }),
             take: 500,
         });
+    });
+});
+
+/**
+ * APW-02 T53 (FR-32, ACC-E2E-05) — the eighth-plus-one source: an App Work's upstream sync,
+ * read only, on the cron the sync run recorded (or the documented default).
+ */
+describe('SchedulesService — the App Works upstream sync source (APW-02 T53)', () => {
+    const NEXT = new Date('2026-10-26T06:03:00.000Z');
+
+    function upstreamService(options: {
+        works: unknown[];
+        states: unknown[];
+        statesThrow?: boolean;
+    }) {
+        const workRepo = {
+            find: jest.fn(async (opts: { where?: { kind?: string } }) =>
+                opts?.where?.kind === 'app' ? options.works : [],
+            ),
+        };
+        const upstreamRepo = {
+            find: options.statesThrow
+                ? jest.fn().mockRejectedValue(new Error('no such table'))
+                : jest.fn().mockResolvedValue(options.states),
+        };
+        const service = new SchedulesService(
+            makeRepo([]) as never,
+            makeRepo([]) as never,
+            makeWorkScheduleRepo([]) as never,
+            makeRepo([]) as never,
+            workRepo as never,
+            makeRepo([]) as never,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            upstreamRepo as never,
+        );
+        return { service, workRepo, upstreamRepo };
+    }
+
+    const appWork = { id: 'work-app-1', name: 'Cal', status: 'active', kind: 'app' };
+
+    it('lists one read-only row per scheduled App Work, with its cron and next run', async () => {
+        const { service } = upstreamService({
+            works: [appWork],
+            states: [
+                {
+                    workId: 'work-app-1',
+                    relation: 'fork',
+                    syncSchedule: '0 3 * * *',
+                    nextSyncAt: NEXT,
+                    upstreamStatus: 'available',
+                    dataRepositoryStatus: 'available',
+                    lastSyncResult: 'up_to_date',
+                    syncFinishedAt: new Date('2026-10-25T06:03:10.000Z'),
+                },
+            ],
+        });
+
+        const rows = (await service.getSchedules(SCOPE)).filter(
+            (row) => row.sourceType === 'app_upstream_sync',
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toMatchObject({
+            id: 'app_upstream_sync:work-app-1',
+            ownerType: 'app_work',
+            ownerId: 'work-app-1',
+            ownerName: 'Cal',
+            ownerLink: '/works/work-app-1/upstream',
+            cadenceRaw: '0 3 * * *',
+            nextRunAt: NEXT.toISOString(),
+            status: 'active',
+            enabled: true,
+        });
+    });
+
+    it('falls back to the documented default cron, reports a paused row, and skips a link or an unscheduled row', async () => {
+        const { service } = upstreamService({
+            works: [
+                appWork,
+                { id: 'work-app-2', name: 'Umami', status: 'active', kind: 'app' },
+                { id: 'work-app-3', name: 'Linked', status: 'active', kind: 'app' },
+                { id: 'work-app-4', name: 'Preparing', status: 'active', kind: 'app' },
+            ],
+            states: [
+                { workId: 'work-app-1', relation: 'fork', syncSchedule: null, nextSyncAt: NEXT },
+                {
+                    workId: 'work-app-2',
+                    relation: 'fork',
+                    nextSyncAt: null,
+                    upstreamStatus: 'archived',
+                },
+                { workId: 'work-app-3', relation: 'link', nextSyncAt: NEXT },
+                { workId: 'work-app-4', relation: 'fork', nextSyncAt: null },
+            ],
+        });
+
+        const rows = (await service.getSchedules(SCOPE)).filter(
+            (row) => row.sourceType === 'app_upstream_sync',
+        );
+
+        expect(rows.map((row) => row.ownerId).sort()).toEqual(['work-app-1', 'work-app-2']);
+        expect(rows.find((row) => row.ownerId === 'work-app-1')?.cadenceRaw).toBe('0 6 * * 1');
+        expect(rows.find((row) => row.ownerId === 'work-app-2')).toMatchObject({
+            status: 'paused',
+            nextRunAt: null,
+            enabled: false,
+        });
+    });
+
+    it('offers no run, pause or resume: the schedule is spec-owned and Sync now lives on the Work', async () => {
+        const { service } = upstreamService({
+            works: [appWork],
+            states: [{ workId: 'work-app-1', relation: 'fork', nextSyncAt: NEXT }],
+        });
+
+        const page = await service.getPage(SCOPE);
+        const row = page.items.find((item) => item.sourceType === 'app_upstream_sync');
+
+        expect(row?.controls).toMatchObject({
+            runNow: false,
+            pause: false,
+            resume: false,
+            // `edit` opens the owner (here: the Upstream tab), as for every Work-managed source.
+            duplicate: false,
+            reassign: false,
+        });
+        expect(row?.controls?.disabledReasons.runNow).toBe('managedOnWork');
+        expect(page.countsBySourceType.app_upstream_sync).toBe(1);
+    });
+
+    it('degrades to an empty slice when the upstream table cannot be read', async () => {
+        const { service } = upstreamService({ works: [appWork], states: [], statesThrow: true });
+
+        const page = await service.getPage(SCOPE);
+
+        expect(page.items.filter((item) => item.sourceType === 'app_upstream_sync')).toHaveLength(
+            0,
+        );
+        expect(page.degradedSources).toContain('app_upstream_sync');
+    });
+
+    it('scopes the App Works read to the caller', async () => {
+        const { service, workRepo } = upstreamService({ works: [], states: [] });
+
+        await service.getSchedules(SCOPE);
+
+        expect(workRepo.find).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ userId: 'user-1', kind: 'app' }),
+            }),
+        );
     });
 });

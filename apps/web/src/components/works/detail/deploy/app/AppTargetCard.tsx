@@ -57,6 +57,22 @@ export interface AppTargetCardProps {
  * radio group, so `↑`/`↓` move between the targets and a disabled one is
  * skipped but still announced with its reason.
  */
+/** The FR-35 reasons the web has copy for (lane aw-safety); anything else is shown by code. */
+const APPS_TIER_REASON_KEYS = new Set([
+    'emailUnverified',
+    'planRequired',
+    'ownerQuarantined',
+    'capReached',
+    'eligibilityUnavailable',
+]);
+
+function appsTierReasonText(
+    t: (key: string, values?: Record<string, string>) => string,
+    reason: string,
+) {
+    return APPS_TIER_REASON_KEYS.has(reason) ? t(reason) : t('unknown', { reason });
+}
+
 export function AppTargetCard({
     workId,
     target,
@@ -76,9 +92,30 @@ export function AppTargetCard({
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Lane aw-safety (2026-10-26): the tier names WHY (APW-10 FR-35 reason codes), so the line
+    // says it — "verify your email", "a paid plan", … — after the generic one.
+    const tEligibility = useTranslations('dashboard.workDetail.appsTierEligibility.reasons');
+    const tEligibilityHints = useTranslations('dashboard.workDetail.appsTierEligibility.hints');
+    const managedReasonCodes = (target.eligibility?.managed?.reasons ?? []).map(String);
+    // Owner decision 2026-10-27: a free owner at the cap is told that a paid plan lifts it — only
+    // when the API says a paid plan would admit this App (never for a paid owner at the paid cap).
+    const paidPlanHint =
+        managedReasonCodes.includes('capReached') &&
+        target.eligibility?.managed?.paidPlanAllowsMore === true
+            ? tEligibilityHints('capReachedPaidPlan')
+            : '';
+    const managedReasons = [
+        ...managedReasonCodes.map((reason) =>
+            appsTierReasonText(
+                tEligibility as unknown as (key: string, values?: Record<string, string>) => string,
+                reason,
+            ),
+        ),
+        ...(paidPlanHint ? [paidPlanHint] : []),
+    ].join(' ');
     const managedReason =
         target.eligibility?.managed && target.eligibility.managed.eligible === false
-            ? t('everWorksApps.ineligible')
+            ? `${t('everWorksApps.ineligible')}${managedReasons ? ` ${managedReasons}` : ''}`
             : t('everWorksApps.unavailable');
 
     const isDisabled = (choice: AppDeployTargetChoice) =>

@@ -36,7 +36,11 @@ type EnvLike = Record<string, string | undefined>;
 /** ON unless the value is exactly `false` — a default-safe switch cannot fail open. */
 function defaultOn(name: string, env: EnvLike | undefined): boolean {
     const raw = (env ?? process.env)[name];
-    return String(raw ?? '').trim().toLowerCase() !== 'false';
+    return (
+        String(raw ?? '')
+            .trim()
+            .toLowerCase() !== 'false'
+    );
 }
 
 /** `APP_TARGET_CHANGE_REQUIRES_OWNER` — see the module table. Default ON. */

@@ -34,7 +34,10 @@ import {
     ValidateIf,
     ValidateNested,
 } from 'class-validator';
-import { INTEGRATION_EXTERNAL_METRIC_PLUGIN_ID, integrationActorLabel } from '@ever-works/contracts';
+import {
+    INTEGRATION_EXTERNAL_METRIC_PLUGIN_ID,
+    integrationActorLabel,
+} from '@ever-works/contracts';
 import {
     GoalOrchestratorService,
     GoalsService,

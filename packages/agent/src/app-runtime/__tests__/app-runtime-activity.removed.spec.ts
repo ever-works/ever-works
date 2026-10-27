@@ -78,7 +78,11 @@ describe('AppRuntimeActivityListener — app.deploy.removed of an App Work delet
             },
         } as never);
 
-        await listener.onDeployRemoved({ workId: 'work-1', userId: 'owner-1', reason: 'owner_removed' });
+        await listener.onDeployRemoved({
+            workId: 'work-1',
+            userId: 'owner-1',
+            reason: 'owner_removed',
+        });
 
         expect(calls).toBe(1);
     });

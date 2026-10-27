@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type KeyboardEvent,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowDown, ArrowUpToLine, Copy, Download, Pause, Play, RotateCw } from 'lucide-react';
 import type { FleetLogSource } from '@ever-works/contracts';
@@ -57,7 +65,10 @@ export function LogViewer({
     at?: string | null;
 }) {
     const t = useTranslations('fleet.logs');
-    const { state, pause, resume, reopen, startFollowing, loadEarlier } = useLogFollow({ nodeId, sources });
+    const { state, pause, resume, reopen, startFollowing, loadEarlier } = useLogFollow({
+        nodeId,
+        sources,
+    });
     const merged = sources.length > 1;
     const chips = useMemo(() => sources.map((id) => logChipLabel(id, listed)), [sources, listed]);
     const [filter, setFilter] = useState('');
@@ -74,9 +85,15 @@ export function LogViewer({
     const earlierTries = useRef(0);
     const lastFirstSeq = useRef<number | null>(null);
 
-    const shown = useMemo(() => filterHeld(state.window.lines, filter), [state.window.lines, filter]);
+    const shown = useMemo(
+        () => filterHeld(state.window.lines, filter),
+        [state.window.lines, filter],
+    );
     const label = source?.label ?? sources[0]?.replace(/^[a-z]+:/, '') ?? '';
-    const kind = source?.kind ?? (sources[0]?.split(':', 1)[0] as FleetLogSource['kind'] | undefined) ?? 'file';
+    const kind =
+        source?.kind ??
+        (sources[0]?.split(':', 1)[0] as FleetLogSource['kind'] | undefined) ??
+        'file';
 
     // Count what arrives at the bottom while the view is not there (the pill).
     useEffect(() => {
@@ -114,7 +131,8 @@ export function LogViewer({
         const list = listRef.current;
         if (!list) return;
         setScrollTop(list.scrollTop);
-        if (shouldStopFollowing(list.scrollTop, list.scrollHeight, list.clientHeight)) setPinned(false);
+        if (shouldStopFollowing(list.scrollTop, list.scrollHeight, list.clientHeight))
+            setPinned(false);
         else if (isAtBottom(list.scrollTop, list.scrollHeight, list.clientHeight)) {
             setPinned(true);
             setNewSinceUnpinned(0);
@@ -132,7 +150,8 @@ export function LogViewer({
         async (what: 'selection' | 'all') => {
             const text =
                 what === 'selection'
-                    ? (typeof window !== 'undefined' ? window.getSelection()?.toString() : '') ?? ''
+                    ? ((typeof window !== 'undefined' ? window.getSelection()?.toString() : '') ??
+                      '')
                     : logsCopyText(shown);
             if (!text) return;
             try {
@@ -175,7 +194,19 @@ export function LogViewer({
         setHighlightSeq(shown[index]!.seq);
         const list = listRef.current;
         if (list) list.scrollTop = Math.max(0, index * ROW_HEIGHT - ROW_HEIGHT * 2);
-    }, [at, state.loaded, state.window.lines, state.loadingEarlier, state.earlierExhausted, state.earlierUnsupported, shown, merged, source, kind, loadEarlier]);
+    }, [
+        at,
+        state.loaded,
+        state.window.lines,
+        state.loadingEarlier,
+        state.earlierExhausted,
+        state.earlierUnsupported,
+        shown,
+        merged,
+        source,
+        kind,
+        loadEarlier,
+    ]);
 
     const download = useCallback(() => {
         // P3 (FR-40): the filtered lines on screen, already scanned on the machine; nothing is stored.
@@ -184,7 +215,11 @@ export function LogViewer({
         const url = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = logsDownloadName(nodeName, merged ? (title ?? 'merged') : (sources[0] ?? 'log'), new Date());
+        anchor.download = logsDownloadName(
+            nodeName,
+            merged ? (title ?? 'merged') : (sources[0] ?? 'log'),
+            new Date(),
+        );
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
@@ -195,7 +230,11 @@ export function LogViewer({
     useEffect(() => {
         const onKey = (event: globalThis.KeyboardEvent) => {
             const target = event.target as HTMLElement | null;
-            const typing = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
+            const typing =
+                target &&
+                (target.tagName === 'INPUT' ||
+                    target.tagName === 'TEXTAREA' ||
+                    target.isContentEditable);
             if (event.key === '/' && !typing) {
                 event.preventDefault();
                 filterRef.current?.focus();
@@ -247,13 +286,22 @@ export function LogViewer({
     });
 
     const errorBody = state.error ? (
-        <div role="alert" className="p-4 space-y-2" data-testid="fleet-logs-error" data-code={state.error.code}>
+        <div
+            role="alert"
+            className="p-4 space-y-2"
+            data-testid="fleet-logs-error"
+            data-code={state.error.code}
+        >
             <p className="text-sm font-medium text-danger">
                 {state.error.details?.abandoned
                     ? t('states.loadingAbandoned', { node: nodeName })
                     : t('states.error', { source: label, node: nodeName })}
             </p>
-            {state.error.hint && <p className="text-xs text-text-muted dark:text-text-muted-dark font-mono">{state.error.hint}</p>}
+            {state.error.hint && (
+                <p className="text-xs text-text-muted dark:text-text-muted-dark font-mono">
+                    {state.error.hint}
+                </p>
+            )}
             <Button size="sm" variant="secondary" onClick={reopen} data-testid="fleet-logs-retry">
                 <RotateCw className="w-3 h-3 mr-1" aria-hidden="true" />
                 {t('states.tryAgain')}
@@ -268,15 +316,32 @@ export function LogViewer({
             data-testid="fleet-logs-viewer"
         >
             <header className="flex items-center justify-between gap-3 px-3 py-2 border-b border-border dark:border-border-dark">
-                <h3 className="text-sm font-medium text-text dark:text-text-dark truncate" data-testid="fleet-logs-viewer-title">
+                <h3
+                    className="text-sm font-medium text-text dark:text-text-dark truncate"
+                    data-testid="fleet-logs-viewer-title"
+                >
                     {merged
                         ? title
-                            ? t('viewer.mergedTitle', { title, count: sources.length, node: nodeName })
-                            : t('viewer.mergedTitleNoName', { count: sources.length, node: nodeName })
-                        : t('viewer.title', { source: label, kind: t(`kinds.${kind}`), node: nodeName })}
+                            ? t('viewer.mergedTitle', {
+                                  title,
+                                  count: sources.length,
+                                  node: nodeName,
+                              })
+                            : t('viewer.mergedTitleNoName', {
+                                  count: sources.length,
+                                  node: nodeName,
+                              })
+                        : t('viewer.title', {
+                              source: label,
+                              kind: t(`kinds.${kind}`),
+                              node: nodeName,
+                          })}
                 </h3>
                 {badge && (
-                    <span className={`text-xs font-semibold shrink-0 ${badge.className}`} data-testid="fleet-logs-badge">
+                    <span
+                        className={`text-xs font-semibold shrink-0 ${badge.className}`}
+                        data-testid="fleet-logs-badge"
+                    >
                         {badge.text}
                     </span>
                 )}
@@ -307,7 +372,12 @@ export function LogViewer({
                     {state.paused ? t('viewer.resume') : t('viewer.pause')}
                 </Button>
                 {!state.following && state.loaded && state.phase === 'live' && (
-                    <Button size="sm" variant="ghost" onClick={startFollowing} data-testid="fleet-logs-follow">
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={startFollowing}
+                        data-testid="fleet-logs-follow"
+                    >
                         {t('viewer.follow')}
                     </Button>
                 )}
@@ -321,11 +391,21 @@ export function LogViewer({
                         onLoad={() => loadEarlier(0)}
                     />
                 )}
-                <Button size="sm" variant="ghost" onClick={() => void copy('selection')} data-testid="fleet-logs-copy-selection">
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void copy('selection')}
+                    data-testid="fleet-logs-copy-selection"
+                >
                     <Copy className="w-3 h-3 mr-1" aria-hidden="true" />
                     {copied === 'selection' ? t('viewer.copied') : t('viewer.copySelection')}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => void copy('all')} data-testid="fleet-logs-copy-all">
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void copy('all')}
+                    data-testid="fleet-logs-copy-all"
+                >
                     {copied === 'all' ? t('viewer.copied') : t('viewer.copyAllShown')}
                 </Button>
                 <Button
@@ -341,25 +421,42 @@ export function LogViewer({
             </div>
 
             {state.groupHint && (
-                <div className="px-3 py-2 border-b border-border dark:border-border-dark space-y-1" data-testid="fleet-logs-group-notice">
-                    <p className="text-xs text-text dark:text-text-dark">{t('notices.groupMembership', { node: nodeName })}</p>
+                <div
+                    className="px-3 py-2 border-b border-border dark:border-border-dark space-y-1"
+                    data-testid="fleet-logs-group-notice"
+                >
+                    <p className="text-xs text-text dark:text-text-dark">
+                        {t('notices.groupMembership', { node: nodeName })}
+                    </p>
                     <CopyCommand command={state.groupHint} testId="fleet-logs-group-command" />
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('notices.groupMembershipAfter')}</p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('notices.groupMembershipAfter')}
+                    </p>
                 </div>
             )}
 
             {errorBody ?? (
                 <div className="relative">
                     {!state.loaded && (
-                        <p className="p-4 text-xs text-text-muted dark:text-text-muted-dark" role="status" data-testid="fleet-logs-loading">
-                            {state.slow ? t('states.loadingSlow', { node: nodeName }) : t('states.loading', { node: nodeName })}
+                        <p
+                            className="p-4 text-xs text-text-muted dark:text-text-muted-dark"
+                            role="status"
+                            data-testid="fleet-logs-loading"
+                        >
+                            {state.slow
+                                ? t('states.loadingSlow', { node: nodeName })
+                                : t('states.loading', { node: nodeName })}
                         </p>
                     )}
                     <div
                         ref={listRef}
                         role="log"
                         aria-live="polite"
-                        aria-label={state.paused ? t('a11y.paused', { count: state.pausedCount }) : t('a11y.following')}
+                        aria-label={
+                            state.paused
+                                ? t('a11y.paused', { count: state.pausedCount })
+                                : t('a11y.following')
+                        }
                         tabIndex={0}
                         onScroll={onScroll}
                         onKeyDown={onListKey}
@@ -393,7 +490,12 @@ export function LogViewer({
             )}
 
             {state.stopReason && state.stopReason !== 'not-following' && (
-                <div className="px-3 py-2 border-t border-border dark:border-border-dark flex items-center gap-2" role="status" data-testid="fleet-logs-stopped" data-reason={state.stopReason}>
+                <div
+                    className="px-3 py-2 border-t border-border dark:border-border-dark flex items-center gap-2"
+                    role="status"
+                    data-testid="fleet-logs-stopped"
+                    data-reason={state.stopReason}
+                >
                     <p className="text-xs text-text dark:text-text-dark">
                         {state.stopReason === 'kill-switch'
                             ? t('states.killSwitch')
@@ -404,7 +506,12 @@ export function LogViewer({
                                 : (state.stopHint ?? t('notices.stopped', { source: label }))}
                     </p>
                     {state.stopReason === 'lost' && (
-                        <Button size="sm" variant="secondary" onClick={reopen} data-testid="fleet-logs-reopen">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={reopen}
+                            data-testid="fleet-logs-reopen"
+                        >
                             {t('viewer.reopen')}
                         </Button>
                     )}
@@ -421,8 +528,13 @@ export function LogViewer({
                 </p>
             )}
 
-            <footer className="px-3 py-1.5 border-t border-border dark:border-border-dark text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-footer">
-                {footer.map((part) => t(`viewer.${part.key}` as Parameters<typeof t>[0], part.values)).join(' · ')}
+            <footer
+                className="px-3 py-1.5 border-t border-border dark:border-border-dark text-[11px] text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-logs-footer"
+            >
+                {footer
+                    .map((part) => t(`viewer.${part.key}` as Parameters<typeof t>[0], part.values))
+                    .join(' · ')}
             </footer>
         </section>
     );
@@ -447,20 +559,32 @@ function EarlierControl({
     const t = useTranslations('fleet.logs');
     if (!supported || unsupported) {
         return (
-            <span className="text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-no-earlier">
+            <span
+                className="text-[11px] text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-logs-no-earlier"
+            >
                 {container ? t('viewer.noEarlierContainer') : t('viewer.noEarlier')}
             </span>
         );
     }
     if (exhausted) {
         return (
-            <span className="text-[11px] text-text-muted dark:text-text-muted-dark" data-testid="fleet-logs-no-earlier">
+            <span
+                className="text-[11px] text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-logs-no-earlier"
+            >
                 {t('viewer.noEarlier')}
             </span>
         );
     }
     return (
-        <Button size="sm" variant="ghost" onClick={onLoad} disabled={loading} data-testid="fleet-logs-load-earlier">
+        <Button
+            size="sm"
+            variant="ghost"
+            onClick={onLoad}
+            disabled={loading}
+            data-testid="fleet-logs-load-earlier"
+        >
             <ArrowUpToLine className="w-3 h-3 mr-1" aria-hidden="true" />
             {loading ? t('viewer.loadingEarlier') : t('viewer.loadEarlier')}
         </Button>
@@ -495,7 +619,9 @@ function LogRow({
             data-level={line.level}
             data-highlight={highlight ? 'true' : undefined}
         >
-            <span className="shrink-0 text-text-muted dark:text-text-muted-dark select-none w-16">{formatLogTime(line.ts)}</span>
+            <span className="shrink-0 text-text-muted dark:text-text-muted-dark select-none w-16">
+                {formatLogTime(line.ts)}
+            </span>
             {chip !== null && (
                 <span
                     className={`shrink-0 rounded px-1.5 select-none max-w-[8rem] truncate ${logChipClass(line.src)}`}

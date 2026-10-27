@@ -670,10 +670,14 @@ export class PluginsController {
             this.ownershipService,
             workId,
             auth,
-            "change the cluster credential this App deploys with",
+            'change the cluster credential this App deploys with',
         );
     }
 }
 
 /** The k8s settings that decide which cluster an App Work's secrets are rendered into. */
-const APP_CLUSTER_CREDENTIAL_KEYS: readonly string[] = ['kubeconfig', 'kubeContext', 'clusterSource'];
+const APP_CLUSTER_CREDENTIAL_KEYS: readonly string[] = [
+    'kubeconfig',
+    'kubeContext',
+    'clusterSource',
+];

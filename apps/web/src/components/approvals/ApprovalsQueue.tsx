@@ -52,7 +52,8 @@ function ProposalDetail({
     const payload = proposal.payload ?? {};
     if (proposal.actionType !== 'other') return null;
     // FL-19 P2 / FL-09 — an Agent's act on a computer waiting for a person (spec §5.2).
-    if (isFleetActionDecisionPayload(payload)) return <FleetActionDecisionCard proposal={proposal} />;
+    if (isFleetActionDecisionPayload(payload))
+        return <FleetActionDecisionCard proposal={proposal} />;
     const body = typeof payload.body === 'string' ? payload.body : null;
     if (payload.kind === 'agent-file-edit' && body !== null) {
         return (

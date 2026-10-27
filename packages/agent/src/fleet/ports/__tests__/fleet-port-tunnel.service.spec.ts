@@ -17,7 +17,14 @@ describe('FleetPortTunnelService', () => {
         process.env = { ...env };
     });
 
-    const node = { id: 'node-1', userId: 'owner-1', name: 'build-01', kind: 'node', status: 'online', lastHeartbeatAt: new Date() };
+    const node = {
+        id: 'node-1',
+        userId: 'owner-1',
+        name: 'build-01',
+        kind: 'node',
+        status: 'online',
+        lastHeartbeatAt: new Date(),
+    };
 
     function make(options: { open?: Array<Record<string, unknown>>; stopped?: boolean } = {}) {
         const rows = new Map<string, Record<string, unknown>>();
@@ -29,13 +36,20 @@ describe('FleetPortTunnelService', () => {
                 return row;
             }),
             findById: jest.fn(async (id: string) => rows.get(id) ?? null),
-            findOpenForPort: jest.fn(async (owner: string, nodeId: string, port: number) =>
-                [...rows.values()].find(
-                    (row) => row.ownerUserId === owner && row.nodeId === nodeId && row.port === port && row.state === 'open',
-                ) ?? null,
+            findOpenForPort: jest.fn(
+                async (owner: string, nodeId: string, port: number) =>
+                    [...rows.values()].find(
+                        (row) =>
+                            row.ownerUserId === owner &&
+                            row.nodeId === nodeId &&
+                            row.port === port &&
+                            row.state === 'open',
+                    ) ?? null,
             ),
             listOpenForOwner: jest.fn(async (owner: string) =>
-                [...rows.values()].filter((row) => row.ownerUserId === owner && row.state === 'open'),
+                [...rows.values()].filter(
+                    (row) => row.ownerUserId === owner && row.state === 'open',
+                ),
             ),
             listOpen: jest.fn(async () => [...rows.values()].filter((row) => row.state === 'open')),
             close: jest.fn(async (id: string, reason: string) => {
@@ -51,8 +65,14 @@ describe('FleetPortTunnelService', () => {
         const access = { resolveForFamily: jest.fn(async () => ({ node, role: 'owner' })) };
         const killSwitch = { isStopped: jest.fn(async () => options.stopped === true) };
         const nodes = { findById: jest.fn(async () => node) };
-        const audit = { record: jest.fn(async (input: { action: string }) => ({ id: `audit-${input.action}` })) };
-        const link = { open: jest.fn(async () => undefined), close: jest.fn(), isConnected: jest.fn(() => true) };
+        const audit = {
+            record: jest.fn(async (input: { action: string }) => ({ id: `audit-${input.action}` })),
+        };
+        const link = {
+            open: jest.fn(async () => undefined),
+            close: jest.fn(),
+            isConnected: jest.fn(() => true),
+        };
         const service = new FleetPortTunnelService(
             repo as never,
             access as never,
@@ -71,7 +91,9 @@ describe('FleetPortTunnelService', () => {
         const { tunnel, created } = await service.open('node-1', 3000, owner);
         expect(created).toBe(true);
         expect(tunnel.url).toBe(`https://preview.example.test/p/${tunnel.id}/`);
-        expect(link.open).toHaveBeenCalledWith(expect.objectContaining({ tunnelId: tunnel.id, port: 3000 }));
+        expect(link.open).toHaveBeenCalledWith(
+            expect.objectContaining({ tunnelId: tunnel.id, port: 3000 }),
+        );
         expect(audit.record).toHaveBeenCalledTimes(1);
         expect(audit.record.mock.calls[0][0].action).toBe('node.port.preview.open');
     });
@@ -93,19 +115,40 @@ describe('FleetPortTunnelService', () => {
 
     it('serves only its owner (FR-24)', async () => {
         const { service } = make({
-            open: [{ id: 't1', ownerUserId: 'owner-1', nodeId: 'node-1', port: 3000, openedAt: new Date() }],
+            open: [
+                {
+                    id: 't1',
+                    ownerUserId: 'owner-1',
+                    nodeId: 'node-1',
+                    port: 3000,
+                    openedAt: new Date(),
+                },
+            ],
         });
-        expect(await service.authorizeRequest('t1', 'someone-else')).toEqual({ ok: false, why: 'not-yours' });
+        expect(await service.authorizeRequest('t1', 'someone-else')).toEqual({
+            ok: false,
+            why: 'not-yours',
+        });
         expect((await service.authorizeRequest('t1', 'owner-1')).ok).toBe(true);
     });
 
     it('closes exactly once, with exactly one close audit row (ACC-FL10-18)', async () => {
         const { service, audit } = make({
-            open: [{ id: 't1', ownerUserId: 'owner-1', nodeId: 'node-1', port: 3000, openedAt: new Date() }],
+            open: [
+                {
+                    id: 't1',
+                    ownerUserId: 'owner-1',
+                    nodeId: 'node-1',
+                    port: 3000,
+                    openedAt: new Date(),
+                },
+            ],
         });
         expect(await service.close('t1', 'user', 'user')).toBe(true);
         expect(await service.close('t1', 'idle', 'idle')).toBe(false);
-        const closes = audit.record.mock.calls.filter((call) => call[0].action === 'node.port.preview.close');
+        const closes = audit.record.mock.calls.filter(
+            (call) => call[0].action === 'node.port.preview.close',
+        );
         expect(closes).toHaveLength(1);
     });
 
@@ -113,9 +156,28 @@ describe('FleetPortTunnelService', () => {
         const now = Date.now();
         const { service, rows } = make({
             open: [
-                { id: 'idle', ownerUserId: 'owner-1', nodeId: 'node-1', port: 1, openedAt: new Date(now - 11 * 60_000) },
-                { id: 'hard', ownerUserId: 'owner-1', nodeId: 'node-1', port: 2, openedAt: new Date(now - 61 * 60_000), lastRequestAt: new Date(now) },
-                { id: 'fresh', ownerUserId: 'owner-1', nodeId: 'node-1', port: 3, openedAt: new Date(now) },
+                {
+                    id: 'idle',
+                    ownerUserId: 'owner-1',
+                    nodeId: 'node-1',
+                    port: 1,
+                    openedAt: new Date(now - 11 * 60_000),
+                },
+                {
+                    id: 'hard',
+                    ownerUserId: 'owner-1',
+                    nodeId: 'node-1',
+                    port: 2,
+                    openedAt: new Date(now - 61 * 60_000),
+                    lastRequestAt: new Date(now),
+                },
+                {
+                    id: 'fresh',
+                    ownerUserId: 'owner-1',
+                    nodeId: 'node-1',
+                    port: 3,
+                    openedAt: new Date(now),
+                },
             ],
         });
         expect((await service.sweep(new Date(now))).closed).toBe(2);
@@ -125,7 +187,15 @@ describe('FleetPortTunnelService', () => {
 
         const stopped = make({
             stopped: true,
-            open: [{ id: 's', ownerUserId: 'owner-1', nodeId: 'node-1', port: 4, openedAt: new Date(now) }],
+            open: [
+                {
+                    id: 's',
+                    ownerUserId: 'owner-1',
+                    nodeId: 'node-1',
+                    port: 4,
+                    openedAt: new Date(now),
+                },
+            ],
         });
         await stopped.service.sweep(new Date(now));
         expect(stopped.rows.get('s')?.closedReason).toBe('kill-switch');
@@ -134,7 +204,9 @@ describe('FleetPortTunnelService', () => {
     it('answers 404 with the flag off (FR-31)', async () => {
         process.env.FLEET_PORT_TUNNEL_ENABLED = 'false';
         const { service } = make();
-        await expect(service.open('node-1', 3000, owner)).rejects.toMatchObject({ portsError: { code: 'not_found' } });
+        await expect(service.open('node-1', 3000, owner)).rejects.toMatchObject({
+            portsError: { code: 'not_found' },
+        });
         expect(await service.authorizeRequest('x', 'owner-1')).toEqual({ ok: false, why: 'off' });
     });
 });

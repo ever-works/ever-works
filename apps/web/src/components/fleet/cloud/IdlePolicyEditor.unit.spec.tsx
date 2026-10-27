@@ -20,7 +20,9 @@ vi.mock('next-intl', () => ({
 }));
 vi.mock('@/i18n/navigation', () => ({
     useRouter: () => router,
-    Link: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+    Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
 }));
 vi.mock('sonner', () => ({ toast }));
 vi.mock('@/app/actions/fleet/cloud', () => actions);
@@ -37,25 +39,41 @@ describe('IdlePolicyEditor (FL-17 P2)', () => {
 
     it('starts at the default "tell me after 3 h" and states what idle means', () => {
         render(<IdlePolicyEditor nodeId={NODE} name="fra-nina" policy={null} />);
-        expect((screen.getByTestId('fleet-cloud-idle-mode-tell-me') as HTMLInputElement).checked).toBe(true);
-        expect((screen.getByTestId('fleet-cloud-idle-hours-tell-me') as HTMLInputElement).value).toBe('3');
+        expect(
+            (screen.getByTestId('fleet-cloud-idle-mode-tell-me') as HTMLInputElement).checked,
+        ).toBe(true);
+        expect(
+            (screen.getByTestId('fleet-cloud-idle-hours-tell-me') as HTMLInputElement).value,
+        ).toBe('3');
         expect(screen.getByText('meaning')).toBeTruthy();
         expect(screen.getByText('neverDestroys')).toBeTruthy();
         // Nothing changed yet: Save is off.
-        expect((screen.getByTestId('fleet-cloud-idle-save') as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByTestId('fleet-cloud-idle-save') as HTMLButtonElement).disabled).toBe(
+            true,
+        );
     });
 
     it('saves power off after N hours and refreshes the page', async () => {
         const user = userEvent.setup();
         const done = vi.fn();
-        render(<IdlePolicyEditor nodeId={NODE} name="fra-nina" policy={{ mode: 'tell-me', afterHours: 3 }} onDone={done} />);
+        render(
+            <IdlePolicyEditor
+                nodeId={NODE}
+                name="fra-nina"
+                policy={{ mode: 'tell-me', afterHours: 3 }}
+                onDone={done}
+            />,
+        );
         await user.click(screen.getByTestId('fleet-cloud-idle-mode-power-off'));
         const hours = screen.getByTestId('fleet-cloud-idle-hours-power-off');
         await user.clear(hours);
         await user.type(hours, '2');
         await user.click(screen.getByTestId('fleet-cloud-idle-save'));
         await waitFor(() =>
-            expect(actions.setFleetCloudIdlePolicyAction).toHaveBeenCalledWith(NODE, { mode: 'power-off', afterHours: 2 }),
+            expect(actions.setFleetCloudIdlePolicyAction).toHaveBeenCalledWith(NODE, {
+                mode: 'power-off',
+                afterHours: 2,
+            }),
         );
         await waitFor(() => expect(router.refresh).toHaveBeenCalled());
         expect(done).toHaveBeenCalled();
@@ -64,12 +82,20 @@ describe('IdlePolicyEditor (FL-17 P2)', () => {
 
     it('says the range and disables Save outside 1–72 hours', async () => {
         const user = userEvent.setup();
-        render(<IdlePolicyEditor nodeId={NODE} name="fra-nina" policy={{ mode: 'tell-me', afterHours: 3 }} />);
+        render(
+            <IdlePolicyEditor
+                nodeId={NODE}
+                name="fra-nina"
+                policy={{ mode: 'tell-me', afterHours: 3 }}
+            />,
+        );
         const hours = screen.getByTestId('fleet-cloud-idle-hours-tell-me');
         await user.clear(hours);
         await user.type(hours, '80');
         expect(screen.getByTestId('fleet-cloud-idle-range').textContent).toBe('range:1,72');
-        expect((screen.getByTestId('fleet-cloud-idle-save') as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByTestId('fleet-cloud-idle-save') as HTMLButtonElement).disabled).toBe(
+            true,
+        );
         expect(actions.setFleetCloudIdlePolicyAction).not.toHaveBeenCalled();
     });
 
@@ -77,12 +103,25 @@ describe('IdlePolicyEditor (FL-17 P2)', () => {
         const user = userEvent.setup();
         actions.setFleetCloudIdlePolicyAction.mockResolvedValue({
             ok: false,
-            error: { code: 'permission_denied', hint: 'Only the owner of fra-nina can power or destroy it' },
+            error: {
+                code: 'permission_denied',
+                hint: 'Only the owner of fra-nina can power or destroy it',
+            },
         });
-        render(<IdlePolicyEditor nodeId={NODE} name="fra-nina" policy={{ mode: 'tell-me', afterHours: 3 }} />);
+        render(
+            <IdlePolicyEditor
+                nodeId={NODE}
+                name="fra-nina"
+                policy={{ mode: 'tell-me', afterHours: 3 }}
+            />,
+        );
         await user.click(screen.getByTestId('fleet-cloud-idle-mode-nothing'));
         await user.click(screen.getByTestId('fleet-cloud-idle-save'));
-        await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Only the owner of fra-nina can power or destroy it'));
+        await waitFor(() =>
+            expect(toast.error).toHaveBeenCalledWith(
+                'Only the owner of fra-nina can power or destroy it',
+            ),
+        );
         expect(router.refresh).not.toHaveBeenCalled();
     });
 });

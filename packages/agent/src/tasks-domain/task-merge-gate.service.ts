@@ -161,7 +161,9 @@ export class TaskMergeGateService {
         // this Task's pull request — whatever `tasks.prNumber` says.
         const headMismatch = pullRequestHeadMismatch(task, status);
         if (headMismatch) {
-            this.logger.warn(`Task ${task.id}: PR #${task.prNumber} ${headMismatch} — refusing the merge.`);
+            this.logger.warn(
+                `Task ${task.id}: PR #${task.prNumber} ${headMismatch} — refusing the merge.`,
+            );
             return { action: 'skipped', reason: 'pr-head-ref-mismatch' };
         }
 
@@ -530,7 +532,9 @@ export function pullRequestHeadRepoMismatch(
 ): string | null {
     const expected = (expectedFullName ?? '').trim().toLowerCase();
     const live =
-        typeof status.headRepoFullName === 'string' ? status.headRepoFullName.trim().toLowerCase() : '';
+        typeof status.headRepoFullName === 'string'
+            ? status.headRepoFullName.trim().toLowerCase()
+            : '';
     if (!expected || !live) return null;
     if (live === expected) return null;
     return `has its head in \`${status.headRepoFullName}\`, not in \`${expectedFullName}\``;

@@ -439,6 +439,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `pnpm --filter @ever-works/github-plugin test` and `pnpm --filter @ever-works/agent test -- git.facade.app-works` pass.
 
 - [ ] **T23 (parallel). Catalog sanitizer and managed availability.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2932): managed availability done** on the live listing — `managedHostingAvailability(item, tier)` (pure, tier passed in) in `apps/api/src/works/apps-catalog-manifest.service.ts`, the tier read through `APPS_TIER_POLICY`; spec `apps-catalog-manifest.availability.spec.ts` (each reason, the order, the purity guard, the closed default). The `apps-catalog.mapper.ts` / `AppsCatalogService` split of the plan was not made: the manifest service is the one reader.
       **Create** `packages/agent/src/apps-catalog/apps-catalog.mapper.ts` and `packages/agent/src/apps-catalog/apps-catalog.types.ts`
       — every rule of [catalog.md §3](./catalog.md), `isVerified`, and the pure
       `managedHostingAvailability(entry, registry, tier, match?)` of plan §2.4: drops a row whose license classifies
@@ -474,6 +475,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `pnpm --filter @ever-works/agent test -- apps-catalog.service` passes.
 
 - [ ] **T25. Public catalog API and web client.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2932): `GET /api/apps-catalog/licenses` done** (public, cached 5 min, before `:id`). `GET /api/apps-catalog` and `/:id` stay behind the session guard (only the create form reads them).
       **Create** `apps/api/src/apps-catalog/apps-catalog.controller.ts` and `apps/api/src/apps-catalog/apps-catalog.module.ts`
       — the three public routes of plan §4.1 (`licenses` declared before `:id`), `@Throttle` 120/min,
       `Cache-Control: public, max-age=300`.
@@ -520,7 +522,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       adapter spec satisfies APW-01's `AppSourceCatalogPort` interface for every `null` case and a match, and
       resolving writes no Activity.
 
-- [ ] **T27 (parallel). Three-way spec merge.**
+- [x] **T27 (parallel). Three-way spec merge.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2919): done** — `app-spec-merge.ts` (pure, `source` from ours, `blueprint` from theirs, unknown base ⇒ two-way) plus a comment-preserving render; `__tests__/app-spec-merge.spec.ts` (47 cases, ACC-03-29).
       **Create** `packages/agent/src/apps-catalog/app-spec-merge.ts` — key-wise merge, named-array merge by
       `name`, conflict list, `source` from ours.
       **Test**: `packages/agent/src/apps-catalog/__tests__/app-spec-merge.spec.ts` — user change kept, both
@@ -528,6 +531,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: the merge is pure (no I/O) and `source` never comes from `theirs`.
 
 - [ ] **T28. Apply and upgrade job.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2919): the apply-after-create and upgrade halves are done** — `AppBlueprintUpgradeService` (`packages/agent/src/apps-catalog/app-blueprint-upgrade.service.ts`), job `app-blueprint-apply` (`packages/tasks/src/tasks/trigger/app-blueprint-apply.task.ts`, runner over `remoteMap`), dispatcher bound in the agent `AppWorksModule`, the landing recorded on `app.spec.applied`. The create-time apply stays the inline path of 2026-10-17. Open: overlays (`overlay.yml`, the add-only files) and `APP_SOURCE_APPLY_REPORTER`.
       **Create** `packages/agent/src/apps-catalog/app-blueprint-apply.service.ts`,
       `packages/agent/src/tasks/app-blueprint-apply.types.ts`, `packages/agent/src/tasks/app-blueprint-apply-dispatcher.ts`
       (`APP_BLUEPRINT_APPLY_DISPATCHER`), `packages/tasks/src/tasks/trigger/app-blueprint-apply.task.ts`.
@@ -570,7 +574,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `pnpm --filter @ever-works/agent test -- app-blueprint-apply` passes and the dispatcher symbol is in
       `DISPATCHER_SYMBOLS`.
 
-- [ ] **T29. Apply, upgrade and dismiss endpoints.**
+- [x] **T29. Apply, upgrade and dismiss endpoints.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2930): done** — on `work-app-spec.controller.ts`; spec `work-app-spec.blueprint-routes.spec.ts` (edit access, the shared 404, refusal mapping, 202/200, the shared 5/hour bucket). `forkMatchNeedsConfirmation` never fires: a Blueprint chosen by id is an explicit match.
       **Modify** `apps/api/src/works/work-app-spec.controller.ts` and `apps/api/src/works/dto/app-spec.dto.ts` —
       `POST …/app-spec/blueprint`, `…/blueprint/upgrade`, `…/blueprint/dismiss` with the plan §4.2 codes and
       5/hour throttles.
@@ -580,6 +585,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: the three routes are in the OpenAPI document and return `202`/`200` without awaiting a job.
 
 - [ ] **T30. Hourly catalog refresh.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2930): the upgrade fan-out is done** as an API `@Cron(APPS_CATALOG_REFRESH_CRON)` service (`apps/api/src/works/apps-catalog-upgrade-notice-cron.service.ts`, locked like `AppLicenseRegistryCronService`) over `AppBlueprintUpgradeService.refreshUpgradeNotices` — the latest version is read from each Blueprint repository, not the manifest. No Trigger `apps-catalog-refresh` task (the API cron is the one runner, as the licence fan-out already is).
       **Create** `packages/tasks/src/tasks/trigger/apps-catalog-refresh.task.ts` (cron `23 * * * *`, pinned
       equal to `APPS_CATALOG_REFRESH_CRON`) and `apps/api/src/apps-catalog/apps-catalog-refresh-cron.service.ts`
       (fallback when Trigger.dev is not the runtime, locked like
@@ -591,7 +597,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       (ACC-03-22, upgrade half), once-per-version, one failing Work does not abort the run.
       **Done when**: both specs pass and the cron constant is asserted equal in both files.
 
-- [ ] **T31. Blueprint card and upgrade dialog.**
+- [x] **T31. Blueprint card and upgrade dialog.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2930): done** — `AppBlueprintCard.tsx`, `AppBlueprintUpgradeDialog.tsx`, the three actions in `app-spec.ts`; `AppBlueprintCard.unit.spec.tsx` (ACC-03-29 card half).
       **Create** `apps/web/src/components/works/detail/settings/app-spec/AppBlueprintCard.tsx` and
       `apps/web/src/components/works/detail/settings/app-spec/AppBlueprintUpgradeDialog.tsx` (apply and upgrade
       variants).

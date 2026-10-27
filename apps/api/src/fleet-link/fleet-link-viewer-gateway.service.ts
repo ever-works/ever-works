@@ -11,6 +11,7 @@ import {
     FLEET_LINK_VIEWER_PING_INTERVAL_MS,
     parseFleetLinkViewerPath,
     type FleetLinkFamily,
+    type FleetLinkFrameKind,
 } from '@ever-works/contracts';
 import { FleetLinkAttachService, type FleetLinkViewerClaims } from './fleet-link-attach.service';
 import { FleetLinkException } from './fleet-link.errors';
@@ -65,7 +66,7 @@ export interface FleetLinkViewerObserver {
     /** The channel is open and bridged. */
     opened?(viewer: FleetLinkViewerHandle): void;
     /** The viewer sent one binary message of `bytes` bytes (forwarded, or refused by its role). */
-    inbound?(viewer: FleetLinkViewerHandle, bytes: number): void;
+    inbound?(viewer: FleetLinkViewerHandle, bytes: number, kind?: number): void;
     /** Asked on every ping tick while open: false closes the viewer (it lost the right to watch). */
     stillAllowed?(viewer: FleetLinkViewerHandle): Promise<boolean>;
     /**
@@ -74,6 +75,13 @@ export interface FleetLinkViewerObserver {
      * Called before the message is forwarded; never sees a `DATA` payload.
      */
     nodeMessage?(viewer: FleetLinkViewerHandle, message: Record<string, unknown>): void;
+    /**
+     * A binary frame the NODE sent on the viewer's channel (FL-07 P2.C: the
+     * Desktop view's recording reads its `FRAME` and `TILES`). Called before
+     * the frame is forwarded; the payload is the node's, read-only — an
+     * observer that keeps it copies it.
+     */
+    nodeBinary?(viewer: FleetLinkViewerHandle, kind: number, payload: Uint8Array): void;
     /** The viewer is gone. */
     closed?(viewer: FleetLinkViewerHandle): void;
 }
@@ -120,6 +128,34 @@ export class FleetLinkViewerGatewayService
     /** Observe one family's viewers (one observer per family; a second replaces the first). */
     registerObserver(family: FleetLinkFamily, observer: FleetLinkViewerObserver): void {
         this.observers.set(family, observer);
+    }
+
+    /**
+     * Close the open viewers on THIS replica that `match` names, at once —
+     * without waiting for the next ping's `stillAllowed` (FL-07 P2: a desktop
+     * driver whose control just ended stops sending input now). Each closes
+     * `4013` like a viewer that lost its right; its channel ends with it.
+     * Returns how many were closed.
+     */
+    closeViewers(
+        match: (viewer: FleetLinkViewerHandle) => boolean,
+        reason = 'access changed',
+    ): number {
+        let closed = 0;
+        for (const [ws, state] of [...this.sockets]) {
+            if (!state.handle || !state.opened) continue;
+            let hit = false;
+            try {
+                hit = match(state.handle);
+            } catch {
+                hit = false;
+            }
+            if (!hit) continue;
+            state.bridge?.viewerClosed();
+            this.safeClose(ws, FLEET_LINK_VIEWER_CLOSE_CODES.channelClosed, reason);
+            closed += 1;
+        }
+        return closed;
     }
 
     onApplicationShutdown(): void {
@@ -173,7 +209,13 @@ export class FleetLinkViewerGatewayService
                     state.bridge.fromViewer(bytes);
                     if (state.opened && state.handle) {
                         try {
-                            state.observer?.inbound?.(state.handle, bytes.byteLength);
+                            // FL-07 P2: the frame kind too (byte 4 of the frame header), so a
+                            // family can tell input from view controls — never the payload.
+                            state.observer?.inbound?.(
+                                state.handle,
+                                bytes.byteLength,
+                                bytes.byteLength > 4 ? bytes[4] : undefined,
+                            );
                         } catch {
                             // an observer never breaks the stream
                         }
@@ -255,7 +297,7 @@ export class FleetLinkViewerGatewayService
             const observer = state.observer;
             // FL-08: an observer that reads the node's JSON messages sees each
             // one before it is forwarded (bytes are never shown to it).
-            const events =
+            const withMessages =
                 observer?.nodeMessage !== undefined
                     ? {
                           ...bridge.events,
@@ -269,6 +311,21 @@ export class FleetLinkViewerGatewayService
                           },
                       }
                     : bridge.events;
+            // FL-07 P2.C: an observer that reads the node's binary frames sees each one first.
+            const events =
+                observer?.nodeBinary !== undefined
+                    ? {
+                          ...withMessages,
+                          binary: (kind: FleetLinkFrameKind, payload: Uint8Array) => {
+                              try {
+                                  observer.nodeBinary?.(handle, kind, payload);
+                              } catch {
+                                  // an observer never breaks the stream
+                              }
+                              withMessages.binary?.(kind, payload);
+                          },
+                      }
+                    : withMessages;
             const channel = await this.links.openChannel({
                 nodeId: claims.nodeId,
                 family: claims.family,

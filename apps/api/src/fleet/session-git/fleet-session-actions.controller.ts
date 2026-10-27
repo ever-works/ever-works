@@ -113,7 +113,10 @@ export class FleetSessionActionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: SendFleetSessionActionDto,
     ): Promise<FleetSessionActionSendResponse> {
-        return this.actions.send(id, actorOf(auth), { actionId: body.actionId, prompt: body.prompt });
+        return this.actions.send(id, actorOf(auth), {
+            actionId: body.actionId,
+            prompt: body.prompt,
+        });
     }
 
     @Get('sessions/:id/actions/ledger')

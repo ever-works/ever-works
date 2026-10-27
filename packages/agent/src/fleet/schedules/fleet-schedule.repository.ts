@@ -36,7 +36,10 @@ export class FleetScheduleRepository {
     }
 
     /** A person's schedules; deleted ones only when `includeDeletedSince` names how far back. */
-    async listForUser(userId: string, includeDeletedSince: Date | null = null): Promise<FleetCommand[]> {
+    async listForUser(
+        userId: string,
+        includeDeletedSince: Date | null = null,
+    ): Promise<FleetCommand[]> {
         const where = includeDeletedSince
             ? [
                   { userId, cadence: Not(IsNull()), deletedAt: IsNull() },
@@ -50,7 +53,10 @@ export class FleetScheduleRepository {
     }
 
     /** Every schedule on one computer (any person's), deleted ones too when asked. */
-    async listForNode(nodeId: string, options: { includeDeleted?: boolean } = {}): Promise<FleetCommand[]> {
+    async listForNode(
+        nodeId: string,
+        options: { includeDeleted?: boolean } = {},
+    ): Promise<FleetCommand[]> {
         const query = this.commands
             .createQueryBuilder('command')
             .where('command.cadence IS NOT NULL')
@@ -97,7 +103,10 @@ export class FleetScheduleRepository {
     }
 
     /** One schedule's newest runs, newest first (the history, FR-20: 30). */
-    async findRuns(commandId: string, limit: number = FLEET_SCHEDULE_HISTORY): Promise<FleetCommandRun[]> {
+    async findRuns(
+        commandId: string,
+        limit: number = FLEET_SCHEDULE_HISTORY,
+    ): Promise<FleetCommandRun[]> {
         return this.runs.find({
             where: { commandId },
             order: { startedAt: 'DESC' },
@@ -139,7 +148,10 @@ export class FleetScheduleRepository {
     }
 
     /** The latest end the platform holds for this computer's schedule runs (the `since` watermark). */
-    async latestEndedAtForNode(nodeId: string, commandIds: readonly string[]): Promise<Date | null> {
+    async latestEndedAtForNode(
+        nodeId: string,
+        commandIds: readonly string[],
+    ): Promise<Date | null> {
         if (commandIds.length === 0) return null;
         const row = await this.runs.findOne({
             where: { nodeId, commandId: In([...commandIds]), endedAt: Not(IsNull()) },

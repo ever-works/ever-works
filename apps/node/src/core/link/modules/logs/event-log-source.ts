@@ -92,7 +92,10 @@ export function parseEventLine(line: string): EventEntry | null {
 	}
 	const message = typeof record.msg === 'string' ? record.msg.replace(/\r\n/g, '\n').trimEnd() : '';
 	const provider = typeof record.provider === 'string' ? record.provider : '';
-	const ts = typeof record.ts === 'string' && !Number.isNaN(Date.parse(record.ts)) ? new Date(Date.parse(record.ts)).toISOString() : null;
+	const ts =
+		typeof record.ts === 'string' && !Number.isNaN(Date.parse(record.ts))
+			? new Date(Date.parse(record.ts)).toISOString()
+			: null;
 	return {
 		ts,
 		level: fleetLogLevelFromWindowsEventLevel(record.level) ?? classifyLogLevel(null, message),
@@ -113,14 +116,23 @@ export function createEventLogReader(io: LogIo, options: EventLogReaderOptions):
 	const recent = new Set<string>();
 
 	const read = async (max: number, after: string | null, before: string | null = null) => {
-		const result = await collectChild(io, 'powershell.exe', powershellArgs(eventLogScript(options, max, after, before)), {
-			max,
-			parse: parseEventLine,
-			timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
-		});
-		if (result.spawnError) throw new LogReadError('unsupported_on_node', 'PowerShell is not available on this computer');
+		const result = await collectChild(
+			io,
+			'powershell.exe',
+			powershellArgs(eventLogScript(options, max, after, before)),
+			{
+				max,
+				parse: parseEventLine,
+				timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
+			}
+		);
+		if (result.spawnError)
+			throw new LogReadError('unsupported_on_node', 'PowerShell is not available on this computer');
 		if (result.timedOut) {
-			throw new LogReadError('operation_failed', `Get-WinEvent did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`);
+			throw new LogReadError(
+				'operation_failed',
+				`Get-WinEvent did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`
+			);
 		}
 		if (result.code !== 0) {
 			const detail = firstLine(result.stderr.join('\n'));
@@ -171,7 +183,10 @@ export function createEventLogReader(io: LogIo, options: EventLogReaderOptions):
 				} catch (error) {
 					failures += 1;
 					if (failures >= 3) {
-						sink.notice('error', error instanceof Error ? error.message : 'the event log could not be read');
+						sink.notice(
+							'error',
+							error instanceof Error ? error.message : 'the event log could not be read'
+						);
 						sink.ended();
 						return;
 					}

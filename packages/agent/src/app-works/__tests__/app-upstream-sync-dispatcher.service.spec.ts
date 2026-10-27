@@ -77,10 +77,16 @@ interface Harness {
         findUnavailableDueForRecheck: jest.Mock;
         /** T43's claim — the fourth leg reads it, so every harness models it. */
         claimSetupPullRequestChecks: jest.Mock;
+        /** T47's claim — the fifth leg. Deliberately NOT recorded in `order` (see `build`). */
+        claimSyncPullRequestChecks: jest.Mock;
         update: jest.Mock;
         findByWorkId: jest.Mock;
     };
-    states: { timeout: jest.Mock; checkSetupPullRequest: jest.Mock };
+    states: {
+        timeout: jest.Mock;
+        checkSetupPullRequest: jest.Mock;
+        checkSyncPullRequest: jest.Mock;
+    };
     sync: { dispatch: jest.Mock };
     readiness: { dispatch: jest.Mock };
     /** Every repository write and every dispatch, in the order they happened. */
@@ -99,6 +105,10 @@ function build(
         bindReadiness?: boolean;
         /** Overrides the outcome `checkSetupPullRequest` answers with. */
         setupCheckResult?: Record<string, unknown>;
+        /** Rows the sync-pull-request claim hands over (T47's fifth leg). */
+        syncChecks?: Record<string, unknown>[];
+        /** Overrides the outcome `checkSyncPullRequest` answers with. */
+        syncCheckResult?: Record<string, unknown>;
     } = {},
 ): Harness {
     const order: string[] = [];
@@ -113,6 +123,9 @@ function build(
                 return options.setupChecks ?? [];
             },
         ),
+        // T47 (2026-10-27): the fifth leg's claim. It is kept out of `order` so the exact
+        // tick sequences the legs 1-4 specs pin are unchanged by a leg that runs after them.
+        claimSyncPullRequestChecks: jest.fn().mockResolvedValue(options.syncChecks ?? []),
         update: jest.fn(async (workId: string, patch: Record<string, unknown>) => {
             order.push(`update:${workId}:${Object.keys(patch).sort().join(',')}`);
             return true;
@@ -126,6 +139,11 @@ function build(
             order.push(`checkSetupPullRequest:${workId}`);
             return options.setupCheckResult ?? { found: true, checked: true, status: 'open' };
         }),
+        checkSyncPullRequest: jest
+            .fn()
+            .mockResolvedValue(
+                options.syncCheckResult ?? { found: true, checked: true, status: 'open' },
+            ),
     };
 
     const sync = {
@@ -568,6 +586,8 @@ describe('AppUpstreamSyncDispatcherService', () => {
                     'redispatchedReadiness',
                     'setupChecked',
                     'skipped',
+                    // APW-02 T47 (2026-10-27) — the fifth leg's counter, additive.
+                    'syncPullRequestChecked',
                     'timedOut',
                 ].sort(),
             );
@@ -707,6 +727,67 @@ describe('AppUpstreamSyncDispatcherService', () => {
             expect(await h.service.requestSetupPullRequestCheck('   ', NOW)).toBeNull();
             expect(h.rows.findByWorkId).not.toHaveBeenCalled();
             expect(h.states.checkSetupPullRequest).not.toHaveBeenCalled();
+        });
+    });
+
+    /** APW-02 T47 (FR-62, ACC-02-26) — the fifth leg: a merged sync pull request finishes. */
+    describe('the sync pull request check — leg 5 (T47)', () => {
+        it('claims at most 50 rows every 10 minutes and checks each one once', async () => {
+            const h = build({ syncChecks: [makeRow(), makeRow({ workId: 'work-2' })] });
+
+            const counters = await h.service.dispatchDue(NOW);
+
+            expect(h.rows.claimSyncPullRequestChecks).toHaveBeenCalledWith(
+                NOW,
+                600_000,
+                APP_UPSTREAM_SYNC_DISPATCH_BATCH,
+            );
+            expect(h.states.checkSyncPullRequest).toHaveBeenCalledTimes(2);
+            expect(h.states.checkSyncPullRequest).toHaveBeenCalledWith(WORK_ID);
+            expect(counters.syncPullRequestChecked).toBe(2);
+            expect(counters.failed).toBe(0);
+        });
+
+        it('counts an unreadable provider as failed and a busy row as skipped', async () => {
+            const unreadable = build({
+                syncChecks: [makeRow()],
+                syncCheckResult: { found: true, checked: true, status: 'unknown' },
+            });
+            const busy = build({
+                syncChecks: [makeRow()],
+                syncCheckResult: { found: true, checked: false, status: 'busy' },
+            });
+
+            const failed = await unreadable.service.dispatchDue(NOW);
+            const skipped = await busy.service.dispatchDue(NOW);
+
+            expect(failed.failed).toBe(1);
+            expect(failed.syncPullRequestChecked).toBe(0);
+            expect(skipped.skipped).toBe(1);
+            expect(skipped.syncPullRequestChecked).toBe(0);
+        });
+
+        it('checks on view only when the last check is older than 60 s', async () => {
+            const fresh = build({
+                row: makeRow({
+                    syncPullRequestNumber: 7,
+                    syncPullRequestCheckedAt: new Date(NOW - 30_000),
+                }),
+            });
+            const stale = build({
+                row: makeRow({
+                    syncPullRequestNumber: 7,
+                    syncPullRequestCheckedAt: new Date(NOW - 61_000),
+                }),
+            });
+            const none = build({ row: makeRow({ syncPullRequestNumber: null }) });
+
+            expect(await fresh.service.requestSyncPullRequestCheck(WORK_ID, NOW)).toBeNull();
+            expect(fresh.states.checkSyncPullRequest).not.toHaveBeenCalled();
+            expect(await stale.service.requestSyncPullRequestCheck(WORK_ID, NOW)).toMatchObject({
+                status: 'open',
+            });
+            expect(await none.service.requestSyncPullRequestCheck(WORK_ID, NOW)).toBeNull();
         });
     });
 });

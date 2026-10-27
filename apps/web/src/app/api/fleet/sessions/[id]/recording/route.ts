@@ -25,7 +25,8 @@ export const GET = bffProxy<RouteContext>(async ({ request, headers }, ctx) => {
     const from = Number(params.get('from'));
     if (params.has('from') && Number.isInteger(from) && from >= 0) out.set('from', String(from));
     const limit = Number(params.get('limit'));
-    if (params.has('limit') && Number.isInteger(limit) && limit >= 1 && limit <= 500) out.set('limit', String(limit));
+    if (params.has('limit') && Number.isInteger(limit) && limit >= 1 && limit <= 500)
+        out.set('limit', String(limit));
     const query = out.toString();
     return forwardFleetCall(fleetApiUrl(`/sessions/${id}/recording${query ? `?${query}` : ''}`), {
         method: 'GET',
@@ -38,7 +39,14 @@ export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => 
     if (!isUuid(id)) return invalidIdResponse();
     const body = sanitizeRecordingBody(await readJsonBody(request));
     if (!body) {
-        return NextResponse.json({ error: { code: 'invalid', hint: 'on must be true or false' } }, { status: 400 });
+        return NextResponse.json(
+            { error: { code: 'invalid', hint: 'on must be true or false' } },
+            { status: 400 },
+        );
     }
-    return forwardFleetCall(fleetApiUrl(`/sessions/${id}/recording`), { method: 'POST', headers, body });
+    return forwardFleetCall(fleetApiUrl(`/sessions/${id}/recording`), {
+        method: 'POST',
+        headers,
+        body,
+    });
 });

@@ -309,7 +309,10 @@ export function FleetComputersTable({
                                     <Button
                                         variant="ghost"
                                         onClick={() => onRemove(node)}
-                                        disabled={isPending || Boolean(node.cloud && !node.cloud.removable)}
+                                        disabled={
+                                            isPending ||
+                                            Boolean(node.cloud && !node.cloud.removable)
+                                        }
                                         data-testid={`fleet-node-remove-${node.id}`}
                                         title={
                                             node.cloud && !node.cloud.removable

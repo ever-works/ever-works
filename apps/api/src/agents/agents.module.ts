@@ -1,6 +1,7 @@
 import {
     AppChangeRequestService,
     AppWorksModule as AgentAppWorksModule,
+    appProvisioningTaskOrigin,
 } from '@ever-works/agent/app-works';
 import { Global, Logger, Module } from '@nestjs/common';
 import {
@@ -116,6 +117,8 @@ import {
     // APW-08 FR-12 / T12 — the one cloud App Work push gate `finalizeRun` asks.
     appWorkCloudPushAllowed,
     appWorkCloudPushRefusal,
+    // APW-04 T10 — the run's Task, for the App provisioning write rule.
+    TaskRepository,
 } from '@ever-works/agent/tasks-domain';
 // Domain chat-tool sources (AGENT_DOMAIN_TOOL_SOURCES binding below).
 // Each module contributes the ONE service/repository its descriptor
@@ -145,9 +148,11 @@ import {
     FleetSessionService,
     FleetNodeHealthService,
     NeedsALookService,
+    FLEET_DESKTOP_READER,
     FLEET_LOGS_READER,
     FLEET_STATUS_READER,
     FLEET_WAKE_TOOL_PORT,
+    type FleetDesktopReaderPort,
     type FleetLogsReaderPort,
     type FleetStatusReaderPort,
     type FleetWakeToolPort,
@@ -1118,6 +1123,9 @@ async function assertRealWriteTarget(
                 WorkRepository,
                 MergePolicyService,
                 { token: APP_WORK_CHANGE_GATE, optional: true },
+                // APW-04 T10 — APPENDED + optional: the run's Task, for the App
+                // provisioning write rule (`provisioningOriginOf` below).
+                { token: TaskRepository, optional: true },
             ],
             useFactory: (
                 git: GitFacadeService,
@@ -1126,6 +1134,7 @@ async function assertRealWriteTarget(
                 works: WorkRepository,
                 mergePolicy: MergePolicyService,
                 appChangeGate?: AppWorkChangeGate,
+                taskRows?: TaskRepository,
             ): AgentGitFacade => {
                 /**
                  * APW-08 P0 — the repository an Agent git tool actually acts on.
@@ -1407,6 +1416,36 @@ async function assertRealWriteTarget(
                     throw new Error(`${tool}: ${appWorkCloudPushRefusal(consequence)}`);
                 };
 
+                /**
+                 * APW-04 T10 — the run's Task origin when, and only when, the run executes
+                 * THIS Work's App provisioning Task: the gate then holds it to
+                 * `.works/works.yml` / `.works/overlay/**` (rule 3b) exactly as the
+                 * finalize path does for the same Task. `taskId` is set by the platform
+                 * from the run context, never by the model; a Task of another Work, or
+                 * any other origin, answers `null` (no change to the tool path). A Task
+                 * that cannot be read is a refusal — its write rules are unknown.
+                 */
+                const provisioningOriginOf = async (
+                    tool: 'commitToRepo' | 'openPullRequest',
+                    taskId: string | undefined,
+                    workId: string,
+                    consequence: string,
+                ): Promise<string | null> => {
+                    if (!taskId) return null;
+                    let task: { workId?: string | null; origin?: string | null } | null;
+                    try {
+                        if (!taskRows) throw new Error('the Task repository is not bound');
+                        task = (await taskRows.findById(taskId)) ?? null;
+                    } catch {
+                        throw new Error(
+                            `${tool}: this run's Task could not be read, so the rules for what it may ` +
+                                `write are unknown. ${consequence}`,
+                        );
+                    }
+                    if (!task || task.workId !== workId) return null;
+                    return appProvisioningTaskOrigin(task.origin);
+                };
+
                 /** The branch an App Work's RULES are read from: the Work's own base. */
                 const appRulesBase = async (
                     target: Awaited<ReturnType<typeof resolveWorkGitTarget>>,
@@ -1514,6 +1553,12 @@ async function assertRealWriteTarget(
                                         `written, committed or pushed.`,
                                 );
                             }
+                            const commitTaskOrigin = await provisioningOriginOf(
+                                'commitToRepo',
+                                input.taskId,
+                                workId,
+                                'Nothing was written, committed or pushed.',
+                            );
                             await assertAppWorkChange(
                                 'commitToRepo',
                                 async (gate) =>
@@ -1524,6 +1569,11 @@ async function assertRealWriteTarget(
                                               repo: target.repo,
                                               gitOptions: { userId, providerId, workId },
                                               baseRef: base,
+                                              // APW-04 T10 — only for this Work's App
+                                              // provisioning Task; absent otherwise.
+                                              ...(commitTaskOrigin
+                                                  ? { taskOrigin: commitTaskOrigin }
+                                                  : {}),
                                               paths: [...new Set(writes.map((w) => w.path))],
                                               contents: Object.fromEntries(
                                                   writes.map((w) => [w.path, w.body]),
@@ -1895,13 +1945,21 @@ async function assertRealWriteTarget(
                                 workId,
                                 gateCwd,
                             );
+                            const pullRequestTaskOrigin = await provisioningOriginOf(
+                                'openPullRequest',
+                                input.taskId,
+                                workId,
+                                'The pull request was not opened.',
+                            );
                             await assertAppWorkChange(
                                 'openPullRequest',
                                 async (gate) =>
                                     rulesBase
                                         ? gate.evaluate({
                                               work: target.work,
-                                              taskOrigin: null,
+                                              // APW-04 T10 — `null` for every run but this
+                                              // Work's App provisioning Task.
+                                              taskOrigin: pullRequestTaskOrigin,
                                               owner: target.owner,
                                               repo: target.repo,
                                               gitOptions: { userId, providerId, workId },
@@ -2208,6 +2266,10 @@ async function assertRealWriteTarget(
                 // the tools are not offered; install / stop / restart / remove only ever file
                 // an approval.
                 { token: FleetActionsRunnersService, optional: true },
+                // Desktop view & control (FL-07) — backs the read-only `fleet_desktop_displays`.
+                // APPENDED LAST (positional), optional: unbound (or FLEET_DESKTOP_ENABLED off)
+                // the tool is not offered.
+                { token: FLEET_DESKTOP_READER, optional: true },
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -2252,6 +2314,7 @@ async function assertRealWriteTarget(
                 fleetCloud?: FleetCloudService | null,
                 fleetUsage?: FleetUsageViewService | null,
                 fleetRunners?: FleetActionsRunnersService | null,
+                fleetDesktop?: FleetDesktopReaderPort | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -2296,9 +2359,15 @@ async function assertRealWriteTarget(
                               },
                           }
                         : {}),
-                    ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
-                    ...(fleetUsage && config.fleet.isUsageScanEnabled() ? { usage: fleetUsage } : {}),
-                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled() ? { runners: fleetRunners } : {}),
+                    ...(fleetVirtual && config.fleet.isVirtualEnabled()
+                        ? { virtual: fleetVirtual }
+                        : {}),
+                    ...(fleetUsage && config.fleet.isUsageScanEnabled()
+                        ? { usage: fleetUsage }
+                        : {}),
+                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled()
+                        ? { runners: fleetRunners }
+                        : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                     ...(fleetSessionActions && config.fleet.isSessionsEnabled()
                         ? {
@@ -2310,6 +2379,9 @@ async function assertRealWriteTarget(
                           }
                         : {}),
                     ...(fleetCloud && config.fleet.isCloudEnabled() ? { cloud: fleetCloud } : {}),
+                    ...(fleetDesktop && config.fleet.isDesktopEnabled()
+                        ? { desktop: { reader: fleetDesktop } }
+                        : {}),
                 },
                 ...(fleetSessions && config.fleet.isSessionsEnabled()
                     ? { fleetSessions: { service: fleetSessions } }
@@ -2322,8 +2394,11 @@ async function assertRealWriteTarget(
                           fleetTasks: {
                               handoff: fleetTaskHandoff
                                   ? {
-                                        options: (userId: string, taskId: string, agentId: string | null) =>
-                                            fleetTaskHandoff.options(userId, taskId, agentId),
+                                        options: (
+                                            userId: string,
+                                            taskId: string,
+                                            agentId: string | null,
+                                        ) => fleetTaskHandoff.options(userId, taskId, agentId),
                                     }
                                   : null,
                               identity: fleetGitIdentity ?? null,

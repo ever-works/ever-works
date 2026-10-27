@@ -33,7 +33,11 @@ describe('IntegrationGoalsController', () => {
     } as never;
     const RELAY = {
         relayedBy: 'Ever Gauzy (Gauzy)',
-        provenance: { integrationKeyId: 'key-1', integrationKind: 'ever-gauzy', actAsUserId: 'person-1' },
+        provenance: {
+            integrationKeyId: 'key-1',
+            integrationKind: 'ever-gauzy',
+            actAsUserId: 'person-1',
+        },
     };
     const req = (key: string | undefined = 'idem-1') => ({
         method: 'POST',
@@ -397,7 +401,11 @@ describe('IntegrationGoalsController — key without a person (findings 1, 7)', 
         ownerUserId: 'owner-1',
         actAsUserId: null,
     };
-    const keyOnly = { userId: 'owner-1', authMethod: 'integration', integration: principal } as never;
+    const keyOnly = {
+        userId: 'owner-1',
+        authMethod: 'integration',
+        integration: principal,
+    } as never;
     const relayed = {
         userId: 'person-1',
         authMethod: 'integration',
@@ -479,7 +487,9 @@ describe('IntegrationGoalsController — key without a person (findings 1, 7)', 
 
     const refused = (criteria: unknown) => ({
         status: 422,
-        response: { error: { code: 'domain_rule', details: { reason: 'act_as_required', criteria } } },
+        response: {
+            error: { code: 'domain_rule', details: { reason: 'act_as_required', criteria } },
+        },
     });
 
     it('PUT dod: a new open criterion is PROPOSED (inert until a person approves), never written approved', async () => {
@@ -511,7 +521,11 @@ describe('IntegrationGoalsController — key without a person (findings 1, 7)', 
             ],
             {
                 proposedBy: 'Ever Gauzy (Gauzy)',
-                provenance: { integrationKeyId: 'key-1', integrationKind: 'ever-gauzy', actAsUserId: null },
+                provenance: {
+                    integrationKeyId: 'key-1',
+                    integrationKind: 'ever-gauzy',
+                    actAsUserId: null,
+                },
             },
         );
     });
@@ -557,7 +571,9 @@ describe('IntegrationGoalsController — key without a person (findings 1, 7)', 
     });
 
     it('PUT dod: refuses rewording an approved criterion and sending other evidence for it', async () => {
-        const { controller } = setup({ dod: [approvedOpen, { ...approvedDone, evidence: 'PR #1' }] });
+        const { controller } = setup({
+            dod: [approvedOpen, { ...approvedDone, evidence: 'PR #1' }],
+        });
         await expect(
             controller.putDod(
                 keyOnly,
@@ -717,7 +733,13 @@ describe('IntegrationGoalsController — key without a person (findings 1, 7)', 
     it('PATCH: refuses (422) a title / description change of a running Goal without a person', async () => {
         const { controller, goals } = setup({ loopStatus: 'running' });
         await expect(
-            controller.update(keyOnly, 'goal-1', { description: 'New instructions' }, undefined, res()),
+            controller.update(
+                keyOnly,
+                'goal-1',
+                { description: 'New instructions' },
+                undefined,
+                res(),
+            ),
         ).rejects.toMatchObject({
             status: 422,
             response: {
@@ -741,7 +763,13 @@ describe('IntegrationGoalsController — key without a person (findings 1, 7)', 
         );
 
         const relayedEdit = setup({ loopStatus: 'running' });
-        await relayedEdit.controller.update(relayed, 'goal-1', { title: 'Renamed' }, undefined, res());
+        await relayedEdit.controller.update(
+            relayed,
+            'goal-1',
+            { title: 'Renamed' },
+            undefined,
+            res(),
+        );
         expect(relayedEdit.goals.update).toHaveBeenCalled();
 
         const paused = setup({ loopStatus: 'paused' });

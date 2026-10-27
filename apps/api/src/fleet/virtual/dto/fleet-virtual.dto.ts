@@ -36,14 +36,21 @@ import { FleetJobNodeCredentialDto } from '../../dto/fleet-job.dto';
  */
 
 export class FleetVirtualOptionsQueryDto {
-    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_SYSTEM_IDS, description: 'The system to judge hosts for.' })
+    @ApiProperty({
+        required: false,
+        enum: FLEET_VIRTUAL_SYSTEM_IDS,
+        description: 'The system to judge hosts for.',
+    })
     @IsOptional()
     @IsIn([...FLEET_VIRTUAL_SYSTEM_IDS])
     system?: FleetVirtualSystemId;
 }
 
 export class FleetVirtualCreateDto {
-    @ApiProperty({ pattern: FLEET_VIRTUAL_NAME_PATTERN.source, description: '2–39 lower-case letters, digits and hyphens.' })
+    @ApiProperty({
+        pattern: FLEET_VIRTUAL_NAME_PATTERN.source,
+        description: '2–39 lower-case letters, digits and hyphens.',
+    })
     @IsString()
     @MinLength(2)
     @MaxLength(39)
@@ -64,12 +71,19 @@ export class FleetVirtualCreateDto {
     @IsIn([...FLEET_VIRTUAL_MEMORY_GIB_CHOICES])
     memoryGiB?: 4 | 8 | 16;
 
-    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_DISK_GIB_CHOICES, description: 'Windows VMs only.' })
+    @ApiProperty({
+        required: false,
+        enum: FLEET_VIRTUAL_DISK_GIB_CHOICES,
+        description: 'Windows VMs only.',
+    })
     @IsOptional()
     @IsIn([...FLEET_VIRTUAL_DISK_GIB_CHOICES])
     diskGiB?: 64 | 128 | 256;
 
-    @ApiProperty({ required: false, description: 'Satisfies the `confirm` class (CONTRACTS §2.2).' })
+    @ApiProperty({
+        required: false,
+        description: 'Satisfies the `confirm` class (CONTRACTS §2.2).',
+    })
     @IsOptional()
     @IsBoolean()
     confirm?: boolean;
@@ -97,21 +111,31 @@ export class FleetVirtualResizeDto {
     @IsIn([...FLEET_VIRTUAL_MEMORY_GIB_CHOICES])
     memoryGiB?: 4 | 8 | 16;
 
-    @ApiProperty({ required: false, description: 'Resize is `confirm`-class: send `confirm: true`.' })
+    @ApiProperty({
+        required: false,
+        description: 'Resize is `confirm`-class: send `confirm: true`.',
+    })
     @IsOptional()
     @IsBoolean()
     confirm?: boolean;
 }
 
 export class FleetVirtualRevealDto {
-    @ApiProperty({ required: false, description: 'The reveal is `confirm`-class: send `confirm: true`.' })
+    @ApiProperty({
+        required: false,
+        description: 'The reveal is `confirm`-class: send `confirm: true`.',
+    })
     @IsOptional()
     @IsBoolean()
     confirm?: boolean;
 }
 
 export class FleetVirtualDestroyDto {
-    @ApiProperty({ required: false, maxLength: 64, description: 'The virtual computer’s exact name (`confirm-destructive`).' })
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        description: 'The virtual computer’s exact name (`confirm-destructive`).',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(64)
@@ -120,7 +144,10 @@ export class FleetVirtualDestroyDto {
 
 /** The host's node credential + the job it holds (the `push-credential` posture). */
 export class FleetVirtualHostJobDto extends FleetJobNodeCredentialDto {
-    @ApiProperty({ format: 'uuid', description: 'The vm-create / vm-control job this host holds for the child.' })
+    @ApiProperty({
+        format: 'uuid',
+        description: 'The vm-create / vm-control job this host holds for the child.',
+    })
     @IsUUID()
     jobId: string;
 
@@ -141,13 +168,20 @@ export class FleetVirtualProgressDto extends FleetVirtualHostJobDto {
     @IsIn([...FLEET_VIRTUAL_STATES])
     state?: FleetVirtualState;
 
-    @ApiProperty({ required: false, maxLength: 500, description: 'First line of a failure (never a secret).' })
+    @ApiProperty({
+        required: false,
+        maxLength: 500,
+        description: 'First line of a failure (never a secret).',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(500)
     error?: string | null;
 
-    @ApiProperty({ required: false, description: 'The image the host built from: `{ ref, digest }` (the service bounds both).' })
+    @ApiProperty({
+        required: false,
+        description: 'The image the host built from: `{ ref, digest }` (the service bounds both).',
+    })
     @IsOptional()
     image?: { ref: string; digest?: string | null } | null;
 
@@ -156,24 +190,37 @@ export class FleetVirtualProgressDto extends FleetVirtualHostJobDto {
     @IsBoolean()
     activated?: boolean | null;
 
-    @ApiProperty({ required: false, description: 'Windows VMs: the host-loopback port of the installer viewer.' })
+    @ApiProperty({
+        required: false,
+        description: 'Windows VMs: the host-loopback port of the installer viewer.',
+    })
     @IsOptional()
     @IsInt()
     @Min(1)
     viewerPort?: number | null;
 
-    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_CPU_CHOICES, description: 'Resize: the CPUs applied.' })
+    @ApiProperty({
+        required: false,
+        enum: FLEET_VIRTUAL_CPU_CHOICES,
+        description: 'Resize: the CPUs applied.',
+    })
     @IsOptional()
     @IsIn([...FLEET_VIRTUAL_CPU_CHOICES])
     cpus?: number;
 
-    @ApiProperty({ required: false, enum: FLEET_VIRTUAL_MEMORY_GIB_CHOICES, description: 'Resize: the memory applied.' })
+    @ApiProperty({
+        required: false,
+        enum: FLEET_VIRTUAL_MEMORY_GIB_CHOICES,
+        description: 'Resize: the memory applied.',
+    })
     @IsOptional()
     @IsIn([...FLEET_VIRTUAL_MEMORY_GIB_CHOICES])
     memoryGiB?: number;
 }
 
-export function virtualConfirmFields(body: { confirm?: boolean; confirmName?: string } | null | undefined): FleetActionConfirmFields {
+export function virtualConfirmFields(
+    body: { confirm?: boolean; confirmName?: string } | null | undefined,
+): FleetActionConfirmFields {
     const out: FleetActionConfirmFields = {};
     if (body?.confirm === true) out.confirm = true;
     if (typeof body?.confirmName === 'string') out.confirmName = body.confirmName;

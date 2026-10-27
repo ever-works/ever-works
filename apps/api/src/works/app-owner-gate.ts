@@ -30,7 +30,11 @@ export const APP_OWNER_REQUIRED_CODE = 'ownerRequired';
 type EnvLike = Record<string, string | undefined>;
 
 function defaultOn(name: string, env: EnvLike | undefined): boolean {
-    return String((env ?? process.env)[name] ?? '').trim().toLowerCase() !== 'false';
+    return (
+        String((env ?? process.env)[name] ?? '')
+            .trim()
+            .toLowerCase() !== 'false'
+    );
 }
 
 export function appTargetChangeRequiresOwner(env?: EnvLike): boolean {

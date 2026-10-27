@@ -28,7 +28,9 @@ export function normalizeVirtualMeta(raw: unknown): FleetVirtualMeta | null {
     const iso = (value: unknown): string | null =>
         typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
     const image =
-        meta.image && typeof meta.image === 'object' && typeof (meta.image as { ref?: unknown }).ref === 'string'
+        meta.image &&
+        typeof meta.image === 'object' &&
+        typeof (meta.image as { ref?: unknown }).ref === 'string'
             ? {
                   ref: String((meta.image as { ref: string }).ref).slice(0, 300),
                   digest:
@@ -53,7 +55,10 @@ export function normalizeVirtualMeta(raw: unknown): FleetVirtualMeta | null {
         lastControlJobId: typeof meta.lastControlJobId === 'string' ? meta.lastControlJobId : null,
         enrollRequestedAt: iso(meta.enrollRequestedAt),
         viewerPort:
-            typeof meta.viewerPort === 'number' && Number.isInteger(meta.viewerPort) && meta.viewerPort > 0 && meta.viewerPort < 65536
+            typeof meta.viewerPort === 'number' &&
+            Number.isInteger(meta.viewerPort) &&
+            meta.viewerPort > 0 &&
+            meta.viewerPort < 65536
                 ? meta.viewerPort
                 : null,
     };
@@ -62,7 +67,8 @@ export function normalizeVirtualMeta(raw: unknown): FleetVirtualMeta | null {
 /** The create phase that maps to each in-progress view state. */
 function creatingStateOf(phase: FleetVirtualPhase): FleetVirtualState {
     if (phase === 'enrolling') return 'enrolling';
-    if (phase === 'downloading-windows' || phase === 'installing' || phase === 'first-boot') return 'installing';
+    if (phase === 'downloading-windows' || phase === 'installing' || phase === 'first-boot')
+        return 'installing';
     return 'creating';
 }
 
@@ -77,7 +83,10 @@ function creatingStateOf(phase: FleetVirtualPhase): FleetVirtualState {
  *    destroy is in flight), otherwise the machine state the host or the
  *    reconcile last reported (`stopped` when nothing better is known).
  */
-export function deriveVirtualState(source: FleetVirtualViewSource, now: number = Date.now()): FleetVirtualState {
+export function deriveVirtualState(
+    source: FleetVirtualViewSource,
+    now: number = Date.now(),
+): FleetVirtualState {
     const meta = normalizeVirtualMeta(source.virtualMeta);
     const stored = meta?.state ?? 'creating';
     if (stored === 'destroying' || stored === 'gone') return stored;
@@ -85,13 +94,20 @@ export function deriveVirtualState(source: FleetVirtualViewSource, now: number =
         if (stored === 'failed') return 'failed';
         if (stored === 'not-enrolled') return 'not-enrolled';
         const asked = meta?.enrollRequestedAt ? Date.parse(meta.enrollRequestedAt) : NaN;
-        if (Number.isFinite(asked) && now - asked > FLEET_VIRTUAL_ENROLL_TIMEOUT_MS) return 'not-enrolled';
+        if (Number.isFinite(asked) && now - asked > FLEET_VIRTUAL_ENROLL_TIMEOUT_MS)
+            return 'not-enrolled';
         return creatingStateOf(meta?.phase ?? 'queued');
     }
     if (source.status === 'online') {
         return stored === 'stopping' ? 'stopping' : 'running';
     }
-    if (stored === 'starting' || stored === 'stopping' || stored === 'stopped' || stored === 'failed') return stored;
+    if (
+        stored === 'starting' ||
+        stored === 'stopping' ||
+        stored === 'stopped' ||
+        stored === 'failed'
+    )
+        return stored;
     return 'stopped';
 }
 
@@ -122,7 +138,10 @@ export function fleetVirtualViewOf(
         error: state === 'failed' ? meta.error : null,
         imageDigest: meta.image?.digest ?? null,
         // The installer's screen is worth opening only while Windows installs.
-        viewerPort: state === 'installing' || state === 'creating' || state === 'enrolling' ? (meta.viewerPort ?? null) : null,
+        viewerPort:
+            state === 'installing' || state === 'creating' || state === 'enrolling'
+                ? (meta.viewerPort ?? null)
+                : null,
         hostName,
     };
 }

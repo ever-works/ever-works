@@ -157,7 +157,9 @@ export type HomeScheduleKind =
 	| 'data_sync'
 	| 'inbound_trigger'
 	/** Schedules on computers (FL-13): a Command scheduled on one of the person's computers. */
-	| 'node_schedule';
+	| 'node_schedule'
+	/** APW-02 T53: an App Work's upstream sync, on the App spec's cron. */
+	| 'app_upstream_sync';
 
 export const HOME_SCHEDULE_KINDS: readonly HomeScheduleKind[] = [
 	'recurring_task',
@@ -167,7 +169,8 @@ export const HOME_SCHEDULE_KINDS: readonly HomeScheduleKind[] = [
 	'source_validation',
 	'data_sync',
 	'inbound_trigger',
-	'node_schedule'
+	'node_schedule',
+	'app_upstream_sync'
 ];
 
 /** Disabled and ended schedules never reach Home; paused and errored ones do. */

@@ -308,7 +308,9 @@ describe('the identity-provider capability (APW-12 T4)', () => {
 
 		// The append-only guarantee, asserted rather than assumed: every pre-existing
 		// member is still there, in the same relative order, exactly once.
-		const remaining = PLUGIN_CATEGORIES.filter((entry) => entry !== 'identity' && !LATER_CATEGORIES.includes(entry));
+		const remaining = PLUGIN_CATEGORIES.filter(
+			(entry) => entry !== 'identity' && !LATER_CATEGORIES.includes(entry)
+		);
 		expect(remaining).toEqual([...PRE_IDENTITY_CATEGORIES]);
 		expect(new Set(PLUGIN_CATEGORIES).size).toBe(PLUGIN_CATEGORIES.length);
 
@@ -354,7 +356,9 @@ describe('the closed IdentityTokenRejectedError code set (APW-12 T4)', () => {
 			'badAuthorizedParty',
 			'badLogoutEvent',
 			'nonceInLogoutToken',
-			'providerUnavailable'
+			'providerUnavailable',
+			// APW-12 C28 (2026-10-26) — appended, never reordered (append-only).
+			'invalidGrant'
 		]);
 		// Closed means no duplicates either: a repeated member would make a count-based
 		// caller (the facade's per-code counter, §9.1) report one reason twice.

@@ -42,7 +42,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const STATE_FILTERS: readonly SessionsStateFilter[] = [...FLEET_SESSION_BOARD_COLUMNS, 'ended'];
 
 /** Read the view state from the address bar (unknown values fall back to the defaults). */
-export function parseSessionsViewState(source: { get(name: string): string | null }): SessionsViewState {
+export function parseSessionsViewState(source: {
+    get(name: string): string | null;
+}): SessionsViewState {
     const mode = source.get('mode');
     const grouping = source.get('g');
     const agentId = source.get('agent');
@@ -55,7 +57,10 @@ export function parseSessionsViewState(source: { get(name: string): string | nul
         agentId: agentId && UUID.test(agentId) ? agentId : null,
         nodeId: nodeId && UUID.test(nodeId) ? nodeId : null,
         kind: kind === 'owner' || kind === 'agent' ? kind : null,
-        state: state && (STATE_FILTERS as readonly string[]).includes(state) ? (state as SessionsStateFilter) : null,
+        state:
+            state && (STATE_FILTERS as readonly string[]).includes(state)
+                ? (state as SessionsStateFilter)
+                : null,
     };
 }
 
@@ -77,7 +82,12 @@ export function filterBoard(
     view: Pick<SessionsViewState, 'state'>,
 ): FleetSessionBoardResponse {
     if (!view.state || view.state === 'ended') return board;
-    const columns = { needs_you: [], working: [], done: [], idle: [] } as FleetSessionBoardResponse['columns'];
+    const columns = {
+        needs_you: [],
+        working: [],
+        done: [],
+        idle: [],
+    } as FleetSessionBoardResponse['columns'];
     columns[view.state] = board.columns[view.state];
     return { ...board, columns };
 }
@@ -97,7 +107,9 @@ export function filterList(
 }
 
 /** Counts per column (the headers, FR-41). */
-export function boardCounts(board: FleetSessionBoardResponse): Record<FleetSessionBoardColumn, number> {
+export function boardCounts(
+    board: FleetSessionBoardResponse,
+): Record<FleetSessionBoardColumn, number> {
     return {
         needs_you: board.columns.needs_you.length,
         working: board.columns.working.length,
@@ -107,7 +119,9 @@ export function boardCounts(board: FleetSessionBoardResponse): Record<FleetSessi
 }
 
 /** Which column every session is in — compared across reads to announce moves (FR-43, §5.14). */
-export function columnIndex(board: FleetSessionBoardResponse): Map<string, FleetSessionBoardColumn> {
+export function columnIndex(
+    board: FleetSessionBoardResponse,
+): Map<string, FleetSessionBoardColumn> {
     const index = new Map<string, FleetSessionBoardColumn>();
     for (const column of FLEET_SESSION_BOARD_COLUMNS) {
         for (const session of board.columns[column]) index.set(session.id, column);

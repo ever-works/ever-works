@@ -93,21 +93,30 @@ export class FleetPortsLinkAdapter implements FleetPortsNodePort {
     }
 
     /** Wait for an operation the node turned the request into; resolve its result or throw its error. */
-    private async awaitOperation(operationId: string, userId: string, timeoutMs: number): Promise<unknown> {
+    private async awaitOperation(
+        operationId: string,
+        userId: string,
+        timeoutMs: number,
+    ): Promise<unknown> {
         const deadline = Date.now() + timeoutMs;
         for (;;) {
             const view = this.operations.get(operationId, userId);
             if (view.state === 'done') return view.result ?? null;
             if (isFleetOperationTerminal(view.state)) {
                 throw new FleetPortsException(
-                    view.error ?? makeFleetLinkError('operation_failed', `the request ended ${view.state}`),
+                    view.error ??
+                        makeFleetLinkError('operation_failed', `the request ended ${view.state}`),
                 );
             }
             if (Date.now() >= deadline) {
                 throw new FleetPortsException(
-                    makeFleetLinkError('unreachable', 'the computer did not finish in time — try again', {
-                        operationId,
-                    }),
+                    makeFleetLinkError(
+                        'unreachable',
+                        'the computer did not finish in time — try again',
+                        {
+                            operationId,
+                        },
+                    ),
                 );
             }
             await new Promise((resolve) => setTimeout(resolve, FLEET_PORTS_OPERATION_POLL_MS));

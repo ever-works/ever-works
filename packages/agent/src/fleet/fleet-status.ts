@@ -56,7 +56,9 @@ export function composeFleetStatus(input: ComposeFleetStatusInput): FleetStatusV
         viewerRole: node.viewerRole ?? 'owner',
         consents: node.consents ? { ...node.consents } : null,
         health: compactHealth(node),
-        sessionCount: input.liveSessionsByNode ? (input.liveSessionsByNode.get(node.id) ?? 0) : null,
+        sessionCount: input.liveSessionsByNode
+            ? (input.liveSessionsByNode.get(node.id) ?? 0)
+            : null,
         lastSeenAt: node.lastHeartbeatAt ?? null,
     }));
     return {

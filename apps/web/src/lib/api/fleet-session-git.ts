@@ -75,7 +75,9 @@ export const fleetSessionGitAPI = {
     // ─── P2: actions and the platform-side pull request ───
 
     actions: async (sessionId: string) => {
-        return serverFetch<FleetSessionActionsResponse>(`${BASE}/sessions/${encodeURIComponent(sessionId)}/actions`);
+        return serverFetch<FleetSessionActionsResponse>(
+            `${BASE}/sessions/${encodeURIComponent(sessionId)}/actions`,
+        );
     },
 
     sendAction: async (sessionId: string, body: FleetSessionActionSendRequest) => {

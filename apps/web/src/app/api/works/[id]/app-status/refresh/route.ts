@@ -1,5 +1,10 @@
 import { bffProxy } from '@/lib/api/bff-proxy';
-import { appRuntimeApiUrl, forwardAppRuntimeCall, invalidIdResponse, isUuid } from '@/lib/api/app-runtime-bff';
+import {
+    appRuntimeApiUrl,
+    forwardAppRuntimeCall,
+    invalidIdResponse,
+    isUuid,
+} from '@/lib/api/app-runtime-bff';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -11,5 +16,8 @@ type RouteContext = { params: Promise<{ id: string }> };
 export const POST = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id } = await ctx.params;
     if (!isUuid(id)) return invalidIdResponse();
-    return forwardAppRuntimeCall(appRuntimeApiUrl(id, '/app-status/refresh'), { method: 'POST', headers });
+    return forwardAppRuntimeCall(appRuntimeApiUrl(id, '/app-status/refresh'), {
+        method: 'POST',
+        headers,
+    });
 });

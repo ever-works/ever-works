@@ -834,6 +834,22 @@ export const config = {
             );
         },
         /**
+         * Desktop view & control (FL-07, CONTRACTS §9) — `FLEET_DESKTOP_ENABLED`.
+         * Off unless set to `true`, and never without `FLEET_ENABLED`: with it
+         * off every `/api/fleet/nodes/:id/desktop/views|availability|displays|screenshot`
+         * route answers 404 and no Desktop-source channel is opened. A desktop
+         * view rides the node link, so `FLEET_NODE_LINK_ENABLED` still gates
+         * the machine on its own. Read per call: flipping it needs no restart.
+         * The heartbeat keeps storing the helper's trust either way (a fact
+         * about the machine, never an act).
+         */
+        isDesktopEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_DESKTOP_ENABLED === 'true'
+            );
+        },
+        /**
          * Cloud computers (FL-17, CONTRACTS §9) — `FLEET_CLOUD_ENABLED`. Off
          * unless set to `true`, and never without `FLEET_ENABLED`: with it off
          * every `/api/fleet/providers/**` and `/api/fleet/cloud/**` route answers
@@ -844,8 +860,7 @@ export const config = {
          */
         isCloudEnabled(): boolean {
             return (
-                process.env.FLEET_ENABLED !== 'false' &&
-                process.env.FLEET_CLOUD_ENABLED === 'true'
+                process.env.FLEET_ENABLED !== 'false' && process.env.FLEET_CLOUD_ENABLED === 'true'
             );
         },
         /**
@@ -1608,6 +1623,33 @@ export const config = {
             getMaxPerUser(): number {
                 const raw = parseInt(process.env.EVER_WORKS_APPS_MAX_PER_USER || '3', 10);
                 return Number.isFinite(raw) && raw > 0 ? raw : 3;
+            },
+
+            /**
+             * Owner decision 2026-10-27 — how many App Works an owner on a **paid** plan may run on
+             * **Ever Works Apps** (`EVER_WORKS_APPS_MAX_PER_PAID_USER`). The owner's rule: "max 3
+             * managed apps per owner of an UNPAID plan … paid plans can host more than 3 apps", so
+             * {@link getMaxPerUser} is the cap of a free/unpaid owner and this is the operator's
+             * optional bound for a paid one.
+             *
+             * - Unset or blank ⇒ `null`: **no limit** for a paid owner (the documented default).
+             * - A positive integer ⇒ that bound, but never below {@link getMaxPerUser} — a paid
+             *   plan never runs FEWER Apps than a free one.
+             * - Anything else (`0`, negative, non-numeric, `10x`) ⇒ {@link getMaxPerUser}. The
+             *   operator wrote a bound, so a typo must never read as "unlimited"; it degrades to
+             *   the free cap rather than to `NaN` or `0`.
+             *
+             * Read at call time; the paid/unpaid decision itself is the eligibility service's
+             * (`AppsTierEligibilityService`, `SubscriptionService.resolvePlanForUser`).
+             */
+            getMaxPerPaidUser(): number | null {
+                const value = (process.env.EVER_WORKS_APPS_MAX_PER_PAID_USER ?? '').trim();
+                const freeCap = this.getMaxPerUser();
+                if (!value) return null;
+                if (!/^[0-9]+$/.test(value)) return freeCap;
+                const parsed = Number.parseInt(value, 10);
+                if (!Number.isFinite(parsed) || parsed <= 0) return freeCap;
+                return Math.max(parsed, freeCap);
             },
 
             /**

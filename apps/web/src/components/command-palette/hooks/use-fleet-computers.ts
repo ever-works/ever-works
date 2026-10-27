@@ -69,7 +69,8 @@ export function useFleetPaletteComputers(open: boolean, enabled: boolean): Palet
                                   if (node.hostNodeId) base.hostNodeId = node.hostNodeId;
                                   if (node.virtual?.state) base.virtualState = node.virtual.state;
                                   // FL-17: a cloud computer carries its power state (no act while one is pending).
-                                  if (node.cloud && !node.cloud.pending) base.cloudPowerState = node.cloud.powerState;
+                                  if (node.cloud && !node.cloud.pending)
+                                      base.cloudPowerState = node.cloud.powerState;
                                   return base;
                               })
                         : [],

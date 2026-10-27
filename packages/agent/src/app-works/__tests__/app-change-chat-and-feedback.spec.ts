@@ -85,7 +85,11 @@ describe('request_app_change / get_app_change (APW-08 T26)', () => {
             expect(service.request).toHaveBeenCalledWith(
                 expect.objectContaining({ holdForOwner: true, channel: 'agent' }),
             );
-            expect(result).toMatchObject({ status: 'awaiting_owner', dispatched: false, taskId: 't1' });
+            expect(result).toMatchObject({
+                status: 'awaiting_owner',
+                dispatched: false,
+                taskId: 't1',
+            });
         });
 
         it('a tool set assembled without the flag (any non-chat run) holds too', async () => {
@@ -95,25 +99,41 @@ describe('request_app_change / get_app_change (APW-08 T26)', () => {
                 listChanges: jest.fn(),
             };
             const tools = buildAppChangeTools({
-                agent: { id: 'a1', userId: 'owner', permissions: { canCommitToRepo: true } as never },
+                agent: {
+                    id: 'a1',
+                    userId: 'owner',
+                    permissions: { canCommitToRepo: true } as never,
+                },
                 service: service as never,
                 authorize: jest.fn(async () => work),
             });
-            await tools.find((t) => t.name === 'request_app_change')!.invoke({ workId: 'w1', request: 'x' });
-            expect(service.request).toHaveBeenCalledWith(expect.objectContaining({ holdForOwner: true }));
+            await tools
+                .find((t) => t.name === 'request_app_change')!
+                .invoke({ workId: 'w1', request: 'x' });
+            expect(service.request).toHaveBeenCalledWith(
+                expect.objectContaining({ holdForOwner: true }),
+            );
         });
 
         it('the operator switch AGENT_APP_CHANGE_REQUIRES_OWNER=false restores the direct start', async () => {
             process.env.AGENT_APP_CHANGE_REQUIRES_OWNER = 'false';
             const { tools, service } = build({ canCommitToRepo: true }, true, false);
-            await tools.find((t) => t.name === 'request_app_change')!.invoke({ workId: 'w1', request: 'x' });
-            expect((service.request.mock.calls[0] as unknown[])[0]).not.toHaveProperty('holdForOwner');
+            await tools
+                .find((t) => t.name === 'request_app_change')!
+                .invoke({ workId: 'w1', request: 'x' });
+            expect((service.request.mock.calls[0] as unknown[])[0]).not.toHaveProperty(
+                'holdForOwner',
+            );
         });
 
         it('an owner chat turn starts the change directly, as before', async () => {
             const { tools, service } = build({ canCommitToRepo: true }, true, true);
-            await tools.find((t) => t.name === 'request_app_change')!.invoke({ workId: 'w1', request: 'x' });
-            expect((service.request.mock.calls[0] as unknown[])[0]).not.toHaveProperty('holdForOwner');
+            await tools
+                .find((t) => t.name === 'request_app_change')!
+                .invoke({ workId: 'w1', request: 'x' });
+            expect((service.request.mock.calls[0] as unknown[])[0]).not.toHaveProperty(
+                'holdForOwner',
+            );
         });
     });
 

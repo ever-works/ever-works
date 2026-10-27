@@ -104,12 +104,20 @@ function harness(options: { now: number; stored?: StoredSchedule[]; paused?: boo
 
 describe('ScheduleLoop (FL-13, FR-12 … FR-17)', () => {
 	it('fires at its time from the machine clock, with no link', async () => {
-		const stored: StoredSchedule = { definition: definition(), armedAt: at('2026-01-10T00:00:00Z'), lastFireAt: null };
+		const stored: StoredSchedule = {
+			definition: definition(),
+			armedAt: at('2026-01-10T00:00:00Z'),
+			lastFireAt: null
+		};
 		const h = harness({ now: at('2026-01-10T02:00:00.500Z'), stored: [stored] });
 		await h.loop.start();
 		await h.settle();
 		expect(h.start).toHaveBeenCalledTimes(1);
-		expect(h.reports[0]).toMatchObject({ status: 'running', scheduledFor: '2026-01-10T02:00:00.000Z', trigger: 'timer' });
+		expect(h.reports[0]).toMatchObject({
+			status: 'running',
+			scheduledFor: '2026-01-10T02:00:00.000Z',
+			trigger: 'timer'
+		});
 		h.runs[0].finish({ exitCode: 0 });
 		await h.settle();
 		expect(h.reports[0]).toMatchObject({ status: 'done', exitCode: 0 });
@@ -156,7 +164,11 @@ describe('ScheduleLoop (FL-13, FR-12 … FR-17)', () => {
 	});
 
 	it('never catches up a fire from before it held the schedule', async () => {
-		const fresh: StoredSchedule = { definition: definition(), armedAt: at('2026-01-12T02:30:00Z'), lastFireAt: null };
+		const fresh: StoredSchedule = {
+			definition: definition(),
+			armedAt: at('2026-01-12T02:30:00Z'),
+			lastFireAt: null
+		};
 		const h = harness({ now: at('2026-01-12T02:31:00Z'), stored: [fresh] });
 		await h.loop.start();
 		await h.settle();
@@ -165,7 +177,11 @@ describe('ScheduleLoop (FL-13, FR-12 … FR-17)', () => {
 	});
 
 	it('the kill switch ends a run as kill-switch and stops firing; resume re-arms (FR-17)', async () => {
-		const stored: StoredSchedule = { definition: definition(), armedAt: at('2026-01-10T00:00:00Z'), lastFireAt: null };
+		const stored: StoredSchedule = {
+			definition: definition(),
+			armedAt: at('2026-01-10T00:00:00Z'),
+			lastFireAt: null
+		};
 		const h = harness({ now: at('2026-01-10T02:00:00Z'), stored: [stored] });
 		await h.loop.start();
 		await h.settle();
@@ -186,13 +202,19 @@ describe('ScheduleLoop (FL-13, FR-12 … FR-17)', () => {
 	});
 
 	it('Run now is busy while a run is in flight (FR-19)', async () => {
-		const stored: StoredSchedule = { definition: definition(), armedAt: at('2026-01-10T00:00:00Z'), lastFireAt: null };
+		const stored: StoredSchedule = {
+			definition: definition(),
+			armedAt: at('2026-01-10T00:00:00Z'),
+			lastFireAt: null
+		};
 		const h = harness({ now: at('2026-01-10T12:00:00Z'), stored: [stored] });
 		await h.loop.start();
 		const first = await h.loop.runNow(ID, '00000000-0000-4000-8000-0000000000a1');
 		expect(first).toMatchObject({ runId: '00000000-0000-4000-8000-0000000000a1' });
 		await h.settle();
-		expect(await h.loop.runNow(ID, '00000000-0000-4000-8000-0000000000a2')).toMatchObject({ error: { code: 'busy' } });
+		expect(await h.loop.runNow(ID, '00000000-0000-4000-8000-0000000000a2')).toMatchObject({
+			error: { code: 'busy' }
+		});
 		expect(await h.loop.runNow('00000000-0000-4000-8000-0000000000ff', 'x')).toMatchObject({
 			error: { code: 'not_found' }
 		});

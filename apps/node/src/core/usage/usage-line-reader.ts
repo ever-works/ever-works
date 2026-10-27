@@ -92,7 +92,8 @@ export async function readUsageLines(
 			if (skipping || pendingBytes + piece.length > options.maxLineBytes) {
 				oversize += 1;
 			} else {
-				const line = pending.length > 0 ? Buffer.concat([...pending, piece]).toString('utf8') : piece.toString('utf8');
+				const line =
+					pending.length > 0 ? Buffer.concat([...pending, piece]).toString('utf8') : piece.toString('utf8');
 				if (line.trim().length > 0) {
 					lines += 1;
 					onLine(line);

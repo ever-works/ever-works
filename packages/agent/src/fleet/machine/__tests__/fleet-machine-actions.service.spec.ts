@@ -44,7 +44,9 @@ async function caught(promise: Promise<unknown>) {
 describe('FleetMachineActionsService', () => {
     it('asks for confirmation before contacting the machine, and audits nothing', async () => {
         const { service, requests, audit } = setup(() => ({ result: {} }));
-        const refusal = await caught(service.serviceAction('node-1', OWNER, { name: 'nginx', action: 'restart' }));
+        const refusal = await caught(
+            service.serviceAction('node-1', OWNER, { name: 'nginx', action: 'restart' }),
+        );
         expect(refusal).toMatchObject({
             code: 'confirmation_required',
             details: { class: 'confirm', summary: 'Restart nginx on build-01?' },
@@ -55,7 +57,13 @@ describe('FleetMachineActionsService', () => {
 
     it('runs a confirmed act and writes one ok row with the requester', async () => {
         const { service, requests, audit } = setup(() => ({
-            result: { name: 'postgresql', scope: 'system', action: 'start', state: 'running', viaRoot: true },
+            result: {
+                name: 'postgresql',
+                scope: 'system',
+                action: 'start',
+                state: 'running',
+                viaRoot: true,
+            },
         }));
         const result = await service.serviceAction('node-1', OWNER, {
             name: 'postgresql',
@@ -67,7 +75,12 @@ describe('FleetMachineActionsService', () => {
             verb: 'services.action',
             actionFamily: 'services',
             stateChanging: true,
-            params: { name: 'postgresql', action: 'start', scope: 'system', acknowledgeBlastRadius: false },
+            params: {
+                name: 'postgresql',
+                action: 'start',
+                scope: 'system',
+                acknowledgeBlastRadius: false,
+            },
         });
         expect(audit.tryRecord).toHaveBeenCalledTimes(1);
         expect(audit.tryRecord).toHaveBeenCalledWith({
@@ -98,11 +111,19 @@ describe('FleetMachineActionsService', () => {
                 ),
         );
         const refusal = await caught(
-            service.serviceAction('node-1', OWNER, { name: 'NetworkManager', action: 'stop', fields: { confirm: true } }),
+            service.serviceAction('node-1', OWNER, {
+                name: 'NetworkManager',
+                action: 'stop',
+                fields: { confirm: true },
+            }),
         );
         expect(refusal).toMatchObject({
             code: 'confirmation_required',
-            details: { class: 'blast-radius', blastRadiusKind: 'network', summary: 'Stop NetworkManager on build-01?' },
+            details: {
+                class: 'blast-radius',
+                blastRadiusKind: 'network',
+                summary: 'Stop NetworkManager on build-01?',
+            },
         });
         expect(audit.tryRecord).not.toHaveBeenCalled();
     });
@@ -124,7 +145,10 @@ describe('FleetMachineActionsService', () => {
         expect(requests[0].params.acknowledgeBlastRadius).toBe(true);
         expect(audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({
-                details: expect.objectContaining({ confirmationClass: 'blast-radius', blastRadiusKind: 'network' }),
+                details: expect.objectContaining({
+                    confirmationClass: 'blast-radius',
+                    blastRadiusKind: 'network',
+                }),
             }),
         );
     });
@@ -140,13 +164,24 @@ describe('FleetMachineActionsService', () => {
                 ),
         );
         const refusal = await caught(
-            service.serviceAction('node-1', OWNER, { name: 'nginx', action: 'restart', fields: { confirm: true } }),
+            service.serviceAction('node-1', OWNER, {
+                name: 'nginx',
+                action: 'restart',
+                fields: { confirm: true },
+            }),
         );
-        expect(refusal).toMatchObject({ code: 'root_required', hint: 'sudo systemctl restart nginx' });
+        expect(refusal).toMatchObject({
+            code: 'root_required',
+            hint: 'sudo systemctl restart nginx',
+        });
         expect(audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: 'node.service.restart',
-                details: expect.objectContaining({ outcome: 'refused', code: 'root_required', rootRequired: true }),
+                details: expect.objectContaining({
+                    outcome: 'refused',
+                    code: 'root_required',
+                    rootRequired: true,
+                }),
             }),
         );
     });
@@ -154,29 +189,51 @@ describe('FleetMachineActionsService', () => {
     it('audits a gate refusal for the owner to see, but never a not_found', async () => {
         const denied = setup(() => ({ result: {} }), {
             authorize: async () => {
-                throw new FleetMachineException(makeFleetLinkError('permission_denied', 'ask the owner'));
+                throw new FleetMachineException(
+                    makeFleetLinkError('permission_denied', 'ask the owner'),
+                );
             },
         });
-        await caught(denied.service.signalProcess('node-1', OWNER, { pid: 4812, signal: 'TERM', fields: { confirm: true } }));
+        await caught(
+            denied.service.signalProcess('node-1', OWNER, {
+                pid: 4812,
+                signal: 'TERM',
+                fields: { confirm: true },
+            }),
+        );
         expect(denied.audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: 'node.process.signal',
                 ownerUserId: 'owner-1',
-                details: expect.objectContaining({ outcome: 'refused', code: 'permission_denied', signal: 'SIGTERM' }),
+                details: expect.objectContaining({
+                    outcome: 'refused',
+                    code: 'permission_denied',
+                    signal: 'SIGTERM',
+                }),
             }),
         );
 
         const hidden = setup(() => ({ result: {} }), {
             authorize: async () => {
-                throw new FleetMachineException(makeFleetLinkError('not_found', 'no such computer'));
+                throw new FleetMachineException(
+                    makeFleetLinkError('not_found', 'no such computer'),
+                );
             },
         });
-        await caught(hidden.service.signalProcess('node-1', OWNER, { pid: 4812, signal: 'TERM', fields: { confirm: true } }));
+        await caught(
+            hidden.service.signalProcess('node-1', OWNER, {
+                pid: 4812,
+                signal: 'TERM',
+                fields: { confirm: true },
+            }),
+        );
         expect(hidden.audit.tryRecord).not.toHaveBeenCalled();
     });
 
     it('names an Agent as the requester and its owner as the actor', async () => {
-        const { service, audit } = setup(() => ({ result: { pid: 4812, signal: 'TERM', sent: true, stillRunningAfterMs: null } }));
+        const { service, audit } = setup(() => ({
+            result: { pid: 4812, signal: 'TERM', sent: true, stillRunningAfterMs: null },
+        }));
         await service.signalProcess(
             'node-1',
             { kind: 'agent', agentId: 'ops-agent', ownerUserId: 'owner-1' },
@@ -191,7 +248,10 @@ describe('FleetMachineActionsService', () => {
     });
 
     it('hands back the operation of an act that ran over the inline window', async () => {
-        const { service, audit } = setup(() => ({ operationId: 'op-1', operation: { id: 'op-1' } }));
+        const { service, audit } = setup(() => ({
+            operationId: 'op-1',
+            operation: { id: 'op-1' },
+        }));
         const result = await service.serviceAction('node-1', OWNER, {
             name: 'nginx',
             action: 'restart',
@@ -199,12 +259,16 @@ describe('FleetMachineActionsService', () => {
         });
         expect(result).toEqual({ operationId: 'op-1' });
         expect(audit.tryRecord).toHaveBeenCalledWith(
-            expect.objectContaining({ details: expect.objectContaining({ outcome: 'ok', operationId: 'op-1' }) }),
+            expect.objectContaining({
+                details: expect.objectContaining({ outcome: 'ok', operationId: 'op-1' }),
+            }),
         );
     });
 
     it('reads lists under the view family, unaudited', async () => {
-        const { service, requests, audit } = setup(() => ({ result: { services: [], managers: ['systemd'] } }));
+        const { service, requests, audit } = setup(() => ({
+            result: { services: [], managers: ['systemd'] },
+        }));
         await service.listServices('node-1', OWNER, { find: 'nginx' });
         expect(requests[0]).toMatchObject({
             verb: 'services.list',

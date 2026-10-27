@@ -34,7 +34,12 @@ export interface FakeDigitalOceanApi {
 	refuseNextCreate(message: string): void;
 	/** Simulate a droplet destroyed outside Ever Works. */
 	forget(id: number): void;
+	/** P3: the OAuth form bodies the token endpoint received (client secret included — test-only). */
+	oauthForms: URLSearchParams[];
 }
+
+/** P3: the OAuth application the fake token endpoint accepts. */
+export const FAKE_OAUTH_CLIENT = { clientId: 'fake-client-id', clientSecret: 'fake-client-secret', code: 'fake-code' };
 
 export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalOceanApi {
 	const droplets = new Map<number, FakeDroplet>();
@@ -42,6 +47,15 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 	const requests: FakeRequest[] = [];
 	let nextId = 1000;
 	let refusal: string | null = null;
+	const oauthForms: URLSearchParams[] = [];
+
+	/** A droplet as the real API answers it: the region as an object, the size as `size_slug`, no user data. */
+	const view = (droplet: FakeDroplet) => ({
+		...droplet,
+		user_data: undefined,
+		region: { slug: droplet.region, name: droplet.region },
+		size_slug: droplet.size
+	});
 
 	const json = (status: number, body: unknown) =>
 		new Response(body === null ? null : JSON.stringify(body), {
@@ -54,13 +68,45 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 		const method = (init?.method ?? 'GET').toUpperCase();
 		const headers = new Headers(init?.headers);
 		const authorized = headers.get('authorization') === `Bearer ${token}`;
-		const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+		const form =
+			typeof init?.body === 'string' && headers.get('content-type')?.includes('application/x-www-form-urlencoded')
+				? new URLSearchParams(init.body)
+				: null;
+		const body = typeof init?.body === 'string' && !form ? JSON.parse(init.body) : null;
 		requests.push({ method, path: `${url.pathname}${url.search}`, body, authorized });
-		if (!authorized) return json(401, { id: 'unauthorized', message: 'Unable to authenticate you' });
 		const path = url.pathname;
 
+		// P3 — the OAuth token endpoint (cloud.digitalocean.com in production).
+		if (method === 'POST' && path === '/v1/oauth/token') {
+			const params = form ?? new URLSearchParams();
+			oauthForms.push(params);
+			const clientOk =
+				params.get('client_id') === FAKE_OAUTH_CLIENT.clientId &&
+				params.get('client_secret') === FAKE_OAUTH_CLIENT.clientSecret;
+			const grantOk =
+				(params.get('grant_type') === 'authorization_code' && params.get('code') === FAKE_OAUTH_CLIENT.code) ||
+				(params.get('grant_type') === 'refresh_token' && params.get('refresh_token') === 'fake-refresh');
+			if (!clientOk || !grantOk) {
+				return json(401, { error: 'invalid_grant', error_description: `bad code ${params.get('code') ?? ''}` });
+			}
+			return json(200, {
+				access_token: token,
+				token_type: 'bearer',
+				expires_in: 2592000,
+				refresh_token: 'fake-refresh',
+				scope: 'read write'
+			});
+		}
+		if (!authorized) return json(401, { id: 'unauthorized', message: 'Unable to authenticate you' });
+
 		if (method === 'GET' && path === '/v2/account') {
-			return json(200, { account: { email: 'owner@example.com', team: { name: 'acme' } } });
+			return json(200, {
+				account: {
+					uuid: 'b6fc48dbf6d9906cace5e2d4dbb6ae8e9b4b9d25',
+					email: 'owner@example.com',
+					team: { name: 'acme' }
+				}
+			});
 		}
 		if (method === 'GET' && path === '/v2/regions') {
 			return json(200, {
@@ -74,9 +120,36 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 		if (method === 'GET' && path === '/v2/sizes') {
 			return json(200, {
 				sizes: [
-					{ slug: 's-2vcpu-4gb', memory: 4096, vcpus: 2, disk: 80, price_monthly: 24, price_hourly: 0.03571, regions: ['nyc3', 'fra1'], available: true },
-					{ slug: 's-1vcpu-2gb', memory: 2048, vcpus: 1, disk: 50, price_monthly: 12, price_hourly: 0.01786, regions: ['nyc3', 'fra1'], available: true },
-					{ slug: 's-4vcpu-8gb', memory: 8192, vcpus: 4, disk: 160, price_monthly: 48, price_hourly: 0.07143, regions: ['nyc3'], available: true }
+					{
+						slug: 's-2vcpu-4gb',
+						memory: 4096,
+						vcpus: 2,
+						disk: 80,
+						price_monthly: 24,
+						price_hourly: 0.03571,
+						regions: ['nyc3', 'fra1'],
+						available: true
+					},
+					{
+						slug: 's-1vcpu-2gb',
+						memory: 2048,
+						vcpus: 1,
+						disk: 50,
+						price_monthly: 12,
+						price_hourly: 0.01786,
+						regions: ['nyc3', 'fra1'],
+						available: true
+					},
+					{
+						slug: 's-4vcpu-8gb',
+						memory: 8192,
+						vcpus: 4,
+						disk: 160,
+						price_monthly: 48,
+						price_hourly: 0.07143,
+						regions: ['nyc3'],
+						available: true
+					}
 				]
 			});
 		}
@@ -87,7 +160,9 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 		}
 		const keyMatch = path.match(/^\/v2\/account\/keys\/(\d+)$/);
 		if (method === 'DELETE' && keyMatch) {
-			return keys.delete(Number(keyMatch[1])) ? json(204, null) : json(404, { id: 'not_found', message: 'not found' });
+			return keys.delete(Number(keyMatch[1]))
+				? json(204, null)
+				: json(404, { id: 'not_found', message: 'not found' });
 		}
 		if (method === 'POST' && path === '/v2/droplets') {
 			if (refusal) {
@@ -108,12 +183,12 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 				created_at: new Date().toISOString()
 			};
 			droplets.set(id, droplet);
-			return json(202, { droplet: { ...droplet, user_data: undefined } });
+			return json(202, { droplet: view(droplet) });
 		}
 		if (method === 'GET' && path === '/v2/droplets') {
 			const tag = url.searchParams.get('tag_name');
 			const list = [...droplets.values()].filter((droplet) => !tag || droplet.tags.includes(tag));
-			return json(200, { droplets: list.map((droplet) => ({ ...droplet, user_data: undefined })), links: {} });
+			return json(200, { droplets: list.map(view), links: {} });
 		}
 		const dropletMatch = path.match(/^\/v2\/droplets\/(\d+)$/);
 		if (dropletMatch) {
@@ -121,7 +196,12 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 			const droplet = droplets.get(id);
 			if (method === 'GET') {
 				return droplet
-					? json(200, { droplet: { ...droplet, user_data: undefined, networks: { v4: [{ ip_address: '203.0.113.10', type: 'public' }] } } })
+					? json(200, {
+							droplet: {
+								...view(droplet),
+								networks: { v4: [{ ip_address: '203.0.113.10', type: 'public' }] }
+							}
+						})
 					: json(404, { id: 'not_found', message: 'The resource you were accessing could not be found.' });
 			}
 			if (method === 'DELETE') {
@@ -155,6 +235,7 @@ export function createFakeDigitalOceanApi(token = 'do-test-token'): FakeDigitalO
 		},
 		forget(id: number) {
 			droplets.delete(id);
-		}
+		},
+		oauthForms
 	};
 }

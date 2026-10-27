@@ -62,16 +62,30 @@ export async function resizeVirtual(
 	if (state === 'running') throw new VirtualHostError('it is running; stop it first');
 
 	if (meta.kind === 'container') {
-		await docker(deps, containerUpdateArgs(childNodeId, cpus, memoryGiB), DOCKER_STEP_TIMEOUT_MS, 'could not resize it');
+		await docker(
+			deps,
+			containerUpdateArgs(childNodeId, cpus, memoryGiB),
+			DOCKER_STEP_TIMEOUT_MS,
+			'could not resize it'
+		);
 	} else {
 		const image = resolveWindowsImage(deps.env);
 		if (!image) throw new VirtualHostError('No Windows installer image is configured on this computer');
 		const password = deps.passwords ? await deps.passwords.get(childNodeId) : null;
 		if (!password) throw new VirtualHostError('this computer no longer keeps its password');
 		deps.logger?.protect(password);
-		const envFile = await deps.state.writePrivate(childNodeId, posix.join('run', 'vm.env'), `PASSWORD=${password}\n`);
+		const envFile = await deps.state.writePrivate(
+			childNodeId,
+			posix.join('run', 'vm.env'),
+			`PASSWORD=${password}\n`
+		);
 		try {
-			await docker(deps, containerControlArgs('remove', childNodeId), DOCKER_STEP_TIMEOUT_MS, 'could not replace it');
+			await docker(
+				deps,
+				containerControlArgs('remove', childNodeId),
+				DOCKER_STEP_TIMEOUT_MS,
+				'could not replace it'
+			);
 			const system = fleetVirtualSystem(meta.systemId);
 			const share = windowsShare(deps.env);
 			await docker(
@@ -79,7 +93,9 @@ export async function resizeVirtual(
 				windowsCreateArgs({
 					childNodeId,
 					name: meta.name,
-					image: meta.image?.digest ? runnableImageRef({ ref: meta.image.ref, digest: meta.image.digest }) : image.ref,
+					image: meta.image?.digest
+						? runnableImageRef({ ref: meta.image.ref, digest: meta.image.digest })
+						: image.ref,
 					edition: system?.windowsEdition ?? '11',
 					cpus,
 					memoryGiB,
@@ -121,7 +137,12 @@ export async function rebuildContainer(
 	await docker(deps, imagePullArgs(named.ref), PULL_TIMEOUT_MS, 'could not pull the image');
 	let digest = named.digest;
 	if (!digest) {
-		const stdout = await docker(deps, imageDigestArgs(named.ref), DOCKER_STEP_TIMEOUT_MS, 'could not read the image digest');
+		const stdout = await docker(
+			deps,
+			imageDigestArgs(named.ref),
+			DOCKER_STEP_TIMEOUT_MS,
+			'could not read the image digest'
+		);
 		digest = splitImageDigest(stdout.trim()).digest;
 		if (digest && named.source === 'catalogue') {
 			await deps.state.writeLock({ ...lock, [system.id]: { ref: named.ref, digest } });

@@ -34,7 +34,10 @@ import { ResizeVirtualDialog } from './ResizeVirtualDialog';
 export default function VirtualChildActions({ node, allowed = true }: FleetComputerActionProps) {
     const t = useTranslations('fleet.virtual');
     const router = useRouter();
-    const [dialog, setDialog] = useState<{ act: 'stop' | 'destroy' | 'rebuild'; model: ConfirmDialogModel } | null>(null);
+    const [dialog, setDialog] = useState<{
+        act: 'stop' | 'destroy' | 'rebuild';
+        model: ConfirmDialogModel;
+    } | null>(null);
     const [pending, startTransition] = useTransition();
     const [revealOpen, setRevealOpen] = useState(false);
     const [resizeOpen, setResizeOpen] = useState(false);
@@ -86,7 +89,11 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
                     toast.success(t('rebuild.started', { name: node.name }));
                     router.refresh();
                 } else {
-                    toast.success(isVm ? t('power.stoppingVm', { name: node.name }) : t('power.stopping', { name: node.name }));
+                    toast.success(
+                        isVm
+                            ? t('power.stoppingVm', { name: node.name })
+                            : t('power.stopping', { name: node.name }),
+                    );
                     router.refresh();
                 }
             } else {
@@ -109,7 +116,11 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
     const openRebuild = () =>
         setDialog({
             act: 'rebuild',
-            model: { class: 'confirm', title: t('rebuild.title', { name: node.name }), body: t('rebuild.body') },
+            model: {
+                class: 'confirm',
+                title: t('rebuild.title', { name: node.name }),
+                body: t('rebuild.body'),
+            },
         });
 
     const openDestroy = () =>
@@ -118,7 +129,9 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
             model: {
                 class: 'confirm-destructive',
                 title: t('destroy.title', { name: node.name }),
-                body: isVm ? t('destroy.bodyVm', { host: hostLabel }) : t('destroy.body', { host: hostLabel }),
+                body: isVm
+                    ? t('destroy.bodyVm', { host: hostLabel })
+                    : t('destroy.body', { host: hostLabel }),
                 typeName: node.name,
             },
         });
@@ -145,7 +158,9 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
                 );
                 if (response.ok) toast.success(t('watch.opened', { host: hostLabel }));
                 else {
-                    const body = (await response.json().catch(() => null)) as { error?: { hint?: string } } | null;
+                    const body = (await response.json().catch(() => null)) as {
+                        error?: { hint?: string };
+                    } | null;
                     toast.error(body?.error?.hint || t('watch.failed'));
                 }
             } catch {
@@ -157,7 +172,14 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
     return (
         <div className="flex items-center gap-2" data-testid="fleet-virtual-child-actions">
             {isVm && viewerPort ? (
-                <Button type="button" size="sm" variant="ghost" onClick={watch} disabled={pending} data-testid="fleet-virtual-watch">
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={watch}
+                    disabled={pending}
+                    data-testid="fleet-virtual-watch"
+                >
                     {t('watch.button')}
                 </Button>
             ) : null}
@@ -173,16 +195,37 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
                 </Button>
             ) : null}
             {state === 'not-enrolled' ? (
-                <Button type="button" size="sm" variant="ghost" onClick={retry} disabled={!allowed || busy} title={notAllowed}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={retry}
+                    disabled={!allowed || busy}
+                    title={notAllowed}
+                >
                     {t('power.retryEnrollment')}
                 </Button>
             ) : null}
             {running ? (
-                <Button type="button" size="sm" variant="ghost" onClick={openStop} disabled={!allowed || busy} title={notAllowed}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={openStop}
+                    disabled={!allowed || busy}
+                    title={notAllowed}
+                >
                     {t('power.stop')}
                 </Button>
             ) : state === 'stopped' ? (
-                <Button type="button" size="sm" variant="ghost" onClick={start} disabled={!allowed || busy} title={notAllowed}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={start}
+                    disabled={!allowed || busy}
+                    title={notAllowed}
+                >
                     {t('power.start')}
                 </Button>
             ) : null}

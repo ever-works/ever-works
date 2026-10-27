@@ -481,7 +481,9 @@ describe('IntegrationKbController', () => {
             kb.getDocument.mockResolvedValue(proposedDoc(true) as never);
             await expect(controller.acceptDocument(user(), 'doc-1', res())).rejects.toMatchObject({
                 status: 422,
-                response: { error: { code: 'domain_rule', details: { reason: 'act_as_required' } } },
+                response: {
+                    error: { code: 'domain_rule', details: { reason: 'act_as_required' } },
+                },
             });
             expect(knowledgeBase.acceptOrgDocument).not.toHaveBeenCalled();
             expect(knowledgeBase.acceptDocument).not.toHaveBeenCalled();

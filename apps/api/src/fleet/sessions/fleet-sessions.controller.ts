@@ -149,7 +149,8 @@ export class FleetSessionsController {
         const actor = actorOf(auth);
         // An Agent session is QUEUED as a job (P2): `202` while it waits for a slot.
         const queued = (view: FleetSessionView): FleetSessionView => {
-            if (view.kind === 'agent' && view.state === 'starting') response?.status(HttpStatus.ACCEPTED);
+            if (view.kind === 'agent' && view.state === 'starting')
+                response?.status(HttpStatus.ACCEPTED);
             return view;
         };
         if (body.restartOf) {
@@ -162,19 +163,21 @@ export class FleetSessionsController {
                 ),
             );
         }
-        return queued(await this.sessions.start(id, actor, {
-            kind: body.kind,
-            provider: body.provider,
-            cwd: body.cwd,
-            ...(body.title !== undefined ? { title: body.title } : {}),
-            ...(body.firstMessage !== undefined ? { firstMessage: body.firstMessage } : {}),
-            ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
-            ...(body.checkoutId !== undefined ? { checkoutId: body.checkoutId } : {}),
-            ...(body.newWorktreeOf !== undefined ? { newWorktreeOf: body.newWorktreeOf } : {}),
-            ...(body.taskId !== undefined ? { taskId: body.taskId } : {}),
-            ...(body.cols !== undefined ? { cols: body.cols } : {}),
-            ...(body.rows !== undefined ? { rows: body.rows } : {}),
-        }));
+        return queued(
+            await this.sessions.start(id, actor, {
+                kind: body.kind,
+                provider: body.provider,
+                cwd: body.cwd,
+                ...(body.title !== undefined ? { title: body.title } : {}),
+                ...(body.firstMessage !== undefined ? { firstMessage: body.firstMessage } : {}),
+                ...(body.agentId !== undefined ? { agentId: body.agentId } : {}),
+                ...(body.checkoutId !== undefined ? { checkoutId: body.checkoutId } : {}),
+                ...(body.newWorktreeOf !== undefined ? { newWorktreeOf: body.newWorktreeOf } : {}),
+                ...(body.taskId !== undefined ? { taskId: body.taskId } : {}),
+                ...(body.cols !== undefined ? { cols: body.cols } : {}),
+                ...(body.rows !== undefined ? { rows: body.rows } : {}),
+            }),
+        );
     }
 
     @Get('sessions')

@@ -11,10 +11,13 @@ vi.mock('next-intl', async () => {
 
 const options = vi.fn();
 const install = vi.fn();
+const permission = vi.fn();
 vi.mock('@/app/actions/fleet/runners', () => ({
     listFleetActionsRunnersAction: vi.fn(),
     fleetActionsRunnerOptionsAction: (...args: unknown[]) => options(...args),
     installFleetActionsRunnersAction: (...args: unknown[]) => install(...args),
+    // P2 (FR-26): the organisation permission check; unknown unless a test says otherwise.
+    fleetActionsRunnersPermissionAction: (...args: unknown[]) => permission(...args),
     fleetActionsRunnerControlAction: vi.fn(),
     removeFleetActionsRunnerAction: vi.fn(),
 }));
@@ -94,6 +97,8 @@ function open(onInstalled = vi.fn(), onClose = vi.fn()) {
 beforeEach(() => {
     options.mockReset();
     install.mockReset();
+    permission.mockReset();
+    permission.mockResolvedValue({ ok: false, error: { code: 'not_found', hint: '' } });
     toast.success.mockReset();
     toast.error.mockReset();
 });
@@ -261,5 +266,173 @@ describe('InstallRunnersDialog', () => {
             'https://github.com/organizations/acme/settings/installations/1',
         );
         expect(screen.getByTestId('fleet-runners-install-submit')).toBeDisabled();
+    });
+
+    // ─── P2 (spec §5.6, FR-26): the organisation permission check ───────────
+
+    const orgOnly = () =>
+        opts({
+            targets: [
+                {
+                    scope: 'org',
+                    target: 'acme',
+                    accountLogin: 'acme',
+                    permission: 'unknown',
+                    grantUrl: null,
+                },
+                {
+                    scope: 'repo',
+                    target: 'acme/api',
+                    accountLogin: 'acme',
+                    permission: 'ok',
+                    grantUrl: null,
+                },
+            ],
+        });
+
+    it('asks the API about an organisation target and installs once the App may register there', async () => {
+        options.mockResolvedValue({ ok: true, data: orgOnly() });
+        permission.mockResolvedValue({
+            ok: true,
+            data: { scope: 'org', target: 'acme', ok: true, missing: null, grantUrl: null },
+        });
+        open();
+        const target = await screen.findByTestId('fleet-runners-install-target');
+        fireEvent.change(target, { target: { value: 'org:acme' } });
+        await waitFor(() => expect(permission).toHaveBeenCalledWith('org', 'acme'));
+        await waitFor(() =>
+            expect(screen.getByTestId('fleet-runners-install-submit')).toBeEnabled(),
+        );
+        expect(screen.queryByTestId('fleet-runners-install-permission')).toBeNull();
+    });
+
+    it('shows the Grant access card instead of enabling Install when the permission is missing', async () => {
+        options.mockResolvedValue({ ok: true, data: orgOnly() });
+        permission.mockResolvedValue({
+            ok: true,
+            data: {
+                scope: 'org',
+                target: 'acme',
+                ok: false,
+                missing: 'Self-hosted runners: Read and write',
+                grantUrl: 'https://github.com/organizations/acme/settings/installations/1',
+            },
+        });
+        open();
+        fireEvent.change(await screen.findByTestId('fleet-runners-install-target'), {
+            target: { value: 'org:acme' },
+        });
+        const card = await screen.findByTestId('fleet-runners-install-permission');
+        expect(card).toHaveTextContent('Organisation runners need one more permission');
+        expect(card).toHaveTextContent('needs “Self-hosted runners: Read and write”');
+        expect(screen.getByTestId('fleet-runners-install-permission-grant')).toHaveAttribute(
+            'href',
+            'https://github.com/organizations/acme/settings/installations/1',
+        );
+        expect(screen.getByTestId('fleet-runners-install-submit')).toBeDisabled();
+
+        // Check again re-asks; once granted, Install enables.
+        permission.mockResolvedValue({
+            ok: true,
+            data: { scope: 'org', target: 'acme', ok: true, missing: null, grantUrl: null },
+        });
+        fireEvent.click(screen.getByTestId('fleet-runners-install-permission-check'));
+        await waitFor(() => expect(permission).toHaveBeenCalledTimes(2));
+        await waitFor(() =>
+            expect(screen.queryByTestId('fleet-runners-install-permission')).toBeNull(),
+        );
+        expect(screen.getByTestId('fleet-runners-install-submit')).toBeEnabled();
+    });
+
+    it('switches to a repository on "Use a repository instead"', async () => {
+        options.mockResolvedValue({ ok: true, data: orgOnly() });
+        permission.mockResolvedValue({
+            ok: true,
+            data: { scope: 'org', target: 'acme', ok: false, missing: null, grantUrl: null },
+        });
+        open();
+        const target = await screen.findByTestId('fleet-runners-install-target');
+        fireEvent.change(target, { target: { value: 'org:acme' } });
+        fireEvent.click(
+            await screen.findByTestId('fleet-runners-install-permission-use-repository'),
+        );
+        await waitFor(() => expect(target).toHaveValue('repo:acme/api'));
+        expect(screen.queryByTestId('fleet-runners-install-permission')).toBeNull();
+        expect(screen.getByTestId('fleet-runners-install-submit')).toBeEnabled();
+    });
+
+    it('never asks about a repository target', async () => {
+        options.mockResolvedValue({ ok: true, data: opts() });
+        open();
+        await screen.findByTestId('fleet-runners-install-summary');
+        expect(permission).not.toHaveBeenCalled();
+    });
+
+    // ─── P3 (FR-27): container-isolated runners ─────────────────────────────
+
+    it('offers Container-isolated on a Linux computer that lists it, with the daemon opt-in unticked', async () => {
+        options.mockResolvedValue({
+            ok: true,
+            data: opts({ os: 'linux', modes: ['service', 'docker'] }),
+        });
+        install.mockResolvedValue({
+            ok: true,
+            data: { runnerIds: ['r1'], operationId: 'j1', jobId: 'j1' },
+        });
+        open();
+        expect(await screen.findByTestId('fleet-runners-install-mode-service')).toBeChecked();
+        expect(
+            screen.getByText('Container-isolated — each runner in its own container'),
+        ).toBeInTheDocument();
+        // Not shown until the container mode is chosen.
+        expect(screen.queryByTestId('fleet-runners-install-share-daemon')).toBeNull();
+        fireEvent.click(screen.getByTestId('fleet-runners-install-mode-docker'));
+        const share = screen.getByTestId('fleet-runners-install-share-daemon');
+        expect(share).not.toBeChecked();
+        expect(screen.getByText('Share the Docker daemon (runs as root)')).toBeInTheDocument();
+        expect(screen.getByText(/can control every container on build-01/)).toBeInTheDocument();
+        expect(screen.getByTestId('fleet-runners-install-summary')).toHaveTextContent(
+            'Installs 1 Actions runner for acme/api on build-01 each in its own container.',
+        );
+        fireEvent.click(screen.getByTestId('fleet-runners-install-submit'));
+        await waitFor(() =>
+            expect(install).toHaveBeenCalledWith(
+                'n1',
+                expect.objectContaining({
+                    mode: 'docker',
+                    shareDockerDaemon: false,
+                    confirm: true,
+                }),
+            ),
+        );
+    });
+
+    it('sends the daemon opt-in as ticked', async () => {
+        options.mockResolvedValue({
+            ok: true,
+            data: opts({ os: 'linux', modes: ['service', 'docker'] }),
+        });
+        install.mockResolvedValue({
+            ok: true,
+            data: { runnerIds: ['r1'], operationId: 'j1', jobId: 'j1' },
+        });
+        open();
+        fireEvent.click(await screen.findByTestId('fleet-runners-install-mode-docker'));
+        fireEvent.click(screen.getByTestId('fleet-runners-install-share-daemon'));
+        expect(screen.getByTestId('fleet-runners-install-share-daemon')).toBeChecked();
+        fireEvent.click(screen.getByTestId('fleet-runners-install-submit'));
+        await waitFor(() =>
+            expect(install).toHaveBeenCalledWith(
+                'n1',
+                expect.objectContaining({ mode: 'docker', shareDockerDaemon: true }),
+            ),
+        );
+    });
+
+    it('never offers the container mode on a computer that does not list it', async () => {
+        options.mockResolvedValue({ ok: true, data: opts({ os: 'linux', modes: ['service'] }) });
+        open();
+        expect(await screen.findByTestId('fleet-runners-install-mode-service')).toBeChecked();
+        expect(screen.queryByTestId('fleet-runners-install-mode-docker')).toBeNull();
     });
 });

@@ -44,19 +44,32 @@ function make(
     } = {},
 ) {
     const tasks = options.tasks ?? [
-        { id: TASK_ID, userId: OWNER, slug: 'T-42', title: 'Login drops cookie', workId: 'w-1', branchRef: null },
+        {
+            id: TASK_ID,
+            userId: OWNER,
+            slug: 'T-42',
+            title: 'Login drops cookie',
+            workId: 'w-1',
+            branchRef: null,
+        },
     ];
     const taskRepo = {
-        findOne: jest.fn(async ({ where }: { where: Partial<FakeTask> }) =>
-            tasks.find((task) =>
-                Object.entries(where).every(([key, value]) => (task as unknown as Record<string, unknown>)[key] === value),
-            ) ?? null,
+        findOne: jest.fn(
+            async ({ where }: { where: Partial<FakeTask> }) =>
+                tasks.find((task) =>
+                    Object.entries(where).every(
+                        ([key, value]) =>
+                            (task as unknown as Record<string, unknown>)[key] === value,
+                    ),
+                ) ?? null,
         ),
         find: jest.fn(async () => tasks),
     };
     const sessions = { countLiveAgentForNode: jest.fn(async () => options.liveAgents ?? 0) };
     const nodes = {
-        findById: jest.fn(async (id: string) => (id === PINNED_ID ? { id, name: 'build-02' } : null)),
+        findById: jest.fn(async (id: string) =>
+            id === PINNED_ID ? { id, name: 'build-02' } : null,
+        ),
     };
     const runs = {
         findInFlightForTaskAgent: jest.fn(async () => options.inflight ?? null),
@@ -66,7 +79,9 @@ function make(
         }),
     };
     const affinities = {
-        findForAgent: jest.fn(async () => (options.pinnedNodeId ? { nodeId: options.pinnedNodeId } : null)),
+        findForAgent: jest.fn(async () =>
+            options.pinnedNodeId ? { nodeId: options.pinnedNodeId } : null,
+        ),
     };
     const service = new FleetSessionTaskService(
         taskRepo as never,
@@ -102,23 +117,52 @@ describe('FleetSessionTaskService.admit', () => {
 
     it('keeps a stored branch', async () => {
         const { service } = make({
-            tasks: [{ id: TASK_ID, userId: OWNER, slug: 'T-42', title: 't', workId: 'w-1', branchRef: 'task/kept' }],
+            tasks: [
+                {
+                    id: TASK_ID,
+                    userId: OWNER,
+                    slug: 'T-42',
+                    title: 't',
+                    workId: 'w-1',
+                    branchRef: 'task/kept',
+                },
+            ],
         });
-        expect((await service.admit({ userId: OWNER, agent, node, taskId: TASK_ID })).branch).toBe('task/kept');
+        expect((await service.admit({ userId: OWNER, agent, node, taskId: TASK_ID })).branch).toBe(
+            'task/kept',
+        );
     });
 
     it('answers 404 for someone else’s Task outside the Agent’s Organization', async () => {
         const { service } = make({
-            tasks: [{ id: TASK_ID, userId: OTHER, organizationId: null, slug: 'T-1', title: 't', workId: null }],
+            tasks: [
+                {
+                    id: TASK_ID,
+                    userId: OTHER,
+                    organizationId: null,
+                    slug: 'T-1',
+                    title: 't',
+                    workId: null,
+                },
+            ],
         });
-        expect((await refusal(service.admit({ userId: OWNER, agent, node, taskId: TASK_ID })))?.code).toBe(
-            'not_found',
-        );
+        expect(
+            (await refusal(service.admit({ userId: OWNER, agent, node, taskId: TASK_ID })))?.code,
+        ).toBe('not_found');
     });
 
     it('admits an Organization Task the Agent belongs to', async () => {
         const { service } = make({
-            tasks: [{ id: TASK_ID, userId: OTHER, organizationId: ORG, slug: 'T-1', title: 't', workId: null }],
+            tasks: [
+                {
+                    id: TASK_ID,
+                    userId: OTHER,
+                    organizationId: ORG,
+                    slug: 'T-1',
+                    title: 't',
+                    workId: null,
+                },
+            ],
         });
         const admission = await service.admit({ userId: OWNER, agent, node, taskId: TASK_ID });
         expect(admission.branch).toBeNull();
@@ -141,7 +185,9 @@ describe('FleetSessionTaskService.admit', () => {
 
     it('admits the pinned computer itself', async () => {
         const { service } = make({ pinnedNodeId: NODE_ID });
-        await expect(service.admit({ userId: OWNER, agent, node, taskId: TASK_ID })).resolves.toBeTruthy();
+        await expect(
+            service.admit({ userId: OWNER, agent, node, taskId: TASK_ID }),
+        ).resolves.toBeTruthy();
     });
 
     it('refuses a computer with no free agent slot (U5)', async () => {
@@ -153,7 +199,9 @@ describe('FleetSessionTaskService.admit', () => {
 
     it('refuses a malformed Task id', async () => {
         const { service } = make();
-        expect((await refusal(service.admit({ userId: OWNER, agent, node, taskId: 'nope' })))?.code).toBe('invalid');
+        expect(
+            (await refusal(service.admit({ userId: OWNER, agent, node, taskId: 'nope' })))?.code,
+        ).toBe('invalid');
     });
 });
 
@@ -166,7 +214,11 @@ describe('FleetSessionTaskService.refsForRuns', () => {
             ],
         });
         const refs = await service.refsForRuns([RUN_ID, SESSION_ID, RUN_ID]);
-        expect(refs.get(RUN_ID)).toEqual({ id: TASK_ID, slug: 'T-42', title: 'Login drops cookie' });
+        expect(refs.get(RUN_ID)).toEqual({
+            id: TASK_ID,
+            slug: 'T-42',
+            title: 'Login drops cookie',
+        });
         expect(refs.has(SESSION_ID)).toBe(false);
     });
 

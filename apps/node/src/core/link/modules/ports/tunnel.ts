@@ -227,7 +227,8 @@ export async function openTunnelChannel(
 			if (!entry) return;
 			entry.request.destroy();
 			finish(requestId);
-			if (!entry.answered) fail(requestId, 'timeout', `:${port} did not answer within ${Math.round(timeoutMs / 1000)} s`);
+			if (!entry.answered)
+				fail(requestId, 'timeout', `:${port} did not answer within ${Math.round(timeoutMs / 1000)} s`);
 		}, timeoutMs);
 		inFlight.set(requestId, { request, timer, answered: false });
 		request.once('error', (error: NodeJS.ErrnoException) => {
@@ -235,7 +236,11 @@ export async function openTunnelChannel(
 			if (!entry) return;
 			finish(requestId);
 			if (!entry.answered) {
-				fail(requestId, 'unreachable', `${context.nodeName} could not reach :${port} — ${error.code ?? error.message}`);
+				fail(
+					requestId,
+					'unreachable',
+					`${context.nodeName} could not reach :${port} — ${error.code ?? error.message}`
+				);
 			}
 		});
 	};
@@ -287,7 +292,11 @@ export async function openTunnelChannel(
 			if (!entry || entry.answered) return;
 			entry.request.destroy();
 			finish(requestId);
-			fail(requestId, 'timeout', `:${port} did not accept the WebSocket within ${Math.round(timeoutMs / 1000)} s`);
+			fail(
+				requestId,
+				'timeout',
+				`:${port} did not accept the WebSocket within ${Math.round(timeoutMs / 1000)} s`
+			);
 		}, timeoutMs);
 		const entry: InFlight = { request, timer, answered: false };
 		inFlight.set(requestId, entry);
@@ -334,7 +343,11 @@ export async function openTunnelChannel(
 			if (!inFlight.has(requestId)) return;
 			finish(requestId);
 			if (!entry.answered) {
-				fail(requestId, 'unreachable', `${context.nodeName} could not reach :${port} — ${error.code ?? error.message}`);
+				fail(
+					requestId,
+					'unreachable',
+					`${context.nodeName} could not reach :${port} — ${error.code ?? error.message}`
+				);
 			}
 		});
 		request.end();

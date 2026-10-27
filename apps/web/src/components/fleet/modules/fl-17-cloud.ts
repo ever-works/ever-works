@@ -1,5 +1,9 @@
 import { ROUTES } from '@/lib/constants';
-import { registerAddComputerItem, registerComputerAction, registerOverviewBlock } from '../registry';
+import {
+    registerAddComputerItem,
+    registerComputerAction,
+    registerOverviewBlock,
+} from '../registry';
 
 /**
  * Cloud computers (FL-17) — what this epic adds to the Fleet module registry

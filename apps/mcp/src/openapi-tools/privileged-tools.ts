@@ -70,7 +70,8 @@ export const MCP_PRIVILEGED_TOOLS: Readonly<Record<string, string>> = Object.fre
 	fleet_cloud_power: 'powers a billed cloud machine on or off',
 	fleet_cloud_destroy: 'destroys a cloud machine and its disk at the provider',
 	// P2: the idle policy decides when the platform powers a billed machine off (or stops telling the owner).
-	fleet_cloud_idle_policy: 'decides when a billed cloud machine is powered off, or whether its owner is told it sits idle'
+	fleet_cloud_idle_policy:
+		'decides when a billed cloud machine is powered off, or whether its owner is told it sits idle'
 });
 
 /**

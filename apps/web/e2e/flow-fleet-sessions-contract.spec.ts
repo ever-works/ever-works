@@ -31,9 +31,18 @@ test.describe('Fleet sessions — API contract (FL-04)', () => {
         const headers = { ...authedHeaders(user.access_token), 'Content-Type': 'application/json' };
         const calls = [
             request.get(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}`, { headers }),
-            request.patch(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}`, { headers, data: { title: 'x' } }),
-            request.post(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/end`, { headers, data: { confirm: true } }),
-            request.post(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/restart`, { headers, data: {} }),
+            request.patch(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}`, {
+                headers,
+                data: { title: 'x' },
+            }),
+            request.post(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/end`, {
+                headers,
+                data: { confirm: true },
+            }),
+            request.post(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/restart`, {
+                headers,
+                data: {},
+            }),
             request.post(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/attach-token`, {
                 headers,
                 data: { role: 'viewer' },
@@ -44,10 +53,14 @@ test.describe('Fleet sessions — API contract (FL-04)', () => {
         }
     });
 
-    test('an unknown computer answers 404 for its sessions; a stranger reads the same', async ({ request }) => {
+    test('an unknown computer answers 404 for its sessions; a stranger reads the same', async ({
+        request,
+    }) => {
         const user = await registerUserViaAPI(request);
         const headers = { ...authedHeaders(user.access_token), 'Content-Type': 'application/json' };
-        const list = await request.get(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/sessions`, { headers });
+        const list = await request.get(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/sessions`, {
+            headers,
+        });
         expect(list.status()).toBe(404);
         const start = await request.post(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/sessions`, {
             headers,
@@ -56,7 +69,9 @@ test.describe('Fleet sessions — API contract (FL-04)', () => {
         expect(start.status()).toBe(404);
     });
 
-    test('the cross-computer list answers a page (or 404 while the flag is off)', async ({ request }) => {
+    test('the cross-computer list answers a page (or 404 while the flag is off)', async ({
+        request,
+    }) => {
         const user = await registerUserViaAPI(request);
         const response = await request.get(`${API_BASE}/api/fleet/sessions`, {
             headers: authedHeaders(user.access_token),
@@ -69,12 +84,20 @@ test.describe('Fleet sessions — API contract (FL-04)', () => {
         expect(body.nextCursor).toBeNull();
     });
 
-    test('an attach token needs a known role (400) — never minted without one', async ({ request }) => {
+    test('an attach token needs a known role (400) — never minted without one', async ({
+        request,
+    }) => {
         const user = await registerUserViaAPI(request);
-        const response = await request.post(`${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/attach-token`, {
-            headers: { ...authedHeaders(user.access_token), 'Content-Type': 'application/json' },
-            data: { role: 'owner' },
-        });
+        const response = await request.post(
+            `${API_BASE}/api/fleet/sessions/${UNKNOWN_UUID}/attach-token`,
+            {
+                headers: {
+                    ...authedHeaders(user.access_token),
+                    'Content-Type': 'application/json',
+                },
+                data: { role: 'owner' },
+            },
+        );
         // Flag off: 404 (dark). Flag on: the DTO refuses the role before any lookup.
         expect([400, 404]).toContain(response.status());
     });
@@ -83,16 +106,22 @@ test.describe('Fleet sessions — API contract (FL-04)', () => {
         request,
     }) => {
         const user = await registerUserViaAPI(request);
-        const response = await request.post(`${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/sessions`, {
-            headers: { ...authedHeaders(user.access_token), 'Content-Type': 'application/json' },
-            data: {
-                kind: 'agent',
-                provider: 'claude-code',
-                cwd: '~/code/app',
-                agentId: UNKNOWN_UUID,
-                firstMessage: 'Fix the failing build',
+        const response = await request.post(
+            `${API_BASE}/api/fleet/nodes/${UNKNOWN_UUID}/sessions`,
+            {
+                headers: {
+                    ...authedHeaders(user.access_token),
+                    'Content-Type': 'application/json',
+                },
+                data: {
+                    kind: 'agent',
+                    provider: 'claude-code',
+                    cwd: '~/code/app',
+                    agentId: UNKNOWN_UUID,
+                    firstMessage: 'Fix the failing build',
+                },
             },
-        });
+        );
         expect(response.status()).toBe(404);
     });
 

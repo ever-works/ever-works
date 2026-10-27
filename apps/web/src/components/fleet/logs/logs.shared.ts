@@ -38,9 +38,13 @@ export const LOGS_CONSENT_COMMAND = 'ever-works-node start --manage';
  * The computer's own state first (a desktop node cannot manage yet — R-10; an
  * offline one says when it was last seen), then what the platform answered.
  */
-export function logsTabCard(node: Pick<FleetNodeView, 'kind' | 'status' | 'lastHeartbeatAt'>, error: LogsError | null): LogsTabCard | null {
+export function logsTabCard(
+    node: Pick<FleetNodeView, 'kind' | 'status' | 'lastHeartbeatAt'>,
+    error: LogsError | null,
+): LogsTabCard | null {
     if (node.kind === 'desktop-node') return { kind: 'desktop-node' };
-    if (node.status === 'offline') return { kind: 'offline', lastSeenAt: node.lastHeartbeatAt ?? null };
+    if (node.status === 'offline')
+        return { kind: 'offline', lastSeenAt: node.lastHeartbeatAt ?? null };
     if (!error) return null;
     switch (error.code) {
         case 'consent_missing':
@@ -69,7 +73,13 @@ export interface LogSourceGroups {
 }
 
 export function groupLogSources(sources: readonly FleetLogSource[]): LogSourceGroups {
-    const groups: LogSourceGroups = { system: [], files: [], containers: [], services: [], fileCount: 0 };
+    const groups: LogSourceGroups = {
+        system: [],
+        files: [],
+        containers: [],
+        services: [],
+        fileCount: 0,
+    };
     const byRoot = new Map<string, FleetLogSource[]>();
     for (const source of sources) {
         switch (source.kind) {
@@ -144,7 +154,10 @@ export function composeDeepLinkProject(get: (name: string) => string | null): st
     return project.length > 0 && project.length <= 200 ? project : null;
 }
 
-export function composeProjectSources(sources: readonly FleetLogSource[], project: string): string[] {
+export function composeProjectSources(
+    sources: readonly FleetLogSource[],
+    project: string,
+): string[] {
     return sources
         .filter((source) => source.kind === 'container' && source.group === project)
         .map((source) => source.id)
@@ -178,7 +191,9 @@ export const LOG_CHIP_CLASSES: readonly string[] = [
 ];
 
 export function logChipClass(src: number): string {
-    return LOG_CHIP_CLASSES[((src % LOG_CHIP_CLASSES.length) + LOG_CHIP_CLASSES.length) % LOG_CHIP_CLASSES.length]!;
+    return LOG_CHIP_CLASSES[
+        ((src % LOG_CHIP_CLASSES.length) + LOG_CHIP_CLASSES.length) % LOG_CHIP_CLASSES.length
+    ]!;
 }
 
 /** The short name a chip shows for a source id: the label when listed, else the id's key, last segment. */
@@ -215,17 +230,29 @@ export interface HeldWindow {
 export const EMPTY_WINDOW: HeldWindow = { lines: [], discarded: 0, nextSeq: 1 };
 
 /** Append lines, keeping the newest {@link FLEET_LOGS_VIEWER_MAX_LINES}; the oldest go first. */
-export function appendHeld(window: HeldWindow, incoming: readonly FleetLogLine[], max = FLEET_LOGS_VIEWER_MAX_LINES): HeldWindow {
+export function appendHeld(
+    window: HeldWindow,
+    incoming: readonly FleetLogLine[],
+    max = FLEET_LOGS_VIEWER_MAX_LINES,
+): HeldWindow {
     if (incoming.length === 0) return window;
     let seq = window.nextSeq;
     const added = incoming.map((line) => ({ seq: seq++, line }));
     const all = window.lines.concat(added);
     const over = Math.max(0, all.length - max);
-    return { lines: over > 0 ? all.slice(over) : all, discarded: window.discarded + over, nextSeq: seq };
+    return {
+        lines: over > 0 ? all.slice(over) : all,
+        discarded: window.discarded + over,
+        nextSeq: seq,
+    };
 }
 
 /** Prepend an older page (P2); a full window keeps its newest lines and takes only what fits of the page. */
-export function prependHeld(window: HeldWindow, older: readonly FleetLogLine[], max = FLEET_LOGS_VIEWER_MAX_LINES): HeldWindow {
+export function prependHeld(
+    window: HeldWindow,
+    older: readonly FleetLogLine[],
+    max = FLEET_LOGS_VIEWER_MAX_LINES,
+): HeldWindow {
     if (older.length === 0) return window;
     const room = Math.max(0, max - window.lines.length);
     const kept = older.slice(Math.max(0, older.length - room));
@@ -259,15 +286,31 @@ export function firstHeldAtOrAfter(lines: readonly HeldLine[], at: string): numb
 
 export type LogFollowPhase = 'connecting' | 'live' | 'reconnecting' | 'stopped' | 'error';
 
-export type LogStopReason = 'gone' | 'stopped' | 'kill-switch' | 'lost' | 'closed' | 'not-following' | null;
+export type LogStopReason =
+    | 'gone'
+    | 'stopped'
+    | 'kill-switch'
+    | 'lost'
+    | 'closed'
+    | 'not-following'
+    | null;
 
 /** Scrolled up by more than one viewport stops the follow (FR-16). */
-export function shouldStopFollowing(scrollTop: number, scrollHeight: number, clientHeight: number): boolean {
+export function shouldStopFollowing(
+    scrollTop: number,
+    scrollHeight: number,
+    clientHeight: number,
+): boolean {
     return scrollHeight - (scrollTop + clientHeight) > clientHeight;
 }
 
 /** At (or within a line of) the bottom: following may resume. */
-export function isAtBottom(scrollTop: number, scrollHeight: number, clientHeight: number, slack = 24): boolean {
+export function isAtBottom(
+    scrollTop: number,
+    scrollHeight: number,
+    clientHeight: number,
+    slack = 24,
+): boolean {
     return scrollHeight - (scrollTop + clientHeight) <= slack;
 }
 
@@ -288,21 +331,27 @@ export interface LogFooterInput {
 }
 
 /** The footer as ordered message keys + values (`fleet.logs.viewer.*`); the component translates. */
-export function logFooterParts(input: LogFooterInput): Array<{ key: string; values?: Record<string, string | number> }> {
+export function logFooterParts(
+    input: LogFooterInput,
+): Array<{ key: string; values?: Record<string, string | number> }> {
     const parts: Array<{ key: string; values?: Record<string, string | number> }> = [];
     if (input.paused) parts.push({ key: 'footerPaused', values: { count: input.pausedCount } });
     else if (input.phase === 'live' && input.following) parts.push({ key: 'footerFollowing' });
     else if (input.phase === 'reconnecting') parts.push({ key: 'reconnecting' });
     else parts.push({ key: 'notFollowing' });
     if (input.filter.trim().length > 0) {
-        parts.push({ key: 'footerFiltered', values: { shown: input.shown, held: input.held, filter: input.filter.trim() } });
+        parts.push({
+            key: 'footerFiltered',
+            values: { shown: input.shown, held: input.held, filter: input.filter.trim() },
+        });
     } else {
         parts.push({ key: 'footerHeld', values: { count: input.held } });
     }
     parts.push({ key: 'footerBytes', values: { bytes: formatLogBytes(input.bytes) } });
     parts.push({ key: 'footerRedactions', values: { count: input.redactions } });
     if (input.dropped > 0) parts.push({ key: 'footerDropped', values: { count: input.dropped } });
-    if (input.discarded > 0) parts.push({ key: 'footerDiscarded', values: { count: input.discarded } });
+    if (input.discarded > 0)
+        parts.push({ key: 'footerDiscarded', values: { count: input.discarded } });
     return parts;
 }
 

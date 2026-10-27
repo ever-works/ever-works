@@ -40,7 +40,8 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
         const timer = setInterval(() => {
             void listFleetVirtualChildrenAction(hostNodeId).then((result) => {
                 if (!result.ok) return;
-                const fresh = result.data.children.find((child) => child.id === node.id)?.virtual ?? null;
+                const fresh =
+                    result.data.children.find((child) => child.id === node.id)?.virtual ?? null;
                 if (fresh) setLive(fresh);
             });
         }, BUSY_REFRESH_MS);
@@ -53,15 +54,20 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
         ? t('row.sizeWithDisk', { cpus: live.cpus, memory: live.memoryGiB, disk: live.diskGiB })
         : t('row.size', { cpus: live.cpus, memory: live.memoryGiB });
     const { steps, current } = progressSteps(kind, live.phase);
-    const creating = live.state === 'creating' || live.state === 'installing' || live.state === 'enrolling';
+    const creating =
+        live.state === 'creating' || live.state === 'installing' || live.state === 'enrolling';
 
     return (
-        <div className="mt-1 ml-6 text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-virtual-row">
+        <div
+            className="mt-1 ml-6 text-xs text-text-muted dark:text-text-muted-dark"
+            data-testid="fleet-virtual-row"
+        >
             <p>
                 <span aria-hidden className={live.state === 'running' ? 'text-success' : undefined}>
                     {virtualStateGlyph(live.state)}
                 </span>{' '}
-                {t(`state.${VIRTUAL_STATE_KEYS[live.state]}` as Parameters<typeof t>[0])} · {live.systemLabel} · {size}
+                {t(`state.${VIRTUAL_STATE_KEYS[live.state]}` as Parameters<typeof t>[0])} ·{' '}
+                {live.systemLabel} · {size}
                 {kind === 'vm' && live.activated === false ? (
                     <span title={t('activation.note')} data-testid="fleet-virtual-not-activated">
                         {' '}
@@ -72,7 +78,14 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
             {creating ? (
                 <ol className="mt-1 flex flex-wrap gap-2" aria-label={t('progress.label')}>
                     {steps.map((step, index) => (
-                        <li key={step} className={index === current ? 'font-medium text-text dark:text-text-dark' : undefined}>
+                        <li
+                            key={step}
+                            className={
+                                index === current
+                                    ? 'font-medium text-text dark:text-text-dark'
+                                    : undefined
+                            }
+                        >
                             {t(`progress.${VIRTUAL_PHASE_KEYS[step]}` as Parameters<typeof t>[0])}
                             {index < current ? ' ✓' : index === current ? ' …' : ''}
                         </li>
@@ -84,7 +97,9 @@ export function VirtualChildRow({ node }: { node: FleetNodeView }) {
                     {t('row.failed', { reason: live.error })}
                 </p>
             ) : null}
-            {live.state === 'gone' ? <p className="mt-1">{t('row.gone', { host: live.hostName ?? '' })}</p> : null}
+            {live.state === 'gone' ? (
+                <p className="mt-1">{t('row.gone', { host: live.hostName ?? '' })}</p>
+            ) : null}
             {live.state === 'not-enrolled' ? <p className="mt-1">{t('row.notEnrolled')}</p> : null}
         </div>
     );

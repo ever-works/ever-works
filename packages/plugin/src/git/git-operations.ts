@@ -14,8 +14,12 @@ import type {
 	GitCloneBranchOptions,
 	GitPushOptions,
 	GitFileChange,
-	GitFileStatus
+	GitFileStatus,
+	GitFetchBranchOptions,
+	GitCommitRangeOptions,
+	GitCommitRangeCount
 } from '../contracts/capabilities/git-provider.interface.js';
+import { countCommitRange } from './commit-range.js';
 
 /**
  * Node >= 19 ships `http(s).globalAgent` with `timeout: 5000` - a SOCKET-IDLE deadline, not a
@@ -49,6 +53,46 @@ export const http = {
 				(String(request.url).startsWith('https:') ? gitHttpsAgent : gitHttpAgent)
 		} as Parameters<typeof nodeHttp.request>[0])
 };
+
+/**
+ * How long one stretch of isomorphic-git work may hold the event loop before it is made to hand it back.
+ *
+ * isomorphic-git (1.37) collects the whole packfile into one buffer and then indexes it — inflating every
+ * object, resolving every delta, hashing every result — in loops whose only `await`s resolve at once. Those
+ * are microtasks: they never let the event loop reach a timer, a socket or an HTTP request. A clone or pull
+ * of a large repository therefore froze the whole process for as long as the indexing took. In the API that
+ * meant `/api/health/live` went unanswered and the kubelet killed the pod (see `cloneOrPullRequests` in the
+ * agent's git facade), and a workspace backup walking every Work's data repository stopped heartbeating
+ * mid-domain and was failed as `stalled`.
+ *
+ * isomorphic-git `await`s its `onProgress` callback once per percent of the pack and once per file it checks
+ * out, so a callback that yields to the macrotask queue breaks those loops into slices. Thirty seconds of
+ * indexing becomes ~two hundred short stretches with the event loop running in between; nothing about the
+ * git operation itself changes. The fs-backed `await`s these operations already make interleave other work
+ * in exactly the same way, so this adds no new kind of interleaving.
+ */
+const GIT_EVENT_LOOP_SLICE_MS = (() => {
+	const configured = Number(process.env.GIT_EVENT_LOOP_SLICE_MS ?? 50);
+	return Number.isFinite(configured) && configured >= 0 ? configured : 50;
+})();
+
+let lastEventLoopYield = Date.now();
+
+/**
+ * The `onProgress` passed to every clone, pull and fetch: hand the event loop back once the current stretch
+ * of git work has held it for {@link GIT_EVENT_LOOP_SLICE_MS}, and return at once otherwise.
+ *
+ * `setImmediate` rather than `setTimeout(0)`: it runs right after the poll phase, so pending I/O — a probe,
+ * a heartbeat's query result, another request — is served before the git work resumes, without the 1 ms
+ * floor a timer would add to each of the hundreds of calls. Exported so the slicing can be proved directly.
+ */
+export async function yieldToEventLoop(): Promise<void> {
+	if (Date.now() - lastEventLoopYield < GIT_EVENT_LOOP_SLICE_MS) {
+		return;
+	}
+	await new Promise<void>((resolve) => setImmediate(resolve));
+	lastEventLoopYield = Date.now();
+}
 
 const DEFAULT_BRANCHES = ['main', 'master'] as const;
 
@@ -234,6 +278,8 @@ export class GitOperations implements IGitOperations {
 		try {
 			await git.clone({
 				onAuth: () => auth,
+				// Keeps a large pack's indexing from freezing the event loop; see `yieldToEventLoop`.
+				onProgress: yieldToEventLoop,
 				fs,
 				http,
 				dir,
@@ -272,6 +318,7 @@ export class GitOperations implements IGitOperations {
 
 		await git.pull({
 			onAuth: () => auth,
+			onProgress: yieldToEventLoop,
 			fs,
 			http,
 			dir,
@@ -539,7 +586,8 @@ export class GitOperations implements IGitOperations {
 			url,
 			ref: branch,
 			singleBranch: true,
-			onAuth: () => auth
+			onAuth: () => auth,
+			onProgress: yieldToEventLoop
 		});
 
 		return dir;
@@ -611,6 +659,7 @@ export class GitOperations implements IGitOperations {
 		const auth = this.getAuth(token);
 		await git.fetch({
 			onAuth: () => auth,
+			onProgress: yieldToEventLoop,
 			fs,
 			http,
 			dir,
@@ -633,6 +682,107 @@ export class GitOperations implements IGitOperations {
 		});
 
 		return result.oid ?? '';
+	}
+
+	// ── APW-02 T48 — the private copy's sync (FR-63) ──────────────────────
+	//
+	// The read and the move a private copy's upstream sync needs, built so a
+	// provider plugin never has to reach for isomorphic-git itself. Every network
+	// call names its URL (computed by this provider from the coordinates, never
+	// read from the checkout's config), its remote and an empty CORS proxy — see
+	// the credential note in the repository's CLAUDE.md.
+
+	/** The remote name `fetchBranch` files a second repository's history under by default. */
+	static readonly FETCH_BRANCH_DEFAULT_REMOTE = 'upstream';
+
+	async fetchBranch(options: GitFetchBranchOptions): Promise<string | null> {
+		const { dir, owner, repo, branch, token } = options;
+		const remote = options.remote || GitOperations.FETCH_BRANCH_DEFAULT_REMOTE;
+		if (!token) {
+			throw new Error('Git token is required for fetch operation');
+		}
+		const auth = this.getAuth(token);
+		try {
+			const result = await git.fetch({
+				onAuth: () => auth,
+				onProgress: yieldToEventLoop,
+				fs,
+				http,
+				dir,
+				remote,
+				url: this.getCloneUrl(owner, repo),
+				ref: branch,
+				remoteRef: branch,
+				singleBranch: true,
+				tags: false,
+				corsProxy: NO_CORS_PROXY
+			});
+			if (result?.fetchHead) return result.fetchHead;
+			return await this.resolveRef(dir, `refs/remotes/${remote}/${branch}`);
+		} catch (error: unknown) {
+			const err = error as { code?: string };
+			// The repository has no such branch: an answer, not a failure.
+			if (err?.code === 'NotFoundError') return null;
+			throw error;
+		}
+	}
+
+	async resolveRef(dir: string, ref: string): Promise<string | null> {
+		try {
+			return await git.resolveRef({ fs, dir, ref });
+		} catch (error: unknown) {
+			const err = error as { code?: string };
+			if (err?.code === 'NotFoundError') return null;
+			throw error;
+		}
+	}
+
+	async hasCommit(dir: string, oid: string): Promise<boolean> {
+		if (!/^[0-9a-f]{40}$/i.test(oid)) return false;
+		try {
+			await git.readCommit({ fs, dir, oid });
+			return true;
+		} catch (error: unknown) {
+			const err = error as { code?: string };
+			if (err?.code === 'NotFoundError' || err?.code === 'ObjectTypeError') return false;
+			throw error;
+		}
+	}
+
+	async findMergeBase(dir: string, oids: readonly [string, string]): Promise<string | null> {
+		const bases = (await git.findMergeBase({ fs, dir, oids: [...oids] })) as string[];
+		return Array.isArray(bases) && bases.length > 0 ? bases[0] : null;
+	}
+
+	async countCommitsBetween(dir: string, options: GitCommitRangeOptions): Promise<GitCommitRangeCount> {
+		const cache = {};
+		return countCommitRange(
+			async (oid) => {
+				const { commit } = await git.readCommit({ fs, dir, oid, cache });
+				return { parents: commit.parent, timestamp: commit.committer?.timestamp ?? 0 };
+			},
+			options.include,
+			options.exclude,
+			options.max
+		);
+	}
+
+	async writeBranchRef(dir: string, branch: string, oid: string): Promise<void> {
+		if (!branch || branch.startsWith('refs/') || branch.includes('..')) {
+			throw new Error(`Refusing to write the local branch '${branch}'`);
+		}
+		await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: oid, force: true });
+	}
+
+	async removeWorkingCopy(dir: string): Promise<void> {
+		// Only a directory under this instance's base directory — the place
+		// `cloneBranch` creates them — and never the base directory itself.
+		const base = path.resolve(this.baseDir);
+		const target = path.resolve(dir);
+		if (target === base || !target.startsWith(base + path.sep)) {
+			throw new Error('Refusing to remove a directory outside the working-copy base directory');
+		}
+		await this.removeDirSafe(target);
 	}
 
 	private mergeCommitter(committer?: GitCommitter): GitCommitter {

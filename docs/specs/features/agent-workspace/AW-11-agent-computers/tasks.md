@@ -633,7 +633,7 @@ expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale
 
 # PHASE 3 — Re-watch and the terminal channel
 
-- [ ] **T50. Add the recording segment entity and migration C.** _(Terminal recording and re-watch are delivered by Fleet FL-04 P3 (#2841): session-keyed transcript chunks, the recorder, `GET|POST /api/fleet/sessions/:id/recording`, `SessionReplayPlayer` — `../../fleet/FL-04-sessions-on-computers/`. The desktop recording segments stay FL-07's.)_
+- [x] **T50. Add the recording segment entity and migration C.** _(Terminal recording and re-watch are delivered by Fleet FL-04 P3 (#2841): session-keyed transcript chunks, the recorder, `GET|POST /api/fleet/sessions/:id/recording`, `SessionReplayPlayer` — `../../fleet/FL-04-sessions-on-computers/`. **Screen recordings are delivered by Fleet FL-07** (P2 #2923, P2.C #2934): no segment table — the recording columns are on `computer_sessions` (FL-07 slot `1796070100000-AddComputerSessionRecordingColumns`, CONTRACTS R-9), the chunks and their index live in the storage plugin — `../../fleet/FL-07-desktop/`.)_
     - Create `packages/agent/src/entities/computer-recording-segment.entity.ts` per
       [`plan.md`](./plan.md) §3.1 (bytes live in storage; the row holds a `storageKey`, never
       bytes).
@@ -648,7 +648,7 @@ expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale
       drops.
     - **Done when**: it applies twice cleanly.
 
-- [ ] **T51. Write the recording service.**
+- [x] **T51. Write the recording service.** _(Delivered by Fleet FL-07 P2.C (#2934) as `packages/agent/src/computer/desktop-recording.service.ts`, for the Desktop source; the Agent's browser source is not recorded yet — FL-07 lane log.)_
     - Create `packages/agent/src/computer/recording.service.ts` — samples at ≤ 1 fps, writes bytes
       through the storage backend (`getActiveStorageBackend` in
       `apps/api/src/uploads/storage-backend.factory.ts`, reached the way
@@ -658,7 +658,7 @@ expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale
     - **Test**: `packages/agent/src/computer/__tests__/recording.service.spec.ts` per §10.2.
     - **Done when**: a storage outage never fails a session and always shows up on the receipt.
 
-- [ ] **T52. Add the recording GC task.**
+- [x] **T52. Add the recording GC task.** _(Delivered by Fleet FL-07 P2.C (#2934): `packages/tasks/src/tasks/trigger/computer-recording-gc.task.ts` and its API fallback cron.)_
     - Create `packages/tasks/src/tasks/trigger/computer-recording-gc.task.ts`, mirroring
       `packages/tasks/src/tasks/trigger/terminal-transcript-gc.task.ts`. **Delete the storage
       object first, then the row** — the reverse order orphans bytes forever.
@@ -666,7 +666,7 @@ expires < now())`, plus `release` (scoped by `controlHolderSessionId` so a stale
       object whose delete fails leaves its row for the next sweep rather than being lost.
     - **Done when**: nothing older than the retention window survives a sweep.
 
-- [ ] **T53. Build the player and wire it into the Run receipt.**
+- [ ] **T53. Build the player and wire it into the Run receipt.** _(The player is delivered by Fleet FL-07 P2.C (#2934) in the computer page's Desktop tab (`DesktopRecordings.tsx`); the Run receipt's `COMPUTER` block is not built yet — FL-07 lane log.)_
     - Create `apps/web/src/components/computer/ComputerRecordingPlayer.tsx` and the route at
       `apps/web/src/app/[locale]/(dashboard)/agents/[id]/computer/recordings/[sessionId]/page.tsx`.
     - Add the `COMPUTER` block from spec §6.24 to the AW-09 receipt component, gated on

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { parseDockerLine } from './container-source';
 import { eventLogScript, parseEventLine, powershellArgs } from './event-log-source';
 import { parseJournalLine } from './journal-source';
-import { listLogSources, parseDockerPs, parseLaunchctlList, parseSystemctlUnits, parseWindowsServices } from './log-sources';
+import {
+	listLogSources,
+	parseDockerPs,
+	parseLaunchctlList,
+	parseSystemctlUnits,
+	parseWindowsServices
+} from './log-sources';
 import type { LogDirEntry, LogFs, LogIo } from './log-io';
 import { parseLaunchctlLogPaths } from './service-source';
 import { parseUnifiedLogLine } from './unified-log-source';
@@ -47,7 +53,14 @@ describe('readers parse their tools', () => {
 	it('event JSON: level, provider, a multi-line message', () => {
 		expect(
 			parseEventLine(
-				JSON.stringify({ log: 'System', id: 9, ts: '2026-10-21T09:41:02.0000000Z', level: 3, provider: 'Disk', msg: 'slow\r\ndisk' })
+				JSON.stringify({
+					log: 'System',
+					id: 9,
+					ts: '2026-10-21T09:41:02.0000000Z',
+					level: 3,
+					provider: 'Disk',
+					msg: 'slow\r\ndisk'
+				})
 			)
 		).toEqual({ ts: '2026-10-21T09:41:02.000Z', level: 'warning', text: 'Disk: slow\ndisk', key: 'System:9' });
 	});
@@ -61,11 +74,21 @@ describe('readers parse their tools', () => {
 	});
 
 	it('the event-log script quotes names and never splices them into argv', () => {
-		const script = eventLogScript({ logs: ['System', 'Application'], provider: 'Service Control Manager' }, 500, '2026-10-21T09:41:02.000Z');
+		const script = eventLogScript(
+			{ logs: ['System', 'Application'], provider: 'Service Control Manager' },
+			500,
+			'2026-10-21T09:41:02.000Z'
+		);
 		expect(script).toContain("-LogName 'System','Application' -MaxEvents 500");
 		expect(script).toContain("Provider[@Name=''Service Control Manager'']");
 		const args = powershellArgs(script);
-		expect(args.slice(0, 5)).toEqual(['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand']);
+		expect(args.slice(0, 5)).toEqual([
+			'-NoProfile',
+			'-NonInteractive',
+			'-ExecutionPolicy',
+			'Bypass',
+			'-EncodedCommand'
+		]);
 		expect(Buffer.from(args[5]!, 'base64').toString('utf16le')).toBe(script);
 	});
 
@@ -76,7 +99,9 @@ describe('readers parse their tools', () => {
 	});
 
 	it('launchctl print log paths', () => {
-		expect(parseLaunchctlLogPaths('\tstdout path = /usr/local/var/log/nginx.log\n\tstderr path = /dev/null\n')).toEqual({
+		expect(
+			parseLaunchctlLogPaths('\tstdout path = /usr/local/var/log/nginx.log\n\tstderr path = /dev/null\n')
+		).toEqual({
 			stdout: '/usr/local/var/log/nginx.log',
 			stderr: '/dev/null'
 		});
@@ -100,7 +125,9 @@ describe('service and container listings', () => {
 	});
 
 	it('launchctl list: running jobs and failed third-party jobs', () => {
-		const jobs = parseLaunchctlList('PID\tStatus\tLabel\n412\t0\thomebrew.mxcl.nginx\n-\t78\thomebrew.mxcl.redis\n-\t1\tcom.apple.x\n');
+		const jobs = parseLaunchctlList(
+			'PID\tStatus\tLabel\n412\t0\thomebrew.mxcl.nginx\n-\t78\thomebrew.mxcl.redis\n-\t1\tcom.apple.x\n'
+		);
 		expect(jobs.map((j) => [j.label, j.state])).toEqual([
 			['homebrew.mxcl.nginx', 'running'],
 			['homebrew.mxcl.redis', 'failed (exit 78)']
@@ -131,11 +158,20 @@ describe('service and container listings', () => {
 });
 
 describe('listLogSources', () => {
-	function io(platform: string, options: { elevated?: boolean; groups?: string; tree?: Record<string, LogDirEntry[]>; unreadable?: string[] }): LogIo {
+	function io(
+		platform: string,
+		options: { elevated?: boolean; groups?: string; tree?: Record<string, LogDirEntry[]>; unreadable?: string[] }
+	): LogIo {
 		const tree = options.tree ?? {};
 		const fs: LogFs = {
 			realpath: async (path) => path,
-			stat: async (path) => ({ size: 10, mtimeMs: path.endsWith('new.log') ? 2_000 : 1_000, ino: 1, isFile: true, isDirectory: false }),
+			stat: async (path) => ({
+				size: 10,
+				mtimeMs: path.endsWith('new.log') ? 2_000 : 1_000,
+				ino: 1,
+				isFile: true,
+				isDirectory: false
+			}),
 			readdir: async (path) => tree[path] ?? [],
 			canRead: async (path) => !(options.unreadable ?? []).includes(path),
 			read: async () => new Uint8Array()
@@ -169,7 +205,14 @@ describe('listLogSources', () => {
 		const list = await listLogSources({
 			io: io('linux', {
 				tree: {
-					'/var/log': [file('old.log'), file('new.log'), file('auth.log'), file('syslog.2.gz'), file('wtmp'), dir('journal')],
+					'/var/log': [
+						file('old.log'),
+						file('new.log'),
+						file('auth.log'),
+						file('syslog.2.gz'),
+						file('wtmp'),
+						dir('journal')
+					],
 					'/home/ops/code/api': [dir('storage'), file('README.md'), dir('node_modules')],
 					'/home/ops/code/api/storage': [dir('logs')],
 					'/home/ops/code/api/storage/logs': [file('laravel.log')]
@@ -183,7 +226,11 @@ describe('listLogSources', () => {
 			nodeName: 'build-01'
 		});
 		const journal = list.sources.find((s) => s.id === 'system:journal');
-		expect(journal).toMatchObject({ readable: true, unreadableReason: 'group-membership', hint: 'sudo usermod -aG systemd-journal ops' });
+		expect(journal).toMatchObject({
+			readable: true,
+			unreadableReason: 'group-membership',
+			hint: 'sudo usermod -aG systemd-journal ops'
+		});
 		const files = list.sources.filter((s) => s.kind === 'file');
 		expect(files.map((f) => f.label)).toEqual([
 			'/var/log/new.log',
@@ -191,13 +238,20 @@ describe('listLogSources', () => {
 			'/var/log/auth.log',
 			'~/code/api/storage/logs/laravel.log'
 		]);
-		expect(files.find((f) => f.label === '/var/log/auth.log')).toMatchObject({ readable: false, unreadableReason: 'root-only' });
+		expect(files.find((f) => f.label === '/var/log/auth.log')).toMatchObject({
+			readable: false,
+			unreadableReason: 'root-only'
+		});
 		expect(list.roots).toEqual(['/var/log', '~/code/api']);
 	});
 
 	it('lists the Security log as needs-admin without elevation (U7)', async () => {
 		const list = await listLogSources({ io: io('win32', { elevated: false }), roots: [], nodeName: 'win-01' });
-		expect(list.sources.map((s) => s.id)).toEqual(['system:event-system', 'system:event-application', 'system:event-security']);
+		expect(list.sources.map((s) => s.id)).toEqual([
+			'system:event-system',
+			'system:event-application',
+			'system:event-security'
+		]);
 		expect(list.sources[2]).toMatchObject({ readable: false, unreadableReason: 'needs-admin' });
 	});
 });

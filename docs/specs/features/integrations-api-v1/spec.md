@@ -284,19 +284,16 @@ metricId}` (the default when omitted is `{pluginId: 'external', metricId: 'value
   **`PUT /goals/:id/dod`** (`{dodCriteria}`) replace the whole set and answer the Goal DTO (`goal.updated`).
 - **The Definition of Done is a person's finish line** (works-security lane, integration API gates). An approved
   criterion is an instruction the next iteration brief hands the agent as the owner's own words, and "every approved
-  criterion done or waived" completes a delivery Goal with no person involved. So:
-  - **with `X-Act-As-User`** (a person's decision the integration relays, e.g. a key result a person ticked in Gauzy)
-    `PUT /goals/:id/dod` writes the set as approved operator items, as before; the Goal's log records the relay
-    (`provenance: {integrationKeyId, integrationKind, actAsUserId}`);
-  - **without it** the key may only **propose**: a criterion the Goal does not have yet is appended open and inert
-    (`proposed: true`, the planner's approval flow; the owner is notified and approves it in Ever Works). A new
-    criterion sent `done` or `waived`, any change to an approved criterion's text or status (or to evidence / note the
-    body sends), leaving out an approved criterion (removing the last open one would complete the Goal) and any change
-    to a pending proposal answer `422 domain_rule` with `details.reason: act_as_required` and `details.criteria
-    [{id, reason}]` (`closed_status`, `approved_changed`, `approved_removed`, `proposal_changed`). An unchanged echo is
-    a no-op, and naming a proposal **never approves it**. `POST /goals` likewise refuses `done` / `waived` criteria
-    without `X-Act-As-User`.
-  - `INTEGRATION_GOAL_DOD_PROPOSE_ONLY=false` restores the old key-only write.
+  criterion done or waived" completes a delivery Goal with no person involved. So: - **with `X-Act-As-User`** (a person's decision the integration relays, e.g. a key result a person ticked in Gauzy)
+  `PUT /goals/:id/dod` writes the set as approved operator items, as before; the Goal's log records the relay
+  (`provenance: {integrationKeyId, integrationKind, actAsUserId}`); - **without it** the key may only **propose**: a criterion the Goal does not have yet is appended open and inert
+  (`proposed: true`, the planner's approval flow; the owner is notified and approves it in Ever Works). A new
+  criterion sent `done` or `waived`, any change to an approved criterion's text or status (or to evidence / note the
+  body sends), leaving out an approved criterion (removing the last open one would complete the Goal) and any change
+  to a pending proposal answer `422 domain_rule` with `details.reason: act_as_required` and `details.criteria
+[{id, reason}]` (`closed_status`, `approved_changed`, `approved_removed`, `proposal_changed`). An unchanged echo is
+  a no-op, and naming a proposal **never approves it**. `POST /goals` likewise refuses `done` / `waived` criteria
+  without `X-Act-As-User`. - `INTEGRATION_GOAL_DOD_PROPOSE_ONLY=false` restores the old key-only write.
   `PUT /goals/:id/dod` keeps every planner proposal (`proposed: true`) the body does not name, so editing one key
   result never drops proposals awaiting a person (Gauzy CR-12).
 - **`POST /goals/:id/samples`** ([`GoalSample`](./contract/schemas/requests.schema.json) `{criterionId?, value,
@@ -522,10 +519,10 @@ organization overlay into Works, locks, revisions and the activity trail therefo
   needs `X-Act-As-User` (the reviewer) — without it `422 domain_rule`, `details.reason: act_as_required` (the key would
   be accepting its own `proposed` create). It also never accepts **content the key wrote as itself**: every content
   write through this API stamps `metadata.lastContentWrite {principal: 'integration', integrationKeyId,
-  integrationKind, actAsUserId, at}` on the document (any other content write — a person in the app, an agent —
+integrationKind, actAsUserId, at}` on the document (any other content write — a person in the app, an agent —
   supersedes it with `principal: 'app'`; a key-only create from before the marker, `source: imported` + `proposed`, counts too), and a `proposed`
   document whose current content has no person behind it answers `422 domain_rule`, `details.reason:
-  key_authored_content`: a person accepts it in Ever Works, or the integration re-sends the content as the person's
+key_authored_content`: a person accepts it in Ever Works, or the integration re-sends the content as the person's
   write. Proposals written by agents or fleet runs stay acceptable through a relay naming a person (Gauzy's review
   queue mirrors them). `INTEGRATION_KB_ACCEPT_REQUIRES_PERSON=false` restores the old behaviour. Residual (owner
   decision): a key may act as any person its tenant lets it name, and a create with `X-Act-As-User` lands `accepted`

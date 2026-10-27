@@ -168,11 +168,17 @@ export function SessionReplayPlayer({
               ? t('nothingYet')
               : t('notRecorded');
     const date = manifest?.firstAt
-        ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(manifest.firstAt))
+        ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
+              new Date(manifest.firstAt),
+          )
         : '';
 
     return (
-        <section className="space-y-3" aria-label={t('title', { title, node: nodeName, date })} data-testid="fleet-session-replay">
+        <section
+            className="space-y-3"
+            aria-label={t('title', { title, node: nodeName, date })}
+            data-testid="fleet-session-replay"
+        >
             <h2 className="text-sm font-semibold text-text dark:text-text-dark">
                 {t('title', { title, node: nodeName, date })}
             </h2>
@@ -182,14 +188,27 @@ export function SessionReplayPlayer({
                 </p>
             )}
             {empty && (
-                <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-session-replay-empty">
+                <p
+                    role="status"
+                    className="text-sm text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-session-replay-empty"
+                >
                     {emptyLine}
                 </p>
             )}
-            {!manifest && !failed && <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('loading')}</p>}
+            {!manifest && !failed && (
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('loading')}</p>
+            )}
 
-            <div className="relative h-[50vh] min-h-[280px] rounded-md overflow-hidden bg-[#0b0f19]" hidden={Boolean(empty)}>
-                <div ref={hostRef} className="absolute inset-0" data-testid="fleet-session-replay-host" />
+            <div
+                className="relative h-[50vh] min-h-[280px] rounded-md overflow-hidden bg-[#0b0f19]"
+                hidden={Boolean(empty)}
+            >
+                <div
+                    ref={hostRef}
+                    className="absolute inset-0"
+                    data-testid="fleet-session-replay-host"
+                />
             </div>
 
             {!empty && timeline && timeline.length > 0 && (
@@ -202,26 +221,48 @@ export function SessionReplayPlayer({
                             step={REPLAY_STEP_MS}
                             value={position}
                             onChange={(event) => seek(Number(event.target.value))}
-                            aria-label={t('position', { at: formatPosition(position), total: formatPosition(duration) })}
-                            aria-valuetext={t('position', { at: formatPosition(position), total: formatPosition(duration) })}
+                            aria-label={t('position', {
+                                at: formatPosition(position),
+                                total: formatPosition(duration),
+                            })}
+                            aria-valuetext={t('position', {
+                                at: formatPosition(position),
+                                total: formatPosition(duration),
+                            })}
                             className="w-full"
                             data-testid="fleet-session-replay-slider"
                         />
-                        <div className="pointer-events-none absolute inset-x-0 -bottom-1 h-1" aria-hidden="true">
+                        <div
+                            className="pointer-events-none absolute inset-x-0 -bottom-1 h-1"
+                            aria-hidden="true"
+                        >
                             {marks.map((mark, index) => (
                                 <span
                                     key={index}
                                     className="absolute h-1 rounded bg-warning/70"
-                                    style={{ left: `${mark.start * 100}%`, width: `${Math.max(0.5, (mark.end - mark.start) * 100)}%` }}
+                                    style={{
+                                        left: `${mark.start * 100}%`,
+                                        width: `${Math.max(0.5, (mark.end - mark.start) * 100)}%`,
+                                    }}
                                 />
                             ))}
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => seek(0)} aria-label={t('restart')}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => seek(0)}
+                            aria-label={t('restart')}
+                        >
                             <SkipBack className="w-4 h-4" aria-hidden="true" />
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => seek(position - REPLAY_JUMP_MS)} aria-label={t('back10')}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => seek(position - REPLAY_JUMP_MS)}
+                            aria-label={t('back10')}
+                        >
                             <Rewind className="w-4 h-4" aria-hidden="true" />
                         </Button>
                         <Button
@@ -232,16 +273,29 @@ export function SessionReplayPlayer({
                             }}
                             data-testid="fleet-session-replay-play"
                         >
-                            {playing ? <Pause className="w-4 h-4" aria-hidden="true" /> : <Play className="w-4 h-4" aria-hidden="true" />}
+                            {playing ? (
+                                <Pause className="w-4 h-4" aria-hidden="true" />
+                            ) : (
+                                <Play className="w-4 h-4" aria-hidden="true" />
+                            )}
                             {playing ? t('pause') : t('play')}
                         </Button>
-                        <Button size="sm" variant="secondary" onClick={() => seek(position + REPLAY_JUMP_MS)} aria-label={t('forward10')}>
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => seek(position + REPLAY_JUMP_MS)}
+                            aria-label={t('forward10')}
+                        >
                             <FastForward className="w-4 h-4" aria-hidden="true" />
                         </Button>
                         <span className="tabular-nums text-xs text-text-muted dark:text-text-muted-dark">
                             {formatPosition(position)} / {formatPosition(duration)}
                         </span>
-                        <span className="ml-auto inline-flex items-center gap-1 text-xs" role="group" aria-label={t('speed')}>
+                        <span
+                            className="ml-auto inline-flex items-center gap-1 text-xs"
+                            role="group"
+                            aria-label={t('speed')}
+                        >
                             {REPLAY_SPEEDS.map((option) => (
                                 <button
                                     key={option}
@@ -264,7 +318,9 @@ export function SessionReplayPlayer({
                             {marks.map((mark, index) => (
                                 <li key={index}>
                                     {t('driverSpan', {
-                                        name: mark.span.requestedBy?.startsWith('agent:') ? t('anAgent') : t('someone'),
+                                        name: mark.span.requestedBy?.startsWith('agent:')
+                                            ? t('anAgent')
+                                            : t('someone'),
                                         from: clock(mark.span.from, locale),
                                         to: clock(mark.span.to, locale),
                                     })}

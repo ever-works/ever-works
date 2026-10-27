@@ -89,7 +89,8 @@ export function claudeQuestion(input: unknown): { prompt?: string; options: Flee
 	const options: FleetSessionAttentionOption[] = [];
 	for (const raw of rawOptions.slice(0, 8)) {
 		const label = oneLine(asRecord(raw)?.label ?? raw, 120);
-		if (label) options.push({ id: String(options.length + 1), label, ...(options.length === 0 ? { primary: true } : {}) });
+		if (label)
+			options.push({ id: String(options.length + 1), label, ...(options.length === 0 ? { primary: true } : {}) });
 	}
 	return { ...(prompt ? { prompt } : {}), options };
 }

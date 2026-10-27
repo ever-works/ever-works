@@ -152,7 +152,8 @@ export function checkoutActionState(
         if (row.folderRemoved) return { enabled: false, reason: 'folderRemoved' };
         if (row.busy === 'session') return { enabled: false, reason: 'busy' };
         // The computer computes what would be lost; a gone folder needs no computer.
-        if (row.state !== 'missing' && !isComputerOnline(context.node)) return { enabled: false, reason: 'offline' };
+        if (row.state !== 'missing' && !isComputerOnline(context.node))
+            return { enabled: false, reason: 'offline' };
         return { enabled: true };
     }
     if (action === 'restore') {
@@ -178,8 +179,11 @@ export function checkoutActionState(
 }
 
 /** The actions one row shows, in order (the ones it cannot take render disabled with the reason). */
-export function checkoutRowActions(row: Pick<FleetCheckoutView, 'state' | 'kind' | 'createdBy'>): CheckoutRowAction[] {
-    const removal: CheckoutRowAction = row.kind === 'discovered' || row.createdBy === 'task' ? 'forget' : 'delete';
+export function checkoutRowActions(
+    row: Pick<FleetCheckoutView, 'state' | 'kind' | 'createdBy'>,
+): CheckoutRowAction[] {
+    const removal: CheckoutRowAction =
+        row.kind === 'discovered' || row.createdBy === 'task' ? 'forget' : 'delete';
     if (row.state === 'archived') return ['restore', removal];
     return ['fetch', 'pull', 'push', 'refresh', 'archive', removal];
 }
@@ -208,14 +212,19 @@ export function homeRelativePath(path: string): string {
 }
 
 /** Sum of row sizes (the computer's total, spec FR-14), skipping the bin. */
-export function totalCheckoutBytes(rows: readonly Pick<FleetCheckoutView, 'state' | 'sizeBytes'>[]): number {
+export function totalCheckoutBytes(
+    rows: readonly Pick<FleetCheckoutView, 'state' | 'sizeBytes'>[],
+): number {
     let total = 0;
     for (const row of rows) if (row.state !== 'archived') total += row.sizeBytes ?? 0;
     return total;
 }
 
 /** Minutes/hours/days since an ISO time, for "found 2 h ago" / "idle 3 d". Null for unknown. */
-export function ageParts(iso: string | null | undefined, now: number): { value: number; unit: 'm' | 'h' | 'd' } | null {
+export function ageParts(
+    iso: string | null | undefined,
+    now: number,
+): { value: number; unit: 'm' | 'h' | 'd' } | null {
     if (!iso) return null;
     const at = Date.parse(iso);
     if (!Number.isFinite(at)) return null;
@@ -227,9 +236,13 @@ export function ageParts(iso: string | null | undefined, now: number): { value: 
 }
 
 /** How often the tab re-reads: every 10 s while anything is being created or fetched, else every 60 s. */
-export function checkoutsPollMs(rows: readonly Pick<FleetCheckoutView, 'state' | 'lastCommand'>[]): number {
+export function checkoutsPollMs(
+    rows: readonly Pick<FleetCheckoutView, 'state' | 'lastCommand'>[],
+): number {
     const working = rows.some(
-        (row) => row.state === 'creating' || (row.lastCommand !== null && row.lastCommand.exitCode === null),
+        (row) =>
+            row.state === 'creating' ||
+            (row.lastCommand !== null && row.lastCommand.exitCode === null),
     );
     return working ? 10_000 : 60_000;
 }

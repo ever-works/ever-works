@@ -46,6 +46,7 @@ import {
     fleetCloudScreens,
     fleetUsageScreens,
     fleetRunnersScreens,
+    fleetActionsJobsScreens,
     screensFor,
 } from './registry/screens';
 import { useFleetPaletteComputers } from './hooks/use-fleet-computers';
@@ -297,6 +298,8 @@ export function CommandPalette({
             ...fleetUsageScreens(fleetComputers, fleetUsageEnabled),
             // Actions runners (FL-18): "Install Actions runners on <name>".
             ...fleetRunnersScreens(fleetComputers, fleetActionsRunnersEnabled),
+            // Actions jobs (FL-18 P2): "Actions jobs" — the hub's panel.
+            ...fleetActionsJobsScreens(fleetActionsRunnersEnabled),
         ],
         [
             appPath,
@@ -324,7 +327,18 @@ export function CommandPalette({
                 settled,
                 sessions: paletteSessions,
             }),
-        [t, query, filter, commandContext, commands, screens, recents, response, settled, paletteSessions],
+        [
+            t,
+            query,
+            filter,
+            commandContext,
+            commands,
+            screens,
+            recents,
+            response,
+            settled,
+            paletteSessions,
+        ],
     );
     const rows = useMemo(() => flattenRows(sections), [sections]);
 

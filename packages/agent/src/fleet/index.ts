@@ -80,3 +80,5 @@ export * from './cloud';
 export * from './usage';
 // Actions runners on computers (FL-18).
 export * from './runners';
+// Desktop view & control (FL-07) — the desktop facts a heartbeat reports, and the helper admission audit.
+export * from './desktop';

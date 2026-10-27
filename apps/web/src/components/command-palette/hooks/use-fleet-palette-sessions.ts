@@ -10,7 +10,10 @@ import { sessionsClient } from '@/components/fleet/sessions/sessions.client';
  * is on. A deployment with sessions switched off answers 404 and the palette
  * simply shows no session rows.
  */
-export function useFleetPaletteSessions(open: boolean, enabled: boolean): FleetSessionBoardResponse | null {
+export function useFleetPaletteSessions(
+    open: boolean,
+    enabled: boolean,
+): FleetSessionBoardResponse | null {
     const [board, setBoard] = useState<FleetSessionBoardResponse | null>(null);
     useEffect(() => {
         if (!open || !enabled) return undefined;

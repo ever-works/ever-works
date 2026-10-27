@@ -65,7 +65,10 @@ type ToolError = { error: FleetLinkError };
 function toolError(error: unknown): ToolError {
     const known = readFleetCommandError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -74,9 +77,14 @@ function invalid(field: string, hint: string): ToolError {
 }
 
 function compactRun(run: FleetCommandRunView) {
-    const head = run.outputHead.length > MODEL_EDGE_CHARS ? `${run.outputHead.slice(0, MODEL_EDGE_CHARS)}…` : run.outputHead;
+    const head =
+        run.outputHead.length > MODEL_EDGE_CHARS
+            ? `${run.outputHead.slice(0, MODEL_EDGE_CHARS)}…`
+            : run.outputHead;
     const tail =
-        run.outputTail.length > MODEL_EDGE_CHARS ? `…${run.outputTail.slice(-MODEL_EDGE_CHARS)}` : run.outputTail;
+        run.outputTail.length > MODEL_EDGE_CHARS
+            ? `…${run.outputTail.slice(-MODEL_EDGE_CHARS)}`
+            : run.outputTail;
     return {
         nodeId: run.nodeId,
         computer: run.nodeName,
@@ -85,7 +93,10 @@ function compactRun(run: FleetCommandRunView) {
         exitCode: run.exitCode,
         error: run.error,
         durationMs: run.durationMs,
-        output: run.truncated || run.outputHead.length > MODEL_EDGE_CHARS ? { head, tail } : { all: head },
+        output:
+            run.truncated || run.outputHead.length > MODEL_EDGE_CHARS
+                ? { head, tail }
+                : { all: head },
         truncated: run.truncated,
     };
 }
@@ -132,18 +143,31 @@ export function buildFleetCommandTools(args: {
                     description: `The computers (Fleet node ids), 1–${FLEET_COMMAND_MAX_NODES}.`,
                 },
                 command: { type: 'string', description: 'The command line (at most 8 KiB).' },
-                cwd: { type: 'string', description: "Optional folder (default the owner's home, ~)." },
-                timeoutSec: { type: 'integer', description: 'Optional timeout in seconds (default 600, at most 3600).' },
+                cwd: {
+                    type: 'string',
+                    description: "Optional folder (default the owner's home, ~).",
+                },
+                timeoutSec: {
+                    type: 'integer',
+                    description: 'Optional timeout in seconds (default 600, at most 3600).',
+                },
             },
             required: ['nodeIds', 'command'],
         },
         invoke: async (raw) => {
-            const a = (raw ?? {}) as { nodeIds?: unknown; command?: unknown; cwd?: unknown; timeoutSec?: unknown };
-            if (!isFleetCommandLine(a.command)) return invalid('command', 'command is 1 … 8 KiB of text');
+            const a = (raw ?? {}) as {
+                nodeIds?: unknown;
+                command?: unknown;
+                cwd?: unknown;
+                timeoutSec?: unknown;
+            };
+            if (!isFleetCommandLine(a.command))
+                return invalid('command', 'command is 1 … 8 KiB of text');
             const nodeIds = Array.isArray(a.nodeIds)
                 ? a.nodeIds.filter((id): id is string => typeof id === 'string' && id.length > 0)
                 : [];
-            if (nodeIds.length === 0) return invalid('nodeIds', 'nodeIds names at least one computer');
+            if (nodeIds.length === 0)
+                return invalid('nodeIds', 'nodeIds names at least one computer');
             if (nodeIds.length > FLEET_COMMAND_MAX_NODES) {
                 return {
                     error: {
@@ -230,7 +254,8 @@ export function buildFleetCommandTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { commandId?: unknown };
-            if (typeof a.commandId !== 'string' || !a.commandId) return invalid('commandId', 'commandId is required');
+            if (typeof a.commandId !== 'string' || !a.commandId)
+                return invalid('commandId', 'commandId is required');
             try {
                 return { command: compact(await agentCommand(a.commandId)) };
             } catch (error) {
@@ -250,7 +275,8 @@ export function buildFleetCommandTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { commandId?: unknown };
-            if (typeof a.commandId !== 'string' || !a.commandId) return invalid('commandId', 'commandId is required');
+            if (typeof a.commandId !== 'string' || !a.commandId)
+                return invalid('commandId', 'commandId is required');
             try {
                 const view = await agentCommand(a.commandId);
                 return { command: compact(await args.service.cancel(view.id, actor)) };

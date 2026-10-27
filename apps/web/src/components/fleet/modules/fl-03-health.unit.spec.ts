@@ -48,7 +48,11 @@ describe('FL-03 registration (components/fleet/modules/fl-03-health.ts)', () => 
         const registry = await import('../registry');
         const { HEALTH_HISTORY_BLOCK_ID } = await import('./fl-03-health');
         const blocks = registry.getOverviewBlocks('computer', {});
-        expect(blocks[1]).toMatchObject({ id: HEALTH_HISTORY_BLOCK_ID, surface: 'computer', order: 20 });
+        expect(blocks[1]).toMatchObject({
+            id: HEALTH_HISTORY_BLOCK_ID,
+            surface: 'computer',
+            order: 20,
+        });
         expect(blocks[1].flag).toBeUndefined();
     });
 

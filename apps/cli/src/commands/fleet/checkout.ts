@@ -28,7 +28,8 @@ interface CliError {
 }
 
 function readError(error: unknown): CliError {
-    const response = (error as { response?: { data?: { error?: CliError; message?: string } } })?.response;
+    const response = (error as { response?: { data?: { error?: CliError; message?: string } } })
+        ?.response;
     const envelope = response?.data?.error;
     if (envelope && typeof envelope.code === 'string') return envelope;
     return {
@@ -56,7 +57,8 @@ function fail(json: boolean, error: unknown): never {
     else {
         console.error(chalk.red(`✗ ${typed.code}: ${typed.hint}`));
         if (typed.code === 'confirmation_required' && typed.details) {
-            const summary = typeof typed.details.summary === 'string' ? typed.details.summary : null;
+            const summary =
+                typeof typed.details.summary === 'string' ? typed.details.summary : null;
             if (summary) console.error(chalk.yellow(summary));
             console.error(
                 chalk.gray(
@@ -103,7 +105,8 @@ const list = new Command('list')
             emit(options.json === true, response.data, () => {
                 if (response.data.data.length === 0) console.log(chalk.yellow('No checkouts.'));
                 for (const checkout of response.data.data) console.log(line(checkout));
-                if (response.data.meta.bin > 0) console.log(chalk.gray(`Bin: ${response.data.meta.bin}`));
+                if (response.data.meta.bin > 0)
+                    console.log(chalk.gray(`Bin: ${response.data.meta.bin}`));
             });
         } catch (error) {
             fail(options.json === true, error);
@@ -126,7 +129,9 @@ const get = new Command('get')
     });
 
 const create = new Command('create')
-    .description('Create a checkout: a fresh clone (--repo) or a worktree of a checkout (--worktree-of)')
+    .description(
+        'Create a checkout: a fresh clone (--repo) or a worktree of a checkout (--worktree-of)',
+    )
     .requiredOption('--node <id>', 'The computer')
     .option('--repo <url>', 'Repository URL to clone (no credential in it)')
     .option('--worktree-of <checkoutId>', 'A checkout on the same computer to branch off')
@@ -143,7 +148,8 @@ const create = new Command('create')
             json?: boolean;
         }) => {
             if (!UUID.test(options.node)) usage('--node must be a computer id');
-            if (!options.repo === !options.worktreeOf) usage('give exactly one of --repo or --worktree-of');
+            if (!options.repo === !options.worktreeOf)
+                usage('give exactly one of --repo or --worktree-of');
             await requireAuth();
             const body: FleetCheckoutCreateRequest = {
                 nodeId: options.node,
@@ -203,38 +209,62 @@ const archive = new Command('archive')
             const response = await getHttpClient().post(`/fleet/checkouts/${id}/archive`, {
                 confirm: options.confirm === true,
             });
-            emit(options.json === true, response.data, () => console.log(chalk.green('✓ in the bin')));
+            emit(options.json === true, response.data, () =>
+                console.log(chalk.green('✓ in the bin')),
+            );
         } catch (error) {
             fail(options.json === true, error);
         }
     });
 
 const remove = new Command('delete')
-    .description('Delete a checkout Ever Works created, or forget one found on the computer (--forget)')
+    .description(
+        'Delete a checkout Ever Works created, or forget one found on the computer (--forget)',
+    )
     .argument('<id>', 'Checkout id')
     .option('--forget', 'Remove the row only; the folder is not touched')
-    .option('--clean-up', 'FL-06 Clean up: only a worktree whose pull request is merged or closed and no session uses')
+    .option(
+        '--clean-up',
+        'FL-06 Clean up: only a worktree whose pull request is merged or closed and no session uses',
+    )
     .option('--confirm', 'Confirm (nothing would be lost)')
-    .option('--confirm-name <folder>', 'Confirm a delete that would lose work: the checkout folder name')
+    .option(
+        '--confirm-name <folder>',
+        'Confirm a delete that would lose work: the checkout folder name',
+    )
     .option('--json', 'Machine-readable output')
     .action(
         async (
             id: string,
-            options: { forget?: boolean; cleanUp?: boolean; confirm?: boolean; confirmName?: string; json?: boolean },
+            options: {
+                forget?: boolean;
+                cleanUp?: boolean;
+                confirm?: boolean;
+                confirmName?: string;
+                json?: boolean;
+            },
         ) => {
             if (!UUID.test(id)) usage('<id> must be a checkout id');
-            if (options.cleanUp && options.forget) usage('--clean-up removes the folder; it cannot be combined with --forget');
+            if (options.cleanUp && options.forget)
+                usage('--clean-up removes the folder; it cannot be combined with --forget');
             await requireAuth();
             try {
-                const response = await getHttpClient().delete(`/fleet/checkouts/${id}${options.cleanUp ? '?cleanUp=1' : ''}`, {
-                    data: {
-                        ...(options.forget ? { mode: 'forget' } : {}),
-                        ...(options.confirm ? { confirm: true } : {}),
-                        ...(options.confirmName ? { confirmName: options.confirmName } : {}),
+                const response = await getHttpClient().delete(
+                    `/fleet/checkouts/${id}${options.cleanUp ? '?cleanUp=1' : ''}`,
+                    {
+                        data: {
+                            ...(options.forget ? { mode: 'forget' } : {}),
+                            ...(options.confirm ? { confirm: true } : {}),
+                            ...(options.confirmName ? { confirmName: options.confirmName } : {}),
+                        },
                     },
-                });
+                );
                 emit(options.json === true, response.data, () =>
-                    console.log(chalk.green(options.forget ? '✓ forgotten' : '✓ deleted (the bin shows it)')),
+                    console.log(
+                        chalk.green(
+                            options.forget ? '✓ forgotten' : '✓ deleted (the bin shows it)',
+                        ),
+                    ),
                 );
             } catch (error) {
                 fail(options.json === true, error);

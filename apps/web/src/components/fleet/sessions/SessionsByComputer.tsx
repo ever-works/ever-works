@@ -60,7 +60,10 @@ export default function SessionsByComputer({ nodes }: FleetHubTabProps) {
 
     if (nodes.length === 0) {
         return (
-            <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-sessions-by-computer-empty">
+            <p
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-sessions-by-computer-empty"
+            >
                 {t('byComputer.noComputers')}
             </p>
         );
@@ -77,11 +80,17 @@ export default function SessionsByComputer({ nodes }: FleetHubTabProps) {
                 const sessions = byNode.get(node.id) ?? [];
                 const consents = readNodeConsents(node);
                 const online = node.status !== 'offline';
-                const consentWords = [consents.work ? 'work' : null, consents.manage ? 'manage' : null].filter(
-                    (word): word is string => word !== null,
-                );
+                const consentWords = [
+                    consents.work ? 'work' : null,
+                    consents.manage ? 'manage' : null,
+                ].filter((word): word is string => word !== null);
                 return (
-                    <div key={node.id} className="space-y-2" data-testid="fleet-sessions-computer-group" data-node-id={node.id}>
+                    <div
+                        key={node.id}
+                        className="space-y-2"
+                        data-testid="fleet-sessions-computer-group"
+                        data-node-id={node.id}
+                    >
                         <header className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <Link
                                 href={ROUTES.DASHBOARD_FLEET_COMPUTER(node.id, 'sessions')}
@@ -90,17 +99,29 @@ export default function SessionsByComputer({ nodes }: FleetHubTabProps) {
                                 {node.name}
                             </Link>
                             <span className="inline-flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark">
-                                <span className={cn('h-2 w-2 rounded-full', online ? 'bg-success' : 'bg-text-muted dark:bg-text-muted-dark')} aria-hidden="true" />
+                                <span
+                                    className={cn(
+                                        'h-2 w-2 rounded-full',
+                                        online
+                                            ? 'bg-success'
+                                            : 'bg-text-muted dark:bg-text-muted-dark',
+                                    )}
+                                    aria-hidden="true"
+                                />
                                 {online ? t('byComputer.online') : t('byComputer.offline')}
                             </span>
                             {consentWords.length > 0 && (
-                                <span className="text-xs text-text-muted dark:text-text-muted-dark">{consentWords.join(' · ')}</span>
+                                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {consentWords.join(' · ')}
+                                </span>
                             )}
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('byComputer.sessions', { count: sessions.length })}
                             </span>
                             {consents.manage && !consents.work && (
-                                <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('byComputer.manageOnly')}</span>
+                                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('byComputer.manageOnly')}
+                                </span>
                             )}
                             {online && (consents.manage || consents.work) && (
                                 <Link

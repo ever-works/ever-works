@@ -26,7 +26,10 @@ import type {
     FleetNodeView,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
-import { refuseMachinePrincipalAction, type MachinePrincipalRequest } from '../../auth/machine-principal';
+import {
+    refuseMachinePrincipalAction,
+    type MachinePrincipalRequest,
+} from '../../auth/machine-principal';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
@@ -38,12 +41,15 @@ import {
 } from './dto/fleet-cloud.dto';
 import { FleetCloudEnabledGuard } from './fleet-cloud-enabled.guard';
 
-const REFUSAL_WHY = 'an Agent creates, powers and destroys cloud computers through its tools, where each act waits for its owner.';
+const REFUSAL_WHY =
+    'an Agent creates, powers and destroys cloud computers through its tools, where each act waits for its owner.';
 
 /** A plugin id as the manifest validator allows it (lower-case words joined by `-`). */
 function pluginParam(plugin: string): string {
     if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(plugin)) {
-        throw fleetMachineError('invalid', 'the provider id is not a plugin id', { field: 'plugin' });
+        throw fleetMachineError('invalid', 'the provider id is not a plugin id', {
+            field: 'plugin',
+        });
     }
     return plugin;
 }
@@ -109,7 +115,9 @@ export class FleetCloudController {
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
-    async list(@CurrentUser() auth: AuthenticatedUser): Promise<FleetCloudListView & FleetCloudProvidersView> {
+    async list(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<FleetCloudListView & FleetCloudProvidersView> {
         return this.cloud.list({ kind: 'user', userId: auth.userId });
     }
 
@@ -138,8 +146,9 @@ export class FleetCloudController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetCloudCreateResponse> {
         refuseMachinePrincipalAction(auth, req, 'create a cloud computer', REFUSAL_WHY);
-        // `vpnAuthKey` is deliberately not forwarded in this phase (the overlay-VPN
-        // preset arrives in P3) and is never echoed: the response type has no field for it.
+        // P3 (FR-32): `vpnAuthKey` goes to the service, which hands it to the first-boot
+        // script once; it is never echoed (the response type has no field for it), stored,
+        // logged or audited.
         return this.cloud.create(
             { kind: 'user', userId: auth.userId },
             {
@@ -150,6 +159,9 @@ export class FleetCloudController {
                 software: body.software,
                 acknowledgedPriceCents: body.acknowledgedPriceCents,
                 organizationId: body.organizationId ?? null,
+                ...(typeof body.vpnAuthKey === 'string' && body.vpnAuthKey
+                    ? { vpnAuthKey: body.vpnAuthKey }
+                    : {}),
                 fields: cloudConfirmFields(body),
             },
         );
@@ -191,7 +203,12 @@ export class FleetCloudController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetCloudOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'power a cloud computer', REFUSAL_WHY);
-        return this.cloud.power({ kind: 'user', userId: auth.userId }, id, body.action, cloudConfirmFields(body));
+        return this.cloud.power(
+            { kind: 'user', userId: auth.userId },
+            id,
+            body.action,
+            cloudConfirmFields(body),
+        );
     }
 
     @Post('cloud/:id/destroy')
@@ -208,11 +225,17 @@ export class FleetCloudController {
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetCloudOperationResponse> {
         refuseMachinePrincipalAction(auth, req, 'destroy a cloud computer', REFUSAL_WHY);
-        return this.cloud.destroy({ kind: 'user', userId: auth.userId }, id, cloudConfirmFields(body));
+        return this.cloud.destroy(
+            { kind: 'user', userId: auth.userId },
+            id,
+            cloudConfirmFields(body),
+        );
     }
 
     @Delete('cloud/:id')
-    @ApiOperation({ summary: 'The same as `POST /api/fleet/cloud/:id/destroy` (FL-19 catalogue alias).' })
+    @ApiOperation({
+        summary: 'The same as `POST /api/fleet/cloud/:id/destroy` (FL-19 catalogue alias).',
+    })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async destroyAlias(
@@ -237,7 +260,12 @@ export class FleetCloudController {
         @Body() body: FleetCloudIdlePolicyDto,
         @Req() req?: MachinePrincipalRequest,
     ): Promise<FleetNodeView> {
-        refuseMachinePrincipalAction(auth, req, 'change a cloud computer’s idle policy', REFUSAL_WHY);
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'change a cloud computer’s idle policy',
+            REFUSAL_WHY,
+        );
         return this.cloud.setIdlePolicy({ kind: 'user', userId: auth.userId }, id, {
             mode: body.mode,
             afterHours: body.afterHours,
@@ -245,7 +273,9 @@ export class FleetCloudController {
     }
 
     @Patch('cloud/:id/idle-policy')
-    @ApiOperation({ summary: 'The same as `PUT /api/fleet/cloud/:id/idle-policy` (FL-19 catalogue route).' })
+    @ApiOperation({
+        summary: 'The same as `PUT /api/fleet/cloud/:id/idle-policy` (FL-19 catalogue route).',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async patchIdlePolicy(
@@ -259,7 +289,8 @@ export class FleetCloudController {
 
     @Post('cloud/:id/keep-running')
     @ApiOperation({
-        summary: 'Keep an idle cloud computer running: the idle window starts again, so the policy waits its hours again.',
+        summary:
+            'Keep an idle cloud computer running: the idle window starts again, so the policy waits its hours again.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })

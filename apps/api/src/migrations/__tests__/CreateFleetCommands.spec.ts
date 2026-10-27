@@ -111,7 +111,9 @@ describe('CreateFleetCommands1796120000000 + CreateFleetCommandRuns1796120100000
             'idx_fleet_command_runs_status',
             'uq_fleet_command_runs_command_node_started',
         ]);
-        expect(runTable?.foreignKeys.map((key) => key.columnNames.join(','))).toEqual(['commandId']);
+        expect(runTable?.foreignKeys.map((key) => key.columnNames.join(','))).toEqual([
+            'commandId',
+        ]);
     });
 
     it('needs the Command but not the computer, and cascades from the Command', async () => {
@@ -132,7 +134,9 @@ describe('CreateFleetCommands1796120000000 + CreateFleetCommandRuns1796120100000
                 `INSERT INTO "fleet_command_runs" ("id", "commandId", "nodeId", "startedAt") VALUES ('r3', 'c1', 'n-gone', '2026-10-21 10:00:00')`,
             ),
         ).rejects.toThrow();
-        const [row] = await dataSource.query(`SELECT * FROM "fleet_command_runs" WHERE "id" = 'r1'`);
+        const [row] = await dataSource.query(
+            `SELECT * FROM "fleet_command_runs" WHERE "id" = 'r1'`,
+        );
         expect(row.status).toBe('running');
         expect(Number(row.outputBytes)).toBe(0);
         await dataSource.query(`DELETE FROM "fleet_commands" WHERE "id" = 'c1'`);

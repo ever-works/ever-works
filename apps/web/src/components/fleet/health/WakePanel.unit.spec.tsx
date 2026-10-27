@@ -60,9 +60,18 @@ describe('WakePanel', () => {
     });
 
     it('says which computer it would go through when it can wake', () => {
-        render(<WakePanel node={NODE} availability={available()} sendWake={vi.fn()} readStatus={vi.fn()} />);
+        render(
+            <WakePanel
+                node={NODE}
+                availability={available()}
+                sendWake={vi.fn()}
+                readStatus={vi.fn()}
+            />,
+        );
         expect(screen.getByTestId('fleet-wake-button')).not.toBeDisabled();
-        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent('Can be woken from build-01 (same network)');
+        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent(
+            'Can be woken from build-01 (same network)',
+        );
     });
 
     it.each([
@@ -82,7 +91,10 @@ describe('WakePanel', () => {
         );
         const button = screen.getByTestId('fleet-wake-button');
         expect(button).toBeDisabled();
-        expect(button).toHaveAttribute('aria-describedby', screen.getByTestId('fleet-wake-line').id);
+        expect(button).toHaveAttribute(
+            'aria-describedby',
+            screen.getByTestId('fleet-wake-line').id,
+        );
         expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent(text);
     });
 
@@ -103,18 +115,28 @@ describe('WakePanel', () => {
         const readStatus = vi.fn(async () => status(true));
         const onBack = vi.fn();
         render(
-            <WakePanel node={NODE} availability={available()} sendWake={sendWake} readStatus={readStatus} onBack={onBack} />,
+            <WakePanel
+                node={NODE}
+                availability={available()}
+                sendWake={sendWake}
+                readStatus={readStatus}
+                onBack={onBack}
+            />,
         );
         await act(async () => {
             fireEvent.click(screen.getByTestId('fleet-wake-button'));
         });
         expect(sendWake).toHaveBeenCalledWith('n1');
-        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent('Waking… sent through build-01 · listening for win-lab');
+        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent(
+            'Waking… sent through build-01 · listening for win-lab',
+        );
 
         await act(async () => {
             await vi.advanceTimersByTimeAsync(20_000);
         });
-        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent('win-lab is back · checked just now');
+        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent(
+            'win-lab is back · checked just now',
+        );
         expect(onBack).toHaveBeenCalledTimes(1);
         // Back means the 60 s check never runs.
         await act(async () => {
@@ -126,7 +148,12 @@ describe('WakePanel', () => {
     it('says "not yet" at 20 s and "may be powered off" at 60 s, then offers Try again', async () => {
         const readStatus = vi.fn(async () => status(false));
         render(
-            <WakePanel node={NODE} availability={available()} sendWake={vi.fn(async () => sent)} readStatus={readStatus} />,
+            <WakePanel
+                node={NODE}
+                availability={available()}
+                sendWake={vi.fn(async () => sent)}
+                readStatus={readStatus}
+            />,
         );
         await act(async () => {
             fireEvent.click(screen.getByTestId('fleet-wake-button'));
@@ -134,7 +161,9 @@ describe('WakePanel', () => {
         await act(async () => {
             await vi.advanceTimersByTimeAsync(20_000);
         });
-        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent('win-lab has not answered yet');
+        expect(screen.getByTestId('fleet-wake-line')).toHaveTextContent(
+            'win-lab has not answered yet',
+        );
         expect(screen.getByTestId('fleet-wake-button')).toBeDisabled();
 
         await act(async () => {
@@ -152,7 +181,10 @@ describe('WakePanel', () => {
             <WakePanel
                 node={NODE}
                 availability={available()}
-                sendWake={vi.fn(async () => ({ ok: false as const, error: 'Already tried 3 times; give it a minute' }))}
+                sendWake={vi.fn(async () => ({
+                    ok: false as const,
+                    error: 'Already tried 3 times; give it a minute',
+                }))}
                 readStatus={vi.fn()}
             />,
         );

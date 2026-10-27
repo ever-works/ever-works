@@ -209,7 +209,8 @@ export const FLEET_RUN_ENV_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
  * CLI's OWN environment (never its command line), so a name the CLI itself
  * reads (`PATH`, `DOCKER_HOST`, a loader variable) would change what runs.
  */
-export const FLEET_RUN_RESERVED_ENV = /^(PATH|Path|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|LANG|LC_[A-Z]+|LD_[A-Z_]+|DYLD_[A-Z_]+|DOCKER_[A-Z_]+|NODE_[A-Z_]+|SYSTEMROOT|SystemRoot|ComSpec|COMSPEC|PATHEXT|USERPROFILE|APPDATA|LOCALAPPDATA)$/;
+export const FLEET_RUN_RESERVED_ENV =
+	/^(PATH|Path|HOME|USER|LOGNAME|SHELL|TMPDIR|TEMP|TMP|LANG|LC_[A-Z]+|LD_[A-Z_]+|DYLD_[A-Z_]+|DOCKER_[A-Z_]+|NODE_[A-Z_]+|SYSTEMROOT|SystemRoot|ComSpec|COMSPEC|PATHEXT|USERPROFILE|APPDATA|LOCALAPPDATA)$/;
 
 /** A named volume (`pgdata`) rather than a host path. */
 export const FLEET_DOCKER_VOLUME_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
@@ -272,9 +273,7 @@ const DANGEROUS_KEYS = [
 export const FLEET_RUN_DANGEROUS_HINT =
 	'Mounts must be under this computer’s shared folders; privileged, host-namespace and socket mounts are not available from here.';
 
-export type FleetRunValidation =
-	| { ok: true; request: FleetRunRequest }
-	| { ok: false; field: string; hint: string };
+export type FleetRunValidation = { ok: true; request: FleetRunRequest } | { ok: false; field: string; hint: string };
 
 function isAbsoluteContainerPath(value: string): boolean {
 	return value.startsWith('/') && !value.includes('\0') && !/(^|\/)\.\.(\/|$)/.test(value);
@@ -291,7 +290,8 @@ export function isFleetHostPath(value: string): boolean {
  * machine only (the platform does not know them); everything else is here.
  */
 export function validateFleetRunRequest(raw: unknown): FleetRunValidation {
-	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, field: 'request', hint: 'a run request is an object' };
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+		return { ok: false, field: 'request', hint: 'a run request is an object' };
 	const input = raw as Record<string, unknown>;
 	for (const key of DANGEROUS_KEYS) {
 		if (key in input) return { ok: false, field: key, hint: FLEET_RUN_DANGEROUS_HINT };
@@ -302,19 +302,27 @@ export function validateFleetRunRequest(raw: unknown): FleetRunValidation {
 	}
 	const ports: FleetRunPort[] = [];
 	const rawPorts = Array.isArray(input.ports) ? input.ports : input.ports === undefined ? [] : null;
-	if (!rawPorts || rawPorts.length > FLEET_RUN_LIMITS.ports) return { ok: false, field: 'ports', hint: 'too many ports' };
+	if (!rawPorts || rawPorts.length > FLEET_RUN_LIMITS.ports)
+		return { ok: false, field: 'ports', hint: 'too many ports' };
 	for (const entry of rawPorts) {
 		const port = (entry ?? {}) as Record<string, unknown>;
-		const valid = (value: unknown) => typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535;
-		if (!valid(port.host) || !valid(port.container)) return { ok: false, field: 'ports', hint: 'a port is a number from 1 to 65535' };
+		const valid = (value: unknown) =>
+			typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535;
+		if (!valid(port.host) || !valid(port.container))
+			return { ok: false, field: 'ports', hint: 'a port is a number from 1 to 65535' };
 		if (port.proto !== undefined && port.proto !== 'tcp' && port.proto !== 'udp') {
 			return { ok: false, field: 'ports', hint: 'a port is tcp or udp' };
 		}
-		ports.push({ host: port.host as number, container: port.container as number, proto: (port.proto as 'tcp' | 'udp') ?? 'tcp' });
+		ports.push({
+			host: port.host as number,
+			container: port.container as number,
+			proto: (port.proto as 'tcp' | 'udp') ?? 'tcp'
+		});
 	}
 	const env: FleetRunEnv[] = [];
 	const rawEnv = Array.isArray(input.env) ? input.env : input.env === undefined ? [] : null;
-	if (!rawEnv || rawEnv.length > FLEET_RUN_LIMITS.env) return { ok: false, field: 'env', hint: 'too many environment variables' };
+	if (!rawEnv || rawEnv.length > FLEET_RUN_LIMITS.env)
+		return { ok: false, field: 'env', hint: 'too many environment variables' };
 	const seen = new Set<string>();
 	for (const entry of rawEnv) {
 		const variable = (entry ?? {}) as Record<string, unknown>;
@@ -326,14 +334,19 @@ export function validateFleetRunRequest(raw: unknown): FleetRunValidation {
 		}
 		if (seen.has(variable.name)) return { ok: false, field: 'env', hint: `${variable.name} is set twice` };
 		seen.add(variable.name);
-		if (typeof variable.value !== 'string' || variable.value.length > FLEET_RUN_LIMITS.envValueLength || variable.value.includes('\0')) {
+		if (
+			typeof variable.value !== 'string' ||
+			variable.value.length > FLEET_RUN_LIMITS.envValueLength ||
+			variable.value.includes('\0')
+		) {
 			return { ok: false, field: 'env', hint: `the value of ${variable.name} is too long or not text` };
 		}
 		env.push({ name: variable.name, value: variable.value });
 	}
 	const volumes: FleetRunVolume[] = [];
 	const rawVolumes = Array.isArray(input.volumes) ? input.volumes : input.volumes === undefined ? [] : null;
-	if (!rawVolumes || rawVolumes.length > FLEET_RUN_LIMITS.volumes) return { ok: false, field: 'volumes', hint: 'too many volumes' };
+	if (!rawVolumes || rawVolumes.length > FLEET_RUN_LIMITS.volumes)
+		return { ok: false, field: 'volumes', hint: 'too many volumes' };
 	for (const entry of rawVolumes) {
 		const volume = (entry ?? {}) as Record<string, unknown>;
 		if (typeof volume.source !== 'string' || typeof volume.target !== 'string') {
@@ -350,7 +363,11 @@ export function validateFleetRunRequest(raw: unknown): FleetRunValidation {
 			return { ok: false, field: 'volumes', hint: 'a volume source is a named volume or a folder' };
 		}
 		// `:` and `,` would split Docker's -v syntax; a target must be an absolute container path.
-		if (/[,\n\r\0]/.test(source) || (source.includes(':') && !/^[A-Za-z]:[\\/]/.test(source)) || source.slice(2).includes(':')) {
+		if (
+			/[,\n\r\0]/.test(source) ||
+			(source.includes(':') && !/^[A-Za-z]:[\\/]/.test(source)) ||
+			source.slice(2).includes(':')
+		) {
 			return { ok: false, field: 'volumes', hint: 'a volume source cannot contain : or ,' };
 		}
 		if (!isAbsoluteContainerPath(target) || /[:,]/.test(target)) {
@@ -478,7 +495,10 @@ export interface FleetComposeServiceView {
 	volumes: string[];
 	/** Host files and folders it mounts (bind sources). */
 	mounts: string[];
-	dependsOn: { service: string; condition: 'service_started' | 'service_healthy' | 'service_completed_successfully' }[];
+	dependsOn: {
+		service: string;
+		condition: 'service_started' | 'service_healthy' | 'service_completed_successfully';
+	}[];
 }
 
 /** `compose.describe` reply / `GET …/docker/compose?project=` body. */

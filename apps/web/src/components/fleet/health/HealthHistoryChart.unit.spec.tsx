@@ -16,8 +16,21 @@ import { sparklineSegments } from './HealthSparkline';
  * breaks.
  */
 
-function point(at: string, cpu: number | null, overrides: Partial<FleetNodeHealthHistoryPoint> = {}) {
-    return { at, cpu, mem: cpu === null ? null : 50, disk: cpu === null ? null : 40, cpuMax: cpu, memMax: null, diskMax: null, ...overrides };
+function point(
+    at: string,
+    cpu: number | null,
+    overrides: Partial<FleetNodeHealthHistoryPoint> = {},
+) {
+    return {
+        at,
+        cpu,
+        mem: cpu === null ? null : 50,
+        disk: cpu === null ? null : 40,
+        cpuMax: cpu,
+        memMax: null,
+        diskMax: null,
+        ...overrides,
+    };
 }
 
 function history(points: FleetNodeHealthHistoryPoint[]): FleetNodeHealthHistory {
@@ -53,7 +66,9 @@ function renderChart(props: Partial<Parameters<typeof HealthHistoryChart>[0]> = 
 describe('HealthHistoryChart', () => {
     it('says history is switched off on this deployment (U10)', () => {
         renderChart({ history: { nodeId: 'n1', range: '24h', disabled: true } });
-        expect(screen.getByTestId('fleet-history-off')).toHaveTextContent('History is switched off on this deployment.');
+        expect(screen.getByTestId('fleet-history-off')).toHaveTextContent(
+            'History is switched off on this deployment.',
+        );
         expect(screen.queryByTestId('fleet-history-plot')).toBeNull();
     });
 
@@ -101,7 +116,10 @@ describe('HealthHistoryChart', () => {
     it('offers the four ranges, the chosen one pressed, and reports a change', () => {
         const onRangeChange = vi.fn();
         renderChart({ history: history([point('2026-10-21T09:00:00.000Z', 5)]), onRangeChange });
-        expect(screen.getByTestId('fleet-history-range-1h')).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByTestId('fleet-history-range-1h')).toHaveAttribute(
+            'aria-pressed',
+            'true',
+        );
         fireEvent.click(screen.getByTestId('fleet-history-range-7d'));
         expect(onRangeChange).toHaveBeenCalledWith('7d');
     });

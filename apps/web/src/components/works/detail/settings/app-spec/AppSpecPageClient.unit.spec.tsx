@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import type { WorkAppSpecStateDto } from '@ever-works/contracts';
+import en from '../../../../../../messages/en.json';
 
 /**
  * APW-03 T17 — `AppSpecPageClient`, and the one behaviour the two component
@@ -40,6 +41,15 @@ vi.mock('@/app/actions/dashboard/app-spec', () => ({
 
 vi.mock('../../WorkDetailContext', () => ({
     useWorkPermissions: () => permissions,
+}));
+
+// APW-03 T31 — the page now renders the Blueprint card, whose `Button` pulls in the
+// locale-aware `Link`; next-intl's navigation factory needs a Next runtime jsdom lacks.
+vi.mock('@/i18n/navigation', () => ({
+    useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+    Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
 }));
 
 import {
@@ -94,7 +104,20 @@ const APP_SPEC_COPY = {
     issues: {},
 };
 
-const messages = { dashboard: { workDetail: { settings: { appSpec: APP_SPEC_COPY } } } };
+// APW-03 T31 — the Blueprint card's strings, read from the real bundle.
+const BLUEPRINT_COPY = (
+    en as unknown as {
+        dashboard: {
+            workDetail: { settings: { appSpec: { blueprint: Record<string, unknown> } } };
+        };
+    }
+).dashboard.workDetail.settings.appSpec.blueprint;
+
+const messages = {
+    dashboard: {
+        workDetail: { settings: { appSpec: { ...APP_SPEC_COPY, blueprint: BLUEPRINT_COPY } } },
+    },
+};
 
 const HEAD_SHA = '4f1c2ab999999999999999999999999999999999';
 const CHECKED_AT = '2026-09-17T12:00:00.000Z';

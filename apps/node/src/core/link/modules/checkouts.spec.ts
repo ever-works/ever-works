@@ -93,7 +93,10 @@ describe('checkouts module (FL-14 T-11)', () => {
 		const module = build(MANAGE);
 		const reply = (await module.machineVerbs!['checkouts.list'].run(
 			context({ rescan: true, refresh: true, measureSize: true }, MANAGE, 'checkouts.list')
-		)) as { checkouts: Array<{ path: string; present: boolean; gitLine: unknown; sizeBytes: number }>; complete: boolean };
+		)) as {
+			checkouts: Array<{ path: string; present: boolean; gitLine: unknown; sizeBytes: number }>;
+			complete: boolean;
+		};
 		expect(reply.complete).toBe(true);
 		expect(reply.checkouts.map((record) => record.path).sort()).toEqual(
 			[join(code, 'api'), join(code, 'web')].sort()

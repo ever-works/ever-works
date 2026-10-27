@@ -52,14 +52,14 @@ route answers 404. Running a command spends no model tokens and no credits.
 
 ## Who may run commands where
 
-| Check            | Refused with                                                                                       |
-| ---------------- | -------------------------------------------------------------------------------------------------- |
-| `--manage`       | `consent_missing` — _"start the node with --manage on build-01"_                                   |
-| Who may command  | `permission_denied` — the computer's **commands** audience (default: its owner; Settings → Fleet) |
-| The kill switch  | `kill_switch` — no new command runs; running ones are stopped (_"Stopped by the fleet kill switch"_) |
-| The link         | `unreachable` — _"build-01 is offline — last seen 2 h ago"_                                         |
-| An older node    | `unsupported_on_node` — _"update the node on build-01 to run commands"_                             |
-| Limits           | `limit_exceeded` — a command is at most 8 KiB, runs on at most 50 computers, 8 at once, 10 a minute |
+| Check           | Refused with                                                                                         |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| `--manage`      | `consent_missing` — _"start the node with --manage on build-01"_                                     |
+| Who may command | `permission_denied` — the computer's **commands** audience (default: its owner; Settings → Fleet)    |
+| The kill switch | `kill_switch` — no new command runs; running ones are stopped (_"Stopped by the fleet kill switch"_) |
+| The link        | `unreachable` — _"build-01 is offline — last seen 2 h ago"_                                          |
+| An older node   | `unsupported_on_node` — _"update the node on build-01 to run commands"_                              |
+| Limits          | `limit_exceeded` — a command is at most 8 KiB, runs on at most 50 computers, 8 at once, 10 a minute  |
 
 Every run asks first: the dialog names the command, each computer, its shell, that it runs as the machine owner,
 the folder and the timeout, and says _"These are real machines, not a sandbox."_ Each computer gets one audit row
@@ -116,14 +116,14 @@ timed out.
 
 ## API
 
-| Method | Path                                 | What                                                                                       |
-| ------ | ------------------------------------ | ------------------------------------------------------------------------------------------ |
-| POST   | `/api/fleet/commands`                | `{ command, nodeIds, cwd?, timeoutSec?, confirm? }` → 409 `confirmation_required`, then 202 |
-| GET    | `/api/fleet/commands?limit=8`        | Your recent one-off commands with their runs                                               |
-| GET    | `/api/fleet/commands/:id`            | One command with every computer's run (read once a second while one runs)                  |
-| GET    | `/api/fleet/commands/:id/runs`       | Its runs                                                                                   |
-| POST   | `/api/fleet/commands/:id/cancel`     | Stop it on every computer it still runs on                                                 |
-| GET    | `/api/fleet/commands/:id/runs/:runId/output` | One computer's full output, downloaded from the computer (`text/plain` attachment) |
-| GET    | `/api/fleet/nodes/:id/commands/last` | Your latest run on that computer, or `{ last: null }`                                      |
+| Method | Path                                         | What                                                                                        |
+| ------ | -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| POST   | `/api/fleet/commands`                        | `{ command, nodeIds, cwd?, timeoutSec?, confirm? }` → 409 `confirmation_required`, then 202 |
+| GET    | `/api/fleet/commands?limit=8`                | Your recent one-off commands with their runs                                                |
+| GET    | `/api/fleet/commands/:id`                    | One command with every computer's run (read once a second while one runs)                   |
+| GET    | `/api/fleet/commands/:id/runs`               | Its runs                                                                                    |
+| POST   | `/api/fleet/commands/:id/cancel`             | Stop it on every computer it still runs on                                                  |
+| GET    | `/api/fleet/commands/:id/runs/:runId/output` | One computer's full output, downloaded from the computer (`text/plain` attachment)          |
+| GET    | `/api/fleet/nodes/:id/commands/last`         | Your latest run on that computer, or `{ last: null }`                                       |
 
 Every refusal is `{ error: { code, hint, details } }` with the codes above.

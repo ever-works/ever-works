@@ -55,7 +55,9 @@ describe('normalizeGitHubPullRequest', () => {
                 authorAssociation: 'CONTRIBUTOR',
             }),
         );
-        expect(envelope.sourceEventId).toBe('pr-intake:acme/api#912@review_requested:nina:2026-10-21T12:00:00.000Z');
+        expect(envelope.sourceEventId).toBe(
+            'pr-intake:acme/api#912@review_requested:nina:2026-10-21T12:00:00.000Z',
+        );
     });
 
     it.each(GITHUB_PR_INTAKE_ACTIONS)('owns %s', (action) => {
@@ -72,10 +74,15 @@ describe('normalizeGitHubPullRequest', () => {
             body({
                 action: 'assigned',
                 assignee: { login: 'nina' },
-                pull_request: { ...body().pull_request, head: { ref: 'x', repo: { full_name: 'acme/api', fork: false } } },
+                pull_request: {
+                    ...body().pull_request,
+                    head: { ref: 'x', repo: { full_name: 'acme/api', fork: false } },
+                },
             }),
         )!;
-        expect(envelope.payload).toEqual(expect.objectContaining({ assignee: 'nina', fork: false }));
+        expect(envelope.payload).toEqual(
+            expect.objectContaining({ assignee: 'nina', fork: false }),
+        );
     });
 
     it('refuses a delivery without a repository or a number', () => {
@@ -92,7 +99,9 @@ describe('GitHubPrIntakeService', () => {
         service.onModuleInit();
         expect(dispatcher.registerConsumer).toHaveBeenCalledWith(service);
         await service.handle({ userId: 'u-1' } as never, 'pull_request', body() as never);
-        expect(ingest.ingest).toHaveBeenCalledWith('u-1', [expect.objectContaining({ kind: 'github.pr' })]);
+        expect(ingest.ingest).toHaveBeenCalledWith('u-1', [
+            expect.objectContaining({ kind: 'github.pr' }),
+        ]);
         const skipped = await service.handle({ userId: 'u-1' } as never, 'issues', body() as never);
         expect(skipped.ingested).toBeNull();
     });

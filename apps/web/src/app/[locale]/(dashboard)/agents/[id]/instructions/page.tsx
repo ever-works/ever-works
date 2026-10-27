@@ -38,7 +38,8 @@ export default async function AgentInstructionsPage({
     );
 
     // FL-06 P3 (spec FR-27): the Fleet actions section, while sessions on computers are on.
-    const fleetActions = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED'] as const).FLEET_SESSIONS_ENABLED === true;
+    const fleetActions =
+        readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED'] as const).FLEET_SESSIONS_ENABLED === true;
 
     return <AgentInstructionsEditor agentId={id} files={files} fleetActions={fleetActions} />;
 }

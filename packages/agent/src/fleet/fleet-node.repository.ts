@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
-import type { FleetCloudMeta, FleetNodeOrigin, FleetNodeVirtualKind, FleetVirtualMeta } from '@ever-works/contracts';
+import type {
+    FleetCloudMeta,
+    FleetNodeOrigin,
+    FleetNodeVirtualKind,
+    FleetVirtualMeta,
+} from '@ever-works/contracts';
 import {
     FleetNode,
     FleetNodeKind,
@@ -251,7 +256,9 @@ export class FleetNodeRepository {
      * host's limit and its delete guard never miss one). Empty input → [].
      */
     async findByHostNodeIds(hostNodeIds: readonly string[]): Promise<FleetNode[]> {
-        const ids = [...new Set(hostNodeIds.filter((id) => typeof id === 'string' && id.length > 0))];
+        const ids = [
+            ...new Set(hostNodeIds.filter((id) => typeof id === 'string' && id.length > 0)),
+        ];
         if (ids.length === 0) return [];
         return this.repository.find({ where: { hostNodeId: In(ids) }, order: { name: 'ASC' } });
     }
@@ -269,7 +276,10 @@ export class FleetNodeRepository {
     }
 
     /** Cloud computers (FL-17) — the row a provider machine belongs to, or null. */
-    async findByProviderMachine(providerPluginId: string, providerMachineRef: string): Promise<FleetNode | null> {
+    async findByProviderMachine(
+        providerPluginId: string,
+        providerMachineRef: string,
+    ): Promise<FleetNode | null> {
         if (!providerPluginId || !providerMachineRef) return null;
         return this.repository.findOne({ where: { providerPluginId, providerMachineRef } });
     }

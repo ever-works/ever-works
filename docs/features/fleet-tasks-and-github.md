@@ -84,12 +84,12 @@ Agent commits are unaffected: they are already attributed to the Agent.
 
 ## From an Agent, MCP and the CLI
 
-| Tool | What |
-| ---- | ---- |
-| `fleet_tasks_handoff_options` | The computers, checkouts and first message for a Task (read-only). |
-| `fleet_sessions_start` with `taskId` (and `checkoutId`) | The hand-off itself — the one session-start tool. |
-| `fleet_nodes_git_identity_get` | A computer's git identity (read-only). |
-| `fleet_nodes_git_identity_set` | Use my Ever Works identity (`confirm: true` to set). |
+| Tool                                                    | What                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------ |
+| `fleet_tasks_handoff_options`                           | The computers, checkouts and first message for a Task (read-only). |
+| `fleet_sessions_start` with `taskId` (and `checkoutId`) | The hand-off itself — the one session-start tool.                  |
+| `fleet_nodes_git_identity_get`                          | A computer's git identity (read-only).                             |
+| `fleet_nodes_git_identity_set`                          | Use my Ever Works identity (`confirm: true` to set).               |
 
 ```
 ever-works fleet session start --task <taskId> --node <id> [--agent <id>] [--worktree | --clone | --checkout <id>] [--message-file <path>] [--json]

@@ -396,6 +396,56 @@ export class WorkUpstreamStateRepository {
     }
 
     /**
+     * APW-02 T47 (FR-62) — claim the open sync pull requests that are due a merge check: rows
+     * with a `syncPullRequestNumber` whose `syncPullRequestCheckedAt` is missing or older than
+     * `minIntervalMs`, stamped with `nowMs` in the same transaction — the exact shape of
+     * {@link claimSetupPullRequestChecks}, so a tick and the on-view check cannot both claim
+     * one row. `link` rows never have a sync pull request (FR-44) and are excluded.
+     */
+    async claimSyncPullRequestChecks(
+        nowMs: number,
+        minIntervalMs: number,
+        limit: number,
+    ): Promise<WorkUpstreamState[]> {
+        const take = this.batchSize(limit);
+        if (take === 0) {
+            return [];
+        }
+
+        const cutoff = nowMs - Math.max(0, minIntervalMs);
+
+        return serializeOnSingleConnection(this.repository.manager, () =>
+            this.repository.manager.transaction(async (manager) => {
+                const repo = manager.getRepository(WorkUpstreamState);
+                const due = await repo
+                    .createQueryBuilder('state')
+                    .where('state.syncPullRequestNumber IS NOT NULL')
+                    .andWhere('state.relation != :link', { link: 'link' })
+                    .andWhere(
+                        '(state.syncPullRequestCheckedAt IS NULL OR state.syncPullRequestCheckedAt <= :cutoff)',
+                        { cutoff },
+                    )
+                    .orderBy(
+                        'CASE WHEN state.syncPullRequestCheckedAt IS NULL THEN 0 ELSE 1 END',
+                        'ASC',
+                    )
+                    .addOrderBy('state.syncPullRequestCheckedAt', 'ASC')
+                    .addOrderBy('state.id', 'ASC')
+                    .take(take)
+                    .getMany();
+
+                return this.stampClaimedRows(
+                    repo,
+                    due,
+                    'syncPullRequestCheckedAt',
+                    new Date(nowMs),
+                    nowMs,
+                );
+            }),
+        );
+    }
+
+    /**
      * **Sync now** allowance (FR-33): at most `max` attempts per App Work per
      * rolling `windowMs`.
      *
@@ -526,7 +576,7 @@ export class WorkUpstreamStateRepository {
     private async stampClaimedRows(
         repo: Repository<WorkUpstreamState>,
         candidates: WorkUpstreamState[],
-        column: 'nextSyncAt' | 'setupCheckedAt',
+        column: 'nextSyncAt' | 'setupCheckedAt' | 'syncPullRequestCheckedAt',
         stamp: Date,
         nowMs: number,
     ): Promise<WorkUpstreamState[]> {
@@ -534,7 +584,12 @@ export class WorkUpstreamStateRepository {
             return [];
         }
 
-        const patch = column === 'nextSyncAt' ? { nextSyncAt: stamp } : { setupCheckedAt: stamp };
+        const patch =
+            column === 'nextSyncAt'
+                ? { nextSyncAt: stamp }
+                : column === 'setupCheckedAt'
+                  ? { setupCheckedAt: stamp }
+                  : { syncPullRequestCheckedAt: stamp };
         const claimed: WorkUpstreamState[] = [];
 
         for (const candidate of candidates) {

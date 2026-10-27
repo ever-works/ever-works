@@ -85,6 +85,8 @@ const SOURCE_TYPES: readonly ScheduleSourceType[] = [
     'data_sync',
     'inbound_trigger',
     'node_schedule',
+    // APW-02 T53 — read-only: every control answers `managedOnWork`.
+    'app_upstream_sync',
 ];
 
 /** Split `${sourceType}:${ownerKey}`; null when the shape is wrong. */
@@ -298,9 +300,12 @@ export class ScheduleControlService {
 
         switch (parsed.sourceType) {
             case 'node_schedule':
-                await this.require(this.nodeSchedules, 'schedules on computers').pause(parsed.ownerKey, {
-                    userId: ctx.userId,
-                });
+                await this.require(this.nodeSchedules, 'schedules on computers').pause(
+                    parsed.ownerKey,
+                    {
+                        userId: ctx.userId,
+                    },
+                );
                 break;
             case 'recurring_task':
                 await this.require(this.tasks, 'recurring tasks').pauseRecurrence(
@@ -350,9 +355,12 @@ export class ScheduleControlService {
 
         switch (parsed.sourceType) {
             case 'node_schedule':
-                await this.require(this.nodeSchedules, 'schedules on computers').resume(parsed.ownerKey, {
-                    userId: ctx.userId,
-                });
+                await this.require(this.nodeSchedules, 'schedules on computers').resume(
+                    parsed.ownerKey,
+                    {
+                        userId: ctx.userId,
+                    },
+                );
                 break;
             case 'recurring_task':
                 await this.require(this.tasks, 'recurring tasks').resumeRecurrence(

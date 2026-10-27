@@ -59,6 +59,11 @@ import { FleetPreviewHostHandler } from './preview-host.handler';
         FleetMachineFactsEnabledGuard,
         FleetPortTunnelEnabledGuard,
     ],
-    exports: [FLEET_PORTS_NODE_PORT, FLEET_PORT_TUNNEL_LINK_PORT, FleetPortsModule, FleetPreviewHostHandler],
+    exports: [
+        FLEET_PORTS_NODE_PORT,
+        FLEET_PORT_TUNNEL_LINK_PORT,
+        FleetPortsModule,
+        FleetPreviewHostHandler,
+    ],
 })
 export class FleetPortsApiModule {}

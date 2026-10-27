@@ -47,7 +47,10 @@ export const FLEET_CONFIRMATION_TOKEN_FIELDS: readonly string[] = Object.freeze(
 
 /** `/api/fleet/nodes/:id/x` and `/api/fleet/nodes/{id}/x` → the same shape. */
 function routeShape(path: string): string {
-    return path.replace(/\{[^}]+\}/g, '{}').replace(/:[A-Za-z0-9_]+/g, '{}').replace(/\/+$/, '');
+    return path
+        .replace(/\{[^}]+\}/g, '{}')
+        .replace(/:[A-Za-z0-9_]+/g, '{}')
+        .replace(/\/+$/, '');
 }
 
 const ROUTES: ReadonlyMap<string, FleetToolCatalogueEntry> = new Map(
@@ -58,7 +61,10 @@ const ROUTES: ReadonlyMap<string, FleetToolCatalogueEntry> = new Map(
 );
 
 /** The catalogue row of a request's route, or undefined. */
-export function fleetCatalogueEntryForRoute(method: string, routePath: string): FleetToolCatalogueEntry | undefined {
+export function fleetCatalogueEntryForRoute(
+    method: string,
+    routePath: string,
+): FleetToolCatalogueEntry | undefined {
     return ROUTES.get(`${method.toUpperCase()} ${routeShape(routePath)}`);
 }
 
@@ -73,7 +79,8 @@ export function fleetConfirmationHint(klass: FleetConfirmationClass, name?: stri
 export function stripFleetConfirmationTokens(body: unknown): void {
     if (!body || typeof body !== 'object' || Array.isArray(body)) return;
     for (const field of FLEET_CONFIRMATION_TOKEN_FIELDS) {
-        if (field in (body as Record<string, unknown>)) delete (body as Record<string, unknown>)[field];
+        if (field in (body as Record<string, unknown>))
+            delete (body as Record<string, unknown>)[field];
     }
 }
 
@@ -96,12 +103,20 @@ export function completeFleetConfirmationBody(
         ? details.class
         : (entry?.confirmationClass ?? 'confirm');
     details.class = klass;
-    const name = typeof details.name === 'string' ? details.name : typeof details.target === 'string' ? details.target : null;
+    const name =
+        typeof details.name === 'string'
+            ? details.name
+            : typeof details.target === 'string'
+              ? details.target
+              : null;
     const hint =
         typeof body.error.hint === 'string' && body.error.hint.trim().length > 0
             ? body.error.hint
             : fleetConfirmationHint(klass, name);
-    return { ...(response as Record<string, unknown>), error: { ...body.error, code: 'confirmation_required', hint, details } };
+    return {
+        ...(response as Record<string, unknown>),
+        error: { ...body.error, code: 'confirmation_required', hint, details },
+    };
 }
 
 @Injectable()
@@ -119,7 +134,10 @@ export class FleetConfirmationInterceptor implements NestInterceptor {
                 : undefined;
         return next.handle().pipe(
             catchError((error: unknown) => {
-                if (!(error instanceof HttpException) || error.getStatus() !== HttpStatus.CONFLICT) {
+                if (
+                    !(error instanceof HttpException) ||
+                    error.getStatus() !== HttpStatus.CONFLICT
+                ) {
                     return throwError(() => error);
                 }
                 const completed = completeFleetConfirmationBody(error.getResponse(), entry);

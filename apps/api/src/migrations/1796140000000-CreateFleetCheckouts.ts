@@ -32,8 +32,14 @@ export class CreateFleetCheckouts1796140000000 implements MigrationInterface {
     name = 'CreateFleetCheckouts1796140000000';
 
     private static readonly INDEXES = [
-        new TableIndex({ name: 'idx_fleet_checkouts_node_state', columnNames: ['nodeId', 'state'] }),
-        new TableIndex({ name: 'idx_fleet_checkouts_user_state', columnNames: ['userId', 'state'] }),
+        new TableIndex({
+            name: 'idx_fleet_checkouts_node_state',
+            columnNames: ['nodeId', 'state'],
+        }),
+        new TableIndex({
+            name: 'idx_fleet_checkouts_user_state',
+            columnNames: ['userId', 'state'],
+        }),
         new TableIndex({ name: 'idx_fleet_checkouts_work', columnNames: ['workId'] }),
         new TableIndex({
             name: 'uq_fleet_checkouts_node_path',

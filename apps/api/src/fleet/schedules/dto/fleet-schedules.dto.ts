@@ -26,7 +26,9 @@ import {
 
 /** `POST /api/fleet/schedules`. */
 export class CreateFleetScheduleDto {
-    @ApiProperty({ description: `The schedule's name (1–${FLEET_SCHEDULE_NAME_MAX_LENGTH} characters).` })
+    @ApiProperty({
+        description: `The schedule's name (1–${FLEET_SCHEDULE_NAME_MAX_LENGTH} characters).`,
+    })
     @IsString()
     @MaxLength(FLEET_SCHEDULE_NAME_MAX_LENGTH * 4)
     name!: string;
@@ -36,7 +38,9 @@ export class CreateFleetScheduleDto {
     @MaxLength(64)
     nodeId!: string;
 
-    @ApiProperty({ description: "The command line, run in the machine owner's login shell with no input." })
+    @ApiProperty({
+        description: "The command line, run in the machine owner's login shell with no input.",
+    })
     @IsString()
     @MaxLength(FLEET_COMMAND_MAX_LENGTH * 8)
     command!: string;
@@ -93,11 +97,17 @@ export class CreateAgentSessionScheduleDto {
     @MaxLength(FLEET_SCHEDULE_PROMPT_MAX_BYTES * 2)
     prompt!: string;
 
-    @ApiProperty({ enum: FLEET_AGENT_SESSION_PROVIDERS, description: 'The agent CLI the session drives.' })
+    @ApiProperty({
+        enum: FLEET_AGENT_SESSION_PROVIDERS,
+        description: 'The agent CLI the session drives.',
+    })
     @IsIn(FLEET_AGENT_SESSION_PROVIDERS as unknown as string[])
     provider!: string;
 
-    @ApiProperty({ required: false, description: 'The checkout on this computer the session works in.' })
+    @ApiProperty({
+        required: false,
+        description: 'The checkout on this computer the session works in.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(64)

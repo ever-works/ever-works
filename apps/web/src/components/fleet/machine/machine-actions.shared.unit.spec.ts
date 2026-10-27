@@ -10,7 +10,12 @@ import {
     rootRequiredFrom,
     typedNameMatches,
 } from './machine-actions.shared';
-import { atBootAction, primaryActions, riskMarker, visibleServices } from '../services/services.shared';
+import {
+    atBootAction,
+    primaryActions,
+    riskMarker,
+    visibleServices,
+} from '../services/services.shared';
 import { gpuParts, shouldOfferKill } from '../processes/processes.shared';
 
 /**
@@ -33,13 +38,20 @@ describe('confirm dialogs (CONTRACTS §2.2)', () => {
             title: 'Stop NetworkManager on build-01?',
             blastRadius: { kind: 'network', sentence: 'This stops the network service…' },
         });
-        expect(model).toMatchObject({ class: 'blast-radius', sentence: 'This stops the network service…' });
+        expect(model).toMatchObject({
+            class: 'blast-radius',
+            sentence: 'This stops the network service…',
+        });
         expect(isDangerDialog(model!)).toBe(true);
         expect(fieldsForDialog(model!)).toEqual({ confirm: true, acknowledgeBlastRadius: true });
     });
 
     it('needs the exact name for a destructive dialog', () => {
-        const model = dialogForRow({ class: 'confirm-destructive', title: 'Remove acme-api?', typeName: 'acme-api' })!;
+        const model = dialogForRow({
+            class: 'confirm-destructive',
+            title: 'Remove acme-api?',
+            typeName: 'acme-api',
+        })!;
         expect(typedNameMatches(model, 'acme-ap')).toBe(false);
         expect(typedNameMatches(model, 'acme-api')).toBe(true);
         expect(fieldsForDialog(model, 'acme-api')).toEqual({ confirmName: 'acme-api' });
@@ -50,11 +62,19 @@ describe('confirm dialogs (CONTRACTS §2.2)', () => {
             {
                 code: 'confirmation_required',
                 hint: 'x',
-                details: { class: 'blast-radius', summary: 'Stop sshd on build-01?', sentence: 'This stops remote access…' },
+                details: {
+                    class: 'blast-radius',
+                    summary: 'Stop sshd on build-01?',
+                    sentence: 'This stops remote access…',
+                },
             },
             'fallback',
         );
-        expect(model).toEqual({ class: 'blast-radius', title: 'Stop sshd on build-01?', sentence: 'This stops remote access…' });
+        expect(model).toEqual({
+            class: 'blast-radius',
+            title: 'Stop sshd on build-01?',
+            sentence: 'This stops remote access…',
+        });
         expect(dialogFromRefusal({ code: 'invalid', hint: 'x' }, 'fallback')).toBeNull();
     });
 
@@ -66,7 +86,13 @@ describe('confirm dialogs (CONTRACTS §2.2)', () => {
                 details: { command: 'sudo systemctl restart nginx', shell: 'sh' },
             }),
         ).toEqual({ command: 'sudo systemctl restart nginx', shell: 'sh' });
-        expect(rootRequiredFrom({ code: 'root_required', hint: 'Restart-Service -Name W3SVC', details: { shell: 'powershell' } })).toEqual({
+        expect(
+            rootRequiredFrom({
+                code: 'root_required',
+                hint: 'Restart-Service -Name W3SVC',
+                details: { shell: 'powershell' },
+            }),
+        ).toEqual({
             command: 'Restart-Service -Name W3SVC',
             shell: 'powershell',
         });
@@ -127,7 +153,10 @@ describe('Services rows (spec §5.1)', () => {
 
     it('filters and keeps failed first', () => {
         const rows = visibleServices(
-            [service({ id: 'a', name: 'nginx' }), service({ id: 'b', name: 'postgresql', state: 'failed' })],
+            [
+                service({ id: 'a', name: 'nginx' }),
+                service({ id: 'b', name: 'postgresql', state: 'failed' }),
+            ],
             '',
         );
         expect(rows.map((row) => row.name)).toEqual(['postgresql', 'nginx']);
@@ -138,7 +167,14 @@ describe('Services rows (spec §5.1)', () => {
 describe('Processes tab', () => {
     it('says utilisation unavailable rather than a dash on Apple', () => {
         expect(
-            gpuParts({ vendor: 'apple', model: 'Apple M2 Max', utilizationPercent: null, memUsedBytes: null, memTotalBytes: 38 * 1024 ** 3, sharedMemory: true }),
+            gpuParts({
+                vendor: 'apple',
+                model: 'Apple M2 Max',
+                utilizationPercent: null,
+                memUsedBytes: null,
+                memTotalBytes: 38 * 1024 ** 3,
+                sharedMemory: true,
+            }),
         ).toEqual({ model: 'Apple M2 Max', utilization: null, memory: '38 GB', shared: true });
     });
 

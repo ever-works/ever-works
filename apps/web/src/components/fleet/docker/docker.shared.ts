@@ -33,7 +33,8 @@ export function containerGlyph(container: Pick<FleetContainerView, 'state'>): '�
 
 /** Running first, then by name — the Containers list and the Overview's Runs here (spec §5.8). */
 export function sortContainers(containers: readonly FleetContainerView[]): FleetContainerView[] {
-    const rank = (row: FleetContainerView) => (row.state === 'running' ? 0 : row.state === 'restarting' ? 1 : 2);
+    const rank = (row: FleetContainerView) =>
+        row.state === 'running' ? 0 : row.state === 'restarting' ? 1 : 2;
     return [...containers].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
 }
 
@@ -93,16 +94,28 @@ export function splitCommand(line: string): string[] {
 /** The form → the request the API takes, validated with the shared validator; blank rows are dropped. */
 export function requestFromForm(
     form: RunForm,
-): { ok: true; request: FleetRunRequest; preview: string } | { ok: false; field: string; hint: string } {
+):
+    | { ok: true; request: FleetRunRequest; preview: string }
+    | { ok: false; field: string; hint: string } {
     const raw: Record<string, unknown> = {
         image: form.image.trim(),
         ports: form.ports
             .filter((port) => port.host.trim() || port.container.trim())
-            .map((port) => ({ host: Number(port.host), container: Number(port.container), proto: port.proto })),
-        env: form.env.filter((variable) => variable.name.trim()).map((variable) => ({ name: variable.name.trim(), value: variable.value })),
+            .map((port) => ({
+                host: Number(port.host),
+                container: Number(port.container),
+                proto: port.proto,
+            })),
+        env: form.env
+            .filter((variable) => variable.name.trim())
+            .map((variable) => ({ name: variable.name.trim(), value: variable.value })),
         volumes: form.volumes
             .filter((volume) => volume.source.trim() || volume.target.trim())
-            .map((volume) => ({ source: volume.source.trim(), target: volume.target.trim(), readOnly: volume.readOnly })),
+            .map((volume) => ({
+                source: volume.source.trim(),
+                target: volume.target.trim(),
+                readOnly: volume.readOnly,
+            })),
         restart: form.restart,
     };
     if (form.name.trim()) raw.name = form.name.trim();

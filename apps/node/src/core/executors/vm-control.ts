@@ -58,7 +58,10 @@ export function parseVmControlPayload(job: FleetJobView): ControlPayload {
 }
 
 /** The machine's state per `docker inspect`: `running`, `stopped`, or `gone` when there is no such container. */
-export async function containerState(deps: VirtualHostDeps, childNodeId: string): Promise<'running' | 'stopped' | 'gone'> {
+export async function containerState(
+	deps: VirtualHostDeps,
+	childNodeId: string
+): Promise<'running' | 'stopped' | 'gone'> {
 	const result = await deps.runner.run('docker', containerControlArgs('inspect', childNodeId), { timeoutMs: 15_000 });
 	if (result.code !== 0) return 'gone';
 	const status = result.stdout.trim();
@@ -75,7 +78,12 @@ export function createVmControlExecutor(deps: VirtualHostDeps) {
 						await report(deps, job, child, { state: 'gone' });
 						throw new VirtualHostError('its container is gone on this computer');
 					}
-					await docker(deps, containerControlArgs('start', child), DOCKER_STEP_TIMEOUT_MS, 'could not start it');
+					await docker(
+						deps,
+						containerControlArgs('start', child),
+						DOCKER_STEP_TIMEOUT_MS,
+						'could not start it'
+					);
 					await report(deps, job, child, { state: 'running', error: null });
 					return { childNodeId: child, state: 'running' };
 				}
@@ -95,17 +103,22 @@ export function createVmControlExecutor(deps: VirtualHostDeps) {
 					return { childNodeId: child, state: 'stopped' };
 				}
 				case 'destroy': {
-					await docker(deps, containerControlArgs('remove', child), DOCKER_STEP_TIMEOUT_MS, 'could not remove it').catch(
-						async (error: unknown) => {
-							// "No such container" is the state we want; anything else is a real failure.
-							if ((await containerState(deps, child)) !== 'gone') throw error;
-						}
-					);
+					await docker(
+						deps,
+						containerControlArgs('remove', child),
+						DOCKER_STEP_TIMEOUT_MS,
+						'could not remove it'
+					).catch(async (error: unknown) => {
+						// "No such container" is the state we want; anything else is a real failure.
+						if ((await containerState(deps, child)) !== 'gone') throw error;
+					});
 					if (kind === 'vm') {
 						// A VM's disk volume, its password in the keychain, its folder (P2, T-30).
 						await cleanUpWindows(deps, child);
 					} else {
-						await deps.runner.run('docker', homeVolumeRemoveArgs(child), { timeoutMs: DOCKER_STEP_TIMEOUT_MS });
+						await deps.runner.run('docker', homeVolumeRemoveArgs(child), {
+							timeoutMs: DOCKER_STEP_TIMEOUT_MS
+						});
 						await deps.state.removeChild(child);
 					}
 					await report(deps, job, child, { state: 'gone' });
@@ -147,7 +160,8 @@ export function createVmControlExecutor(deps: VirtualHostDeps) {
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			if (action !== 'destroy') await report(deps, job, child, { error: message.split(/\r?\n/)[0].slice(0, 300) });
+			if (action !== 'destroy')
+				await report(deps, job, child, { error: message.split(/\r?\n/)[0].slice(0, 300) });
 			throw error instanceof VirtualHostError ? error : new VirtualHostError(message);
 		}
 	};

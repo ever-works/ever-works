@@ -45,7 +45,9 @@ export class FleetCommandProposalListener {
             ? payload.nodeIds.filter((id): id is string => typeof id === 'string')
             : [];
         if (!isFleetCommandLine(payload.command) || nodeIds.length === 0) {
-            this.logger.warn(`Approved command ${event.proposalId} is not a valid command; not run`);
+            this.logger.warn(
+                `Approved command ${event.proposalId} is not a valid command; not run`,
+            );
             return;
         }
         try {
@@ -55,7 +57,9 @@ export class FleetCommandProposalListener {
                     command: payload.command,
                     nodeIds,
                     ...(typeof payload.cwd === 'string' && payload.cwd ? { cwd: payload.cwd } : {}),
-                    ...(typeof payload.timeoutSec === 'number' ? { timeoutSec: payload.timeoutSec } : {}),
+                    ...(typeof payload.timeoutSec === 'number'
+                        ? { timeoutSec: payload.timeoutSec }
+                        : {}),
                     confirm: true,
                 },
             );

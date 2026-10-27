@@ -394,12 +394,15 @@ export class TerminalTranscriptService {
             const seen = new Set<number>();
             const writes = [];
             for (const frame of frames) {
-                if (!Number.isSafeInteger(frame.seq) || frame.seq < 0 || seen.has(frame.seq)) continue;
+                if (!Number.isSafeInteger(frame.seq) || frame.seq < 0 || seen.has(frame.seq))
+                    continue;
                 if (!(frame.data instanceof Uint8Array) || frame.data.byteLength === 0) continue;
                 seen.add(frame.seq);
-                const decoded = Buffer.from(frame.data.buffer, frame.data.byteOffset, frame.data.byteLength).toString(
-                    'utf-8',
-                );
+                const decoded = Buffer.from(
+                    frame.data.buffer,
+                    frame.data.byteOffset,
+                    frame.data.byteLength,
+                ).toString('utf-8');
                 const { text } = redactTerminalText(decoded);
                 writes.push({
                     fleetSessionId,
@@ -441,7 +444,10 @@ export class TerminalTranscriptService {
         let chars = 0;
         let hasMore = false;
         for (const row of rows) {
-            if (chunks.length >= limit || (chars + row.text.length > maxChars && chunks.length > 0)) {
+            if (
+                chunks.length >= limit ||
+                (chars + row.text.length > maxChars && chunks.length > 0)
+            ) {
                 hasMore = true;
                 break;
             }
@@ -452,7 +458,11 @@ export class TerminalTranscriptService {
                 at: row.createdAt?.toISOString?.() ?? new Date(0).toISOString(),
             });
         }
-        return { chunks, lastSeq: chunks.length > 0 ? chunks[chunks.length - 1].seq : null, hasMore };
+        return {
+            chunks,
+            lastSeq: chunks.length > 0 ? chunks[chunks.length - 1].seq : null,
+            hasMore,
+        };
     }
 
     /** What a session's recording holds: count, the highest seq, the first and last write. */
@@ -471,7 +481,9 @@ export class TerminalTranscriptService {
      * deleted, whatever the plan (run transcripts keep their plan tier).
      */
     async sweepExpiredSessions(now: Date = new Date()): Promise<{ deletedChunks: number }> {
-        const cutoff = new Date(now.getTime() - this.daysToMs(FLEET_SESSION_RECORDING_RETENTION_DAYS));
+        const cutoff = new Date(
+            now.getTime() - this.daysToMs(FLEET_SESSION_RECORDING_RETENTION_DAYS),
+        );
         const deletedChunks = await this.chunks.deleteSessionChunksOlderThan(cutoff);
         if (deletedChunks > 0) {
             this.logger.log(`Session recording retention swept ${deletedChunks} chunks`);

@@ -139,7 +139,8 @@ export function createRootRunner(options: RootRunnerOptions): RootRunner {
 			}
 			if (result.code !== 0 && isSudoRefusal(result.stderr)) {
 				decisions.set(key, { allowed: false, at: now() });
-				anySudoAllowed = anySudoAllowed && fresh(anySudoAllowed) ? anySudoAllowed : { allowed: false, at: now() };
+				anySudoAllowed =
+					anySudoAllowed && fresh(anySudoAllowed) ? anySudoAllowed : { allowed: false, at: now() };
 				return { ok: false, command, shell: 'sh' };
 			}
 			decisions.set(key, { allowed: true, at: now() });

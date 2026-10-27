@@ -61,7 +61,12 @@ async function sudoRun(
 	if (deps.isRoot()) {
 		return deps.exec({ command: argv[0], args: argv.slice(1), cwd: dir, timeoutMs: SERVICE_TIMEOUT_MS });
 	}
-	const result = await deps.exec({ command: 'sudo', args: ['-n', '--', ...argv], cwd: dir, timeoutMs: SERVICE_TIMEOUT_MS });
+	const result = await deps.exec({
+		command: 'sudo',
+		args: ['-n', '--', ...argv],
+		cwd: dir,
+		timeoutMs: SERVICE_TIMEOUT_MS
+	});
 	if (result.spawnError === 'ENOENT' || (result.code !== 0 && isSudoRefusal(result.stderr))) {
 		throw new RunnerHostError(
 			`Installing a service on ${deps.nodeName} needs passwordless sudo for the node's user. Run this once on ${deps.nodeName}: ${linuxSudoersCommand(deps.user, deps.state.root)}`,
@@ -107,15 +112,21 @@ export async function installRunnerService(deps: RunnerHostDeps, dir: string, me
 	if (manager === 'systemd') {
 		const svc = join(dir, 'svc.sh');
 		const install = await sudoRun(deps, dir, [svc, 'install', deps.user]);
-		if (install.code !== 0) throw new RunnerHostError(`could not install the service: ${firstOutputLine(install, 'svc.sh install failed')}`);
+		if (install.code !== 0)
+			throw new RunnerHostError(
+				`could not install the service: ${firstOutputLine(install, 'svc.sh install failed')}`
+			);
 		const start = await sudoRun(deps, dir, [svc, 'start']);
-		if (start.code !== 0) throw new RunnerHostError(`could not start the service: ${firstOutputLine(start, 'svc.sh start failed')}`);
+		if (start.code !== 0)
+			throw new RunnerHostError(`could not start the service: ${firstOutputLine(start, 'svc.sh start failed')}`);
 	} else if (manager === 'launchd') {
 		for (const verb of ['install', 'start'] as const) {
 			const { command, args } = runnerScriptCommand(deps.platform, dir, 'svc', [verb]);
 			const result = await deps.exec({ command, args, cwd: dir, timeoutMs: SERVICE_TIMEOUT_MS });
 			if (result.spawnError || result.code !== 0) {
-				throw new RunnerHostError(`could not ${verb} the service: ${firstOutputLine(result, `svc.sh ${verb} failed`)}`);
+				throw new RunnerHostError(
+					`could not ${verb} the service: ${firstOutputLine(result, `svc.sh ${verb} failed`)}`
+				);
 			}
 		}
 	} else if (manager === 'windows') {
@@ -172,7 +183,11 @@ export async function controlRunnerService(
  * does it, and `sc.exe delete` takes back a service it left — 1060 "no such service"
  * is the state asked for). Best-effort on Windows and macOS.
  */
-export async function uninstallRunnerService(deps: RunnerHostDeps, dir: string, meta?: RunnerMeta | null): Promise<void> {
+export async function uninstallRunnerService(
+	deps: RunnerHostDeps,
+	dir: string,
+	meta?: RunnerMeta | null
+): Promise<void> {
 	const manager = runnerServiceManagerFor(deps.platform, deps.hasSystemd());
 	if (manager === 'systemd') {
 		await sudoRun(deps, dir, [join(dir, 'svc.sh'), 'stop']).catch(() => undefined);
@@ -183,14 +198,22 @@ export async function uninstallRunnerService(deps: RunnerHostDeps, dir: string, 
 			await deps.exec({ command, args, cwd: dir, timeoutMs: SERVICE_TIMEOUT_MS }).catch(() => undefined);
 		}
 	} else if (manager === 'windows' && meta) {
-		const name = (await serviceNameOf(deps, meta).catch(() => null)) ?? defaultRunnerServiceName(meta, deps.platform);
-		await deps.exec({ command: 'sc.exe', args: ['stop', name], timeoutMs: SERVICE_TIMEOUT_MS }).catch(() => undefined);
-		await deps.exec({ command: 'sc.exe', args: ['delete', name], timeoutMs: SERVICE_TIMEOUT_MS }).catch(() => undefined);
+		const name =
+			(await serviceNameOf(deps, meta).catch(() => null)) ?? defaultRunnerServiceName(meta, deps.platform);
+		await deps
+			.exec({ command: 'sc.exe', args: ['stop', name], timeoutMs: SERVICE_TIMEOUT_MS })
+			.catch(() => undefined);
+		await deps
+			.exec({ command: 'sc.exe', args: ['delete', name], timeoutMs: SERVICE_TIMEOUT_MS })
+			.catch(() => undefined);
 	}
 }
 
 /** The unit / launchd label / Windows service name, from the runner's `.service` file. */
-export async function serviceNameOf(deps: Pick<RunnerHostDeps, 'state' | 'platform'>, meta: Pick<RunnerMeta, 'name'>): Promise<string | null> {
+export async function serviceNameOf(
+	deps: Pick<RunnerHostDeps, 'state' | 'platform'>,
+	meta: Pick<RunnerMeta, 'name'>
+): Promise<string | null> {
 	const raw = await deps.state.serviceFile(meta.name);
 	if (!raw) return null;
 	// macOS writes the LaunchAgent's plist path; its label is the file name without `.plist`.
@@ -199,7 +222,10 @@ export async function serviceNameOf(deps: Pick<RunnerHostDeps, 'state' | 'platfo
 }
 
 /** What the service manager says about one runner (`runner.list`, FR-13). */
-export async function runnerServiceState(deps: RunnerHostDeps, meta: RunnerMeta): Promise<FleetActionsRunnerServiceState> {
+export async function runnerServiceState(
+	deps: RunnerHostDeps,
+	meta: RunnerMeta
+): Promise<FleetActionsRunnerServiceState> {
 	const name = await serviceNameOf(deps, meta);
 	const manager = runnerServiceManagerFor(deps.platform, deps.hasSystemd());
 	if (!name || !manager) return meta.configured ? 'missing' : 'unknown';

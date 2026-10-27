@@ -48,7 +48,9 @@ export class FleetSessionGitCronService {
                 // A tick is bounded (500 sessions, 80 provider asks); a crashed replica's lease lapses before the next.
                 ttlMs: 55 * 1000,
                 onLocked: () =>
-                    this.logger.debug('Skipping fleet-session-git tick because another instance holds the task lock'),
+                    this.logger.debug(
+                        'Skipping fleet-session-git tick because another instance holds the task lock',
+                    ),
             },
         );
     }

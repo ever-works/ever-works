@@ -40,7 +40,10 @@ export function AgentFleetToolsSection({ agentName, data, className }: Props) {
     const [retrying, startRetry] = useTransition();
 
     const view = data?.kind === 'ready' ? data.view : null;
-    const rows = useMemo<AgentFleetToolsRow[]>(() => (view ? agentFleetToolsRows(view) : []), [view]);
+    const rows = useMemo<AgentFleetToolsRow[]>(
+        () => (view ? agentFleetToolsRows(view) : []),
+        [view],
+    );
 
     if (data === null) return null;
 
@@ -58,10 +61,19 @@ export function AgentFleetToolsSection({ agentName, data, className }: Props) {
 
     if (data.kind === 'error') {
         return (
-            <section id="fleet-tools" className={className} data-testid="capabilities-fleet-tools-section">
+            <section
+                id="fleet-tools"
+                className={className}
+                data-testid="capabilities-fleet-tools-section"
+            >
                 {header}
-                <div className="p-4 flex items-center justify-between gap-4" data-testid="capabilities-fleet-tools-error">
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('error', { agent: agentName })}</p>
+                <div
+                    className="p-4 flex items-center justify-between gap-4"
+                    data-testid="capabilities-fleet-tools-error"
+                >
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('error', { agent: agentName })}
+                    </p>
                     <button
                         type="button"
                         className="text-xs text-primary hover:underline disabled:opacity-50"
@@ -78,17 +90,30 @@ export function AgentFleetToolsSection({ agentName, data, className }: Props) {
     const hasComputers = view ? agentFleetToolsHasComputers(view) : false;
 
     return (
-        <section id="fleet-tools" className={className} data-testid="capabilities-fleet-tools-section">
+        <section
+            id="fleet-tools"
+            className={className}
+            data-testid="capabilities-fleet-tools-section"
+        >
             {header}
             {view?.killSwitch && (
-                <p className="px-4 pt-3 text-xs text-warning" data-testid="capabilities-fleet-tools-stopped">
+                <p
+                    className="px-4 pt-3 text-xs text-warning"
+                    data-testid="capabilities-fleet-tools-stopped"
+                >
                     {t('stopped')}
                 </p>
             )}
             {!hasComputers ? (
-                <div className="p-4 text-xs text-text-muted dark:text-text-muted-dark space-y-1" data-testid="capabilities-fleet-tools-empty">
+                <div
+                    className="p-4 text-xs text-text-muted dark:text-text-muted-dark space-y-1"
+                    data-testid="capabilities-fleet-tools-empty"
+                >
                     <p>{t('empty')}</p>
-                    <Link href={ROUTES.DASHBOARD_SETTINGS_FLEET} className="text-primary hover:underline">
+                    <Link
+                        href={ROUTES.DASHBOARD_SETTINGS_FLEET}
+                        className="text-primary hover:underline"
+                    >
                         {t('addComputer')}
                     </Link>
                 </div>
@@ -122,11 +147,18 @@ function FleetToolsRow({ row }: { row: AgentFleetToolsRow }) {
     const t = useTranslations('fleet.tools.capabilities');
     const refusedComputers = row.computers.filter((computer) => !computer.allowed);
     return (
-        <tr className="border-t border-border/30 dark:border-border-dark/30 align-top" data-testid={`capabilities-fleet-tools-row-${row.family}`}>
-            <td className="py-2 pr-4 text-text dark:text-text-dark">{t(`families.${row.family}` as never)}</td>
+        <tr
+            className="border-t border-border/30 dark:border-border-dark/30 align-top"
+            data-testid={`capabilities-fleet-tools-row-${row.family}`}
+        >
+            <td className="py-2 pr-4 text-text dark:text-text-dark">
+                {t(`families.${row.family}` as never)}
+            </td>
             <td className="py-2 pr-4">
                 {row.comingSoon ? (
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('comingSoon')}</span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('comingSoon')}
+                    </span>
                 ) : row.read ? (
                     <Check className="w-4 h-4 text-success" aria-label={t('yes')} />
                 ) : (

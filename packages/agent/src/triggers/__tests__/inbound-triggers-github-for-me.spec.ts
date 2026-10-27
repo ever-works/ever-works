@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
-import { GITHUB_FOR_ME_LABEL, GITHUB_FOR_ME_TRIGGER_NAME, InboundTriggersService } from '../inbound-triggers.service';
+import {
+    GITHUB_FOR_ME_LABEL,
+    GITHUB_FOR_ME_TRIGGER_NAME,
+    InboundTriggersService,
+} from '../inbound-triggers.service';
 import { WebhookSubscriptionSecretService } from '../../services/webhook-subscription-secret.service';
 import type { InboundTrigger } from '../../entities/inbound-trigger.entity';
 import type { IngestedEvent } from '../../entities/ingested-event.entity';
@@ -21,19 +25,29 @@ function makeRepo() {
     return {
         create: jest.fn((partial: Partial<InboundTrigger>) => ({ ...partial })),
         save: jest.fn(async (row: Partial<InboundTrigger>) => {
-            const saved = { createdAt: new Date(), updatedAt: new Date(), ...row, id: row.id ?? `trigger-${++seq}` } as InboundTrigger;
+            const saved = {
+                createdAt: new Date(),
+                updatedAt: new Date(),
+                ...row,
+                id: row.id ?? `trigger-${++seq}`,
+            } as InboundTrigger;
             rows.set(saved.id, saved);
             return saved;
         }),
         find: jest.fn(async () => [...rows.values()]),
-        findOne: jest.fn(async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null),
+        findOne: jest.fn(
+            async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null,
+        ),
         update: jest.fn(async () => undefined),
     };
 }
 
 /** A claim ledger whose `complete` writes the Task back, as the real one does. */
 function makeFires() {
-    const rows = new Map<string, { id: string; taskId: string | null; status: string; firedAt: Date }>();
+    const rows = new Map<
+        string,
+        { id: string; taskId: string | null; status: string; firedAt: Date }
+    >();
     const byId = new Map<string, string>();
     let seq = 0;
     return {
@@ -41,19 +55,26 @@ function makeFires() {
             const key = `${triggerId}|${dedupeKey}`;
             const existing = rows.get(key);
             if (existing) return { fire: { ...existing }, won: false };
-            const fire = { id: `fire-${++seq}`, taskId: null, status: 'running', firedAt: new Date() };
+            const fire = {
+                id: `fire-${++seq}`,
+                taskId: null,
+                status: 'running',
+                firedAt: new Date(),
+            };
             rows.set(key, fire);
             byId.set(fire.id, key);
             return { fire: { ...fire }, won: true };
         }),
-        complete: jest.fn(async (id: string, status: string, patch: { taskId?: string | null } = {}) => {
-            const key = byId.get(id);
-            const row = key ? rows.get(key) : undefined;
-            if (row) {
-                row.status = status;
-                row.taskId = patch.taskId ?? null;
-            }
-        }),
+        complete: jest.fn(
+            async (id: string, status: string, patch: { taskId?: string | null } = {}) => {
+                const key = byId.get(id);
+                const row = key ? rows.get(key) : undefined;
+                if (row) {
+                    row.status = status;
+                    row.taskId = patch.taskId ?? null;
+                }
+            },
+        ),
         listRecent: jest.fn(async () => []),
     };
 }
@@ -74,7 +95,9 @@ function makeService(options: { linked?: boolean } = {}) {
     const agents = { findByIdAndUser: jest.fn(async (id: string) => ({ id })) };
     const githubLinks = {
         findByUserId: jest.fn(async () =>
-            options.linked === false ? null : { userId: 'user-1', githubUserId: '1', githubLogin: 'Nina' },
+            options.linked === false
+                ? null
+                : { userId: 'user-1', githubUserId: '1', githubLogin: 'Nina' },
         ),
     };
     const taskChat = { post: jest.fn(async () => ({ id: 'message-1' })) };
@@ -111,7 +134,12 @@ const reviewRequest = (id: string, reviewer = 'nina'): IngestedEvent =>
         subjectExternalId: 'acme/api#912',
         title: 'Fix the cookie',
         sourceUrl: 'https://github.com/acme/api/pull/912',
-        payload: { action: 'review_requested', requestedReviewer: reviewer, repoFullName: 'acme/api', prNumber: 912 },
+        payload: {
+            action: 'review_requested',
+            requestedReviewer: reviewer,
+            repoFullName: 'acme/api',
+            prNumber: 912,
+        },
         processedAt: null,
         dedupeKey: `dedupe-${id}`,
         createdAt: new Date(),
@@ -142,7 +170,9 @@ describe('InboundTriggersService — GitHub: things for me (FL-15 P3)', () => {
 
     it('refuses without a linked GitHub account (U11)', async () => {
         const { service } = makeService({ linked: false });
-        await expect(service.createGithubForMe(SCOPE, {})).rejects.toBeInstanceOf(BadRequestException);
+        await expect(service.createGithubForMe(SCOPE, {})).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
     });
 
     it('fires only for the owner’s login, labels the Task, and coalesces a repeat onto it (U12)', async () => {
@@ -164,7 +194,10 @@ describe('InboundTriggersService — GitHub: things for me (FL-15 P3)', () => {
         expect(tasks.create).toHaveBeenCalledTimes(1);
         expect(taskChat.post).toHaveBeenCalledWith(
             'user-1',
-            expect.objectContaining({ taskId: 'task-1', body: expect.stringContaining('acme/api#912') }),
+            expect.objectContaining({
+                taskId: 'task-1',
+                body: expect.stringContaining('acme/api#912'),
+            }),
         );
     });
 });

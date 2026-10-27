@@ -141,7 +141,10 @@ describe('detectAppRepository + draftAppSpecDocument (APW-04)', () => {
         const detection = () =>
             detectAppRepository({
                 rootEntries: ['Dockerfile', '.works'],
-                files: { '.works/works.yml': HOSTILE_SPEC, Dockerfile: 'FROM node:22\nEXPOSE 3000\n' },
+                files: {
+                    '.works/works.yml': HOSTILE_SPEC,
+                    Dockerfile: 'FROM node:22\nEXPOSE 3000\n',
+                },
             });
 
         it("prefers the platform's own source record and drops the owned blocks of a file that is not effective", () => {

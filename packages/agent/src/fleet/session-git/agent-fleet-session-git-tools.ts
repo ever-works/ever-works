@@ -1,4 +1,8 @@
-import { isFleetSessionActionId, type FleetOpenPullRequestRequest, type FleetOpenPullRequestResponse } from '@ever-works/contracts';
+import {
+    isFleetSessionActionId,
+    type FleetOpenPullRequestRequest,
+    type FleetOpenPullRequestResponse,
+} from '@ever-works/contracts';
 import type { TaskToolDescriptor } from '../../tasks-domain/agent-task-tools';
 import { config } from '../../config';
 import type { FleetCheckoutService } from '../checkouts/fleet-checkout.service';
@@ -28,12 +32,23 @@ import type { FleetSessionActionService } from './fleet-session-action.service';
 
 /** Annotations FL-19's catalogue reads (MCP tool annotations, CONTRACTS §11.3). */
 export const FLEET_SESSION_GIT_TOOL_ANNOTATIONS: Readonly<
-    Record<string, { readOnly: boolean; destructive: boolean; confirmationClass: 'plain' | 'confirm' | 'confirm-destructive' }>
+    Record<
+        string,
+        {
+            readOnly: boolean;
+            destructive: boolean;
+            confirmationClass: 'plain' | 'confirm' | 'confirm-destructive';
+        }
+    >
 > = {
     fleet_sessions_actions_list: { readOnly: true, destructive: false, confirmationClass: 'plain' },
     fleet_sessions_action: { readOnly: false, destructive: false, confirmationClass: 'plain' },
     fleet_checkouts_changes: { readOnly: true, destructive: false, confirmationClass: 'plain' },
-    fleet_checkouts_open_pull_request: { readOnly: false, destructive: false, confirmationClass: 'plain' },
+    fleet_checkouts_open_pull_request: {
+        readOnly: false,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
 };
 
 /** The API's pull-request service, as the tools reach it (the GitHub App credentials are the API's). */
@@ -45,10 +60,21 @@ export interface FleetSessionPullRequestOpener {
     ): Promise<FleetOpenPullRequestResponse>;
 }
 
-function failure(error: unknown): { error: { code: string; hint: string; details?: Record<string, unknown> } } {
+function failure(error: unknown): {
+    error: { code: string; hint: string; details?: Record<string, unknown> };
+} {
     const typed = readFleetSessionError(error);
-    if (typed) return { error: { code: typed.code, hint: typed.hint, ...(typed.details ? { details: typed.details } : {}) } };
-    return { error: { code: 'internal', hint: error instanceof Error ? error.message : String(error) } };
+    if (typed)
+        return {
+            error: {
+                code: typed.code,
+                hint: typed.hint,
+                ...(typed.details ? { details: typed.details } : {}),
+            },
+        };
+    return {
+        error: { code: 'internal', hint: error instanceof Error ? error.message : String(error) },
+    };
 }
 
 function text(value: unknown): string | undefined {
@@ -65,8 +91,14 @@ export function buildFleetSessionGitTools(args: {
 }): TaskToolDescriptor[] {
     if (!config.fleet.isSessionsEnabled()) return [];
     const actor = { userId: args.userId, ...(args.agentId ? { agentId: args.agentId } : {}) };
-    const sessionId = { type: 'string' as const, description: 'The session (its id, from fleet_sessions_list).' };
-    const checkoutId = { type: 'string' as const, description: 'The checkout (its id, from fleet_checkouts_list).' };
+    const sessionId = {
+        type: 'string' as const,
+        description: 'The session (its id, from fleet_sessions_list).',
+    };
+    const checkoutId = {
+        type: 'string' as const,
+        description: 'The checkout (its id, from fleet_checkouts_list).',
+    };
     const tools: TaskToolDescriptor[] = [
         {
             name: 'fleet_sessions_actions_list',
@@ -75,7 +107,10 @@ export function buildFleetSessionGitTools(args: {
             parameters: { type: 'object', properties: { sessionId }, required: ['sessionId'] },
             invoke: async (raw) => {
                 try {
-                    return await args.actions.list(text((raw as { sessionId?: unknown })?.sessionId) ?? '', actor);
+                    return await args.actions.list(
+                        text((raw as { sessionId?: unknown })?.sessionId) ?? '',
+                        actor,
+                    );
                 } catch (error) {
                     return failure(error);
                 }
@@ -91,9 +126,13 @@ export function buildFleetSessionGitTools(args: {
                     sessionId,
                     actionId: {
                         type: 'string',
-                        description: 'commit, commitPush, pullRequest, review, fixComments, resolveConflicts or recap.',
+                        description:
+                            'commit, commitPush, pullRequest, review, fixComments, resolveConflicts or recap.',
                     },
-                    prompt: { type: 'string', description: 'The prompt to type; the action’s template when absent.' },
+                    prompt: {
+                        type: 'string',
+                        description: 'The prompt to type; the action’s template when absent.',
+                    },
                 },
                 required: ['sessionId', 'actionId'],
             },
@@ -101,11 +140,15 @@ export function buildFleetSessionGitTools(args: {
                 const input = (raw ?? {}) as Record<string, unknown>;
                 const id = text(input.sessionId) ?? '';
                 if (!isFleetSessionActionId(input.actionId)) {
-                    return { error: { code: 'invalid', hint: 'actionId is one of the seven actions' } };
+                    return {
+                        error: { code: 'invalid', hint: 'actionId is one of the seven actions' },
+                    };
                 }
                 try {
                     let prompt = text(input.prompt);
-                    if (!prompt) prompt = (await args.actions.list(id, actor)).templates[input.actionId].text;
+                    if (!prompt)
+                        prompt = (await args.actions.list(id, actor)).templates[input.actionId]
+                            .text;
                     return await args.actions.send(id, actor, { actionId: input.actionId, prompt });
                 } catch (error) {
                     return failure(error);
@@ -123,7 +166,10 @@ export function buildFleetSessionGitTools(args: {
                 type: 'object',
                 properties: {
                     checkoutId,
-                    maxBytes: { type: 'number', description: 'At most this many bytes of patch text (4 KiB … 1 MiB).' },
+                    maxBytes: {
+                        type: 'number',
+                        description: 'At most this many bytes of patch text (4 KiB … 1 MiB).',
+                    },
                 },
                 required: ['checkoutId'],
             },
@@ -154,7 +200,11 @@ export function buildFleetSessionGitTools(args: {
                     title: { type: 'string', description: 'At most 70 characters.' },
                     body: { type: 'string', description: 'What changed and why.' },
                     draft: { type: 'boolean', description: 'Open it as a draft pull request.' },
-                    sessionId: { type: 'string', description: 'The session the pull request comes from (its ledger is credited).' },
+                    sessionId: {
+                        type: 'string',
+                        description:
+                            'The session the pull request comes from (its ledger is credited).',
+                    },
                 },
                 required: ['checkoutId', 'title'],
             },

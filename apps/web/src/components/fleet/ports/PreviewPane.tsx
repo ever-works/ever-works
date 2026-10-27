@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type WheelEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useRef,
+    useState,
+    type KeyboardEvent,
+    type PointerEvent,
+    type WheelEvent,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { RefreshCw, X } from 'lucide-react';
 import {
@@ -45,7 +53,9 @@ export function PreviewPane({
 }) {
     const t = useTranslations('fleet.ports.preview');
     const nowMs = useNow(1_000);
-    const [picture, setPicture] = useState<{ src: string; width: number; height: number } | null>(null);
+    const [picture, setPicture] = useState<{ src: string; width: number; height: number } | null>(
+        null,
+    );
     const [phase, setPhase] = useState<'connecting' | 'live' | 'ended'>('connecting');
     const [ended, setEnded] = useState<PreviewSocketClose | null>(null);
     const socketRef = useRef<FleetPreviewSocket | null>(null);
@@ -108,11 +118,20 @@ export function PreviewPane({
     const onWheel = (event: WheelEvent<HTMLImageElement>) => {
         const at = toPicture(event.clientX, event.clientY);
         if (!at) return;
-        send({ kind: 'scroll', x: at.x, y: at.y, dx: Math.round(event.deltaX), dy: Math.round(event.deltaY) });
+        send({
+            kind: 'scroll',
+            x: at.x,
+            y: at.y,
+            dx: Math.round(event.deltaX),
+            dy: Math.round(event.deltaY),
+        });
     };
 
     const modifiers = (event: KeyboardEvent) =>
-        (event.altKey ? 1 : 0) | (event.ctrlKey ? 2 : 0) | (event.metaKey ? 4 : 0) | (event.shiftKey ? 8 : 0);
+        (event.altKey ? 1 : 0) |
+        (event.ctrlKey ? 2 : 0) |
+        (event.metaKey ? 4 : 0) |
+        (event.shiftKey ? 8 : 0);
 
     const onKey = (action: 'down' | 'up', event: KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Escape' && action === 'down') {
@@ -120,12 +139,24 @@ export function PreviewPane({
             return;
         }
         event.preventDefault();
-        if (action === 'down' && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        if (
+            action === 'down' &&
+            event.key.length === 1 &&
+            !event.ctrlKey &&
+            !event.metaKey &&
+            !event.altKey
+        ) {
             send({ kind: 'text', text: event.key });
             return;
         }
         if (event.key.length > 32 || event.code.length > 32) return;
-        send({ kind: 'key', action, key: event.key, code: event.code, modifiers: modifiers(event) });
+        send({
+            kind: 'key',
+            action,
+            key: event.key,
+            code: event.code,
+            modifiers: modifiers(event),
+        });
     };
 
     const left = timeLeft(endsAt, nowMs);

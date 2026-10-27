@@ -106,7 +106,8 @@ export function isOmittedRowMissing(
     now: number,
 ): boolean {
     if (row.state === 'archived' || row.state === 'missing') return false;
-    if (row.state === 'creating') return now - toMs(row.createdAt) >= FLEET_CHECKOUT_CREATING_STALE_MS;
+    if (row.state === 'creating')
+        return now - toMs(row.createdAt) >= FLEET_CHECKOUT_CREATING_STALE_MS;
     return true;
 }
 
@@ -119,12 +120,20 @@ export function isCheckoutFolderRemoved(
 }
 
 /** A `creating` row older than the stale window (spec §6: never a phantom `creating`). */
-export function isCreatingStale(row: Pick<FleetCheckout, 'state' | 'createdAt'>, now: number): boolean {
-    return row.state === 'creating' && now - toMs(row.createdAt) >= FLEET_CHECKOUT_CREATING_STALE_MS;
+export function isCreatingStale(
+    row: Pick<FleetCheckout, 'state' | 'createdAt'>,
+    now: number,
+): boolean {
+    return (
+        row.state === 'creating' && now - toMs(row.createdAt) >= FLEET_CHECKOUT_CREATING_STALE_MS
+    );
 }
 
 /** The `lastCommand` a stale `creating` row is closed with. */
-export function staleCreatingCommand(row: Pick<FleetCheckout, 'lastCommand'>, now: Date): FleetCheckoutLastCommand {
+export function staleCreatingCommand(
+    row: Pick<FleetCheckout, 'lastCommand'>,
+    now: Date,
+): FleetCheckoutLastCommand {
     return {
         command: row.lastCommand?.command ?? 'clone',
         exitCode: -1,
@@ -138,7 +147,11 @@ export function staleCreatingCommand(row: Pick<FleetCheckout, 'lastCommand'>, no
  * Per-checkout throttle for a person's Refresh (spec FR-9: no more than once
  * per 10 seconds per checkout). Pure over the last time and the window.
  */
-export function refreshAllowedAt(lastAt: number | undefined, now: number, windowMs: number): number | null {
+export function refreshAllowedAt(
+    lastAt: number | undefined,
+    now: number,
+    windowMs: number,
+): number | null {
     if (lastAt === undefined || now - lastAt >= windowMs) return null;
     return lastAt + windowMs;
 }

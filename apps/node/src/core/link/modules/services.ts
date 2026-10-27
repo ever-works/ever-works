@@ -117,7 +117,8 @@ export function buildServiceView(
 	const unsupported: Partial<Record<FleetServiceAction, string>> = { ...draft.unsupported };
 	if (isNode) {
 		for (const action of ALL_ACTIONS) {
-			unsupported[action] = 'Ever Works will not stop its own node from here. Use the machine or Settings → Fleet.';
+			unsupported[action] =
+				'Ever Works will not stop its own node from here. Use the machine or Settings → Fleet.';
 		}
 	} else if (!isFleetServiceName(draft.name)) {
 		for (const action of ALL_ACTIONS) unsupported[action] = 'Ever Works does not act on a service with this name.';
@@ -255,7 +256,9 @@ export function createServicesModule(deps: ServicesModuleDeps = {}): NodeModule 
 						manager,
 						scope: 'user',
 						actions: ['start', 'stop', 'restart', 'enable'],
-						unsupported: { disable: 'Homebrew turns a service off at login only by stopping it — use Stop.' },
+						unsupported: {
+							disable: 'Homebrew turns a service off at login only by stopping it — use Stop.'
+						},
 						needsRoot: false
 					});
 				}
@@ -326,7 +329,9 @@ export function createServicesModule(deps: ServicesModuleDeps = {}): NodeModule 
 		}
 		if (raw === undefined || raw === null) return available[0];
 		if (!isFleetServiceManager(raw) || !available.includes(raw)) {
-			throw new MachineVerbError(makeFleetLinkError('invalid', 'manager is not one this computer has', { field: 'manager' }));
+			throw new MachineVerbError(
+				makeFleetLinkError('invalid', 'manager is not one this computer has', { field: 'manager' })
+			);
 		}
 		return raw;
 	};
@@ -346,15 +351,21 @@ export function createServicesModule(deps: ServicesModuleDeps = {}): NodeModule 
 		]);
 		const draft = drafts.find((row) => row.manager === manager && row.name === name);
 		if (!draft) {
-			throw new MachineVerbError(makeFleetLinkError('not_found', `${name} is not a ${scope} service on ${context.nodeName}`));
+			throw new MachineVerbError(
+				makeFleetLinkError('not_found', `${name} is not a ${scope} service on ${context.nodeName}`)
+			);
 		}
 		const blast = blastContext(context.nodeName, processes);
 		const view = buildServiceView(draft, blast, root);
 		if (view.isNode) {
 			throw new MachineVerbError(
-				makeFleetLinkError('invalid', 'Ever Works will not stop its own node from here. Use the machine or Settings → Fleet.', {
-					field: 'name'
-				})
+				makeFleetLinkError(
+					'invalid',
+					'Ever Works will not stop its own node from here. Use the machine or Settings → Fleet.',
+					{
+						field: 'name'
+					}
+				)
 			);
 		}
 		if (!view.actions.includes(action)) {
@@ -383,11 +394,17 @@ export function createServicesModule(deps: ServicesModuleDeps = {}): NodeModule 
 			if (outcome.refusal === 'root') {
 				const shell = manager === 'windows' ? 'powershell' : 'sh';
 				throw new MachineVerbError(
-					makeFleetLinkError('root_required', outcome.command, { command: outcome.command, shell, machine: context.nodeName })
+					makeFleetLinkError('root_required', outcome.command, {
+						command: outcome.command,
+						shell,
+						machine: context.nodeName
+					})
 				);
 			}
 			if (outcome.refusal === 'not-found') {
-				throw new MachineVerbError(makeFleetLinkError('not_found', `${name} is not a service on ${context.nodeName}`));
+				throw new MachineVerbError(
+					makeFleetLinkError('not_found', `${name} is not a service on ${context.nodeName}`)
+				);
 			}
 			throw new MachineVerbError(makeFleetLinkError('operation_failed', outcome.message));
 		}

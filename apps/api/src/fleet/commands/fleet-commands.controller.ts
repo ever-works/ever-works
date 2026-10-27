@@ -114,7 +114,9 @@ export class FleetCommandsController {
             // A Command with a cadence is a Schedule on ONE computer (FL-13).
             const created = await this.schedules.create(actorOf(auth), {
                 name: body.name ?? '',
-                ...(body.nodeId !== undefined ? { nodeId: body.nodeId } : { nodeIds: body.nodeIds }),
+                ...(body.nodeId !== undefined
+                    ? { nodeId: body.nodeId }
+                    : { nodeIds: body.nodeIds }),
                 command: body.command,
                 ...(body.cwd !== undefined ? { cwd: body.cwd } : {}),
                 cadence: body.cadence,
@@ -135,7 +137,8 @@ export class FleetCommandsController {
 
     @Get('commands')
     @ApiOperation({
-        summary: 'My most recent one-off Commands, newest first, each with its runs (Recent: the last 8).',
+        summary:
+            'My most recent one-off Commands, newest first, each with its runs (Recent: the last 8).',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
@@ -250,7 +253,12 @@ export class FleetCommandsController {
         };
         try {
             await this.link.readOutput(
-                { nodeId: run.nodeId, commandId: id, runId: run.id, caller: { kind: 'user', userId: auth.userId } },
+                {
+                    nodeId: run.nodeId,
+                    commandId: id,
+                    runId: run.id,
+                    caller: { kind: 'user', userId: auth.userId },
+                },
                 {
                     bytes: (total) => start(total),
                     data: (chunk) => {

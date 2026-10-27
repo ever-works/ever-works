@@ -22,7 +22,9 @@ const BASE = '/fleet/nodes';
 
 export const fleetVirtualAPI = {
     listChildren: async (hostNodeId: string) =>
-        serverFetch<FleetVirtualChildrenListView>(`${BASE}/${encodeURIComponent(hostNodeId)}/virtual`),
+        serverFetch<FleetVirtualChildrenListView>(
+            `${BASE}/${encodeURIComponent(hostNodeId)}/virtual`,
+        ),
 
     options: async (hostNodeId: string | 'auto', systemId?: FleetVirtualSystemId) =>
         serverFetch<FleetVirtualOptionsView>(
@@ -37,7 +39,12 @@ export const fleetVirtualAPI = {
             wrapInData: false,
         }),
 
-    power: async (hostNodeId: string, childNodeId: string, action: FleetVirtualPowerAction, fields: FleetActionConfirmFields) =>
+    power: async (
+        hostNodeId: string,
+        childNodeId: string,
+        action: FleetVirtualPowerAction,
+        fields: FleetActionConfirmFields,
+    ) =>
         serverMutation<FleetVirtualOperationResponse>({
             endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}/power`,
             data: { action, ...(fields.confirm === true ? { confirm: true } : {}) },
@@ -54,7 +61,11 @@ export const fleetVirtualAPI = {
         }),
 
     /** Resize (P3): a stopped machine's CPUs / memory — `confirm: true`. */
-    resize: async (hostNodeId: string, childNodeId: string, body: { cpus?: number; memoryGiB?: number }) =>
+    resize: async (
+        hostNodeId: string,
+        childNodeId: string,
+        body: { cpus?: number; memoryGiB?: number },
+    ) =>
         serverMutation<FleetVirtualOperationResponse>({
             endpoint: `${BASE}/${encodeURIComponent(hostNodeId)}/virtual/${encodeURIComponent(childNodeId)}`,
             data: { ...body, confirm: true },

@@ -32,7 +32,9 @@ export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     }
     const upstreamDisposition = upstream.headers.get('content-disposition');
     const disposition =
-        upstreamDisposition && !/[\r\n]/.test(upstreamDisposition) ? upstreamDisposition : FALLBACK_DISPOSITION;
+        upstreamDisposition && !/[\r\n]/.test(upstreamDisposition)
+            ? upstreamDisposition
+            : FALLBACK_DISPOSITION;
     return new Response(upstream.body, {
         status: 200,
         headers: {

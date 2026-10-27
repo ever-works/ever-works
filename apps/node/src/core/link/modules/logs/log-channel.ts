@@ -78,9 +78,19 @@ function asLinkError(error: unknown, fallback: string): FleetLinkError {
 }
 
 /** One line as it leaves the machine: scanned, cut, framed (bounded under one frame). */
-export function encodeLogLine(line: RawLogLine, src: number, earlier = false): { text: string; bytes: number; redactions: number } {
+export function encodeLogLine(
+	line: RawLogLine,
+	src: number,
+	earlier = false
+): { text: string; bytes: number; redactions: number } {
 	const scan = redactSecrets(line.text);
-	const wire: FleetLogLine = { ts: line.ts, level: line.level, text: capFleetLogText(scan.cleaned), src, redactions: scan.redactions };
+	const wire: FleetLogLine = {
+		ts: line.ts,
+		level: line.level,
+		text: capFleetLogText(scan.cleaned),
+		src,
+		redactions: scan.redactions
+	};
 	if (earlier) wire.earlier = true;
 	let text = `${JSON.stringify(wire)}\n`;
 	let bytes = Buffer.byteLength(text, 'utf8');
@@ -189,7 +199,12 @@ export class LogChannel {
 			if (!result.batch) {
 				firstError ??= result.error;
 				if (this.readers.length > 1 && result.error) {
-					this.enqueueJson({ type: FLEET_LOGS_MESSAGES.notice, kind: 'error', hint: result.error.hint, src: result.src });
+					this.enqueueJson({
+						type: FLEET_LOGS_MESSAGES.notice,
+						kind: 'error',
+						hint: result.error.hint,
+						src: result.src
+					});
 				}
 				continue;
 			}
@@ -242,7 +257,13 @@ export class LogChannel {
 	private async earlier(lines: number, src: number): Promise<void> {
 		const reader = this.readers[src];
 		if (!reader || !reader.supportsEarlier || !reader.earlier) {
-			this.enqueueJson({ type: FLEET_LOGS_MESSAGES.earlierDone, count: 0, hasMore: false, src, unsupported: true });
+			this.enqueueJson({
+				type: FLEET_LOGS_MESSAGES.earlierDone,
+				count: 0,
+				hasMore: false,
+				src,
+				unsupported: true
+			});
 			this.flush();
 			return;
 		}
@@ -354,10 +375,13 @@ export class LogChannel {
 
 	private retryIn(ms: number): void {
 		if (this.retryTimer !== null || this.closed) return;
-		this.retryTimer = this.deps.timers.setTimer(() => {
-			this.retryTimer = null;
-			this.flush();
-		}, Math.max(1, ms));
+		this.retryTimer = this.deps.timers.setTimer(
+			() => {
+				this.retryTimer = null;
+				this.flush();
+			},
+			Math.max(1, ms)
+		);
 	}
 
 	private reportDropped(): boolean {
@@ -448,11 +472,16 @@ export class LogChannel {
  * the kill switch, build the readers (each validates its source on THIS
  * machine), then accept.
  */
-export async function openLogChannel(context: NodeChannelContext, deps: LogChannelDeps): Promise<NodeChannelOpenResult> {
+export async function openLogChannel(
+	context: NodeChannelContext,
+	deps: LogChannelDeps
+): Promise<NodeChannelOpenResult> {
 	const params = parseFleetLogsOpenParams(context.params);
 	if (!params) return refused(makeFleetLinkError('invalid', 'source', { field: 'source' }));
 	if (context.control.paused) {
-		return refused(makeFleetLinkError('kill_switch', 'all computers are stopped — clear it under Settings → Fleet'));
+		return refused(
+			makeFleetLinkError('kill_switch', 'all computers are stopped — clear it under Settings → Fleet')
+		);
 	}
 	let readers: LogReader[];
 	try {

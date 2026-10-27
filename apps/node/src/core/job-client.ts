@@ -527,9 +527,11 @@ export class FleetJobClient {
 		if (report.phase !== undefined) body.phase = report.phase;
 		if (report.state !== undefined) body.state = report.state;
 		if (report.error !== undefined) body.error = report.error;
-		if (report.runnerVersion !== undefined && report.runnerVersion !== null) body.runnerVersion = report.runnerVersion;
+		if (report.runnerVersion !== undefined && report.runnerVersion !== null)
+			body.runnerVersion = report.runnerVersion;
 		if (report.serviceUnit !== undefined && report.serviceUnit !== null) body.serviceUnit = report.serviceUnit;
-		if (report.githubRunnerId !== undefined && report.githubRunnerId !== null) body.githubRunnerId = report.githubRunnerId;
+		if (report.githubRunnerId !== undefined && report.githubRunnerId !== null)
+			body.githubRunnerId = report.githubRunnerId;
 		if (report.deregistered !== undefined) body.deregistered = report.deregistered;
 		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
 		await this.post(`api/internal/fleet/runners/${encodeURIComponent(runnerId)}/progress`, 'runner-progress', body);

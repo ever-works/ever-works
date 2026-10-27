@@ -30,9 +30,7 @@ export type ParsedProcess = Omit<FleetProcessView, 'protected'>;
 /** The scanned, cut command line of FR-10. */
 export function safeCommandLine(command: string): string {
 	const cleaned = redactSecrets(command.replace(/[\r\n\t]+/g, ' ')).cleaned.trim();
-	return cleaned.length > FLEET_PROCESS_COMMAND_MAX
-		? `${cleaned.slice(0, FLEET_PROCESS_COMMAND_MAX - 1)}…`
-		: cleaned;
+	return cleaned.length > FLEET_PROCESS_COMMAND_MAX ? `${cleaned.slice(0, FLEET_PROCESS_COMMAND_MAX - 1)}…` : cleaned;
 }
 
 /** A process's short name from its command line: `[kthreadd]` → `kthreadd`, `/usr/bin/node x` → `node`. */
@@ -60,7 +58,12 @@ export function parsePsRows(stdout: string, platform: string): ParsedProcess[] {
 		const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+([\d.,]+)\s+(\d+)\s+(\S+)\s+(.*)$/.exec(line);
 		if (!match) continue;
 		const [, pid, ppid, user, cpu, rss, elapsed, args] = match;
-		const runtimeSec = platform === 'darwin' ? parseElapsed(elapsed) : /^\d+$/.test(elapsed) ? Number(elapsed) : parseElapsed(elapsed);
+		const runtimeSec =
+			platform === 'darwin'
+				? parseElapsed(elapsed)
+				: /^\d+$/.test(elapsed)
+					? Number(elapsed)
+					: parseElapsed(elapsed);
 		out.push({
 			pid: Number(pid),
 			ppid: Number(ppid) || null,
@@ -142,7 +145,8 @@ export async function readProcesses(
 			? ['-axo', 'pid=,ppid=,user=,%cpu=,rss=,etime=,args=']
 			: ['-eo', 'pid=,ppid=,user:32=,%cpu=,rss=,etimes=,args='];
 	const result = await runner.run('ps', args, { timeoutMs: 10_000 });
-	if (result.code !== 0 && !result.stdout) return { error: firstLine(result.stderr, `ps exited ${result.code ?? 1}`) };
+	if (result.code !== 0 && !result.stdout)
+		return { error: firstLine(result.stderr, `ps exited ${result.code ?? 1}`) };
 	return { processes: parsePsRows(result.stdout, platform) };
 }
 
@@ -160,8 +164,11 @@ export function topProcesses(
 }
 
 /** CPU and memory of a few pids (the Services tab's running rows), from one full read. */
-export function statsByPid(processes: readonly ParsedProcess[]): Map<number, { cpuPercent: number; memBytes: number | null }> {
+export function statsByPid(
+	processes: readonly ParsedProcess[]
+): Map<number, { cpuPercent: number; memBytes: number | null }> {
 	const out = new Map<number, { cpuPercent: number; memBytes: number | null }>();
-	for (const process of processes) out.set(process.pid, { cpuPercent: process.cpuPercent, memBytes: process.memBytes });
+	for (const process of processes)
+		out.set(process.pid, { cpuPercent: process.cpuPercent, memBytes: process.memBytes });
 	return out;
 }

@@ -39,13 +39,20 @@ export function normalizeCloudMeta(value: unknown): FleetCloudMeta | null {
     const createdAt = iso(raw.createdAt) ?? new Date(0).toISOString();
     const timeline: FleetCloudPowerEvent[] = Array.isArray(raw.powerTimeline)
         ? (raw.powerTimeline as unknown[])
-              .map((entry) => (entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {}))
+              .map((entry) =>
+                  entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {},
+              )
               .filter(
                   (entry) =>
-                      (entry.state === 'running' || entry.state === 'off' || entry.state === 'gone') &&
+                      (entry.state === 'running' ||
+                          entry.state === 'off' ||
+                          entry.state === 'gone') &&
                       iso(entry.at) !== null,
               )
-              .map((entry) => ({ state: entry.state as FleetCloudPowerEvent['state'], at: entry.at as string }))
+              .map((entry) => ({
+                  state: entry.state as FleetCloudPowerEvent['state'],
+                  at: entry.at as string,
+              }))
               .slice(-FLEET_CLOUD_MAX_POWER_TIMELINE)
         : [];
     return {
@@ -70,21 +77,33 @@ export function normalizeCloudMeta(value: unknown): FleetCloudMeta | null {
         powerStateAt: iso(raw.powerStateAt) ?? createdAt,
         pending: isFleetCloudPending(raw.pending) ? raw.pending : null,
         powerTimeline: timeline,
-        error: typeof raw.error === 'string' && raw.error.trim() ? raw.error.trim().split(/\r?\n/)[0].slice(0, 300) : null,
-        idlePolicy: raw.idlePolicy ? normalizeFleetCloudIdlePolicy(raw.idlePolicy) : { ...FLEET_CLOUD_DEFAULT_IDLE_POLICY },
+        error:
+            typeof raw.error === 'string' && raw.error.trim()
+                ? raw.error.trim().split(/\r?\n/)[0].slice(0, 300)
+                : null,
+        idlePolicy: raw.idlePolicy
+            ? normalizeFleetCloudIdlePolicy(raw.idlePolicy)
+            : { ...FLEET_CLOUD_DEFAULT_IDLE_POLICY },
         idleSince: iso(raw.idleSince),
-        cost: raw.cost && typeof raw.cost === 'object' ? (raw.cost as FleetCloudMeta['cost']) : null,
+        cost:
+            raw.cost && typeof raw.cost === 'object' ? (raw.cost as FleetCloudMeta['cost']) : null,
         destroyedAt: iso(raw.destroyedAt),
         finalCostCents: typeof raw.finalCostCents === 'number' ? raw.finalCostCents : null,
         goneAt: iso(raw.goneAt),
-        software: Array.isArray(raw.software) ? (raw.software as unknown[]).filter(isFleetCloudSoftwareId) : [],
+        software: Array.isArray(raw.software)
+            ? (raw.software as unknown[]).filter(isFleetCloudSoftwareId)
+            : [],
         tags: Array.isArray(raw.tags)
-            ? (raw.tags as unknown[]).filter((tag): tag is string => typeof tag === 'string').slice(0, 20)
+            ? (raw.tags as unknown[])
+                  .filter((tag): tag is string => typeof tag === 'string')
+                  .slice(0, 20)
             : [],
         ipv4: typeof raw.ipv4 === 'string' && /^[0-9.]{7,15}$/.test(raw.ipv4) ? raw.ipv4 : null,
         unenrolledNoticeAt: iso(raw.unenrolledNoticeAt),
-        idleNotifiedKey: typeof raw.idleNotifiedKey === 'string' ? raw.idleNotifiedKey.slice(0, 200) : null,
+        idleNotifiedKey:
+            typeof raw.idleNotifiedKey === 'string' ? raw.idleNotifiedKey.slice(0, 200) : null,
         poweredOffByPolicyAt: iso(raw.poweredOffByPolicyAt),
+        unclaimedAt: iso(raw.unclaimedAt),
     };
 }
 
@@ -94,7 +113,10 @@ export function normalizeCloudMeta(value: unknown): FleetCloudMeta | null {
  * the heartbeat is what turns the row online (spec §1), and nothing has to
  * write the phase for it.
  */
-export function deriveCloudPhase(node: Pick<FleetNode, 'status'>, meta: FleetCloudMeta): FleetCloudPhase {
+export function deriveCloudPhase(
+    node: Pick<FleetNode, 'status'>,
+    meta: FleetCloudMeta,
+): FleetCloudPhase {
     if (meta.phase === 'failed') return 'failed';
     if (node.status !== 'enrolling') return 'online';
     return meta.phase === 'online' ? 'enrolling' : meta.phase;
@@ -117,12 +139,18 @@ export function fleetCloudRemovableNode(
     const meta = normalizeCloudMeta(node.providerMeta);
     const hasMachine = cloudHasMachine(node);
     if (!meta) return !hasMachine;
-    return fleetCloudRemovable({ hasMachine, meta: { powerState: meta.powerState, phase: deriveCloudPhase(node, meta) } });
+    return fleetCloudRemovable({
+        hasMachine,
+        meta: { powerState: meta.powerState, phase: deriveCloudPhase(node, meta) },
+    });
 }
 
 /** The Cloud block (spec FR-15), or null for a Node that is not a cloud computer. */
 export function fleetCloudViewOf(
-    node: Pick<FleetNode, 'origin' | 'status' | 'providerPluginId' | 'providerMachineRef' | 'providerMeta'>,
+    node: Pick<
+        FleetNode,
+        'origin' | 'status' | 'providerPluginId' | 'providerMachineRef' | 'providerMeta'
+    >,
     nowMs: number = Date.now(),
 ): FleetNodeCloudView | null {
     if (node.origin !== 'cloud' && !node.providerPluginId) return null;
@@ -166,14 +194,19 @@ export function fleetCloudViewOf(
         goneAt: meta.goneAt ?? null,
         idleWindowReached: idleWindowReached(meta, nowMs),
         poweredOffByPolicyAt: meta.poweredOffByPolicyAt ?? null,
+        unclaimedAt: meta.unclaimedAt ?? null,
         hasMachine,
-        removable: fleetCloudRemovable({ hasMachine, meta: { powerState: meta.powerState, phase } }),
+        removable: fleetCloudRemovable({
+            hasMachine,
+            meta: { powerState: meta.powerState, phase },
+        }),
     };
 }
 
 /** P2 (spec S6): the idle window has lasted the policy's hours, and the policy is not `nothing`. */
 export function idleWindowReached(meta: FleetCloudMeta, nowMs: number): boolean {
-    if (meta.idlePolicy.mode === 'nothing' || !meta.idleSince || meta.powerState !== 'running') return false;
+    if (meta.idlePolicy.mode === 'nothing' || !meta.idleSince || meta.powerState !== 'running')
+        return false;
     const since = Date.parse(meta.idleSince);
     return Number.isFinite(since) && nowMs - since >= meta.idlePolicy.afterHours * 60 * 60 * 1000;
 }

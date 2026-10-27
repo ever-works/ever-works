@@ -1984,11 +1984,16 @@ first-boot script and keeps no password or key for any machine.
 | --------------- | ----- | -------------------------------------------------------------------------------------------------------- |
 | `apiToken`      | user  | Secret. A DigitalOcean personal access token with read and write scope; never returned after it is saved |
 | `defaultRegion` | user  | The region the New cloud computer dialog selects first (`nyc3`, `fra1`, …)                               |
+| `clientId`      | admin | Operator only, env `DIGITALOCEAN_OAUTH_CLIENT_ID`: the OAuth application that offers Sign in             |
+| `clientSecret`  | admin | Operator only, secret, env `DIGITALOCEAN_OAUTH_CLIENT_SECRET`; with both set the plugin adds `oauth`     |
 
 Lists regions and sizes with their current list prices, creates Ubuntu 24.04 droplets tagged with the Fleet
 node id, powers them off gracefully and on, destroys them (idempotently), and reads the account's month-to-date
 usage when the token may read billing. DigitalOcean bills a powered-off droplet, and the dialog says so before
 Create. Switched on per deployment by `FLEET_CLOUD_ENABLED`.
+
+Writing a second provider: [Creating a Machine-Provider Plugin](./creating-machine-provider-plugin.md) — the contract,
+the tags reconciliation reads, and what `billsWhileOff` and `usage` mean.
 
 ## GitHub Actions runners (`github-actions-runners`)
 

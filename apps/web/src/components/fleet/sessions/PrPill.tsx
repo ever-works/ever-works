@@ -28,7 +28,10 @@ export function PrPill({
     if (!pr) {
         if (unknownMinutes === null) return null;
         return (
-            <span className={cn('text-xs text-text-muted dark:text-text-muted-dark', className)} data-testid="fleet-pr-pill-unknown">
+            <span
+                className={cn('text-xs text-text-muted dark:text-text-muted-dark', className)}
+                data-testid="fleet-pr-pill-unknown"
+            >
                 {t('unknown', { minutes: unknownMinutes })}
             </span>
         );
@@ -42,7 +45,9 @@ export function PrPill({
             <GitPullRequest className="h-3 w-3 shrink-0" aria-hidden="true" />
             <span>{label}</span>
             {glyph ? <span aria-hidden="true">{glyph}</span> : null}
-            {unknownMinutes !== null ? <span className="opacity-70">· {t('stale', { minutes: unknownMinutes })}</span> : null}
+            {unknownMinutes !== null ? (
+                <span className="opacity-70">· {t('stale', { minutes: unknownMinutes })}</span>
+            ) : null}
         </>
     );
     const classes = cn(
@@ -64,7 +69,12 @@ export function PrPill({
             {body}
         </a>
     ) : (
-        <span className={classes} title={`${label} · ${checks}`} data-testid="fleet-pr-pill" data-state={pr.state}>
+        <span
+            className={classes}
+            title={`${label} · ${checks}`}
+            data-testid="fleet-pr-pill"
+            data-state={pr.state}
+        >
             {body}
         </span>
     );

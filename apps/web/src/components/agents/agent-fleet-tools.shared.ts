@@ -16,7 +16,10 @@ import { ROUTES } from '@/lib/constants';
  */
 
 /** What the page could read: the view, nothing (Fleet off — the block hides), or an error. */
-export type AgentFleetToolsData = { kind: 'ready'; view: FleetToolsGateView } | { kind: 'error' } | null;
+export type AgentFleetToolsData =
+    | { kind: 'ready'; view: FleetToolsGateView }
+    | { kind: 'error' }
+    | null;
 
 export type AgentFleetToolsActCell =
     | { kind: 'none' }
@@ -32,7 +35,13 @@ export interface AgentFleetToolsRow {
     /** Where to change it (an app route), when a gate refuses. */
     fixHref: string | null;
     /** Per-computer refusals (`build-02 ✗ owner allows only owner`). */
-    computers: Array<{ nodeId: string; name: string; allowed: boolean; hint: string | null; href: string }>;
+    computers: Array<{
+        nodeId: string;
+        name: string;
+        allowed: boolean;
+        hint: string | null;
+        href: string;
+    }>;
     /** Only planned tools: the family has not landed on this deployment yet. */
     comingSoon: boolean;
 }
@@ -51,7 +60,9 @@ export function fleetToolsFixHref(
         case 'fleet-settings':
             return ROUTES.DASHBOARD_SETTINGS_FLEET;
         case 'computer-settings':
-            return nodeId ? ROUTES.DASHBOARD_FLEET_COMPUTER(nodeId, 'settings') : ROUTES.DASHBOARD_FLEET;
+            return nodeId
+                ? ROUTES.DASHBOARD_FLEET_COMPUTER(nodeId, 'settings')
+                : ROUTES.DASHBOARD_FLEET;
         default:
             return null;
     }

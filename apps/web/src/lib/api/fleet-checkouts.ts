@@ -34,7 +34,12 @@ function query(params: Record<string, string | number | boolean | undefined>): s
  */
 export const fleetCheckoutsAPI = {
     list: async (
-        options: { nodeId?: string; workId?: string; state?: FleetCheckoutState; cursor?: string } = {},
+        options: {
+            nodeId?: string;
+            workId?: string;
+            state?: FleetCheckoutState;
+            cursor?: string;
+        } = {},
     ) => {
         return serverFetch<FleetCheckoutListResponse>(
             `${BASE}/checkouts${query({
@@ -99,7 +104,11 @@ export const fleetCheckoutsAPI = {
         });
     },
 
-    remove: async (id: string, body: FleetCheckoutDeleteRequest, options: { cleanUp?: boolean } = {}) => {
+    remove: async (
+        id: string,
+        body: FleetCheckoutDeleteRequest,
+        options: { cleanUp?: boolean } = {},
+    ) => {
         return serverMutation<FleetCheckoutView | { forgotten: true; id: string }>({
             // FL-06: `?cleanUp=1` applies the Clean up gate first (worktree, PR merged/closed, no live session).
             endpoint: `${BASE}/checkouts/${encodeURIComponent(id)}${options.cleanUp ? '?cleanUp=1' : ''}`,

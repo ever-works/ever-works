@@ -26,12 +26,12 @@ Logs need two things:
 The left side lists everything the computer can show, in four groups, re-listed when the tab opens and every
 30 seconds while it is visible:
 
-| Group          | Linux                                  | macOS                                         | Windows                                              |
-| -------------- | -------------------------------------- | --------------------------------------------- | ---------------------------------------------------- |
-| **System**     | the system journal, the kernel         | the unified log                               | System and Application event logs; Security as an administrator |
-| **Files**      | `/var/log` and the shared folders      | `/var/log`, `/Library/Logs`, `~/Library/Logs` and the shared folders | the shared folders                     |
-| **Containers** | every Docker container (running or not) | same                                         | same (Docker Desktop)                                |
-| **Services**   | running and failed systemd units, failed first | running launchd jobs (and failed third-party ones) | running Windows services                    |
+| Group          | Linux                                          | macOS                                                                | Windows                                                         |
+| -------------- | ---------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------- |
+| **System**     | the system journal, the kernel                 | the unified log                                                      | System and Application event logs; Security as an administrator |
+| **Files**      | `/var/log` and the shared folders              | `/var/log`, `/Library/Logs`, `~/Library/Logs` and the shared folders | the shared folders                                              |
+| **Containers** | every Docker container (running or not)        | same                                                                 | same (Docker Desktop)                                           |
+| **Services**   | running and failed systemd units, failed first | running launchd jobs (and failed third-party ones)                   | running Windows services                                        |
 
 **Files** are regular files under the standard log folders and under the folders the computer shares —
 log-looking files (`*.log`, `*.out`, `*.err`, rotated `*.log.1`, anything in a `logs/` folder), newest first,
@@ -60,12 +60,12 @@ show the lines their service manager attributes to them: the journal for a syste
 
 Opening a source shows its last **500** lines, newest at the bottom, then follows it live (`● LIVE`).
 
-| You do                      | It does                                                                                         |
-| --------------------------- | ----------------------------------------------------------------------------------------------- |
-| type in **filter…**         | shows only the lines containing that text (any case), held and live; the footer counts them     |
-| **Pause**                   | the view stops moving and counts what arrives — "Paused · 12 new lines"; **Resume** appends them |
-| scroll up more than a screen | the view stops following; "↓ 8 new lines — jump to latest" takes you back                      |
-| **Copy selection** / **Copy all shown** | plain text, one line per line                                                       |
+| You do                                  | It does                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| type in **filter…**                     | shows only the lines containing that text (any case), held and live; the footer counts them      |
+| **Pause**                               | the view stops moving and counts what arrives — "Paused · 12 new lines"; **Resume** appends them |
+| scroll up more than a screen            | the view stops following; "↓ 8 new lines — jump to latest" takes you back                        |
+| **Copy selection** / **Copy all shown** | plain text, one line per line                                                                    |
 
 Errors and warnings are coloured and carry the level in text (`✖ error`, `⚠ warn`) — from the source's own
 level where it has one (journal priority, event level, unified-log message type), from the line's text
@@ -125,11 +125,11 @@ An Agent can read the same sources, read-only, through two tools: `fleet_logs_so
 read only when the computer's `logs` audience includes the Agent's owner; the read is audited as the Agent.
 The same two tools are offered by the MCP server. The routes, under `/api/fleet`:
 
-| Route                                  | What                                                    |
-| -------------------------------------- | ------------------------------------------------------- |
-| `GET  /nodes/:id/logs/sources`         | the four groups                                         |
-| `POST /nodes/:id/logs/attach-token`    | a 60-second token for the viewer socket (`/ws/fleet/logs/<id>`) |
-| `POST /nodes/:id/logs/read`            | one batch of at most 500 lines, never a follow          |
+| Route                               | What                                                            |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `GET  /nodes/:id/logs/sources`      | the four groups                                                 |
+| `POST /nodes/:id/logs/attach-token` | a 60-second token for the viewer socket (`/ws/fleet/logs/<id>`) |
+| `POST /nodes/:id/logs/read`         | one batch of at most 500 lines, never a follow                  |
 
 Refusals use the shared envelope `{ error: { code, hint, details } }`: `unreachable`, `consent_missing`,
 `permission_denied`, `kill_switch`, `limit_exceeded`, `unsupported_on_node`, `invalid`, `not_found`,

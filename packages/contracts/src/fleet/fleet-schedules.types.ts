@@ -138,7 +138,8 @@ export function fleetNodeScheduleRowId(commandId: string): string {
 }
 
 /** What a Command schedule's row and dialog say about spend (FR-29). */
-export const FLEET_SCHEDULE_NO_CREDITS_SENTENCE = 'Runs a command on your computer — it spends no model tokens or credits.';
+export const FLEET_SCHEDULE_NO_CREDITS_SENTENCE =
+	'Runs a command on your computer — it spends no model tokens or credits.';
 
 /** The sentence every confirmation of a Command schedule carries, verbatim (FR-25). */
 export const FLEET_SCHEDULE_SANDBOX_SENTENCE: typeof FLEET_COMMAND_SANDBOX_SENTENCE = FLEET_COMMAND_SANDBOX_SENTENCE;
@@ -337,7 +338,10 @@ function cronNeverFires(fields: FleetCronFields): boolean {
  * Read a cadence off the wire or a form, or say why not (spec FR-6, FR-28
  * `invalid`). Never throws. `timezone` is always `'node'`.
  */
-export function parseFleetScheduleCadence(raw: unknown): { cadence: FleetScheduleCadence | null; error: string | null } {
+export function parseFleetScheduleCadence(raw: unknown): {
+	cadence: FleetScheduleCadence | null;
+	error: string | null;
+} {
 	const refuse = (error: string) => ({ cadence: null, error });
 	if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return refuse('choose when it runs');
 	const record = raw as Record<string, unknown>;
@@ -389,7 +393,8 @@ export function fleetScheduleCadenceFromForm(form: FleetScheduleCadenceForm): {
 		case 'weekdays':
 			return parseFleetScheduleCadence({ kind: 'weekdays', at: form.at });
 		case 'days': {
-			if (!isFleetScheduleClockTime(form.at)) return { cadence: null, error: 'the time is HH:MM on a 24-hour clock' };
+			if (!isFleetScheduleClockTime(form.at))
+				return { cadence: null, error: 'the time is HH:MM on a 24-hour clock' };
 			const days = [...new Set(form.days.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort(
 				(a, b) => a - b
 			);
@@ -964,7 +969,9 @@ export interface FleetScheduleRunsResult {
 }
 
 const boundCount = (value: unknown): number =>
-	typeof value === 'number' && Number.isFinite(value) ? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(value))) : 0;
+	typeof value === 'number' && Number.isFinite(value)
+		? Math.min(Number.MAX_SAFE_INTEGER, Math.max(0, Math.floor(value)))
+		: 0;
 
 /** Platform side: one run report, bounded, or null. */
 export function parseFleetScheduleRunReport(value: unknown): FleetScheduleRunReport | null {

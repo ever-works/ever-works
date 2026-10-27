@@ -137,6 +137,56 @@ export interface AppBlueprintUpgradePr {
 	url: string;
 	version: string;
 	breaking: boolean;
+	// ── Additive (2026-10-27, lane aw-blueprints — APW-03 T28/T31) ─────────
+	/** `apply` — a Blueprint applied to an App Work that had none; `upgrade` otherwise. */
+	mode?: AppBlueprintRunMode;
+	/** The version the App Work followed when the proposal was made (`null` for `apply`). */
+	fromVersion?: string | null;
+	/** The branch the pull request is opened from. */
+	branch?: string;
+	/** The Blueprint commit the proposal was composed from, when the provider named it. */
+	blueprintSha?: string | null;
+	/** `false` when the applied version could not be read and the merge was two-way. */
+	baseKnown?: boolean;
+	/** Every conflict the three-way merge found (the member's value was kept for each). */
+	conflictCount?: number;
+	/** The first {@link APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED} conflicts — paths only, never a member value. */
+	conflicts?: readonly AppBlueprintUpgradeConflictSummary[];
+	/** ISO time of the last update of the proposal. */
+	updatedAt?: string;
+}
+
+/** What one Blueprint run does (APW-03 T28): apply to an App Work with none, or upgrade. */
+export const APP_BLUEPRINT_RUN_MODES = ['apply', 'upgrade'] as const;
+
+/** Union derived from {@link APP_BLUEPRINT_RUN_MODES}. */
+export type AppBlueprintRunMode = (typeof APP_BLUEPRINT_RUN_MODES)[number];
+
+/**
+ * `blueprintUpgradeStatus` (additive column, migration `1796600000000`): where the
+ * latest Blueprint apply / upgrade run is. `queued` and `running` are the in-flight
+ * guard (`409 applyInProgress`); `proposed` means a pull request is open (or updated)
+ * and waits for the member's merge; `unchanged` means the merge found nothing to
+ * propose; `failed` carries `blueprintUpgradeError`.
+ */
+export const APP_BLUEPRINT_UPGRADE_STATUSES = ['queued', 'running', 'proposed', 'unchanged', 'failed'] as const;
+
+/** Union derived from {@link APP_BLUEPRINT_UPGRADE_STATUSES}. */
+export type AppBlueprintUpgradeStatus = (typeof APP_BLUEPRINT_UPGRADE_STATUSES)[number];
+
+/** How many conflicts {@link AppBlueprintUpgradePr.conflicts} lists. */
+export const APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED = 20;
+
+/**
+ * One conflict of a Blueprint upgrade, as stored and shown: where, and why the member's
+ * value was kept. The member's own value is never stored here; `proposed` is a bounded
+ * one-line preview of the Blueprint's (public) value.
+ */
+export interface AppBlueprintUpgradeConflictSummary {
+	/** `spec.env[name=DATABASE_URL].value`. */
+	path: string;
+	kind: 'both_changed' | 'both_added' | 'deleted_by_blueprint' | 'deleted_by_you';
+	proposed?: string;
 }
 
 /**
@@ -235,6 +285,12 @@ export interface WorkAppSpecStateDto {
 	blueprintLatestVersion: string | null;
 	blueprintUpgradeDismissedVersion: string | null;
 	blueprintUpgradePr: AppBlueprintUpgradePr | null;
+	/** Additive (APW-03 T28): the latest apply / upgrade run's status; absent on an older API. */
+	blueprintUpgradeStatus?: AppBlueprintUpgradeStatus | null;
+	/** Additive (APW-03 T28): the reason code of a `failed` run. */
+	blueprintUpgradeError?: string | null;
+	/** Additive (APW-03 T28): when the latest run was requested. */
+	blueprintUpgradeRequestedAt?: string | null;
 	licenseSpdx: string | null;
 	licenseClass: LicenseClass | null;
 	licenseSource: LicenseSource | null;
