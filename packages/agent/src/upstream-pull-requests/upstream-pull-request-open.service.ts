@@ -3,6 +3,7 @@ import { isAppWorkKind, type AppSourceRecord } from '@ever-works/contracts';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { config } from '../config';
+import { ActivityStatus } from '../entities/activity-log.types';
 import { GitFacadeService } from '../facades/git.facade';
 import { TaskChatService } from '../tasks-domain/task-chat.service';
 import { relationOf } from '../app-works/app-source-initializer.service';
@@ -10,6 +11,8 @@ import { resolveTaskRepository } from '../tasks-domain/task-repository';
 import { UpstreamCredentialService } from './upstream-credential.service';
 import { ownershipScopeOf } from '../database/ownership-scope';
 import { UpstreamPullRequestRecordService } from './upstream-pull-request-record.service';
+import { UpstreamEligibilityService } from './upstream-eligibility.service';
+import type { UpstreamRateLimitRefusal } from './upstream-rate-limits';
 
 /**
  * APW-09 — the first surface over the upstream-PR facade: open a pull request from a
@@ -41,6 +44,15 @@ import { UpstreamPullRequestRecordService } from './upstream-pull-request-record
  * second request for a Task that already has an active record is refused
  * `409 activeProposal` (FR-5) and reaches no provider. The success body is unchanged except
  * for one added field, `recordId`. The record never holds the token.
+ *
+ * ## FR-26 / FR-39 limits (APW-09 T8, lane aw-upstream-prs — additive)
+ *
+ * When `UpstreamEligibilityService` is bound, the route refuses `429` before any provider call
+ * when the member already opened one pull request on this upstream in 24 hours, has the App
+ * spec's `maxOpen` open there, opened 3 anywhere in 24 hours, or Ever Works opened 5 on this
+ * upstream in 24 hours (`platformCapReached`). The body names the `limit` and, for a windowed
+ * limit, `nextSlotAt` (FR-27). The check runs twice — before the claim, and again with the claim
+ * counted — so two concurrent requests cannot both slip under a limit.
  */
 
 export interface UpstreamPullRequestOpenInput {
@@ -114,6 +126,8 @@ export class UpstreamPullRequestOpenService {
         @Optional() private readonly taskChat?: TaskChatService,
         // APW-09 T7/T35 — the `upstream_pull_requests` record. Appended LAST and optional.
         @Optional() private readonly records?: UpstreamPullRequestRecordService,
+        // APW-09 T8/T9 — the FR-26 / FR-39 limits. Appended LAST and optional.
+        @Optional() private readonly eligibility?: UpstreamEligibilityService,
     ) {}
 
     async open(input: UpstreamPullRequestOpenInput): Promise<UpstreamPullRequestOpenResult> {
@@ -193,6 +207,16 @@ export class UpstreamPullRequestOpenService {
             );
         }
 
+        // ── APW-09 FR-26 / FR-39: the limits, before any credential or provider call ──
+        const limitScope = {
+            workId: work.id,
+            userId: input.callerUserId,
+            upstreamOwner: upstream.owner,
+            upstreamRepo: upstream.repo,
+        };
+        const preLimit = this.eligibility ? await this.eligibility.limitsFor(limitScope) : null;
+        if (preLimit) return limitRefusal(preLimit, `${upstream.owner}/${upstream.repo}`);
+
         // ── the publishing member's own credential (FR-24) ────────────────────
         const publishing = await this.credentials.resolveForPublishingMember(
             work.id,
@@ -252,6 +276,27 @@ export class UpstreamPullRequestOpenService {
             };
         }
         const row = claim.status === 'claimed' ? claim.row : null;
+
+        // The second look, with this request's own claim counted (see the class docstring).
+        if (row && this.eligibility && this.records) {
+            const postLimit = await this.eligibility.limitsFor({ ...limitScope, includesSelf: true });
+            if (postLimit) {
+                await this.records
+                    .transition(
+                        row,
+                        ['opening'],
+                        'refused',
+                        { openedAt: null, nextCheckAt: null, refusalCode: postLimit.code },
+                        {
+                            event: 'app.upstream_pr.refused',
+                            status: ActivityStatus.FAILED,
+                            summary: `A pull request on ${upstream.owner}/${upstream.repo} was refused by a limit`,
+                        },
+                    )
+                    .catch(() => undefined);
+                return limitRefusal(postLimit, `${upstream.owner}/${upstream.repo}`);
+            }
+        }
 
         try {
             const pr = await this.git.createPullRequest(
@@ -333,6 +378,26 @@ export class UpstreamPullRequestOpenService {
             );
         }
     }
+}
+
+/** The `429` an FR-26 / FR-39 limit answers, naming the limit (FR-27). */
+function limitRefusal(refusal: UpstreamRateLimitRefusal, upstream: string): UpstreamPullRequestOpenResult {
+    const message =
+        refusal.code === 'platformCapReached'
+            ? `Ever Works has opened its daily limit of ${refusal.limitValue} pull requests on ${upstream}.`
+            : refusal.limit === 'openPerUpstream'
+              ? `You already have ${refusal.limitValue} open pull request(s) on ${upstream}.`
+              : refusal.limit === 'openedPerUpstreamPer24h'
+                ? `You can open ${refusal.limitValue} pull request(s) on ${upstream} per day.`
+                : `You've reached this limit for now (limit: ${refusal.limitValue} per 24 hours).`;
+    return {
+        status: 'refused',
+        httpStatus: 429,
+        code: refusal.code,
+        message: refusal.nextSlotAt ? `${message} Next one available at ${refusal.nextSlotAt}.` : message,
+        limit: refusal.limit,
+        ...(refusal.nextSlotAt ? { nextSlotAt: refusal.nextSlotAt } : {}),
+    };
 }
 
 /**
