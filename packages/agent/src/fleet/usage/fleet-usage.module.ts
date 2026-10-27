@@ -43,7 +43,17 @@ export class FleetUsageDispatchService {
  */
 @Module({
     imports: [DatabaseModule, UsageModule, FleetModule],
-    providers: [FleetUsageReconcilerService, FleetUsageScanService, FleetUsageViewService, FleetUsageDispatchService],
-    exports: [FleetUsageReconcilerService, FleetUsageScanService, FleetUsageViewService, FleetUsageDispatchService],
+    providers: [
+        FleetUsageReconcilerService,
+        FleetUsageScanService,
+        FleetUsageViewService,
+        FleetUsageDispatchService,
+    ],
+    exports: [
+        FleetUsageReconcilerService,
+        FleetUsageScanService,
+        FleetUsageViewService,
+        FleetUsageDispatchService,
+    ],
 })
 export class FleetUsageModule {}

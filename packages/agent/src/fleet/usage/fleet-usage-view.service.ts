@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThanOrEqual, Repository } from 'typeorm';
+import { Between, In, MoreThanOrEqual, Repository } from 'typeorm';
 import {
     FLEET_USAGE_PAYER_NOTE,
     FLEET_USAGE_TASK_COSTS_MAX_IDS,
@@ -15,6 +15,7 @@ import {
     type FleetUsagePricesView,
     type FleetUsageProvider,
     type FleetUsageScanState,
+    type FleetUsageDigestLine,
     type FleetUsageTaskCost,
     type FleetUsageTaskCostsView,
     type FleetUsageView,
@@ -101,9 +102,16 @@ export class FleetUsageViewService {
         @Inject(MODEL_LIST_PRICES) private readonly prices: ModelListPrices,
     ) {}
 
-    async view(caller: FleetCaller, query: FleetUsageQuery = {}, now: Date = new Date()): Promise<FleetUsageView> {
+    async view(
+        caller: FleetCaller,
+        query: FleetUsageQuery = {},
+        now: Date = new Date(),
+    ): Promise<FleetUsageView> {
         const days = parseDays(query.days);
-        const model = typeof query.model === 'string' && query.model.trim() ? query.model.trim().slice(0, 120) : null;
+        const model =
+            typeof query.model === 'string' && query.model.trim()
+                ? query.model.trim().slice(0, 120)
+                : null;
         const scope = await this.scope(caller, query.nodeId ?? null);
         const to = now;
         const from = new Date(now.getTime() - days * DAY_MS);
@@ -114,12 +122,17 @@ export class FleetUsageViewService {
             from,
             model,
         );
-        const owned = new Set(scope.filter((entry) => entry.role === 'owner').map((entry) => entry.node.id));
+        const owned = new Set(
+            scope.filter((entry) => entry.role === 'owner').map((entry) => entry.node.id),
+        );
         // Other sessions are the machine owner's alone (spec §8b).
-        let visible = rows.filter((row) => owned.has(row.nodeId) || row.fleetSessionId || row.agentRunId);
+        let visible = rows.filter(
+            (row) => owned.has(row.nodeId) || row.fleetSessionId || row.agentRunId,
+        );
         const otherHidden = visible.length !== rows.length;
         // P2 — one Agent's work only: rows attributed to its sessions or its Task runs.
-        const agentId = typeof query.agentId === 'string' && UUID.test(query.agentId) ? query.agentId : null;
+        const agentId =
+            typeof query.agentId === 'string' && UUID.test(query.agentId) ? query.agentId : null;
         if (agentId) visible = await this.onlyAgent(visible, agentId);
 
         const priced = priceUsageGroups(visible, this.prices);
@@ -158,7 +171,9 @@ export class FleetUsageViewService {
                 requests: mine.requests,
             };
         });
-        byNode.sort((a, b) => (b.costCents ?? -1) - (a.costCents ?? -1) || a.name.localeCompare(b.name));
+        byNode.sort(
+            (a, b) => (b.costCents ?? -1) - (a.costCents ?? -1) || a.name.localeCompare(b.name),
+        );
 
         const busiestCheckouts = await this.busiestCheckouts(visible, scope);
         // With an Agent filter there are no "other" rows: other sessions name no Agent (FR-6).
@@ -186,7 +201,10 @@ export class FleetUsageViewService {
                 costCents: priced.costCents,
                 tokens: priced.tokens,
                 requests: priced.requests,
-                topModel: byModel.find((line) => line.costCents !== null)?.model ?? byModel[0]?.model ?? null,
+                topModel:
+                    byModel.find((line) => line.costCents !== null)?.model ??
+                    byModel[0]?.model ??
+                    null,
             },
             byModel,
             byNode,
@@ -213,10 +231,15 @@ export class FleetUsageViewService {
      */
     async runFleetUsage(runId: string): Promise<RunReceiptFleetUsage | null> {
         if (!config.fleet.isUsageScanEnabled() || !runId) return null;
-        const sessions = await this.sessions.find({ where: { agentRunId: runId }, select: { id: true } });
+        const sessions = await this.sessions.find({
+            where: { agentRunId: runId },
+            select: { id: true },
+        });
         const rows = [
             ...(sessions.length > 0
-                ? await this.samples.find({ where: { fleetSessionId: In(sessions.map((session) => session.id)) } })
+                ? await this.samples.find({
+                      where: { fleetSessionId: In(sessions.map((session) => session.id)) },
+                  })
                 : []),
             ...(await this.samples.find({ where: { agentRunId: runId } })),
         ];
@@ -227,7 +250,9 @@ export class FleetUsageViewService {
         for (const row of rows) {
             byNode.set(
                 row.nodeId,
-                (byNode.get(row.nodeId) ?? 0) + bigintCount(row.inputTokens) + bigintCount(row.outputTokens),
+                (byNode.get(row.nodeId) ?? 0) +
+                    bigintCount(row.inputTokens) +
+                    bigintCount(row.outputTokens),
             );
         }
         const nodeId = [...byNode.entries()].sort((a, b) => b[1] - a[1])[0][0];
@@ -238,7 +263,10 @@ export class FleetUsageViewService {
             costCents: priced.costCents,
             tokens: priced.tokens,
             requests: priced.requests,
-            priceListVersion: priced.versionsUsed.length > 0 ? priced.versionsUsed[priced.versionsUsed.length - 1] : null,
+            priceListVersion:
+                priced.versionsUsed.length > 0
+                    ? priced.versionsUsed[priced.versionsUsed.length - 1]
+                    : null,
             unknownModels: priced.unknownModels,
             note: FLEET_USAGE_PAYER_NOTE,
         };
@@ -257,10 +285,9 @@ export class FleetUsageViewService {
         now: Date = new Date(),
     ): Promise<FleetUsageTaskCostsView> {
         const userId = typeof caller === 'string' ? caller : caller.userId;
-        const ids = [...new Set(taskIds.filter((id) => typeof id === 'string' && UUID.test(id)))].slice(
-            0,
-            FLEET_USAGE_TASK_COSTS_MAX_IDS,
-        );
+        const ids = [
+            ...new Set(taskIds.filter((id) => typeof id === 'string' && UUID.test(id))),
+        ].slice(0, FLEET_USAGE_TASK_COSTS_MAX_IDS);
         if (ids.length === 0 || !userId) return { tasks: [], note: FLEET_USAGE_PAYER_NOTE };
         const since = new Date(now.getTime() - 30 * DAY_MS);
         const runs = await this.runs.find({
@@ -284,9 +311,12 @@ export class FleetUsageViewService {
             const own = runs
                 .filter((run) => run.taskId === taskId)
                 .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            if (own.length === 0) return { taskId, lastRun: null, last30DaysCents: null, runs30Days: 0 };
+            if (own.length === 0)
+                return { taskId, lastRun: null, last30DaysCents: null, runs30Days: 0 };
             const newest = own[0];
-            const inWindow = own.filter((run) => new Date(run.createdAt).getTime() >= since.getTime());
+            const inWindow = own.filter(
+                (run) => new Date(run.createdAt).getTime() >= since.getTime(),
+            );
             let cents = 0;
             let priced = false;
             for (const run of inWindow) {
@@ -325,8 +355,11 @@ export class FleetUsageViewService {
                 where: { agentRunId: In([...chunk]) },
                 select: { id: true, agentRunId: true },
             });
-            for (const session of sessions) if (session.agentRunId) runBySession.set(session.id, session.agentRunId);
-            for (const sample of await this.samples.find({ where: { agentRunId: In([...chunk]) } })) {
+            for (const session of sessions)
+                if (session.agentRunId) runBySession.set(session.id, session.agentRunId);
+            for (const sample of await this.samples.find({
+                where: { agentRunId: In([...chunk]) },
+            })) {
                 if (sample.agentRunId) push(sample.agentRunId, sample);
             }
         }
@@ -336,7 +369,9 @@ export class FleetUsageViewService {
                 where: { fleetSessionId: In(sessionIds.slice(i, i + 200)) },
             });
             for (const sample of viaSessions) {
-                const runId = sample.fleetSessionId ? runBySession.get(sample.fleetSessionId) : undefined;
+                const runId = sample.fleetSessionId
+                    ? runBySession.get(sample.fleetSessionId)
+                    : undefined;
                 if (runId) push(runId, sample);
             }
         }
@@ -349,10 +384,46 @@ export class FleetUsageViewService {
         return out;
     }
 
+    /**
+     * The digest's fleet line (FL-20 P3; `DIGEST_FLEET_USAGE_READER`): the
+     * user's OWN computers' model work in the window — every attribution,
+     * "other" included (they are the owner's machines) — at list price. Null
+     * with the flag off or nothing scanned.
+     */
+    async fleetUsageForDigest(
+        userId: string,
+        since: Date,
+        until: Date,
+    ): Promise<FleetUsageDigestLine | null> {
+        if (!config.fleet.isUsageScanEnabled() || !userId) return null;
+        const nodes = (await this.nodes.findByUser(userId)).filter(
+            (node) => node.consents?.usageScan === true,
+        );
+        if (nodes.length === 0) return null;
+        const rows = await this.samples.find({
+            where: { nodeId: In(nodes.map((node) => node.id)), bucketStart: Between(since, until) },
+            take: 20_000,
+        });
+        if (rows.length === 0) return null;
+        const priced = priceUsageGroups(groupFleetUsageSamples(rows), this.prices);
+        return {
+            costCents: priced.costCents,
+            tokens: priced.tokens,
+            requests: priced.requests,
+            unknownRequests: priced.unknownRequests,
+            computers: new Set(rows.map((row) => row.nodeId)).size,
+            note: FLEET_USAGE_PAYER_NOTE,
+        };
+    }
+
     /** P2 — keep the rows attributed to one Agent (its sessions, or its Task runs). */
     private async onlyAgent(rows: readonly GroupedRow[], agentId: string): Promise<GroupedRow[]> {
-        const sessionIds = [...new Set(rows.map((row) => row.fleetSessionId).filter((id): id is string => !!id))];
-        const runIds = [...new Set(rows.map((row) => row.agentRunId).filter((id): id is string => !!id))];
+        const sessionIds = [
+            ...new Set(rows.map((row) => row.fleetSessionId).filter((id): id is string => !!id)),
+        ];
+        const runIds = [
+            ...new Set(rows.map((row) => row.agentRunId).filter((id): id is string => !!id)),
+        ];
         const agentSessions = new Set<string>();
         const agentRuns = new Set<string>();
         for (let i = 0; i < sessionIds.length; i += 200) {
@@ -387,9 +458,10 @@ export class FleetUsageViewService {
                 provider: entry.provider,
                 perMillionUsd: { ...entry.perMillionUsd },
             })),
-            history: this.prices
-                .versions()
-                .map((version) => ({ version, effectiveFrom: this.prices.getVersion(version)?.effectiveFrom ?? '' })),
+            history: this.prices.versions().map((version) => ({
+                version,
+                effectiveFrom: this.prices.getVersion(version)?.effectiveFrom ?? '',
+            })),
             note: FLEET_USAGE_PAYER_NOTE,
         };
     }
@@ -404,7 +476,9 @@ export class FleetUsageViewService {
             const { node, role } = await this.access.resolveVisible(nodeId, caller);
             const state = fleetUsageScanState(node);
             if (state.state === 'unsupported') {
-                throw fleetUsageError('unsupported_on_node', `update the node on ${node.name}`, { nodeId: node.id });
+                throw fleetUsageError('unsupported_on_node', `update the node on ${node.name}`, {
+                    nodeId: node.id,
+                });
             }
             if (state.state === 'off') {
                 throw fleetUsageError('consent_missing', fleetUsageOptInHint(node.name), {
@@ -415,7 +489,9 @@ export class FleetUsageViewService {
             return [{ node, role }];
         }
         const userId = typeof caller === 'string' ? caller : caller.userId;
-        const own = (await this.nodes.findByUser(userId)).filter((node) => node.status !== 'enrolling');
+        const own = (await this.nodes.findByUser(userId)).filter(
+            (node) => node.status !== 'enrolling',
+        );
         const shared = await this.access.listSharedWith(caller);
         return [
             ...own.map((node) => ({ node, role: 'owner' as FleetViewerRole })),
@@ -425,7 +501,11 @@ export class FleetUsageViewService {
 
     // ─── the grouped read ────────────────────────────────────────────────
 
-    private async grouped(nodeIds: string[], from: Date, model: string | null): Promise<GroupedRow[]> {
+    private async grouped(
+        nodeIds: string[],
+        from: Date,
+        model: string | null,
+    ): Promise<GroupedRow[]> {
         if (nodeIds.length === 0) return [];
         const out: GroupedRow[] = [];
         for (let i = 0; i < nodeIds.length; i += 200) {
@@ -517,11 +597,16 @@ export class FleetUsageViewService {
         const paths = top.filter((line) => line.path).map((line) => line.path as string);
         if (paths.length > 0) {
             const known = await this.checkouts.find({
-                where: { nodeId: In([...new Set(top.map((line) => line.nodeId))]), path: In(paths) },
+                where: {
+                    nodeId: In([...new Set(top.map((line) => line.nodeId))]),
+                    path: In(paths),
+                },
                 select: { id: true, nodeId: true, path: true },
             });
             for (const line of top) {
-                const hit = known.find((checkout) => checkout.nodeId === line.nodeId && checkout.path === line.path);
+                const hit = known.find(
+                    (checkout) => checkout.nodeId === line.nodeId && checkout.path === line.path,
+                );
                 if (hit) line.checkoutId = hit.id;
             }
         }
@@ -533,8 +618,12 @@ export class FleetUsageViewService {
         all: readonly GroupedRow[],
         owned: ReadonlySet<string>,
     ): Promise<FleetUsageView['sessions']> {
-        const sessionIds = [...new Set(visible.map((row) => row.fleetSessionId).filter((id): id is string => !!id))];
-        const runIds = [...new Set(visible.map((row) => row.agentRunId).filter((id): id is string => !!id))];
+        const sessionIds = [
+            ...new Set(visible.map((row) => row.fleetSessionId).filter((id): id is string => !!id)),
+        ];
+        const runIds = [
+            ...new Set(visible.map((row) => row.agentRunId).filter((id): id is string => !!id)),
+        ];
         const sessionRows = sessionIds.length
             ? await this.sessions.find({
                   where: { id: In(sessionIds) },
@@ -542,7 +631,10 @@ export class FleetUsageViewService {
               })
             : [];
         const runRows = runIds.length
-            ? await this.runs.find({ where: { id: In(runIds) }, select: { id: true, agentId: true } })
+            ? await this.runs.find({
+                  where: { id: In(runIds) },
+                  select: { id: true, agentId: true },
+              })
             : [];
         const sessionById = new Map(sessionRows.map((session) => [session.id, session]));
         const runById = new Map(runRows.map((run) => [run.id, run]));
@@ -553,7 +645,10 @@ export class FleetUsageViewService {
             if (row.fleetSessionId) {
                 const session = sessionById.get(row.fleetSessionId);
                 if (session?.kind === 'agent' && session.agentId) {
-                    const group = agentGroups.get(session.agentId) ?? { units: new Set<string>(), rows: [] };
+                    const group = agentGroups.get(session.agentId) ?? {
+                        units: new Set<string>(),
+                        rows: [],
+                    };
                     group.units.add(`s:${row.fleetSessionId}`);
                     group.rows.push(row);
                     agentGroups.set(session.agentId, group);
@@ -572,7 +667,10 @@ export class FleetUsageViewService {
         }
         const agentIds = [...agentGroups.keys()];
         const names = agentIds.length
-            ? await this.agents.find({ where: { id: In(agentIds) }, select: { id: true, name: true } })
+            ? await this.agents.find({
+                  where: { id: In(agentIds) },
+                  select: { id: true, name: true },
+              })
             : [];
         const nameById = new Map(names.map((agent) => [agent.id, agent.name]));
         const agents: FleetUsageAgentLine[] = agentIds
@@ -588,16 +686,26 @@ export class FleetUsageViewService {
             .sort((a, b) => (b.costCents ?? -1) - (a.costCents ?? -1) || b.sessions - a.sessions);
 
         // Other: unattributed rows on computers the caller owns, counted by provider session.
-        const otherRows = all.filter((row) => !row.fleetSessionId && !row.agentRunId && owned.has(row.nodeId));
-        const otherSessions = new Set(otherRows.map((row) => `${row.nodeId}:${row.providerSessionId ?? '?'}`));
+        const otherRows = all.filter(
+            (row) => !row.fleetSessionId && !row.agentRunId && owned.has(row.nodeId),
+        );
+        const otherSessions = new Set(
+            otherRows.map((row) => `${row.nodeId}:${row.providerSessionId ?? '?'}`),
+        );
         // Null when the caller owns none of these computers: they may see no other sessions at all.
         const other =
             owned.size === 0
                 ? null
-                : { sessions: otherSessions.size, costCents: priceUsageGroups(otherRows, this.prices).costCents };
+                : {
+                      sessions: otherSessions.size,
+                      costCents: priceUsageGroups(otherRows, this.prices).costCents,
+                  };
         return {
             agents,
-            owner: { sessions: ownerGroup.units.size, costCents: priceUsageGroups(ownerGroup.rows, this.prices).costCents },
+            owner: {
+                sessions: ownerGroup.units.size,
+                costCents: priceUsageGroups(ownerGroup.rows, this.prices).costCents,
+            },
             other,
         };
     }
@@ -613,9 +721,12 @@ function parseDays(value: unknown): FleetUsagePeriodDays {
 }
 
 /** The consent as the node last reported it (no job facts). */
-export function fleetUsageScanState(node: Pick<FleetNode, 'name' | 'consents'>): Pick<FleetUsageScanState, 'state' | 'hint'> {
+export function fleetUsageScanState(
+    node: Pick<FleetNode, 'name' | 'consents'>,
+): Pick<FleetUsageScanState, 'state' | 'hint'> {
     if (!node.consents) return { state: 'unsupported', hint: `update the node on ${node.name}` };
-    if (node.consents.usageScan !== true) return { state: 'off', hint: fleetUsageOptInHint(node.name) };
+    if (node.consents.usageScan !== true)
+        return { state: 'off', hint: fleetUsageOptInHint(node.name) };
     return { state: 'on', hint: null };
 }
 

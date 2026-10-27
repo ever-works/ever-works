@@ -128,6 +128,9 @@ export interface MachineProviderMachine {
 	name?: string;
 	/** When the provider says it was created (ISO-8601). */
 	createdAt?: string | null;
+	/** P3: the region and size ids the provider reports — reconciliation prices an adopted machine with them. */
+	regionId?: string | null;
+	sizeId?: string | null;
 }
 
 /** What `create` answers. */

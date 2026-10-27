@@ -1,4 +1,13 @@
-import { parseUsageJson, usageCount, usageCwd, usageModel, usageObject, usageSessionId, usageTime, type UsageRecord } from './usage-record';
+import {
+	parseUsageJson,
+	usageCount,
+	usageCwd,
+	usageModel,
+	usageObject,
+	usageSessionId,
+	usageTime,
+	type UsageRecord
+} from './usage-record';
 
 /**
  * Usage & cost on the fleet (FL-20, plan §3 "Claude Code records", T-09) —

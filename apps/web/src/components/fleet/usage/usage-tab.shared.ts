@@ -1,4 +1,9 @@
-import { FLEET_USAGE_PERIODS, isFleetUsagePeriodDays, type FleetUsagePeriodDays, type FleetUsageView } from '@ever-works/contracts';
+import {
+    FLEET_USAGE_PERIODS,
+    isFleetUsagePeriodDays,
+    type FleetUsagePeriodDays,
+    type FleetUsageView,
+} from '@ever-works/contracts';
 
 /**
  * Usage & cost on the fleet (FL-20 P2, spec §5.1, §5.2, §5.6) — the pure half
@@ -34,18 +39,26 @@ export function usageTabState(view: FleetUsageView): UsageTabState {
 }
 
 /** What the totals leave out for this viewer (FR-17, U10), as i18n keys with their values. */
-export function usageExclusionNotes(view: FleetUsageView): Array<{ key: 'excludedNodes' | 'otherHidden'; values?: Record<string, number> }> {
-    const notes: Array<{ key: 'excludedNodes' | 'otherHidden'; values?: Record<string, number> }> = [];
-    if (view.excluded.nodes > 0) notes.push({ key: 'excludedNodes', values: { count: view.excluded.nodes } });
+export function usageExclusionNotes(
+    view: FleetUsageView,
+): Array<{ key: 'excludedNodes' | 'otherHidden'; values?: Record<string, number> }> {
+    const notes: Array<{ key: 'excludedNodes' | 'otherHidden'; values?: Record<string, number> }> =
+        [];
+    if (view.excluded.nodes > 0)
+        notes.push({ key: 'excludedNodes', values: { count: view.excluded.nodes } });
     if (view.excluded.otherHidden) notes.push({ key: 'otherHidden' });
     return notes;
 }
 
 /** The price-list line (spec U8): "priced at model list prices v1" (+ "v2 in effect since …" when older versions were used). */
-export function usagePriceListLine(view: FleetUsageView): { key: 'priceList' | 'priceListMixed'; values: Record<string, string> } {
+export function usagePriceListLine(view: FleetUsageView): {
+    key: 'priceList' | 'priceListMixed';
+    values: Record<string, string>;
+} {
     const used = view.priceList.versionsUsed;
     const older = used.filter((version) => version !== view.priceList.version);
-    if (older.length === 0) return { key: 'priceList', values: { version: String(view.priceList.version) } };
+    if (older.length === 0)
+        return { key: 'priceList', values: { version: String(view.priceList.version) } };
     return {
         key: 'priceListMixed',
         values: {

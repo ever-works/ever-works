@@ -12,7 +12,11 @@ import { usageCacheTokens, usageMoney, usageTokens } from '@/components/fleet/us
  * AW-09's cost block only when the Run has scanned usage; renders nothing
  * otherwise, so every other receipt is unchanged.
  */
-export function RunReceiptFleetCostLine({ usage }: { usage: RunReceiptFleetUsage | null | undefined }) {
+export function RunReceiptFleetCostLine({
+    usage,
+}: {
+    usage: RunReceiptFleetUsage | null | undefined;
+}) {
     const t = useTranslations('fleet.usage.receipt');
     if (!usage) return null;
     const cost = usageMoney(usage.costCents);
@@ -33,7 +37,9 @@ export function RunReceiptFleetCostLine({ usage }: { usage: RunReceiptFleetUsage
                     : t('lineTokensOnly', figures)}
             </p>
             {usage.unknownModels.length > 0 && (
-                <p className="text-[11px] text-text-muted">{t('unknownModels', { models: usage.unknownModels.join(', ') })}</p>
+                <p className="text-[11px] text-text-muted">
+                    {t('unknownModels', { models: usage.unknownModels.join(', ') })}
+                </p>
             )}
             <UsagePayerNote className="text-[11px]" />
         </div>
