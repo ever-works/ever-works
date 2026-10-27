@@ -65,11 +65,12 @@ Addresses are backed by **email-provider plugins**, enabled and configured per t
 | ---------------------------------- | ------------------------- | ---------------------- |
 | Postmark                           | `postmark`                | Outbound **+ inbound** |
 | Mailgun                            | `mailgun`                 | Outbound **+ inbound** |
+| Ever Email Router                  | `ever-email-router`       | Inbound only           |
 | Resend                             | `resend`                  | Outbound only          |
 | SendGrid                           | `sendgrid`                | Outbound only          |
 | Mailchimp Transactional (Mandrill) | `mailchimp-transactional` | Outbound only          |
 
-Only **Postmark** and **Mailgun** can receive mail. Resend's plugin says why in its own manifest — inbound is deferred until Resend's inbound API is generally available. So an inbound address, and therefore anything on this page that begins with an arriving email, needs a Postmark or Mailgun address.
+Only **Postmark**, **Mailgun** and the **Ever Email Router** can receive mail. Resend's plugin says why in its own manifest — inbound is deferred until Resend's inbound API is generally available. So an inbound address, and therefore anything on this page that begins with an arriving email, needs a Postmark, Mailgun or Ever Email Router address. The Ever Email Router receives `@ever.email` mail (the `EVER_EMAIL_DOMAIN` domain) from a shared Cloudflare Worker, needs nothing registered by the tenant, and gives each mailbox one owner per deployment — see `packages/plugins/ever-email-router/README.md`.
 
 Each plugin's `providerSettings` schema is small and every secret is marked `x-secret` with an env-var fallback:
 
@@ -80,6 +81,7 @@ Each plugin's `providerSettings` schema is small and every secret is marked `x-s
 | `resend`                  | `apiKey` (`RESEND_API_KEY`), `defaultSenderDomain`                                                                                                     |
 | `sendgrid`                | `apiKey` (`SENDGRID_API_KEY`), `defaultSenderDomain`                                                                                                   |
 | `mailchimp-transactional` | `apiKey` (`MANDRILL_API_KEY`), `defaultSenderDomain`                                                                                                   |
+| `ever-email-router`       | `inboundWebhookSecret` (`EVER_EMAIL_ROUTER_SECRET`) — admin-only: the deployment's secret, never a tenant's                                            |
 
 Because providers are pluggable, you get **failover**: point an address at a different provider plugin without touching any Agent's configuration.
 
@@ -123,7 +125,7 @@ The addresses on this page carry _Agent_ mail. The platform's own transactional 
 
     **A webhook secret is required.** Configure Postmark's `inboundWebhookSecret` (`POSTMARK_INBOUND_SECRET`; Postmark sends it as HTTP Basic `postmark:<secret>` — put it in the webhook URL you register) or Mailgun's `webhookSigningKey` (`MAILGUN_WEBHOOK_SIGNING_KEY`). With no secret configured, inbound and delivery-event webhooks are refused with `401`: an unsigned webhook cannot be told apart from a forgery. A local stack with no public webhook URL can opt out with `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (that exact string); never set it on a deployed environment.
 
-    Both are public routes that **verify the provider's webhook signature** before doing anything, are throttled to 600 requests/minute per client (the standard per-user / per-IP limiter, not a per-plugin bucket), and answer `202` once the signature checks out, so the provider stops retrying. A bad signature answers `401` with a generic body (the reason is only logged), and a provider plugin that cannot load answers `503`, so the provider retries later. The inbound ack is deliberately contentless (`{ "received": true }`) — it leaks no routing metadata to an unauthenticated caller.
+    Both are public routes that **verify the provider's webhook signature** before doing anything, are throttled to 600 requests/minute per client (the standard per-user / per-IP limiter, not a per-plugin bucket), and answer `202` once the signature checks out, so the provider stops retrying. A bad signature answers `401` with a generic body (the reason is only logged), and a provider plugin that cannot load answers `503`, so the provider retries later. The inbound ack is deliberately contentless (`{ "received": true }`) — it leaks no routing metadata to an unauthenticated caller. The one exception is a plugin that opts in with `inboundAck: 'counts'` (today only `ever-email-router`, whose secret is admin-only): once its signature has passed, it is answered `{ "accepted": n, "duplicates": n, "dropped": n }` so the router can tell a taken message from "no such mailbox here".
 
 6. **Confirm it landed** — `GET /api/email/addresses` (optionally `?direction=inbound`), or reload `/settings/integrations/emails`, where the new row appears with its provider and verified flag.
 

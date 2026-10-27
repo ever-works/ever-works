@@ -291,13 +291,14 @@ The Email Addresses dropdown on the Agent identity panel offers the registered a
 
 Each provider lands as its own plugin under `packages/plugins/<name>/`:
 
-| Plugin                    | Capabilities       | Auth                                                       | Notes                                                         |
-| ------------------------- | ------------------ | ---------------------------------------------------------- | ------------------------------------------------------------- |
-| `mailchimp-transactional` | outbound + inbound | API key + webhook secret                                   | Inbound via Mandrill webhooks; outbound via Mandrill Send API |
-| `mailgun`                 | outbound + inbound | API key + signing-key (webhook signature) + sending domain | Inbound via "Routes" → HTTP POST to our webhook               |
-| `postmark`                | outbound + inbound | server token + inbound webhook secret                      | Inbound via Postmark Inbound Streams                          |
-| `resend`                  | outbound only (v1) | API key                                                    | Resend's inbound is in private beta — add when GA             |
-| `sendgrid`                | outbound + inbound | API key + Event Webhook signing                            | Inbound Parse Webhook                                         |
+| Plugin                    | Capabilities       | Auth                                                       | Notes                                                                        |
+| ------------------------- | ------------------ | ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `mailchimp-transactional` | outbound + inbound | API key + webhook secret                                   | Inbound via Mandrill webhooks; outbound via Mandrill Send API                |
+| `mailgun`                 | outbound + inbound | API key + signing-key (webhook signature) + sending domain | Inbound via "Routes" → HTTP POST to our webhook                              |
+| `postmark`                | outbound + inbound | server token + inbound webhook secret                      | Inbound via Postmark Inbound Streams                                         |
+| `resend`                  | outbound only (v1) | API key                                                    | Resend's inbound is in private beta — add when GA                            |
+| `sendgrid`                | outbound + inbound | API key + Event Webhook signing                            | Inbound Parse Webhook                                                        |
+| `ever-email-router`       | inbound only       | admin-only HMAC-SHA256 secret (`x-ever-email-signature`)   | Shared Cloudflare router for `@ever.email`; counts ack (opt-in `inboundAck`) |
 
 Plus a fallback `local-smtp` plugin for dev / self-host that wraps `nodemailer` with no inbound (no public webhook).
 
