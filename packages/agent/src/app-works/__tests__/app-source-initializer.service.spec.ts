@@ -1040,9 +1040,12 @@ describe('AppSourceInitializerService (APW-01 T15)', () => {
             expect(h.license.request).toHaveBeenCalledWith(WORK_ID);
             expect(h.appSpec.hasValidAppSpec).toHaveBeenCalledWith(WORK_ID, COMMIT_SHA);
             expect(h.provisioning.start).toHaveBeenCalledTimes(1);
+            // `systemTrigger` since 7fa3daadc: auto-create is the platform's own start,
+            // not an owner opt-in to re-provisioning.
             expect(h.provisioning.start).toHaveBeenCalledWith({
                 workId: WORK_ID,
                 trigger: 'auto-create',
+                systemTrigger: true,
             });
         });
 
