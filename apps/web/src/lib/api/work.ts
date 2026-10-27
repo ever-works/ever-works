@@ -38,6 +38,7 @@ import type {
     AppSourceInspectRequest,
     AppSourceInspectResponse,
     AppSourceCreatedView,
+    AppUpstreamSyncRequest,
 } from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
@@ -1007,10 +1008,15 @@ export const workAPI = {
      * an `ApiResponseError` whose `code` is one of `no_upstream`, `not_ready`,
      * `sync_in_progress`, `sync_paused`, `sync_limit_reached` (`plan.md:504-516`).
      */
-    syncUpstream: async (id: string): Promise<AppUpstreamDispatchResult> => {
+    syncUpstream: async (
+        id: string,
+        // APW-02 T46 — optional, additive: the owner's "Sync anyway" for a held workflow
+        // change. Omitted ⇒ the empty body every caller sent before.
+        body: AppUpstreamSyncRequest = {},
+    ): Promise<AppUpstreamDispatchResult> => {
         return serverMutation<AppUpstreamDispatchResult>({
             endpoint: `/works/${id}/upstream/sync`,
-            data: {},
+            data: { ...body },
             method: 'POST',
             wrapInData: false,
         });

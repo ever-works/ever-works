@@ -506,6 +506,8 @@ interface SyncOutcome {
     rateLimited?: boolean;
     /** `true` ⇒ the tracked branch moved; the licence and hygiene legs run (FR-40). */
     trackedBranchChanged?: boolean;
+    /** T47 — the licence re-evaluation reason when the tracked branch moved (default `upstream_synced`). */
+    licenseReason?: AppLicenseEvaluationReason;
     /** `true` ⇒ `nextSyncAt` is cleared (the pause states, §6.4). */
     pause?: boolean;
     /** The sync-owned columns this run wrote outside `finishSync` (§3.1). */
@@ -654,13 +656,15 @@ export class AppUpstreamSyncService {
         const { workId, trigger } = context;
 
         // ── step 3: the spec gate (FR-64, ACC-02-28) ─────────────────────────
-        if (context.settings.modeHonoured !== true) {
+        // T47: `merged` is bookkeeping for a pull request the MEMBER merged — finishing it is
+        // never "a sync the spec turned off", so neither spec gate applies to it.
+        if (context.settings.modeHonoured !== true && trigger !== 'merged') {
             // A `mode` this epic cannot carry out is refused whatever the trigger: the
             // spec asks for a desync the platform does not implement, and pretending to
             // merge is worse than saying so (plan §6.4).
             return { result: 'skipped', reason: 'disabled_by_spec' };
         }
-        if (trigger !== 'manual' && context.settings.enabled !== true) {
+        if (trigger !== 'manual' && trigger !== 'merged' && context.settings.enabled !== true) {
             // FR-64: the *scheduled* path is off. A manual **Sync now** deliberately
             // ignores this — a person is never locked out of their own repository.
             return { result: 'skipped', reason: 'disabled_by_spec' };
@@ -707,6 +711,11 @@ export class AppUpstreamSyncService {
         const ownerUserId = owner.userId;
         context.ownerUserId = ownerUserId;
         context.ownerScope = owner.scope;
+
+        // T47 (FR-62): the finish path — and NOT the compare-and-open path.
+        if (trigger === 'merged') {
+            return await this.finishMergedPullRequest(context, row);
+        }
 
         const upstream = await context.budget.call(() =>
             this.git.getRepository(row.upstreamOwner as string, row.upstreamRepo as string, {
@@ -951,6 +960,51 @@ export class AppUpstreamSyncService {
         // fast-forward raced or was refused, and every private copy that is behind: one
         // reusable pull request on `ever-works/upstream-sync` (FR-36).
         return await this.pullRequestPath(context, row, base);
+    }
+
+    // ── T47 — a merged sync pull request finishes the sync (FR-62) ───────────
+
+    /**
+     * The `merged` finish path. Guarded by the row, so a re-dispatch is a no-op: the first run
+     * clears `syncPullRequestNumber`, and a run that finds none on record (or a pull request
+     * that is not merged after all) settles with the outcome already recorded.
+     *
+     * A merge moved the tracked branch, so `trackedBranchChanged` runs FR-40's two follow-ups
+     * exactly once, through settle: the licence re-evaluation with reason `upstream_merged`,
+     * and Actions hygiene (the merged range may have brought workflows the owner released).
+     */
+    private async finishMergedPullRequest(
+        context: RunContext,
+        row: WorkUpstreamState,
+    ): Promise<SyncOutcome> {
+        const number = row.syncPullRequestNumber;
+        if (typeof number !== 'number') {
+            return recordedOutcomeOf(row, {});
+        }
+        const status = await context.budget.call(() =>
+            this.git.getPullRequestStatus(row.dataOwner, row.dataRepo, number, {
+                userId: context.ownerUserId as string,
+                providerId: context.providerId,
+                workId: context.workId,
+            }),
+        );
+        const merged = status?.merged === true || status?.state === 'merged';
+        if (!merged) {
+            return recordedOutcomeOf(row, {});
+        }
+        const headSha = nonEmptyString(status?.headSha) ?? row.lastSyncedUpstreamSha ?? null;
+        return {
+            result: 'up_to_date',
+            reason: 'pull_request_merged',
+            commits: row.lastSyncCommitCount ?? null,
+            fromSha: row.lastSyncedUpstreamSha ?? null,
+            toSha: headSha,
+            pullRequestNumber: null,
+            pullRequestUrl: null,
+            trackedBranchChanged: true,
+            licenseReason: 'upstream_merged',
+            rowPatch: row.workflowHold ? { workflowHold: null } : undefined,
+        };
     }
 
     // ── the workflow hold (FR-60, FR-61, T46) ─────────────────────────────────
@@ -1795,7 +1849,10 @@ export class AppUpstreamSyncService {
 
         // ── step 8's two follow-ups: only when the tracked branch changed ────
         if (outcome.trackedBranchChanged === true) {
-            result.licenseRequested = await this.requestLicense(workId, 'upstream_synced');
+            result.licenseRequested = await this.requestLicense(
+                workId,
+                outcome.licenseReason ?? 'upstream_synced',
+            );
             result.hygiene = await this.runHygiene(workId);
         } else if (
             context.workflowReleaseUsed === true &&

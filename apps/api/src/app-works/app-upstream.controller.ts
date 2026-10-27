@@ -118,6 +118,9 @@ export class AppUpstreamController {
         // `setupCheckedAt` is the gate. Same posture as the divergence refresh above: it can
         // never turn a rendered card into an error.
         await this.refreshSetupPullRequest(id);
+        // APW-02 T47 (FR-62): an open sync pull request is checked for a merge when the card is
+        // opened and the last check is older than 60 s — same posture, same swallow.
+        await this.refreshSyncPullRequest(id);
 
         return state;
     }
@@ -284,6 +287,17 @@ export class AppUpstreamController {
             await this.dispatcher.requestSetupPullRequestCheck(workId);
         } catch {
             // Deliberately swallowed: see the docstring.
+        }
+    }
+
+    /** T47 — the on-view sync pull request check; best-effort exactly like the two above. */
+    private async refreshSyncPullRequest(workId: string): Promise<void> {
+        try {
+            if (typeof this.dispatcher.requestSyncPullRequestCheck === 'function') {
+                await this.dispatcher.requestSyncPullRequestCheck(workId);
+            }
+        } catch {
+            // Deliberately swallowed: see `refreshDivergence`.
         }
     }
 }

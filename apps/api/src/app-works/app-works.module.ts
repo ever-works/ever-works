@@ -14,6 +14,7 @@ import {
 } from '@ever-works/agent/app-works';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AppUpstreamController } from './app-upstream.controller';
+import { AppSpecAppliedUpstreamListener } from './app-spec-applied.listener';
 import { AppLicenseRegistryCronService } from '../app-license/app-license-registry-cron.service';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { WorkOwnershipService } from '@ever-works/agent/services';
@@ -182,6 +183,10 @@ import { WorkOwnershipService } from '@ever-works/agent/services';
         // (`requireAppWorkOwnerSession`). Provided locally, as `AppBuildsModule` and
         // `ComparisonGeneratorModule` do; its two repositories come from `DatabaseModule`.
         WorkOwnershipService,
+        // APW-02 T49 (FR-64) — `app.spec.applied` recomputes the upstream sync schedule and
+        // the next slot. Its two collaborators: `WorkUpstreamStateRepository` (DatabaseModule)
+        // and `AppSpecService` (AppSpecModule), both imported above.
+        AppSpecAppliedUpstreamListener,
     ],
     exports: [
         AgentAppWorksModule,

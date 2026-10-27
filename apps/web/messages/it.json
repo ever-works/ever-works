@@ -5513,7 +5513,24 @@
                     "openOnGitHub": "Apri su GitHub",
                     "enableBuildWorkflow": "Attiva il workflow di build"
                 },
-                "editAccessRequired": "Ti serve l'accesso in modifica a questa App Work per farlo."
+                "editAccessRequired": "Ti serve l'accesso in modifica a questa App Work per farlo.",
+                "resultPullRequestMerged": "{count, plural, =1 {Sync pull request merged (1 commit)} other {Sync pull request merged (# commits)}}",
+                "workflowHold": {
+                    "title": "Upstream changed {count, plural, =1 {1 workflow file} other {# workflow files}}. Nothing was synced.",
+                    "incomplete": "Upstream's changes are too large to check every file for workflow changes. Nothing was synced.",
+                    "explain": "Syncing lets these workflows run in this repository with its secrets. Review the changes first.",
+                    "review": "Review the changes",
+                    "syncAnyway": "Sync anyway",
+                    "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
+                    "confirmYes": "Yes, sync anyway",
+                    "cancel": "Cancel",
+                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
+                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "changed": "Upstream moved since you reviewed it. Review the new changes first.",
+                    "noHold": "No upstream workflow change is waiting for review.",
+                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                }
             },
             "settings": {
                 "tabs": {

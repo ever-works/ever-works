@@ -461,6 +461,28 @@ export interface AppSetupPullRequestCheck {
     readonly runId?: string | null;
 }
 
+/**
+ * What one sync-pull-request check did (FR-62, APW-02 T47).
+ *
+ * `merged` queued the `merged` finish run; `closed` recorded `pull_request_closed` and cleared
+ * the pull request; `open` changed nothing but the stamp; `busy` = a sync is running right now,
+ * so the check waits for the next door rather than racing it; `unknown` = the provider would
+ * not answer; `not_open` = there is no sync pull request on record.
+ */
+export interface AppSyncPullRequestCheck {
+    readonly found: boolean;
+    readonly checked: boolean;
+    readonly status: 'open' | 'merged' | 'closed' | 'busy' | 'unknown' | 'not_open';
+    /** The sync run id, when this check dispatched the `merged` finish run. */
+    readonly runId?: string | null;
+}
+
+/** T47 — the dispatcher checks an open sync pull request at most every 10 minutes. */
+export const APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS = 600_000;
+
+/** T47 — and the Upstream card's read checks it when the last check is older than 60 s. */
+export const APP_SYNC_PULL_REQUEST_ON_VIEW_MS = 60_000;
+
 @Injectable()
 export class AppUpstreamStateService {
     private readonly logger = new Logger(AppUpstreamStateService.name);
@@ -890,6 +912,97 @@ export class AppUpstreamStateService {
 
         if (status.state === 'closed') {
             await this.fail(workId, 'setup_pull_request_closed');
+            return { found: true, checked: true, status: 'closed' };
+        }
+
+        return { found: true, checked: true, status: 'open' };
+    }
+
+    /**
+     * **FR-62 — a merged sync pull request finishes the sync** (APW-02 T47).
+     *
+     * The sync run opens ONE pull request from `ever-works/upstream-sync` and leaves it for the
+     * member (FR-39: nothing is merged automatically). Until now nothing watched it, so a merged
+     * sync pull request left the row saying "pull request opened" forever. This is the watcher,
+     * reached from the dispatcher's tick (`claimSyncPullRequestChecks`, at most once per row per
+     * {@link APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS}) and from the card's read (when the last
+     * check is older than {@link APP_SYNC_PULL_REQUEST_ON_VIEW_MS}).
+     *
+     *   - **merged** ⇒ queue `app-upstream-sync` with `trigger: 'merged'`. The run's finish path
+     *     records the merged head, clears the pull request, asks for the licence re-evaluation
+     *     (`upstream_merged`) and runs Actions hygiene — once, guarded by the row: a second
+     *     dispatch finds no pull request on record and changes nothing.
+     *   - **closed without merging** ⇒ the pull request fields are cleared and
+     *     `skipped / pull_request_closed` is recorded with its head (S26), so the next sync does
+     *     not reopen the very range the member said no to. The tracked branch is not touched.
+     *   - **open** ⇒ nothing but the stamp.
+     *   - the provider would not answer ⇒ `unknown`, nothing but the stamp.
+     *
+     * Reads with the Work owner's own credential, like {@link checkSetupPullRequest}.
+     */
+    async checkSyncPullRequest(workId: string): Promise<AppSyncPullRequestCheck> {
+        const state = await this.states.findByWorkId(workId);
+        if (!state) {
+            return { found: false, checked: false, status: 'not_open' };
+        }
+        const number = state.syncPullRequestNumber;
+        if (
+            state.relation === 'link' ||
+            typeof number !== 'number' ||
+            !state.dataOwner ||
+            !state.dataRepo
+        ) {
+            return { found: true, checked: false, status: 'not_open' };
+        }
+
+        const now = Date.now();
+        if (
+            this.runningSince(state) !== null &&
+            now - (state.syncStartedAt as Date).getTime() < APP_UPSTREAM_SYNC_LOCK_TTL_MS
+        ) {
+            // A run is moving the sync branch or reading this very pull request: let it settle.
+            return { found: true, checked: false, status: 'busy' };
+        }
+
+        const work = await this.loadWork(workId);
+        if (!this.git || !work) {
+            return { found: true, checked: false, status: 'unknown' };
+        }
+
+        let status: GitPullRequestStatus | null = null;
+        try {
+            status = await this.git.getPullRequestStatus(state.dataOwner, state.dataRepo, number, {
+                userId: work.userId,
+                providerId: APP_WORK_GIT_PROVIDER_ID,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `App upstream: the sync pull request check for work ${workId} could not read the provider (${errorText(error)}).`,
+            );
+            await this.states.update(workId, { syncPullRequestCheckedAt: new Date(now) });
+            return { found: true, checked: true, status: 'unknown' };
+        }
+
+        await this.states.update(workId, { syncPullRequestCheckedAt: new Date(now) });
+
+        if (!status) {
+            return { found: true, checked: true, status: 'unknown' };
+        }
+
+        if (status.merged || status.state === 'merged') {
+            const runId = await this.dispatchSync(workId, { workId, trigger: 'merged' });
+            return { found: true, checked: true, status: 'merged', runId };
+        }
+
+        if (status.state === 'closed') {
+            const headSha = typeof status.headSha === 'string' ? status.headSha.trim() : '';
+            await this.states.update(workId, {
+                syncPullRequestNumber: null,
+                syncPullRequestUrl: null,
+                ...(headSha ? { syncPullRequestClosedHeadSha: headSha } : {}),
+                lastSyncResult: 'skipped',
+                lastSyncReason: 'pull_request_closed',
+            });
             return { found: true, checked: true, status: 'closed' };
         }
 
