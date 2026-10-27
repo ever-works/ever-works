@@ -92,6 +92,20 @@ jobs:
         shell: pwsh
         run: ./build-release.ps1 -OutDir dist
 
+      # The signing scripts, exercised without any real identity: an ad hoc
+      # signature on macOS, a throwaway self-signed certificate on Windows. A
+      # real signature needs the owner's identity (FL-07 owner question 7).
+      - name: Signing dry run (macOS, ad hoc)
+        if: ${{ runner.os == 'macOS' && (github.event_name == 'pull_request' || inputs.release) }}
+        env:
+          SCREEN_HELPER_DRY_RUN: '1'
+        run: bash ./sign-release.sh dist
+
+      - name: Signing dry run (Windows, throwaway certificate)
+        if: ${{ runner.os == 'Windows' && (github.event_name == 'pull_request' || inputs.release) }}
+        shell: pwsh
+        run: ./sign-release.ps1 -OutDir dist -DryRun
+
       # The unsigned build and its fingerprint, for inspection only: nothing is
       # published, and a helper reaches a node only through the owner-approved
       # release steps in PACKAGING.md.
@@ -100,6 +114,8 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ever-works-screen-${{ runner.os }}-unsigned
-          path: apps/node/native/ever-works-screen/dist/
+          path: |
+            apps/node/native/ever-works-screen/dist/
+            !apps/node/native/ever-works-screen/dist/signed/
           retention-days: 7
           if-no-files-found: error
