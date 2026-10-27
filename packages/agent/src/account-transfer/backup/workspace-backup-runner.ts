@@ -27,6 +27,7 @@ import {
     BACKUP_WORK_CONTENT,
     type BackupWorkContent,
     type BackupWorkContentSource,
+    type BackupWorkRef,
 } from './backup-work-content';
 import { getBackupCollector } from './collectors';
 import type {
@@ -56,7 +57,15 @@ import type {
  *   transaction.
  * - **It reports for itself.** A heartbeat after every domain and every page
  *   means a worker that dies is noticed in ten minutes by the sweeper rather
- *   than leaving a backup at "running" forever (spec FR-5, S-14).
+ *   than leaving a backup at "running" forever (spec FR-5, S-14). On top of
+ *   those, a keepalive timer beats every {@link HEARTBEAT_INTERVAL_MS} for as
+ *   long as the run is producing, so ONE long step — a Work whose data repo
+ *   takes minutes to clone, a page of wide rows, a large attachment — can no
+ *   longer read as a dead process. What the stall rule now catches is exactly
+ *   what it is for: a process that died, or an event loop frozen for the whole
+ *   stall window. A step that hangs while the process is healthy is the
+ *   ceiling's job (spec FR-6), and one Work's content read has a bound of its
+ *   own (see `addWorkContent`).
  * - **It can be stopped.** Cancellation is checked between domains and
  *   between pages; an abort destroys the zip stream so no partial object is
  *   left on storage (spec FR-8).
@@ -119,6 +128,36 @@ export interface WorkspaceBackupRunOptions {
      * outcome. The run stops at whichever comes first.
      */
     readonly deadline?: Date;
+    /**
+     * Overrides of the runner's internal cadences. Absent in production —
+     * `runFromPayload` / `startFromPayload` never set it — so every field
+     * falls back to its default; it exists so a spec can drive the keepalive
+     * and the per-Work bound in milliseconds rather than minutes.
+     */
+    readonly tuning?: WorkspaceBackupRunTuning;
+}
+
+/** See {@link WorkspaceBackupRunOptions.tuning}. Every field is optional. */
+export interface WorkspaceBackupRunTuning {
+    /** Minimum gap between two heartbeats. */
+    readonly heartbeatIntervalMs?: number;
+    /** The keepalive's period. Defaults to `heartbeatIntervalMs`. */
+    readonly keepaliveIntervalMs?: number;
+    /** How long one Work's content read may take before the archive moves on without it. */
+    readonly workContentTimeoutMs?: number;
+    /** How many Works may time out before the rest of the content pass is skipped. */
+    readonly workContentTimeoutBudget?: number;
+}
+
+/**
+ * One Work's content read outlived its bound. The Work's content is reported
+ * as a gap and the pass moves on; never escapes `addWorkContent`.
+ */
+class WorkContentTimeoutError extends Error {
+    constructor(slug: string, ms: number) {
+        super(`Reading the content of work ${slug} did not finish within ${ms} ms`);
+        this.name = 'WorkContentTimeoutError';
+    }
 }
 
 /**
@@ -138,10 +177,46 @@ interface RunCeiling {
     reached: WorkspaceBackupTimeoutError | null;
     /** The run's writer, once it has one, so the timer can abort it. */
     writer: BackupArchiveWriter | null;
+    /** Stops the run's keepalive heartbeat, once production has started one. */
+    stopKeepalive: (() => void) | null;
 }
 
 const HEARTBEAT_INTERVAL_MS = 25_000;
 const DEFAULT_PAGE_SIZE = 500;
+
+/**
+ * How long ONE Work's content read — `findById`, a clone or pull of its data
+ * repo, and the read of every item file — may take before the archive stops
+ * waiting for it (overridable with `BACKUP_WORK_CONTENT_TIMEOUT_MS`).
+ *
+ * The read is a git operation the runner cannot cancel, and there used to be
+ * nothing bounding it at all: a repository that took twenty minutes held the
+ * whole archive for twenty minutes, and one that never answered held it until
+ * the hour's ceiling failed every other domain with it. Past this bound the
+ * Work's content is reported as a gap (`work_content_unavailable`) and the
+ * pass moves on; the abandoned read finishes on its own and is discarded.
+ */
+const DEFAULT_WORK_CONTENT_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * How many Works may hit that bound before the content pass stops trying.
+ * Several in one run means the git host or this process is struggling, and
+ * every further attempt would only march the run towards its ceiling with yet
+ * another abandoned read competing for the same CPU. The remaining Works are
+ * reported as gaps, exactly as a timed-out one is.
+ */
+const DEFAULT_WORK_CONTENT_TIMEOUT_BUDGET = 3;
+
+/** Rows written into one content file between two progress reports. */
+const CONTENT_HEARTBEAT_EVERY_ROWS = 500;
+
+function workContentTimeoutMs(tuning: WorkspaceBackupRunTuning | undefined): number {
+    if (tuning?.workContentTimeoutMs !== undefined) return tuning.workContentTimeoutMs;
+    const configured = Number(process.env.BACKUP_WORK_CONTENT_TIMEOUT_MS);
+    return Number.isFinite(configured) && configured > 0
+        ? configured
+        : DEFAULT_WORK_CONTENT_TIMEOUT_MS;
+}
 const DEFAULT_FORMAT_REFERENCE = 'https://docs.ever.works/features/workspace-backup';
 
 @Injectable()
@@ -350,7 +425,7 @@ export class WorkspaceBackupRunner {
             options.deadline?.getTime() ?? Number.POSITIVE_INFINITY,
         );
 
-        const run: RunCeiling = { reached: null, writer: null };
+        const run: RunCeiling = { reached: null, writer: null, stopKeepalive: null };
         let timer: ReturnType<typeof setTimeout> | undefined;
         const ceilingReached = new Promise<'timeout'>((resolve) => {
             timer = setTimeout(
@@ -386,7 +461,58 @@ export class WorkspaceBackupRunner {
             return { status: 'failed', reason: 'internal', backupId };
         } finally {
             clearTimeout(timer);
+            // Whichever way the run ended — settled, failed, or stopped at its
+            // ceiling while the production was still waiting on something —
+            // nothing may keep reporting it alive.
+            run.stopKeepalive?.();
         }
+    }
+
+    /**
+     * Beat every `intervalMs` until stopped, independently of what the run is
+     * waiting on.
+     *
+     * The progress heartbeats only fire when a step FINISHES — a page, a
+     * domain, a Work, a file — so a single step that took longer than the
+     * stall window was indistinguishable from a dead process: the Works
+     * domain's content pass, waiting minutes on one Work's data repo, was
+     * failed as `stalled` with its process perfectly healthy. A timer fires
+     * as long as the process is alive and its event loop turns, which is
+     * precisely the question the stall rule asks.
+     *
+     * `beat` is the run's own throttled heartbeat, so a progress report a
+     * moment earlier makes this tick a no-op, and its `false` from a row no
+     * longer `running` still raises the cancellation signal — a cancel now
+     * reaches a step that is waiting, at the next tick. A failed write is
+     * logged and the next tick tries again; it must never become an
+     * unhandled rejection, which would take the API process down with it.
+     */
+    private startKeepalive(
+        backupId: string,
+        beat: () => Promise<void>,
+        intervalMs: number,
+    ): () => void {
+        let beating = false;
+        const timer = setInterval(
+            () => {
+                if (beating) return;
+                beating = true;
+                beat()
+                    .catch((error: unknown) => {
+                        this.logger.warn(
+                            `Workspace backup ${backupId} keepalive heartbeat failed: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                    })
+                    .finally(() => {
+                        beating = false;
+                    });
+            },
+            Math.max(1, intervalMs),
+        );
+        timer.unref?.();
+        return () => clearInterval(timer);
     }
 
     /**
@@ -524,13 +650,20 @@ export class WorkspaceBackupRunner {
          * multi-million-row table bought nothing until that whole domain
          * finished, contradicting both doc comments that promise otherwise.
          */
+        const heartbeatIntervalMs = options.tuning?.heartbeatIntervalMs ?? HEARTBEAT_INTERVAL_MS;
         const heartbeat = async (): Promise<void> => {
-            if (Date.now() - lastHeartbeat < HEARTBEAT_INTERVAL_MS) return;
+            if (Date.now() - lastHeartbeat < heartbeatIntervalMs) return;
             lastHeartbeat = Date.now();
             if (!(await this.backups.heartbeat(row.id, {}))) {
                 cancelled.value = true;
             }
         };
+        // Stopped by `execute`, whichever way the run ends.
+        run.stopKeepalive = this.startKeepalive(
+            row.id,
+            heartbeat,
+            options.tuning?.keepaliveIntervalMs ?? heartbeatIntervalMs,
+        );
 
         const context: BackupCollectContext = {
             scope,
@@ -590,7 +723,14 @@ export class WorkspaceBackupRunner {
             // our database, so it is the only one with a second pass.
             outcomes.push(
                 descriptor.key === 'works'
-                    ? await this.addWorkContent(outcome, plans, context, writer, descriptor.dataDir)
+                    ? await this.addWorkContent(
+                          outcome,
+                          plans,
+                          context,
+                          writer,
+                          descriptor.dataDir,
+                          options.tuning,
+                      )
                     : outcome,
             );
         }
@@ -906,6 +1046,25 @@ export class WorkspaceBackupRunner {
      * source's contract), and a Work whose read throws outright downgrades the
      * domain to `partial` with `work_content_unavailable` — the other Works,
      * the Work rows and the other fourteen domains all still ship.
+     *
+     * ## Why this pass is bounded
+     *
+     * This is the one place a backup leaves the database: every Work costs a
+     * clone or pull of its data repository and a read of every item file, on
+     * the API's own event loop. On a large account it is by far the longest
+     * step of the archive, and it used to be unbounded per Work and silent
+     * while it waited — the progress report came only after a Work FINISHED.
+     * So a workspace with many large Works stopped heartbeating in the middle
+     * of this domain and was failed as `stalled`, twice in a row, before it
+     * reached the next one. Three things now hold:
+     *
+     *  - a report before each Work and every {@link CONTENT_HEARTBEAT_EVERY_ROWS}
+     *    rows written, plus the run's keepalive while one read is in flight;
+     *  - one Work's read is bounded ({@link DEFAULT_WORK_CONTENT_TIMEOUT_MS}),
+     *    past which its content is a gap and the pass moves on;
+     *  - after {@link DEFAULT_WORK_CONTENT_TIMEOUT_BUDGET} such timeouts the
+     *    remaining Works are reported as gaps without being read, so a
+     *    struggling git host costs a few minutes, never the hour.
      */
     private async addWorkContent(
         outcome: BackupDomainOutcome,
@@ -913,6 +1072,7 @@ export class WorkspaceBackupRunner {
         context: BackupCollectContext,
         writer: BackupArchiveWriter,
         dataDir: string,
+        tuning?: WorkspaceBackupRunTuning,
     ): Promise<BackupDomainOutcome> {
         const rootPlan = plans.find((plan) => plan.spec.registerIdsAs === 'workIds');
         if (!this.workContent || !rootPlan || rootPlan.unavailable) {
@@ -922,15 +1082,35 @@ export class WorkspaceBackupRunner {
         const files = [...outcome.files];
         let records = outcome.records;
         let degraded = false;
+        const timeoutMs = workContentTimeoutMs(tuning);
+        const timeoutBudget = tuning?.workContentTimeoutBudget ?? DEFAULT_WORK_CONTENT_TIMEOUT_BUDGET;
+        let timedOut = 0;
+        let skipped = 0;
 
         try {
             for (const work of await this.pageWorkRefs(context, rootPlan)) {
                 if (context.shouldStop()) break;
 
+                if (timedOut >= timeoutBudget) {
+                    // Not read at all — a gap, reported exactly like a Work
+                    // whose read failed, never as an empty Work.
+                    skipped += 1;
+                    degraded = true;
+                    continue;
+                }
+
+                // Before the read, not only after it: the read is the slow
+                // part, and the report that matters is the one that says the
+                // run reached it.
+                await context.heartbeat();
+
                 let content: BackupWorkContent;
                 try {
-                    content = await this.workContent.readWorkContent(work);
+                    content = await this.readWorkContentWithin(work, timeoutMs);
                 } catch (error) {
+                    if (error instanceof WorkContentTimeoutError) {
+                        timedOut += 1;
+                    }
                     this.logger.warn(
                         `Backup could not read content for work ${work.slug}: ${
                             error instanceof Error ? error.message : String(error)
@@ -952,7 +1132,7 @@ export class WorkspaceBackupRunner {
                 for (const [name, rows] of groups) {
                     const entry = await writer.addJsonlEntry(
                         `${base}/${name}.jsonl`,
-                        toAsyncIterable(rows),
+                        toAsyncIterable(rows, context.heartbeat),
                     );
                     files.push({
                         name: entry.name,
@@ -991,6 +1171,12 @@ export class WorkspaceBackupRunner {
             degraded = true;
         }
 
+        if (skipped > 0) {
+            this.logger.warn(
+                `Backup skipped the content of ${skipped} work(s) after ${timedOut} content read(s) timed out`,
+            );
+        }
+
         if (degraded) {
             return {
                 ...outcome,
@@ -1007,6 +1193,29 @@ export class WorkspaceBackupRunner {
             records,
             files,
         };
+    }
+
+    /**
+     * One Work's content, or a {@link WorkContentTimeoutError} once `ms` have
+     * passed without it.
+     *
+     * The read itself cannot be cancelled — it is a git operation inside the
+     * account export's walk — so on a timeout it is abandoned rather than
+     * stopped: it finishes on its own (the git facade coalesces a second
+     * caller of the same repo onto it) and its result is discarded. Its
+     * eventual rejection is claimed here so it can never surface as an
+     * unhandled one.
+     */
+    private readWorkContentWithin(work: BackupWorkRef, ms: number): Promise<BackupWorkContent> {
+        const read = this.workContent!.readWorkContent(work);
+        read.catch(() => undefined);
+
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new WorkContentTimeoutError(work.slug, ms)), ms);
+            timer.unref?.();
+        });
+        return Promise.race([read, timeout]).finally(() => clearTimeout(timer));
     }
 
     /** Work ids and slugs, paged with the collector's own scoped query. */
@@ -1145,11 +1354,21 @@ export class WorkspaceBackupRunner {
     }
 }
 
-/** Hand an in-memory row group to the writer, which only speaks async iterables. */
+/**
+ * Hand an in-memory row group to the writer, which only speaks async
+ * iterables — reporting progress every {@link CONTENT_HEARTBEAT_EVERY_ROWS}
+ * rows, so one Work with tens of thousands of items is not one silent step.
+ */
 async function* toAsyncIterable(
     rows: readonly Record<string, unknown>[],
+    heartbeat?: () => Promise<void>,
 ): AsyncIterable<Record<string, unknown>> {
+    let written = 0;
     for (const row of rows) {
         yield row;
+        written += 1;
+        if (heartbeat && written % CONTENT_HEARTBEAT_EVERY_ROWS === 0) {
+            await heartbeat();
+        }
     }
 }
