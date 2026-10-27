@@ -635,6 +635,9 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/checkouts/{id}/changes'),
 		cli: 'fleet checkouts changes'
 	}),
+	read('fleet_checkouts_pull_request_get', 'checkouts', 'FL-06', 'FLEET_CHECKOUTS_ENABLED', 'planned', {
+		route: GET('/api/fleet/checkouts/{id}/pull-request')
+	}),
 	act('fleet_checkouts_create', 'checkouts', 'FL-14', 'FLEET_CHECKOUTS_ENABLED', 'live', plain('machine.run'), {
 		route: POST('/api/fleet/checkouts'),
 		cli: 'fleet checkouts create',
