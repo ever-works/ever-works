@@ -200,6 +200,7 @@ export class FleetActionsRunnersController {
             ...(body.names ? { names: body.names } : {}),
             ...(body.labels ? { labels: body.labels } : {}),
             ...(body.mode ? { mode: body.mode } : {}),
+            ...(body.shareDockerDaemon === true ? { shareDockerDaemon: true } : {}),
             fields: runnerConfirmFields(body),
         });
     }
@@ -233,7 +234,7 @@ export class FleetActionsRunnersController {
     @Post('nodes/:id/runners/:runnerId/:action')
     @ApiOperation({
         summary:
-            'Start, stop, restart or remove one Actions runner. Stop and restart need `confirm: true`; remove needs `confirmName` = the runner’s name and is refused `busy` while it runs a job. Answers 202.',
+            'Start, stop, restart, reinstall or remove one Actions runner. Stop, restart and reinstall (GitHub’s current build, the same name and labels) need `confirm: true`; remove needs `confirmName` = the runner’s name; remove and reinstall are refused `busy` while it runs a job. Answers 202.',
     })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })

@@ -107,6 +107,10 @@ export async function installFleetActionsRunnersAction(
         ...(request.names ? { names: request.names } : {}),
         ...(request.labels ? { labels: request.labels } : {}),
         ...(request.mode ? { mode: request.mode } : {}),
+        // P3 (FR-27): the container mode's labelled opt-in, forwarded exactly as ticked.
+        ...(request.mode === 'docker' && typeof request.shareDockerDaemon === 'boolean'
+            ? { shareDockerDaemon: request.shareDockerDaemon }
+            : {}),
         ...(request.confirm === true ? { confirm: true } : {}),
     };
     return run(() => fleetActionsRunnersAPI.install(nodeId, body));
@@ -132,6 +136,15 @@ export async function removeFleetActionsRunnerAction(
     confirmName?: string,
 ): Promise<FleetActionsRunnersResult<FleetActionsRunnerOperationResponse>> {
     return run(() => fleetActionsRunnersAPI.remove(nodeId, runnerId, confirmName));
+}
+
+/** Reinstall one runner with GitHub's newest build (P3, FR-28; `confirm`). Answers 202. */
+export async function reinstallFleetActionsRunnerAction(
+    nodeId: string,
+    runnerId: string,
+    confirm = false,
+): Promise<FleetActionsRunnersResult<FleetActionsRunnerOperationResponse>> {
+    return run(() => fleetActionsRunnersAPI.reinstall(nodeId, runnerId, confirm));
 }
 
 // ─── Actions jobs (FL-18 P2, FR-20 – FR-26) ─────────────────────────────────

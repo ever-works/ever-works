@@ -63,6 +63,15 @@ export const fleetActionsRunnersAPI = {
             method: 'POST',
             wrapInData: false,
         }),
+
+    /** P3 (FR-28): download GitHub's newest build again and re-register with the same name and labels (`confirm`). */
+    reinstall: async (nodeId: string, runnerId: string, confirm: boolean) =>
+        serverMutation<FleetActionsRunnerOperationResponse>({
+            endpoint: `${base(nodeId)}/${encodeURIComponent(runnerId)}/reinstall`,
+            data: confirm ? { confirm: true } : {},
+            method: 'POST',
+            wrapInData: false,
+        }),
 };
 
 /** What `PUT /api/fleet/runners/jobs/watched` answers: the list the panel watches now (the default after `[]`). */
