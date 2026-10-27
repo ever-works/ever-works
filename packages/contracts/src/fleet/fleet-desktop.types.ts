@@ -20,6 +20,16 @@
  */
 
 import { COMPUTER_MAX_DIMENSION, COMPUTER_QUALITIES, type ComputerQuality } from '../computer/computer-frame.types.js';
+import {
+	isFleetDesktopMode,
+	isFleetHelperControlState,
+	normalizeFleetDesktopControllerName,
+	normalizeFleetDesktopControlReasons,
+	type FleetDesktopControlAvailability,
+	type FleetDesktopControlReason,
+	type FleetDesktopMode,
+	type FleetHelperControlState
+} from './fleet-desktop-control.types.js';
 
 // ─── Sources and capability tags (CONTRACTS §1.2) ───────────────────────────
 
@@ -388,6 +398,13 @@ export interface FleetHelperStatusView {
 	verifiedAt: string | null;
 	/** The admitted fingerprint is one the node package publishes (false: the owner admitted an unpublished build). */
 	published: boolean | null;
+	/**
+	 * P2: the owner's on-machine permission for control (`helper control allow`).
+	 * Absent from an older node — read as not allowed.
+	 */
+	control?: FleetHelperControlState;
+	/** P2: what would stop input on this machine (the helper's `hello`), e.g. `permission-accessibility`. */
+	inputReasons?: FleetDesktopControlReason[];
 }
 
 /** The fingerprint prefix shown and audited — never a full hash under a key a redactor eats. */
@@ -415,7 +432,10 @@ export function normalizeFleetHelperStatus(value: unknown): FleetHelperStatusVie
 		version: boundedVersion(raw.version),
 		fingerprintPrefix: prefix && HEX_PREFIX.test(prefix) ? prefix : null,
 		verifiedAt: typeof raw.verifiedAt === 'string' && ISO_INSTANT.test(raw.verifiedAt) ? raw.verifiedAt : null,
-		published: typeof raw.published === 'boolean' ? raw.published : null
+		published: typeof raw.published === 'boolean' ? raw.published : null,
+		// P2 (control): carried only when the node said them, so an older node's status reads as before.
+		...(isFleetHelperControlState(raw.control) ? { control: raw.control } : {}),
+		...(Array.isArray(raw.inputReasons) ? { inputReasons: normalizeFleetDesktopControlReasons(raw.inputReasons) } : {})
 	};
 }
 
@@ -442,6 +462,8 @@ export interface FleetDesktopAvailabilityView {
 	/** Live desktop views on this computer and the per-computer cap. */
 	liveViews: number;
 	maxViews: number;
+	/** P2: whether a live view may take control, and if not why (absent from a P1 platform). */
+	control?: FleetDesktopControlAvailability;
 }
 
 /** `POST …/desktop/views` body (FR-1). `source` defaults to `desktop`. */
@@ -562,7 +584,9 @@ export const FLEET_DESKTOP_MESSAGES = {
 	setDisplay: 'desktop.setDisplay',
 	displayChanged: 'desktop.displayChanged',
 	mode: 'desktop.mode',
-	openUrl: 'desktop.openUrl'
+	openUrl: 'desktop.openUrl',
+	/** P2, node → the controlling viewer: an input the machine did not take (`{ code }`, never the input). */
+	inputRefused: 'desktop.inputRefused'
 } as const;
 
 /** Node → platform, once, right after `channel.ready`: what the view shows. */
@@ -600,6 +624,10 @@ export interface FleetDesktopSourceParams {
 	viewId: string;
 	display?: string | null;
 	quality?: ComputerQuality;
+	/** P2: `controlling` only on a driver grant to the view holding control; anything else watches. */
+	mode?: FleetDesktopMode;
+	/** P2: who is controlling, printed on the machine's console while they do. */
+	controlledBy?: string;
 }
 
 /** Read a `desktop` channel's open params for the Desktop source; null when they are not. */
@@ -608,6 +636,9 @@ export function readFleetDesktopSourceParams(params: Record<string, unknown>): F
 	const out: FleetDesktopSourceParams = { source: 'desktop', viewId: params.viewId };
 	if (isFleetDisplayId(params.display)) out.display = params.display;
 	if (isFleetDesktopQuality(params.quality)) out.quality = params.quality;
+	if (isFleetDesktopMode(params.mode)) out.mode = params.mode;
+	const controlledBy = normalizeFleetDesktopControllerName(params.controlledBy);
+	if (controlledBy) out.controlledBy = controlledBy;
 	return out;
 }
 

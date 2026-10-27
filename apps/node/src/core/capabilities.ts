@@ -6,6 +6,7 @@ import {
 	FLEET_PUSH_MIN_GIT_VERSION,
 	FLEET_SCREEN_CAPABILITY,
 	FLEET_HELPER_SCREEN_CAPABILITY,
+	FLEET_INPUT_CAPABILITY,
 	FLEET_SCREEN_BROWSER_CAPABILITY,
 	FLEET_SCREEN_DESKTOP_CAPABILITY,
 	normalizeFleetDesktopReasons,
@@ -388,7 +389,10 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		// stands on). A runtime with a live-view lane passes the backends
 		// that lane selects from, so the tag reads the SAME list with the
 		// SAME rule the lane used, and the two cannot disagree. `input` is
-		// NOT advertised: nothing on this node injects input yet.
+		// not decided here: the desktop helper's tags module advertises it
+		// when the admitted helper can inject and the owner allowed control
+		// on this machine (FL-07, FR-40); the browser source's injector does
+		// not advertise it yet (FL-07 lane log, owner question).
 		environment.attended === true ? FLEET_ATTENDED_CAPABILITY : null,
 		environment.attended === true && isScreenCaptureAvailable(environment, environment.captureBackends)
 			? FLEET_SCREEN_CAPABILITY
@@ -451,6 +455,9 @@ const NON_SELECTABLE_TAGS = new Set<string>([
 	FLEET_SCREEN_BROWSER_CAPABILITY,
 	FLEET_SCREEN_DESKTOP_CAPABILITY,
 	FLEET_HELPER_SCREEN_CAPABILITY,
+	// FL-07 P2: `input` from the desktop helper exists only after the owner allowed control
+	// on the machine (`helper control allow`), which IS the opt-in.
+	FLEET_INPUT_CAPABILITY,
 	// Usage & cost on the fleet (FL-20): `usage-scan` exists only under
 	// --usage-scan, which IS the opt-in.
 	FLEET_USAGE_SCAN_CAPABILITY

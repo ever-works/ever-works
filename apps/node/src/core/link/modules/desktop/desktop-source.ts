@@ -1,16 +1,22 @@
 import {
+	decodeComputerFrame,
 	encodeComputerFrame,
+	fleetDesktopControlReasonHint,
 	fleetDesktopReasonHint,
 	FLEET_DESKTOP_MESSAGES,
 	FLEET_LINK_FRAME_KINDS,
+	isComputerInputFrame,
+	isComputerShortcutBlocked,
 	isFleetDesktopQuality,
 	isFleetDisplayId,
 	makeFleetLinkError,
 	readFleetDesktopSourceParams,
 	type ComputerQuality,
+	type FleetDesktopInputRefusedCode,
 	type FleetLinkError,
 	type FleetLinkFrameKind
 } from '@ever-works/contracts';
+import type { Logger } from '../../../logger';
 import type {
 	DesktopHelperHost,
 	DesktopHelperStream,
@@ -34,8 +40,21 @@ import type { NodeChannelContext, NodeChannelOpenResult, NodeModule } from '../r
  *   platform → node  `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`
  *
  * The family's consent (`--attend`) was checked by the link before this runs.
- * Watching is read-only: every `INPUT` frame is dropped here (control is P2),
- * and the kill switch (`link.pause`) refuses the open and ends a live stream.
+ * Watching is read-only: every `INPUT` frame is dropped here, and the kill
+ * switch (`link.pause`) refuses the open and ends a live stream.
+ *
+ * Control (P2): a channel opened `mode: 'controlling'` — the platform mints that
+ * only for the view holding the computer's control lock, and FL-02's gateway
+ * forwards `INPUT` only from that view's `driver` socket — forwards input to the
+ * helper, after refusing the blocked shortcuts here first (the helper refuses
+ * them again). The owner's on-machine permission (`helper control allow`) is
+ * checked again before the helper starts; withdrawing it, the kill switch or
+ * the channel closing releases every key and button (FR-39) and ends control.
+ * While a person controls the desktop, the node says so on its own console:
+ * who, and how to stop it.
+ *
+ *   node → platform  `desktop.inputRefused { code }` — an input the machine did
+ *                    not take, at most one a second, a code only
  * A frame the link cannot take right now is dropped and a fresh keyframe asked
  * for, so a slow link resynchronises instead of queueing pictures.
  */
@@ -62,6 +81,10 @@ export function desktopRefusalError(refusal: DesktopStreamRefusal, nodeName: str
 			return makeFleetLinkError('limit_exceeded', `${nodeName} is already showing its desktop twice; close one view`, {
 				limit: 'views-per-computer'
 			});
+		case 'control':
+			return makeFleetLinkError('unsupported_on_node', fleetDesktopControlReasonHint(refusal.reason, nodeName), {
+				reason: refusal.reason
+			});
 		case 'crashing':
 			return makeFleetLinkError(
 				'operation_failed',
@@ -85,8 +108,14 @@ function endReason(reason: DesktopStreamEnd, nodeName: string): { code: FleetLin
 	}
 }
 
+/** At most one `desktop.inputRefused` a second goes back to a controller who keeps trying. */
+export const DESKTOP_INPUT_REFUSED_EVERY_MS = 1_000;
+
 export interface DesktopSourceOptions {
 	host: DesktopHelperHost;
+	/** P2: where the node says, on its own console, that someone is controlling this computer. */
+	logger?: Logger;
+	now?: () => number;
 	setTimer?: (callback: () => void, ms: number) => unknown;
 	setRepeat?: (callback: () => void, ms: number) => unknown;
 	clearRepeat?: (handle: unknown) => void;
@@ -103,6 +132,7 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 			return handle;
 		});
 	const clearRepeat = options.clearRepeat ?? ((handle) => clearInterval(handle as ReturnType<typeof setInterval>));
+	const now = options.now ?? (() => Date.now());
 
 	return async (context: NodeChannelContext): Promise<NodeChannelOpenResult> => {
 		const params = readFleetDesktopSourceParams(context.params as Record<string, unknown>);
@@ -113,6 +143,11 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 			return { ok: false, error: makeFleetLinkError('kill_switch', 'clear it under Settings → Fleet') };
 		}
 		let quality: ComputerQuality = params.quality ?? DESKTOP_DEFAULT_QUALITY;
+		// P2: only a grant to the control holder opens `controlling`; anything else watches.
+		const controlling = params.mode === 'controlling';
+		let controlLive = controlling;
+		let picture: { width: number; height: number } | null = null;
+		let lastRefusedAt = -Infinity;
 		let ready = false;
 		let closed = false;
 		let seq = 0;
@@ -124,14 +159,35 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 		let statsTimer: unknown = null;
 		let unwatch: (() => void) | null = null;
 
+		const say = (line: string): void => {
+			try {
+				options.logger?.warn(line);
+			} catch {
+				// the console is a courtesy; control never depends on it
+			}
+		};
+		const endControl = (why: string): void => {
+			if (!controlLive) return;
+			controlLive = false;
+			// FR-39: every key and button let go before anything else.
+			stream?.releaseAll();
+			say(`Desktop control of this computer ended (${why}).`);
+		};
 		const finish = (): void => {
 			if (closed) return;
+			endControl('the view closed');
 			closed = true;
 			if (statsTimer !== null) clearRepeat(statsTimer);
 			statsTimer = null;
 			unwatch?.();
 			unwatch = null;
 			stream?.stop();
+		};
+		const refuseInput = (code: FleetDesktopInputRefusedCode): void => {
+			const at = now();
+			if (!ready || closed || at - lastRefusedAt < DESKTOP_INPUT_REFUSED_EVERY_MS) return;
+			lastRefusedAt = at;
+			context.sendJson({ type: FLEET_DESKTOP_MESSAGES.inputRefused, code });
 		};
 		const send = (kind: FleetLinkFrameKind, payload: Uint8Array): void => {
 			if (!ready || closed) return;
@@ -140,9 +196,10 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 		};
 
 		const opened = await options.host.openStream(
-			{ display: params.display ?? null, quality },
+			{ display: params.display ?? null, quality, ...(controlling ? { controlling: true } : {}) },
 			{
 				onFrame: (frame) => {
+					picture = { width: frame.width, height: frame.height };
 					const encoded = encodeComputerFrame({
 						kind: 'frame',
 						seq: seq++,
@@ -176,9 +233,17 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 						context.close('operation_failed', error.message || 'the desktop could not be captured');
 					}
 				},
+				onInputResult: (result) => refuseInput(result.code),
+				onControlRevoked: (reason) => {
+					if (closed) return;
+					endControl('control was withdrawn on this computer');
+					finish();
+					context.close('unsupported_on_node', fleetDesktopControlReasonHint(reason, context.nodeName));
+				},
 				onEnded: (reason) => {
 					if (closed) return;
 					const end = endReason(reason, context.nodeName);
+					controlLive = false;
 					closed = true;
 					if (statsTimer !== null) clearRepeat(statsTimer);
 					unwatch?.();
@@ -188,6 +253,13 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 		);
 		if (!opened.ok) return { ok: false, error: desktopRefusalError(opened.refusal, context.nodeName) };
 		stream = opened.stream;
+		if (controlling) {
+			// Visible on the machine (the node runs in the person's session, decision 5).
+			say(
+				`Desktop control: ${params.controlledBy ?? 'a person in Ever Works'} is now controlling this computer's mouse and keyboard. ` +
+					'To stop it at once: ever-works-node helper control deny (or the fleet stop switch).'
+			);
+		}
 
 		// `channel.ready` goes out when this open resolves; the first message follows it.
 		setTimer(() => {
@@ -198,7 +270,8 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 				display: stream?.started.display ?? null,
 				displays: stream?.started.displays ?? [],
 				fellBack: stream?.started.fellBack === true,
-				quality
+				quality,
+				mode: controlling ? 'controlling' : 'watching'
 			});
 			// Anything the helper published before `ready` was dropped: start from a keyframe.
 			stream?.refresh();
@@ -224,6 +297,7 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 		// The kill switch ends a live view at once (R-24, FR-32).
 		unwatch = context.control.onChange((state) => {
 			if (!state.paused || closed) return;
+			endControl('the fleet stop switch is on');
 			finish();
 			context.close('kill_switch', 'clear it under Settings → Fleet');
 		});
@@ -293,12 +367,28 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 							return;
 						}
 						default:
-							// `desktop.mode` and input arrive with control (P2).
 							return;
 					}
 				},
-				// Watching is read-only (P1): no INPUT (or any other binary frame) reaches this machine.
-				onBinary: () => undefined,
+				onBinary: (kind, payload) => {
+					// Watching is read-only: no INPUT (or any other binary frame) reaches this machine.
+					if (kind !== FLEET_LINK_FRAME_KINDS.INPUT || closed || !stream) return;
+					if (!controlling) return;
+					if (!controlLive) {
+						refuseInput('not-controlling');
+						return;
+					}
+					// The kill switch pauses input before it ends the view.
+					if (context.control.paused) return;
+					const frame = decodeComputerFrame(payload);
+					if (!frame || !isComputerInputFrame(frame)) return;
+					if (frame.kind === 'key' && isComputerShortcutBlocked(frame)) {
+						refuseInput('blocked-shortcut');
+						return;
+					}
+					if (!picture) return; // nothing on screen to aim at yet
+					stream.input(frame, picture);
+				},
 				onClose: () => finish()
 			}
 		};

@@ -1413,7 +1413,9 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			? {
 					desktopSources: {
 						...(portsModule ? { preview: portsModule.previewSource } : {}),
-						...(desktopHelper ? { desktop: createDesktopSourceOpener({ host: desktopHelper }) } : {})
+						...(desktopHelper
+							? { desktop: createDesktopSourceOpener({ host: desktopHelper, logger: io.logger }) }
+							: {})
 					}
 				}
 			: {}),

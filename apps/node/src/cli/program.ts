@@ -18,6 +18,7 @@ import {
 	helperStatus,
 	type HelperAdmissionDeps
 } from '../core/screen/helper/helper-admission';
+import { helperControlAllow, helperControlDeny, helperControlStatus } from '../core/screen/helper/helper-control';
 import { BAKED_HELPER_MANIFEST } from '../core/screen/helper/helper-manifest';
 import { createHelperFs, helperPathsFor, type HelperFs } from '../core/screen/helper/helper-trust';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
@@ -2339,6 +2340,30 @@ export function buildProgram(deps: CliDeps): Command {
 		.option('--json', 'Emit the report as one JSON object')
 		.action(async (options: { json?: boolean }) => {
 			await runHelperCommand(deps, (helperDeps) => helperStatus(helperDeps, options));
+		});
+	// FL-07 P2: the owner's permission, on this machine, for people to take control of
+	// its mouse and keyboard from a live view (default: not allowed).
+	const helperControl = helper
+		.command('control')
+		.description('Allow or withdraw control of this computer’s mouse and keyboard from a live view (default: not allowed)');
+	helperControl
+		.command('allow')
+		.description('Let the people you allow take control of this computer from a live view (type "control")')
+		.action(async () => {
+			await runHelperCommand(deps, (helperDeps) => helperControlAllow(helperDeps));
+		});
+	helperControl
+		.command('deny')
+		.description('Withdraw control: a running node lets go of every key and button and ends any control at once')
+		.action(async () => {
+			await runHelperCommand(deps, (helperDeps) => helperControlDeny(helperDeps));
+		});
+	helperControl
+		.command('status')
+		.description('Show whether control of this computer is allowed')
+		.option('--json', 'Emit the report as one JSON object')
+		.action(async (options: { json?: boolean }) => {
+			await runHelperCommand(deps, (helperDeps) => helperControlStatus(helperDeps, options));
 		});
 
 	// Schedules on computers (FL-13 P3): what the OS scheduler starts. Hidden.

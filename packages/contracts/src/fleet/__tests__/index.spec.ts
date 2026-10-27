@@ -1479,6 +1479,30 @@ const HELPER_EXPORTS = [
 	'FLEET_HELPER_SEEN_EVENT_IDS'
 ] as const;
 
+/** Desktop control (FL-07 P2): `fleet-desktop-control.types.ts`, a NEW module (one witness row below). */
+const DESKTOP_CONTROL_EXPORTS = [
+	'FLEET_DESKTOP_CONTROL_REASONS',
+	'isFleetDesktopControlReason',
+	'normalizeFleetDesktopControlReasons',
+	'FLEET_DESKTOP_CONTROL_REASON_FIXES',
+	'fleetDesktopControlReasonHint',
+	'FLEET_HELPER_CONTROL_STATES',
+	'isFleetHelperControlState',
+	'FLEET_HELPER_CONTROL_WORD',
+	'parseFleetHelperControlRecord',
+	'isFleetHelperControlAllowed',
+	'resolveFleetDesktopControlReasons',
+	'FLEET_DESKTOP_MODES',
+	'isFleetDesktopMode',
+	'FLEET_DESKTOP_CONTROLLER_NAME_MAX',
+	'normalizeFleetDesktopControllerName',
+	'FLEET_DESKTOP_INPUT_REFUSED_CODES',
+	'isFleetDesktopInputRefusedCode',
+	'normalizeFleetDesktopInputRefusedCode',
+	'fleetDesktopBlockedShortcutLabels',
+	'fleetDesktopControlAvailabilityOf'
+] as const;
+
 /** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
 const ACTIONS_RUNNERS_EXPORTS = [
 	'FLEET_ACTIONS_RUNNER_CAPABILITY',
@@ -1653,6 +1677,7 @@ const ALL_EXPORTS = [
 	...DESKTOP_EXPORTS,
 	...DESKTOP_TILES_EXPORTS,
 	...HELPER_EXPORTS,
+	...DESKTOP_CONTROL_EXPORTS,
 	...USAGE_EXPORTS,
 	...MODEL_LIST_PRICES_EXPORTS,
 	...CLOUD_P2_EXPORTS,
@@ -2243,7 +2268,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1357 runtime symbols', () => {
+	it('exposes exactly these 1377 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2348,7 +2373,8 @@ describe('fleet barrel', () => {
 		// → +4 with FL-17 P3 (site tag, reconcile requester), same module (`CLOUD_P3_EXPORTS`).
 		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
 		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70);
+		// → +20 with desktop control (FL-07 P2): `fleet-desktop-control.types.ts`, a NEW module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 20);
 	});
 
 	it.each([
@@ -2395,6 +2421,7 @@ describe('fleet barrel', () => {
 		['fleet-desktop.types.js', 'FLEET_DESKTOP_REASONS'],
 		['fleet-desktop-tiles.codec.js', 'encodeDesktopTiles'],
 		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS'],
+		['fleet-desktop-control.types.js', 'FLEET_DESKTOP_CONTROL_REASONS'],
 		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
 		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES'],
 		['fleet-actions-runners.types.js', 'FLEET_ACTIONS_RUNNER_CAPABILITY']

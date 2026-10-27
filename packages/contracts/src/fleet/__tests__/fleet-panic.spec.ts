@@ -158,7 +158,10 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.runner.stop',
 	'node.runner.restart',
 	'node.runner.remove',
-	'node.runner.job.cancel'
+	'node.runner.job.cancel',
+	// Desktop control permission on the machine (FL-07 P2).
+	'node.helper.control-allow',
+	'node.helper.control-deny'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */

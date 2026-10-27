@@ -67,6 +67,10 @@ export interface FakeHelperOptions {
 	startError?: string;
 	/** Never send hello. */
 	silent?: boolean;
+	/** P2: the hello's `inputReasons`. */
+	inputReasons?: string[];
+	/** P2: answer every input `refused` with this code (e.g. `permission-accessibility`). */
+	refuseInput?: string;
 }
 
 type Listener = (...args: never[]) => void;
@@ -74,6 +78,10 @@ type Listener = (...args: never[]) => void;
 /** A fake helper child: hello on spawn, `started` + a keyframe on start, tiles on refresh. */
 export class FakeHelperChild implements HelperChild {
 	readonly received: Array<{ kind: number; payload: Uint8Array }> = [];
+	/** P2: every input the node forwarded, parsed. */
+	readonly inputs: Array<Record<string, unknown>> = [];
+	/** P2: how many `releaseAll` arrived. */
+	releases = 0;
 	private readonly listeners = new Map<string, Listener[]>();
 	private readonly decoder = new HelperMessageDecoder();
 	private alive = true;
@@ -100,7 +108,8 @@ export class FakeHelperChild implements HelperChild {
 						version: '0.1.0',
 						platform: 'linux',
 						reasons: options.reasons ?? [],
-						displays: this.displays()
+						displays: this.displays(),
+						inputReasons: options.inputReasons ?? []
 					})
 				)
 			);
@@ -159,6 +168,19 @@ export class FakeHelperChild implements HelperChild {
 			this.sendFrame();
 		} else if (kind === HELPER_MESSAGES.refresh) {
 			this.sendFrame();
+		} else if (kind === HELPER_MESSAGES.input) {
+			const input = JSON.parse(new TextDecoder().decode(payload)) as Record<string, unknown>;
+			this.inputs.push(input);
+			if (this.options.refuseInput) {
+				this.emitMessage(
+					encodeHelperJson(HELPER_MESSAGES.inputResult, { outcome: 'refused', code: this.options.refuseInput })
+				);
+			} else if (input.kind === 'key' && input.code === 'KeyC' && (Number(input.modifiers) & 2) !== 0) {
+				// The helper's own second check of the blocked shortcuts.
+				this.emitMessage(encodeHelperJson(HELPER_MESSAGES.inputResult, { outcome: 'blocked', code: 'blocked-shortcut' }));
+			}
+		} else if (kind === HELPER_MESSAGES.releaseAll) {
+			this.releases += 1;
 		} else if (kind === HELPER_MESSAGES.listDisplays) {
 			this.emitMessage(encodeHelperJson(HELPER_MESSAGES.displays, { displays: this.displays() }));
 		} else if (kind === HELPER_MESSAGES.setDisplay) {

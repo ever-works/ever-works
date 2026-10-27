@@ -47,6 +47,8 @@ export interface HelperPaths {
 	eventsPath: string;
 	/** Where `helper install` puts the helper. */
 	installPath: string;
+	/** P2: the owner's on-machine permission for control (`helper-control.json`); beside `policyPath` when absent. */
+	controlPath?: string;
 }
 
 /** The helper's files beside a node config file. */
