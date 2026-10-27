@@ -357,6 +357,12 @@ describe('createAuthRuntimeInstance', () => {
             expect(generateId()).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee01');
             expect(generateId()).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeee02');
         });
+
+        it('keeps Better Auth schema validation on (1.7.3+ checks the live tables before auth calls)', () => {
+            createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
+
+            expect(getCapturedOptions().advanced.database.validateSchema).toBe(true);
+        });
     });
 
     describe('user model', () => {
