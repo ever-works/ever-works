@@ -88,13 +88,12 @@ interface Finding {
 const KNOWN_DRIFT: Readonly<Record<string, string>> = {
     // APW-01 — the App Works create surface. Its error bodies are not described to the
     // generated document (the controllers declare only the status codes), the create body's
-    // `repositoryUrl` is optional in the shared DTO because a website Work has none, the two
-    // deletion refusals are not declared, and the `inspect_app_source` tool is not whitelisted
-    // yet (APW-01 T19).
+    // `repositoryUrl` is optional in the shared DTO because a website Work has none, and the two
+    // deletion refusals are not declared. (`inspect_app_source` is whitelisted since APW-01 T19,
+    // lane B1 2026-10-27, so its `x-mcp` line is no longer drift: the fragment's
+    // `{ tool: inspect_app_source, readOnlyHint: true }` is now checked against a real entry.)
     'apw-01.openapi.yaml POST /api/works/app-source/inspect :: response 400':
         'error body not described by the controller',
-    'apw-01.openapi.yaml POST /api/works/app-source/inspect :: x-mcp':
-        'inspect_app_source is not in the MCP whitelist yet (APW-01 T19)',
     'apw-01.openapi.yaml POST /api/works :: request body':
         '`repositoryUrl` is required for an App Work only, so the shared DTO marks it optional',
     'apw-01.openapi.yaml POST /api/works :: response 400':
@@ -677,6 +676,34 @@ describe('the comparison itself (controls — a checker that finds nothing prove
                 expect.stringContaining('OpenAPI 3.1 type array'),
             ]),
         );
+    });
+});
+
+/**
+ * APW-01 T19 (lane B1, 2026-10-27) — the `x-mcp` decisions of the APW-01 fragment hold against the
+ * REAL whitelist: `inspect_app_source` is present and read-only, `create_work` is present and
+ * `delete_work` is present and destructive. The x-mcp check does not read the generated document,
+ * so this runs without the API build (an empty document only adds "operation absent" findings,
+ * which are filtered out here).
+ */
+describe('the APW-01 agent-surface decisions, against the real MCP whitelist', () => {
+    it('finds no x-mcp drift in apw-01 — inspect_app_source is whitelisted and read-only', () => {
+        const apw01 = loadFragments().find((entry) => entry.name === 'apw-01.openapi.yaml');
+        expect(apw01).toBeDefined();
+        const xMcp = compareFragment(apw01!.name, apw01!.fragment, { paths: {} }, WHITELIST).filter(
+            (finding) => finding.key.endsWith(':: x-mcp'),
+        );
+        expect(xMcp).toEqual([]);
+
+        const inspect = WHITELIST.filter(
+            (entry) => entry.method === 'POST' && entry.path === '/api/works/app-source/inspect',
+        );
+        expect(inspect).toEqual([
+            expect.objectContaining({
+                toolName: 'inspect_app_source',
+                annotations: { readOnlyHint: true },
+            }),
+        ]);
     });
 });
 

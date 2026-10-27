@@ -24,7 +24,7 @@ Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible cli
 The MCP server is a standalone NestJS application in `apps/mcp/` that:
 
 1. **Fetches** the Ever Works API's OpenAPI spec at startup
-2. **Filters** endpoints through a curated whitelist of 208 operations
+2. **Filters** endpoints through a curated whitelist of 240 operations
 3. **Converts** OpenAPI schemas to MCP tool definitions automatically
 4. **Proxies** tool calls to the API using your API key
 
@@ -148,9 +148,9 @@ Add the MCP server to your project's `.mcp.json`:
 > the Agent tools and `ever-works fleet …`: the same confirmation fields, the same typed refusals. See
 > [Fleet tools for Agents, the MCP server and the CLI](./fleet-agent-tools.md).
 
-The MCP server exposes 208 tools from the OpenAPI whitelist, organized by domain below. The tables cover the main domains; the fleet machine tools (computers, sessions, checkouts, logs, commands, schedules, ports, files, virtual and cloud computers, Actions runners, usage) follow the fleet tool catalogue in `packages/contracts/src/fleet/fleet-tools.types.ts`. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
+The MCP server exposes 240 tools from the OpenAPI whitelist, organized by domain below. The tables cover the main domains; the fleet machine tools (computers, sessions, checkouts, logs, commands, schedules, ports, files, virtual and cloud computers, Actions runners, usage) follow the fleet tool catalogue in `packages/contracts/src/fleet/fleet-tools.types.ts`. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
 
-Seven more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the five `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`), `register_work` and `ping`. A connected client therefore sees **215 tools** in all. There is deliberately no `kb.unlock`: a lock is how the owner keeps agents off a document, so unlocking is a person's decision (works-security lane 3a, 2026-10-18); a person unlocks in the app, the API or the CLI. Every `kb.*` result is fenced as untrusted data.
+Seven more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the five `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`), `register_work` and `ping`. A connected client therefore sees **247 tools** in all. There is deliberately no `kb.unlock`: a lock is how the owner keeps agents off a document, so unlocking is a person's decision (works-security lane 3a, 2026-10-18); a person unlocks in the app, the API or the CLI. Every `kb.*` result is fenced as untrusted data.
 
 ### Human-in-the-loop gates are not tools
 
@@ -334,6 +334,45 @@ CLI; only the tool surface excludes them.
 - `list_agent_plugin_findings` — validation findings recorded at install
 - `list_agent_plugin_catalog_entries` — skills contributed by packages
 - `list_agent_plugin_updates` — packages with a newer version available
+
+### App Works (32 tools)
+
+An App Work is a running open-source app. Reads and three read-shaped calls are always on; every state-changing tool is held back by `MCP_PRIVILEGED_TOOLS`. The human-only acts are never tools, whatever the switch: requesting a Build, deploying, running an App job, provisioning, any env write (set, `.env` import, rotation), configuring or deleting a dependency, the deploy target and kubeconfig, licence attestation, "Sync anyway" on held upstream workflow changes and deleting stored data. The decision per route is `docs/specs/features/app-works/contracts/agent-surfaces.md` §3.2; `apps/mcp/test/whitelist-app-works.spec.ts` pins it.
+
+| Tool                            | Description                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `inspect_app_source`            | Check a GitHub repository before an App Work is created from it (read-only)             |
+| `get_app_status`                | Runtime state, URL, current Deployment, health and last smoke result                    |
+| `refresh_app_status`            | Re-read the runtime status from the cluster (changes nothing)                           |
+| `list_app_deployments`          | The last 20 Deployments                                                                 |
+| `request_app_logs`              | Ask for the last log lines of one component or job (read-only)                          |
+| `get_app_logs`                  | Read a log request back (the tail is redacted)                                          |
+| `get_app_target`                | The deploy target, its settings and the last cluster check                              |
+| `get_app_deletion_preview`      | What deleting the App Work would remove (owner only)                                    |
+| `run_app_smoke`                 | Run the App spec smoke checks against the live app (privileged)                         |
+| `rollback_app`                  | Roll back to an earlier Live Deployment (privileged; no `confirmClusterChange`)         |
+| `change_app_lifecycle`          | Pause, resume, remove or cancel the running Deployment (privileged; never deletes data) |
+| `list_app_builds`               | List the Builds                                                                         |
+| `get_app_build`                 | One Build                                                                               |
+| `cancel_app_build`              | Cancel a running Build (privileged)                                                     |
+| `get_app_env`                   | The Environment: names, sources, phases, set/unset — never a value                      |
+| `list_app_dependencies`         | The dependencies: kind, status, provider — never a connection value                     |
+| `get_app_spec`                  | The App spec state: validation, effective spec, Blueprint, licence                      |
+| `validate_app_spec`             | Re-check the spec on the tracked branch, or validate a draft                            |
+| `apply_app_blueprint`           | Apply a Blueprint as a pull request (privileged)                                        |
+| `upgrade_app_blueprint`         | Propose a Blueprint upgrade as a pull request (privileged)                              |
+| `dismiss_app_blueprint_upgrade` | Dismiss an upgrade notice for one version (privileged)                                  |
+| `get_app_license`               | The licence classification and attestation text                                         |
+| `list_app_catalog_entries`      | Browse the Apps catalog                                                                 |
+| `list_app_blueprints`           | The App Blueprints                                                                      |
+| `list_app_licenses`             | The App licence registry                                                                |
+| `get_app_catalog_entry`         | One Apps catalog entry                                                                  |
+| `get_app_provisioning`          | The open and recent provisioning Tasks                                                  |
+| `cancel_app_provisioning`       | Cancel the running provisioning (privileged)                                            |
+| `list_app_changes`              | The change requests (Tasks) of the App Work                                             |
+| `get_app_upstream`              | Upstream state: readiness, divergence, last sync, held workflow change                  |
+| `sync_app_upstream`             | Queue an upstream sync (privileged; never "Sync anyway")                                |
+| `retry_app_readiness`           | Retry a timed-out fork preparation (privileged)                                         |
 
 ## Adding New Tools
 

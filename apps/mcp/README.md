@@ -87,18 +87,19 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 
 The API cannot tell an MCP client holding the owner's personal key (or a session JWT this server forwards) from the owner, and every client is a model that may be reading hostile content — a scraped page, an email, community-PR text. So the tools that publish, re-point model traffic, start paid or autonomous work, or destroy data are **not registered** unless the operator sets `MCP_PRIVILEGED_TOOLS=true` on the server. With the switch on they register exactly as before; with it off the server logs, at startup, which tools it held back.
 
-| Group                          | Tools held back while the switch is off                                                                                                                                                                                                                                                                                      |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Deploy                         | `deploy_work`                                                                                                                                                                                                                                                                                                                |
-| Plugin secrets / model routing | `enable_plugin`, `update_plugin_settings`                                                                                                                                                                                                                                                                                    |
-| Starts paid or autonomous work | `generate_items`, `update_items`, `update_schedule`, `run_scheduled_update`, `run_mission_now`, `resume_mission`, `clone_mission`, `build_idea`, `retry_idea`, `rebuild_idea`, `accept_idea`, `run_tasks_batch`, `run_task`, `activate_goal`, `update_goal_limits`, `run_agent_now`, `resume_agent`, `process_community_prs` |
-| Destroys or hides data         | `delete_work`, `delete_mission`, `delete_task`, `discard_task_branch`, `delete_inbox_item`, `delete_comparison`, `remove_item`                                                                                                                                                                                               |
+| Group                                    | Tools held back while the switch is off                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deploy                                   | `deploy_work`                                                                                                                                                                                                                                                                                                                |
+| Plugin secrets / model routing           | `enable_plugin`, `update_plugin_settings`                                                                                                                                                                                                                                                                                    |
+| Starts paid or autonomous work           | `generate_items`, `update_items`, `update_schedule`, `run_scheduled_update`, `run_mission_now`, `resume_mission`, `clone_mission`, `build_idea`, `retry_idea`, `rebuild_idea`, `accept_idea`, `run_tasks_batch`, `run_task`, `activate_goal`, `update_goal_limits`, `run_agent_now`, `resume_agent`, `process_community_prs` |
+| Destroys or hides data                   | `delete_work`, `delete_mission`, `delete_task`, `discard_task_branch`, `delete_inbox_item`, `delete_comparison`, `remove_item`                                                                                                                                                                                               |
+| App Works (live app, fork, owner's runs) | `run_app_smoke`, `rollback_app`, `change_app_lifecycle`, `cancel_app_build`, `cancel_app_provisioning`, `apply_app_blueprint`, `upgrade_app_blueprint`, `dismiss_app_blueprint_upgrade`, `sync_app_upstream`, `retry_app_readiness`                                                                                          |
 
 The switch also governs two arguments: `create_task` / `update_task` do not offer or forward `agentId` and `scheduledAt` (who runs a Task and when) while it is off. And `kb.create` / `kb.update` file their documents as proposals (`reviewState: 'proposed'`, `source: 'agent'` on create; a content edit re-enters review) — the document feeds agent context once a person accepts it in the app; the API applies the same rule to every non-session credential (`KB_NON_SESSION_WRITES_PROPOSED`). The list lives in `src/openapi-tools/privileged-tools.ts`.
 
 Three more rules close the paths that would make a held-back run starter one call away (review of #2804): `create_mission` / `update_mission` do not offer or forward `schedule`, `autoBuildWorks` and `guardrailsOverride` (a one-shot Mission can still be filed and edited; a person starts it in the app); `transition_task` refuses a move to `in_progress`, `in_review` or `done` (those moves dispatch the Task's agents, its reviewers or its dependents; every other move still runs); and `post_task_chat_message` refuses a body with an `@mention` (a mention starts the mentioned Agent; the platform's mention grammar also matches an e-mail address, so write names without the @). A refused call sends nothing upstream and says which switch would allow it.
 
-## Available Tools (208)
+## Available Tools (240)
 
 The authoritative list is `src/openapi-tools/whitelist.ts`; the tables below cover the main domains, and `test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts here against it.
 
@@ -282,6 +283,45 @@ human through the API, web UI and CLI. See `docs/specs/decisions/018-agent-plugi
 - `list_agent_plugin_findings` — validation findings recorded at install
 - `list_agent_plugin_catalog_entries` — skills contributed by packages
 - `list_agent_plugin_updates` — packages with a newer version available
+
+### App Works (32)
+
+An App Work is a running open-source app. Reads and three read-shaped calls are always on; every state-changing tool is held back by `MCP_PRIVILEGED_TOOLS`. The human-only acts are never tools, whatever the switch: requesting a Build, deploying, running an App job, provisioning, any env write (set, `.env` import, rotation), configuring or deleting a dependency, the deploy target and kubeconfig, licence attestation, "Sync anyway" on held upstream workflow changes and deleting stored data. The decision per route is `docs/specs/features/app-works/contracts/agent-surfaces.md` §3.2; `test/whitelist-app-works.spec.ts` pins it.
+
+| Tool                            | Description                                                                             |
+| ------------------------------- | --------------------------------------------------------------------------------------- |
+| `inspect_app_source`            | Check a GitHub repository before an App Work is created from it (read-only)             |
+| `get_app_status`                | Runtime state, URL, current Deployment, health and last smoke result                    |
+| `refresh_app_status`            | Re-read the runtime status from the cluster (changes nothing)                           |
+| `list_app_deployments`          | The last 20 Deployments                                                                 |
+| `request_app_logs`              | Ask for the last log lines of one component or job (read-only)                          |
+| `get_app_logs`                  | Read a log request back (the tail is redacted)                                          |
+| `get_app_target`                | The deploy target, its settings and the last cluster check                              |
+| `get_app_deletion_preview`      | What deleting the App Work would remove (owner only)                                    |
+| `run_app_smoke`                 | Run the App spec smoke checks against the live app (privileged)                         |
+| `rollback_app`                  | Roll back to an earlier Live Deployment (privileged; no `confirmClusterChange`)         |
+| `change_app_lifecycle`          | Pause, resume, remove or cancel the running Deployment (privileged; never deletes data) |
+| `list_app_builds`               | List the Builds                                                                         |
+| `get_app_build`                 | One Build                                                                               |
+| `cancel_app_build`              | Cancel a running Build (privileged)                                                     |
+| `get_app_env`                   | The Environment: names, sources, phases, set/unset — never a value                      |
+| `list_app_dependencies`         | The dependencies: kind, status, provider — never a connection value                     |
+| `get_app_spec`                  | The App spec state: validation, effective spec, Blueprint, licence                      |
+| `validate_app_spec`             | Re-check the spec on the tracked branch, or validate a draft                            |
+| `apply_app_blueprint`           | Apply a Blueprint as a pull request (privileged)                                        |
+| `upgrade_app_blueprint`         | Propose a Blueprint upgrade as a pull request (privileged)                              |
+| `dismiss_app_blueprint_upgrade` | Dismiss an upgrade notice for one version (privileged)                                  |
+| `get_app_license`               | The licence classification and attestation text                                         |
+| `list_app_catalog_entries`      | Browse the Apps catalog                                                                 |
+| `list_app_blueprints`           | The App Blueprints                                                                      |
+| `list_app_licenses`             | The App licence registry                                                                |
+| `get_app_catalog_entry`         | One Apps catalog entry                                                                  |
+| `get_app_provisioning`          | The open and recent provisioning Tasks                                                  |
+| `cancel_app_provisioning`       | Cancel the running provisioning (privileged)                                            |
+| `list_app_changes`              | The change requests (Tasks) of the App Work                                             |
+| `get_app_upstream`              | Upstream state: readiness, divergence, last sync, held workflow change                  |
+| `sync_app_upstream`             | Queue an upstream sync (privileged; never "Sync anyway")                                |
+| `retry_app_readiness`           | Retry a timed-out fork preparation (privileged)                                         |
 
 ## Adding New Tools
 

@@ -184,6 +184,7 @@ const LABELS: Record<string, string> = {
     createWorkWithAI: 'Creating work with AI',
     importWork: 'Importing work',
     analyzeImportSource: 'Analyzing repository',
+    inspectAppSource: 'Checking repository',
     updateWork: 'Updating work',
     deleteWork: 'Deleting work',
     addItem: 'Adding item',

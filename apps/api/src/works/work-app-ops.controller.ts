@@ -12,7 +12,7 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import {
     AppTargetService,
     type AppDeploymentHistoryEntry,
@@ -98,6 +98,27 @@ export class WorkAppOpsController {
             'with a request id; read the tail back with GET app-logs/:requestId (kept 5 minutes).',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
+    // Lane B1 (chat and MCP parity): the body is parsed by the service, so describe it here —
+    // without a schema the generated MCP tool `request_app_logs` would offer no argument at all.
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                component: {
+                    type: 'string',
+                    description:
+                        'One component of the App spec. Give a component or a job, not both.',
+                },
+                job: {
+                    type: 'string',
+                    description: 'One job of the App spec. Give a component or a job, not both.',
+                },
+                deploymentId: { type: 'string', description: 'A Deployment of this App Work.' },
+                previous: { type: 'boolean', description: "The previous container's logs." },
+                lines: { type: 'integer', minimum: 1, maximum: 500, default: 200 },
+            },
+        },
+    })
     async requestLogs(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
