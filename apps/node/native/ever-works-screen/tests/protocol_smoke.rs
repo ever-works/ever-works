@@ -20,6 +20,9 @@ const MSG_START: u8 = 0x01;
 const MSG_INPUT: u8 = 0x10;
 const MSG_RELEASE_HELD: u8 = 0x12;
 const MSG_CONTROL_MARKER: u8 = 0x13;
+const MSG_ADD_DISPLAY: u8 = 0x07;
+const MSG_REMOVE_DISPLAY: u8 = 0x08;
+const MSG_DISPLAY_CHANGE: u8 = 0x88;
 const MSG_HELLO: u8 = 0x81;
 const MSG_ERROR: u8 = 0x85;
 const MSG_INPUT_RESULT: u8 = 0x87;
@@ -239,6 +242,46 @@ fn a_fresh_helper_takes_release_held_first_and_answers_only_a_refusal() {
         assert_eq!(kind, MSG_ERROR, "only the marker's error follows");
         assert_eq!(message["code"], "invalid");
     }
+
+    let (code, _) = helper.close_and_wait();
+    assert_eq!(code, Some(0));
+}
+
+#[test]
+fn refuses_virtual_display_requests_it_cannot_or_must_not_do_by_name() {
+    // Safe on any machine: an off-list size is refused before the X server is asked, and a
+    // display that does not exist cannot be removed.
+    let mut helper = spawn();
+    let (kind, _) = helper.next();
+    assert_eq!(kind, MSG_HELLO);
+
+    helper.send(
+        MSG_ADD_DISPLAY,
+        br#"{"name":"Desk","width":640,"height":480}"#,
+    );
+    let (kind, answer) = helper.next();
+    assert_eq!(kind, MSG_DISPLAY_CHANGE);
+    assert_eq!(answer["action"], "add");
+    assert_eq!(answer["ok"], false);
+    assert_eq!(answer["code"], "size-not-offered");
+    assert!(answer["displays"].is_array());
+
+    helper.send(MSG_REMOVE_DISPLAY, br#"{"display":"no-such-display"}"#);
+    let (kind, answer) = helper.next();
+    assert_eq!(kind, MSG_DISPLAY_CHANGE);
+    assert_eq!(answer["action"], "remove");
+    assert_eq!(answer["ok"], false);
+    let code = answer["code"].as_str().expect("a refusal code");
+    let expected: &[&str] = if cfg!(target_os = "linux") {
+        &[
+            "unsupported-session",
+            "randr-unavailable",
+            "unknown-display",
+        ]
+    } else {
+        &["unsupported"]
+    };
+    assert!(expected.contains(&code), "unexpected refusal {code}");
 
     let (code, _) = helper.close_and_wait();
     assert_eq!(code, Some(0));
