@@ -197,6 +197,17 @@ describe('App Works chat rows — what reaches the API', () => {
         expect(callApi).not.toHaveBeenCalled();
     });
 
+    it('a fork-of-a-fork Blueprint confirmation is a privileged card', async () => {
+        const card = await run(unconfirmedTools().apply_app_blueprint, {
+            id: 'w1',
+            body: { blueprintId: 'bp-1', confirmForkMatch: true },
+        });
+        expect(card.__confirmationRequired).toBe(true);
+        expect(card.confirmationKind).toBe('privileged');
+        expect(card.preview).toContain('confirmForkMatch');
+        expect(callApi).not.toHaveBeenCalled();
+    });
+
     it('a plain sync is still a card (it writes to the fork)', async () => {
         const card = await run(unconfirmedTools().sync_app_upstream, { id: 'w1' });
         expect(card.__confirmationRequired).toBe(true);

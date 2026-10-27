@@ -471,8 +471,10 @@ export const APP_WORKS_OPERATIONS: OperationSpec[] = [
         kind: 'action',
         params: [workIdParam],
         body: true,
-        bodyHint: 'blueprintId (from list_app_blueprints), version (optional).',
-        bodyFields: { allowed: ['blueprintId', 'version'] },
+        bodyHint:
+            'blueprintId (from list_app_blueprints), version (optional); confirmForkMatch (optional boolean — ' +
+            'only when the user accepts that a fork of a fork inherits this Blueprint).',
+        bodyFields: { allowed: ['blueprintId', 'version'], privileged: ['confirmForkMatch'] },
         requiresConfirmation: true,
     },
     {

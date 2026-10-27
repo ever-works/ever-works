@@ -1334,7 +1334,8 @@ export const WHITELIST: WhitelistEntry[] = [
 	//    turns privileged tools on;
 	//  - the human-only gates stay out of the request even then: "Sync anyway"
 	//    (`confirmWorkflowChanges` / `workflowHeadSha`, the owner's acceptance of upstream
-	//    workflow code), a cluster change (`confirmClusterChange`) and destroying stored data
+	//    workflow code), a cluster change (`confirmClusterChange`), a fork of a fork inheriting
+	//    a Blueprint (`confirmForkMatch`) and destroying stored data
 	//    (`deleteData` / `confirmSlug`) are `omitArgs` — and the API refuses them to an API key
 	//    besides (`requireHumanSession`, `requireAppWorkOwnerSession`).
 	//
@@ -1451,7 +1452,9 @@ export const WHITELIST: WhitelistEntry[] = [
 	{
 		method: 'POST',
 		path: '/api/works/{id}/app-spec/blueprint',
-		toolName: 'apply_app_blueprint'
+		toolName: 'apply_app_blueprint',
+		// A fork of a fork inheriting a Blueprint nobody chose is the member's confirmation.
+		omitArgs: ['confirmForkMatch']
 	},
 	{
 		method: 'POST',

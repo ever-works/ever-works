@@ -153,6 +153,7 @@ describe('App Works MCP whitelist (APW-01 T19, lane B1)', () => {
 			expect.arrayContaining(['confirmWorkflowChanges', 'workflowHeadSha'])
 		);
 		expect(omits('rollback_app')).toEqual(expect.arrayContaining(['confirmClusterChange']));
+		expect(omits('apply_app_blueprint')).toEqual(expect.arrayContaining(['confirmForkMatch']));
 		expect(omits('change_app_lifecycle')).toEqual(expect.arrayContaining(['deleteData', 'confirmSlug']));
 	});
 
