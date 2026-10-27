@@ -123,8 +123,16 @@ export function DesktopRecordingPlayer({
     const playbackRef = useRef<DesktopRecordingPlayback | null>(null);
     const positionRef = useRef(0);
 
+    /** Every paint (a seek, a step of play) runs after the one before: a seek never lands under an older step. */
+    const opRef = useRef<Promise<void>>(Promise.resolve());
+    const run = useCallback((op: () => Promise<void> | undefined) => {
+        opRef.current = opRef.current.then(() => op()).catch(() => undefined);
+        return opRef.current;
+    }, []);
+
     useEffect(() => {
         let cancelled = false;
+        let painterOf: DesktopPainter | null = null;
         void desktopClient.recording(nodeId, viewId).then(async (result) => {
             if (cancelled) return;
             if (!result.ok) {
@@ -136,18 +144,21 @@ export function DesktopRecordingPlayer({
                 canvas: () => canvasRef.current,
                 requestKeyframe: () => undefined,
             });
+            painterOf = painter;
             const playback = new DesktopRecordingPlayback(
                 result.data.chunks ?? [],
                 (seq) => desktopClient.recordingChunk(nodeId, viewId, seq),
                 painter,
             );
             playbackRef.current = playback;
-            await playback.seek(0);
+            await run(() => playback.seek(0));
         });
         return () => {
             cancelled = true;
+            painterOf?.dispose();
+            playbackRef.current = null;
         };
-    }, [nodeId, viewId, t]);
+    }, [nodeId, viewId, t, run]);
 
     const duration = recording?.durationMs ?? 0;
 
@@ -156,9 +167,9 @@ export function DesktopRecordingPlayer({
             const clamped = Math.max(0, Math.min(duration, to));
             positionRef.current = clamped;
             setPosition(clamped);
-            await playbackRef.current?.seek(clamped);
+            await run(() => playbackRef.current?.seek(clamped));
         },
-        [duration],
+        [duration, run],
     );
 
     useEffect(() => {
@@ -175,12 +186,12 @@ export function DesktopRecordingPlayer({
             positionRef.current = next;
             setPosition(next);
             painting = true;
-            void (playbackRef.current?.advance(next) ?? Promise.resolve()).finally(() => {
+            void run(() => playbackRef.current?.advance(next)).finally(() => {
                 painting = false;
             });
         }, PLAY_TICK_MS);
         return () => clearInterval(timer);
-    }, [duration, playing]);
+    }, [duration, playing, run]);
 
     const remove = async () => {
         setBusy(true);

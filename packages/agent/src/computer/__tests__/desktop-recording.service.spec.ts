@@ -74,10 +74,21 @@ function setup(options: { storage?: boolean; retentionDays?: number } = {}) {
         findDesktopRecordingsForNode: jest.fn(async () =>
             row.recordingRef ? [row as ComputerSession] : [],
         ),
-        findExpiredDesktopRecordings: jest.fn(async (now: Date) =>
-            row.recordingRef && row.recordingExpiresAt && row.recordingExpiresAt < now
-                ? [row as ComputerSession]
-                : [],
+        findExpiredDesktopRecordings: jest.fn(
+            async (now: Date, _take: number, _cutoff?: Date, exclude: readonly string[] = []) =>
+                row.recordingRef &&
+                row.recordingExpiresAt &&
+                row.recordingExpiresAt < now &&
+                !exclude.includes(row.id)
+                    ? [row as ComputerSession]
+                    : [],
+        ),
+        swapRecordingRef: jest.fn(
+            async (_id: string, previous: string | null, patch: Partial<ComputerSession>) => {
+                if ((row.recordingRef ?? null) !== previous) return false;
+                Object.assign(row, patch);
+                return true;
+            },
         ),
     };
     const audit = { tryRecord: jest.fn(async () => true) };
@@ -230,6 +241,61 @@ describe('DesktopRecordingService — starting twice at once', () => {
         const [first, second] = await Promise.all([start(), start()]);
         expect(first && second).toBe(true);
         expect(actions(audit)).toEqual(['node.desktop.recording.start']);
+    });
+});
+
+describe('DesktopRecordingService — two writers and a crash', () => {
+    it('stamps a provisional expiry the moment it starts (a crash is still swept)', async () => {
+        const { row, start } = setup();
+        await start();
+        expect(row.recordingExpiresAt).toBeInstanceOf(Date);
+        expect((row.recordingExpiresAt as Date).getTime()).toBeGreaterThan(
+            Date.parse('2026-11-10T09:00:00Z'),
+        );
+    });
+
+    it('merges into the newer index when another replica moved the recording meanwhile', async () => {
+        const { service, storage, row, advance, start } = setup();
+        await start();
+        service.push(VIEW, 20, jpegFrame);
+        advance(61_000);
+        service.push(VIEW, 20, jpegFrame); // chunk 0 written
+        await new Promise((resolve) => setImmediate(resolve));
+        // Another replica published an index with a chunk of its own.
+        const theirs = {
+            schemaVersion: 1,
+            viewId: VIEW,
+            trigger: 'control',
+            startedAt: '2026-10-27T09:00:00.000Z',
+            chunks: [{ seq: 0, key: 'their-chunk', startMs: 30_000, endMs: 40_000, bytes: 5 }],
+        };
+        storage!.objects.set('their-chunk', Buffer.from('EWR1'));
+        storage!.objects.set('their-index', Buffer.from(JSON.stringify(theirs)));
+        row.recordingRef = 'their-index';
+        await service.stop(VIEW, 'view-ended');
+        const index = JSON.parse(
+            storage!.objects.get(row.recordingRef as string)!.toString('utf8'),
+        );
+        expect(index.chunks.map((chunk: { key: string }) => chunk.key)).toContain('their-chunk');
+        expect(index.chunks.map((chunk: { seq: number }) => chunk.seq)).toEqual(
+            index.chunks.map((_: unknown, seq: number) => seq),
+        );
+        expect(index.chunks.length).toBe(3);
+    });
+
+    it('records nothing rather than orphan a recording whose index cannot be read', async () => {
+        const { service, row, start } = setup();
+        row.recordingRef = 'gone-index';
+        expect(await start()).toBe(false);
+        expect(service.failureOf(VIEW)).toBe('storage-failed');
+        expect(row.recordingRef).toBe('gone-index');
+    });
+
+    it('keeps the row when the index cannot be read on delete (its chunks could not be found)', async () => {
+        const { service, row } = setup();
+        row.recordingRef = 'gone-index';
+        expect(await service.remove(VIEW, OWNER)).toBe(false);
+        expect(row.recordingRef).toBe('gone-index');
     });
 });
 

@@ -222,7 +222,7 @@ observer `inbound` hook also receives the frame kind (byte 4), never the payload
 `recordingBytes`, `recordingDurationMs`, `recordingExpiresAt`, `recordingStoppedReason`, `recordingSkippedReason`);
 chunks are `EWR1` containers of the view's `FRAME` / `TILES` frames (`FleetDesktopRecordingEntry`, ≤ 1 keyframe a
 second); routes `GET …/desktop/recordings`, `GET …/recordings/:viewId`, `GET …/recordings/:viewId/chunks/:seq`
-(`application/octet-stream`, `attachment`, `nosniff`), `DELETE …/recordings/:viewId { confirm }` (class `confirm`);
+(`application/octet-stream`, `attachment`, `nosniff`), `DELETE …/recordings/:viewId { confirm }` (class `confirm`; the computer's owner only; `busy` while the view is live);
 `FleetDesktopViewView.recording { state: recording | off | failed, reason }`; the `computer-recording-gc` cron
 (`FLEET_DESKTOP_RECORDING_GC_CRON`); FL-02's viewer observer gains `nodeBinary(viewer, kind, payload)`. Shapes in
 `packages/contracts/src/fleet/fleet-desktop-recording.types.ts`.

@@ -167,6 +167,8 @@ interface DesktopViewRecord {
     checkedAt: number;
     /** P2.C: the recording ends when no socket of the view came back within this timer. */
     recordingTimer: ReturnType<typeof setTimeout> | null;
+    /** P2.C: the ONE socket whose pictures the recording takes (two streams are never mixed). */
+    recorderSocketId: string | null;
 }
 
 @Injectable()
@@ -308,6 +310,7 @@ export class FleetDesktopService
             releaseTimer: null,
             checkedAt: now,
             recordingTimer: null,
+            recorderSocketId: null,
         };
         // AW-11's admission lock: the caps and the row that counts against them, together.
         await this.withAdmissionLock(node, async () => {
@@ -338,7 +341,21 @@ export class FleetDesktopService
 
     /** One of my views, from any replica (its row). */
     async view(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopViewView> {
-        return this.viewOf(await this.loadView(userId, nodeId, viewId));
+        const record = await this.loadView(userId, nodeId, viewId);
+        const view = this.viewOf(record);
+        // Another replica may be the one writing it: the row says so (a provisional expiry, no stop reason).
+        if (view.recording?.state === 'off' && record.persisted && this.sessions) {
+            const row = await this.sessions.findById(viewId).catch(() => null);
+            if (row?.recordingStoppedReason === 'storage-failed' || row?.recordingSkippedReason) {
+                view.recording = {
+                    state: 'failed',
+                    reason: row.recordingSkippedReason ?? 'storage-failed',
+                };
+            } else if (row?.recordingRef && row.recordingExpiresAt && !row.recordingStoppedReason) {
+                view.recording = { state: 'recording', reason: null };
+            }
+        }
+        return view;
     }
 
     /** Another display or quality: a fresh grant the browser re-attaches with (a `driver` one while it holds control). */
@@ -531,7 +548,9 @@ export class FleetDesktopService
         }
         const state = this.controlOutcome(await control.take(this.actorOf(record)), node);
         // FR-48: a view in control mode is recorded, from the moment control is won.
-        if (state.mode === 'controlling') await this.recordIfDue(record, 'control');
+        // (A socket of the view on THIS replica records it; otherwise its driver socket will, wherever it lands.)
+        if (state.mode === 'controlling' && record.sockets > 0)
+            void this.recordIfDue(record, 'control');
         const attach = state.mode === 'controlling' ? await this.mintFor(record, 'driver') : null;
         return { state, attach };
     }
@@ -659,9 +678,29 @@ export class FleetDesktopService
         confirm: boolean,
     ): Promise<void> {
         const node = await this.recordingNode(userId, nodeId);
+        // FR-52: "at once by its owner" — watching a computer is not the right to erase its record.
+        if (node.userId !== userId) {
+            throw fleetLinkError(
+                'permission_denied',
+                `Only the owner of ${node.name} can delete its recordings`,
+                {
+                    actionFamily: 'desktop',
+                },
+            );
+        }
         const recording = this.requireRecording();
         const view = await recording.read(viewId, node.id, node.name);
         if (!view) throw this.recordingGone();
+        // A view still live is still being recorded: deleting it would switch its recording off (FR-48).
+        if (!view.endedAt) {
+            throw fleetLinkError(
+                'busy',
+                'this view is still live — end it before deleting its recording',
+                {
+                    reason: 'view-live',
+                },
+            );
+        }
         if (!confirm) {
             throw fleetLinkError(
                 'confirmation_required',
@@ -834,6 +873,7 @@ export class FleetDesktopService
             clearTimeout(record.recordingTimer);
             record.recordingTimer = null;
         }
+        if (!record.recorderSocketId) record.recorderSocketId = viewer.id;
         void this.recordIfDue(record, viewer.claims.role === 'driver' ? 'control' : 'watch');
         if (viewer.claims.role === 'driver') {
             record.drivers += 1;
@@ -867,6 +907,9 @@ export class FleetDesktopService
         if (!record) return;
         record.sockets = Math.max(0, record.sockets - 1);
         record.lastGrantAt = this.now();
+        if (record.recorderSocketId === viewer.id) record.recorderSocketId = null;
+        // No socket left here: write the tail now — the view may go on on another replica.
+        if (record.sockets === 0) this.recording?.flushNow(record.viewId);
         if (
             record.sockets === 0 &&
             this.recording?.isRecording(record.viewId) &&
@@ -881,6 +924,8 @@ export class FleetDesktopService
         }
         if (viewer.claims.role !== 'driver') return;
         record.drivers = Math.max(0, record.drivers - 1);
+        // M8: the controller's socket is gone — what is recorded now would be watching time.
+        if (record.drivers === 0) void this.stopControlRecording(record.viewId);
         if (record.drivers > 0 || !this.control || record.releaseTimer) return;
         // AW-11's grace: a controller whose socket dropped gets it back if it returns in time.
         const closedAt = this.now();
@@ -944,6 +989,9 @@ export class FleetDesktopService
         if (kind !== FLEET_LINK_FRAME_KINDS.FRAME && kind !== FLEET_LINK_FRAME_KINDS.TILES) return;
         const record = this.desktopRecordOf(viewer);
         if (!record?.persisted || !this.recording.isRecording(record.viewId)) return;
+        // One stream per recording: two sockets of a view (another window, a re-attach) are never mixed.
+        if (!record.recorderSocketId) record.recorderSocketId = viewer.id;
+        if (record.recorderSocketId !== viewer.id) return;
         this.recording.push(record.viewId, kind, payload);
     }
 
@@ -1226,6 +1274,10 @@ export class FleetDesktopService
             clearTimeout(record.recordingTimer);
             record.recordingTimer = null;
         }
+        // The view ended (here, on another replica, or by the stall rule): so does its recording here.
+        if (this.recording?.isRecording(record.viewId)) {
+            void this.recording.stop(record.viewId, 'view-ended').catch(() => undefined);
+        }
         if (record.releaseTimer) {
             clearTimeout(record.releaseTimer);
             record.releaseTimer = null;
@@ -1276,7 +1328,7 @@ export class FleetDesktopService
         viewId: string,
         reason: 'closed-by-user' | 'session-ceiling' | 'error',
     ): Promise<void> {
-        await this.recording?.stop(viewId, 'view-ended').catch(() => undefined);
+        void this.recording?.stop(viewId, 'view-ended').catch(() => undefined);
         try {
             if (typeof this.sessions?.close === 'function') {
                 await this.sessions.close(viewId, {
@@ -1358,6 +1410,7 @@ export class FleetDesktopService
             releaseTimer: null,
             checkedAt: this.now(),
             recordingTimer: null,
+            recorderSocketId: null,
         };
         this.views.set(record.viewId, record);
         return record;
