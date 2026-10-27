@@ -335,6 +335,10 @@
       `node.desktop.display.add|remove`.
       **Test**: `tests/virtual_display.rs` (fake X); `fleet-desktop.controller.virtual.spec.ts`
       (`unsupported_on_node` on macOS/Windows nodes); picker unit spec.
+      **Status (2026-10-27, lane H):** helper side merged (#2951): `src/virtual_display.rs` +
+      `src/virtual_display_x11.rs` (RandR requests, no `xrandr` process), protocol `addDisplay` / `removeDisplay` /
+      `displayChange`, verified against Xorg + the dummy driver. Node messages, API routes, picker, tools and audit
+      are open.
 - [ ] **T-46**. Accessibility: `apps/web/e2e/flow-fleet-desktop-a11y.spec.ts` — keyboard-only
       operation of every control, live-region announcements, axe pass on tab, split and player.
       **Test**: the spec itself; fix findings.
