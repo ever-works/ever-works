@@ -176,9 +176,19 @@ dispatcher** and **failing closed**:
 | `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED`  | APW-08 auto-delivery and APW-06 auto-deploy                 | APW-08 | off                   |
 | `EVER_WORKS_APP_UPSTREAM_PRS_ENABLED` | APW-09 open/push (Wave 2 has no other switch)               | APW-09 | off                   |
 | `EVER_WORKS_APP_MAIL_RELAY_ENABLED`   | APW-07's platform SMTP relay                                | APW-07 | off                   |
+| `EVER_WORKS_APP_CHANGES_ENABLED`      | APW-08 new change runs (chat, board, Goal, Mission)         | APW-08 | off                   |
 
 `EVER_WORKS_APP_WORKS_ENABLED` (R-6) keeps its separate meaning for create and inspect. **These seven are
 not yet in [CONTRACTS.md](./CONTRACTS.md) §7's table** — §0 R-30 is their normative source; see §9 item 6.
+
+**As built (APW-08 T49, lane B2, 2026-10-27 — an addition, nothing above changes).** The table's last column is
+the value a switch reads as when its setting is **not recognised** (fail closed). An **unset or blank** switch
+reads as **on**, which is the default [CONTRACTS.md](./CONTRACTS.md) §7 now lists for every R-30 switch
+(`true`). `EVER_WORKS_APP_CHANGES_ENABLED` is the eighth switch (§7, APW-08). The two APW-08 switches are read
+by `packages/agent/src/app-works/app-work-switches.ts` at each decision. Changes off: `POST …/evolve` and
+`request_app_change` answer `503 switchOff`; `dispatchAgentRun`, `AgentRunService.execute` and the fleet
+planner start no run on a Task on an App Work (a review run still runs). Auto-deploy off: a deployable Build
+no longer deploys itself (APW-06 T35's listener); a person's Deploy and the owner's domain-change rebuild stay.
 
 ### 3B. Quotas and caps (R-31)
 

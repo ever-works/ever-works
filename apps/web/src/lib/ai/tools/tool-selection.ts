@@ -132,6 +132,47 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
         'modify the',
         'change the code',
         'app spec',
+        // Chat and MCP parity (lane B1, 2026-10-27) — the Deploy, Builds, Upstream and App spec
+        // tabs' own words, plus their page paths (the haystack includes the page URL). Still
+        // phrases rather than bare words that ordinary turns contain ("rotate my api key" must
+        // stay out: no bare `rotate`, `key` or `secret`).
+        'app-spec',
+        'app status',
+        'app logs',
+        'logs',
+        'smoke',
+        'run the job',
+        'run a job',
+        'the build',
+        'a build',
+        'builds',
+        'rebuild',
+        'image build',
+        'roll back the app',
+        'pause the app',
+        'resume the app',
+        'env var',
+        'environment variable',
+        'app env',
+        'rotate the',
+        'dependency',
+        'dependencies',
+        'database for',
+        'blueprint',
+        'licence',
+        'license',
+        'apps catalog',
+        'app catalog',
+        'open-source app',
+        'self-host',
+        'upstream',
+        'sync the fork',
+        'sync anyway',
+        'fork',
+        'github.com/',
+        // The Deploy tab's page path (`/works/:id/deploy`). With the slash, so a plain "deploy"
+        // in a message stays the `deploy` domain's alone.
+        '/deploy',
     ],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],
@@ -193,6 +234,16 @@ function deriveDomain(path: string): string {
     if (p.includes('/api/pr-review')) return 'prreview';
     if (p.includes('/api/tool-grants')) return 'toolgrants';
     if (p.includes('/evolve') || p.includes('/provision')) return 'appworks';
+    // Chat and MCP parity (lane B1) — the App Works runtime, Builds, env, dependencies, App
+    // spec, licence, upstream and catalog routes. Without this they fall into the `works`
+    // catch-all below, which is active on EVERY turn, and ~35 App tools would crowd the budget
+    // of every unrelated conversation.
+    if (
+        /^\/api\/works\/\{[a-z]+\}\/(app-[a-z-]+|builds|upstream|deploy)(\/|$)/.test(p) ||
+        p.startsWith('/api/apps-catalog')
+    ) {
+        return 'appworks';
+    }
     if (p.includes('/members') || p.includes('/invitations')) return 'members';
     if (p.includes('/api-keys')) return 'apikeys';
     if (p.includes('/budgets') || p.includes('/usage')) return 'budgets';
@@ -252,6 +303,8 @@ export const STATIC_TOOL_DOMAINS: Record<string, string> = {
     createWorkWithAI: 'works',
     importWork: 'works',
     analyzeImportSource: 'works',
+    // APW-01 T32 — reached with "can I fork / self-host github.com/…" (the `appworks` slot).
+    inspectAppSource: 'appworks',
     updateWork: 'works',
     deleteWork: 'works',
     syncWork: 'works',
