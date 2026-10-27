@@ -32,8 +32,8 @@ jest.mock('./templates/render', () => ({
     listTemplates: jest.fn(() => []),
 }));
 
-import { NotFoundException } from '@nestjs/common';
-import { EmailService } from './email.service';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { EmailService, ROUTED_ADDRESS_TAKEN } from './email.service';
 
 /**
  * EmailService — security-scoped behaviour around `sendMessage`.
@@ -869,5 +869,249 @@ describe('EmailService.listAddresses (EW-P4-3)', () => {
             service.listAddresses('user-1', 'outbound', { includeDisabled: true }),
         ).resolves.toHaveLength(2);
         expect(addresses.findAllByUser).toHaveBeenCalledWith('user-1', 'outbound');
+    });
+});
+
+/**
+ * Ever Email Router — the allocation guard. The router delivers one domain
+ * (`EVER_EMAIL_DOMAIN`, default `ever.email`) and the inbound binding picks the
+ * oldest enabled inbound row of a mailbox whoever owns it, so a router address
+ * is held to that domain and to ONE owner per deployment. Other plugins are
+ * untouched.
+ */
+describe('EmailService — Ever Email Router allocation guard', () => {
+    let addresses: {
+        save: jest.Mock;
+        delete: jest.Mock;
+        update: jest.Mock;
+        findByIdForUser: jest.Mock;
+        findEnabledInboundByAddress: jest.Mock;
+    };
+    let service: EmailService;
+    const previousDomain = process.env.EVER_EMAIL_DOMAIN;
+
+    const routed = (address: string, direction: 'inbound' | 'outbound' | 'both' = 'inbound') => ({
+        address,
+        direction,
+        pluginId: 'ever-email-router',
+        providerSettings: {},
+    });
+
+    beforeEach(() => {
+        delete process.env.EVER_EMAIL_DOMAIN;
+        addresses = {
+            save: jest.fn().mockImplementation(async (row) => ({
+                id: 'new-row',
+                createdAt: new Date('2026-10-27T10:00:00Z'),
+                ...row,
+            })),
+            delete: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+            findByIdForUser: jest.fn(),
+            findEnabledInboundByAddress: jest.fn().mockResolvedValue([]),
+        };
+        service = new EmailService(
+            addresses as never,
+            {} as never,
+            {} as never,
+            {} as never,
+            {} as never,
+        );
+    });
+
+    afterAll(() => {
+        if (previousDomain === undefined) delete process.env.EVER_EMAIL_DOMAIN;
+        else process.env.EVER_EMAIL_DOMAIN = previousDomain;
+    });
+
+    describe('createAddress', () => {
+        it('registers a free @ever.email mailbox, stored lower-cased', async () => {
+            addresses.findEnabledInboundByAddress
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([{ id: 'new-row', userId: 'user-1' }]);
+
+            const row = await service.createAddress('user-1', routed(' Agent.Smith@Ever.Email '));
+
+            expect(row.address).toBe('agent.smith@ever.email');
+            expect(addresses.save).toHaveBeenCalledWith(
+                expect.objectContaining({ address: 'agent.smith@ever.email' }),
+            );
+            expect(addresses.findEnabledInboundByAddress).toHaveBeenCalledWith(
+                'agent.smith@ever.email',
+            );
+            expect(addresses.delete).not.toHaveBeenCalled();
+        });
+
+        it('refuses a mailbox on any other domain (400), saving nothing', async () => {
+            await expect(
+                service.createAddress('user-1', routed('agent@example.com')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.createAddress('user-1', routed('agent@sub.ever.email')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+
+        it('takes the domain from EVER_EMAIL_DOMAIN', async () => {
+            process.env.EVER_EMAIL_DOMAIN = 'Mail.Example.Org';
+            await expect(
+                service.createAddress('user-1', routed('agent@ever.email')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.createAddress('user-1', routed('agent@mail.example.org')),
+            ).resolves.toMatchObject({ address: 'agent@mail.example.org' });
+        });
+
+        it('refuses (409) a mailbox another account already holds with this plugin', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2', pluginId: 'ever-email-router' },
+            ]);
+
+            const attempt = service.createAddress('user-1', routed('agent@ever.email'));
+
+            await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+            await expect(attempt).rejects.toThrow(ROUTED_ADDRESS_TAKEN);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+
+        it('refuses (409) a mailbox another account squats with another plugin', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'squat', userId: 'user-2', pluginId: 'postmark' },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', routed('agent@ever.email', 'both')),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+
+        it('does not count the caller own rows as a conflict', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'mine', userId: 'user-1', pluginId: 'ever-email-router' },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', routed('agent@ever.email', 'both')),
+            ).resolves.toMatchObject({ id: 'new-row' });
+        });
+
+        it('loses a concurrent registration: an older row of another account is kept, this one deleted (409)', async () => {
+            addresses.findEnabledInboundByAddress
+                .mockResolvedValueOnce([]) // the check before saving saw nobody
+                .mockResolvedValueOnce([
+                    { id: 'theirs', userId: 'user-2' },
+                    { id: 'new-row', userId: 'user-1' },
+                ]);
+
+            await expect(
+                service.createAddress('user-1', routed('agent@ever.email')),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.delete).toHaveBeenCalledWith('new-row', 'user-1');
+        });
+
+        it('wins a concurrent registration when its row is the older one', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValueOnce([]).mockResolvedValueOnce([
+                { id: 'new-row', userId: 'user-1' },
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', routed('agent@ever.email')),
+            ).resolves.toMatchObject({ id: 'new-row' });
+            expect(addresses.delete).not.toHaveBeenCalled();
+        });
+
+        it('checks only the domain of an outbound-only router row', async () => {
+            await expect(
+                service.createAddress('user-1', routed('agent@ever.email', 'outbound')),
+            ).resolves.toMatchObject({ direction: 'outbound' });
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+            await expect(
+                service.createAddress('user-1', routed('agent@example.com', 'outbound')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('leaves every other plugin exactly as before (any domain, address as typed, no lookup)', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2', pluginId: 'postmark' },
+            ]);
+
+            const row = await service.createAddress('user-1', {
+                address: 'Agent@Ever.Email',
+                direction: 'inbound',
+                pluginId: 'postmark',
+                providerSettings: {},
+            });
+
+            expect(row.address).toBe('Agent@Ever.Email');
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('updateAddress', () => {
+        const disabledAt = new Date('2026-10-20T00:00:00Z');
+        const routedRow = {
+            id: 'row-1',
+            userId: 'user-1',
+            address: 'agent@ever.email',
+            direction: 'inbound',
+            pluginId: 'ever-email-router',
+            disabledAt,
+        };
+
+        it('refuses (409) re-enabling a router mailbox another account took meanwhile', async () => {
+            addresses.findByIdForUser.mockResolvedValue(routedRow);
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.updateAddress('user-1', 'row-1', { disabled: false }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.update).not.toHaveBeenCalled();
+        });
+
+        it('re-enables a router mailbox that is free', async () => {
+            addresses.findByIdForUser.mockResolvedValue(routedRow);
+
+            await service.updateAddress('user-1', 'row-1', { disabled: false });
+
+            expect(addresses.update).toHaveBeenCalledTimes(1);
+            expect(addresses.update).toHaveBeenCalledWith('row-1', { disabledAt: null });
+        });
+
+        it('puts the row back to disabled when another account took the mailbox during the re-enable', async () => {
+            addresses.findByIdForUser.mockResolvedValue(routedRow);
+            addresses.findEnabledInboundByAddress.mockResolvedValueOnce([]).mockResolvedValueOnce([
+                { id: 'row-1', userId: 'user-1' },
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.updateAddress('user-1', 'row-1', { disabled: false }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.update).toHaveBeenLastCalledWith('row-1', { disabledAt });
+        });
+
+        it('does not check a router row on any other update (disable, settings)', async () => {
+            addresses.findByIdForUser.mockResolvedValue({ ...routedRow, disabledAt: null });
+
+            await service.updateAddress('user-1', 'row-1', { disabled: true });
+            await service.updateAddress('user-1', 'row-1', { providerSettings: { a: 1 } });
+
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+        });
+
+        it('leaves re-enabling another plugin row unchecked', async () => {
+            addresses.findByIdForUser.mockResolvedValue({ ...routedRow, pluginId: 'postmark' });
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await service.updateAddress('user-1', 'row-1', { disabled: false });
+
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+            expect(addresses.update).toHaveBeenCalledWith('row-1', { disabledAt: null });
+        });
     });
 });

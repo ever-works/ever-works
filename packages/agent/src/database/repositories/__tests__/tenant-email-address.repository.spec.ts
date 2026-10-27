@@ -120,6 +120,50 @@ describe('TenantEmailAddressRepository (real database)', () => {
         });
     });
 
+    it('findEnabledInboundByAddress: enabled inbound/both rows of every user and plugin, case-insensitive, oldest first', async () => {
+        const OTHER = '22222222-2222-4222-8222-222222222222';
+        await dataSource.getRepository(User).insert({
+            id: OTHER,
+            username: 'orion',
+            slug: 'orion',
+            email: 'orion@example.com',
+            password: 'not-a-real-hash',
+            registrationProvider: 'local',
+            isActive: true,
+        } as Partial<User>);
+        const oldest = await insertAddress({
+            address: 'Agent@Ever.Email',
+            direction: 'both',
+            pluginId: 'postmark',
+            createdAt: new Date('2026-10-01T00:00:00Z'),
+        });
+        const newer = await insertAddress({
+            userId: OTHER,
+            address: 'agent@ever.email',
+            direction: 'inbound',
+            pluginId: 'ever-email-router',
+            createdAt: new Date('2026-10-02T00:00:00Z'),
+        });
+        // Not counted: disabled, outbound-only, another mailbox.
+        await insertAddress({
+            userId: OTHER,
+            address: 'agent@ever.email',
+            direction: 'outbound',
+            pluginId: 'ever-email-router',
+        });
+        await insertAddress({
+            address: 'agent@ever.email',
+            direction: 'inbound',
+            pluginId: 'ever-email-router',
+            disabledAt: new Date('2026-10-03T00:00:00Z'),
+        });
+        await insertAddress({ address: 'agent2@ever.email', direction: 'inbound' });
+
+        const rows = await addresses.findEnabledInboundByAddress(' AGENT@ever.email ');
+
+        expect(rows.map((row) => row.id)).toEqual([oldest, newer]);
+    });
+
     it('findAllByUser lists disabled addresses too; findActiveByUser does not', async () => {
         await insertAddress();
         await insertAddress({ disabledAt: new Date('2026-10-01T00:00:00Z') });

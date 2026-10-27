@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     HttpException,
     HttpStatus,
     Injectable,
@@ -57,6 +58,32 @@ export const VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
 
 /** EW-P4-3 — where the confirmation link lands (a public web page, see apps/web). */
 export const EMAIL_ADDRESS_VERIFY_PATH = '/email-address/verify';
+
+/**
+ * Ever Email Router (`packages/plugins/ever-email-router`): the shared
+ * Cloudflare router delivers ONE domain, and the inbound binding
+ * (`TenantEmailAddressRepository.findByAddress`) picks the OLDEST enabled
+ * inbound row of a mailbox, whoever owns it and whatever its plugin. So an
+ * address of this plugin is held to the router's domain and to one owner per
+ * deployment ({@link EmailService.assertRoutedAddressAvailable}) — otherwise a
+ * second account could take a mailbox someone already holds (re-enabling an
+ * older row would even move their mail), or squat it first. Nothing here
+ * applies to any other plugin.
+ */
+export const EVER_EMAIL_ROUTER_PLUGIN_ID = 'ever-email-router';
+
+/** The domain the router delivers when `EVER_EMAIL_DOMAIN` is unset. */
+export const DEFAULT_EVER_EMAIL_DOMAIN = 'ever.email';
+
+/** `EVER_EMAIL_DOMAIN` (lower-cased), else {@link DEFAULT_EVER_EMAIL_DOMAIN}. */
+export function everEmailDomain(env: NodeJS.ProcessEnv = process.env): string {
+    return (env.EVER_EMAIL_DOMAIN ?? '').trim().toLowerCase() || DEFAULT_EVER_EMAIL_DOMAIN;
+}
+
+/** Answered (409) when another account already holds a router mailbox. */
+export const ROUTED_ADDRESS_TAKEN = 'This address is already registered by another account.';
+
+const INBOUND_DIRECTIONS: readonly EmailAddressDirection[] = ['inbound', 'both'];
 
 /** EW-P4-3 — what `POST /api/email/addresses/:id/verify` answers. */
 export interface TriggerVerificationResult {
@@ -251,10 +278,15 @@ export class EmailService {
         userId: string,
         input: CreateEmailAddressInput,
     ): Promise<TenantEmailAddress> {
+        const routed = input.pluginId === EVER_EMAIL_ROUTER_PLUGIN_ID;
+        // A router mailbox is stored lower-cased: the plugin binds on the
+        // lower-cased envelope recipient, and the binding lookup is exact.
+        const address = routed ? input.address.trim().toLowerCase() : input.address;
+        if (routed) await this.assertRoutedAddressAvailable(userId, address, input.direction);
         const verificationToken = randomBytes(24).toString('base64url');
-        return this.addresses.save({
+        const saved = await this.addresses.save({
             userId,
-            address: input.address,
+            address,
             direction: input.direction,
             pluginId: input.pluginId,
             providerSettings: input.providerSettings,
@@ -265,6 +297,19 @@ export class EmailService {
             // confirmation link cannot verify the address indefinitely.
             verificationTokenExpiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
         } as TenantEmailAddress);
+        if (routed && INBOUND_DIRECTIONS.includes(saved.direction)) {
+            // Two accounts registering the same mailbox at once both pass the
+            // check above (no unique index spans users). Oldest first, the one
+            // the binding picks is kept; a row another account wrote before
+            // this one means this request lost the race.
+            const holders = await this.addresses.findEnabledInboundByAddress(address);
+            const first = holders.find((row) => row.userId !== userId || row.id === saved.id);
+            if (first && first.id !== saved.id) {
+                await this.addresses.delete(saved.id, userId);
+                throw new ConflictException(ROUTED_ADDRESS_TAKEN);
+            }
+        }
+        return saved;
     }
 
     async updateAddress(
@@ -272,15 +317,68 @@ export class EmailService {
         id: string,
         input: UpdateEmailAddressInput,
     ): Promise<TenantEmailAddress> {
-        await this.findOwnedOrThrow(userId, id);
+        const row = await this.findOwnedOrThrow(userId, id);
         const patch: Partial<TenantEmailAddress> = {};
         if (input.providerSettings) patch.providerSettings = input.providerSettings;
         if (typeof input.defaultForReplies === 'boolean')
             patch.defaultForReplies = input.defaultForReplies;
         if (typeof input.disabled === 'boolean')
             patch.disabledAt = input.disabled ? new Date() : null;
+        // Re-enabling a router mailbox is the one update that changes who
+        // receives it (the row keeps its old `createdAt`, so the binding would
+        // prefer it over a newer holder): it must be free again.
+        const reEnablesRouted =
+            row.pluginId === EVER_EMAIL_ROUTER_PLUGIN_ID &&
+            input.disabled === false &&
+            !!row.disabledAt;
+        if (reEnablesRouted) {
+            await this.assertRoutedAddressAvailable(userId, row.address, row.direction, row.id);
+        }
         await this.addresses.update(id, patch);
+        if (reEnablesRouted && INBOUND_DIRECTIONS.includes(row.direction)) {
+            // As in `createAddress`: another account that took the mailbox
+            // meanwhile keeps it, and this row goes back to disabled.
+            const holders = await this.addresses.findEnabledInboundByAddress(row.address);
+            if (holders.some((holder) => holder.userId !== userId)) {
+                await this.addresses.update(id, { disabledAt: row.disabledAt });
+                throw new ConflictException(ROUTED_ADDRESS_TAKEN);
+            }
+        }
         return this.findOwnedOrThrow(userId, id);
+    }
+
+    /**
+     * The Ever Email Router allocation rule ({@link EVER_EMAIL_ROUTER_PLUGIN_ID}):
+     * the address must be on the router's domain (`EVER_EMAIL_DOMAIN`, default
+     * `ever.email`) — 400 — and, when it receives mail, no other account may
+     * hold an enabled inbound row for the same mailbox (case-insensitive, any
+     * plugin: the binding would pick that row, so this one would never receive)
+     * — 409. `excludeId` is the row being re-enabled.
+     */
+    private async assertRoutedAddressAvailable(
+        userId: string,
+        address: string,
+        direction: EmailAddressDirection,
+        excludeId?: string,
+    ): Promise<void> {
+        const domain = everEmailDomain();
+        const at = address.lastIndexOf('@');
+        if (
+            at <= 0 ||
+            address
+                .slice(at + 1)
+                .trim()
+                .toLowerCase() !== domain
+        ) {
+            throw new BadRequestException(
+                `Ever Email Router addresses must be on @${domain} — the only domain the router delivers.`,
+            );
+        }
+        if (!INBOUND_DIRECTIONS.includes(direction)) return;
+        const holders = await this.addresses.findEnabledInboundByAddress(address);
+        if (holders.some((row) => row.id !== excludeId && row.userId !== userId)) {
+            throw new ConflictException(ROUTED_ADDRESS_TAKEN);
+        }
     }
 
     async deleteAddress(userId: string, id: string): Promise<void> {
