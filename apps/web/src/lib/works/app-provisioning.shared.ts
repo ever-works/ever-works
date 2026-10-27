@@ -97,8 +97,18 @@ export function provisioningHeadline(state: AppProvisioningState | null): AppPro
     }
 }
 
+/** A trigger's i18n leaf under `appProvisioning.trigger`. */
+export type AppProvisioningTriggerKey =
+    | 'autoCreate'
+    | 'manual'
+    | 'smokeFailed'
+    | 'targetUpdated'
+    | 'buildFailed';
+
 /** The i18n leaf for a trigger, or `null` for one the card has no copy for. */
-export function provisioningTriggerKey(trigger: string | null | undefined): string | null {
+export function provisioningTriggerKey(
+    trigger: string | null | undefined,
+): AppProvisioningTriggerKey | null {
     switch (trigger) {
         case 'auto-create':
             return 'autoCreate';
@@ -115,18 +125,57 @@ export function provisioningTriggerKey(trigger: string | null | undefined): stri
     }
 }
 
+/** A refusal's i18n leaf under `appProvisioning.errors`. */
+export type AppProvisioningRefusalKey =
+    | 'alreadyProvisioning'
+    | 'nothingToCancel'
+    | 'cancelRefused'
+    | 'notAppWork'
+    | 'notFound'
+    | 'failed';
+
 /** The refusal codes of `POST provision` / `provision/cancel` the card has its own copy for. */
-const KNOWN_REFUSALS: ReadonlySet<string> = new Set([
-    'alreadyProvisioning',
-    'nothingToCancel',
-    'cancelRefused',
-    'notAppWork',
-    'not_found',
-]);
+const REFUSAL_KEYS: Readonly<Record<string, AppProvisioningRefusalKey>> = {
+    alreadyProvisioning: 'alreadyProvisioning',
+    nothingToCancel: 'nothingToCancel',
+    cancelRefused: 'cancelRefused',
+    notAppWork: 'notAppWork',
+    not_found: 'notFound',
+};
 
 /** The i18n leaf (under `appProvisioning.errors`) for a refusal code. */
-export function provisioningRefusalKey(code: string | null | undefined): string {
-    return code && KNOWN_REFUSALS.has(code)
-        ? code.replace(/_(\w)/g, (_m, c) => c.toUpperCase())
-        : 'failed';
+export function provisioningRefusalKey(code: string | null | undefined): AppProvisioningRefusalKey {
+    return (
+        (code && Object.prototype.hasOwnProperty.call(REFUSAL_KEYS, code) && REFUSAL_KEYS[code]) ||
+        'failed'
+    );
+}
+
+/** A Task status's i18n leaf under `appProvisioning.status` (camelCase, no dots). */
+export type AppProvisioningStatusKey =
+    | 'backlog'
+    | 'todo'
+    | 'inProgress'
+    | 'inReview'
+    | 'blocked'
+    | 'done'
+    | 'cancelled'
+    | 'unknown';
+
+/** The i18n leaf for a Task status. */
+export function provisioningStatusKey(status: string): AppProvisioningStatusKey {
+    switch (status) {
+        case 'in_progress':
+            return 'inProgress';
+        case 'in_review':
+            return 'inReview';
+        case 'backlog':
+        case 'todo':
+        case 'blocked':
+        case 'done':
+        case 'cancelled':
+            return status;
+        default:
+            return 'unknown';
+    }
 }

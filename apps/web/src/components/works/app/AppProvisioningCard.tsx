@@ -27,6 +27,7 @@ import {
     isProvisioningActive,
     provisioningHeadline,
     provisioningRefusalKey,
+    provisioningStatusKey,
     provisioningTriggerKey,
     type AppProvisioningState,
     type AppProvisioningTaskView,
@@ -242,7 +243,7 @@ export function AppProvisioningCard({ workId, initialState }: AppProvisioningCar
                             >
                                 {task.taskSlug}
                             </Link>{' '}
-                            · {t(`status.${statusKey(task.status)}`)}
+                            · {t(`status.${provisioningStatusKey(task.status)}`)}
                         </li>
                     ))}
                 </ul>
@@ -290,22 +291,4 @@ export function AppProvisioningCard({ workId, initialState }: AppProvisioningCar
             )}
         </section>
     );
-}
-
-/** The i18n leaf for a Task status (camelCase, no dots). */
-function statusKey(status: string): string {
-    switch (status) {
-        case 'in_progress':
-            return 'inProgress';
-        case 'in_review':
-            return 'inReview';
-        case 'backlog':
-        case 'todo':
-        case 'blocked':
-        case 'done':
-        case 'cancelled':
-            return status;
-        default:
-            return 'unknown';
-    }
 }
