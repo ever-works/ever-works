@@ -666,6 +666,52 @@ export class WorkAppSpecStateRepository {
     }
 
     /**
+     * APW-03 T30 (lane aw-blueprints) — the distinct Blueprint ids App Works follow, for
+     * the upgrade-notice fan-out to read each Blueprint's latest version once.
+     */
+    async listFollowedBlueprintIds(
+        limit: number = WORK_APP_SPEC_STATE_SCAN_MAX,
+    ): Promise<string[]> {
+        const take = this.batchSize(limit);
+        if (take === 0) {
+            return [];
+        }
+        const rows: Array<{ blueprintId: string | null }> = await this.repository
+            .createQueryBuilder('state')
+            .select('state.blueprintId', 'blueprintId')
+            .where('state.blueprintId IS NOT NULL')
+            .andWhere('state.blueprintVersion IS NOT NULL')
+            .groupBy('state.blueprintId')
+            .orderBy('state.blueprintId', 'ASC')
+            .limit(take)
+            .getRawMany();
+        return rows
+            .map((row) => row.blueprintId)
+            .filter((id): id is string => typeof id === 'string' && id !== '');
+    }
+
+    /**
+     * APW-03 T30 — record that `version` is the newest the Work's Blueprint has, **once
+     * per version**: the `WHERE` makes a re-run for the same version write nothing, so
+     * `app.blueprint.upgrade_available` is recorded exactly once per (Work, version).
+     */
+    async markUpgradeAvailable(workId: string, version: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppSpecState)
+            .set({ blueprintLatestVersion: version })
+            .where('workId = :workId', { workId })
+            .andWhere(
+                '("blueprintLatestVersion" IS NULL OR "blueprintLatestVersion" <> :version)',
+                {
+                    version,
+                },
+            )
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * APW-03 T44 — store (or clear, with `null`) the owner's single attestation
      * record (C3, R-3). Guarded by the licence the caller judged, so an attest
      * that raced a re-classification writes nothing (`409 licenseChanged`).
@@ -737,20 +783,28 @@ export class WorkAppSpecStateRepository {
         blueprintId: string,
         version: string,
         limit: number = WORK_APP_SPEC_STATE_SCAN_MAX,
+        // APW-03 T30 (lane aw-blueprints) — the notice fan-out skips the rows it already
+        // told about this version, so a capped run moves on to the next rows instead of
+        // re-reading the same first `limit` forever. Absent ⇒ the original query.
+        options: { excludeNotified?: boolean } = {},
     ): Promise<WorkAppSpecState[]> {
         const take = this.batchSize(limit);
         if (!blueprintId || take === 0) {
             return [];
         }
 
-        return this.repository
+        const query = this.repository
             .createQueryBuilder('state')
             .where('state.blueprintId = :blueprintId', { blueprintId })
             .andWhere('state.blueprintVersion IS NOT NULL')
-            .andWhere('state.blueprintVersion <> :version', { version })
-            .orderBy('state.id', 'ASC')
-            .take(take)
-            .getMany();
+            .andWhere('state.blueprintVersion <> :version', { version });
+        if (options.excludeNotified) {
+            query.andWhere(
+                '(state.blueprintLatestVersion IS NULL OR state.blueprintLatestVersion <> :version)',
+                { version },
+            );
+        }
+        return query.orderBy('state.id', 'ASC').take(take).getMany();
     }
 
     /**

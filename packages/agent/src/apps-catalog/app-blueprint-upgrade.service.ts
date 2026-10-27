@@ -113,6 +113,12 @@ export const APP_BLUEPRINT_RUN_LOCK_TTL_MS = 10 * 60_000;
 /** How many times a non-fast-forward commit is retried after re-reading the branch. */
 export const APP_BLUEPRINT_COMMIT_ATTEMPTS = 3;
 
+/** Notices one fan-out run records at most (plan §6.4: ≤ 500 Works per run). */
+export const APP_BLUEPRINT_NOTICES_PER_RUN = 500;
+
+/** Distinct Blueprints one fan-out run reads at most. */
+export const APP_BLUEPRINT_NOTICE_BLUEPRINTS_PER_RUN = 100;
+
 /** How many Blueprint changes a pull request body lists by path. */
 const PR_BODY_CHANGES_LISTED = 30;
 
@@ -846,6 +852,103 @@ export class AppBlueprintUpgradeService {
             },
         });
         return true;
+    }
+
+    /* ------------------------------------------------------------------ *
+     * refreshUpgradeNotices — "a new Blueprint version is out"
+     * ------------------------------------------------------------------ */
+
+    /**
+     * APW-03 T30 — the upgrade-notice fan-out (plan §2.5 "Upgrade", §6.4), run hourly by
+     * the API cron (`APPS_CATALOG_REFRESH_CRON`, `23 * * * *`):
+     *
+     *  1. every distinct Blueprint id an App Work follows;
+     *  2. that Blueprint's latest release — its default branch, read through the
+     *     resolver (public Blueprints only: no Work's owner is in scope here, so a private
+     *     first-party Blueprint is never read on a Work's behalf);
+     *  3. each Work on an older version (`findUpgradeCandidates` + `semver`) gets
+     *     `blueprintLatestVersion` set and ONE `app.blueprint.upgrade_available` row per
+     *     version (the guarded write is the once-only rule), with the `breaking` flag of a
+     *     `MAJOR` bump.
+     *
+     * At most `limit` notices per run (plan: ≤ 500); the rest are reached by the next run.
+     * One Blueprint that cannot be read never stops the others.
+     */
+    async refreshUpgradeNotices(options: { limit?: number } = {}): Promise<{
+        blueprints: number;
+        scanned: number;
+        notices: number;
+    }> {
+        const summary = { blueprints: 0, scanned: 0, notices: 0 };
+        const states = this.states();
+        if (!states || !this.resolver) return summary;
+        const limit = Math.max(
+            1,
+            Math.min(options.limit ?? APP_BLUEPRINT_NOTICES_PER_RUN, APP_BLUEPRINT_NOTICES_PER_RUN),
+        );
+
+        const ids = await states.listFollowedBlueprintIds(APP_BLUEPRINT_NOTICE_BLUEPRINTS_PER_RUN);
+        for (const blueprintId of ids) {
+            if (summary.notices >= limit) break;
+            let release: AppBlueprintRelease | null = null;
+            try {
+                release = await this.resolver.readBlueprintRelease(blueprintId, {
+                    sourceOwner: null,
+                });
+            } catch (error) {
+                if (error instanceof AppsCatalogCredentialUnavailableError) {
+                    return summary; // nothing can be read this run
+                }
+                this.logger.warn(
+                    `Blueprint notices: reading ${blueprintId} failed (${errorText(error)}).`,
+                );
+                continue;
+            }
+            if (!release) continue;
+            summary.blueprints += 1;
+            const latest = release.hit.version;
+
+            const candidates = await states.findUpgradeCandidates(
+                blueprintId,
+                latest,
+                limit - summary.notices,
+                { excludeNotified: true },
+            );
+            for (const candidate of candidates) {
+                summary.scanned += 1;
+                if (!isNewerBlueprintVersion(latest, candidate.blueprintVersion)) continue;
+                if (candidate.blueprintLatestVersion === latest) continue;
+                let first = false;
+                try {
+                    first = await states.markUpgradeAvailable(candidate.workId, latest);
+                } catch (error) {
+                    this.logger.warn(
+                        `Blueprint notices: marking work ${candidate.workId} failed (${errorText(error)}).`,
+                    );
+                    continue;
+                }
+                if (!first) continue;
+                summary.notices += 1;
+                const breaking = isBreakingBlueprintUpgrade(candidate.blueprintVersion, latest);
+                const owner = this.works
+                    ? ((await this.works.findById(candidate.workId).catch(() => null))?.userId ??
+                      null)
+                    : null;
+                await this.logActivity(candidate.workId, owner, {
+                    action: APP_BLUEPRINT_RUN_EVENTS.upgradeAvailable,
+                    status: ActivityStatus.COMPLETED,
+                    summary: `${breaking ? 'Breaking: ' : ''}the ${blueprintId} Blueprint ${latest} is available (this App Work follows ${candidate.blueprintVersion})`,
+                    details: {
+                        blueprintId,
+                        version: latest,
+                        fromVersion: candidate.blueprintVersion ?? null,
+                        breaking,
+                    },
+                });
+                if (summary.notices >= limit) break;
+            }
+        }
+        return summary;
     }
 
     /* ------------------------------------------------------------------ *

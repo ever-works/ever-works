@@ -72,6 +72,8 @@ import { AppsCatalogBlueprintsService } from './apps-catalog-blueprints.service'
 // Lane aw-web-3 — the manifest-backed Apps catalog (APW-03).
 import { AppsCatalogController } from './apps-catalog.controller';
 import { AppsCatalogManifestService } from './apps-catalog-manifest.service';
+// APW-03 T30 (lane aw-blueprints) — the hourly Blueprint upgrade-notice pass.
+import { AppsCatalogUpgradeNoticeCronService } from './apps-catalog-upgrade-notice-cron.service';
 import { WorkRunsController } from './work-runs.controller';
 import { WorkPullRequestsController } from './work-pull-requests.controller';
 import { MembersController } from './members.controller';
@@ -171,6 +173,9 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         AppsCatalogBlueprintsService,
         // `GET /api/apps-catalog` (+ `/:id`) — the manifest-backed Apps catalog.
         AppsCatalogManifestService,
+        // APW-03 T30 — `blueprintLatestVersion` + `app.blueprint.upgrade_available`,
+        // hourly at `APPS_CATALOG_REFRESH_CRON`, one replica per tick (the lock below).
+        AppsCatalogUpgradeNoticeCronService,
         WorksTemplateCatalogService,
         ExistingWebsiteLinkService,
         WorkCleanupService,

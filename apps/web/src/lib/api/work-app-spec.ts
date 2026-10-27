@@ -1,6 +1,8 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import type {
+    AppBlueprintRunMode,
+    AppBlueprintUpgradePr,
     AppSpecIssue,
     AppSpecValidationStatus,
     WorkAppSpecStateDto,
@@ -78,6 +80,21 @@ export interface AppSpecContentValidation {
 /** Either half of the `validate` response, discriminated by `evaluationPending`. */
 export type AppSpecValidateResult = AppSpecEvaluationQueued | AppSpecContentValidation;
 
+/**
+ * APW-03 T29/T31 (lane aw-blueprints) — what `POST …/app-spec/blueprint` and
+ * `…/blueprint/upgrade` answer: `queued` (202) or `existing` (200, the open pull
+ * request for that version).
+ */
+export interface AppBlueprintRunAccepted {
+    status: 'queued' | 'existing';
+    mode: AppBlueprintRunMode;
+    blueprintId: string;
+    version: string;
+    applyStatus?: 'applying';
+    runId?: string | null;
+    pullRequest?: AppBlueprintUpgradePr;
+}
+
 export const workAppSpecAPI = {
     /** `GET /api/works/:id/app-spec` — the App Work's spec state (view). */
     get: async (workId: string): Promise<WorkAppSpecStateDto> => {
@@ -100,6 +117,48 @@ export const workAppSpecAPI = {
     ): Promise<AppSpecValidateResult> => {
         return serverMutation<AppSpecValidateResult>({
             endpoint: `/works/${workId}/app-spec/validate`,
+            data: input,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+    /**
+     * `POST /api/works/:id/app-spec/blueprint` — apply a Blueprint to an App Work that
+     * has none (edit). A refusal (`404 blueprintNotFound`, `409 applyInProgress` /
+     * `blueprintAlreadyApplied`, `429`) arrives as a thrown `ApiResponseError`.
+     */
+    applyBlueprint: async (
+        workId: string,
+        input: { blueprintId: string; version?: string },
+    ): Promise<AppBlueprintRunAccepted> => {
+        return serverMutation<AppBlueprintRunAccepted>({
+            endpoint: `/works/${workId}/app-spec/blueprint`,
+            data: input,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** `POST /api/works/:id/app-spec/blueprint/upgrade` — propose an upgrade (edit). */
+    upgradeBlueprint: async (
+        workId: string,
+        input: { version?: string },
+    ): Promise<AppBlueprintRunAccepted> => {
+        return serverMutation<AppBlueprintRunAccepted>({
+            endpoint: `/works/${workId}/app-spec/blueprint/upgrade`,
+            data: input,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** `POST /api/works/:id/app-spec/blueprint/dismiss` — hide one version's notice (edit). */
+    dismissBlueprintUpgrade: async (
+        workId: string,
+        input: { version: string },
+    ): Promise<{ status: 'dismissed'; version: string }> => {
+        return serverMutation<{ status: 'dismissed'; version: string }>({
+            endpoint: `/works/${workId}/app-spec/blueprint/dismiss`,
             data: input,
             method: 'POST',
             wrapInData: false,
