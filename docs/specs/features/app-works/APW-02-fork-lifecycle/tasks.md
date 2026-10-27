@@ -729,7 +729,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       **Done when**: the three specs are green and the Upstream card no longer shows "Not synced yet" after a merged
       sync pull request.
 
-- [ ] **T48. Private-copy divergence and sync through a plugin capability (FR-63 — ACC-02-27).**
+- [x] **T48. Private-copy divergence and sync through a plugin capability (FR-63 — ACC-02-27).** _(2026-10-27, #2913; the move pins the checked sha instead of reusing `createRepositoryCopy`.)_
       **Modify** `packages/plugin/src/contracts/capabilities/git-provider.app-forks.ts` (T9) and
       `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` (T10) — add the optional
       `getRepositoryCopyDivergence?`: it takes the source and target coordinates plus `maxCommits`, and returns
@@ -847,7 +847,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       `packages/agent/src/template-catalog/template-catalog.service.spec.ts` (the `forkTemplateForUser` caller)
       passes unchanged.
 
-- [ ] **T53. The Upstream sync appears in the Schedules view (FR-32 — ACC-E2E-05).**
+- [x] **T53. The Upstream sync appears in the Schedules view (FR-32 — ACC-E2E-05).** _(2026-10-27, lane aw-loops: read-only; Run now answers `managedOnWork` and the row links to the Upstream tab, where Sync now lives.)_
       ACC-E2E-05 asserts that "the Schedules view lists the Upstream sync with the spec's cron expression", and no
       task in any epic put it there: this epic runs sync from its own dispatcher (`app-upstream-sync-dispatcher`,
       §6.6) and the existing Schedules surface aggregates **seven** sources — recurring Tasks, Agent heartbeats,

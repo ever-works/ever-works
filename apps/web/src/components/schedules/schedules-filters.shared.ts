@@ -38,6 +38,8 @@ export const SCHEDULE_FILTER_SOURCES: readonly ScheduleSourceType[] = [
     'data_sync',
     'inbound_trigger',
     'node_schedule',
+    // APW-02 T53.
+    'app_upstream_sync',
 ];
 
 export const SCHEDULE_FILTER_STATUSES: readonly ScheduleStatus[] = [

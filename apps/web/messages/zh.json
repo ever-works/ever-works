@@ -4327,7 +4327,8 @@
             "more": "还有 {n} 个",
             "source": {
                 "work": "作品",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9772,7 +9773,8 @@
                 "missionTick": "Mission 滴答",
                 "sourceValidation": "来源验证",
                 "dataSync": "数据同步",
-                "inboundTrigger": "入站触发器"
+                "inboundTrigger": "入站触发器",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "活跃",

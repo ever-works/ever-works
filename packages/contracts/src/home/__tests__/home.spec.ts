@@ -25,9 +25,11 @@ describe('home contract', () => {
 	});
 
 	it('names every one of the seven schedule kinds', () => {
-		// Eight since FL-13 added `node_schedule` (a Command scheduled on a computer).
-		expect(HOME_SCHEDULE_KINDS).toHaveLength(8);
-		expect(new Set(HOME_SCHEDULE_KINDS).size).toBe(8);
+		// Eight since FL-13 added `node_schedule` (a Command scheduled on a computer);
+		// nine since APW-02 T53 added `app_upstream_sync` (an App Work's upstream sync).
+		expect(HOME_SCHEDULE_KINDS).toHaveLength(9);
+		expect(new Set(HOME_SCHEDULE_KINDS).size).toBe(9);
+		expect(HOME_SCHEDULE_KINDS).toContain('app_upstream_sync');
 	});
 
 	describe('parseHomeBlockIds', () => {

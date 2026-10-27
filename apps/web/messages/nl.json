@@ -4327,7 +4327,8 @@
             "more": "+{n} meer",
             "source": {
                 "work": "Werk",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9772,7 +9773,8 @@
                 "missionTick": "Mission-tick",
                 "sourceValidation": "Bronvalidatie",
                 "dataSync": "Gegevenssynchronisatie",
-                "inboundTrigger": "Inkomende trigger"
+                "inboundTrigger": "Inkomende trigger",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Actief",

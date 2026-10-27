@@ -20,6 +20,8 @@ const TRACKS_LAST_RUN: ReadonlySet<ScheduleSourceType> = new Set([
     'inbound_trigger',
     // FL-13: the machine reports every run of a Command schedule.
     'node_schedule',
+    // APW-02 T53: the sync run stamps when it finished.
+    'app_upstream_sync',
 ]);
 
 /**

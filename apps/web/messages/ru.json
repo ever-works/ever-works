@@ -4327,7 +4327,8 @@
             "more": "+{n} ещё",
             "source": {
                 "work": "Работа",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9772,7 +9773,8 @@
                 "missionTick": "Тик Mission",
                 "sourceValidation": "Проверка источника",
                 "dataSync": "Синхронизация данных",
-                "inboundTrigger": "Входящий триггер"
+                "inboundTrigger": "Входящий триггер",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Активный",
