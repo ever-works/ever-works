@@ -6,7 +6,13 @@ import { ExternalLink } from 'lucide-react';
 import type { FleetActionsRunnerView } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
 import { openLogsForSource } from '../logs/logs-tab.registry';
-import { formatClock, runnerLabelChips, runnerStatus, type RunnerTone } from './runners.shared';
+import {
+    formatClock,
+    runnerLabelChips,
+    runnerStatus,
+    runnerUpdateAvailable,
+    type RunnerTone,
+} from './runners.shared';
 
 const TONE_CLASS: Readonly<Record<RunnerTone, string>> = {
     ok: 'text-success',
@@ -47,6 +53,8 @@ export function RunnerRow({
     const status = runnerStatus(runner);
     const job = runner.state === 'working' ? runner.currentJob : null;
     const checked = formatClock(runner.lastCheckAt);
+    // P3 (FR-28): GitHub publishes a newer build for this runner's platform; Reinstall takes it.
+    const update = runnerUpdateAvailable(runner);
     const source =
         runner.stateSource === 'github'
             ? t('sourceGithub')
@@ -103,6 +111,14 @@ export function RunnerRow({
                         ? ` · ${t('version', { version: runner.runnerVersion })}`
                         : null}
                 </span>
+                {update ? (
+                    <span
+                        className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary"
+                        data-testid="fleet-runner-update"
+                    >
+                        {t('updateAvailable', { version: update })}
+                    </span>
+                ) : null}
                 {checked ? (
                     <span className="text-xs text-text-muted dark:text-text-muted-dark">
                         {t('checked', { time: checked })}

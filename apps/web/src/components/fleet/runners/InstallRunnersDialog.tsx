@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Check, Copy } from 'lucide-react';
 import {
     FLEET_ACTIONS_RUNNER_MAX_LABELS,
+    FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL,
     FLEET_ACTIONS_RUNNERS_MAX_PER_NODE,
     fleetActionsRunnerInstallSummary,
     type FleetActionsRunnerInstallResponse,
@@ -88,6 +89,8 @@ function formFor(
         names: namesForCount([], 1, namePool(options, existingNames)),
         labelsText: '',
         mode: modes[0] ?? 'service',
+        // P3 (FR-27): never ticked for the person.
+        shareDockerDaemon: false,
     };
 }
 
@@ -151,8 +154,10 @@ function CopyableCommand({
  *  - **Names** — prefilled `<computer>-<n>`, editable, unique;
  *  - **Extra labels** — comma-separated, cleaned by the contracts' rule, with
  *    the labels GitHub adds itself shown as fixed chips;
- *  - **Run as** — Service (Windows: the only mode); the container mode is not
- *    offered in P1;
+ *  - **Run as** — Service (Windows: the only mode); on a Linux computer that
+ *    advertises it, **Container-isolated** (P3, FR-27) with its labelled,
+ *    unticked opt-in to share the host's container daemon (runs as root) and a
+ *    one-line warning of what that grants;
  *  - the confirmation sentence (target, count, mode, computer, "no credits are
  *    spent", FR-30) — the dialog IS the confirmation: Install sends
  *    `confirm: true`.
@@ -582,6 +587,30 @@ export function InstallRunnersDialog({
                                     ))}
                                 </div>
                             )}
+                            {form.mode === 'docker' && modes.includes('docker') ? (
+                                <div
+                                    className="mt-1 flex flex-col gap-1 pl-6"
+                                    data-testid="fleet-runners-install-share"
+                                >
+                                    <label className="inline-flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.shareDockerDaemon === true}
+                                            onChange={(event) =>
+                                                setForm((previous) => ({
+                                                    ...previous,
+                                                    shareDockerDaemon: event.target.checked,
+                                                }))
+                                            }
+                                            data-testid="fleet-runners-install-share-daemon"
+                                        />
+                                        {FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL}
+                                    </label>
+                                    <span className="text-xs text-warning">
+                                        {t('shareWarning', { name })}
+                                    </span>
+                                </div>
+                            ) : null}
                         </fieldset>
 
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
