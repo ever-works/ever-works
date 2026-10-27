@@ -3,7 +3,11 @@ import { homedir as osHomedir, hostname as osHostname } from 'node:os';
 import { stat as statFile, unlink as removeFile } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
 import type { FleetVirtualSystemId } from '@ever-works/contracts';
-import { parseCatalogueLock, resolveVirtualImage, VIRTUAL_CONTAINER_IMAGES } from '../core/link/modules/virtual/catalogue';
+import {
+	parseCatalogueLock,
+	resolveVirtualImage,
+	VIRTUAL_CONTAINER_IMAGES
+} from '../core/link/modules/virtual/catalogue';
 import { resolveWindowsImage } from '../core/link/modules/virtual/windows';
 import { createNativeScheduler } from '../core/link/modules/schedule/native-scheduler';
 import { ScheduleHistory } from '../core/link/modules/schedule/schedule-history';
@@ -446,7 +450,9 @@ export async function resolveEnrollToken(
 				throw new CliError(`The token file ${path} belongs to another user; refusing to read it`);
 			}
 			if ((info.mode & 0o077) !== 0) {
-				throw new CliError(`The token file ${path} is readable by other users (it must be 0600); refusing to read it`);
+				throw new CliError(
+					`The token file ${path} is readable by other users (it must be 0600); refusing to read it`
+				);
 			}
 		}
 		const raw = await io.readFile(path);
@@ -1968,7 +1974,11 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	const virtual = await describeVirtualCatalogue(deps);
 	if (options.json === true) {
 		deps.out(
-			JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual }, null, 2)
+			JSON.stringify(
+				{ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual },
+				null,
+				2
+			)
 		);
 		return;
 	}
@@ -2316,7 +2326,9 @@ export function buildProgram(deps: CliDeps): Command {
 		.description('The native screen helper that shows this computer’s desktop in a live view (Desktop source)');
 	helper
 		.command('install')
-		.description('Download the screen helper this node version publishes for this platform and check its fingerprint')
+		.description(
+			'Download the screen helper this node version publishes for this platform and check its fingerprint'
+		)
 		.action(async () => {
 			await runHelperCommand(deps, (helperDeps) => helperInstall(helperDeps));
 		});
@@ -2345,7 +2357,9 @@ export function buildProgram(deps: CliDeps): Command {
 	// its mouse and keyboard from a live view (default: not allowed).
 	const helperControl = helper
 		.command('control')
-		.description('Allow or withdraw control of this computer’s mouse and keyboard from a live view (default: not allowed)');
+		.description(
+			'Allow or withdraw control of this computer’s mouse and keyboard from a live view (default: not allowed)'
+		);
 	helperControl
 		.command('allow')
 		.description('Let the people you allow take control of this computer from a live view (type "control")')
@@ -2369,7 +2383,9 @@ export function buildProgram(deps: CliDeps): Command {
 	// Schedules on computers (FL-13 P3): what the OS scheduler starts. Hidden.
 	program
 		.command('schedule-run', { hidden: true })
-		.description("Run what is due of this computer's schedules once (started by the OS scheduler; not for direct use)")
+		.description(
+			"Run what is due of this computer's schedules once (started by the OS scheduler; not for direct use)"
+		)
 		.argument('<id>', 'The schedule the OS scheduler fired')
 		.action(async (id: string) => {
 			await runScheduleRun(deps, id);
@@ -2507,7 +2523,10 @@ function safeHostname(): string {
 }
 
 /** Run one `helper …` verb, turning its refusal into the CLI's own error. */
-async function runHelperCommand(deps: CliDeps, run: (helperDeps: HelperAdmissionDeps) => Promise<unknown>): Promise<void> {
+async function runHelperCommand(
+	deps: CliDeps,
+	run: (helperDeps: HelperAdmissionDeps) => Promise<unknown>
+): Promise<void> {
 	try {
 		await run(helperAdmissionDeps(deps));
 	} catch (error) {

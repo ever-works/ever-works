@@ -48,7 +48,12 @@ describe('ComputerControlArbiter — Desktop views', () => {
     }
 
     beforeEach(async () => {
-        dataSource = new DataSource({ type: 'better-sqlite3', database: ':memory:', entities: [FleetNode], synchronize: true });
+        dataSource = new DataSource({
+            type: 'better-sqlite3',
+            database: ':memory:',
+            entities: [FleetNode],
+            synchronize: true,
+        });
         await dataSource.initialize();
         nodes = dataSource.getRepository(FleetNode);
         await nodes.save(
@@ -72,7 +77,10 @@ describe('ComputerControlArbiter — Desktop views', () => {
             }),
             findDesktopViewFor: jest.fn(async (id: string, openedByUserId: string) => {
                 const row = sessions.get(id);
-                return row && row.openedByUserId === openedByUserId && row.source === 'desktop' && !row.agentId
+                return row &&
+                    row.openedByUserId === openedByUserId &&
+                    row.source === 'desktop' &&
+                    !row.agentId
                     ? row
                     : null;
             }),
@@ -98,11 +106,19 @@ describe('ComputerControlArbiter — Desktop views', () => {
         if (dataSource?.isInitialized) await dataSource.destroy();
     });
 
-    const audited = () => audit.tryRecord.mock.calls.map(([input]) => input as { action: string; details: Record<string, unknown> });
+    const audited = () =>
+        audit.tryRecord.mock.calls.map(
+            ([input]) => input as { action: string; details: Record<string, unknown> },
+        );
 
     it('finds a desktop view by who opened it — and nobody else’s', async () => {
-        expect(await arbiter.getState(desktop(DESKTOP_A))).toMatchObject({ sessionId: DESKTOP_A, mode: 'watching' });
-        expect(await arbiter.getState(desktop(DESKTOP_A, '99999999-9999-4999-8999-999999999999'))).toBeNull();
+        expect(await arbiter.getState(desktop(DESKTOP_A))).toMatchObject({
+            sessionId: DESKTOP_A,
+            mode: 'watching',
+        });
+        expect(
+            await arbiter.getState(desktop(DESKTOP_A, '99999999-9999-4999-8999-999999999999')),
+        ).toBeNull();
         // An Agent's browser view is never reachable as a desktop one.
         expect(await arbiter.getState(desktop(BROWSER))).toBeNull();
     });
@@ -134,16 +150,27 @@ describe('ComputerControlArbiter — Desktop views', () => {
         expect(handed?.state.mode).toBe('watching');
         expect((await arbiter.holdOf(DESKTOP_B)).held).toBe(true);
         const release = audited().find((entry) => entry.action === 'node.desktop.control.release');
-        expect(release?.details).toMatchObject({ target: DESKTOP_A, outcome: 'released', releaseReason: 'handed-over' });
+        expect(release?.details).toMatchObject({
+            target: DESKTOP_A,
+            outcome: 'released',
+            releaseReason: 'handed-over',
+        });
     });
 
     it('gives back with its own audit row, and an automatic release names the system', async () => {
         await arbiter.take(desktop(DESKTOP_A));
         await arbiter.giveBack(desktop(DESKTOP_A));
-        expect(audited().filter((entry) => entry.action === 'node.desktop.control.release')).toHaveLength(1);
+        expect(
+            audited().filter((entry) => entry.action === 'node.desktop.control.release'),
+        ).toHaveLength(1);
         await arbiter.take(desktop(DESKTOP_A));
         expect(await arbiter.releaseForSession(DESKTOP_A, 'disconnected')).toBe(true);
-        const last = audited().filter((entry) => entry.action === 'node.desktop.control.release').pop();
-        expect(last?.details).toMatchObject({ requestedBy: 'system:control-arbiter', releaseReason: 'disconnected' });
+        const last = audited()
+            .filter((entry) => entry.action === 'node.desktop.control.release')
+            .pop();
+        expect(last?.details).toMatchObject({
+            requestedBy: 'system:control-arbiter',
+            releaseReason: 'disconnected',
+        });
     });
 });

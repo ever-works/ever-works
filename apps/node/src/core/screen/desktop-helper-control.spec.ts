@@ -61,7 +61,13 @@ async function flush(): Promise<void> {
 function host(files: Record<string, string>, options: Parameters<typeof fakeHelperSpawner>[0] = {}) {
 	const fs = memoryHelperFs(files);
 	const fake = fakeHelperSpawner(options);
-	const desktop = new DesktopHelperHost({ paths, fs, platform: 'linux', env: { DISPLAY: ':0' }, spawner: fake.spawner });
+	const desktop = new DesktopHelperHost({
+		paths,
+		fs,
+		platform: 'linux',
+		env: { DISPLAY: ':0' },
+		spawner: fake.spawner
+	});
 	return { desktop, fs, fake };
 }
 
@@ -133,7 +139,10 @@ describe('controlling streams', () => {
 		const files = { [paths.installPath]: BINARY, [paths.policyPath]: RECORD, [helperControlPath(paths)]: ALLOWED };
 		const { desktop, fake } = host(files);
 		const watching = await desktop.openStream({ display: null, quality: 'smooth' }, handlers());
-		const controlling = await desktop.openStream({ display: null, quality: 'smooth', controlling: true }, handlers());
+		const controlling = await desktop.openStream(
+			{ display: null, quality: 'smooth', controlling: true },
+			handlers()
+		);
 		if (!watching.ok || !controlling.ok) throw new Error('both open');
 		expect(watching.stream.input(POINTER, { width: 1280, height: 720 })).toBe(false);
 		expect(controlling.stream.input(POINTER, { width: 1280, height: 720 })).toBe(true);
@@ -148,7 +157,10 @@ describe('controlling streams', () => {
 		const sink = handlers();
 		const opened = await desktop.openStream({ display: null, quality: 'smooth', controlling: true }, sink);
 		if (!opened.ok) throw new Error('open');
-		opened.stream.input({ kind: 'key', action: 'down', key: 'c', code: 'KeyC', modifiers: 2 }, { width: 64, height: 64 });
+		opened.stream.input(
+			{ kind: 'key', action: 'down', key: 'c', code: 'KeyC', modifiers: 2 },
+			{ width: 64, height: 64 }
+		);
 		await flush();
 		expect(sink.results).toEqual(['blocked-shortcut']);
 	});

@@ -57,7 +57,11 @@ import {
     type FleetDisplayView,
 } from '@ever-works/contracts';
 import { FleetLinkAttachService } from '../../fleet-link/fleet-link-attach.service';
-import { describeAgo, fleetLinkError, FleetLinkException } from '../../fleet-link/fleet-link.errors';
+import {
+    describeAgo,
+    fleetLinkError,
+    FleetLinkException,
+} from '../../fleet-link/fleet-link.errors';
 import { FleetLinkService } from '../../fleet-link/fleet-link.service';
 import {
     FleetLinkViewerGatewayService,
@@ -198,7 +202,10 @@ export class FleetDesktopService
                 this.attended(node) && (node.capabilities ?? []).includes(FLEET_SCREEN_CAPABILITY),
             liveViews: await this.liveViewCount(node),
             maxViews: resolveComputerSessionLimits(process.env).perNode,
-            control: fleetDesktopControlAvailabilityOf(this.control ? facts?.helper : null, node.name),
+            control: fleetDesktopControlAvailabilityOf(
+                this.control ? facts?.helper : null,
+                node.name,
+            ),
         };
     }
 
@@ -242,13 +249,20 @@ export class FleetDesktopService
                 displayId: request.displayId ?? null,
                 quality,
             });
-            throw fleetLinkError(FLEET_DESKTOP_BLOCKER_CODES[blocker], this.hintFor(blocker, node), {
-                reason: blocker,
-            });
+            throw fleetLinkError(
+                FLEET_DESKTOP_BLOCKER_CODES[blocker],
+                this.hintFor(blocker, node),
+                {
+                    reason: blocker,
+                },
+            );
         }
         await this.assertWithinCaps(node);
         const facts = fleetNodeDesktopViewOf(node);
-        const { display, fellBack } = pickFleetDisplay(facts?.displays ?? [], request.displayId ?? null);
+        const { display, fellBack } = pickFleetDisplay(
+            facts?.displays ?? [],
+            request.displayId ?? null,
+        );
         const now = this.now();
         const record: DesktopViewRecord = {
             viewId: randomUUID(),
@@ -312,9 +326,13 @@ export class FleetDesktopService
         const { node } = await this.access.resolveVisible(nodeId, { userId });
         const blocker = await this.blockerFor(node, userId);
         if (blocker) {
-            throw fleetLinkError(FLEET_DESKTOP_BLOCKER_CODES[blocker], this.hintFor(blocker, node), {
-                reason: blocker,
-            });
+            throw fleetLinkError(
+                FLEET_DESKTOP_BLOCKER_CODES[blocker],
+                this.hintFor(blocker, node),
+                {
+                    reason: blocker,
+                },
+            );
         }
         const facts = fleetNodeDesktopViewOf(node);
         let display: FleetDisplayView | null = null;
@@ -322,9 +340,13 @@ export class FleetDesktopService
         if (update.displayId !== undefined) {
             const displays = facts?.displays ?? [];
             if (displays.length > 0 && !displays.some((entry) => entry.id === update.displayId)) {
-                throw fleetLinkError('unsupported_on_node', `${node.name} has no display "${update.displayId}"`, {
-                    displayId: update.displayId,
-                });
+                throw fleetLinkError(
+                    'unsupported_on_node',
+                    `${node.name} has no display "${update.displayId}"`,
+                    {
+                        displayId: update.displayId,
+                    },
+                );
             }
             const previous = record.displayId;
             ({ display, fellBack } = pickFleetDisplay(displays, update.displayId));
@@ -346,14 +368,22 @@ export class FleetDesktopService
     }
 
     /** A reconnect of the same view (the socket dropped): a fresh single-use grant — `driver` while it holds control. */
-    async attachToken(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopAttachGrant> {
+    async attachToken(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<FleetDesktopAttachGrant> {
         const record = await this.loadView(userId, nodeId, viewId);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
         const blocker = await this.blockerFor(node, userId);
         if (blocker) {
-            throw fleetLinkError(FLEET_DESKTOP_BLOCKER_CODES[blocker], this.hintFor(blocker, node), {
-                reason: blocker,
-            });
+            throw fleetLinkError(
+                FLEET_DESKTOP_BLOCKER_CODES[blocker],
+                this.hintFor(blocker, node),
+                {
+                    reason: blocker,
+                },
+            );
         }
         return this.mintFor(record, await this.roleNow(record));
     }
@@ -371,7 +401,11 @@ export class FleetDesktopService
     // ─── Control (P2, FR-36 … FR-42) ────────────────────────────────────────
 
     /** Control of the computer as this view sees it. */
-    async controlState(userId: string, nodeId: string, viewId: string): Promise<ComputerControlStateView> {
+    async controlState(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<ComputerControlStateView> {
         const record = await this.loadView(userId, nodeId, viewId);
         const control = this.requireControl(record);
         const state = await control.getState(this.actorOf(record));
@@ -394,7 +428,9 @@ export class FleetDesktopService
         const record = await this.loadView(userId, nodeId, viewId);
         const control = this.requireControl(record);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
-        const action = request.request ? 'node.desktop.control.request' : 'node.desktop.control.take';
+        const action = request.request
+            ? 'node.desktop.control.request'
+            : 'node.desktop.control.take';
         const blocker = await this.blockerFor(node, userId);
         if (blocker) {
             await this.recordAudit(node, userId, action, viewId, {
@@ -402,21 +438,31 @@ export class FleetDesktopService
                 code: FLEET_DESKTOP_BLOCKER_CODES[blocker],
                 reason: blocker,
             });
-            throw fleetLinkError(FLEET_DESKTOP_BLOCKER_CODES[blocker], this.hintFor(blocker, node), {
-                reason: blocker,
-            });
+            throw fleetLinkError(
+                FLEET_DESKTOP_BLOCKER_CODES[blocker],
+                this.hintFor(blocker, node),
+                {
+                    reason: blocker,
+                },
+            );
         }
         // The machine half (CONTRACTS §1.1 `helper.control`): never offered on a guess.
-        const reasons = resolveFleetDesktopControlReasons(fleetNodeDesktopViewOf(node)?.helper ?? null);
+        const reasons = resolveFleetDesktopControlReasons(
+            fleetNodeDesktopViewOf(node)?.helper ?? null,
+        );
         if (reasons.length > 0) {
             await this.recordAudit(node, userId, action, viewId, {
                 outcome: 'refused',
                 code: 'unsupported_on_node',
                 reason: reasons[0],
             });
-            throw fleetLinkError('unsupported_on_node', fleetDesktopControlReasonHint(reasons[0], node.name), {
-                reason: reasons[0],
-            });
+            throw fleetLinkError(
+                'unsupported_on_node',
+                fleetDesktopControlReasonHint(reasons[0], node.name),
+                {
+                    reason: reasons[0],
+                },
+            );
         }
         if (request.request) {
             const state = this.controlOutcome(await control.request(this.actorOf(record)), node);
@@ -440,7 +486,11 @@ export class FleetDesktopService
     }
 
     /** Give control back (idempotent): the driver sockets here close, and a viewer grant answers. */
-    async giveBackControl(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopControlResult> {
+    async giveBackControl(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<FleetDesktopControlResult> {
         const record = await this.loadView(userId, nodeId, viewId);
         const control = this.requireControl(record);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
@@ -460,25 +510,42 @@ export class FleetDesktopService
         const record = await this.loadView(userId, nodeId, viewId);
         const control = this.requireControl(record);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
-        const state = this.controlOutcome(await control.answer(this.actorOf(record), requestId, decision), node);
+        const state = this.controlOutcome(
+            await control.answer(this.actorOf(record), requestId, decision),
+            node,
+        );
         if (state.mode === 'controlling') return { state, attach: null };
         this.closeDrivers(record.viewId, 'control handed over');
         return { state, attach: await this.mintFor(record, 'viewer') };
     }
 
     /** "Keep control" on the idle warning. */
-    async keepControl(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopControlResult> {
+    async keepControl(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<FleetDesktopControlResult> {
         const record = await this.loadView(userId, nodeId, viewId);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
-        const state = this.controlOutcome(await this.requireControl(record).keep(this.actorOf(record)), node);
+        const state = this.controlOutcome(
+            await this.requireControl(record).keep(this.actorOf(record)),
+            node,
+        );
         return { state, attach: null };
     }
 
     /** One more stretch of control, once. */
-    async extendControl(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopControlResult> {
+    async extendControl(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<FleetDesktopControlResult> {
         const record = await this.loadView(userId, nodeId, viewId);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
-        const state = this.controlOutcome(await this.requireControl(record).extend(this.actorOf(record)), node);
+        const state = this.controlOutcome(
+            await this.requireControl(record).extend(this.actorOf(record)),
+            node,
+        );
         return { state, attach: null };
     }
 
@@ -499,23 +566,40 @@ export class FleetDesktopService
     // ─── Screenshot (the read-only Agent tool's read) ───────────────────────
 
     /** One Steady-width keyframe of a display, through a short-lived channel. */
-    async screenshot(userId: string, nodeId: string, displayId: string | null): Promise<FleetDesktopScreenshot> {
+    async screenshot(
+        userId: string,
+        nodeId: string,
+        displayId: string | null,
+    ): Promise<FleetDesktopScreenshot> {
         const { node } = await this.access.resolveVisible(nodeId, { userId });
         const blocker = await this.blockerFor(node, userId);
         if (blocker) {
-            throw fleetLinkError(FLEET_DESKTOP_BLOCKER_CODES[blocker], this.hintFor(blocker, node), {
-                reason: blocker,
-            });
+            throw fleetLinkError(
+                FLEET_DESKTOP_BLOCKER_CODES[blocker],
+                this.hintFor(blocker, node),
+                {
+                    reason: blocker,
+                },
+            );
         }
         await this.assertWithinCaps(node);
         const viewId = randomUUID();
-        let settle: (picture: { width: number; height: number; mime: FleetDesktopScreenshot['mime']; data: string } | null) => void =
-            () => undefined;
-        const pictured = new Promise<{ width: number; height: number; mime: FleetDesktopScreenshot['mime']; data: string } | null>(
-            (resolve) => {
-                settle = resolve;
-            },
-        );
+        let settle: (
+            picture: {
+                width: number;
+                height: number;
+                mime: FleetDesktopScreenshot['mime'];
+                data: string;
+            } | null,
+        ) => void = () => undefined;
+        const pictured = new Promise<{
+            width: number;
+            height: number;
+            mime: FleetDesktopScreenshot['mime'];
+            data: string;
+        } | null>((resolve) => {
+            settle = resolve;
+        });
         let closeHint: string | null = null;
         const channel = await this.links.openChannel({
             nodeId: node.id,
@@ -533,7 +617,12 @@ export class FleetDesktopService
                     if (kind !== FLEET_LINK_FRAME_KINDS.FRAME) return;
                     const frame = decodeComputerFrame(payload);
                     if (frame && frame.kind === 'frame') {
-                        settle({ width: frame.width, height: frame.height, mime: frame.mime, data: frame.data });
+                        settle({
+                            width: frame.width,
+                            height: frame.height,
+                            mime: frame.mime,
+                            data: frame.data,
+                        });
                     }
                 },
                 close: (_reason, hint) => {
@@ -582,7 +671,11 @@ export class FleetDesktopService
         }
         return (async () => {
             const record = this.checkAdmit(
-                await this.loadView(viewer.claims.userId, viewer.claims.nodeId, viewer.claims.target).catch(() => null),
+                await this.loadView(
+                    viewer.claims.userId,
+                    viewer.claims.nodeId,
+                    viewer.claims.target,
+                ).catch(() => null),
                 viewer,
             );
             if (viewer.claims.role === 'driver') await this.admitDriver(record, viewer);
@@ -632,7 +725,8 @@ export class FleetDesktopService
         const control = this.control;
         if (!control) return;
         const state = await control.getState(this.actorOf(record));
-        const since = state?.holder?.thisView && state.holder.since ? Date.parse(state.holder.since) : NaN;
+        const since =
+            state?.holder?.thisView && state.holder.since ? Date.parse(state.holder.since) : NaN;
         if (Number.isFinite(since) && since > closedAt) return;
         await control.releaseForSession(record.viewId, 'disconnected');
     }
@@ -653,10 +747,15 @@ export class FleetDesktopService
         if (message.type !== FLEET_DESKTOP_MESSAGES.stats) return;
         const record = this.desktopRecordOf(viewer);
         if (!record?.persisted || !this.sessions) return;
-        const fps = typeof message.fps === 'number' && Number.isFinite(message.fps) ? Math.max(0, Math.trunc(message.fps)) : 0;
+        const fps =
+            typeof message.fps === 'number' && Number.isFinite(message.fps)
+                ? Math.max(0, Math.trunc(message.fps))
+                : 0;
         record.statsFrames += fps;
         const bytesOut =
-            typeof message.bytesOut === 'number' && Number.isFinite(message.bytesOut) ? Math.max(0, message.bytesOut) : 0;
+            typeof message.bytesOut === 'number' && Number.isFinite(message.bytesOut)
+                ? Math.max(0, message.bytesOut)
+                : 0;
         const now = this.now();
         if (now - record.stampAt < DESKTOP_ROW_STAMP_EVERY_MS) return;
         const frames = record.statsFrames;
@@ -664,7 +763,9 @@ export class FleetDesktopService
         record.statsFrames = 0;
         record.statsBytes = bytesOut;
         record.stampAt = now;
-        void this.sessions.recordFrames(record.viewId, frames, bytes, new Date(now)).catch(() => undefined);
+        void this.sessions
+            .recordFrames(record.viewId, frames, bytes, new Date(now))
+            .catch(() => undefined);
     }
 
     /**
@@ -692,7 +793,8 @@ export class FleetDesktopService
             }
             const node = await this.nodes.findById(record.nodeId);
             if (!node) return false;
-            if (!(await this.access.canAct(node, { userId: record.userId }, 'desktop'))) return false;
+            if (!(await this.access.canAct(node, { userId: record.userId }, 'desktop')))
+                return false;
             if (viewer.claims.role === 'driver') {
                 if (!this.control || !(await this.control.holdOf(record.viewId)).held) return false;
                 await this.control.acknowledge(record.viewId);
@@ -706,27 +808,44 @@ export class FleetDesktopService
 
     // ─── Internals ──────────────────────────────────────────────────────────
 
-    private checkAdmit(record: DesktopViewRecord | null, viewer: FleetLinkViewerHandle): DesktopViewRecord {
-        if (!record || record.userId !== viewer.claims.userId || record.nodeId !== viewer.claims.nodeId) {
+    private checkAdmit(
+        record: DesktopViewRecord | null,
+        viewer: FleetLinkViewerHandle,
+    ): DesktopViewRecord {
+        if (
+            !record ||
+            record.userId !== viewer.claims.userId ||
+            record.nodeId !== viewer.claims.nodeId
+        ) {
             throw fleetLinkError('not_found', 'this desktop view has ended — open it again');
         }
         if (this.now() - record.openedAt >= FLEET_DESKTOP_VIEW_CEILING_MS) {
             this.forget(record);
             if (record.persisted) void this.closeRow(record.viewId, 'session-ceiling');
-            throw fleetLinkError('limit_exceeded', 'a desktop view lasts at most 4 hours — open a new one', {
-                limit: 'view-ceiling',
-            });
+            throw fleetLinkError(
+                'limit_exceeded',
+                'a desktop view lasts at most 4 hours — open a new one',
+                {
+                    limit: 'view-ceiling',
+                },
+            );
         }
         return record;
     }
 
     /** A driver socket only while its view holds control, and only on a `controlling` grant. */
-    private async admitDriver(record: DesktopViewRecord, viewer: FleetLinkViewerHandle): Promise<void> {
+    private async admitDriver(
+        record: DesktopViewRecord,
+        viewer: FleetLinkViewerHandle,
+    ): Promise<void> {
         if (viewer.claims.params.mode !== 'controlling' || !this.control) {
             throw fleetLinkError('permission_denied', 'take control from the view first');
         }
         if (!(await this.control.holdOf(record.viewId)).held) {
-            throw fleetLinkError('permission_denied', 'this view does not have control any more — take it again');
+            throw fleetLinkError(
+                'permission_denied',
+                'this view does not have control any more — take it again',
+            );
         }
     }
 
@@ -741,7 +860,10 @@ export class FleetDesktopService
 
     private requireControl(record: DesktopViewRecord): ComputerControlArbiter {
         if (!this.control || !record.persisted) {
-            throw fleetLinkError('unsupported_on_node', 'control of a desktop is not available on this platform yet');
+            throw fleetLinkError(
+                'unsupported_on_node',
+                'control of a desktop is not available on this platform yet',
+            );
         }
         return this.control;
     }
@@ -751,7 +873,10 @@ export class FleetDesktopService
     }
 
     /** AW-11's typed outcome as CONTRACTS §8 (the state rides in `details`). */
-    private controlOutcome(outcome: ComputerControlOutcome | null, node: FleetNode): ComputerControlStateView {
+    private controlOutcome(
+        outcome: ComputerControlOutcome | null,
+        node: FleetNode,
+    ): ComputerControlStateView {
         if (!outcome) throw this.viewGone();
         if (!('refused' in outcome)) return outcome.state;
         const { refused, state } = outcome;
@@ -765,14 +890,24 @@ export class FleetDesktopService
                     { reason: 'policy', state },
                 );
             case 'held':
-                throw fleetLinkError('busy', `Someone else has control of ${node.name} — ask them to hand it over`, {
-                    reason: 'held',
+                throw fleetLinkError(
+                    'busy',
+                    `Someone else has control of ${node.name} — ask them to hand it over`,
+                    {
+                        reason: 'held',
+                        state,
+                    },
+                );
+            case 'session-ended':
+                throw fleetLinkError('not_found', 'this desktop view has ended — open it again', {
+                    reason: refused,
                     state,
                 });
-            case 'session-ended':
-                throw fleetLinkError('not_found', 'this desktop view has ended — open it again', { reason: refused, state });
             default:
-                throw fleetLinkError('busy', DESKTOP_CONTROL_REFUSAL_HINTS[refused] ?? refused, { reason: refused, state });
+                throw fleetLinkError('busy', DESKTOP_CONTROL_REFUSAL_HINTS[refused] ?? refused, {
+                    reason: refused,
+                    state,
+                });
         }
     }
 
@@ -788,7 +923,9 @@ export class FleetDesktopService
     private closeDrivers(viewId: string, reason: string): void {
         this.gateway?.closeViewers(
             (viewer) =>
-                viewer.claims.family === 'desktop' && viewer.claims.target === viewId && viewer.claims.role === 'driver',
+                viewer.claims.family === 'desktop' &&
+                viewer.claims.target === viewId &&
+                viewer.claims.role === 'driver',
             reason,
         );
     }
@@ -826,7 +963,10 @@ export class FleetDesktopService
         record.persisted = true;
     }
 
-    private async updateRow(record: DesktopViewRecord, patch: Partial<ComputerSession>): Promise<void> {
+    private async updateRow(
+        record: DesktopViewRecord,
+        patch: Partial<ComputerSession>,
+    ): Promise<void> {
         if (!record.persisted || typeof this.sessions?.updateOpen !== 'function') return;
         try {
             await this.sessions.updateOpen(record.viewId, patch);
@@ -838,10 +978,16 @@ export class FleetDesktopService
     }
 
     /** End a view's row (once), give back control it held, close its sockets here. Never throws. */
-    private async closeRow(viewId: string, reason: 'closed-by-user' | 'session-ceiling' | 'error'): Promise<void> {
+    private async closeRow(
+        viewId: string,
+        reason: 'closed-by-user' | 'session-ceiling' | 'error',
+    ): Promise<void> {
         try {
             if (typeof this.sessions?.close === 'function') {
-                await this.sessions.close(viewId, { closeReason: reason, endedAt: new Date(this.now()) });
+                await this.sessions.close(viewId, {
+                    closeReason: reason,
+                    endedAt: new Date(this.now()),
+                });
             }
             await this.control?.releaseForSession(viewId, 'session-ended');
         } catch (error) {
@@ -864,7 +1010,11 @@ export class FleetDesktopService
     }
 
     /** A view from this replica's memory, or from its row (another replica opened it). */
-    private async loadView(userId: string, nodeId: string, viewId: string): Promise<DesktopViewRecord> {
+    private async loadView(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<DesktopViewRecord> {
         const cached = this.views.get(viewId);
         if (cached) {
             if (cached.userId !== userId || cached.nodeId !== nodeId) throw this.viewGone();
@@ -945,7 +1095,9 @@ export class FleetDesktopService
                 return 'clear it under Settings → Fleet';
             case 'offline': {
                 const ago = describeAgo(node.lastHeartbeatAt ?? null, this.now());
-                return ago ? `${node.name} is offline; last heard from ${ago} ago` : `${node.name} is offline`;
+                return ago
+                    ? `${node.name} is offline; last heard from ${ago} ago`
+                    : `${node.name} is offline`;
             }
             case 'consent-missing':
                 return fleetConsentMissingHint('attend', node.name);
@@ -954,7 +1106,9 @@ export class FleetDesktopService
             case 'link-unavailable':
                 return `${node.name} is not connected to Ever Works right now; it reconnects on its own — try again in a moment`;
             default:
-                return isFleetDesktopReason(blocker) ? fleetDesktopReasonHint(blocker, node.name) : blocker;
+                return isFleetDesktopReason(blocker)
+                    ? fleetDesktopReasonHint(blocker, node.name)
+                    : blocker;
         }
     }
 
@@ -981,8 +1135,9 @@ export class FleetDesktopService
     private async liveViewCount(node: FleetNode): Promise<number> {
         const rows = (await this.sessions?.findOpenForNode(node.id).catch(() => [])) ?? [];
         return (
-            this.holding(rows.filter((row) => (row as Partial<ComputerSession>).source === 'desktop')) +
-            this.liveDesktopViews((view) => !view.persisted && view.nodeId === node.id)
+            this.holding(
+                rows.filter((row) => (row as Partial<ComputerSession>).source === 'desktop'),
+            ) + this.liveDesktopViews((view) => !view.persisted && view.nodeId === node.id)
         );
     }
 
@@ -992,9 +1147,12 @@ export class FleetDesktopService
         const organizationId = node.organizationId ?? null;
         const [onNode, inScope] = await Promise.all([
             this.sessions?.findOpenForNode(node.id) ?? Promise.resolve([]),
-            this.sessions?.findOpenForScope({ userId: node.userId, organizationId }) ?? Promise.resolve([]),
+            this.sessions?.findOpenForScope({ userId: node.userId, organizationId }) ??
+                Promise.resolve([]),
         ]);
-        const desktopOnNode = this.liveDesktopViews((view) => !view.persisted && view.nodeId === node.id);
+        const desktopOnNode = this.liveDesktopViews(
+            (view) => !view.persisted && view.nodeId === node.id,
+        );
         if (this.holding(onNode) + desktopOnNode >= limits.perNode) {
             throw fleetLinkError(
                 'limit_exceeded',
@@ -1041,7 +1199,10 @@ export class FleetDesktopService
         return record;
     }
 
-    private async mintFor(record: DesktopViewRecord, role: 'viewer' | 'driver'): Promise<FleetDesktopAttachGrant> {
+    private async mintFor(
+        record: DesktopViewRecord,
+        role: 'viewer' | 'driver',
+    ): Promise<FleetDesktopAttachGrant> {
         try {
             const grant = await this.attach.mint({
                 nodeId: record.nodeId,
@@ -1056,14 +1217,24 @@ export class FleetDesktopService
                     quality: record.quality,
                     ...(record.displayId ? { display: record.displayId } : {}),
                     ...(role === 'driver'
-                        ? { mode: 'controlling', ...(record.controllerName ? { controlledBy: record.controllerName } : {}) }
+                        ? {
+                              mode: 'controlling',
+                              ...(record.controllerName
+                                  ? { controlledBy: record.controllerName }
+                                  : {}),
+                          }
                         : {}),
                 },
                 requirement: { actionFamily: 'desktop', target: record.viewId },
             });
             record.lastGrantAt = this.now();
             record.role = role;
-            return { token: grant.token, wsPath: grant.wsPath, expiresInSec: grant.expiresInSec, role: grant.role };
+            return {
+                token: grant.token,
+                wsPath: grant.wsPath,
+                expiresInSec: grant.expiresInSec,
+                role: grant.role,
+            };
         } catch (error) {
             if (error instanceof FleetLinkException) throw error;
             this.logger.warn(

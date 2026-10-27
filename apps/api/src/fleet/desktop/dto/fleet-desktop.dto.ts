@@ -12,23 +12,39 @@ const DISPLAY_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 
 /** `POST /api/fleet/nodes/:id/desktop/views` (FL-07 plan §5). */
 export class OpenFleetDesktopViewDto {
-    @ApiProperty({ required: false, enum: ['desktop'], description: 'The screen source; only `desktop` here.' })
+    @ApiProperty({
+        required: false,
+        enum: ['desktop'],
+        description: 'The screen source; only `desktop` here.',
+    })
     @IsOptional()
     @IsIn(['desktop'])
     source?: 'desktop';
 
-    @ApiProperty({ required: false, maxLength: 64, description: 'The display to show (default: the primary).' })
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        description: 'The display to show (default: the primary).',
+    })
     @IsOptional()
     @IsString()
     @Matches(DISPLAY_ID)
     displayId?: string;
 
-    @ApiProperty({ required: false, enum: COMPUTER_QUALITIES, description: 'Sharp, Smooth or Steady (default Smooth).' })
+    @ApiProperty({
+        required: false,
+        enum: COMPUTER_QUALITIES,
+        description: 'Sharp, Smooth or Steady (default Smooth).',
+    })
     @IsOptional()
     @IsIn([...COMPUTER_QUALITIES])
     quality?: ComputerQuality;
 
-    @ApiProperty({ required: false, format: 'uuid', description: 'The session this view sits beside (FL-04).' })
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'The session this view sits beside (FL-04).',
+    })
     @IsOptional()
     @IsUUID()
     fleetSessionId?: string;
@@ -50,14 +66,18 @@ export class UpdateFleetDesktopViewDto {
 
 /** `POST …/views/:viewId/control` (FL-07 P2): take control (`confirm: true`), or ask for it (`request: true`). */
 export class FleetDesktopControlDto {
-    @ApiProperty({ required: false, description: 'Ask whoever holds control to hand it over, instead of taking it.' })
+    @ApiProperty({
+        required: false,
+        description: 'Ask whoever holds control to hand it over, instead of taking it.',
+    })
     @IsOptional()
     @IsBoolean()
     request?: boolean;
 
     @ApiProperty({
         required: false,
-        description: 'CONTRACTS §2.2 class `confirm`: without it a take answers 409 `confirmation_required`.',
+        description:
+            'CONTRACTS §2.2 class `confirm`: without it a take answers 409 `confirmation_required`.',
     })
     @IsOptional()
     @IsBoolean()
@@ -66,7 +86,10 @@ export class FleetDesktopControlDto {
 
 /** `POST …/views/:viewId/control/handover`: the holding view answers a request. */
 export class AnswerFleetDesktopControlDto {
-    @ApiProperty({ format: 'uuid', description: 'The requesting view (the request id the control state names).' })
+    @ApiProperty({
+        format: 'uuid',
+        description: 'The requesting view (the request id the control state names).',
+    })
     @IsUUID()
     requestId!: string;
 

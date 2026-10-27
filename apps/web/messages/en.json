@@ -15819,6 +15819,41 @@
                 "copied": "Copied",
                 "tryAgain": "Try again",
                 "never": "never"
+            },
+            "control": {
+                "you": "YOU",
+                "status": {
+                    "watching": "Watching — nothing on {name} is paused.",
+                    "controlling": "You have control of {name}.",
+                    "other": "Someone else has control of {name}."
+                },
+                "take": "Take control",
+                "request": "Request control",
+                "requestWaiting": "Asked — waiting {countdown}",
+                "giveBack": "Give back control",
+                "extend": "Extend",
+                "keepControl": "Keep control",
+                "handOver": "Hand over",
+                "idleIn": "Gives back in {countdown} without input",
+                "idleWarning": "Control goes back in {countdown} — nothing was typed or clicked.",
+                "incoming": "Someone is asking for control of {name}.",
+                "autoDeclines": "Declines on its own in {countdown}.",
+                "notInAudience": "You can watch {name}, but its owner has not allowed you to control it.",
+                "blocked": "Not sent to the computer: {list}",
+                "confirm": {
+                    "title": "Take control of {name}?",
+                    "body": "Your mouse and keyboard will drive {name}. Everyone watching sees it, and {name} shows who is controlling it. Control goes back after 10 minutes without input, or when you press Escape twice.",
+                    "yes": "Take control",
+                    "no": "Cancel"
+                },
+                "refused": {
+                    "blockedShortcut": "That shortcut is never sent to the computer.",
+                    "notControlling": "This view no longer has control.",
+                    "controlNotAllowed": "Control was turned off on the computer.",
+                    "permissionAccessibility": "macOS has not allowed the screen helper to use the mouse and keyboard.",
+                    "inputUnavailable": "The computer does not take input in this session.",
+                    "injectFailed": "The computer did not take that input."
+                }
             }
         },
         "cloud": {

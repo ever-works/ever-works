@@ -230,7 +230,8 @@ export class DesktopHelperHost {
 	/** P2: re-read the owner's permission now (a controlling open checks it fresh, like the helper itself). */
 	async checkControl(): Promise<FleetDesktopControlReason[]> {
 		const policy = await readHelperPolicy(this.options.fs, this.options.paths.policyPath);
-		const verified = this.verification?.ok && policy && policy.sha256 === this.verification.record.sha256 ? policy : null;
+		const verified =
+			this.verification?.ok && policy && policy.sha256 === this.verification.record.sha256 ? policy : null;
 		await this.readControl(verified);
 		return this.controlReasons();
 	}
@@ -292,7 +293,12 @@ export class DesktopHelperHost {
 			if (!this.controlAllowed) return { ok: false, refusal: { kind: 'control', reason: 'control-not-allowed' } };
 		}
 
-		const record: StreamRecord = new StreamRecord(this, verification.record.sha256, handlers, request.controlling === true);
+		const record: StreamRecord = new StreamRecord(
+			this,
+			verification.record.sha256,
+			handlers,
+			request.controlling === true
+		);
 		const helper = HelperProcess.start(
 			verification.record.path,
 			helperEnvironment(this.options.env, this.options.platform),
@@ -300,7 +306,10 @@ export class DesktopHelperHost {
 				onMessage: (message) => record.onMessage(message.kind, message.payload),
 				onExit: () => record.onExit()
 			},
-			{ ...(this.options.spawner ? { spawner: this.options.spawner } : {}), ...(this.options.logger ? { logger: this.options.logger } : {}) }
+			{
+				...(this.options.spawner ? { spawner: this.options.spawner } : {}),
+				...(this.options.logger ? { logger: this.options.logger } : {})
+			}
 		);
 		record.helper = helper;
 		const hello = await record.waitHello(HELPER_HELLO_TIMEOUT_MS);
@@ -413,7 +422,10 @@ export class DesktopHelperHost {
 					},
 					onExit: () => resolveHello(null)
 				},
-				{ ...(this.options.spawner ? { spawner: this.options.spawner } : {}), ...(this.options.logger ? { logger: this.options.logger } : {}) }
+				{
+					...(this.options.spawner ? { spawner: this.options.spawner } : {}),
+					...(this.options.logger ? { logger: this.options.logger } : {})
+				}
 			);
 			const timer = setTimeout(() => resolveHello(null), HELPER_HELLO_TIMEOUT_MS);
 			const hello = await helloPromise;
@@ -434,7 +446,10 @@ export class DesktopHelperHost {
 			this.recordedFailureFor = null;
 			return;
 		}
-		if (verification.reason !== 'helper-untrusted' && !(verification.reason === 'helper-missing' && verification.record)) {
+		if (
+			verification.reason !== 'helper-untrusted' &&
+			!(verification.reason === 'helper-missing' && verification.record)
+		) {
 			return;
 		}
 		const key = `${verification.record?.acknowledgedAt ?? ''}:${verification.reason}`;
@@ -451,7 +466,9 @@ export class DesktopHelperHost {
 			{
 				kind: 'verify-failed',
 				reason: verification.reason,
-				fingerprintPrefix: verification.record ? fleetHelperFingerprintPrefix(verification.record.sha256) : null,
+				fingerprintPrefix: verification.record
+					? fleetHelperFingerprintPrefix(verification.record.sha256)
+					: null,
 				version: verification.record?.version ?? null
 			},
 			this.now
@@ -620,7 +637,10 @@ class StreamRecord {
 					}
 					const timer = setTimeout(() => {
 						this.startWaiter = null;
-						resolve({ ok: false, error: { code: 'timeout', message: 'the screen helper did not switch display' } });
+						resolve({
+							ok: false,
+							error: { code: 'timeout', message: 'the screen helper did not switch display' }
+						});
 					}, HELPER_START_TIMEOUT_MS);
 					timer.unref?.();
 					this.startWaiter = {
@@ -632,7 +652,10 @@ class StreamRecord {
 							} else {
 								resolve({
 									ok: false,
-									error: answer ?? { code: 'timeout', message: 'the screen helper did not switch display' }
+									error: answer ?? {
+										code: 'timeout',
+										message: 'the screen helper did not switch display'
+									}
 								});
 							}
 						}

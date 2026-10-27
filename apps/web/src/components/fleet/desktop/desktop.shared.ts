@@ -1,6 +1,8 @@
 import {
     FLEET_DESKTOP_REASON_FIXES,
     isFleetDesktopReason,
+    type ComputerControlDecision,
+    type ComputerControlStateView,
     type ComputerQuality,
     type FleetDesktopAttachGrant,
     type FleetDesktopAvailabilityView,
@@ -36,12 +38,16 @@ export const DESKTOP_BLOCKER_KEYS = {
 /** The command a blocker's card offers to copy (run on the machine), or null. */
 export function desktopBlockerCommand(blocker: FleetDesktopBlocker): string | null {
     if (blocker === 'consent-missing') return 'ever-works-node start --attend';
-    return isFleetDesktopReason(blocker) ? (FLEET_DESKTOP_REASON_FIXES[blocker].command ?? null) : null;
+    return isFleetDesktopReason(blocker)
+        ? (FLEET_DESKTOP_REASON_FIXES[blocker].command ?? null)
+        : null;
 }
 
 /** The settings path a blocker's card names (followed on the machine), or null. */
 export function desktopBlockerSettingsPath(blocker: FleetDesktopBlocker): string | null {
-    return isFleetDesktopReason(blocker) ? (FLEET_DESKTOP_REASON_FIXES[blocker].settingsPath ?? null) : null;
+    return isFleetDesktopReason(blocker)
+        ? (FLEET_DESKTOP_REASON_FIXES[blocker].settingsPath ?? null)
+        : null;
 }
 
 /** Whether the card offers "Try again" (a state the machine or the platform may leave on its own). */
@@ -97,6 +103,25 @@ export interface DesktopBrowserOpenResult extends Omit<FleetDesktopOpenResult, '
     attach: DesktopBrowserGrant;
 }
 
+/** P2: what every control call answers (the grant only when the view's role changed). */
+export interface DesktopBrowserControlResult {
+    state: ComputerControlStateView;
+    attach: DesktopBrowserGrant | null;
+}
+
+/**
+ * P2 (FR-42): which status sentence the strip reads — watching, controlling,
+ * or someone else controlling. An Agent holding a desktop (FL-07's Agent input
+ * tool) is not offered yet, so `other` is always a person.
+ */
+export function desktopControlStatus(
+    state: ComputerControlStateView | null,
+): 'watching' | 'controlling' | 'other' {
+    if (state?.mode === 'controlling') return 'controlling';
+    if (state?.holder && !state.holder.thisView) return 'other';
+    return 'watching';
+}
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<DesktopResult<T>> {
     try {
         const response = await fetch(path, { cache: 'no-store', ...init });
@@ -123,7 +148,11 @@ export const desktopClient = {
         nodeId: string,
         body: { displayId?: string; quality?: ComputerQuality },
     ): Promise<DesktopResult<DesktopBrowserOpenResult>> {
-        return call(`${base(nodeId)}/views`, { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) });
+        return call(`${base(nodeId)}/views`, {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify(body),
+        });
     },
     update(
         nodeId: string,
@@ -137,11 +166,58 @@ export const desktopClient = {
         });
     },
     reattach(nodeId: string, viewId: string): Promise<DesktopResult<DesktopBrowserGrant>> {
-        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/attach-token`, { method: 'POST' });
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/attach-token`, {
+            method: 'POST',
+        });
+    },
+    // ─── Control (P2) ──────────────────────────────────────────────────────
+    control(nodeId: string, viewId: string): Promise<DesktopResult<ComputerControlStateView>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control`);
+    },
+    /** Take control (`confirm: true`, after the person confirmed it) or ask for it (`request: true`). */
+    takeControl(
+        nodeId: string,
+        viewId: string,
+        body: { confirm: true } | { request: true },
+    ): Promise<DesktopResult<DesktopBrowserControlResult>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control`, {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify(body),
+        });
+    },
+    giveBack(nodeId: string, viewId: string): Promise<DesktopResult<DesktopBrowserControlResult>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control`, {
+            method: 'DELETE',
+        });
+    },
+    answer(
+        nodeId: string,
+        viewId: string,
+        body: { requestId: string; decision: ComputerControlDecision },
+    ): Promise<DesktopResult<DesktopBrowserControlResult>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control/handover`, {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify(body),
+        });
+    },
+    keep(nodeId: string, viewId: string): Promise<DesktopResult<DesktopBrowserControlResult>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control/keep`, {
+            method: 'POST',
+        });
+    },
+    extend(nodeId: string, viewId: string): Promise<DesktopResult<DesktopBrowserControlResult>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control/extend`, {
+            method: 'POST',
+        });
     },
     async end(nodeId: string, viewId: string): Promise<void> {
         try {
-            await fetch(`${base(nodeId)}/views/${encodeURIComponent(viewId)}`, { method: 'DELETE', cache: 'no-store' });
+            await fetch(`${base(nodeId)}/views/${encodeURIComponent(viewId)}`, {
+                method: 'DELETE',
+                cache: 'no-store',
+            });
         } catch {
             // the socket close ends the picture anyway
         }

@@ -1,4 +1,8 @@
-import { applyReportedDesktop, fleetNodeDesktopViewOf, helperEventAudit } from '../fleet-desktop-facts';
+import {
+    applyReportedDesktop,
+    fleetNodeDesktopViewOf,
+    helperEventAudit,
+} from '../fleet-desktop-facts';
 
 /**
  * Desktop view & control (FL-07, T-17, T-20, FR-16, FR-18, U3) — a beat's
@@ -10,7 +14,9 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')
 
 describe('applyReportedDesktop', () => {
     it('leaves the stored facts alone when the beat says nothing about the desktop', () => {
-        expect(applyReportedDesktop({ helperTrust: 'hash-pinned', desktopFacts: null }, {}, AT)).toBeNull();
+        expect(
+            applyReportedDesktop({ helperTrust: 'hash-pinned', desktopFacts: null }, {}, AT),
+        ).toBeNull();
     });
 
     it('stores the trust, the facts and the receipt time, re-normalised', () => {
@@ -18,8 +24,17 @@ describe('applyReportedDesktop', () => {
             { helperTrust: 'none', desktopFacts: null },
             {
                 helperTrust: 'hash-pinned',
-                helper: { trust: 'hash-pinned', present: true, admitted: true, fingerprintPrefix: 'abcdef12', sha256: 'f'.repeat(64) },
-                displays: [{ id: 'DP-1', width: 1920, height: 1080, primary: true }, { id: 'bad id', width: 1, height: 1 }],
+                helper: {
+                    trust: 'hash-pinned',
+                    present: true,
+                    admitted: true,
+                    fingerprintPrefix: 'abcdef12',
+                    sha256: 'f'.repeat(64),
+                },
+                displays: [
+                    { id: 'DP-1', width: 1920, height: 1080, primary: true },
+                    { id: 'bad id', width: 1, height: 1 },
+                ],
                 desktopReasons: ['permission-accessibility', 'nonsense'],
                 helperEvents: [],
             },
@@ -36,7 +51,17 @@ describe('applyReportedDesktop', () => {
                 verifiedAt: null,
                 published: null,
             },
-            displays: [{ id: 'DP-1', name: 'DP-1', width: 1920, height: 1080, scale: 1, primary: true, virtual: false }],
+            displays: [
+                {
+                    id: 'DP-1',
+                    name: 'DP-1',
+                    width: 1920,
+                    height: 1080,
+                    scale: 1,
+                    primary: true,
+                    virtual: false,
+                },
+            ],
             reasons: ['permission-accessibility'],
             reportedAt: AT.toISOString(),
             seenEventIds: [],
@@ -45,9 +70,13 @@ describe('applyReportedDesktop', () => {
     });
 
     it('reads an unknown trust as none (fail-closed)', () => {
-        expect(applyReportedDesktop({ helperTrust: 'signed', desktopFacts: null }, { helperTrust: 'trusted' }, AT)?.patch.helperTrust).toBe(
-            'none',
-        );
+        expect(
+            applyReportedDesktop(
+                { helperTrust: 'signed', desktopFacts: null },
+                { helperTrust: 'trusted' },
+                AT,
+            )?.patch.helperTrust,
+        ).toBe('none');
     });
 
     it('returns only the events not audited before, and remembers them', () => {
@@ -56,7 +85,13 @@ describe('applyReportedDesktop', () => {
             {
                 helperTrust: 'hash-pinned',
                 helperEvents: [
-                    { id: id(1), kind: 'admit', at: '2026-10-26T03:00:00Z', level: 'hash-pinned', fingerprintPrefix: 'abcdef12' },
+                    {
+                        id: id(1),
+                        kind: 'admit',
+                        at: '2026-10-26T03:00:00Z',
+                        level: 'hash-pinned',
+                        fingerprintPrefix: 'abcdef12',
+                    },
                 ],
             },
             AT,
@@ -68,7 +103,12 @@ describe('applyReportedDesktop', () => {
                 helperTrust: 'none',
                 helperEvents: [
                     { id: id(1), kind: 'admit', at: '2026-10-26T03:00:00Z' },
-                    { id: id(2), kind: 'verify-failed', at: '2026-10-26T03:30:00Z', reason: 'helper-untrusted' },
+                    {
+                        id: id(2),
+                        kind: 'verify-failed',
+                        at: '2026-10-26T03:30:00Z',
+                        reason: 'helper-untrusted',
+                    },
                 ],
             },
             AT,
@@ -81,9 +121,20 @@ describe('applyReportedDesktop', () => {
 describe('fleetNodeDesktopViewOf', () => {
     it('never exposes the audited ids', () => {
         const view = fleetNodeDesktopViewOf({
-            desktopFacts: { helper: null, displays: [], reasons: ['helper-missing'], reportedAt: AT.toISOString(), seenEventIds: [id(1)] },
+            desktopFacts: {
+                helper: null,
+                displays: [],
+                reasons: ['helper-missing'],
+                reportedAt: AT.toISOString(),
+                seenEventIds: [id(1)],
+            },
         });
-        expect(view).toEqual({ helper: null, displays: [], reasons: ['helper-missing'], reportedAt: AT.toISOString() });
+        expect(view).toEqual({
+            helper: null,
+            displays: [],
+            reasons: ['helper-missing'],
+            reportedAt: AT.toISOString(),
+        });
         expect(fleetNodeDesktopViewOf({ desktopFacts: null })).toBeNull();
     });
 });
@@ -107,9 +158,16 @@ describe('helperEventAudit', () => {
             fingerprintPrefix: 'abcdef12',
         });
         for (const key of Object.keys(row.extra)) {
-            expect(key).not.toMatch(/secret|token|credential|password|passphrase|hash|apikey|api_key/i);
+            expect(key).not.toMatch(
+                /secret|token|credential|password|passphrase|hash|apikey|api_key/i,
+            );
         }
-        expect(helperEventAudit({ id: id(4), kind: 'admit', at: '2026-10-26T03:00:00Z' }).action).toBe('node.helper.admit');
-        expect(helperEventAudit({ id: id(5), kind: 'revoke', at: '2026-10-26T03:00:00Z' }).extra.outcome).toBe('done');
+        expect(
+            helperEventAudit({ id: id(4), kind: 'admit', at: '2026-10-26T03:00:00Z' }).action,
+        ).toBe('node.helper.admit');
+        expect(
+            helperEventAudit({ id: id(5), kind: 'revoke', at: '2026-10-26T03:00:00Z' }).extra
+                .outcome,
+        ).toBe('done');
     });
 });

@@ -75,12 +75,19 @@ describe('DesktopHelperHost facts', () => {
 		expect(desktop.tags()).toEqual(['helper:screen', 'screen:desktop']);
 		const report = await desktop.report();
 		expect(report).toMatchObject({ helperTrust: 'hash-pinned', desktopReasons: [] });
-		expect(report.helper).toMatchObject({ admitted: true, present: true, fingerprintPrefix: sha256Of(BINARY).slice(0, 8) });
+		expect(report.helper).toMatchObject({
+			admitted: true,
+			present: true,
+			fingerprintPrefix: sha256Of(BINARY).slice(0, 8)
+		});
 		expect(report.displays.map((display) => display.id)).toEqual(['DP-1']);
 	});
 
 	it('keeps helper:screen but not screen:desktop on a Wayland session', async () => {
-		const { desktop } = host({ [paths.installPath]: BINARY, [paths.policyPath]: RECORD }, { reasons: ['wayland-unsupported'] });
+		const { desktop } = host(
+			{ [paths.installPath]: BINARY, [paths.policyPath]: RECORD },
+			{ reasons: ['wayland-unsupported'] }
+		);
 		await desktop.refresh();
 		expect(desktop.tags()).toEqual(['helper:screen']);
 		expect(desktop.reasons()).toEqual(['wayland-unsupported']);
@@ -115,7 +122,10 @@ describe('DesktopHelperHost streams', () => {
 		const opened = await desktop.openStream({ display: 'DP-1', quality: 'steady' }, sink);
 		expect(opened.ok).toBe(true);
 		const start = fake.children[0].received.find((message) => message.kind === 0x01)!;
-		expect(JSON.parse(new TextDecoder().decode(start.payload))).toEqual({ ...helperSettingsFor('steady'), display: 'DP-1' });
+		expect(JSON.parse(new TextDecoder().decode(start.payload))).toEqual({
+			...helperSettingsFor('steady'),
+			display: 'DP-1'
+		});
 		await flush();
 		fake.children[0].sendTiles();
 		fake.children[0].sendFrame();
@@ -134,7 +144,10 @@ describe('DesktopHelperHost streams', () => {
 	});
 
 	it('answers a start the helper refused as failed', async () => {
-		const { desktop } = host({ [paths.installPath]: BINARY, [paths.policyPath]: RECORD }, { startError: 'capture-failed' });
+		const { desktop } = host(
+			{ [paths.installPath]: BINARY, [paths.policyPath]: RECORD },
+			{ startError: 'capture-failed' }
+		);
 		expect(await desktop.openStream({ display: null, quality: 'smooth' }, handlers())).toMatchObject({
 			ok: false,
 			refusal: { kind: 'failed' }

@@ -80,7 +80,10 @@ export interface HelperFs {
 }
 
 /** The real filesystem. `restrict` applies the owner-only ACL on Windows (`node-io`'s helper). */
-export function createHelperFs(options: { platform: string; restrict?: (path: string) => Promise<void> | void }): HelperFs {
+export function createHelperFs(options: {
+	platform: string;
+	restrict?: (path: string) => Promise<void> | void;
+}): HelperFs {
 	const paths = options.platform === 'win32' ? win32 : posix;
 	return {
 		async readText(path) {
@@ -192,7 +195,12 @@ export async function verifyHelper(
 	const record = await readHelperPolicy(fs, paths.policyPath);
 	if (!record) {
 		const installed = await fs.isFile(paths.installPath);
-		return { ok: false, reason: installed ? 'helper-unadmitted' : 'helper-missing', record: null, present: installed };
+		return {
+			ok: false,
+			reason: installed ? 'helper-unadmitted' : 'helper-missing',
+			record: null,
+			present: installed
+		};
 	}
 	if (!(await fs.isFile(record.path))) {
 		return { ok: false, reason: 'helper-missing', record, present: false };

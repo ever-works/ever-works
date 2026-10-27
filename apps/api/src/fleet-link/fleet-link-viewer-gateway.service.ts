@@ -129,7 +129,10 @@ export class FleetLinkViewerGatewayService
      * `4013` like a viewer that lost its right; its channel ends with it.
      * Returns how many were closed.
      */
-    closeViewers(match: (viewer: FleetLinkViewerHandle) => boolean, reason = 'access changed'): number {
+    closeViewers(
+        match: (viewer: FleetLinkViewerHandle) => boolean,
+        reason = 'access changed',
+    ): number {
         let closed = 0;
         for (const [ws, state] of [...this.sockets]) {
             if (!state.handle || !state.opened) continue;

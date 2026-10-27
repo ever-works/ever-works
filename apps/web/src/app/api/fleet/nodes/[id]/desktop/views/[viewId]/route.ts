@@ -15,7 +15,10 @@ type RouteContext = { params: Promise<{ id: string; viewId: string }> };
 export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id, viewId } = await ctx.params;
     if (!isUuid(id) || !isUuid(viewId)) return invalidIdResponse();
-    return forwardFleetCall(fleetApiUrl(`/nodes/${id}/desktop/views/${viewId}`), { method: 'GET', headers });
+    return forwardFleetCall(fleetApiUrl(`/nodes/${id}/desktop/views/${viewId}`), {
+        method: 'GET',
+        headers,
+    });
 });
 
 /** Another display (audited) or quality — answers a fresh grant to re-attach with. */
@@ -34,5 +37,8 @@ export const PATCH = bffProxy<RouteContext>(async ({ request, headers }, ctx) =>
 export const DELETE = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id, viewId } = await ctx.params;
     if (!isUuid(id) || !isUuid(viewId)) return invalidIdResponse();
-    return forwardFleetCall(fleetApiUrl(`/nodes/${id}/desktop/views/${viewId}`), { method: 'DELETE', headers });
+    return forwardFleetCall(fleetApiUrl(`/nodes/${id}/desktop/views/${viewId}`), {
+        method: 'DELETE',
+        headers,
+    });
 });

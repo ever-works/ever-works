@@ -45,13 +45,22 @@ describe('helper admit', () => {
 	it('shows both fingerprints, and approves only after the typed word', async () => {
 		const { deps: d, out, fs } = deps({ fs: memoryHelperFs({ [paths.installPath]: BINARY }), typed: 'admit' });
 		const record = await helperAdmit(d);
-		expect(record).toMatchObject({ level: 'hash-pinned', published: true, version: '0.1.0', sha256: sha256Of(BINARY) });
+		expect(record).toMatchObject({
+			level: 'hash-pinned',
+			published: true,
+			version: '0.1.0',
+			sha256: sha256Of(BINARY)
+		});
 		expect(out.some((line) => line.startsWith('Its SHA-256'))).toBe(true);
 		expect(out.some((line) => line.startsWith('Published'))).toBe(true);
 		expect(await readHelperPolicy(fs, paths.policyPath)).toEqual(record);
 		const events = await readHelperEvents(fs, paths.eventsPath);
 		expect(events).toHaveLength(1);
-		expect(events[0]).toMatchObject({ kind: 'admit', level: 'hash-pinned', fingerprintPrefix: sha256Of(BINARY).slice(0, 8) });
+		expect(events[0]).toMatchObject({
+			kind: 'admit',
+			level: 'hash-pinned',
+			fingerprintPrefix: sha256Of(BINARY).slice(0, 8)
+		});
 	});
 
 	it('refuses when the word is not typed, and writes nothing', async () => {

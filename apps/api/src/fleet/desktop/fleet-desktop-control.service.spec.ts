@@ -30,8 +30,23 @@ function node(helper: Record<string, unknown> = { control: 'allowed', inputReaso
         workerState: null,
         helperTrust: 'hash-pinned',
         desktopFacts: {
-            helper: { trust: 'hash-pinned', present: true, admitted: true, fingerprintPrefix: 'abcdef12', ...helper },
-            displays: [{ id: 'DP-1', name: 'Display 1', width: 1920, height: 1080, scale: 1, primary: true }],
+            helper: {
+                trust: 'hash-pinned',
+                present: true,
+                admitted: true,
+                fingerprintPrefix: 'abcdef12',
+                ...helper,
+            },
+            displays: [
+                {
+                    id: 'DP-1',
+                    name: 'Display 1',
+                    width: 1920,
+                    height: 1080,
+                    scale: 1,
+                    primary: true,
+                },
+            ],
             reasons: [],
             reportedAt: new Date().toISOString(),
             seenEventIds: [],
@@ -41,7 +56,9 @@ function node(helper: Record<string, unknown> = { control: 'allowed', inputReaso
 
 type Row = Record<string, unknown> & { id: string; status: string };
 
-function build(options: { helper?: Record<string, unknown>; held?: boolean; refused?: string } = {}) {
+function build(
+    options: { helper?: Record<string, unknown>; held?: boolean; refused?: string } = {},
+) {
     const row = node(options.helper);
     const rows = new Map<string, Row>();
     const audits: Array<{ action: string; extra: Record<string, unknown> }> = [];
@@ -71,7 +88,9 @@ function build(options: { helper?: Record<string, unknown>; held?: boolean; refu
         serverTime: new Date().toISOString(),
     });
     const outcome = (sessionId: string) =>
-        options.refused ? { refused: options.refused, state: state(sessionId) } : { state: state(sessionId) };
+        options.refused
+            ? { refused: options.refused, state: state(sessionId) }
+            : { state: state(sessionId) };
     const control = {
         getState: jest.fn(async (actor: { sessionId: string }) => state(actor.sessionId)),
         take: jest.fn(async (actor: { sessionId: string; source?: string }) => {
@@ -88,7 +107,9 @@ function build(options: { helper?: Record<string, unknown>; held?: boolean; refu
             return { state: state(actor.sessionId) };
         }),
         keep: jest.fn(async (actor: { sessionId: string }) => ({ state: state(actor.sessionId) })),
-        extend: jest.fn(async (actor: { sessionId: string }) => ({ state: state(actor.sessionId) })),
+        extend: jest.fn(async (actor: { sessionId: string }) => ({
+            state: state(actor.sessionId),
+        })),
         holdOf: jest.fn(async () => ({ held, untilMs: null })),
         acknowledge: jest.fn(async () => undefined),
         recordInput: jest.fn(async () => ({ held, untilMs: null })),
@@ -96,17 +117,27 @@ function build(options: { helper?: Record<string, unknown>; held?: boolean; refu
     };
     const sessions = {
         create: jest.fn(async (data: Record<string, unknown>) => {
-            const created = { ...data, id: `00000000-0000-4000-8000-00000000000${rows.size + 1}`, createdAt: new Date() } as unknown as Row;
+            const created = {
+                ...data,
+                id: `00000000-0000-4000-8000-00000000000${rows.size + 1}`,
+                createdAt: new Date(),
+            } as unknown as Row;
             rows.set(created.id, created);
             return created;
         }),
         findById: jest.fn(async (id: string) => rows.get(id) ?? null),
         findDesktopViewFor: jest.fn(async (id: string, userId: string) => {
             const found = rows.get(id);
-            return found && found.openedByUserId === userId && found.source === 'desktop' ? found : null;
+            return found && found.openedByUserId === userId && found.source === 'desktop'
+                ? found
+                : null;
         }),
-        findOpenForNode: jest.fn(async () => [...rows.values()].filter((entry) => entry.status !== 'ended')),
-        findOpenForScope: jest.fn(async () => [...rows.values()].filter((entry) => entry.status !== 'ended')),
+        findOpenForNode: jest.fn(async () =>
+            [...rows.values()].filter((entry) => entry.status !== 'ended'),
+        ),
+        findOpenForScope: jest.fn(async () =>
+            [...rows.values()].filter((entry) => entry.status !== 'ended'),
+        ),
         updateOpen: jest.fn(async (id: string, patch: Record<string, unknown>) => {
             const found = rows.get(id);
             if (found) Object.assign(found, patch);
@@ -135,26 +166,49 @@ function build(options: { helper?: Record<string, unknown>; held?: boolean; refu
         } as never,
         { isStopped: jest.fn(async () => false) } as never,
         {
-            recordNodeAction: jest.fn(async (input: { action: string; extra: Record<string, unknown> }) => {
-                audits.push({ action: input.action, extra: input.extra });
-                return true;
-            }),
+            recordNodeAction: jest.fn(
+                async (input: { action: string; extra: Record<string, unknown> }) => {
+                    audits.push({ action: input.action, extra: input.extra });
+                    return true;
+                },
+            ),
         } as never,
-        { isConnected: jest.fn(() => true), liveConsents: jest.fn(() => null), openChannel: jest.fn() } as never,
+        {
+            isConnected: jest.fn(() => true),
+            liveConsents: jest.fn(() => null),
+            openChannel: jest.fn(),
+        } as never,
         {
             mint: jest.fn(async (input: Record<string, unknown>) => {
                 mints.push(input);
-                return { token: `${input.role}-token`, wsPath: `/ws/fleet/desktop/${input.target}`, expiresInSec: 60, role: input.role };
+                return {
+                    token: `${input.role}-token`,
+                    wsPath: `/ws/fleet/desktop/${input.target}`,
+                    expiresInSec: 60,
+                    role: input.role,
+                };
             }),
         } as never,
         sessions as never,
         gateway as never,
         control as never,
     );
-    return { service, rows, audits, mints, control, sessions, gateway, closed, setHeld: (next: boolean) => (held = next) };
+    return {
+        service,
+        rows,
+        audits,
+        mints,
+        control,
+        sessions,
+        gateway,
+        closed,
+        setHeld: (next: boolean) => (held = next),
+    };
 }
 
-async function refusal(promise: Promise<unknown>): Promise<{ code: string; hint: string; details?: Record<string, unknown> }> {
+async function refusal(
+    promise: Promise<unknown>,
+): Promise<{ code: string; hint: string; details?: Record<string, unknown> }> {
     try {
         await promise;
     } catch (error) {
@@ -164,10 +218,22 @@ async function refusal(promise: Promise<unknown>): Promise<{ code: string; hint:
     throw new Error('expected a refusal');
 }
 
-const handle = (target: string, role: 'viewer' | 'driver', params: Record<string, unknown> = { source: 'desktop' }) => ({
+const handle = (
+    target: string,
+    role: 'viewer' | 'driver',
+    params: Record<string, unknown> = { source: 'desktop' },
+) => ({
     id: `h-${role}`,
     acceptedAt: Date.now(),
-    claims: { userId: OWNER, nodeId: NODE_ID, family: 'desktop' as const, target, role, params, requirement: {} },
+    claims: {
+        userId: OWNER,
+        nodeId: NODE_ID,
+        family: 'desktop' as const,
+        target,
+        role,
+        params,
+        requirement: {},
+    },
 });
 
 describe('desktop views as computer_sessions rows (FR-33)', () => {
@@ -204,11 +270,18 @@ describe('desktop views as computer_sessions rows (FR-33)', () => {
         // A second replica: same rows, nothing in memory.
         const second = build();
         for (const [id, value] of first.rows) second.rows.set(id, value);
-        expect((await second.service.view(OWNER, NODE_ID, opened.view.viewId)).viewId).toBe(opened.view.viewId);
-        expect(await refusal(second.service.view('someone-else', NODE_ID, opened.view.viewId))).toMatchObject({ code: 'not_found' });
+        expect((await second.service.view(OWNER, NODE_ID, opened.view.viewId)).viewId).toBe(
+            opened.view.viewId,
+        );
+        expect(
+            await refusal(second.service.view('someone-else', NODE_ID, opened.view.viewId)),
+        ).toMatchObject({ code: 'not_found' });
         await second.service.endView(OWNER, NODE_ID, opened.view.viewId);
         expect(second.rows.get(opened.view.viewId)?.status).toBe('ended');
-        expect(second.control.releaseForSession).toHaveBeenCalledWith(opened.view.viewId, 'session-ended');
+        expect(second.control.releaseForSession).toHaveBeenCalledWith(
+            opened.view.viewId,
+            'session-ended',
+        );
         expect(second.gateway.closeViewers).toHaveBeenCalled();
     });
 
@@ -220,7 +293,12 @@ describe('desktop views as computer_sessions rows (FR-33)', () => {
         service.opened(viewer);
         (service as unknown as { now: () => number }).now = () => Date.now() + 20_000;
         service.nodeMessage(viewer, { type: 'desktop.stats', fps: 4, bytesOut: 4096 });
-        expect(sessions.recordFrames).toHaveBeenCalledWith(opened.view.viewId, 4, 4096, expect.any(Date));
+        expect(sessions.recordFrames).toHaveBeenCalledWith(
+            opened.view.viewId,
+            4,
+            4096,
+            expect.any(Date),
+        );
     });
 });
 
@@ -228,20 +306,33 @@ describe('taking control of a desktop view', () => {
     it('is refused before the arbiter when the owner has not allowed control on the machine', async () => {
         const { service, control, audits } = build({ helper: { control: 'not-allowed' } });
         const opened = await service.openView(OWNER, NODE_ID, {});
-        const answer = await refusal(service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }));
-        expect(answer).toMatchObject({ code: 'unsupported_on_node', details: { reason: 'control-not-allowed' } });
+        const answer = await refusal(
+            service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }),
+        );
+        expect(answer).toMatchObject({
+            code: 'unsupported_on_node',
+            details: { reason: 'control-not-allowed' },
+        });
         expect(answer.hint).toContain('ever-works-node helper control allow');
         expect(control.take).not.toHaveBeenCalled();
         expect(audits[audits.length - 1]).toMatchObject({
             action: 'node.desktop.control.take',
-            extra: { outcome: 'refused', reason: 'control-not-allowed', confirmationClass: 'confirm' },
+            extra: {
+                outcome: 'refused',
+                reason: 'control-not-allowed',
+                confirmationClass: 'confirm',
+            },
         });
     });
 
     it('never offers control on a node that says nothing about it (an older node)', async () => {
         const { service } = build({ helper: {} });
         const opened = await service.openView(OWNER, NODE_ID, {});
-        expect(await refusal(service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }))).toMatchObject({
+        expect(
+            await refusal(
+                service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }),
+            ),
+        ).toMatchObject({
             details: { reason: 'control-not-allowed' },
         });
     });
@@ -249,14 +340,26 @@ describe('taking control of a desktop view', () => {
     it('needs confirm (CONTRACTS §2.2), then answers a driver grant naming the controller', async () => {
         const { service, control, mints } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
-        expect(await refusal(service.takeControl(OWNER, NODE_ID, opened.view.viewId, {}))).toMatchObject({
+        expect(
+            await refusal(service.takeControl(OWNER, NODE_ID, opened.view.viewId, {})),
+        ).toMatchObject({
             code: 'confirmation_required',
             details: { class: 'confirm' },
         });
         expect(control.take).not.toHaveBeenCalled();
-        const taken = await service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }, 'Ada Lovelace');
+        const taken = await service.takeControl(
+            OWNER,
+            NODE_ID,
+            opened.view.viewId,
+            { confirm: true },
+            'Ada Lovelace',
+        );
         expect(control.take).toHaveBeenCalledWith(
-            expect.objectContaining({ sessionId: opened.view.viewId, userId: OWNER, source: 'desktop' }),
+            expect.objectContaining({
+                sessionId: opened.view.viewId,
+                userId: OWNER,
+                source: 'desktop',
+            }),
         );
         expect(taken.state.mode).toBe('controlling');
         expect(taken.attach?.role).toBe('driver');
@@ -269,13 +372,21 @@ describe('taking control of a desktop view', () => {
     it('maps the arbiter’s refusals to CONTRACTS codes, the state in details', async () => {
         const held = build({ refused: 'held' });
         const opened = await held.service.openView(OWNER, NODE_ID, {});
-        expect(await refusal(held.service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }))).toMatchObject({
+        expect(
+            await refusal(
+                held.service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true }),
+            ),
+        ).toMatchObject({
             code: 'busy',
             details: { reason: 'held' },
         });
         const policy = build({ refused: 'policy' });
         const second = await policy.service.openView(OWNER, NODE_ID, {});
-        expect(await refusal(policy.service.takeControl(OWNER, NODE_ID, second.view.viewId, { confirm: true }))).toMatchObject({
+        expect(
+            await refusal(
+                policy.service.takeControl(OWNER, NODE_ID, second.view.viewId, { confirm: true }),
+            ),
+        ).toMatchObject({
             code: 'permission_denied',
         });
     });
@@ -283,7 +394,9 @@ describe('taking control of a desktop view', () => {
     it('asks for control without a confirmation', async () => {
         const { service, control } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
-        const asked = await service.takeControl(OWNER, NODE_ID, opened.view.viewId, { request: true });
+        const asked = await service.takeControl(OWNER, NODE_ID, opened.view.viewId, {
+            request: true,
+        });
         expect(control.request).toHaveBeenCalled();
         expect(asked.attach).toBeNull();
     });
@@ -311,17 +424,25 @@ describe('driver sockets', () => {
     it('are admitted only with a controlling grant while the view holds control', async () => {
         const { service, setHeld } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
-        const driver = handle(opened.view.viewId, 'driver', { source: 'desktop', mode: 'controlling' });
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
         await expect(service.admit(driver)).rejects.toBeInstanceOf(FleetLinkException);
         setHeld(true);
         await expect(service.admit(driver)).resolves.toBeUndefined();
-        await expect(service.admit(handle(opened.view.viewId, 'driver'))).rejects.toBeInstanceOf(FleetLinkException);
+        await expect(service.admit(handle(opened.view.viewId, 'driver'))).rejects.toBeInstanceOf(
+            FleetLinkException,
+        );
     });
 
     it('acknowledge the hold on every ping, and lose it when control ends', async () => {
         const { service, control, setHeld } = build({ held: true });
         const opened = await service.openView(OWNER, NODE_ID, {});
-        const driver = handle(opened.view.viewId, 'driver', { source: 'desktop', mode: 'controlling' });
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
         await service.admit(driver);
         service.opened(driver);
         expect(await service.stillAllowed(driver)).toBe(true);
@@ -333,7 +454,10 @@ describe('driver sockets', () => {
     it('push the idle deadline with input, at most every few seconds', async () => {
         const { service, control } = build({ held: true });
         const opened = await service.openView(OWNER, NODE_ID, {});
-        const driver = handle(opened.view.viewId, 'driver', { source: 'desktop', mode: 'controlling' });
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
         await service.admit(driver);
         service.opened(driver);
         service.inbound(driver, 40);
@@ -365,13 +489,19 @@ describe('driver sockets', () => {
         try {
             const { service, control } = build({ held: true });
             const opened = await service.openView(OWNER, NODE_ID, {});
-            const driver = handle(opened.view.viewId, 'driver', { source: 'desktop', mode: 'controlling' });
+            const driver = handle(opened.view.viewId, 'driver', {
+                source: 'desktop',
+                mode: 'controlling',
+            });
             await service.admit(driver);
             service.opened(driver);
             service.closed(driver);
             control.getState.mockImplementationOnce(async () => null as never);
             await jest.advanceTimersByTimeAsync(30_000);
-            expect(control.releaseForSession).toHaveBeenCalledWith(opened.view.viewId, 'disconnected');
+            expect(control.releaseForSession).toHaveBeenCalledWith(
+                opened.view.viewId,
+                'disconnected',
+            );
         } finally {
             jest.useRealTimers();
         }
@@ -380,9 +510,14 @@ describe('driver sockets', () => {
 
 describe('availability', () => {
     it('says whether control is possible, and names the blocked shortcuts', async () => {
-        const { service } = build({ helper: { control: 'allowed', inputReasons: ['permission-accessibility'] } });
+        const { service } = build({
+            helper: { control: 'allowed', inputReasons: ['permission-accessibility'] },
+        });
         const view = await service.availability(OWNER, NODE_ID);
-        expect(view.control).toMatchObject({ available: false, reasons: ['permission-accessibility'] });
+        expect(view.control).toMatchObject({
+            available: false,
+            reasons: ['permission-accessibility'],
+        });
         expect(view.control?.blockedShortcuts).toContain('Alt+F4');
     });
 });

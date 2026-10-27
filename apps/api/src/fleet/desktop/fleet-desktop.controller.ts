@@ -77,7 +77,8 @@ export class FleetDesktopController {
 
     @Get('nodes/:id/desktop/availability')
     @ApiOperation({
-        summary: "Whether this computer's desktop can be watched now, and if not the one reason and its fix.",
+        summary:
+            "Whether this computer's desktop can be watched now, and if not the one reason and its fix.",
     })
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     availability(
@@ -88,7 +89,9 @@ export class FleetDesktopController {
     }
 
     @Get('nodes/:id/desktop/displays')
-    @ApiOperation({ summary: 'The displays this computer last reported (id, name, size, scale, primary).' })
+    @ApiOperation({
+        summary: 'The displays this computer last reported (id, name, size, scale, primary).',
+    })
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     displays(
         @CurrentUser() auth: AuthenticatedUser,
@@ -135,7 +138,8 @@ export class FleetDesktopController {
 
     @Patch('nodes/:id/desktop/views/:viewId')
     @ApiOperation({
-        summary: 'Show another display (audited) or change the quality; answers a fresh viewer token to re-attach with.',
+        summary:
+            'Show another display (audited) or change the quality; answers a fresh viewer token to re-attach with.',
     })
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     update(
@@ -177,7 +181,10 @@ export class FleetDesktopController {
     // ─── Control (P2) ──────────────────────────────────────────────────────
 
     @Get('nodes/:id/desktop/views/:viewId/control')
-    @ApiOperation({ summary: 'Control of this computer as my view sees it: who holds it, until when, and any request.' })
+    @ApiOperation({
+        summary:
+            'Control of this computer as my view sees it: who holds it, until when, and any request.',
+    })
     @Throttle({ long: { limit: 120, ttl: 60_000 } })
     controlState(
         @CurrentUser() auth: AuthenticatedUser,
@@ -204,13 +211,19 @@ export class FleetDesktopController {
             auth.userId,
             id,
             viewId,
-            { ...(body?.request ? { request: true } : {}), ...(body?.confirm === true ? { confirm: true } : {}) },
+            {
+                ...(body?.request ? { request: true } : {}),
+                ...(body?.confirm === true ? { confirm: true } : {}),
+            },
             controllerNameOf(auth),
         );
     }
 
     @Delete('nodes/:id/desktop/views/:viewId/control')
-    @ApiOperation({ summary: 'Give control back from my view (idempotent); answers the viewer grant to re-attach with.' })
+    @ApiOperation({
+        summary:
+            'Give control back from my view (idempotent); answers the viewer grant to re-attach with.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     giveBackControl(
@@ -222,7 +235,9 @@ export class FleetDesktopController {
     }
 
     @Post('nodes/:id/desktop/views/:viewId/control/handover')
-    @ApiOperation({ summary: 'The view holding control answers a request: hand control over, or keep it.' })
+    @ApiOperation({
+        summary: 'The view holding control answers a request: hand control over, or keep it.',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
     answerControlRequest(
@@ -231,7 +246,13 @@ export class FleetDesktopController {
         @Param('viewId', ParseUUIDPipe) viewId: string,
         @Body() body: AnswerFleetDesktopControlDto,
     ): Promise<FleetDesktopControlResult> {
-        return this.desktop.answerControlRequest(auth.userId, id, viewId, body.requestId, body.decision);
+        return this.desktop.answerControlRequest(
+            auth.userId,
+            id,
+            viewId,
+            body.requestId,
+            body.decision,
+        );
     }
 
     @Post('nodes/:id/desktop/views/:viewId/control/keep')
@@ -270,7 +291,9 @@ export class FleetDesktopController {
         @Query('displayId') displayId?: string,
     ): Promise<FleetDesktopScreenshot> {
         if (displayId !== undefined && !isFleetDisplayId(displayId)) {
-            throw fleetLinkError('invalid', 'displayId', { displayId: String(displayId).slice(0, 64) });
+            throw fleetLinkError('invalid', 'displayId', {
+                displayId: String(displayId).slice(0, 64),
+            });
         }
         return this.desktop.screenshot(auth.userId, id, displayId ?? null);
     }

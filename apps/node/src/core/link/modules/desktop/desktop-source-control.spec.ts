@@ -87,7 +87,11 @@ function setup(files: Record<string, string>) {
 	let clock = 0;
 	const opener = createDesktopSourceOpener({
 		host,
-		logger: { info: (line) => said.push(line), warn: (line) => said.push(line), error: (line) => said.push(line) },
+		logger: {
+			info: (line: string) => void said.push(line),
+			warn: (line: string) => void said.push(line),
+			error: (line: string) => void said.push(line)
+		} as never,
 		now: () => clock,
 		setTimer: (callback) => {
 			timers.push(callback);
@@ -138,16 +142,26 @@ describe('a controlling desktop channel', () => {
 	it('says on the machine who is controlling it, and how to stop it', async () => {
 		const { result, said, json } = await open(FILES);
 		expect(result.ok).toBe(true);
-		expect(said.some((line) => line.includes('Ada Lovelace is now controlling') && line.includes('helper control deny'))).toBe(true);
+		expect(
+			said.some(
+				(line) => line.includes('Ada Lovelace is now controlling') && line.includes('helper control deny')
+			)
+		).toBe(true);
 		expect(json[0]).toMatchObject({ type: 'desktop.started', mode: 'controlling' });
 	});
 
 	it('forwards pointer, wheel, key and text with the picture size', async () => {
 		const { result, fake } = await open(FILES);
 		const handler = (result as { ok: true; handler: NodeChannelHandler }).handler;
-		handler.onBinary!(FLEET_LINK_FRAME_KINDS.INPUT, inputBytes({ kind: 'pointer', action: 'move', x: 1, y: 2, button: null, buttons: 0 }));
+		handler.onBinary!(
+			FLEET_LINK_FRAME_KINDS.INPUT,
+			inputBytes({ kind: 'pointer', action: 'move', x: 1, y: 2, button: null, buttons: 0 })
+		);
 		handler.onBinary!(FLEET_LINK_FRAME_KINDS.INPUT, inputBytes({ kind: 'scroll', x: 1, y: 2, dx: 0, dy: 120 }));
-		handler.onBinary!(FLEET_LINK_FRAME_KINDS.INPUT, inputBytes({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 0 }));
+		handler.onBinary!(
+			FLEET_LINK_FRAME_KINDS.INPUT,
+			inputBytes({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 0 })
+		);
 		handler.onBinary!(FLEET_LINK_FRAME_KINDS.INPUT, inputBytes({ kind: 'text', text: 'hello' }));
 		await flush();
 		expect(fake.children[0].inputs.map((input) => input.kind)).toEqual(['pointer', 'scroll', 'key', 'text']);
@@ -186,7 +200,7 @@ describe('a controlling desktop channel', () => {
 
 	it('releases every key and button when the channel closes (FR-39)', async () => {
 		const { result, fake } = await open(FILES);
-		(result as { ok: true; handler: NodeChannelHandler }).handler.onClose!();
+		(result as { ok: true; handler: NodeChannelHandler }).handler.onClose!('normal');
 		await flush();
 		expect(fake.children[0].received.some((message) => message.kind === HELPER_MESSAGES.releaseAll)).toBe(true);
 	});

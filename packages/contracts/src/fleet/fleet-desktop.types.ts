@@ -435,7 +435,9 @@ export function normalizeFleetHelperStatus(value: unknown): FleetHelperStatusVie
 		published: typeof raw.published === 'boolean' ? raw.published : null,
 		// P2 (control): carried only when the node said them, so an older node's status reads as before.
 		...(isFleetHelperControlState(raw.control) ? { control: raw.control } : {}),
-		...(Array.isArray(raw.inputReasons) ? { inputReasons: normalizeFleetDesktopControlReasons(raw.inputReasons) } : {})
+		...(Array.isArray(raw.inputReasons)
+			? { inputReasons: normalizeFleetDesktopControlReasons(raw.inputReasons) }
+			: {})
 	};
 }
 

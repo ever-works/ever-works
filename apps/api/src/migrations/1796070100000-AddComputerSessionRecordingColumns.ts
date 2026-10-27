@@ -32,19 +32,41 @@ export class AddComputerSessionRecordingColumns1796070100000 implements Migratio
     name = 'AddComputerSessionRecordingColumns1796070100000';
 
     private static readonly COLUMNS: TableColumn[] = [
-        new TableColumn({ name: 'source', type: 'varchar', length: '8', isNullable: false, default: "'browser'" }),
+        new TableColumn({
+            name: 'source',
+            type: 'varchar',
+            length: '8',
+            isNullable: false,
+            default: "'browser'",
+        }),
         new TableColumn({ name: 'displayId', type: 'varchar', length: '64', isNullable: true }),
         new TableColumn({ name: 'fleetSessionId', type: 'uuid', isNullable: true }),
         new TableColumn({ name: 'recordingRef', type: 'varchar', length: '512', isNullable: true }),
         new TableColumn({ name: 'recordingBytes', type: 'bigint', isNullable: false, default: 0 }),
-        new TableColumn({ name: 'recordingDurationMs', type: 'int', isNullable: false, default: 0 }),
+        new TableColumn({
+            name: 'recordingDurationMs',
+            type: 'int',
+            isNullable: false,
+            default: 0,
+        }),
         new TableColumn({ name: 'recordingExpiresAt', type: 'timestamp', isNullable: true }),
-        new TableColumn({ name: 'recordingStoppedReason', type: 'varchar', length: '24', isNullable: true }),
+        new TableColumn({
+            name: 'recordingStoppedReason',
+            type: 'varchar',
+            length: '24',
+            isNullable: true,
+        }),
     ];
 
     private static readonly INDEXES: TableIndex[] = [
-        new TableIndex({ name: 'idx_computer_sessions_recording_expires', columnNames: ['recordingExpiresAt'] }),
-        new TableIndex({ name: 'idx_computer_sessions_fleet_session', columnNames: ['fleetSessionId'] }),
+        new TableIndex({
+            name: 'idx_computer_sessions_recording_expires',
+            columnNames: ['recordingExpiresAt'],
+        }),
+        new TableIndex({
+            name: 'idx_computer_sessions_fleet_session',
+            columnNames: ['fleetSessionId'],
+        }),
     ];
 
     public async up(queryRunner: QueryRunner): Promise<void> {
@@ -76,9 +98,12 @@ export class AddComputerSessionRecordingColumns1796070100000 implements Migratio
                 await queryRunner.dropIndex('computer_sessions', index.name!);
             }
         }
-        for (const column of [...AddComputerSessionRecordingColumns1796070100000.COLUMNS].reverse()) {
+        for (const column of [
+            ...AddComputerSessionRecordingColumns1796070100000.COLUMNS,
+        ].reverse()) {
             const table = await queryRunner.getTable('computer_sessions');
-            if (table?.findColumnByName(column.name)) await queryRunner.dropColumn('computer_sessions', column.name);
+            if (table?.findColumnByName(column.name))
+                await queryRunner.dropColumn('computer_sessions', column.name);
         }
     }
 }

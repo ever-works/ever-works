@@ -199,6 +199,20 @@ already audited (§4.1); the eight desktop reasons are their own union (`FLEET_D
 `COMPUTER_UNWATCHABLE_REASONS` unchanged for the browser source; CONTRACTS §7's `node.desktop.openUrl` is written
 `node.desktop.open-url` when it lands (the audit vocabulary is lowercase kebab) — not in P1.
 
+**Revision 24 (2026-10-27)** — FL-07 P2 control (lane log decisions 18–26): a Desktop view is a `computer_sessions`
+row (`source: 'desktop'`, `agentId` null, `userId` = the computer's owner, `openedByUserId` = the viewer; slot
+`1796070100000` adds R-9's columns and relaxes `agentId`, forward-only on `down`), so AW-11's caps and its ONE control
+lock per computer cover both sources; control on a view is `GET|POST|DELETE …/desktop/views/:viewId/control` and
+`POST …/control/{handover,keep,extend}` answering `FleetDesktopControlResult { state, attach }` (a take needs `confirm:
+true`, class `confirm`; a `driver` grant only to the view holding the lock, with channel params `mode: 'controlling'` and
+`controlledBy`); the machine half is the owner's on-machine permission (`ever-works-node helper control allow|deny`,
+`helper-control.json`, bound to one admission) reported inside the heartbeat's `helper` as `control: allowed |
+not-allowed` and `inputReasons[]` (`FLEET_DESKTOP_CONTROL_REASONS`; absent reads as not allowed), audited
+`node.helper.control-allow|deny` from `helperEvents`; node → controlling viewer `desktop.inputRefused { code }`
+(`FLEET_DESKTOP_INPUT_REFUSED_CODES`, a code only); a controlling channel refuses `desktop.setDisplay` (a display switch
+is the audited `PATCH`); the helper wire gains `inputResult` (0x87) and `hello.inputReasons`. Shapes in
+`packages/contracts/src/fleet/fleet-desktop-control.types.ts`.
+
 ## 0. Resolutions (R-1 … R-41)
 
 Rulings that settle questions more than one epic would otherwise answer differently.

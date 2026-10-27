@@ -288,10 +288,16 @@ export class ComputerControlArbiter {
                 current,
             );
         if (ControlArbiterDesktop.is(session)) {
-            await this.auditDesktop(session, 'node.desktop.control.request', actor.userId, lock.userId, {
-                outcome: 'requested',
-                holderSessionId: holder,
-            });
+            await this.auditDesktop(
+                session,
+                'node.desktop.control.request',
+                actor.userId,
+                lock.userId,
+                {
+                    outcome: 'requested',
+                    holderSessionId: holder,
+                },
+            );
         }
         return { state: await this.view(session.id, actor.userId, current, now) };
     }
@@ -603,11 +609,17 @@ export class ComputerControlArbiter {
             await this.writeSpans(session, closeSpan(session.controlSpans, now, reason));
         }
         if (session && ControlArbiterDesktop.is(session)) {
-            await this.auditDesktop(session, 'node.desktop.control.release', actorUserId, lock.userId, {
-                outcome: 'released',
-                releaseReason: reason,
-                heldMs,
-            });
+            await this.auditDesktop(
+                session,
+                'node.desktop.control.release',
+                actorUserId,
+                lock.userId,
+                {
+                    outcome: 'released',
+                    releaseReason: reason,
+                    heldMs,
+                },
+            );
         } else {
             await this.audit?.tryRecord({
                 action: 'computer.control-release',
@@ -643,10 +655,16 @@ export class ComputerControlArbiter {
         const holderUserId = lock.controlHolderUserId ?? actorUserId;
         await this.writeSpans(session, openSpan(session.controlSpans, holderUserId, now));
         if (ControlArbiterDesktop.is(session)) {
-            await this.auditDesktop(session, 'node.desktop.control.take', actorUserId, lock.userId, {
-                outcome: 'granted',
-                holderUserId,
-            });
+            await this.auditDesktop(
+                session,
+                'node.desktop.control.take',
+                actorUserId,
+                lock.userId,
+                {
+                    outcome: 'granted',
+                    holderUserId,
+                },
+            );
         } else {
             await this.audit?.tryRecord({
                 action: 'computer.control-grant',
@@ -686,11 +704,17 @@ export class ComputerControlArbiter {
         lock: ComputerControlLockRow,
     ): Promise<void> {
         if (ControlArbiterDesktop.is(session)) {
-            await this.auditDesktop(session, 'node.desktop.control.take', actorUserId, lock.userId, {
-                outcome: 'refused',
-                policy: this.desktopPolicy(lock),
-                holderPresent: Boolean(lock.controlHolderSessionId),
-            });
+            await this.auditDesktop(
+                session,
+                'node.desktop.control.take',
+                actorUserId,
+                lock.userId,
+                {
+                    outcome: 'refused',
+                    policy: this.desktopPolicy(lock),
+                    holderPresent: Boolean(lock.controlHolderSessionId),
+                },
+            );
             return;
         }
         await this.audit?.tryRecord({

@@ -78,9 +78,13 @@ export function desktopRefusalError(refusal: DesktopStreamRefusal, nodeName: str
 				reason: refusal.reason
 			});
 		case 'limit':
-			return makeFleetLinkError('limit_exceeded', `${nodeName} is already showing its desktop twice; close one view`, {
-				limit: 'views-per-computer'
-			});
+			return makeFleetLinkError(
+				'limit_exceeded',
+				`${nodeName} is already showing its desktop twice; close one view`,
+				{
+					limit: 'views-per-computer'
+				}
+			);
 		case 'control':
 			return makeFleetLinkError('unsupported_on_node', fleetDesktopControlReasonHint(refusal.reason, nodeName), {
 				reason: refusal.reason
@@ -95,7 +99,10 @@ export function desktopRefusalError(refusal: DesktopStreamRefusal, nodeName: str
 	}
 }
 
-function endReason(reason: DesktopStreamEnd, nodeName: string): { code: FleetLinkError['code'] | 'normal'; hint?: string } {
+function endReason(
+	reason: DesktopStreamEnd,
+	nodeName: string
+): { code: FleetLinkError['code'] | 'normal'; hint?: string } {
 	switch (reason) {
 		case 'revoked':
 			return { code: 'unsupported_on_node', hint: `the screen helper's approval on ${nodeName} was revoked` };
@@ -343,7 +350,10 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 							// platform (`PATCH …/views/:viewId`, audited `node.desktop.display.set`).
 							if (controlling) {
 								reply(message.requestId, {
-									error: makeFleetLinkError('invalid', 'switch the display from the view’s display picker')
+									error: makeFleetLinkError(
+										'invalid',
+										'switch the display from the view’s display picker'
+									)
 								});
 								return;
 							}

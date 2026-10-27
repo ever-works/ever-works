@@ -73,7 +73,9 @@ export class DesktopPainter {
             if (!canvas || !context || this.disposed) return;
             for (const tile of tiles.tiles) {
                 try {
-                    const bitmap = await this.decode(new Blob([new Uint8Array(tile.data)], { type: 'image/jpeg' }));
+                    const bitmap = await this.decode(
+                        new Blob([new Uint8Array(tile.data)], { type: 'image/jpeg' }),
+                    );
                     context.drawImage(bitmap, tile.x, tile.y, tile.w, tile.h);
                     bitmap.close?.();
                     this.badTiles = 0;

@@ -40,7 +40,11 @@ import type { FleetDesktopAttachGrant } from './fleet-desktop.types.js';
  *  - `input-unavailable` — the session takes no synthetic input (an X server
  *    without the XTest extension, another desktop in front on Windows).
  */
-export const FLEET_DESKTOP_CONTROL_REASONS = ['control-not-allowed', 'permission-accessibility', 'input-unavailable'] as const;
+export const FLEET_DESKTOP_CONTROL_REASONS = [
+	'control-not-allowed',
+	'permission-accessibility',
+	'input-unavailable'
+] as const;
 
 export type FleetDesktopControlReason = (typeof FLEET_DESKTOP_CONTROL_REASONS)[number];
 
@@ -130,7 +134,8 @@ export function resolveFleetDesktopControlReasons(
 	helper: { control?: unknown; inputReasons?: unknown } | null | undefined
 ): FleetDesktopControlReason[] {
 	const reasons = normalizeFleetDesktopControlReasons(helper?.inputReasons);
-	if (helper?.control !== 'allowed' && !reasons.includes('control-not-allowed')) reasons.unshift('control-not-allowed');
+	if (helper?.control !== 'allowed' && !reasons.includes('control-not-allowed'))
+		reasons.unshift('control-not-allowed');
 	return normalizeFleetDesktopControlReasons(reasons);
 }
 

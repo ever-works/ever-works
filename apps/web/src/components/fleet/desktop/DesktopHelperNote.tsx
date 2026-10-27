@@ -29,7 +29,9 @@ export function DesktopHelperNote({
             <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
             <span>
                 {t('reducedTrust', { name: nodeName })}
-                {helper?.fingerprintPrefix ? ` ${t('fingerprint', { prefix: helper.fingerprintPrefix })}` : ''}
+                {helper?.fingerprintPrefix
+                    ? ` ${t('fingerprint', { prefix: helper.fingerprintPrefix })}`
+                    : ''}
                 {helper?.published === false ? ` ${t('unpublished')}` : ''}
             </span>
         </p>

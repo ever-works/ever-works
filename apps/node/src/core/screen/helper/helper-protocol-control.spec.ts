@@ -34,7 +34,9 @@ describe('helper input', () => {
 	});
 
 	it('refuses an input too large for the helper to accept', () => {
-		expect(encodeHelperInput({ kind: 'text', text: 'x'.repeat(HELPER_INPUT_MAX_BYTES) }, { width: 1, height: 1 })).toBeNull();
+		expect(
+			encodeHelperInput({ kind: 'text', text: 'x'.repeat(HELPER_INPUT_MAX_BYTES) }, { width: 1, height: 1 })
+		).toBeNull();
 	});
 
 	it('reads the helper’s refusals as codes only', () => {

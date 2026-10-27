@@ -127,7 +127,9 @@ export class ComputerSessionRepository {
      * than its owner. A foreign id resolves to null, exactly like an unknown one.
      */
     async findDesktopViewFor(id: string, openedByUserId: string): Promise<ComputerSession | null> {
-        return this.repository.findOne({ where: { id, openedByUserId, source: 'desktop', agentId: IsNull() } });
+        return this.repository.findOne({
+            where: { id, openedByUserId, source: 'desktop', agentId: IsNull() },
+        });
     }
 
     /** Node-scoped: the only read a node credential buys. */

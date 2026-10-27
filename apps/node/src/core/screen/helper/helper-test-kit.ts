@@ -146,19 +146,29 @@ export class FakeHelperChild implements HelperChild {
 	}
 
 	sendTiles(): void {
-		const tiles = encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: fakeJpeg(3) }] });
+		const tiles = encodeDesktopTiles({
+			width: 64,
+			height: 64,
+			tiles: [{ x: 0, y: 0, w: 64, h: 64, data: fakeJpeg(3) }]
+		});
 		if (tiles) this.emitMessage(encodeHelperMessage(HELPER_MESSAGES.tiles, tiles));
 	}
 
 	private displays(): Array<Record<string, unknown>> {
-		return this.options.displays ?? [{ id: 'DP-1', name: 'Display 1', width: 1920, height: 1080, scale: 1, primary: true }];
+		return (
+			this.options.displays ?? [
+				{ id: 'DP-1', name: 'Display 1', width: 1920, height: 1080, scale: 1, primary: true }
+			]
+		);
 	}
 
 	private onCommand(kind: number, payload: Uint8Array): void {
 		this.received.push({ kind, payload });
 		if (kind === HELPER_MESSAGES.start) {
 			if (this.options.startError) {
-				this.emitMessage(encodeHelperJson(HELPER_MESSAGES.error, { code: this.options.startError, message: 'no' }));
+				this.emitMessage(
+					encodeHelperJson(HELPER_MESSAGES.error, { code: this.options.startError, message: 'no' })
+				);
 				return;
 			}
 			const displays = this.displays();
@@ -173,11 +183,16 @@ export class FakeHelperChild implements HelperChild {
 			this.inputs.push(input);
 			if (this.options.refuseInput) {
 				this.emitMessage(
-					encodeHelperJson(HELPER_MESSAGES.inputResult, { outcome: 'refused', code: this.options.refuseInput })
+					encodeHelperJson(HELPER_MESSAGES.inputResult, {
+						outcome: 'refused',
+						code: this.options.refuseInput
+					})
 				);
 			} else if (input.kind === 'key' && input.code === 'KeyC' && (Number(input.modifiers) & 2) !== 0) {
 				// The helper's own second check of the blocked shortcuts.
-				this.emitMessage(encodeHelperJson(HELPER_MESSAGES.inputResult, { outcome: 'blocked', code: 'blocked-shortcut' }));
+				this.emitMessage(
+					encodeHelperJson(HELPER_MESSAGES.inputResult, { outcome: 'blocked', code: 'blocked-shortcut' })
+				);
 			}
 		} else if (kind === HELPER_MESSAGES.releaseAll) {
 			this.releases += 1;
@@ -203,13 +218,17 @@ export class FakeHelperChild implements HelperChild {
 		if (!this.alive) return;
 		this.alive = false;
 		queueMicrotask(() => {
-			for (const listener of this.listeners.get('exit') ?? []) (listener as (code: number | null, signal: null) => void)(code, null);
+			for (const listener of this.listeners.get('exit') ?? [])
+				(listener as (code: number | null, signal: null) => void)(code, null);
 		});
 	}
 }
 
 /** A spawner that hands out {@link FakeHelperChild}ren and remembers them. */
-export function fakeHelperSpawner(options: FakeHelperOptions = {}): { spawner: HelperSpawner; children: FakeHelperChild[] } {
+export function fakeHelperSpawner(options: FakeHelperOptions = {}): {
+	spawner: HelperSpawner;
+	children: FakeHelperChild[];
+} {
 	const children: FakeHelperChild[] = [];
 	return {
 		children,

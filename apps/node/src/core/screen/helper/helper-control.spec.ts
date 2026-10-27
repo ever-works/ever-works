@@ -26,7 +26,11 @@ const PUBLISHED: FleetHelperManifest = {
 	targets: { 'linux-x64': { sha256: sha256Of(BINARY), url: 'https://downloads.example/ever-works-screen' } }
 };
 
-function deps(fs = memoryHelperFs({ [paths.installPath]: BINARY }), typed: string | null = 'control', at = '2026-10-27T03:00:00Z') {
+function deps(
+	fs = memoryHelperFs({ [paths.installPath]: BINARY }),
+	typed: string | null = 'control',
+	at = '2026-10-27T03:00:00Z'
+) {
 	const out: string[] = [];
 	const value: HelperAdmissionDeps = {
 		fs,

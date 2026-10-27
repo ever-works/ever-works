@@ -101,10 +101,16 @@ export async function helperControlAllow(deps: HelperAdmissionDeps): Promise<Fle
 	deps.out(`Allowing control lets the people you allow in Ever Works (the computer's "desktop" audience) take over`);
 	deps.out(`the mouse and keyboard of ${deps.hostName}, one person at a time, after they confirm it in a live view.`);
 	deps.out('While someone has control, this node prints who it is here; control ends when they give it back,');
-	deps.out('after 10 minutes without input, at the fleet stop switch, or when you run: ever-works-node helper control deny');
-	deps.out('Some shortcuts are never forwarded (Ctrl/⌘+C, X, V, W, T, N, Q, Ctrl+Tab, Alt+Tab, Alt+F4, Ctrl+Alt+Delete, ⌘/Win).');
+	deps.out(
+		'after 10 minutes without input, at the fleet stop switch, or when you run: ever-works-node helper control deny'
+	);
+	deps.out(
+		'Some shortcuts are never forwarded (Ctrl/⌘+C, X, V, W, T, N, Q, Ctrl+Tab, Alt+Tab, Alt+F4, Ctrl+Alt+Delete, ⌘/Win).'
+	);
 	if (!deps.readLine) {
-		throw new HelperAdmissionError('helper control allow needs you at this machine’s keyboard (no terminal input).');
+		throw new HelperAdmissionError(
+			'helper control allow needs you at this machine’s keyboard (no terminal input).'
+		);
 	}
 	const typed = await deps.readLine(`Type ${FLEET_HELPER_CONTROL_WORD} to allow control of ${deps.hostName}: `);
 	if ((typed ?? '').trim() !== FLEET_HELPER_CONTROL_WORD) {
@@ -131,7 +137,9 @@ export async function helperControlDeny(deps: HelperAdmissionDeps): Promise<bool
 	await deps.fs.remove(path);
 	if (wasAllowed && admission) {
 		await appendHelperEvent(deps.fs, deps.paths.eventsPath, eventFor('control-deny', admission), deps.now);
-		deps.out('Control withdrawn. A running node releases every key and button and ends any control within a second.');
+		deps.out(
+			'Control withdrawn. A running node releases every key and button and ends any control within a second.'
+		);
 		return true;
 	}
 	deps.out(`Control was not allowed on ${deps.hostName}; it stays off.`);
@@ -163,7 +171,10 @@ export async function helperControlStatus(
 		return report;
 	}
 	deps.out(`control       ${allowed ? `allowed, since ${current?.changedAt}` : 'not allowed'}`);
-	if (report.stale) deps.out('It was allowed for an earlier approval of the helper; allow it again: ever-works-node helper control allow');
+	if (report.stale)
+		deps.out(
+			'It was allowed for an earlier approval of the helper; allow it again: ever-works-node helper control allow'
+		);
 	else if (!allowed) deps.out('To let people take control of this computer: ever-works-node helper control allow');
 	return report;
 }

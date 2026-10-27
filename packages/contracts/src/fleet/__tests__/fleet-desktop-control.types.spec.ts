@@ -13,13 +13,21 @@ import {
 	parseFleetHelperControlRecord,
 	resolveFleetDesktopControlReasons
 } from '../fleet-desktop-control.types.js';
+import { fleetHelperEventAuditAction, normalizeFleetHelperEvent } from '../fleet-helper.types.js';
+import { FLEET_AUDIT_ACTIONS } from '../fleet-panic.types.js';
+import { normalizeFleetHelperStatus } from '../fleet-desktop.types.js';
 
 const AT = '2026-10-27T02:00:00.000Z';
 
 describe('desktop control reasons (FL-07 P2)', () => {
 	it('keeps known reasons once, in the declared order', () => {
 		expect(
-			normalizeFleetDesktopControlReasons(['input-unavailable', 'nope', 'control-not-allowed', 'input-unavailable'])
+			normalizeFleetDesktopControlReasons([
+				'input-unavailable',
+				'nope',
+				'control-not-allowed',
+				'input-unavailable'
+			])
 		).toEqual(['control-not-allowed', 'input-unavailable']);
 		expect(normalizeFleetDesktopControlReasons('control-not-allowed')).toEqual([]);
 	});
@@ -67,7 +75,12 @@ describe('the owner’s on-machine permission (helper-control.json)', () => {
 	});
 
 	it('is void for any other admission of the helper', () => {
-		const record = parseFleetHelperControlRecord({ schemaVersion: 1, allowed: true, admissionAt: AT, changedAt: AT });
+		const record = parseFleetHelperControlRecord({
+			schemaVersion: 1,
+			allowed: true,
+			admissionAt: AT,
+			changedAt: AT
+		});
 		expect(isFleetHelperControlAllowed(record, { acknowledgedAt: AT })).toBe(true);
 		expect(isFleetHelperControlAllowed(record, { acknowledgedAt: '2026-10-28T00:00:00.000Z' })).toBe(false);
 		expect(isFleetHelperControlAllowed(record, null)).toBe(false);
@@ -93,5 +106,34 @@ describe('the channel', () => {
 	it('maps whatever the helper answered to a known refusal code', () => {
 		expect(normalizeFleetDesktopInputRefusedCode('blocked-shortcut')).toBe('blocked-shortcut');
 		expect(normalizeFleetDesktopInputRefusedCode('wayland-unsupported')).toBe('inject-failed');
+	});
+});
+
+describe('the machine half on the wire', () => {
+	it('carries control and input reasons inside `helper`, only when the node said them', () => {
+		const base = { trust: 'hash-pinned', present: true, admitted: true };
+		expect(normalizeFleetHelperStatus(base)).not.toHaveProperty('control');
+		expect(
+			normalizeFleetHelperStatus({ ...base, control: 'allowed', inputReasons: ['permission-accessibility', 'x'] })
+		).toMatchObject({
+			control: 'allowed',
+			inputReasons: ['permission-accessibility']
+		});
+		expect(normalizeFleetHelperStatus({ ...base, control: 'yes' })).not.toHaveProperty('control');
+	});
+
+	it('audits the owner allowing or withdrawing control on the machine', () => {
+		expect(fleetHelperEventAuditAction('control-allow')).toBe('node.helper.control-allow');
+		expect(fleetHelperEventAuditAction('control-deny')).toBe('node.helper.control-deny');
+		expect(FLEET_AUDIT_ACTIONS).toEqual(
+			expect.arrayContaining(['node.helper.control-allow', 'node.helper.control-deny'])
+		);
+		expect(
+			normalizeFleetHelperEvent({
+				id: '0f0e0d0c-0b0a-4908-8706-050403020100',
+				kind: 'control-allow',
+				at: '2026-10-27T03:00:00Z'
+			})
+		).toMatchObject({ kind: 'control-allow' });
 	});
 });
