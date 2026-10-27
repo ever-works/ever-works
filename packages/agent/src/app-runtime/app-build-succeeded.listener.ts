@@ -8,7 +8,8 @@
  * - the Build is `deployable: true` — APW-05's verdict, which already encodes "on the tracked
  *   (deploy) branch, a push/manual trigger, not a pull request" (`deployable-verdict.ts`);
  * - the App Work has a target other than `none`;
- * - `targetSettings.autoDeploy` is on (plan §7.2's default is `true`) — **or** the Build is the one
+ * - `targetSettings.autoDeploy` is on (plan §7.2's default is `true`) and the operator's
+ *   `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED` is not off (APW-08 T49, R-30) — **or** the Build is the one
  *   `pendingDomainRebuildBuildId` names, in which case the Deployment is a `domain-change` one and
  *   the marker is cleared.
  *
@@ -42,6 +43,8 @@ import {
     AppBuildSucceededEvent,
 } from '../events/app-build.events';
 import { AppDeployRequestService, type AppDeployRequestResult } from './app-deploy-request.service';
+// APW-08 T49 — a leaf (the Nest logger only).
+import { readAppWorkSwitches } from '../app-works/app-work-switches';
 
 /** The runtime-state facts this listener reads and the one write it makes. */
 export interface AppBuildTriggerStateStore {
@@ -120,6 +123,13 @@ export class AppBuildSucceededListener {
         if (payload.deployable !== true) return { requested: false, reason: 'not_deployable' };
         if (!pending && state?.targetSettings?.autoDeploy === false) {
             return { requested: false, reason: 'auto_deploy_off' };
+        }
+        // APW-08 T49 (R-30) — the operator's `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED`, read now. Off, a
+        // deployable Build (a merge to the tracked branch, a push) deploys nothing by itself; a
+        // person's Deploy stays available, and so does the domain-change rebuild the owner asked
+        // for (the `pending` marker). Nothing is cleared, so the Build can be deployed by hand.
+        if (!pending && !readAppWorkSwitches().autoDeployEnabled) {
+            return { requested: false, reason: 'switch_off' };
         }
 
         const key = `${payload.workId}:${payload.buildId}`;

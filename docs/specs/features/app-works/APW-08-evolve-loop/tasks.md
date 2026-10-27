@@ -1011,7 +1011,8 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test run-containment`.
       **Done when**: the spec is green and `fleet-agent-task-reconciler.spec.ts` passes unchanged.
 
-- [ ] **T49. Operator kill switches for the evolve loop and auto-delivery (XC-10, FR-74, R-30).**
+- [x] **T49. Operator kill switches for the evolve loop and auto-delivery (XC-10, FR-74, R-30).**
+      **Status (2026-10-27, lane B2 `aw-evolve`): done for every dispatcher that exists** — `app-work-switches.ts` (`readAppWorkSwitches`; unset/blank = on, unrecognised = off). Read by `AppChangeRequestService.request` (`503 switchOff`, nothing filed), `TaskTransitionService.dispatchAgentRun` (no run row for a Task on an App Work; Goals dispatch through it), `AgentRunService.execute` (a resumed, drained, assign-task or already-queued run fails with `switch_off` before any model call), the fleet planner, and APW-06 T35's `AppBuildSucceededListener` (auto-deploy). Review runs pass. `app-change-delivery.task.ts`, the merge hook's follow-ups and the Mission tick's App Work branch do not exist yet (T21–T23, T35): each must read `readAppWorkSwitches()` itself when it lands. Spec `app-work-kill-switch.spec.ts` (19). Not built: the read-only banner in the web, and parking with automatic resume (a refused Task is run again by hand).
       **Read R-30's switches; do not invent a family.** `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED` already exists
       (CONTRACTS §7, R-30) and already names APW-08: `false` pauses auto-delivery and auto-deploy. The **new**-change
       switch is the one addition, requested from the lead as `EVER_WORKS_APP_CHANGES_ENABLED` (CONTRACTS §7 plus an

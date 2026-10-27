@@ -161,6 +161,25 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
         expect(plan!.mcp).toBeUndefined();
     });
 
+    /**
+     * APW-08 T49 (R-30) — a resumed or drained run reaches the planner without passing
+     * `dispatchAgentRun`, so the planner reads the change switch itself.
+     */
+    it('refuses an App Work Task while EVER_WORKS_APP_CHANGES_ENABLED is off, before any job', async () => {
+        process.env.EVER_WORKS_APP_CHANGES_ENABLED = 'false';
+
+        await expect(build().plan(payload)).rejects.toThrow(
+            /switch_off: EVER_WORKS_APP_CHANGES_ENABLED is off/,
+        );
+    });
+
+    it('plans a Task on another Work while the change switch is off', async () => {
+        process.env.EVER_WORKS_APP_CHANGES_ENABLED = 'false';
+        tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+
+        await expect(build().plan(payload)).resolves.not.toBeNull();
+    });
+
     it('still stamps the bridge for an ordinary Work (the switches mean what they meant)', async () => {
         tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
 

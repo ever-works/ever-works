@@ -4,6 +4,8 @@ import { PromptAssemblerService } from '@ever-works/agent/agents';
 import {
     APP_WORK_TOOL_POLICY_REFUSAL_CODE,
     appWorkTaskToolPolicyApplies,
+    describeAppChangesPaused,
+    readAppWorkSwitches,
 } from '@ever-works/agent/app-works';
 import { config } from '@ever-works/agent/config';
 import {
@@ -27,6 +29,7 @@ import {
     type AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
 import {
+    isAppWorkKind,
     composeFleetTaskCommitMessage,
     FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
     FLEET_RUN_MCP_SERVER_NAME,
@@ -773,6 +776,18 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         }
 
         const work = task.workId ? await this.works.findById(task.workId) : null;
+        // APW-08 T49 (R-30) — the operator's change switch, read again here because a resumed
+        // or drained run reaches the planner without passing `dispatchAgentRun`. Off, a Task on an
+        // App Work (or one whose Work cannot be read) is refused before any job is written.
+        if (
+            !readAppWorkSwitches().changesEnabled &&
+            task.workId &&
+            (!work || isAppWorkKind(work.kind))
+        ) {
+            throw new FleetAgentTaskPlanError(
+                `Task ${task.slug ?? task.id}: ${describeAppChangesPaused()}`,
+            );
+        }
         // Owner-authored, from the Work's defaults and the Task's own list.
         // `safeResolveChecks` swallows a read failure to `[]` deliberately:
         // an unreadable Work grades nothing, and that was true before this
