@@ -94,6 +94,20 @@ describe('EverEmailRouterPlugin', () => {
 			).not.toThrow();
 		});
 
+		it('accepts the raw body as the utf8 string the API captures (main.ts `req.rawBody`)', async () => {
+			// The API's body-parser `verify` hook stores `buffer.toString('utf8')`,
+			// so the plugin is handed a string typed as a Buffer in production.
+			const raw = body();
+			const asString = raw.toString('utf8') as unknown as Buffer;
+			expect(() =>
+				plugin.verifyWebhookSignature(asString, { 'x-ever-email-signature': sign(raw) }, { settings })
+			).not.toThrow();
+			expect(plugin.extractInboundRecipients(asString, {})).toEqual(['agent.smith@ever.email']);
+			await expect(plugin.parseInboundWebhook(asString, {}, { settings })).resolves.toMatchObject({
+				subject: 'Quarterly report'
+			});
+		});
+
 		it('accepts the EVER_EMAIL_ROUTER_SECRET env fallback and any header case', () => {
 			process.env.EVER_EMAIL_ROUTER_SECRET = SECRET;
 			const raw = body();
