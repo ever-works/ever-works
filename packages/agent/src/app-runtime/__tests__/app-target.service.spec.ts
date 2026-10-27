@@ -192,6 +192,44 @@ describe('AppTargetService.putTarget / getTarget (PUT/GET app-target)', () => {
         expect(states.patchRuntimeState).not.toHaveBeenCalled();
     });
 
+    it('tells a free owner at the cap that a paid plan lifts it — on PUT and on GET (owner decision 2026-10-27)', async () => {
+        const eligibility = jest.fn(async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            max: 3,
+            paidPlanAllowsMore: true,
+        }));
+        const { service } = harness(undefined, { isOpen: () => true, eligibility });
+
+        const put = await service.putTarget('w-1', 'u-1', { target: 'ever-works-apps' });
+        expect(put).toMatchObject({
+            ok: false,
+            refusal: { unmet: [{ code: 'managed_ineligible', names: ['capReached'] }] },
+        });
+        expect((put as { refusal: { message: string } }).refusal.message).toContain(
+            'A paid plan allows more App Works on Ever Works Apps',
+        );
+
+        await expect(service.getTarget('w-1', 'u-1')).resolves.toMatchObject({
+            eligibility: {
+                managed: { eligible: false, reasons: ['capReached'], paidPlanAllowsMore: true },
+            },
+        });
+    });
+
+    it('a paid owner at the paid cap gets no upgrade hint (GET answers no paidPlanAllowsMore)', async () => {
+        const eligibility = jest.fn(async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            max: 10,
+        }));
+        const { service } = harness(undefined, { isOpen: () => true, eligibility });
+
+        const body = await service.getTarget('w-1', 'u-1');
+
+        expect(body.eligibility?.managed).toEqual({ eligible: false, reasons: ['capReached'] });
+    });
+
     it('refuses the managed target while the tier is closed (422 APP_TARGET_REFUSED managed_disabled)', async () => {
         const { service, states } = harness();
         const result = await service.putTarget('w-1', 'u-1', { target: 'ever-works-apps' });

@@ -39,6 +39,8 @@ export * from './fleet-cloud-usage.task';
 export * from './fleet-cloud-idle.task';
 // Actions runners on computers (FL-18) — refresh runner states from GitHub and the nodes.
 export * from './fleet-runners-poll.task';
+// Desktop recordings (FL-07 P2.C) — delete recordings past their retention (object first, row second).
+export * from './computer-recording-gc.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).

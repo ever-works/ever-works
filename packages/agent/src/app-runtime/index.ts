@@ -141,6 +141,7 @@ export * from '../apps-tier/config-apps-tier-policy';
 export * from '../apps-tier/apps-tier-eligibility.port';
 export {
     APPS_MANAGED_REQUIRE_PAID_PLAN_ENV,
+    APPS_MAX_PER_PAID_USER_ENV,
     APPS_TIER_PLAN_READER,
     AppsTierEligibilityService,
     type AppsTierPlanReader,

@@ -1,10 +1,18 @@
 import { Global, Module } from '@nestjs/common';
-import { ComputerModule as AgentComputerModule } from '@ever-works/agent/computer';
+import { DistributedTaskLockService } from '@ever-works/agent/cache';
+import {
+    ComputerModule as AgentComputerModule,
+    DESKTOP_RECORDING_STORAGE,
+    DesktopRecordingService,
+} from '@ever-works/agent/computer';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { FLEET_DESKTOP_READER, FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetDesktopController } from './fleet-desktop.controller';
 import { FleetDesktopEnabledGuard } from './fleet-desktop-enabled.guard';
 import { FleetDesktopService } from './fleet-desktop.service';
+import { FleetDesktopRecordingGcCronService } from './fleet-desktop-recording-gc-cron.service';
+import { getActiveStorageBackend } from '../../uploads/storage-backend.factory';
 
 /**
  * Desktop view & control (FL-07) — the API half of the Desktop source:
@@ -27,15 +35,22 @@ import { FleetDesktopService } from './fleet-desktop.service';
  */
 @Global()
 @Module({
-    imports: [AgentFleetModule, AgentComputerModule],
+    imports: [AgentFleetModule, AgentComputerModule, DatabaseModule],
     controllers: [FleetDesktopController],
     providers: [
         FleetDesktopService,
         { provide: FLEET_DESKTOP_READER, useExisting: FleetDesktopService },
+        // P2.C — recordings: the writer / reader / sweep (in the agent package, so the
+        // `computer-recording-gc` Trigger task can reach it over the internal RPC), the
+        // configured storage plugin it writes through, and the sweep when Trigger is not the runtime.
+        DesktopRecordingService,
+        { provide: DESKTOP_RECORDING_STORAGE, useFactory: () => getActiveStorageBackend() },
+        FleetDesktopRecordingGcCronService,
+        DistributedTaskLockService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetDesktopEnabledGuard,
     ],
-    exports: [FleetDesktopService, FLEET_DESKTOP_READER],
+    exports: [FleetDesktopService, FLEET_DESKTOP_READER, DesktopRecordingService],
 })
 export class FleetDesktopApiModule {}

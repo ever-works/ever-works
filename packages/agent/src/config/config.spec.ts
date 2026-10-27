@@ -1915,6 +1915,36 @@ describe('agent/config', () => {
             );
         });
 
+        describe('getMaxPerPaidUser (owner decision 2026-10-27: paid plans host more than 3)', () => {
+            it('defaults to no limit (null) when unset or blank', () => {
+                expect(config.everWorks.apps.getMaxPerPaidUser()).toBeNull();
+                process.env.EVER_WORKS_APPS_MAX_PER_PAID_USER = '   ';
+                expect(config.everWorks.apps.getMaxPerPaidUser()).toBeNull();
+            });
+
+            it('returns a configured positive bound', () => {
+                process.env.EVER_WORKS_APPS_MAX_PER_PAID_USER = '10';
+
+                expect(config.everWorks.apps.getMaxPerPaidUser()).toBe(10);
+            });
+
+            it('never answers below the free cap — a paid plan never runs fewer Apps', () => {
+                process.env.EVER_WORKS_APPS_MAX_PER_PAID_USER = '2';
+                expect(config.everWorks.apps.getMaxPerPaidUser()).toBe(3);
+
+                process.env.EVER_WORKS_APPS_MAX_PER_USER = '5';
+                expect(config.everWorks.apps.getMaxPerPaidUser()).toBe(5);
+            });
+
+            it.each(['lots', '0', '-2', '10x', '1.5'])(
+                'degrades %j to the free cap — a typo never reads as unlimited, NaN or 0',
+                (value) => {
+                    process.env.EVER_WORKS_APPS_MAX_PER_PAID_USER = value;
+                    expect(config.everWorks.apps.getMaxPerPaidUser()).toBe(3);
+                },
+            );
+        });
+
         describe('getDnsZoneId / getDnsApiToken (plan §8.3:1130-1131)', () => {
             it('answers undefined for both when nothing is configured', () => {
                 // CONTRACTS §7: unset means no managed subdomains are written at all,

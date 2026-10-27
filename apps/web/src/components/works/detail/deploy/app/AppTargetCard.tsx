@@ -95,14 +95,24 @@ export function AppTargetCard({
     // Lane aw-safety (2026-10-26): the tier names WHY (APW-10 FR-35 reason codes), so the line
     // says it — "verify your email", "a paid plan", … — after the generic one.
     const tEligibility = useTranslations('dashboard.workDetail.appsTierEligibility.reasons');
-    const managedReasons = (target.eligibility?.managed?.reasons ?? [])
-        .map((reason) =>
+    const tEligibilityHints = useTranslations('dashboard.workDetail.appsTierEligibility.hints');
+    const managedReasonCodes = (target.eligibility?.managed?.reasons ?? []).map(String);
+    // Owner decision 2026-10-27: a free owner at the cap is told that a paid plan lifts it — only
+    // when the API says a paid plan would admit this App (never for a paid owner at the paid cap).
+    const paidPlanHint =
+        managedReasonCodes.includes('capReached') &&
+        target.eligibility?.managed?.paidPlanAllowsMore === true
+            ? tEligibilityHints('capReachedPaidPlan')
+            : '';
+    const managedReasons = [
+        ...managedReasonCodes.map((reason) =>
             appsTierReasonText(
                 tEligibility as unknown as (key: string, values?: Record<string, string>) => string,
-                String(reason),
+                reason,
             ),
-        )
-        .join(' ');
+        ),
+        ...(paidPlanHint ? [paidPlanHint] : []),
+    ].join(' ');
     const managedReason =
         target.eligibility?.managed && target.eligibility.managed.eligible === false
             ? `${t('everWorksApps.ineligible')}${managedReasons ? ` ${managedReasons}` : ''}`
