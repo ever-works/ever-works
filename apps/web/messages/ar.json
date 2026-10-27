@@ -5569,6 +5569,31 @@
                     "maintainerOptOut": "{upstream} asks not to receive automated contributions, so Ever Works won't open a pull request there.",
                     "deniedUpstream": "Ever Works has been asked not to open pull requests on {upstream}.",
                     "reportInvalid": "The preparation run didn't report what it found, so nothing was proposed. Try again."
+                },
+                "pullRequests": {
+                    "title": "Upstream pull requests",
+                    "description": "Changes from this App Work offered to the upstream project, with their state there.",
+                    "theUpstream": "the upstream project",
+                    "empty": "No upstream pull requests yet.",
+                    "loadFailed": "Upstream pull requests couldn't be loaded. Reload the page to try again.",
+                    "privateCopy": "A private copy isn't connected to {upstream} on GitHub, so it can't propose pull requests there. Use a fork to contribute.",
+                    "draft": "Draft",
+                    "openedDirectly": "Opened directly",
+                    "opensInNewTab": "(opens in a new tab)",
+                    "head": "From {head}",
+                    "states": {
+                        "preparing": "Preparing",
+                        "needs_signature": "Needs your signature",
+                        "awaiting_approval": "Awaiting your approval",
+                        "opening": "Opening",
+                        "open": "Open",
+                        "merged": "Merged",
+                        "closed": "Closed",
+                        "refused": "Refused",
+                        "failed": "Failed",
+                        "expired": "Expired",
+                        "withdrawn": "Withdrawn"
+                    }
                 }
             },
             "appUpstream": {
