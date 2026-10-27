@@ -88,7 +88,9 @@ function mailboxes(entries: readonly Address[] | undefined = []): string[] {
 	};
 	for (const entry of entries) {
 		if (entry.group) entry.group.forEach(add);
-		else add(entry);
+		// A cast, not narrowing: packages that compile this file with
+		// `strictNullChecks` off (the agent specs) do not narrow on `group`.
+		else if (entry.address) add(entry as Mailbox);
 	}
 	return out;
 }

@@ -798,3 +798,111 @@ describe('EmailFacadeService — inbound webhooks over a lazy email plugin (PLG-
         });
     });
 });
+
+/**
+ * Ever Email Router — the REAL plugin behind a REAL lazy proxy. Its webhook
+ * is answered with counts only because the facade reads `inboundAck` from the
+ * LOADED instance: a cold proxy answers a forwarding function for that name.
+ * An unknown recipient (no address bound) is verified with the deployment's
+ * secret — the `x-adminOnly` setting's env var, from the CLASS schema.
+ */
+describe('EmailFacadeService — Ever Email Router over a lazy proxy', () => {
+    const { EverEmailRouterPlugin } = jest.requireActual<{ EverEmailRouterPlugin: PluginClass }>(
+        '../../../../plugins/ever-email-router/src/ever-email-router-plugin',
+    );
+    const ROUTER_ID = 'ever-email-router';
+    const SECRET = 'router-secret-0123456789-abcdef';
+    const saved = process.env.EVER_EMAIL_ROUTER_SECRET;
+
+    afterEach(() => {
+        if (saved === undefined) delete process.env.EVER_EMAIL_ROUTER_SECRET;
+        else process.env.EVER_EMAIL_ROUTER_SECRET = saved;
+    });
+
+    function routerWebhook(secret: string, to = 'nobody@ever.email') {
+        const rawBody = Buffer.from(
+            JSON.stringify({
+                raw: Buffer.from(
+                    'From: ada@example.com\r\nTo: x@ever.email\r\nSubject: hi\r\nMessage-ID: <r-1@example.com>\r\n\r\nhello\r\n',
+                ).toString('base64'),
+                envelope: { from: 'ada@example.com', to: [to] },
+            }),
+        );
+        const t = Math.floor(Date.now() / 1000);
+        const v1 = createHmac('sha256', secret).update(`${t}.`).update(rawBody).digest('hex');
+        return { rawBody, headers: { 'x-ever-email-signature': `t=${t},v1=${v1}` } };
+    }
+
+    function world() {
+        const registry = createRegistry();
+        registerRealLazy(registry, new EverEmailRouterPlugin());
+        registerRealLazy(registry, new PostmarkPlugin());
+        const { service, scopes } = realSettings(registry, {});
+        const addresses = {
+            findByAddress: jest.fn(async () => null),
+        } as unknown as TenantEmailAddressRepository;
+        return { registry, scopes, facade: facadeFor(registry, service, addresses) };
+    }
+
+    it('answers inboundAck "counts" from the loaded instance on the first (cold) webhook', async () => {
+        process.env.EVER_EMAIL_ROUTER_SECRET = SECRET;
+        const { registry, facade } = world();
+        const cold = registry
+            .getByCapability('email-inbound')
+            .find((entry) => entry.plugin.id === ROUTER_ID)!.plugin as unknown as Record<
+            string,
+            unknown
+        >;
+        // What a read through the cold proxy would see — never 'counts'.
+        expect(typeof cold.inboundAck).toBe('function');
+
+        const legit = routerWebhook(SECRET);
+        await expect(
+            facade.parseInbound(ROUTER_ID, legit.rawBody, legit.headers),
+        ).resolves.toMatchObject({ inboundAck: 'counts', authenticatedRecipient: null });
+    });
+
+    it('verifies an unknown recipient with EVER_EMAIL_ROUTER_SECRET at admin scope, and refuses a forgery (401)', async () => {
+        process.env.EVER_EMAIL_ROUTER_SECRET = SECRET;
+        const { scopes, facade } = world();
+
+        const forged = routerWebhook('forged-secret-0123456789-abcdef');
+        await expect(
+            facade.parseInbound(ROUTER_ID, forged.rawBody, forged.headers),
+        ).rejects.toMatchObject(signatureRefused('Ever Email Router inbound: signature mismatch.'));
+        const legit = routerWebhook(SECRET);
+        await expect(
+            facade.parseInbound(ROUTER_ID, legit.rawBody, legit.headers),
+        ).resolves.toMatchObject({ provider: ROUTER_ID, to: ['x@ever.email'] });
+        expect(scopes.every((scope) => scope === 'admin')).toBe(true);
+    });
+
+    it('refuses every webhook when the deployment has no secret (fail closed)', async () => {
+        delete process.env.EVER_EMAIL_ROUTER_SECRET;
+        const { facade } = world();
+        const signed = routerWebhook(SECRET);
+        await expect(
+            facade.parseInbound(ROUTER_ID, signed.rawBody, signed.headers),
+        ).rejects.toMatchObject({ status: 401 });
+    });
+
+    it('keeps "received" for a plugin that did not opt in (postmark)', async () => {
+        process.env.POSTMARK_INBOUND_SECRET = 'pm-env';
+        try {
+            const { facade } = world();
+            const rawBody = Buffer.from(
+                JSON.stringify({
+                    MessageID: 'pm-1',
+                    To: 'x@y.test',
+                    Subject: 'hi',
+                    Date: '2026-10-27T00:00:00Z',
+                }),
+            );
+            await expect(
+                facade.parseInbound('postmark', rawBody, { authorization: basic('pm-env') }),
+            ).resolves.toMatchObject({ inboundAck: 'received' });
+        } finally {
+            delete process.env.POSTMARK_INBOUND_SECRET;
+        }
+    });
+});
