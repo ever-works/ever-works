@@ -572,7 +572,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `pnpm --filter @ever-works/agent test -- app-blueprint-apply` passes and the dispatcher symbol is in
       `DISPATCHER_SYMBOLS`.
 
-- [ ] **T29. Apply, upgrade and dismiss endpoints.**
+- [x] **T29. Apply, upgrade and dismiss endpoints.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2930): done** — on `work-app-spec.controller.ts`; spec `work-app-spec.blueprint-routes.spec.ts` (edit access, the shared 404, refusal mapping, 202/200, the shared 5/hour bucket). `forkMatchNeedsConfirmation` never fires: a Blueprint chosen by id is an explicit match.
       **Modify** `apps/api/src/works/work-app-spec.controller.ts` and `apps/api/src/works/dto/app-spec.dto.ts` —
       `POST …/app-spec/blueprint`, `…/blueprint/upgrade`, `…/blueprint/dismiss` with the plan §4.2 codes and
       5/hour throttles.
@@ -582,6 +583,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: the three routes are in the OpenAPI document and return `202`/`200` without awaiting a job.
 
 - [ ] **T30. Hourly catalog refresh.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2930): the upgrade fan-out is done** as an API `@Cron(APPS_CATALOG_REFRESH_CRON)` service (`apps/api/src/works/apps-catalog-upgrade-notice-cron.service.ts`, locked like `AppLicenseRegistryCronService`) over `AppBlueprintUpgradeService.refreshUpgradeNotices` — the latest version is read from each Blueprint repository, not the manifest. No Trigger `apps-catalog-refresh` task (the API cron is the one runner, as the licence fan-out already is).
       **Create** `packages/tasks/src/tasks/trigger/apps-catalog-refresh.task.ts` (cron `23 * * * *`, pinned
       equal to `APPS_CATALOG_REFRESH_CRON`) and `apps/api/src/apps-catalog/apps-catalog-refresh-cron.service.ts`
       (fallback when Trigger.dev is not the runtime, locked like
@@ -593,7 +595,8 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       (ACC-03-22, upgrade half), once-per-version, one failing Work does not abort the run.
       **Done when**: both specs pass and the cron constant is asserted equal in both files.
 
-- [ ] **T31. Blueprint card and upgrade dialog.**
+- [x] **T31. Blueprint card and upgrade dialog.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2930): done** — `AppBlueprintCard.tsx`, `AppBlueprintUpgradeDialog.tsx`, the three actions in `app-spec.ts`; `AppBlueprintCard.unit.spec.tsx` (ACC-03-29 card half).
       **Create** `apps/web/src/components/works/detail/settings/app-spec/AppBlueprintCard.tsx` and
       `apps/web/src/components/works/detail/settings/app-spec/AppBlueprintUpgradeDialog.tsx` (apply and upgrade
       variants).

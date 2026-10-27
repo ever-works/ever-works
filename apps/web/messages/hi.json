@@ -5651,6 +5651,63 @@
                         "buildStrategyUnavailable": "कोई सक्षम बिल्ड प्लगइन `{strategy}` रणनीति का समर्थन नहीं करता है।",
                         "dependencyUnavailable": "कोई {kind} प्रदाता उपलब्ध नहीं है।",
                         "trackedBranchMissing": "ट्रैक की गई शाखा मौजूद नहीं है।"
+                    },
+                    "blueprint": {
+                        "title": "Blueprint",
+                        "follows": "Follows the {id} Blueprint, version {version}.",
+                        "none": "This App Work follows no Blueprint.",
+                        "applyLabel": "Blueprint id",
+                        "apply": "Apply a Blueprint",
+                        "applyFailed": "The Blueprint could not be applied ({code}).",
+                        "upgradeAvailable": "Version {version} of this Blueprint is available.",
+                        "breaking": "Breaking",
+                        "reviewUpgrade": "Review upgrade",
+                        "dismiss": "Dismiss",
+                        "runPending": "Preparing the pull request…",
+                        "proposalUpgrade": "Pull request #{number} upgrades to version {version}",
+                        "proposalApply": "Pull request #{number} applies version {version}",
+                        "baseUnknown": "The version you applied could not be read, so every difference was treated as a conflict and your values were kept.",
+                        "conflicts": "{count, plural, =1 {1 conflict: your value was kept.} other {# conflicts: your values were kept.}}",
+                        "noConflicts": "No conflicts: nothing you changed is touched.",
+                        "proposed": "the Blueprint proposes {value}",
+                        "unchanged": "Your App spec already matches the latest Blueprint version.",
+                        "runFailed": "The last Blueprint run could not open a pull request ({code}).",
+                        "match": {
+                            "manifest": "Listed",
+                            "alias": "Listed",
+                            "fork": "Fork of a listed app",
+                            "probe": "Unlisted",
+                            "explicit": "Chosen for this repository",
+                            "file": "From the file"
+                        },
+                        "refusal": {
+                            "blueprintNotFound": "No Blueprint has that id.",
+                            "blueprintVersionNotFound": "That Blueprint version could not be found.",
+                            "blueprintAlreadyApplied": "This App Work already follows a Blueprint. Upgrade it instead.",
+                            "applyInProgress": "A Blueprint run is already in progress for this App Work.",
+                            "noBlueprint": "This App Work follows no Blueprint.",
+                            "noUpgrade": "That version is not newer than the one applied.",
+                            "notAnAppWork": "This Work is not an App Work.",
+                            "catalogUnavailable": "The Blueprint repositories cannot be read right now. Please try again later.",
+                            "dependenciesUnavailable": "Blueprint upgrades are not available on this instance.",
+                            "notFound": "This App Work could not be found.",
+                            "throttled": "Blueprint runs are limited to 5 an hour per App Work. Please try again later.",
+                            "forbidden": "You do not have permission to change this App Work.",
+                            "unknown": "Something went wrong. Please try again."
+                        },
+                        "dialog": {
+                            "applyTitle": "Apply the {id} Blueprint",
+                            "applyBody": "Ever Works composes the Blueprint into this App Work’s App spec.",
+                            "upgradeTitle": "Upgrade the {id} Blueprint to {version}",
+                            "upgradeBody": "From version {from} to version {version}.",
+                            "pointPullRequest": "A pull request is opened on the App’s repository. Only .works/works.yml changes.",
+                            "pointKept": "Values you changed are kept, never overwritten. Every conflict is listed in the pull request.",
+                            "pointMerge": "Nothing takes effect until you merge the pull request.",
+                            "breaking": "This is a major version bump. Read the pull request before you merge it.",
+                            "cancel": "Cancel",
+                            "confirmApply": "Open the pull request",
+                            "confirmUpgrade": "Open the pull request"
+                        }
                     }
                 },
                 "budgets": {
