@@ -65,7 +65,8 @@ export class FleetUsageScanService {
     /** The 15-minute pass. Does nothing while the flag is off. */
     async dispatchDue(now: Date = new Date()): Promise<{ nodes: number; enqueued: number }> {
         if (!config.fleet.isUsageScanEnabled()) return { nodes: 0, enqueued: 0 };
-        if (this.killSwitch && (await this.killSwitch.isStopped())) return { nodes: 0, enqueued: 0 };
+        if (this.killSwitch && (await this.killSwitch.isStopped()))
+            return { nodes: 0, enqueued: 0 };
         const candidates = await this.nodeRows
             .createQueryBuilder('n')
             .where('n.status = :status', { status: 'online' })
@@ -101,11 +102,17 @@ export class FleetUsageScanService {
     }
 
     /** The owner's "scan now" (FR-18 codes and hints). */
-    async rescan(nodeId: string, caller: FleetCaller, now: Date = new Date()): Promise<FleetUsageRescanResult> {
+    async rescan(
+        nodeId: string,
+        caller: FleetCaller,
+        now: Date = new Date(),
+    ): Promise<FleetUsageRescanResult> {
         const { node, role } = await this.access.resolveVisible(nodeId, caller);
         if (role !== 'owner') throw new ForbiddenException(fleetOwnerOnlyBody(node));
         if (!node.consents) {
-            throw fleetUsageError('unsupported_on_node', `update the node on ${node.name}`, { nodeId: node.id });
+            throw fleetUsageError('unsupported_on_node', `update the node on ${node.name}`, {
+                nodeId: node.id,
+            });
         }
         if (node.consents.usageScan !== true) {
             throw fleetUsageError('consent_missing', fleetUsageOptInHint(node.name), {
@@ -113,7 +120,10 @@ export class FleetUsageScanService {
                 consent: 'usageScan',
             });
         }
-        if (!Array.isArray(node.capabilities) || !node.capabilities.includes(FLEET_USAGE_SCAN_CAPABILITY)) {
+        if (
+            !Array.isArray(node.capabilities) ||
+            !node.capabilities.includes(FLEET_USAGE_SCAN_CAPABILITY)
+        ) {
             throw fleetUsageError(
                 'unsupported_on_node',
                 `no Claude Code or Codex records were found on ${node.name}, or the node there is too old — update it`,
@@ -151,7 +161,8 @@ export class FleetUsageScanService {
             const backlog = row.result?.backlogPct;
             out.set(row.nodeId, {
                 lastScanAt: row.completedAt ?? null,
-                backlogPct: typeof backlog === 'number' && Number.isFinite(backlog) ? backlog : null,
+                backlogPct:
+                    typeof backlog === 'number' && Number.isFinite(backlog) ? backlog : null,
             });
         }
         return out;
@@ -171,7 +182,11 @@ export class FleetUsageScanService {
         });
         for (const row of rows) {
             const result = row.result;
-            if (result && typeof result.ingestedAt === 'string' && typeof result.watermark === 'number') {
+            if (
+                result &&
+                typeof result.ingestedAt === 'string' &&
+                typeof result.watermark === 'number'
+            ) {
                 return result.watermark;
             }
         }
@@ -197,7 +212,11 @@ export class FleetUsageScanService {
         const busy = new Set<string>();
         for (let i = 0; i < nodeIds.length; i += 200) {
             const rows = await this.jobRows.find({
-                where: { kind: 'usage-scan', status: In(ACTIVE), targetNodeId: In(nodeIds.slice(i, i + 200)) },
+                where: {
+                    kind: 'usage-scan',
+                    status: In(ACTIVE),
+                    targetNodeId: In(nodeIds.slice(i, i + 200)),
+                },
                 select: { id: true, targetNodeId: true },
             });
             for (const row of rows) if (row.targetNodeId) busy.add(row.targetNodeId);

@@ -28,7 +28,11 @@ import type { AppLimitRangeInput, AppTargetRef } from '@ever-works/plugin';
 import { NotificationCategory, NotificationType } from '../entities/notification.types';
 import type { AppDeployBuildSource } from './app-deploy-preconditions.service';
 import { APP_DEPLOY_DISPATCHER } from './app-deploy-request.service';
-import { APP_CLUSTER_OP_DISPATCHER } from './app-runtime-deletion.service';
+import {
+    APP_CLUSTER_OP_DISPATCHER,
+    type AppWorkDeletionCompletion,
+    type AppWorkDeletionCompletionReport,
+} from './app-runtime-deletion.service';
 import type {
     AppCommitAncestry,
     AppDeployOrchestratorDispatcher,
@@ -806,4 +810,105 @@ export class AppClusterOpDispatchRelay {
             return null;
         return this.gate.dispatch(payload, opts);
     }
+}
+
+/* -------------------------------------------------------------------------- *
+ * APP_WORK_DELETION_COMPLETION in the worker (APW-06 T58 / §9.8, lane aw-safety 2026-10-26)
+ * -------------------------------------------------------------------------- */
+
+/** The ONE member of the API's `AppRuntimeDeletionService` the worker may dial. */
+export interface AppRuntimeDeletionFinishRemote {
+    finishDeletion(
+        workId: string,
+        report?: AppWorkDeletionCompletionReport,
+    ): Promise<{ completed?: boolean; reason?: string } | null | undefined>;
+}
+
+/**
+ * The worker's `APP_WORK_DELETION_COMPLETION`: §9.8's "remote proxy of
+ * `AppRuntimeDeletionService.finishDeletion(workId, { mayRemain })`" — the method runs in the API,
+ * where the guarded completion (`AppWorkDeletionCompletionService`) checks that the row really
+ * records a deletion, tells the owner what may remain, and only then asks APW-01 to delete the row.
+ *
+ * Unbound before 2026-10-26, so a finished removal kept the Work row forever (the fail-closed
+ * answer of the deletion service's header table).
+ *
+ * - **Narrow**: one method over a one-member remote facade, never the raw proxy.
+ * - **Fail-closed**: an answer that is not `completed: true` — a refusal, an unbound API side, a
+ *   failed hop — THROWS, which the worker's `finishDeletion` reports as `completed: false`; the
+ *   Work row is kept and a repeated delete re-dispatches once the claim is stale. Never a
+ *   "completed" that did not happen.
+ */
+export function workerAppWorkDeletionCompletion(
+    remote: AppRuntimeDeletionFinishRemote,
+): AppWorkDeletionCompletion {
+    return {
+        async completeAppWorkDeletion(
+            workId: string,
+            report?: AppWorkDeletionCompletionReport,
+        ): Promise<void> {
+            const answer = report
+                ? await remote.finishDeletion(workId, report)
+                : await remote.finishDeletion(workId);
+            if (answer?.completed !== true) {
+                throw new Error(
+                    `The API did not complete the deletion of work ${workId} (${String(
+                        answer?.reason ?? 'no_answer',
+                    ).slice(0, 60)}).`,
+                );
+            }
+        },
+    };
+}
+
+/* -------------------------------------------------------------------------- *
+ * APPS_TIER_POLICY eligibility in the worker (APW-10 T27 / APW-06 T45, lane aw-safety 2026-10-26)
+ * -------------------------------------------------------------------------- */
+
+/** The ONE member of the API's `AppsTierEligibilityService` the worker may dial. */
+export interface AppsTierEligibilityRemote {
+    evaluate(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible?: boolean; reasons?: unknown; counted?: unknown; max?: unknown } | null | undefined>;
+}
+
+/**
+ * The worker's eligibility source for its `ConfigAppsTierPolicy`: the API's
+ * `AppsTierEligibilityService.evaluate` over the internal channel (`remoteMap`), because the facts
+ * (the account, the plan, the owner's other App Works) are rows the worker cannot read.
+ *
+ * Narrow (one method, the answer rebuilt field by field). A malformed answer THROWS, and the
+ * worker's policy is built with `onSourceFailure: 'admit'` — the API already ran the authoritative
+ * check when the Deployment was requested; the worker's re-check exists to catch a concurrent
+ * Deployment, and must not refuse everything during an API/worker rollout skew.
+ */
+export function workerAppsTierEligibilitySource(remote: AppsTierEligibilityRemote): {
+    evaluate(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible: boolean; reasons: string[]; counted?: string[]; max?: number }>;
+} {
+    return {
+        async evaluate(userId: string, opts?: { workId?: string | null }) {
+            const workId = typeof opts?.workId === 'string' && opts.workId ? opts.workId : null;
+            const answer = await remote.evaluate(String(userId ?? ''), workId ? { workId } : {});
+            if (!answer || typeof answer.eligible !== 'boolean') {
+                throw new Error('The API answered no eligibility verdict.');
+            }
+            const out: { eligible: boolean; reasons: string[]; counted?: string[]; max?: number } = {
+                eligible: answer.eligible === true,
+                reasons: Array.isArray(answer.reasons)
+                    ? answer.reasons.map((reason) => String(reason)).slice(0, 10)
+                    : [],
+            };
+            if (Array.isArray(answer.counted)) {
+                out.counted = answer.counted.map((name) => String(name)).slice(0, 20);
+            }
+            if (typeof answer.max === 'number') {
+                out.max = answer.max;
+            }
+            return out;
+        },
+    };
 }

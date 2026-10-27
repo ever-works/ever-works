@@ -80,6 +80,7 @@ import { buildFleetSessionGitTools } from '../fleet/session-git/agent-fleet-sess
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
+import { buildFleetDesktopTools } from '../fleet/desktop/agent-fleet-desktop-tools';
 import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
@@ -756,6 +757,13 @@ export class AgentToolService {
                         userId: agent.userId,
                         reader: logs.reader,
                     }),
+                );
+            }
+            // Desktop view & control (FL-07): the read-only display list, when bound.
+            if (fleet.desktop) {
+                const desktop = fleet.desktop;
+                add('fleet-desktop', () =>
+                    buildFleetDesktopTools({ agentId: agent.id, userId: agent.userId, reader: desktop.reader }),
                 );
             }
             // Files on computers (FL-11): the read-only file tools, when bound.

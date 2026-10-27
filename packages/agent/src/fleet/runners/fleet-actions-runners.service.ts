@@ -1,6 +1,19 @@
 import { HttpException, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     clampFleetActionsRunnerCount,
+    diagnoseFleetActionsJob,
+    FLEET_ACTIONS_JOBS_CACHE_MS,
+    FLEET_ACTIONS_MAX_LISTED_JOBS,
+    FLEET_ACTIONS_MAX_WATCHED_TARGETS,
+    FLEET_ACTIONS_RUNNERS_CLOSED_REFRESH_MS,
+    fleetActionsRunCancelSummary,
+    isFleetActionsJobUnassignable,
+    normalizeFleetActionsWatchedTargets,
+    type FleetActionsDiagnosisRunner,
+    type FleetActionsJobsView,
+    type FleetActionsJobView,
+    type FleetActionsRunnersPermissionView,
+    type FleetActionsWatchedTarget,
     FLEET_ACTIONS_RUNNER_ACTION_CLASS,
     FLEET_ACTIONS_RUNNER_AUDIT_ACTION,
     FLEET_ACTIONS_RUNNER_CAPABILITY,
@@ -50,6 +63,7 @@ import {
     type FleetRunnerInstallPayload,
     type FleetViewerRole,
 } from '@ever-works/contracts';
+import type { ActionsJob } from '@ever-works/plugin';
 import { config } from '../../config';
 import type { FleetActionsRunner } from '../../entities/fleet-actions-runner.entity';
 import type { FleetJob } from '../../entities/fleet-job.entity';
@@ -76,6 +90,7 @@ import {
 import { FleetActionsRunnerRepository } from './fleet-actions-runner.repository';
 import {
     capabilityValue,
+    defaultWatchedTargets,
     describeAgo,
     fleetActionsRunnerViewOf,
     githubRunnerIdOf,
@@ -130,6 +145,16 @@ export interface FleetActionsRunnerInstallInput extends Partial<FleetActionsRunn
     fields?: FleetActionConfirmFields | null;
 }
 
+/** An organisation target's jobs are read from at most this many of its repositories (each is GitHub reads). */
+const FLEET_ACTIONS_MAX_ORG_REPOSITORIES = 20;
+
+/** One watched target's jobs, as last read (30 s fresh; kept through a rate limit). */
+interface JobsCacheEntry {
+    jobs: ActionsJob[];
+    checkedAt: number;
+    rateLimitedUntil: number | null;
+}
+
 /** What the per-target GitHub cache remembers between refreshes (conditional reads, back-off). */
 interface TargetCacheEntry {
     etag: string | null;
@@ -145,6 +170,10 @@ export class FleetActionsRunnersService {
     private readonly targetCache = new Map<string, TargetCacheEntry>();
     /** nodeId → when it was last refreshed on a page's read. */
     private readonly nodeRefreshedAt = new Map<string, number>();
+    /** `ownerUserId|scope|target` → that watched target's jobs (P2; one API replica's memory, a cache only). */
+    private readonly jobsCache = new Map<string, JobsCacheEntry>();
+    /** ownerUserId → the jobs the last panel / poll read found (what `job-unassignable` reads). */
+    private readonly jobsByOwner = new Map<string, { at: number; jobs: FleetActionsJobView[] }>();
 
     constructor(
         private readonly runners: FleetActionsRunnerRepository,
@@ -195,7 +224,10 @@ export class FleetActionsRunnersService {
     }
 
     /** The Install dialog (spec §5.1, FR-1 – FR-3). */
-    async options(caller: FleetMachineCaller, nodeId: string): Promise<FleetActionsRunnerOptionsView> {
+    async options(
+        caller: FleetMachineCaller,
+        nodeId: string,
+    ): Promise<FleetActionsRunnerOptionsView> {
         this.requireEnabled();
         const userId = fleetMachineCallerUserId(caller);
         const { node, role } = await this.resolve(nodeId, userId, 'view');
@@ -231,13 +263,19 @@ export class FleetActionsRunnersService {
             nodeName: node.name,
             canHost: reason === null,
             reason,
-            hint: reason ? runnerHostReasonHint(reason, node, { lastSeen: describeAgo(node.lastHeartbeatAt) }) : null,
+            hint: reason
+                ? runnerHostReasonHint(reason, node, {
+                      lastSeen: describeAgo(node.lastHeartbeatAt),
+                  })
+                : null,
             os,
             arch,
             targets,
             modes: fleetActionsRunnerModesFor({
                 os,
-                hasServiceManager: (node.capabilities ?? []).includes(FLEET_ACTIONS_RUNNER_CAPABILITY),
+                hasServiceManager: (node.capabilities ?? []).includes(
+                    FLEET_ACTIONS_RUNNER_CAPABILITY,
+                ),
                 hasDocker: (node.capabilities ?? []).includes('docker'),
             }),
             defaultLabels: fleetActionsRunnerDefaultLabels(os, arch),
@@ -268,7 +306,9 @@ export class FleetActionsRunnersService {
         // 2–3: the kill switch and the computer (the limit with the count asked for).
         const rawCount = typeof input.count === 'number' ? input.count : Number(input.count ?? 1);
         if (!Number.isInteger(rawCount) || rawCount < 1) {
-            throw fleetMachineError('invalid', 'the count must be a whole number from 1 to 16', { field: 'count' });
+            throw fleetMachineError('invalid', 'the count must be a whole number from 1 to 16', {
+                field: 'count',
+            });
         }
         const reason = runnerHostReason({
             node,
@@ -287,10 +327,16 @@ export class FleetActionsRunnersService {
                 code,
                 reason,
             });
-            throw fleetMachineError(code, runnerHostReasonHint(reason, node, { lastSeen: describeAgo(node.lastHeartbeatAt) }), {
-                reason,
-                ...(reason === 'limit' ? { limit: FLEET_ACTIONS_RUNNERS_MAX_PER_NODE, existing: existing.length } : {}),
-            });
+            throw fleetMachineError(
+                code,
+                runnerHostReasonHint(reason, node, { lastSeen: describeAgo(node.lastHeartbeatAt) }),
+                {
+                    reason,
+                    ...(reason === 'limit'
+                        ? { limit: FLEET_ACTIONS_RUNNERS_MAX_PER_NODE, existing: existing.length }
+                        : {}),
+                },
+            );
         }
         const count = clampFleetActionsRunnerCount(rawCount);
 
@@ -298,22 +344,38 @@ export class FleetActionsRunnersService {
         const scope = input.target?.scope;
         const target = typeof input.target?.target === 'string' ? input.target.target.trim() : '';
         if (!isFleetActionsRunnerScope(scope) || !isFleetActionsRunnerTarget(scope, target)) {
-            throw fleetMachineError('invalid', 'choose a repository (owner/repo) or an organisation', { field: 'target' });
+            throw fleetMachineError(
+                'invalid',
+                'choose a repository (owner/repo) or an organisation',
+                { field: 'target' },
+            );
         }
-        const mode: FleetActionsRunnerMode = input.mode === undefined || input.mode === null ? 'service' : (input.mode as FleetActionsRunnerMode);
+        const mode: FleetActionsRunnerMode =
+            input.mode === undefined || input.mode === null
+                ? 'service'
+                : (input.mode as FleetActionsRunnerMode);
         if (!isFleetActionsRunnerMode(mode)) {
-            throw fleetMachineError('invalid', 'the mode must be service or docker', { field: 'mode' });
+            throw fleetMachineError('invalid', 'the mode must be service or docker', {
+                field: 'mode',
+            });
         }
         if (mode === 'docker') {
             // Docker-isolated runners are phase 3 (FR-27); Windows never offers them.
-            throw fleetMachineError('unsupported_on_node', 'Docker-isolated runners are not available yet; install them as services', {
-                field: 'mode',
-            });
+            throw fleetMachineError(
+                'unsupported_on_node',
+                'Docker-isolated runners are not available yet; install them as services',
+                {
+                    field: 'mode',
+                },
+            );
         }
         const names = this.namesFor(node, count, input.names, existing);
         const os = capabilityValue(node.capabilities, 'os');
         const arch = capabilityValue(node.capabilities, 'arch');
-        const normalized = normalizeFleetActionsRunnerLabels(input.labels ?? [], fleetActionsRunnerDefaultLabels(os, arch));
+        const normalized = normalizeFleetActionsRunnerLabels(
+            input.labels ?? [],
+            fleetActionsRunnerDefaultLabels(os, arch),
+        );
         if (normalized.invalid !== null) {
             throw fleetMachineError(
                 'invalid',
@@ -325,15 +387,30 @@ export class FleetActionsRunnersService {
 
         // The target must be the caller's (U7), and GitHub must publish a build for this computer (FR-6).
         const resolved = await this.resolveTarget(userId, scope, target);
-        const downloads = await this.facadeCall(() => this.requireFacade().listDownloads(userId, resolved));
+        const downloads = await this.facadeCall(() =>
+            this.requireFacade().listDownloads(userId, resolved),
+        );
         const download = pickFleetActionsRunnerDownload(downloads, os, arch);
         if (!download || !isFleetActionsRunnerDownloadUrl(download.downloadUrl)) {
-            throw fleetMachineError('unsupported_on_node', `GitHub publishes no runner for ${os ?? 'this system'} on ${arch ?? 'this processor'}`);
+            throw fleetMachineError(
+                'unsupported_on_node',
+                `GitHub publishes no runner for ${os ?? 'this system'} on ${arch ?? 'this processor'}`,
+            );
         }
 
         // 5: the confirmation.
-        const summary = fleetActionsRunnerInstallSummary({ count, target, mode, computer: node.name });
-        this.requireConfirmation('install', node.name, summary, input.fields ?? { confirm: input.confirm });
+        const summary = fleetActionsRunnerInstallSummary({
+            count,
+            target,
+            mode,
+            computer: node.name,
+        });
+        this.requireConfirmation(
+            'install',
+            node.name,
+            summary,
+            input.fields ?? { confirm: input.confirm },
+        );
 
         // The rows first (FR-5), then the durable job.
         const created: FleetActionsRunner[] = [];
@@ -359,9 +436,15 @@ export class FleetActionsRunnersService {
                 );
             }
         } catch {
-            await Promise.all(created.map((row) => this.runners.delete(row.id).catch(() => undefined)));
+            await Promise.all(
+                created.map((row) => this.runners.delete(row.id).catch(() => undefined)),
+            );
             // A unique-name race with another install is the only expected failure here.
-            throw fleetMachineError('invalid', `one of these names is already used on ${node.name}`, { field: 'names' });
+            throw fleetMachineError(
+                'invalid',
+                `one of these names is already used on ${node.name}`,
+                { field: 'names' },
+            );
         }
         const payload: FleetRunnerInstallPayload = {
             nodeId: node.id,
@@ -386,7 +469,9 @@ export class FleetActionsRunnersService {
             });
         } catch (error) {
             // No job, no runner: take the rows back so nothing half-made stays.
-            await Promise.all(created.map((row) => this.runners.delete(row.id).catch(() => undefined)));
+            await Promise.all(
+                created.map((row) => this.runners.delete(row.id).catch(() => undefined)),
+            );
             throw error;
         }
         for (const row of created) {
@@ -418,20 +503,34 @@ export class FleetActionsRunnersService {
     ): Promise<FleetActionsRunnerOperationResponse> {
         this.requireEnabled();
         if (!isFleetActionsRunnerControlAction(action)) {
-            throw fleetMachineError('invalid', 'action must be start, stop, restart or remove', { field: 'action' });
+            throw fleetMachineError('invalid', 'action must be start, stop, restart or remove', {
+                field: 'action',
+            });
         }
         if (action === 'reinstall') {
-            throw fleetMachineError('unsupported_on_node', 'reinstalling a runner is not available yet; remove it and install it again');
+            throw fleetMachineError(
+                'unsupported_on_node',
+                'reinstalling a runner is not available yet; remove it and install it again',
+            );
         }
         const userId = fleetMachineCallerUserId(caller);
         const requestedBy = describeFleetMachineCaller(caller);
         const { node, role } = await this.resolve(nodeId, userId, 'view');
         const runner = await this.runners.findById(runnerId);
-        if (!runner || runner.nodeId !== node.id || runner.removedAt || runner.state === 'removed') {
+        if (
+            !runner ||
+            runner.nodeId !== node.id ||
+            runner.removedAt ||
+            runner.state === 'removed'
+        ) {
             throw fleetMachineError('not_found', `no such runner on ${node.name}`);
         }
         const auditAction = FLEET_ACTIONS_RUNNER_AUDIT_ACTION[action] as FleetAuditAction;
-        const refuse = async (code: FleetLinkErrorCode, hint: string, details?: Record<string, unknown>) => {
+        const refuse = async (
+            code: FleetLinkErrorCode,
+            hint: string,
+            details?: Record<string, unknown>,
+        ) => {
             await this.record(auditAction, caller, node, runner.id, {
                 targetName: runner.name,
                 requestedBy,
@@ -448,26 +547,41 @@ export class FleetActionsRunnersService {
             existing: null,
         });
         if (reason) {
-            throw await refuse(runnerHostReasonCode(reason), runnerHostReasonHint(reason, node, { lastSeen: describeAgo(node.lastHeartbeatAt) }), {
-                reason,
-            });
+            throw await refuse(
+                runnerHostReasonCode(reason),
+                runnerHostReasonHint(reason, node, { lastSeen: describeAgo(node.lastHeartbeatAt) }),
+                {
+                    reason,
+                },
+            );
         }
         // Busy checks before the confirmation: a person never types the name only to be told to wait.
         if (runner.state === 'installing' && action !== 'remove') {
-            throw await refuse('busy', `${runner.name} is still being installed`, { state: runner.state });
+            throw await refuse('busy', `${runner.name} is still being installed`, {
+                state: runner.state,
+            });
         }
-        if (runner.phase === 'removing') throw await refuse('busy', `${runner.name} is already being removed`);
+        if (runner.phase === 'removing')
+            throw await refuse('busy', `${runner.name} is already being removed`);
         if (action === 'start' && (runner.state === 'idle' || runner.state === 'working')) {
-            throw await refuse('busy', `${runner.name} is already running`, { state: runner.state });
+            throw await refuse('busy', `${runner.name} is already running`, {
+                state: runner.state,
+            });
         }
         if (action === 'stop' && runner.state === 'stopped') {
-            throw await refuse('busy', `${runner.name} is already stopped`, { state: runner.state });
+            throw await refuse('busy', `${runner.name} is already stopped`, {
+                state: runner.state,
+            });
         }
         if (action === 'remove' && runner.state === 'working') {
             const job = runner.currentJob?.name ? ` job ${runner.currentJob.name}` : ' a job';
-            throw await refuse('busy', `${runner.name} is running${job}; stop after the job or cancel the run`, {
-                state: runner.state,
-            });
+            throw await refuse(
+                'busy',
+                `${runner.name} is running${job}; stop after the job or cancel the run`,
+                {
+                    state: runner.state,
+                },
+            );
         }
         const summary =
             action === 'stop'
@@ -517,6 +631,356 @@ export class FleetActionsRunnersService {
         return { runnerId: runner.id, operationId: job.id, jobId: job.id };
     }
 
+    // ─── Actions jobs (P2, FR-20 – FR-26) ─────────────────────────────────
+
+    /**
+     * The Actions jobs panel (FR-20 – FR-25): the queued and running jobs that
+     * target self-hosted runners in the watched repositories and organisations
+     * (the saved list, else every target the caller has runners for), each
+     * queued one diagnosed against the caller's own runners (FR-22), the busy
+     * count, and whether the caller may cancel. GitHub is read through a
+     * per-target 30 s cache with rate-limit back-off; a watched target that can
+     * no longer be read is listed as unreadable with the reason, never hidden.
+     */
+    async actionsJobs(
+        caller: FleetMachineCaller,
+        requested?: readonly unknown[] | null,
+    ): Promise<FleetActionsJobsView> {
+        this.requireEnabled();
+        const userId = fleetMachineCallerUserId(caller);
+        const rows = (await this.runners.listForOwner(userId)).filter(
+            (row) => !row.removedAt && row.state !== 'removed',
+        );
+        const saved = this.facade
+            ? await this.facade.getWatchedTargets(userId).catch(() => null)
+            : null;
+        let watched: FleetActionsWatchedTarget[];
+        if (requested && requested.length > 0) {
+            const normalized = normalizeFleetActionsWatchedTargets(requested);
+            if (!normalized) {
+                throw fleetMachineError(
+                    'invalid',
+                    'targets must be repositories (owner/repo) or organisations',
+                    { field: 'targets' },
+                );
+            }
+            watched = normalized;
+        } else {
+            watched = saved && saved.length > 0 ? saved : defaultWatchedTargets(rows);
+        }
+        const available = this.facade
+            ? (await this.facade.listTargets(userId).catch(() => [])).map((entry) => ({
+                  scope: entry.scope,
+                  target: entry.target,
+              }))
+            : [];
+        const diagnosisRunners = await this.diagnosisRunnersOf(rows);
+        const now = new Date();
+        const jobs: FleetActionsJobView[] = [];
+        const unreadable: FleetActionsJobsView['unreadable'] = [];
+        let rateLimitedUntil: number | null = null;
+        let checkedAt: number | null = null;
+        for (const target of watched) {
+            const read = await this.readJobs(userId, target);
+            if ('reason' in read) {
+                unreadable.push({ ...target, reason: read.reason, grantUrl: read.grantUrl });
+                continue;
+            }
+            if (read.rateLimitedUntil)
+                rateLimitedUntil = Math.max(rateLimitedUntil ?? 0, read.rateLimitedUntil);
+            checkedAt = Math.max(checkedAt ?? 0, read.checkedAt);
+            for (const job of read.jobs) {
+                const result = diagnoseFleetActionsJob(job, diagnosisRunners);
+                jobs.push({
+                    repository: job.repository,
+                    runId: job.runId,
+                    runNumber: job.runNumber,
+                    jobId: job.jobId,
+                    name: job.name,
+                    workflowName: job.workflowName,
+                    labels: [...job.labels],
+                    status: job.status,
+                    runnerName: job.runnerName,
+                    startedAt: job.startedAt,
+                    queuedAt: job.queuedAt,
+                    url: job.url,
+                    diagnosis: result.diagnosis,
+                    diagnosisDetail: result.detail,
+                    unassignable: isFleetActionsJobUnassignable({
+                        status: job.status,
+                        diagnosis: result.diagnosis,
+                        queuedAt: job.queuedAt,
+                        now,
+                    }),
+                });
+            }
+        }
+        // Queued first (oldest first), then the running ones.
+        jobs.sort(
+            (a, b) =>
+                Number(a.status !== 'queued') - Number(b.status !== 'queued') ||
+                (a.queuedAt ?? '').localeCompare(b.queuedAt ?? ''),
+        );
+        const listed = jobs.slice(0, FLEET_ACTIONS_MAX_LISTED_JOBS);
+        const stopped = await this.isStopped();
+        this.jobsByOwner.set(userId, { at: Date.now(), jobs: listed });
+        return {
+            jobs: listed,
+            busyRunners: rows.filter((row) => row.state === 'working').length,
+            totalRunners: rows.length,
+            watched,
+            watchedSaved: Boolean(saved && saved.length > 0),
+            available,
+            unreadable,
+            checkedAt: checkedAt !== null ? new Date(checkedAt).toISOString() : null,
+            rateLimitedUntil:
+                rateLimitedUntil !== null ? new Date(rateLimitedUntil).toISOString() : null,
+            killSwitch: stopped,
+            // Every listed job is of a target the caller's own installations cover (checked again on
+            // cancel); while the kill switch holds, cancelling is paused (U14).
+            canCancel: !stopped,
+        };
+    }
+
+    /** The jobs the last read for this person found, while fresh (the `job-unassignable` producer reads it). */
+    cachedJobs(userId: string): FleetActionsJobView[] | null {
+        const entry = this.jobsByOwner.get(userId);
+        if (!entry || Date.now() - entry.at > FLEET_ACTIONS_RUNNERS_CLOSED_REFRESH_MS * 2)
+            return null;
+        return entry.jobs;
+    }
+
+    /** Save the watched list (FR-21): each target must be one the caller's GitHub App covers; empty = the default. */
+    async setWatched(
+        caller: FleetMachineCaller,
+        raw: unknown,
+    ): Promise<{ watched: FleetActionsWatchedTarget[] }> {
+        this.requireEnabled();
+        const userId = fleetMachineCallerUserId(caller);
+        const normalized = normalizeFleetActionsWatchedTargets(raw);
+        if (!normalized) {
+            throw fleetMachineError(
+                'invalid',
+                `targets must be up to ${FLEET_ACTIONS_MAX_WATCHED_TARGETS} repositories (owner/repo) or organisations`,
+                { field: 'targets' },
+            );
+        }
+        const facade = this.requireFacade();
+        for (const target of normalized)
+            await this.resolveTarget(userId, target.scope, target.target);
+        await this.facadeCall(() =>
+            facade.setWatchedTargets(userId, normalized.length > 0 ? normalized : null),
+        );
+        this.jobsByOwner.delete(userId);
+        if (normalized.length > 0) return { watched: normalized };
+        const rows = (await this.runners.listForOwner(userId)).filter(
+            (row) => !row.removedAt && row.state !== 'removed',
+        );
+        return { watched: defaultWatchedTargets(rows) };
+    }
+
+    /**
+     * Cancel a whole workflow run (FR-23, R-37): a repository one of the caller's
+     * own installations covers, `confirm` (the sentence names the run and the
+     * repository), refused `kill_switch` while the switch holds; one
+     * `node.runner.job.cancel` audit row (the run as `target`).
+     */
+    async cancelRun(
+        caller: FleetMachineCaller,
+        input: {
+            repository: unknown;
+            runId: unknown;
+            runNumber?: unknown;
+            fields?: FleetActionConfirmFields | null;
+        },
+    ): Promise<{ repository: string; runId: number; cancelled: true }> {
+        this.requireEnabled();
+        const userId = fleetMachineCallerUserId(caller);
+        const repository = typeof input.repository === 'string' ? input.repository.trim() : '';
+        if (!isFleetActionsRunnerTarget('repo', repository)) {
+            throw fleetMachineError('invalid', 'repository must be owner/repo', {
+                field: 'repository',
+            });
+        }
+        const runId = typeof input.runId === 'number' ? input.runId : Number(input.runId);
+        if (!Number.isSafeInteger(runId) || runId <= 0) {
+            throw fleetMachineError('invalid', 'runId must be a workflow run id', {
+                field: 'runId',
+            });
+        }
+        const runNumber =
+            typeof input.runNumber === 'number' &&
+            Number.isSafeInteger(input.runNumber) &&
+            input.runNumber > 0
+                ? input.runNumber
+                : null;
+        const requestedBy = describeFleetMachineCaller(caller);
+        const audit = async (outcome: 'ok' | 'refused', extra: Record<string, unknown> = {}) => {
+            if (!this.audit) return;
+            await this.audit.tryRecord({
+                action: FLEET_ACTIONS_RUNNER_AUDIT_ACTION['cancel-run'] as FleetAuditAction,
+                actorUserId: userId,
+                ownerUserId: userId,
+                nodeId: null,
+                details: {
+                    family: 'machines',
+                    target: `${repository}#${runId}`,
+                    requestedBy,
+                    confirmationClass: FLEET_ACTIONS_RUNNER_ACTION_CLASS['cancel-run'],
+                    outcome,
+                    repository,
+                    runId,
+                    runNumber,
+                    ...extra,
+                },
+            });
+        };
+        if (await this.isStopped()) {
+            await audit('refused', { code: 'kill_switch' });
+            throw fleetMachineError(
+                'kill_switch',
+                'All computers are stopped — runners keep running; cancelling is paused. Clear it under Settings → Fleet',
+            );
+        }
+        const resolved = await this.resolveTarget(userId, 'repo', repository);
+        this.requireConfirmation(
+            'cancel-run',
+            repository,
+            fleetActionsRunCancelSummary(runNumber, repository),
+            input.fields,
+        );
+        const facade = this.requireFacade();
+        await this.facadeCall(() => facade.cancelRun(userId, resolved, runId));
+        await audit('ok');
+        this.jobsByOwner.delete(userId);
+        return { repository: resolved.target, runId, cancelled: true };
+    }
+
+    /** Whether the caller's installation may manage runners for a target (FR-26, spec §5.6). */
+    async permission(
+        caller: FleetMachineCaller,
+        scope: unknown,
+        target: unknown,
+    ): Promise<FleetActionsRunnersPermissionView> {
+        this.requireEnabled();
+        const userId = fleetMachineCallerUserId(caller);
+        const name = typeof target === 'string' ? target.trim() : '';
+        if (!isFleetActionsRunnerScope(scope) || !isFleetActionsRunnerTarget(scope, name)) {
+            throw fleetMachineError(
+                'invalid',
+                'choose a repository (owner/repo) or an organisation',
+                { field: 'target' },
+            );
+        }
+        const resolved = await this.resolveTarget(userId, scope, name);
+        const facade = this.requireFacade();
+        const check = await this.facadeCall(() => facade.checkPermission(userId, resolved));
+        return {
+            scope,
+            target: resolved.target,
+            ok: check.ok,
+            missing: check.ok ? null : (check.missing ?? null),
+            grantUrl: check.ok ? null : (check.grantUrl ?? null),
+        };
+    }
+
+    /** One watched target's jobs through the cache: fresh for 30 s, backing off while GitHub rate-limits. */
+    private async readJobs(
+        userId: string,
+        target: FleetActionsWatchedTarget,
+    ): Promise<
+        | { jobs: ActionsJob[]; checkedAt: number; rateLimitedUntil: number | null }
+        | { reason: string; grantUrl: string | null }
+    > {
+        const key = `${userId}|${target.scope}|${target.target.toLowerCase()}`;
+        const cached = this.jobsCache.get(key);
+        const now = Date.now();
+        if (
+            cached &&
+            (now - cached.checkedAt < FLEET_ACTIONS_JOBS_CACHE_MS ||
+                (cached.rateLimitedUntil ?? 0) > now)
+        ) {
+            return {
+                jobs: cached.jobs,
+                checkedAt: cached.checkedAt,
+                rateLimitedUntil: cached.rateLimitedUntil,
+            };
+        }
+        if (!this.facade)
+            return {
+                reason: 'Actions runners are not available on this deployment',
+                grantUrl: null,
+            };
+        try {
+            const resolved = await this.facade.resolveTarget(userId, target.scope, target.target);
+            const repositories =
+                resolved.scope === 'org'
+                    ? (await this.facade.repositoriesOf(resolved.installationEntityId)).slice(
+                          0,
+                          FLEET_ACTIONS_MAX_ORG_REPOSITORIES,
+                      )
+                    : [];
+            // No conditional read for jobs: a 304 on one status list would drop its jobs (the cache is the saver).
+            const page = await this.facade.listJobs(userId, resolved, { etag: null, repositories });
+            const until = page.rateLimitedUntil ? Date.parse(page.rateLimitedUntil) : null;
+            const jobs =
+                page.jobs.length > 0 || !cached ? page.jobs : until ? cached.jobs : page.jobs;
+            this.jobsCache.set(key, { jobs, checkedAt: now, rateLimitedUntil: until });
+            return { jobs, checkedAt: now, rateLimitedUntil: until };
+        } catch (error) {
+            if (error instanceof ActionsRunnersFacadeError) {
+                if (error.reason === 'rate-limited') {
+                    const until = error.extra.rateLimitedUntil
+                        ? Date.parse(error.extra.rateLimitedUntil)
+                        : now + 60_000;
+                    this.jobsCache.set(key, {
+                        jobs: cached?.jobs ?? [],
+                        checkedAt: cached?.checkedAt ?? now,
+                        rateLimitedUntil: until,
+                    });
+                    return {
+                        jobs: cached?.jobs ?? [],
+                        checkedAt: cached?.checkedAt ?? now,
+                        rateLimitedUntil: until,
+                    };
+                }
+                return {
+                    reason: error.message.split(/\r?\n/)[0].slice(0, 200),
+                    grantUrl: error.extra.grantUrl ?? null,
+                };
+            }
+            this.logger.debug(
+                `actions jobs: ${target.target} not read (${error instanceof Error ? error.message : String(error)})`,
+            );
+            return { reason: 'GitHub could not be read', grantUrl: null };
+        }
+    }
+
+    /** The caller's runners as the diagnosis reads them: every label, GitHub's own included. */
+    private async diagnosisRunnersOf(
+        rows: readonly FleetActionsRunner[],
+    ): Promise<FleetActionsDiagnosisRunner[]> {
+        const nodes = new Map<string, FleetNode | null>();
+        const out: FleetActionsDiagnosisRunner[] = [];
+        for (const row of rows) {
+            if (!nodes.has(row.nodeId))
+                nodes.set(row.nodeId, await this.nodes.findById(row.nodeId).catch(() => null));
+            const node = nodes.get(row.nodeId) ?? null;
+            const defaults = fleetActionsRunnerDefaultLabels(
+                capabilityValue(node?.capabilities, 'os'),
+                capabilityValue(node?.capabilities, 'arch'),
+            );
+            out.push({
+                name: row.name,
+                scope: row.scope,
+                target: row.target,
+                labels: [...defaults, ...(row.labels ?? [])],
+                state: row.state,
+            });
+        }
+        return out;
+    }
+
     // ─── Node-facing (node credential) ────────────────────────────────────
 
     /**
@@ -533,27 +997,45 @@ export class FleetActionsRunnersService {
      */
     async mintRunnerToken(
         runnerId: string,
-        request: { nodeId: unknown; secret: unknown; jobId: unknown; leaseGeneration?: unknown; kind?: unknown },
+        request: {
+            nodeId: unknown;
+            secret: unknown;
+            jobId: unknown;
+            leaseGeneration?: unknown;
+            kind?: unknown;
+        },
     ): Promise<FleetActionsRunnerTokenResponse | null> {
         if (!config.fleet.isActionsRunnersEnabled()) return null;
         const held = await this.authorizeNodeJob(runnerId, request);
         if (!held) return null;
         const { runner, job } = held;
         const kind: FleetActionsRunnerTokenKind = request.kind === 'remove' ? 'remove' : 'register';
-        const control = job.kind === 'runner-control' ? (job.payload?.action as FleetActionsRunnerControlAction | undefined) : undefined;
-        if (kind === 'register' && job.kind !== 'runner-install' && control !== 'reinstall') return null;
+        const control =
+            job.kind === 'runner-control'
+                ? (job.payload?.action as FleetActionsRunnerControlAction | undefined)
+                : undefined;
+        if (kind === 'register' && job.kind !== 'runner-install' && control !== 'reinstall')
+            return null;
         if (kind === 'remove' && control !== 'remove' && control !== 'reinstall') return null;
-        if (await this.isStopped()) throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
+        if (await this.isStopped())
+            throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
         const resolved = await this.resolveTarget(runner.ownerUserId, runner.scope, runner.target);
         const facade = this.requireFacade();
         if (kind === 'remove') {
-            const minted = await this.facadeCall(() => facade.mintRemoveToken(runner.ownerUserId, resolved));
+            const minted = await this.facadeCall(() =>
+                facade.mintRemoveToken(runner.ownerUserId, resolved),
+            );
             return { token: minted.token, expiresAt: minted.expiresAt, replace: false };
         }
         // FR-8 / U10: "replace" only when GitHub already lists this name as THIS runner.
         let replace = false;
-        const page = await this.facadeCall(() => facade.listRunners(runner.ownerUserId, resolved, null)).catch(() => null);
-        const same = page?.runners.find((remote) => remote.name.toLowerCase() === runner.name.toLowerCase()) ?? null;
+        const page = await this.facadeCall(() =>
+            facade.listRunners(runner.ownerUserId, resolved, null),
+        ).catch(() => null);
+        const same =
+            page?.runners.find(
+                (remote) => remote.name.toLowerCase() === runner.name.toLowerCase(),
+            ) ?? null;
         if (same) {
             const ours = githubRunnerIdOf(runner.githubRunnerId);
             if (ours !== null && same.id === ours) {
@@ -564,13 +1046,22 @@ export class FleetActionsRunnersService {
                     phase: null,
                     lastError: `GitHub already has a runner named ${runner.name} on ${runner.target}; choose another name`,
                 });
-                throw fleetMachineError('invalid', `GitHub already has a runner named ${runner.name} on ${runner.target}`, {
-                    field: 'names',
-                });
+                throw fleetMachineError(
+                    'invalid',
+                    `GitHub already has a runner named ${runner.name} on ${runner.target}`,
+                    {
+                        field: 'names',
+                    },
+                );
             }
         }
-        const minted = await this.facadeCall(() => facade.mintRegistrationToken(runner.ownerUserId, resolved));
-        await this.runners.update(runner.id, { phase: 'registering', installationEntityId: resolved.installationEntityId });
+        const minted = await this.facadeCall(() =>
+            facade.mintRegistrationToken(runner.ownerUserId, resolved),
+        );
+        await this.runners.update(runner.id, {
+            phase: 'registering',
+            installationEntityId: resolved.installationEntityId,
+        });
         return { token: minted.token, expiresAt: minted.expiresAt, replace };
     }
 
@@ -581,21 +1072,32 @@ export class FleetActionsRunnersService {
      * authorisation as {@link mintRunnerToken}. A remove that reports `removed`
      * soft-removes the row (kept 30 days, never listed).
      */
-    async reportProgress(runnerId: string, report: Partial<FleetActionsRunnerProgressReport>): Promise<boolean> {
+    async reportProgress(
+        runnerId: string,
+        report: Partial<FleetActionsRunnerProgressReport>,
+    ): Promise<boolean> {
         if (!config.fleet.isActionsRunnersEnabled()) return false;
         const held = await this.authorizeNodeJob(runnerId, report);
         if (!held) return false;
         const { runner } = held;
         const now = new Date();
         const patch: Partial<FleetActionsRunner> = { lastCheckAt: now };
-        if (isFleetActionsRunnerPhase(report.phase)) patch.phase = report.phase === 'done' ? null : report.phase;
-        if (typeof report.runnerVersion === 'string' && /^\d+\.\d+\.\d+$/.test(report.runnerVersion)) {
+        if (isFleetActionsRunnerPhase(report.phase))
+            patch.phase = report.phase === 'done' ? null : report.phase;
+        if (
+            typeof report.runnerVersion === 'string' &&
+            /^\d+\.\d+\.\d+$/.test(report.runnerVersion)
+        ) {
             patch.runnerVersion = report.runnerVersion;
         }
         if (typeof report.serviceUnit === 'string' && report.serviceUnit.trim()) {
             patch.serviceUnit = report.serviceUnit.trim().slice(0, 200);
         }
-        if (typeof report.githubRunnerId === 'number' && Number.isSafeInteger(report.githubRunnerId) && report.githubRunnerId > 0) {
+        if (
+            typeof report.githubRunnerId === 'number' &&
+            Number.isSafeInteger(report.githubRunnerId) &&
+            report.githubRunnerId > 0
+        ) {
             patch.githubRunnerId = report.githubRunnerId;
         }
         if (typeof report.error === 'string' && report.error.trim()) {
@@ -648,6 +1150,10 @@ export class FleetActionsRunnersService {
                 const rows = await this.runners.listForOwner(ownerUserId);
                 runners += rows.length;
                 changed += await this.refreshRows(ownerUserId, rows);
+                // P2 (FR-25): the jobs off-page, so `job-unassignable` is raised with no page open.
+                await this.actionsJobs({ kind: 'user', userId: ownerUserId }).catch(
+                    () => undefined,
+                );
             } catch (error) {
                 this.logger.debug(
                     `actions runners refresh for ${ownerUserId} failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -655,7 +1161,9 @@ export class FleetActionsRunnersService {
             }
         }
         // Removed rows past their 30 days (the audit rows keep the history).
-        await this.runners.purgeRemovedBefore(new Date(Date.now() - 30 * 24 * 60 * 60_000)).catch(() => 0);
+        await this.runners
+            .purgeRemovedBefore(new Date(Date.now() - 30 * 24 * 60 * 60_000))
+            .catch(() => 0);
         return { owners: owners.length, runners, changed };
     }
 
@@ -664,7 +1172,11 @@ export class FleetActionsRunnersService {
         const githubRunnerId = githubRunnerIdOf(runner.githubRunnerId);
         if (githubRunnerId === null || !this.facade) return;
         try {
-            const resolved = await this.facade.resolveTarget(runner.ownerUserId, runner.scope, runner.target);
+            const resolved = await this.facade.resolveTarget(
+                runner.ownerUserId,
+                runner.scope,
+                runner.target,
+            );
             await this.facade.deleteRunner(runner.ownerUserId, resolved, githubRunnerId);
         } catch (error) {
             this.logger.warn(
@@ -682,12 +1194,17 @@ export class FleetActionsRunnersService {
             .listForNode(node.id)
             .then((rows) => this.refreshRows(node.userId, rows))
             .catch((error: unknown) =>
-                this.logger.debug(`actions runners refresh of ${node.id} failed: ${error instanceof Error ? error.message : String(error)}`),
+                this.logger.debug(
+                    `actions runners refresh of ${node.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+                ),
             );
     }
 
     /** Merge GitHub's and the nodes' view of these rows (one owner's). Answers how many changed. */
-    private async refreshRows(ownerUserId: string, rows: readonly FleetActionsRunner[]): Promise<number> {
+    private async refreshRows(
+        ownerUserId: string,
+        rows: readonly FleetActionsRunner[],
+    ): Promise<number> {
         const live = rows.filter((row) => !row.removedAt && row.state !== 'removed');
         if (live.length === 0) return 0;
         // GitHub, per target.
@@ -710,12 +1227,15 @@ export class FleetActionsRunnersService {
         const now = new Date();
         for (const row of live) {
             const node = nodeById.get(row.nodeId) ?? null;
-            const listing = github.get(`${ownerUserId}|${row.scope}|${row.target.toLowerCase()}`) ?? null;
+            const listing =
+                github.get(`${ownerUserId}|${row.scope}|${row.target.toLowerCase()}`) ?? null;
             const nodeFacts = facts.get(row.nodeId) ?? null;
             const remote = listing
                 ? (listing.runners.find((entry) => {
                       const ours = githubRunnerIdOf(row.githubRunnerId);
-                      return ours !== null ? entry.id === ours : entry.name.toLowerCase() === row.name.toLowerCase();
+                      return ours !== null
+                          ? entry.id === ours
+                          : entry.name.toLowerCase() === row.name.toLowerCase();
                   }) ?? null)
                 : undefined;
             const fact = nodeFacts ? (nodeFacts.get(row.id) ?? null) : undefined;
@@ -730,15 +1250,19 @@ export class FleetActionsRunnersService {
             });
             const patch: Partial<FleetActionsRunner> = {};
             if (merged.state !== row.state) patch.state = merged.state;
-            if (merged.source && merged.source !== row.stateSource) patch.stateSource = merged.source;
+            if (merged.source && merged.source !== row.stateSource)
+                patch.stateSource = merged.source;
             if (merged.seen) patch.lastSeenAt = now;
             if (merged.state === 'unknown') {
-                if (merged.discrepancy && merged.discrepancy !== row.lastError) patch.lastError = merged.discrepancy;
+                if (merged.discrepancy && merged.discrepancy !== row.lastError)
+                    patch.lastError = merged.discrepancy;
             } else if (row.state === 'unknown' && row.lastError) {
                 patch.lastError = null;
             }
-            if (remote && githubRunnerIdOf(row.githubRunnerId) === null) patch.githubRunnerId = remote.id;
-            if (fact?.runnerVersion && fact.runnerVersion !== row.runnerVersion) patch.runnerVersion = fact.runnerVersion;
+            if (remote && githubRunnerIdOf(row.githubRunnerId) === null)
+                patch.githubRunnerId = remote.id;
+            if (fact?.runnerVersion && fact.runnerVersion !== row.runnerVersion)
+                patch.runnerVersion = fact.runnerVersion;
             if (merged.state !== 'working' && row.currentJob) patch.currentJob = null;
             if (listing !== null || nodeFacts !== null) patch.lastCheckAt = now;
             if (Object.keys(patch).length === 0) continue;
@@ -762,12 +1286,15 @@ export class FleetActionsRunnersService {
         try {
             const resolved = await this.facade.resolveTarget(ownerUserId, row.scope, row.target);
             const page = await this.facade.listRunners(ownerUserId, resolved, cached?.etag ?? null);
-            const runners = page.notModified && cached ? cached.runners : page.runners.map((entry) => ({
-                id: entry.id,
-                name: entry.name,
-                status: entry.status,
-                busy: entry.busy,
-            }));
+            const runners =
+                page.notModified && cached
+                    ? cached.runners
+                    : page.runners.map((entry) => ({
+                          id: entry.id,
+                          name: entry.name,
+                          status: entry.status,
+                          busy: entry.busy,
+                      }));
             this.targetCache.set(key, {
                 etag: page.etag ?? cached?.etag ?? null,
                 runners,
@@ -777,7 +1304,9 @@ export class FleetActionsRunnersService {
             return { runners };
         } catch (error) {
             if (error instanceof ActionsRunnersFacadeError && error.reason === 'rate-limited') {
-                const until = error.extra.rateLimitedUntil ? Date.parse(error.extra.rateLimitedUntil) : Date.now() + 60_000;
+                const until = error.extra.rateLimitedUntil
+                    ? Date.parse(error.extra.rateLimitedUntil)
+                    : Date.now() + 60_000;
                 this.targetCache.set(key, {
                     etag: cached?.etag ?? null,
                     runners: cached?.runners ?? [],
@@ -786,13 +1315,17 @@ export class FleetActionsRunnersService {
                 });
                 return cached ? { runners: cached.runners } : null;
             }
-            this.logger.debug(`actions runners: ${row.target} not read (${error instanceof Error ? error.message : String(error)})`);
+            this.logger.debug(
+                `actions runners: ${row.target} not read (${error instanceof Error ? error.message : String(error)})`,
+            );
             return null;
         }
     }
 
     /** One computer's `runner.list` over its link, or null when it cannot be read now. */
-    private async readNode(node: FleetNode): Promise<Map<string, FleetActionsRunnerNodeFact> | null> {
+    private async readNode(
+        node: FleetNode,
+    ): Promise<Map<string, FleetActionsRunnerNodeFact> | null> {
         if (!this.link || !isRunnerHostOnline(node, this.offlineCutoff())) return null;
         try {
             const reply = await this.link.request({
@@ -810,20 +1343,27 @@ export class FleetActionsRunnersService {
             if (!listed || !Array.isArray(listed.runners)) return null;
             return new Map(listed.runners.map((fact) => [fact.runnerId, fact]));
         } catch (error) {
-            this.logger.debug(`actions runners: ${node.id} could not be read (${error instanceof Error ? error.message : String(error)})`);
+            this.logger.debug(
+                `actions runners: ${node.id} could not be read (${error instanceof Error ? error.message : String(error)})`,
+            );
             return null;
         }
     }
 
     // ─── Shared ───────────────────────────────────────────────────────────
 
-    private async listViewOf(node: FleetNode, rows: readonly FleetActionsRunner[]): Promise<FleetActionsRunnersListView> {
+    private async listViewOf(
+        node: FleetNode,
+        rows: readonly FleetActionsRunner[],
+    ): Promise<FleetActionsRunnersListView> {
         let checkedAt: number | null = null;
         let rateLimitedUntil: number | null = null;
         for (const row of rows) {
             const at = row.lastCheckAt ? new Date(row.lastCheckAt).getTime() : NaN;
             if (Number.isFinite(at) && (checkedAt === null || at > checkedAt)) checkedAt = at;
-            const cached = this.targetCache.get(`${row.ownerUserId}|${row.scope}|${row.target.toLowerCase()}`);
+            const cached = this.targetCache.get(
+                `${row.ownerUserId}|${row.scope}|${row.target.toLowerCase()}`,
+            );
             if (cached?.rateLimitedUntil && cached.rateLimitedUntil > Date.now()) {
                 rateLimitedUntil = Math.max(rateLimitedUntil ?? 0, cached.rateLimitedUntil);
             }
@@ -832,7 +1372,8 @@ export class FleetActionsRunnersService {
             node: { id: node.id, name: node.name },
             runners: rows.map((row) => fleetActionsRunnerViewOf(row, node)),
             checkedAt: checkedAt !== null ? new Date(checkedAt).toISOString() : null,
-            rateLimitedUntil: rateLimitedUntil !== null ? new Date(rateLimitedUntil).toISOString() : null,
+            rateLimitedUntil:
+                rateLimitedUntil !== null ? new Date(rateLimitedUntil).toISOString() : null,
             killSwitch: await this.isStopped(),
         };
     }
@@ -849,19 +1390,28 @@ export class FleetActionsRunnersService {
             return fleetActionsRunnerDefaultNames(node.name, count, [...taken]);
         }
         if (requested.length !== count) {
-            throw fleetMachineError('invalid', `give ${count} names, one per runner`, { field: 'names' });
+            throw fleetMachineError('invalid', `give ${count} names, one per runner`, {
+                field: 'names',
+            });
         }
         const out: string[] = [];
         for (const raw of requested) {
             const name = typeof raw === 'string' ? raw.trim() : '';
             if (!isFleetActionsRunnerName(name)) {
-                throw fleetMachineError('invalid', 'a runner name is up to 64 letters, digits, dots, dashes and underscores', {
-                    field: 'names',
-                });
+                throw fleetMachineError(
+                    'invalid',
+                    'a runner name is up to 64 letters, digits, dots, dashes and underscores',
+                    {
+                        field: 'names',
+                    },
+                );
             }
             const key = name.toLowerCase();
             if (taken.has(key)) {
-                throw fleetMachineError('invalid', `${name} is already a runner on ${node.name}`, { field: 'names', name });
+                throw fleetMachineError('invalid', `${name} is already a runner on ${node.name}`, {
+                    field: 'names',
+                    name,
+                });
             }
             taken.add(key);
             out.push(name);
@@ -870,13 +1420,20 @@ export class FleetActionsRunnersService {
     }
 
     /** The caller's installation covering the target, or `permission_denied` (U7, FR-2). */
-    private async resolveTarget(userId: string, scope: 'org' | 'repo', target: string): Promise<ActionsRunnersTarget> {
+    private async resolveTarget(
+        userId: string,
+        scope: 'org' | 'repo',
+        target: string,
+    ): Promise<ActionsRunnersTarget> {
         return this.facadeCall(() => this.requireFacade().resolveTarget(userId, scope, target));
     }
 
     private requireFacade(): ActionsRunnersFacadeService {
         if (!this.facade) {
-            throw fleetMachineError('unsupported_on_node', 'Actions runners are not available on this deployment');
+            throw fleetMachineError(
+                'unsupported_on_node',
+                'Actions runners are not available on this deployment',
+            );
         }
         return this.facade;
     }
@@ -889,25 +1446,38 @@ export class FleetActionsRunnersService {
             if (error instanceof ActionsRunnersFacadeError) {
                 switch (error.reason) {
                     case 'not-covered':
-                        throw fleetMachineError('permission_denied', error.message, { reason: 'app-not-installed' });
-                    case 'permission-missing':
-                        throw fleetMachineError(
-                            'permission_denied',
-                            error.message,
-                            { reason: 'permission-missing', missing: error.extra.missing ?? null, grantUrl: error.extra.grantUrl ?? null },
-                        );
-                    case 'rate-limited':
-                        throw fleetMachineError('operation_failed', 'GitHub is rate-limiting; try again shortly', {
-                            reason: 'rate-limited',
-                            rateLimitedUntil: error.extra.rateLimitedUntil ?? null,
+                        throw fleetMachineError('permission_denied', error.message, {
+                            reason: 'app-not-installed',
                         });
+                    case 'permission-missing':
+                        throw fleetMachineError('permission_denied', error.message, {
+                            reason: 'permission-missing',
+                            missing: error.extra.missing ?? null,
+                            grantUrl: error.extra.grantUrl ?? null,
+                        });
+                    case 'rate-limited':
+                        throw fleetMachineError(
+                            'operation_failed',
+                            'GitHub is rate-limiting; try again shortly',
+                            {
+                                reason: 'rate-limited',
+                                rateLimitedUntil: error.extra.rateLimitedUntil ?? null,
+                            },
+                        );
                     case 'no-provider':
                     case 'not-configured':
-                        throw fleetMachineError('unsupported_on_node', 'Actions runners are not available on this deployment', {
-                            reason: error.reason,
-                        });
+                        throw fleetMachineError(
+                            'unsupported_on_node',
+                            'Actions runners are not available on this deployment',
+                            {
+                                reason: error.reason,
+                            },
+                        );
                     default:
-                        throw fleetMachineError('operation_failed', error.message.split(/\r?\n/)[0].slice(0, 300));
+                        throw fleetMachineError(
+                            'operation_failed',
+                            error.message.split(/\r?\n/)[0].slice(0, 300),
+                        );
                 }
             }
             throw error;
@@ -916,7 +1486,10 @@ export class FleetActionsRunnersService {
 
     private requireEnabled(): void {
         if (!config.fleet.isActionsRunnersEnabled()) {
-            throw fleetMachineError('not_found', 'Actions runners are not switched on in this deployment');
+            throw fleetMachineError(
+                'not_found',
+                'Actions runners are not switched on in this deployment',
+            );
         }
     }
 
@@ -931,7 +1504,9 @@ export class FleetActionsRunnersService {
         if (!missing) return;
         throw fleetMachineError(
             'confirmation_required',
-            missing === 'confirm-destructive' ? `type ${target} to confirm` : 'send confirm: true to confirm',
+            missing === 'confirm-destructive'
+                ? `type ${target} to confirm`
+                : 'send confirm: true to confirm',
             { class: missing, summary, ...(missing === 'confirm-destructive' ? { target } : {}) },
         );
     }
@@ -951,11 +1526,14 @@ export class FleetActionsRunnersService {
         if (!held) return null;
         const job = await this.jobRows.findById(held.jobId);
         if (!job || (job.kind !== 'runner-install' && job.kind !== 'runner-control')) return null;
-        const payload = (job.payload ?? {}) as Partial<FleetRunnerInstallPayload & FleetRunnerControlPayload>;
+        const payload = (job.payload ?? {}) as Partial<
+            FleetRunnerInstallPayload & FleetRunnerControlPayload
+        >;
         if (payload.nodeId !== held.nodeId) return null;
         const named =
             job.kind === 'runner-install'
-                ? Array.isArray(payload.runners) && payload.runners.some((entry) => entry?.runnerId === runnerId)
+                ? Array.isArray(payload.runners) &&
+                  payload.runners.some((entry) => entry?.runnerId === runnerId)
                 : payload.runnerId === runnerId;
         if (!named) return null;
         const runner = await this.runners.findById(runnerId);
@@ -985,7 +1563,8 @@ export class FleetActionsRunnersService {
             }
         }
         const node = nodeId ? await this.nodes.findById(nodeId) : null;
-        if (!node || node.userId !== userId) throw fleetMachineError('not_found', 'no such computer');
+        if (!node || node.userId !== userId)
+            throw fleetMachineError('not_found', 'no such computer');
         return { node, role: 'owner' };
     }
 
@@ -997,12 +1576,18 @@ export class FleetActionsRunnersService {
     }
 
     /** Every Node the caller may see, with their role (own + shared through an Organization). */
-    private async visibleNodes(userId: string): Promise<Array<{ node: FleetNode; role: FleetViewerRole }>> {
-        const own = (await this.nodes.findByUser(userId)).map((node) => ({ node, role: 'owner' as FleetViewerRole }));
+    private async visibleNodes(
+        userId: string,
+    ): Promise<Array<{ node: FleetNode; role: FleetViewerRole }>> {
+        const own = (await this.nodes.findByUser(userId)).map((node) => ({
+            node,
+            role: 'owner' as FleetViewerRole,
+        }));
         const shared = this.access ? await this.access.listSharedWith(userId).catch(() => []) : [];
-        return [...own, ...shared.map((entry) => ({ node: entry.node as FleetNode, role: entry.role }))].filter(
-            (entry) => entry.node.status !== 'enrolling',
-        );
+        return [
+            ...own,
+            ...shared.map((entry) => ({ node: entry.node as FleetNode, role: entry.role })),
+        ].filter((entry) => entry.node.status !== 'enrolling');
     }
 
     private async isStopped(): Promise<boolean> {

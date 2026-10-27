@@ -149,7 +149,11 @@ export interface IActionsRunnersPlugin extends IPlugin {
 	mintRemoveToken(target: ActionsRunnerTarget, token: string): Promise<ActionsRunnerOneTimeToken>;
 
 	/** The target's self-hosted runners (conditional with `etag`). */
-	listRunners(target: ActionsRunnerTarget, token: string, options?: { etag?: string | null }): Promise<ActionsRunnersPage>;
+	listRunners(
+		target: ActionsRunnerTarget,
+		token: string,
+		options?: { etag?: string | null }
+	): Promise<ActionsRunnersPage>;
 
 	/** Deregister one runner by its GitHub id (the fallback when the node cannot). */
 	deleteRunner(target: ActionsRunnerTarget, runnerId: number, token: string): Promise<void>;

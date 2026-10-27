@@ -25,7 +25,8 @@ function download(overrides: Partial<FleetActionsRunnerDownload> = {}): FleetAct
 	return {
 		os: 'linux',
 		architecture: 'x64',
-		downloadUrl: 'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
+		downloadUrl:
+			'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
 		filename: 'actions-runner-linux-x64-2.321.0.tar.gz',
 		sha256: SHA,
 		...overrides
@@ -33,11 +34,27 @@ function download(overrides: Partial<FleetActionsRunnerDownload> = {}): FleetAct
 }
 
 describe('runnerConfigArgs (FR-7, FR-8, FR-9)', () => {
-	const base = { platform: 'linux', url: 'https://github.com/acme/api', name: 'build-01-1', labels: ['gpu'], replace: false };
+	const base = {
+		platform: 'linux',
+		url: 'https://github.com/acme/api',
+		name: 'build-01-1',
+		labels: ['gpu'],
+		replace: false
+	};
 
 	it('is unattended, names the URL, name, labels and work folder — and never a token', () => {
 		const args = runnerConfigArgs(base);
-		expect(args).toEqual(['--unattended', '--url', 'https://github.com/acme/api', '--name', 'build-01-1', '--work', '_work', '--labels', 'gpu']);
+		expect(args).toEqual([
+			'--unattended',
+			'--url',
+			'https://github.com/acme/api',
+			'--name',
+			'build-01-1',
+			'--work',
+			'_work',
+			'--labels',
+			'gpu'
+		]);
 		expect(args.join(' ')).not.toContain('--token');
 	});
 
@@ -81,7 +98,9 @@ describe('runnerConfigArgs (FR-7, FR-8, FR-9)', () => {
 	});
 
 	it('starts Windows scripts through cmd.exe with the script relative to the runner folder', () => {
-		expect(runnerScriptCommand('win32', 'C:\\r\\a', 'config', ['--x'], { ComSpec: 'C:\\Windows\\System32\\cmd.exe' })).toEqual({
+		expect(
+			runnerScriptCommand('win32', 'C:\\r\\a', 'config', ['--x'], { ComSpec: 'C:\\Windows\\System32\\cmd.exe' })
+		).toEqual({
 			command: 'C:\\Windows\\System32\\cmd.exe',
 			args: ['/d', '/c', 'config.cmd', '--x']
 		});
@@ -90,10 +109,16 @@ describe('runnerConfigArgs (FR-7, FR-8, FR-9)', () => {
 
 describe('runner download (FR-6, U6)', () => {
 	it('accepts only GitHub release assets for THIS machine with a checksum', () => {
-		expect(assertRunnerDownloadFor(download(), 'linux', 'x64').filename).toBe('actions-runner-linux-x64-2.321.0.tar.gz');
-		expect(() => assertRunnerDownloadFor(download({ downloadUrl: 'https://example.com/actions/runner/releases/download/x.tar.gz' }), 'linux', 'x64')).toThrow(
-			/not a GitHub release asset/
+		expect(assertRunnerDownloadFor(download(), 'linux', 'x64').filename).toBe(
+			'actions-runner-linux-x64-2.321.0.tar.gz'
 		);
+		expect(() =>
+			assertRunnerDownloadFor(
+				download({ downloadUrl: 'https://example.com/actions/runner/releases/download/x.tar.gz' }),
+				'linux',
+				'x64'
+			)
+		).toThrow(/not a GitHub release asset/);
 		expect(() => assertRunnerDownloadFor(download({ sha256: 'nope' }), 'linux', 'x64')).toThrow(/no checksum/);
 		expect(() => assertRunnerDownloadFor(download(), 'darwin', 'arm64')).toThrow(/not this computer/);
 	});
@@ -108,7 +133,11 @@ describe('runner download (FR-6, U6)', () => {
 		});
 
 		const fetchOf = (body: string) =>
-			(async () => new Response(body, { status: 200, headers: { 'content-length': String(body.length) } })) as unknown as typeof fetch;
+			(async () =>
+				new Response(body, {
+					status: 200,
+					headers: { 'content-length': String(body.length) }
+				})) as unknown as typeof fetch;
 
 		it('keeps an archive whose SHA-256 matches', async () => {
 			const body = 'runner build bytes';
@@ -123,9 +152,15 @@ describe('runner download (FR-6, U6)', () => {
 
 		it('deletes a mismatching archive and names the file (nothing is extracted)', async () => {
 			await expect(
-				downloadRunnerArchive({ state: new RunnerState(root), fetch: fetchOf('tampered') }, download(), new AbortController().signal)
+				downloadRunnerArchive(
+					{ state: new RunnerState(root), fetch: fetchOf('tampered') },
+					download(),
+					new AbortController().signal
+				)
 			).rejects.toThrow('checksum mismatch for actions-runner-linux-x64-2.321.0.tar.gz — nothing was installed');
-			await expect(readFile(join(root, '.downloads', 'actions-runner-linux-x64-2.321.0.tar.gz'))).rejects.toThrow();
+			await expect(
+				readFile(join(root, '.downloads', 'actions-runner-linux-x64-2.321.0.tar.gz'))
+			).rejects.toThrow();
 		});
 	});
 });
@@ -173,7 +208,14 @@ describe('service rules (FR-9, U3, U4)', () => {
 describe('runner state and logs', () => {
 	it('reads only well-formed meta (never a token field)', () => {
 		const meta = parseRunnerMeta(
-			JSON.stringify({ runnerId: RUNNER_ID, name: 'build-01-1', scope: 'repo', target: 'acme/api', labels: ['gpu'], mode: 'service' })
+			JSON.stringify({
+				runnerId: RUNNER_ID,
+				name: 'build-01-1',
+				scope: 'repo',
+				target: 'acme/api',
+				labels: ['gpu'],
+				mode: 'service'
+			})
 		);
 		expect(meta?.name).toBe('build-01-1');
 		expect(parseRunnerMeta('{"runnerId":"x","name":"../../etc","scope":"repo","target":"a/b"}')).toBeNull();
@@ -193,7 +235,8 @@ describe('runner state and logs', () => {
 });
 
 describe('payload parsing (never trusted from the platform)', () => {
-	const job = (payload: Record<string, unknown>): FleetJobView => ({ id: 'job-1', payload, leaseGeneration: 1 }) as unknown as FleetJobView;
+	const job = (payload: Record<string, unknown>): FleetJobView =>
+		({ id: 'job-1', payload, leaseGeneration: 1 }) as unknown as FleetJobView;
 
 	it('runner-install: a repository, its URL, unique valid names, no token field', () => {
 		const parsed = parseRunnerInstallPayload(
@@ -213,14 +256,25 @@ describe('payload parsing (never trusted from the platform)', () => {
 		expect(JSON.stringify(parsed)).not.toContain('smuggled');
 		expect(() =>
 			parseRunnerInstallPayload(
-				job({ nodeId: 'n', scope: 'repo', target: 'acme/api', url: 'https://evil.example/acme/api', mode: 'service', runners: [] })
+				job({
+					nodeId: 'n',
+					scope: 'repo',
+					target: 'acme/api',
+					url: 'https://evil.example/acme/api',
+					mode: 'service',
+					runners: []
+				})
 			)
 		).toThrow(/registration URL/);
 	});
 
 	it('runner-control: a runner id, a valid name, a known act', () => {
-		expect(parseRunnerControlPayload(job({ runnerId: RUNNER_ID, name: 'build-01-1', action: 'stop' })).action).toBe('stop');
-		expect(() => parseRunnerControlPayload(job({ runnerId: RUNNER_ID, name: 'build-01-1', action: 'format' }))).toThrow();
+		expect(parseRunnerControlPayload(job({ runnerId: RUNNER_ID, name: 'build-01-1', action: 'stop' })).action).toBe(
+			'stop'
+		);
+		expect(() =>
+			parseRunnerControlPayload(job({ runnerId: RUNNER_ID, name: 'build-01-1', action: 'format' }))
+		).toThrow();
 	});
 });
 
@@ -243,7 +297,8 @@ describe('executors (T-14)', () => {
 			state: new RunnerState(root),
 			exec: async (request) => {
 				execs.push(request);
-				if (request.command === 'sudo' && !options.sudo) return { code: 1, stdout: '', stderr: 'sudo: a password is required' };
+				if (request.command === 'sudo' && !options.sudo)
+					return { code: 1, stdout: '', stderr: 'sudo: a password is required' };
 				if (request.command === 'tar') {
 					const into = request.args[request.args.indexOf('-C') + 1];
 					await mkdir(into, { recursive: true });
@@ -338,8 +393,14 @@ describe('executors (T-14)', () => {
 			serviceUnit: null,
 			installedAt: null
 		});
-		const job = { id: 'job-2', leaseGeneration: 1, payload: { runnerId: RUNNER_ID, name: 'build-01-1', action: 'remove' } } as unknown as FleetJobView;
-		await expect(createRunnerControlExecutor(deps)(job, new AbortController().signal)).rejects.toThrow(/belongs to another runner/);
+		const job = {
+			id: 'job-2',
+			leaseGeneration: 1,
+			payload: { runnerId: RUNNER_ID, name: 'build-01-1', action: 'remove' }
+		} as unknown as FleetJobView;
+		await expect(createRunnerControlExecutor(deps)(job, new AbortController().signal)).rejects.toThrow(
+			/belongs to another runner/
+		);
 		expect((await deps.state.readMeta('build-01-1'))?.runnerId).toBe(OTHER_ID);
 	});
 
@@ -348,7 +409,11 @@ describe('executors (T-14)', () => {
 		await createRunnerInstallExecutor(deps)(installJob, new AbortController().signal);
 		await mkdir(join(root, 'neighbour'), { recursive: true });
 		const before = execs.length;
-		const job = { id: 'job-3', leaseGeneration: 1, payload: { runnerId: RUNNER_ID, name: 'build-01-1', action: 'remove' } } as unknown as FleetJobView;
+		const job = {
+			id: 'job-3',
+			leaseGeneration: 1,
+			payload: { runnerId: RUNNER_ID, name: 'build-01-1', action: 'remove' }
+		} as unknown as FleetJobView;
 		const result = await createRunnerControlExecutor(deps)(job, new AbortController().signal);
 		expect(result).toMatchObject({ state: 'removed', deregistered: true });
 		const removeCalls = execs.slice(before);

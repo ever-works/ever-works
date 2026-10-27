@@ -100,6 +100,9 @@ export function computerUsageLineState(
         cost: usageMoney(costCents),
         age: usageAge(scan.lastScanAt, now),
         online: scan.online,
-        scannedPct: typeof backlog === 'number' && backlog > 0 ? Math.max(0, Math.min(99, 100 - Math.round(backlog))) : null,
+        scannedPct:
+            typeof backlog === 'number' && backlog > 0
+                ? Math.max(0, Math.min(99, 100 - Math.round(backlog)))
+                : null,
     };
 }

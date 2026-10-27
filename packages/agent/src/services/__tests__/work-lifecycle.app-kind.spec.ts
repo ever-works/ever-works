@@ -91,7 +91,16 @@ interface DeleteCall {
     repo: string;
 }
 
-type PortBehaviour = 'unbound' | 'done' | 'pending' | 'throw';
+type PortBehaviour =
+    | 'unbound'
+    | 'done'
+    | 'pending'
+    | 'throw'
+    // Lane aw-safety (2026-10-26) — `pending` with a not-started reason, and the runtime's typed refusal.
+    | 'not-started:dispatcher_unavailable'
+    | 'not-started:runtime_state_unreadable'
+    | 'not-started:deploy_in_progress'
+    | 'refusal';
 
 interface Stack {
     service: WorkLifecycleService;
@@ -224,6 +233,21 @@ function makeStack(work: Work, port: PortBehaviour = 'unbound'): Stack {
                 events.push('port requestDeletion');
                 if (port === 'throw') {
                     throw Object.assign(new Error('runtime unavailable'), { code: 'no_runtime' });
+                }
+                if (port === 'refusal') {
+                    const refusal = Object.assign(new Error('No App Work to delete.'), {
+                        code: 'not_found',
+                        status: 404,
+                    });
+                    refusal.name = 'AppWorkDeletionRefusalError';
+                    throw refusal;
+                }
+                if (port.startsWith('not-started:')) {
+                    return {
+                        status: 'pending',
+                        target: 'your-cluster',
+                        reason: port.slice('not-started:'.length),
+                    } as AppWorkDeletionOutcome;
                 }
                 return {
                     status: port === 'pending' ? 'pending' : 'done',
@@ -676,6 +700,45 @@ describe('deleteWork — the APP_WORK_DELETION_PORT contract (T39)', () => {
         expect(stack.events).toContain('port requestDeletion');
         expect(result.message).toContain('your-cluster');
         expect(result.message).toContain('no_runtime');
+    });
+
+    // Lane aw-safety (2026-10-26) — a removal that was NOT started must not delete anything, and
+    // must not answer "deleting" either: no claim exists, so the Work would never finish.
+    it.each([
+        ['not-started:dispatcher_unavailable', 503, 'app_runtime_unavailable'],
+        ['not-started:runtime_state_unreadable', 503, 'app_runtime_unavailable'],
+        ['not-started:deploy_in_progress', 409, 'app_deploy_in_progress'],
+    ] as const)(
+        '%s ⇒ refused %s before ANY repository step, the row kept',
+        async (behaviour, status, code) => {
+            const stack = makeStack(appWork('fork'), behaviour);
+
+            await expect(
+                stack.service.deleteWork(
+                    'w-app',
+                    await viaGlobalPipe({ delete_data_repository: true }),
+                    user,
+                ),
+            ).rejects.toMatchObject({ status, response: expect.objectContaining({ code }) });
+
+            expect(stack.events).toEqual(['port requestDeletion']);
+            expect(callNames(stack.calls)).toEqual([]);
+            expect(stack.workRepository.delete).not.toHaveBeenCalled();
+            for (const cleanup of stack.cleanups) {
+                expect(cleanup).not.toHaveBeenCalled();
+            }
+        },
+    );
+
+    it('a TYPED runtime refusal is rethrown, not taken as done — nothing is deleted', async () => {
+        const stack = makeStack(appWork('fork'), 'refusal');
+
+        await expect(
+            stack.service.deleteWork('w-app', await viaGlobalPipe({ delete_data_repository: true }), user),
+        ).rejects.toMatchObject({ status: 404, response: expect.objectContaining({ code: 'not_found' }) });
+
+        expect(callNames(stack.calls)).toEqual([]);
+        expect(stack.workRepository.delete).not.toHaveBeenCalled();
     });
 
     it('non-app kinds never call the port', async () => {

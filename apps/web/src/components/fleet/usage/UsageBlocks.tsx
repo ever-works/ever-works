@@ -36,7 +36,11 @@ export function UsagePeriodControl({
 }) {
     const t = useTranslations('fleet.usage.tab');
     return (
-        <div role="radiogroup" aria-label={t('periodLabel')} className="inline-flex rounded-md border border-border dark:border-border-dark">
+        <div
+            role="radiogroup"
+            aria-label={t('periodLabel')}
+            className="inline-flex rounded-md border border-border dark:border-border-dark"
+        >
             {FLEET_USAGE_PERIODS.map((period, index) => (
                 <button
                     key={period}
@@ -47,7 +51,9 @@ export function UsagePeriodControl({
                     onClick={() => onChange(period)}
                     className={cn(
                         'px-3 py-1 text-xs first:rounded-l-md last:rounded-r-md',
-                        period === days ? 'bg-primary/10 font-medium text-text dark:text-text-dark' : muted,
+                        period === days
+                            ? 'bg-primary/10 font-medium text-text dark:text-text-dark'
+                            : muted,
                     )}
                     data-testid={`fleet-usage-period-${period}`}
                 >
@@ -75,7 +81,10 @@ export function UsageTotals({ view }: { view: FleetUsageView }) {
             <UsagePayerNote />
             {view.unknownModels.requests > 0 && (
                 <p className={muted} data-testid="fleet-usage-unknown-models">
-                    {t('unknownModels', { count: view.unknownModels.requests, models: view.unknownModels.models.join(', ') })}
+                    {t('unknownModels', {
+                        count: view.unknownModels.requests,
+                        models: view.unknownModels.models.join(', '),
+                    })}
                 </p>
             )}
             {usageExclusionNotes(view).map((note) => (
@@ -94,10 +103,16 @@ export function UsageCatchingUp({ view }: { view: FleetUsageView }) {
     return (
         <div className="space-y-1" data-testid="fleet-usage-catching-up">
             <div className="h-1 w-full rounded bg-border/60 dark:bg-border-dark/60">
-                <div className="h-1 rounded bg-primary" style={{ width: `${view.catchingUp.scannedPct}%` }} />
+                <div
+                    className="h-1 rounded bg-primary"
+                    style={{ width: `${view.catchingUp.scannedPct}%` }}
+                />
             </div>
             <p className={muted}>
-                {t('catchingUp', { pct: view.catchingUp.scannedPct, computer: view.catchingUp.nodeName })}
+                {t('catchingUp', {
+                    pct: view.catchingUp.scannedPct,
+                    computer: view.catchingUp.nodeName,
+                })}
             </p>
         </div>
     );
@@ -112,7 +127,11 @@ export function UsageByModel({
 }) {
     const t = useTranslations('fleet.usage.tab');
     return (
-        <section className={card} aria-labelledby="fleet-usage-by-model" data-testid="fleet-usage-by-model">
+        <section
+            className={card}
+            aria-labelledby="fleet-usage-by-model"
+            data-testid="fleet-usage-by-model"
+        >
             <h3 id="fleet-usage-by-model" className="font-medium">
                 {t('byModel')}
             </h3>
@@ -121,12 +140,22 @@ export function UsageByModel({
             ) : (
                 <ul className="space-y-1">
                     {view.byModel.map((line) => (
-                        <li key={line.model} className="flex items-center justify-between gap-3 tabular-nums">
-                            <button type="button" className="min-w-0 truncate text-left font-mono text-xs hover:underline" onClick={() => onModel(line.model)}>
-                                {line.costCents === null ? t('unknownModel', { model: line.model }) : line.model}
+                        <li
+                            key={line.model}
+                            className="flex items-center justify-between gap-3 tabular-nums"
+                        >
+                            <button
+                                type="button"
+                                className="min-w-0 truncate text-left font-mono text-xs hover:underline"
+                                onClick={() => onModel(line.model)}
+                            >
+                                {line.costCents === null
+                                    ? t('unknownModel', { model: line.model })
+                                    : line.model}
                             </button>
                             <span className="shrink-0 text-xs">
-                                {t('requests', { count: line.requests })} · {usageMoney(line.costCents) ?? t('tokensOnly')}
+                                {t('requests', { count: line.requests })} ·{' '}
+                                {usageMoney(line.costCents) ?? t('tokensOnly')}
                             </span>
                         </li>
                     ))}
@@ -138,7 +167,10 @@ export function UsageByModel({
 
 function NodeRescan({ nodeId }: { nodeId: string }) {
     const t = useTranslations('fleet.usage.tab');
-    const [state, setState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
+    const [state, setState] = useState<{ busy: boolean; message: string | null }>({
+        busy: false,
+        message: null,
+    });
     return (
         <span className="inline-flex items-center gap-1">
             <button
@@ -148,7 +180,12 @@ function NodeRescan({ nodeId }: { nodeId: string }) {
                 onClick={() => {
                     setState({ busy: true, message: null });
                     void rescanFleetUsageAction(nodeId).then((result) =>
-                        setState({ busy: false, message: result.ok ? t('rescanQueued') : result.error.hint || result.error.code }),
+                        setState({
+                            busy: false,
+                            message: result.ok
+                                ? t('rescanQueued')
+                                : result.error.hint || result.error.code,
+                        }),
                     );
                 }}
             >
@@ -174,7 +211,11 @@ export function UsageByComputer({
     const t = useTranslations('fleet.usage.tab');
     const roles = new Map(nodes.map((node) => [node.id, node.viewerRole ?? 'owner']));
     return (
-        <section className={card} aria-labelledby="fleet-usage-by-computer" data-testid="fleet-usage-by-computer">
+        <section
+            className={card}
+            aria-labelledby="fleet-usage-by-computer"
+            data-testid="fleet-usage-by-computer"
+        >
             <h3 id="fleet-usage-by-computer" className="font-medium">
                 {t('byComputer')}
             </h3>
@@ -183,23 +224,38 @@ export function UsageByComputer({
                     const age = usageAge(line.scan.lastScanAt, now);
                     const scan =
                         line.scan.state === 'on'
-                            ? [line.scan.online ? null : t('offline'), age ? t('scannedAgo', { age }) : t('noScanYet')]
+                            ? [
+                                  line.scan.online ? null : t('offline'),
+                                  age ? t('scannedAgo', { age }) : t('noScanYet'),
+                              ]
                                   .filter(Boolean)
                                   .join(' · ')
                             : (line.scan.hint ?? t('scanOff'));
                     return (
-                        <li key={line.nodeId} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5" data-testid="fleet-usage-node-line">
-                            <button type="button" className="font-medium hover:underline" onClick={() => onNode(line.nodeId)}>
+                        <li
+                            key={line.nodeId}
+                            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5"
+                            data-testid="fleet-usage-node-line"
+                        >
+                            <button
+                                type="button"
+                                className="font-medium hover:underline"
+                                onClick={() => onNode(line.nodeId)}
+                            >
                                 {line.name}
                             </button>
                             <span className="text-xs tabular-nums">
-                                {line.scan.state === 'on' ? (usageMoney(line.costCents) ?? t('tokensOnly')) : '—'}
+                                {line.scan.state === 'on'
+                                    ? (usageMoney(line.costCents) ?? t('tokensOnly'))
+                                    : '—'}
                             </span>
                             <span className={cn(muted, 'w-full')}>
                                 {scan}{' '}
-                                {line.scan.state === 'on' && line.scan.online && roles.get(line.nodeId) === 'owner' && (
-                                    <NodeRescan nodeId={line.nodeId} />
-                                )}
+                                {line.scan.state === 'on' &&
+                                    line.scan.online &&
+                                    roles.get(line.nodeId) === 'owner' && (
+                                        <NodeRescan nodeId={line.nodeId} />
+                                    )}
                             </span>
                         </li>
                     );
@@ -229,7 +285,8 @@ export function UsageBusiestCheckouts({ view }: { view: FleetUsageView }) {
                         <span className="text-xs">{t('otherFolders')}</span>
                     )}{' '}
                     <span className={muted}>
-                        {t('onComputer', { computer: line.nodeName })} {usageMoney(line.costCents) ?? t('tokensOnly')}
+                        {t('onComputer', { computer: line.nodeName })}{' '}
+                        {usageMoney(line.costCents) ?? t('tokensOnly')}
                     </span>
                 </span>
             ))}
@@ -242,8 +299,10 @@ export function UsageSessionsBreakdown({ view }: { view: FleetUsageView }) {
     const parts: string[] = view.sessions.agents.map((agent) =>
         t('agentSessions', { name: agent.name ?? t('unknownAgent'), count: agent.sessions }),
     );
-    if (view.sessions.owner.sessions > 0) parts.push(t('ownerSessions', { count: view.sessions.owner.sessions }));
-    if (view.sessions.other) parts.push(t('otherSessions', { count: view.sessions.other.sessions }));
+    if (view.sessions.owner.sessions > 0)
+        parts.push(t('ownerSessions', { count: view.sessions.owner.sessions }));
+    if (view.sessions.other)
+        parts.push(t('otherSessions', { count: view.sessions.other.sessions }));
     else parts.push(t('otherNotShown'));
     return (
         <p className="text-sm" data-testid="fleet-usage-sessions">

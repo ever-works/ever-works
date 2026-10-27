@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import {
     FLEET_USAGE_DEFAULT_PERIOD,
     FLEET_USAGE_PERIODS,
+    fleetUsageCsv,
     formatFleetUsageCents,
     formatFleetUsageTokens,
     isFleetUsagePeriodDays,
@@ -52,13 +53,22 @@ export function renderFleetUsage(view: FleetUsageView, now: number = Date.now())
         );
     }
     if (view.catchingUp) {
-        lines.push(chalk.gray(`Catching up · ${view.catchingUp.scannedPct} % scanned on ${view.catchingUp.nodeName}`));
+        lines.push(
+            chalk.gray(
+                `Catching up · ${view.catchingUp.scannedPct} % scanned on ${view.catchingUp.nodeName}`,
+            ),
+        );
     }
     if (view.byModel.length > 0) {
         lines.push('');
         const rows = [['MODEL', 'REQUESTS', 'TOKENS', 'COST']];
         for (const line of view.byModel) {
-            rows.push([line.model, String(line.requests), formatFleetUsageTokens(totalFleetUsageTokens(line.tokens)), money(line.costCents)]);
+            rows.push([
+                line.model,
+                String(line.requests),
+                formatFleetUsageTokens(totalFleetUsageTokens(line.tokens)),
+                money(line.costCents),
+            ]);
         }
         lines.push(fleetTable(rows));
     }
@@ -78,28 +88,42 @@ export function renderFleetUsage(view: FleetUsageView, now: number = Date.now())
         lines.push('');
         lines.push(
             `Busiest checkouts  ${view.busiestCheckouts
-                .map((line) => `${line.path ?? 'other folders'} on ${line.nodeName} ${money(line.costCents)}`)
+                .map(
+                    (line) =>
+                        `${line.path ?? 'other folders'} on ${line.nodeName} ${money(line.costCents)}`,
+                )
                 .join(' · ')}`,
         );
     }
     const sessions = view.sessions;
-    const parts = sessions.agents.map((agent) => `${agent.name ?? agent.agentId} ${agent.sessions}`);
+    const parts = sessions.agents.map(
+        (agent) => `${agent.name ?? agent.agentId} ${agent.sessions}`,
+    );
     if (sessions.owner.sessions > 0) parts.push(`owner sessions ${sessions.owner.sessions}`);
-    if (sessions.other) parts.push(`other (not started from Ever Works) ${sessions.other.sessions}`);
+    if (sessions.other)
+        parts.push(`other (not started from Ever Works) ${sessions.other.sessions}`);
     if (parts.length > 0) lines.push(`Sessions  ${parts.join(' · ')}`);
     if (view.excluded.nodes > 0 || view.excluded.otherHidden) {
         lines.push(
             chalk.gray(
                 `Not shown: ${[
-                    view.excluded.nodes > 0 ? `${view.excluded.nodes} computer(s) you may not see` : null,
-                    view.excluded.otherHidden ? 'sessions not started from Ever Works on computers you do not own' : null,
+                    view.excluded.nodes > 0
+                        ? `${view.excluded.nodes} computer(s) you may not see`
+                        : null,
+                    view.excluded.otherHidden
+                        ? 'sessions not started from Ever Works on computers you do not own'
+                        : null,
                 ]
                     .filter(Boolean)
                     .join('; ')}`,
             ),
         );
     }
-    lines.push(chalk.gray(`Priced at model list prices v${view.priceList.version} (in effect since ${view.priceList.effectiveFrom}).`));
+    lines.push(
+        chalk.gray(
+            `Priced at model list prices v${view.priceList.version} (in effect since ${view.priceList.effectiveFrom}).`,
+        ),
+    );
     return lines;
 }
 
@@ -116,24 +140,42 @@ export function parseFleetUsageDays(raw: string | undefined): number | null {
 
 export const usageCommand = new Command('usage')
     .description('What the model work on my computers would cost at list price (read-only)')
-    .option('--days <days>', `The period: ${FLEET_USAGE_PERIODS.join(', ')} (default ${FLEET_USAGE_DEFAULT_PERIOD})`)
+    .option(
+        '--days <days>',
+        `The period: ${FLEET_USAGE_PERIODS.join(', ')} (default ${FLEET_USAGE_DEFAULT_PERIOD})`,
+    )
     .option('--on <computer>', 'Only this computer (its name or id)')
     .option('--model <model>', 'Only this model id')
     .option('--json', 'Machine-readable output: { ok, data }')
-    .action(async (options: { days?: string; on?: string; model?: string; json?: boolean }) => {
-        const json = options.json === true;
-        const days = parseFleetUsageDays(options.days);
-        if (days === null) {
-            return emitFleetError(json, {
-                code: 'invalid',
-                hint: `--days must be one of ${FLEET_USAGE_PERIODS.join(', ')}`,
-                details: { field: 'days' },
-            });
-        }
-        const node = options.on ? await resolveFleetNodeId(json, options.on) : undefined;
-        await runFleetVerb<FleetUsageView>(
-            json,
-            { method: 'GET', path: '/fleet/usage', query: { days, node, model: options.model } },
-            printFleetUsage,
-        );
-    });
+    .option('--csv', 'The same figures as CSV (one row per model, computer, checkout and Agent)')
+    .action(
+        async (options: {
+            days?: string;
+            on?: string;
+            model?: string;
+            json?: boolean;
+            csv?: boolean;
+        }) => {
+            const json = options.json === true;
+            const days = parseFleetUsageDays(options.days);
+            if (days === null) {
+                return emitFleetError(json, {
+                    code: 'invalid',
+                    hint: `--days must be one of ${FLEET_USAGE_PERIODS.join(', ')}`,
+                    details: { field: 'days' },
+                });
+            }
+            const node = options.on ? await resolveFleetNodeId(json, options.on) : undefined;
+            await runFleetVerb<FleetUsageView>(
+                json,
+                {
+                    method: 'GET',
+                    path: '/fleet/usage',
+                    query: { days, node, model: options.model },
+                },
+                options.csv === true && !json
+                    ? (view) => process.stdout.write(fleetUsageCsv(view))
+                    : printFleetUsage,
+            );
+        },
+    );
