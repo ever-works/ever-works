@@ -17,6 +17,15 @@ const { applyMock, upgradeMock, dismissMock } = vi.hoisted(() => ({
     dismissMock: vi.fn(),
 }));
 
+// `Button` pulls in the locale-aware `Link`; next-intl's navigation factory needs a Next
+// runtime that jsdom does not provide.
+vi.mock('@/i18n/navigation', () => ({
+    useRouter: () => ({ push: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+    Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
+}));
+
 vi.mock('@/app/actions/dashboard/app-spec', () => ({
     applyBlueprintAction: applyMock,
     upgradeBlueprintAction: upgradeMock,
