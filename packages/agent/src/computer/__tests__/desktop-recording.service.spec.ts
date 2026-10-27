@@ -93,14 +93,10 @@ function setup(options: { storage?: boolean; retentionDays?: number } = {}) {
     };
     const audit = { tryRecord: jest.fn(async () => true) };
     const storage = options.storage === false ? null : memoryStorage();
+    const nodeRow = { id: NODE, recordingRetentionDays: options.retentionDays ?? 14 };
     const service = new DesktopRecordingService(
         sessions as unknown as ComputerSessionRepository,
-        {
-            findById: jest.fn(async () => ({
-                id: NODE,
-                recordingRetentionDays: options.retentionDays ?? 14,
-            })),
-        } as never,
+        { findById: jest.fn(async () => nodeRow) } as never,
         audit as never,
         storage,
     );
@@ -109,6 +105,7 @@ function setup(options: { storage?: boolean; retentionDays?: number } = {}) {
     return {
         service,
         row,
+        nodeRow,
         storage,
         audit,
         advance: (ms: number) => {
@@ -172,6 +169,16 @@ describe('DesktopRecordingService — writing', () => {
             bytes.toString('utf8').startsWith('{'),
         );
         expect(indexes).toHaveLength(1);
+    });
+
+    it('applies a retention the owner changed during the view when it stops (FL-07 P3)', async () => {
+        const { service, row, nodeRow, start, advance } = setup();
+        await start();
+        service.push(VIEW, 20, new Uint8Array([0xff, 0xd8, 1]));
+        nodeRow.recordingRetentionDays = 3;
+        advance(1_000);
+        await service.stop(VIEW, 'view-ended');
+        expect(row.recordingExpiresAt?.toISOString()).toBe('2026-10-30T09:00:01.000Z');
     });
 
     it('expires 14 days after the view ends, or the computer’s clamped retention (FR-52)', async () => {

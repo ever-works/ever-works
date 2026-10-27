@@ -25,7 +25,7 @@ import {
 } from '../core/screen/helper/helper-admission';
 import { helperControlAllow, helperControlDeny, helperControlStatus } from '../core/screen/helper/helper-control';
 import { BAKED_HELPER_MANIFEST } from '../core/screen/helper/helper-manifest';
-import { checkHelperSignature } from '../core/screen/helper/helper-signature';
+import { nodeHelperSignatureChecker } from '../core/screen/helper/helper-signature';
 import { createHelperFs, helperPathsFor, type HelperFs } from '../core/screen/helper/helper-trust';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
@@ -2510,26 +2510,23 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
 
 /** The screen helper's admission deps for this CLI (FL-07). */
 export function helperAdmissionDeps(deps: CliDeps): HelperAdmissionDeps {
+	const arch = deps.arch ?? deps.io.environment.arch;
+	// P3: the OS signature check (macOS, Windows), bound to the signer this node version publishes.
+	const checkSignature = nodeHelperSignatureChecker(deps.io.runner, deps.platform, arch, BAKED_HELPER_MANIFEST);
 	return {
 		fs:
 			deps.helperFs ??
 			createHelperFs({ platform: deps.platform, ...(deps.restrictFile ? { restrict: deps.restrictFile } : {}) }),
 		paths: helperPathsFor(deps.configPath, deps.platform),
 		platform: deps.platform,
-		arch: deps.arch ?? deps.io.environment.arch,
+		arch,
 		manifest: BAKED_HELPER_MANIFEST,
 		hostName: safeHostname(),
 		out: deps.out,
 		...(deps.readLine ? { readLine: deps.readLine } : {}),
 		...(deps.helperFetch ? { fetchFn: deps.helperFetch } : {}),
 		...(deps.now ? { now: deps.now } : {}),
-		// P3: the OS signature check, where the OS has one (macOS, Windows).
-		...(deps.platform === 'darwin' || deps.platform === 'win32'
-			? {
-					checkSignature: (path: string, expected: string) =>
-						checkHelperSignature(deps.io.runner, deps.platform, path, expected)
-				}
-			: {})
+		...(checkSignature ? { checkSignature } : {})
 	};
 }
 

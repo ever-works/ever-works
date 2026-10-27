@@ -196,11 +196,13 @@ export class DesktopHelperHost {
 	/** Re-verify the helper and, when admitted and stale, re-probe its facts. Never throws. */
 	async refresh(): Promise<void> {
 		try {
+			// A probe STARTS the helper: that beat checks the signature afresh, like any start (FR-14).
+			const probeDue = this.streams.size === 0 && this.now() - this.lastProbeAt >= HELPER_PROBE_EVERY_MS;
 			const verification = await verifyHelper(
 				this.options.fs,
 				this.options.paths,
 				this.now,
-				this.heartbeatChecker()
+				probeDue ? this.options.checkSignature : this.heartbeatChecker()
 			);
 			await this.noteVerification(verification);
 			await this.readControl(verification.ok ? verification.record : null);
@@ -208,7 +210,7 @@ export class DesktopHelperHost {
 				this.hello = null;
 				return;
 			}
-			if (this.streams.size === 0 && this.now() - this.lastProbeAt >= HELPER_PROBE_EVERY_MS) {
+			if (probeDue) {
 				await this.probe(verification);
 			}
 		} catch (error) {
@@ -416,7 +418,15 @@ export class DesktopHelperHost {
 			const memo = this.signatureMemo;
 			if (key && memo && memo.key === key && this.now() - memo.at < HELPER_SIGNATURE_MEMO_MS) return memo.check;
 			const result = await check(path, expectedSigner, sha256);
-			this.signatureMemo = key && result.ok ? { key, at: this.now(), check: result } : null;
+			// Remembered only when the bytes the OS judged are still the bytes hashed before it.
+			let unchanged = false;
+			if (key && result.ok) {
+				unchanged = await this.options.fs.sha256(path).then(
+					(after) => after === sha256,
+					() => false
+				);
+			}
+			this.signatureMemo = key && result.ok && unchanged ? { key, at: this.now(), check: result } : null;
 			return result;
 		};
 	}

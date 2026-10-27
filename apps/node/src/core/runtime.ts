@@ -1,7 +1,7 @@
 import type { FleetJobKind } from '@ever-works/contracts';
 import { fleetHelperTarget } from '@ever-works/contracts';
 import { BAKED_HELPER_MANIFEST } from './screen/helper/helper-manifest';
-import { checkHelperSignature } from './screen/helper/helper-signature';
+import { nodeHelperSignatureChecker } from './screen/helper/helper-signature';
 import { describeApiBase, resolveApiBase } from './api-base';
 import { PlatformAuthClient, type SignInWithEverIdOptions } from './auth-client';
 import {
@@ -1230,13 +1230,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					env: options.env ?? process.env,
 					...(options.screenHelperSpawner ? { spawner: options.screenHelperSpawner } : {}),
 					logger: io.logger,
-					// P3 (T-43): a `signed` admission is verified by its OS signature.
-					...(io.environment.platform === 'darwin' || io.environment.platform === 'win32'
-						? {
-								checkSignature: (path: string, expected: string) =>
-									checkHelperSignature(io.runner, io.environment.platform, path, expected)
-							}
-						: {}),
+					// P3 (T-43): a `signed` admission is verified by its OS signature, for the signer this version publishes.
+					...signatureCheckerOption(
+						nodeHelperSignatureChecker(
+							io.runner,
+							io.environment.platform,
+							io.environment.arch,
+							BAKED_HELPER_MANIFEST
+						)
+					),
 					signedAvailable: bakedSignedHelperAvailable(io.environment.platform, io.environment.arch)
 				})
 			: null;
@@ -2340,6 +2342,11 @@ export function installShutdownHandlers(signals: SignalSource, shutdown: () => P
 	};
 	signals.on('SIGINT', handler);
 	signals.on('SIGTERM', handler);
+}
+
+/** FL-07 P3: the host option for a signature checker, present only when the OS has one. */
+function signatureCheckerOption<T>(checker: T | undefined): { checkSignature?: T } {
+	return checker ? { checkSignature: checker } : {};
 }
 
 /** FL-07 P3 (T-44): does this node version publish a SIGNED screen helper for this machine? */

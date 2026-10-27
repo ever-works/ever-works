@@ -229,7 +229,9 @@ second); routes `GET …/desktop/recordings`, `GET …/recordings/:viewId`, `GET
 
 **Revision 26 (2026-10-27)** — FL-07 P3 (lane log decisions 34–36): a helper policy record of `level: signed` carries
 `signer` (a macOS Team ID or a Windows certificate subject, matched exactly against the node version's manifest
-target `signer`) and is verified by its OS signature before every start, never by its hash; the heartbeat's
+target `signer` — a signer the running version no longer publishes is refused) and is verified by its OS signature
+before every start, never by its hash (macOS: the Developer ID code requirement of the Team ID; Windows: Authenticode
+`Valid` under a machine root); the heartbeat's
 `helper.signedAvailable?: true` says the node version publishes a signed build the machine does not run;
 `PATCH /api/fleet/nodes/:id` accepts `recordWatchSessions` (boolean) and `recordingRetentionDays` (integer 1–90),
 owner only, audited `node.policy.change` with `{ family: desktop, setting, from, to }`.

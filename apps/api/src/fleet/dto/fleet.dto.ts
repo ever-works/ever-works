@@ -239,7 +239,8 @@ export class UpdateFleetNodeDto {
         description:
             'Desktop view & control — also record Desktop views of this computer that are only watched (views under control are always recorded). Owner only.',
     })
-    @IsOptional()
+    // `null` is not "absent": it is refused here, before any field of the PATCH is written.
+    @ValidateIf((body: { recordWatchSessions?: unknown }) => body.recordWatchSessions !== undefined)
     @IsBoolean()
     recordWatchSessions?: boolean;
 
@@ -256,7 +257,7 @@ export class UpdateFleetNodeDto {
         description:
             'Desktop view & control — days a recording of this computer is kept after its view ended (1–90, default 14). Applies to recordings that stop from now on. Owner only.',
     })
-    @IsOptional()
+    @ValidateIf((body: { recordingRetentionDays?: unknown }) => body.recordingRetentionDays !== undefined)
     @IsInt()
     @Min(1)
     @Max(90)

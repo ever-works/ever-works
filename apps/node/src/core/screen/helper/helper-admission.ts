@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { posix as posixPath, win32 as windowsPath } from 'node:path';
 import {
 	fleetHelperFingerprintPrefix,
 	fleetHelperManifestPublishes,
@@ -185,6 +186,10 @@ export async function helperAdmitSigned(
 	options: { path?: string } = {}
 ): Promise<FleetHelperPolicyRecord> {
 	const path = options.path?.trim() || deps.paths.installPath;
+	// The file checked, approved and started must be one and the same: never a path relative to a working directory.
+	if (!(deps.platform === 'win32' ? windowsPath.isAbsolute(path) : posixPath.isAbsolute(path))) {
+		throw new HelperAdmissionError(`Pass the helper's full path (${path} is relative). Nothing was approved.`);
+	}
 	if (!(await deps.fs.isFile(path))) {
 		throw new HelperAdmissionError(
 			`There is no screen helper at ${path}. Run: ever-works-node helper install (or pass --path <file>).`
@@ -202,7 +207,9 @@ export async function helperAdmitSigned(
 			'Signed approval is not available on this platform; approve it hash-pinned: ever-works-node helper admit'
 		);
 	}
-	const signature = await deps.checkSignature(path, expected);
+	// The bytes fingerprinted are the bytes the OS judged: hashed before and after the check.
+	const before = await deps.fs.sha256(path);
+	const signature = await deps.checkSignature(path, expected, before);
 	if (!signature.ok) {
 		throw new HelperAdmissionError(
 			signature.reason === 'wrong-signer'
@@ -214,6 +221,11 @@ export async function helperAdmitSigned(
 	}
 	const sha256 = await deps.fs.sha256(path);
 	if (!isFleetSha256Hex(sha256)) throw new HelperAdmissionError('The helper could not be fingerprinted.');
+	if (sha256 !== before) {
+		throw new HelperAdmissionError('The helper changed while its signature was being checked. Nothing was approved.');
+	}
+	// `published`: these exact bytes are the build this node version publishes (a newer signed build is not, yet).
+	const published = Boolean(target && deps.manifest.targets[target]?.sha256 === sha256);
 	deps.out(`Screen helper   ${path}`);
 	deps.out(`Signed by       ${signature.signer} (the publisher this node version names)`);
 	deps.out(`Its SHA-256     ${formatFleetHelperFingerprint(sha256)}`);
@@ -233,7 +245,7 @@ export async function helperAdmitSigned(
 		sha256,
 		level: 'signed',
 		version: deps.manifest.version,
-		published: true,
+		published,
 		acknowledgedAt: new Date((deps.now ?? Date.now)()).toISOString(),
 		signer: signature.signer
 	};

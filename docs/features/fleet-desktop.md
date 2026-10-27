@@ -53,11 +53,12 @@ On macOS and Windows a helper can also be approved **by its code signature**:
 ever-works-node helper admit --signed
 ```
 
-The node asks the operating system — `codesign --verify --strict` on macOS (a Developer ID Application signature
-with the Team ID this node version names), the Authenticode signature on Windows (a `Valid` signature whose
-certificate subject is the publisher this node version names) — and approves only when it matches. Before every
-start the signature is checked again, so a file that is no longer signed by that publisher is refused. What a signed
-approval buys: an **update signed by the same publisher keeps the approval** (and, on macOS, its Screen Recording and
+The node asks the operating system and accepts only its verdict: on macOS, `codesign` must confirm a Developer ID
+Application signature, issued by Apple, of the Team ID this node version names; on Windows, the Authenticode
+signature must be `Valid`, chain to a root the machine (not just your account) trusts, and carry the certificate
+subject this node version names. Before every start the signature is checked again, so a file that is no longer
+signed by that publisher is refused — and a node release that stops naming a publisher withdraws its approvals.
+What a signed approval buys: an **update signed by the same publisher keeps the approval** (and, on macOS, its Screen Recording and
 Accessibility permissions), where a hash-pinned approval has to be given again after every update. A signed helper
 shows no "Reduced trust" note; when this node version publishes a signed helper for a machine whose helper is
 hash-pinned, the note says so and names the command. Linux has no signed level — a helper there is always

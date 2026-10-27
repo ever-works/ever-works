@@ -392,6 +392,45 @@ describe('FleetController', () => {
         );
     });
 
+    it('refuses a shared actor sending the recording settings beside a rename, before any write', async () => {
+        service.resolveMachinesActor.mockResolvedValueOnce({
+            ownerUserId: 'owner-9',
+            role: 'org-admin',
+            nodeName: nodeView.name,
+            ctx: {},
+        });
+        await expect(
+            controller.update(auth, nodeView.id, {
+                name: 'renamed',
+                recordWatchSessions: true,
+            } as never),
+        ).rejects.toMatchObject({ status: 403 });
+        expect(service.renameForUser).not.toHaveBeenCalled();
+        expect(service.setDesktopRecordingSettingsForUser).not.toHaveBeenCalled();
+    });
+
+    it('validates the recording settings in the DTO: null, out of range and non-integers are refused', async () => {
+        for (const body of [
+            { recordingRetentionDays: null },
+            { recordingRetentionDays: 0 },
+            { recordingRetentionDays: 91 },
+            { recordingRetentionDays: 2.5 },
+            { recordWatchSessions: null },
+            { recordWatchSessions: 'yes' },
+        ]) {
+            const errors = await validate(plainToInstance(UpdateFleetNodeDto, body));
+            expect(errors.length).toBeGreaterThan(0);
+        }
+        expect(
+            await validate(
+                plainToInstance(UpdateFleetNodeDto, {
+                    recordWatchSessions: false,
+                    recordingRetentionDays: 90,
+                }),
+            ),
+        ).toEqual([]);
+    });
+
     it('remove is owner-scoped', async () => {
         await controller.remove(auth, nodeView.id);
         expect(service.deleteForUser).toHaveBeenCalledWith('user-1', nodeView.id);

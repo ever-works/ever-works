@@ -57,10 +57,25 @@ describe('helper admit --signed', () => {
 	it('records a signed admission after the OS signature names the published team and the word is typed', async () => {
 		const { deps: d, out, fs } = deps();
 		const record = await helperAdmitSigned(d);
-		expect(record).toMatchObject({ level: 'signed', signer: TEAM, published: true });
+		// Signed by the publisher, but not the exact build this version publishes: `published` says so.
+		expect(record).toMatchObject({ level: 'signed', signer: TEAM, published: false, sha256: sha256Of('signed v1') });
 		expect(out.some((line) => line.startsWith('Signed by') && line.includes(TEAM))).toBe(true);
 		expect(await readHelperPolicy(fs, paths.policyPath)).toEqual(record);
 		expect((await readHelperEvents(fs, paths.eventsPath))[0]).toMatchObject({ kind: 'admit', level: 'signed' });
+	});
+
+	it('marks the exact published build as published, and refuses a relative path or bytes that changed mid-check', async () => {
+		const published = deps();
+		await published.fs.writeExecutable(paths.installPath, new TextEncoder().encode('unsigned'));
+		expect(await helperAdmitSigned(published.deps)).toMatchObject({ published: true });
+		await expect(helperAdmitSigned(deps().deps, { path: 'ever-works-screen' })).rejects.toThrow(/full path/);
+		const swapped = deps();
+		const swapping: HelperSignatureChecker = async (path, expected) => {
+			await swapped.fs.writeExecutable(path, new TextEncoder().encode('something else'));
+			return signedBy(TEAM)(path, expected);
+		};
+		await expect(helperAdmitSigned({ ...swapped.deps, checkSignature: swapping })).rejects.toThrow(/changed/);
+		expect(await readHelperPolicy(swapped.fs, paths.policyPath)).toBeNull();
 	});
 
 	it('refuses another publisher, an unpublished signer, no checker, and no typed word', async () => {
@@ -146,7 +161,7 @@ describe('verifying a signed admission (before every start)', () => {
 		expect((await host.report()).helper).toMatchObject({ trust: 'hash-pinned', signedAvailable: true });
 	});
 
-	it('asks the OS once per bytes for heartbeats, and again when the file changes', async () => {
+	it('asks the OS once per bytes for plain heartbeats, afresh before a probe, and again when the file changes', async () => {
 		const fs = await admitted();
 		let calls = 0;
 		const counting: HelperSignatureChecker = async (path, expected, sha256) => {
@@ -161,11 +176,13 @@ describe('verifying a signed admission (before every start)', () => {
 			spawner: fakeHelperSpawner().spawner,
 			checkSignature: counting
 		});
-		await host.refresh();
-		await host.refresh();
+		await host.refresh(); // a probe is due: it starts the helper, so the OS is asked afresh
 		expect(calls).toBe(1);
-		await fs.writeExecutable(paths.installPath, new TextEncoder().encode('signed v3'));
+		await host.refresh(); // a plain beat: asked once, remembered for these bytes
 		await host.refresh();
 		expect(calls).toBe(2);
+		await fs.writeExecutable(paths.installPath, new TextEncoder().encode('signed v3'));
+		await host.refresh();
+		expect(calls).toBe(3);
 	});
 });
