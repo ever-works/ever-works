@@ -318,8 +318,14 @@ const MIN_SCOPED_PUSH_GIT: readonly [number, number] = (() => {
  * fleet machine reports is the one fact this whole capability turns on,
  * and it varies by platform packaging far more than any other probe here.
  */
+/** How much of `git --version`'s output {@link gitSupportsScopedPush} reads. */
+const GIT_VERSION_PROBE_MAX_CHARS = 200;
+
 export function gitSupportsScopedPush(versionOutput: string): boolean {
-	const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(versionOutput ?? ''));
+	// Bounded first: the unanchored pattern below is quadratic on long digit runs (CodeQL
+	// js/polynomial-redos); a real `git --version` line is far shorter than this.
+	const head = String(versionOutput ?? '').slice(0, GIT_VERSION_PROBE_MAX_CHARS);
+	const match = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(head);
 	if (!match) return false;
 	const major = Number.parseInt(match[1], 10);
 	const minor = Number.parseInt(match[2], 10);
