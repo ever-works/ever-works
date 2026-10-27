@@ -454,7 +454,12 @@ export function fleetComputerPortsScreens(
  * act and its confirmation live. Only while `FLEET_VIRTUAL_ENABLED` is on.
  */
 export function fleetVirtualScreens(
-    computers: ReadonlyArray<{ id: string; name: string; hostNodeId?: string; virtualState?: string }>,
+    computers: ReadonlyArray<{
+        id: string;
+        name: string;
+        hostNodeId?: string;
+        virtualState?: string;
+    }>,
     enabled: boolean,
 ): PaletteScreen[] {
     if (!enabled) return [];
@@ -547,7 +552,8 @@ export function fleetUsageScreens(
             id: `fleet.usage.${computer.id}`,
             href: `${ROUTES.DASHBOARD_FLEET_USAGE}?node=${encodeURIComponent(computer.id)}`,
             icon: Monitor,
-            title: (t: PaletteTranslator) => t('fleet.usage.palette.usageOn', { name: computer.name }),
+            title: (t: PaletteTranslator) =>
+                t('fleet.usage.palette.usageOn', { name: computer.name }),
             breadcrumb: fleet,
         });
     }

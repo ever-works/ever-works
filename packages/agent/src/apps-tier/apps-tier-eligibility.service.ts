@@ -64,7 +64,9 @@ export const APPS_MANAGED_REQUIRE_PAID_PLAN_ENV = 'EVER_WORKS_APPS_MANAGED_REQUI
 /** The plan read, as narrow as the `planRequired` rule needs it. */
 export interface AppsTierPlanReader {
     isEnabled(): boolean;
-    resolvePlanForUser(user: unknown): Promise<{ code?: string | null; hosting?: string | null } | null>;
+    resolvePlanForUser(
+        user: unknown,
+    ): Promise<{ code?: string | null; hosting?: string | null } | null>;
 }
 
 /** DI token for {@link AppsTierPlanReader} — bound to `SubscriptionService` where it is available. */
@@ -140,7 +142,10 @@ export class AppsTierEligibilityService implements AppsTierEligibilitySource {
         if (workId) {
             const max = config.everWorks.apps.getMaxPerUser();
             answer.max = max;
-            if (!this.runtimeStates || typeof this.runtimeStates.countManagedForOwner !== 'function') {
+            if (
+                !this.runtimeStates ||
+                typeof this.runtimeStates.countManagedForOwner !== 'function'
+            ) {
                 reasons.push(APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON);
             } else {
                 try {

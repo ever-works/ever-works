@@ -13,7 +13,13 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { setFleetCloudIdlePolicyAction } from '@/app/actions/fleet/cloud';
-import { idleHoursValid, idlePolicyChanged, idlePolicyDraftOf, idlePolicyFromDraft, type IdlePolicyDraft } from './cloud.shared';
+import {
+    idleHoursValid,
+    idlePolicyChanged,
+    idlePolicyDraftOf,
+    idlePolicyFromDraft,
+    type IdlePolicyDraft,
+} from './cloud.shared';
 
 const MODE_KEYS: Readonly<Record<FleetCloudIdlePolicyMode, 'nothing' | 'tellMe' | 'powerOff'>> = {
     nothing: 'nothing',
@@ -64,7 +70,11 @@ export function IdlePolicyEditor({
     };
 
     return (
-        <fieldset className="mt-2 space-y-2" data-testid="fleet-cloud-idle-editor" disabled={pending}>
+        <fieldset
+            className="mt-2 space-y-2"
+            data-testid="fleet-cloud-idle-editor"
+            disabled={pending}
+        >
             <legend className="text-sm font-medium">{t('title')}</legend>
             {FLEET_CLOUD_IDLE_POLICY_MODES.map((mode) => {
                 const id = `${groupId}-${mode}`;
@@ -89,11 +99,19 @@ export function IdlePolicyEditor({
                                     min={FLEET_CLOUD_IDLE_MIN_HOURS}
                                     max={FLEET_CLOUD_IDLE_MAX_HOURS}
                                     step={1}
-                                    aria-label={t('hoursLabel', { mode: t(`modes.${MODE_KEYS[mode]}`) })}
+                                    aria-label={t('hoursLabel', {
+                                        mode: t(`modes.${MODE_KEYS[mode]}`),
+                                    })}
                                     className="h-8 w-16 rounded-md border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 text-sm tabular-nums disabled:opacity-60"
-                                    value={draft.mode === mode ? draft.hours : idlePolicyDraftOf(policy).hours}
+                                    value={
+                                        draft.mode === mode
+                                            ? draft.hours
+                                            : idlePolicyDraftOf(policy).hours
+                                    }
                                     disabled={draft.mode !== mode}
-                                    onChange={(event) => setDraft({ mode, hours: event.target.value })}
+                                    onChange={(event) =>
+                                        setDraft({ mode, hours: event.target.value })
+                                    }
                                     data-testid={`fleet-cloud-idle-hours-${mode}`}
                                 />
                                 <span>{t('hours')}</span>
@@ -103,12 +121,21 @@ export function IdlePolicyEditor({
                 );
             })}
             {!hoursOk ? (
-                <p className="text-xs text-amber-700 dark:text-amber-400" role="alert" data-testid="fleet-cloud-idle-range">
-                    {t('range', { min: FLEET_CLOUD_IDLE_MIN_HOURS, max: FLEET_CLOUD_IDLE_MAX_HOURS })}
+                <p
+                    className="text-xs text-amber-700 dark:text-amber-400"
+                    role="alert"
+                    data-testid="fleet-cloud-idle-range"
+                >
+                    {t('range', {
+                        min: FLEET_CLOUD_IDLE_MIN_HOURS,
+                        max: FLEET_CLOUD_IDLE_MAX_HOURS,
+                    })}
                 </p>
             ) : null}
             <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('meaning')}</p>
-            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('neverDestroys')}</p>
+            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                {t('neverDestroys')}
+            </p>
             <div className="flex items-center gap-2">
                 <Button
                     size="sm"
@@ -120,7 +147,12 @@ export function IdlePolicyEditor({
                     {t('save')}
                 </Button>
                 {onDone ? (
-                    <Button size="sm" variant="secondary" onClick={onDone} data-testid="fleet-cloud-idle-cancel">
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={onDone}
+                        data-testid="fleet-cloud-idle-cancel"
+                    >
                         {t('cancel')}
                     </Button>
                 ) : null}

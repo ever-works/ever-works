@@ -73,7 +73,9 @@ describe('cloud bootstrap (FL-17)', () => {
 
     it('authorises only the throwaway public key and no password', () => {
         const doc = buildCloudBootstrap(input());
-        expect(doc).toMatch(/ssh_authorized_keys:\n {6}- 'ssh-ed25519 [A-Za-z0-9+/=]+ ever-works-throwaway'/);
+        expect(doc).toMatch(
+            /ssh_authorized_keys:\n {6}- 'ssh-ed25519 [A-Za-z0-9+/=]+ ever-works-throwaway'/,
+        );
         expect(doc).toContain('lock_passwd: true');
         expect(doc).toContain('ssh_pwauth: false');
         expect(doc).not.toContain('BEGIN OPENSSH PRIVATE KEY');
@@ -92,18 +94,24 @@ describe('cloud bootstrap (FL-17)', () => {
             }),
         );
         expect(withKey.split('vpnkey-1234567890')).toHaveLength(2);
-        expect(withKey).toContain('/usr/bin/vpn up --auth-key-file=/run/ever-works/overlay-vpn-key');
+        expect(withKey).toContain(
+            '/usr/bin/vpn up --auth-key-file=/run/ever-works/overlay-vpn-key',
+        );
     });
 
     it('refuses anything that could escape a scalar or a shell word', () => {
         expect(() => assertBootstrapSafe(input({ name: "x'; rm -rf /" }))).toThrow();
-        expect(() => assertBootstrapSafe(input({ apiUrl: 'https://api.ever.works/$(id)' }))).toThrow();
+        expect(() =>
+            assertBootstrapSafe(input({ apiUrl: 'https://api.ever.works/$(id)' })),
+        ).toThrow();
         expect(() => assertBootstrapSafe(input({ token: "abc'def" }))).toThrow();
         expect(() => assertBootstrapSafe(input({ runtimeSpec: 'left-pad' }))).toThrow();
         expect(() => assertBootstrapSafe(input({ publicKey: 'ssh-rsa AAAA' }))).toThrow();
         expect(() =>
             assertBootstrapSafe(
-                input({ overlayVpn: { installScriptUrl: 'http://x', joinCommand: null, authKey: null } }),
+                input({
+                    overlayVpn: { installScriptUrl: 'http://x', joinCommand: null, authKey: null },
+                }),
             ),
         ).toThrow();
         expect(() => assertBootstrapSafe(input())).not.toThrow();

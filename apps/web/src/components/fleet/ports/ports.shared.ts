@@ -42,7 +42,9 @@ export function programLine(port: FleetListeningPort): string | null {
     if (port.container) return `${port.container.name} (container)`;
     if (!port.program) return null;
     const pid = port.program.pid !== null ? ` (pid ${port.program.pid})` : '';
-    return port.program.cwd ? `${port.program.name}${pid} · ${port.program.cwd}` : `${port.program.name}${pid}`;
+    return port.program.cwd
+        ? `${port.program.name}${pid} · ${port.program.cwd}`
+        : `${port.program.name}${pid}`;
 }
 
 /** The message key (under `fleet.ports.reasons`) for an unavailable Open target. */
@@ -102,8 +104,13 @@ export function formatBytes(bytes: number): string {
 }
 
 /** The open tunnel of a port in a list response, if the viewer holds one. */
-export function tunnelFor(list: FleetPortsListResponse | null, port: number): FleetPortTunnelView | null {
-    return list?.tunnel?.open.find((tunnel) => tunnel.port === port && tunnel.state === 'open') ?? null;
+export function tunnelFor(
+    list: FleetPortsListResponse | null,
+    port: number,
+): FleetPortTunnelView | null {
+    return (
+        list?.tunnel?.open.find((tunnel) => tunnel.port === port && tunnel.state === 'open') ?? null
+    );
 }
 
 /**
@@ -118,7 +125,8 @@ export function watchedStopped(
 ): { stopped: number[]; live: Set<number> } {
     const live = new Set<number>();
     for (const port of list.ports) {
-        if (watched.includes(port.port) && port.kind !== 'waiting' && !port.stopped) live.add(port.port);
+        if (watched.includes(port.port) && port.kind !== 'waiting' && !port.stopped)
+            live.add(port.port);
     }
     const stopped = [...wasLive].filter((port) => watched.includes(port) && !live.has(port));
     return { stopped, live };
@@ -148,7 +156,10 @@ async function call<T>(input: string, init?: RequestInit): Promise<PortsResult<T
         if (!response.ok) return { ok: false, error: readPortsError(response.status, body) };
         return { ok: true, data: body as T };
     } catch {
-        return { ok: false, error: { code: 'network', hint: null, details: {}, status: 0 } as PortsErrorRead };
+        return {
+            ok: false,
+            error: { code: 'network', hint: null, details: {}, status: 0 } as PortsErrorRead,
+        };
     }
 }
 
@@ -160,17 +171,22 @@ export const portsClient = {
     /** Phase 3 — a watched server stopped: file the Inbox item (best-effort). */
     async watchStopped(nodeId: string, port: number): Promise<void> {
         try {
-            await fetch(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/watch-stopped`, {
-                method: 'POST',
-                cache: 'no-store',
-            });
+            await fetch(
+                `/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/watch-stopped`,
+                {
+                    method: 'POST',
+                    cache: 'no-store',
+                },
+            );
         } catch {
             // the inline notice is shown either way
         }
     },
     /** Phase 2 — open (or re-open) the person's preview tunnel; the answer carries a one-time `openUrl`. */
     openPreview(nodeId: string, port: number): Promise<PortsResult<FleetPortTunnelOpenResponse>> {
-        return call(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`, { method: 'POST' });
+        return call(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`, {
+            method: 'POST',
+        });
     },
     /** Phase 2 — the open tunnel with a fresh one-time `openUrl`. */
     readPreview(nodeId: string, port: number): Promise<PortsResult<FleetPortTunnelOpenResponse>> {
@@ -179,15 +195,21 @@ export const portsClient = {
     /** Phase 2 — close the person's preview tunnel. */
     async closePreview(nodeId: string, port: number): Promise<PortsResult<null>> {
         try {
-            const response = await fetch(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`, {
-                method: 'DELETE',
-                cache: 'no-store',
-            });
+            const response = await fetch(
+                `/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`,
+                {
+                    method: 'DELETE',
+                    cache: 'no-store',
+                },
+            );
             if (response.ok) return { ok: true, data: null };
             const body = (await response.json().catch(() => null)) as unknown;
             return { ok: false, error: readPortsError(response.status, body) };
         } catch {
-            return { ok: false, error: { code: 'network', hint: null, details: {}, status: 0 } as PortsErrorRead };
+            return {
+                ok: false,
+                error: { code: 'network', hint: null, details: {}, status: 0 } as PortsErrorRead,
+            };
         }
     },
     open(

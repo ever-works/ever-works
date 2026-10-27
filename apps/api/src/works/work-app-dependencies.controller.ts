@@ -134,9 +134,7 @@ export class WorkAppDependenciesController {
         ]);
         // Works-security — Delete data is the owner's while `APP_DATA_DELETE_OWNER_ONLY` is on, so
         // the card can disable that one button (with the reason) for everyone else.
-        const canDeleteData = appDataDeleteOwnerOnly()
-            ? isOwnerAccess(access)
-            : canEdit;
+        const canDeleteData = appDataDeleteOwnerOnly() ? isOwnerAccess(access) : canEdit;
         return {
             workId: id,
             deployTarget,

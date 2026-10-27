@@ -87,7 +87,10 @@ export function PortRow({
     const program = programLine(port);
     const defaultTarget = list.defaultTarget;
     const reasonText = (state: FleetPortOpenTargetState) =>
-        t(`reasons.${reasonKey(state.reason)}` as Parameters<typeof t>[0], { name: nodeName, command: state.command ?? '' });
+        t(`reasons.${reasonKey(state.reason)}` as Parameters<typeof t>[0], {
+            name: nodeName,
+            command: state.command ?? '',
+        });
     const isWeb = port.kind === 'web' && !port.stopped;
 
     const copy = async () => {
@@ -117,12 +120,16 @@ export function PortRow({
                 </span>
             )}
             {port.web?.scheme === 'https' && (
-                <span className="rounded bg-surface-secondary px-1.5 text-xs dark:bg-surface-secondary-dark">{t('https')}</span>
+                <span className="rounded bg-surface-secondary px-1.5 text-xs dark:bg-surface-secondary-dark">
+                    {t('https')}
+                </span>
             )}
             {port.web && <span className="font-mono text-xs">{port.web.status}</span>}
             {port.kind !== 'web' && port.wellKnown && <span>{port.wellKnown}</span>}
             {port.noHttpAnswer && (
-                <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('noHttpAnswer')}</span>
+                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('noHttpAnswer')}
+                </span>
             )}
             {program && (
                 <span className="min-w-0 truncate text-text-muted dark:text-text-muted-dark">
@@ -210,9 +217,13 @@ export function PortRow({
                         <MoreHorizontal className="h-4 w-4" aria-hidden />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => void copy()}>{t('copyAddress')}</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => void copy()}>
+                            {t('copyAddress')}
+                        </DropdownMenuItem>
                         {onWatch && !port.stopped && (
-                            <DropdownMenuItem onClick={() => onWatch(port.port)}>{t('watch')}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onWatch(port.port)}>
+                                {t('watch')}
+                            </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem asChild>

@@ -386,57 +386,57 @@ function DependencyRow({
                 (canRetryAppDependency(entry) ||
                     canDeleteAppDependencyDataOf(entry) ||
                     (onConfigure && canConfigureAppDependency(entry))) && (
-                <div className="flex flex-wrap gap-2">
-                    {onConfigure && canConfigureAppDependency(entry) && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant={entry.awaitingConfig ? 'primary' : 'ghost'}
-                            className="gap-1"
-                            onClick={onConfigure}
-                            disabled={disabled}
-                            data-testid="app-dependency-configure-open"
-                            aria-label={t('configure.aria', { kind: kindLabel })}
-                        >
-                            <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
-                            {t('configure.open')}
-                        </Button>
-                    )}
-                    {canRetryAppDependency(entry) && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant={failed ? 'primary' : 'secondary'}
-                            className="gap-1"
-                            onClick={onRetry}
-                            loading={pending}
-                            disabled={disabled}
-                            data-testid="app-dependency-retry"
-                            aria-label={t('retryAria', { kind: kindLabel })}
-                        >
-                            <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                            {t('retry')}
-                        </Button>
-                    )}
-                    {canDeleteAppDependencyDataOf(entry) && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1 text-danger"
-                            onClick={onDeleteData}
-                            disabled={disabled || !canDeleteData}
-                            title={canDeleteData ? undefined : t('deleteDataOwnerOnly')}
-                            aria-describedby={canDeleteData ? undefined : ownerOnlyId}
-                            data-testid="app-dependency-delete-open"
-                            aria-label={t('deleteDataAria', { kind: kindLabel })}
-                        >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                            {t('deleteData')}
-                        </Button>
-                    )}
-                </div>
-            )}
+                    <div className="flex flex-wrap gap-2">
+                        {onConfigure && canConfigureAppDependency(entry) && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={entry.awaitingConfig ? 'primary' : 'ghost'}
+                                className="gap-1"
+                                onClick={onConfigure}
+                                disabled={disabled}
+                                data-testid="app-dependency-configure-open"
+                                aria-label={t('configure.aria', { kind: kindLabel })}
+                            >
+                                <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                {t('configure.open')}
+                            </Button>
+                        )}
+                        {canRetryAppDependency(entry) && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={failed ? 'primary' : 'secondary'}
+                                className="gap-1"
+                                onClick={onRetry}
+                                loading={pending}
+                                disabled={disabled}
+                                data-testid="app-dependency-retry"
+                                aria-label={t('retryAria', { kind: kindLabel })}
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                                {t('retry')}
+                            </Button>
+                        )}
+                        {canDeleteAppDependencyDataOf(entry) && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="gap-1 text-danger"
+                                onClick={onDeleteData}
+                                disabled={disabled || !canDeleteData}
+                                title={canDeleteData ? undefined : t('deleteDataOwnerOnly')}
+                                aria-describedby={canDeleteData ? undefined : ownerOnlyId}
+                                data-testid="app-dependency-delete-open"
+                                aria-label={t('deleteDataAria', { kind: kindLabel })}
+                            >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                {t('deleteData')}
+                            </Button>
+                        )}
+                    </div>
+                )}
         </li>
     );
 }

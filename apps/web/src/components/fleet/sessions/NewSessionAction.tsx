@@ -33,7 +33,8 @@ export default function NewSessionAction({ node, allowed = true }: FleetComputer
             priority: SHORTCUT_PRIORITY.screen,
             enabled: usable,
         },
-        (event) => event.key.toLowerCase() === 'n' && !event.ctrlKey && !event.metaKey && !event.altKey,
+        (event) =>
+            event.key.toLowerCase() === 'n' && !event.ctrlKey && !event.metaKey && !event.altKey,
         () => setOpen(true),
     );
 
@@ -55,7 +56,11 @@ export default function NewSessionAction({ node, allowed = true }: FleetComputer
 
     return (
         <>
-            {usable ? button : <Tooltip content={t('start.noConsent', { node: node.name })}>{button}</Tooltip>}
+            {usable ? (
+                button
+            ) : (
+                <Tooltip content={t('start.noConsent', { node: node.name })}>{button}</Tooltip>
+            )}
             <SessionStartDialog open={open} onOpenChange={setOpen} node={node} />
         </>
     );

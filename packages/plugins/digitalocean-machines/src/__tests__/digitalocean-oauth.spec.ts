@@ -22,7 +22,11 @@ function plugin() {
 	const fake = createFakeDigitalOceanApi(ACCESS);
 	return {
 		fake,
-		provider: new DigitalOceanMachinesPlugin(fake.fetch, 'https://fake.digitalocean.test', 'https://fake-cloud.digitalocean.test')
+		provider: new DigitalOceanMachinesPlugin(
+			fake.fetch,
+			'https://fake.digitalocean.test',
+			'https://fake-cloud.digitalocean.test'
+		)
 	};
 }
 
@@ -49,8 +53,13 @@ describe('DigitalOceanMachinesPlugin sign-in (FL-17 P3)', () => {
 
 	it('declares the operator application as admin-only global settings the OAuth service reads', () => {
 		const { provider } = plugin();
-		const properties = (provider.settingsSchema as { properties: Record<string, Record<string, unknown>> }).properties;
-		expect(properties.clientId).toMatchObject({ 'x-adminOnly': true, 'x-scope': 'global', 'x-envVar': ENV_DIGITALOCEAN_OAUTH_CLIENT_ID });
+		const properties = (provider.settingsSchema as { properties: Record<string, Record<string, unknown>> })
+			.properties;
+		expect(properties.clientId).toMatchObject({
+			'x-adminOnly': true,
+			'x-scope': 'global',
+			'x-envVar': ENV_DIGITALOCEAN_OAUTH_CLIENT_ID
+		});
 		expect(properties.clientSecret).toMatchObject({
 			'x-secret': true,
 			'x-adminOnly': true,
@@ -78,9 +87,18 @@ describe('DigitalOceanMachinesPlugin sign-in (FL-17 P3)', () => {
 
 	it('swaps the code with a form body, and refuses without quoting the provider’s body', async () => {
 		const { provider, fake } = plugin();
-		const config = { clientId: FAKE_OAUTH_CLIENT.clientId, clientSecret: FAKE_OAUTH_CLIENT.clientSecret, redirectUri: 'https://app.example.com/cb' };
+		const config = {
+			clientId: FAKE_OAUTH_CLIENT.clientId,
+			clientSecret: FAKE_OAUTH_CLIENT.clientSecret,
+			redirectUri: 'https://app.example.com/cb'
+		};
 		const token = await provider.exchangeCodeForToken(FAKE_OAUTH_CLIENT.code, config);
-		expect(token).toMatchObject({ accessToken: ACCESS, tokenType: 'bearer', refreshToken: 'fake-refresh', expiresIn: 2592000 });
+		expect(token).toMatchObject({
+			accessToken: ACCESS,
+			tokenType: 'bearer',
+			refreshToken: 'fake-refresh',
+			expiresIn: 2592000
+		});
 		expect(fake.oauthForms[0].get('grant_type')).toBe('authorization_code');
 		expect(fake.oauthForms[0].get('redirect_uri')).toBe('https://app.example.com/cb');
 		// The secret travelled in the body, never in the URL.
@@ -110,7 +128,9 @@ describe('DigitalOceanMachinesPlugin sign-in (FL-17 P3)', () => {
 
 	it('prefers a saved API token over the sign-in', async () => {
 		const { provider, fake } = plugin();
-		const refused = await provider.listOptions({ apiToken: 'a-different-token', oauthAccessToken: ACCESS }).catch((e: unknown) => e);
+		const refused = await provider
+			.listOptions({ apiToken: 'a-different-token', oauthAccessToken: ACCESS })
+			.catch((e: unknown) => e);
 		// The fake knows only the OAuth token, so the saved token being used shows as a refusal.
 		expect(isMachineProviderError(refused)).toBe(true);
 		expect(fake.requests.at(-1)?.authorized).toBe(false);
@@ -119,7 +139,13 @@ describe('DigitalOceanMachinesPlugin sign-in (FL-17 P3)', () => {
 	it('reports a machine’s region and size, as reconciliation prices an adopted one with them', async () => {
 		const { provider } = plugin();
 		const created = await provider.create(
-			{ name: 'nyc-ops', regionId: 'nyc3', sizeId: 's-2vcpu-4gb', bootstrapScript: '#cloud-config\n', tags: ['ever-works'] },
+			{
+				name: 'nyc-ops',
+				regionId: 'nyc3',
+				sizeId: 's-2vcpu-4gb',
+				bootstrapScript: '#cloud-config\n',
+				tags: ['ever-works']
+			},
 			{ oauthAccessToken: ACCESS }
 		);
 		const machine = await provider.getMachine(created.machineRef, { oauthAccessToken: ACCESS });

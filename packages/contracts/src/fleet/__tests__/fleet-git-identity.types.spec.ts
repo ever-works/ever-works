@@ -42,7 +42,11 @@ describe('git identity on a computer (FL-15 P2)', () => {
 			readAt: null
 		});
 		expect(
-			parseFleetGitIdentityReply({ name: { set: true, value: 'N' }, email: { set: 'yes' }, helper: { present: true } })
+			parseFleetGitIdentityReply({
+				name: { set: true, value: 'N' },
+				email: { set: 'yes' },
+				helper: { present: true }
+			})
 		).toEqual({ name: { set: true, value: 'N' }, email: { set: false }, helper: { present: true }, readAt: null });
 	});
 

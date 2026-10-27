@@ -4,8 +4,11 @@ import {
 	FLEET_DESKTOP_VIEWS_PER_NODE,
 	FLEET_DESKTOP_WATCH_REASONS,
 	FLEET_HELPER_SCREEN_CAPABILITY,
+	FLEET_INPUT_CAPABILITY,
 	FLEET_SCREEN_DESKTOP_CAPABILITY,
+	type ComputerInputFrame,
 	type ComputerQuality,
+	type FleetDesktopControlReason,
 	type FleetDesktopReason,
 	type FleetDisplayView,
 	type FleetHelperEvent,
@@ -15,6 +18,7 @@ import {
 import type { Logger } from '../logger';
 import {
 	HELPER_MESSAGES,
+	encodeHelperInput,
 	encodeHelperJson,
 	encodeHelperMessage,
 	helperStartMessage,
@@ -22,15 +26,19 @@ import {
 	parseHelperError,
 	parseHelperFrame,
 	parseHelperHello,
+	parseHelperInputResult,
 	parseHelperStarted,
 	acceptHelperTiles,
 	type HelperDisplays,
 	type HelperError,
 	type HelperFrame,
 	type HelperHello,
+	type HelperInputResult,
+	type HelperPictureSize,
 	type HelperStarted,
 	type HelperStreamSettings
 } from './helper/helper-protocol';
+import { isHelperControlAllowed } from './helper/helper-control';
 import { HelperProcess, helperEnvironment, type HelperSpawner } from './helper/helper-process';
 import {
 	appendHelperEvent,
@@ -59,7 +67,13 @@ import {
  * process) is noticed within a second while a stream runs: every stream ends
  * at once, closed `node-unavailable` (FR-19).
  *
- * Input is not here: watching is read-only in P1 (control is P2).
+ * Control (P2): a stream opened `controlling` forwards a controller's input to
+ * its helper ({@link DesktopHelperStream.input}) and releases every key and
+ * button when control ends ({@link DesktopHelperStream.releaseAll}). Whether
+ * control is possible here — the owner's on-machine permission
+ * (`helper control allow`, bound to this admission) and what the helper said
+ * would stop input — is re-read with the admission record (every second while a
+ * stream runs): withdrawing it ends control on every stream at once.
  */
 
 /** A helper that has not said `hello` within this long is stopped. */
@@ -90,6 +104,10 @@ export interface DesktopHelperReport {
 }
 
 export interface DesktopStreamHandlers {
+	/** P2: an input the helper did not inject (blocked, refused) — a code only. */
+	onInputResult?(result: HelperInputResult): void;
+	/** P2: the owner withdrew control on the machine (or it became impossible); control must end now. */
+	onControlRevoked?(reason: FleetDesktopControlReason): void;
 	onFrame(frame: HelperFrame): void;
 	onTiles(payload: Uint8Array): void;
 	onDisplays(displays: HelperDisplays): void;
@@ -103,11 +121,14 @@ export type DesktopStreamEnd = 'stopped' | 'revoked' | 'helper-exited' | 'kill-s
 export interface DesktopStreamRequest {
 	display: string | null;
 	quality: ComputerQuality;
+	/** P2: the stream takes a controller's input (checked again here before the helper starts). */
+	controlling?: boolean;
 }
 
 /** Why a stream could not open. */
 export type DesktopStreamRefusal =
 	| { kind: 'reason'; reason: FleetDesktopReason }
+	| { kind: 'control'; reason: FleetDesktopControlReason }
 	| { kind: 'limit' }
 	| { kind: 'crashing' }
 	| { kind: 'failed'; message: string };
@@ -119,6 +140,10 @@ export interface DesktopHelperStream {
 	/** Switch display; resolves with what the helper answered. */
 	setDisplay(display: string): Promise<{ ok: true; started: HelperStarted } | { ok: false; error: HelperError }>;
 	listDisplays(): Promise<FleetDisplayView[]>;
+	/** P2: forward one input (only on a `controlling` stream); false when it was not sent. */
+	input(frame: ComputerInputFrame, picture: HelperPictureSize): boolean;
+	/** P2: let go of every key and button pressed on the controller's behalf (FR-39). */
+	releaseAll(): void;
 	stop(): void;
 }
 
@@ -149,6 +174,8 @@ export class DesktopHelperHost {
 	private watchTimer: ReturnType<typeof setInterval> | null = null;
 	/** The verify-failed event already recorded for this record (once per admission, not per beat). */
 	private recordedFailureFor: string | null = null;
+	/** P2: the owner's on-machine permission for control, for the current admission (re-read with it). */
+	private controlAllowed = false;
 	private readonly now: () => number;
 
 	constructor(private readonly options: DesktopHelperHostOptions) {
@@ -160,6 +187,7 @@ export class DesktopHelperHost {
 		try {
 			const verification = await verifyHelper(this.options.fs, this.options.paths, this.now);
 			await this.noteVerification(verification);
+			await this.readControl(verification.ok ? verification.record : null);
 			if (!verification.ok) {
 				this.hello = null;
 				return;
@@ -181,8 +209,31 @@ export class DesktopHelperHost {
 		const reasons = this.reasons();
 		if (this.hello && !reasons.some((reason) => FLEET_DESKTOP_WATCH_REASONS.includes(reason))) {
 			tags.push(FLEET_SCREEN_DESKTOP_CAPABILITY);
+			// FR-40: `input` exactly when the admitted helper can inject here.
+			if (this.controlReasons().length === 0) tags.push(FLEET_INPUT_CAPABILITY);
 		}
 		return tags;
+	}
+
+	/**
+	 * P2: why a desktop here cannot be controlled right now (empty when it can):
+	 * the owner has not allowed it on the machine for this admission, or the
+	 * helper said what would stop input. From the last refresh.
+	 */
+	controlReasons(): FleetDesktopControlReason[] {
+		const reasons: FleetDesktopControlReason[] = [];
+		if (!this.verification?.ok || !this.controlAllowed) reasons.push('control-not-allowed');
+		for (const reason of this.hello?.inputReasons ?? []) if (!reasons.includes(reason)) reasons.push(reason);
+		return reasons;
+	}
+
+	/** P2: re-read the owner's permission now (a controlling open checks it fresh, like the helper itself). */
+	async checkControl(): Promise<FleetDesktopControlReason[]> {
+		const policy = await readHelperPolicy(this.options.fs, this.options.paths.policyPath);
+		const verified =
+			this.verification?.ok && policy && policy.sha256 === this.verification.record.sha256 ? policy : null;
+		await this.readControl(verified);
+		return this.controlReasons();
 	}
 
 	/** Why the Desktop source is unavailable right now (empty when it is available). */
@@ -207,7 +258,9 @@ export class DesktopHelperHost {
 				version: this.hello?.version ?? record?.version ?? null,
 				fingerprintPrefix: record ? fleetHelperFingerprintPrefix(record.sha256) : null,
 				verifiedAt: verification?.ok ? verification.verifiedAt : null,
-				published: record ? record.published : null
+				published: record ? record.published : null,
+				control: verification?.ok && this.controlAllowed ? 'allowed' : 'not-allowed',
+				inputReasons: [...(this.hello?.inputReasons ?? [])]
 			},
 			displays: this.hello?.displays ?? [],
 			desktopReasons: this.reasons(),
@@ -234,8 +287,18 @@ export class DesktopHelperHost {
 		const verification = await verifyHelper(this.options.fs, this.options.paths, this.now);
 		await this.noteVerification(verification);
 		if (!verification.ok) return { ok: false, refusal: { kind: 'reason', reason: verification.reason } };
+		if (request.controlling) {
+			// Control is checked fresh too: the owner may have withdrawn it a moment ago.
+			await this.readControl(verification.record);
+			if (!this.controlAllowed) return { ok: false, refusal: { kind: 'control', reason: 'control-not-allowed' } };
+		}
 
-		const record: StreamRecord = new StreamRecord(this, verification.record.sha256, handlers);
+		const record: StreamRecord = new StreamRecord(
+			this,
+			verification.record.sha256,
+			handlers,
+			request.controlling === true
+		);
 		const helper = HelperProcess.start(
 			verification.record.path,
 			helperEnvironment(this.options.env, this.options.platform),
@@ -243,7 +306,10 @@ export class DesktopHelperHost {
 				onMessage: (message) => record.onMessage(message.kind, message.payload),
 				onExit: () => record.onExit()
 			},
-			{ ...(this.options.spawner ? { spawner: this.options.spawner } : {}), ...(this.options.logger ? { logger: this.options.logger } : {}) }
+			{
+				...(this.options.spawner ? { spawner: this.options.spawner } : {}),
+				...(this.options.logger ? { logger: this.options.logger } : {})
+			}
 		);
 		record.helper = helper;
 		const hello = await record.waitHello(HELPER_HELLO_TIMEOUT_MS);
@@ -257,6 +323,11 @@ export class DesktopHelperHost {
 		if (blocking) {
 			helper.stop('blocked');
 			return { ok: false, refusal: { kind: 'reason', reason: blocking } };
+		}
+		const inputBlocked = request.controlling ? hello.inputReasons[0] : undefined;
+		if (inputBlocked) {
+			helper.stop('input blocked');
+			return { ok: false, refusal: { kind: 'control', reason: inputBlocked } };
 		}
 		// The waiter first: a helper may answer before `send` returns.
 		const answer = record.waitStarted(HELPER_START_TIMEOUT_MS);
@@ -309,7 +380,7 @@ export class DesktopHelperHost {
 		this.watchTimer.unref?.();
 	}
 
-	/** FR-19: the record gone or replaced ends every stream at once. */
+	/** FR-19: the record gone or replaced ends every stream at once; control withdrawn ends every control. */
 	private async watchPolicy(): Promise<void> {
 		if (this.streams.size === 0) return;
 		const policy = await readHelperPolicy(this.options.fs, this.options.paths.policyPath);
@@ -319,6 +390,19 @@ export class DesktopHelperHost {
 		if (!policy) {
 			this.verification = { ok: false, reason: 'helper-unadmitted', record: null, present: true };
 			this.hello = null;
+		}
+		await this.readControl(policy);
+		if (!this.controlAllowed) {
+			for (const record of [...this.streams]) record.revokeControl('control-not-allowed');
+		}
+	}
+
+	/** Re-read the owner's permission for control, for this admission. Never throws. */
+	private async readControl(admission: Parameters<typeof isHelperControlAllowed>[2]): Promise<void> {
+		try {
+			this.controlAllowed = await isHelperControlAllowed(this.options.fs, this.options.paths, admission);
+		} catch {
+			this.controlAllowed = false;
 		}
 	}
 
@@ -338,7 +422,10 @@ export class DesktopHelperHost {
 					},
 					onExit: () => resolveHello(null)
 				},
-				{ ...(this.options.spawner ? { spawner: this.options.spawner } : {}), ...(this.options.logger ? { logger: this.options.logger } : {}) }
+				{
+					...(this.options.spawner ? { spawner: this.options.spawner } : {}),
+					...(this.options.logger ? { logger: this.options.logger } : {})
+				}
 			);
 			const timer = setTimeout(() => resolveHello(null), HELPER_HELLO_TIMEOUT_MS);
 			const hello = await helloPromise;
@@ -359,7 +446,10 @@ export class DesktopHelperHost {
 			this.recordedFailureFor = null;
 			return;
 		}
-		if (verification.reason !== 'helper-untrusted' && !(verification.reason === 'helper-missing' && verification.record)) {
+		if (
+			verification.reason !== 'helper-untrusted' &&
+			!(verification.reason === 'helper-missing' && verification.record)
+		) {
 			return;
 		}
 		const key = `${verification.record?.acknowledgedAt ?? ''}:${verification.reason}`;
@@ -376,7 +466,9 @@ export class DesktopHelperHost {
 			{
 				kind: 'verify-failed',
 				reason: verification.reason,
-				fingerprintPrefix: verification.record ? fleetHelperFingerprintPrefix(verification.record.sha256) : null,
+				fingerprintPrefix: verification.record
+					? fleetHelperFingerprintPrefix(verification.record.sha256)
+					: null,
 				version: verification.record?.version ?? null
 			},
 			this.now
@@ -393,11 +485,23 @@ class StreamRecord {
 	private startWaiter: Waiter<HelperStarted | HelperError | null> | null = null;
 	private displayWaiters: Array<Waiter<FleetDisplayView[]>> = [];
 
+	/** The controlling half ended (withdrawn on the machine); the stream may still show the picture. */
+	private controlEnded = false;
+
 	constructor(
 		private readonly host: DesktopHelperHost,
 		readonly admittedSha256: string,
-		private readonly handlers: DesktopStreamHandlers
+		private readonly handlers: DesktopStreamHandlers,
+		readonly controlling = false
 	) {}
+
+	/** P2: the owner withdrew control — let go of everything, and tell the stream's owner once. */
+	revokeControl(reason: FleetDesktopControlReason): void {
+		if (!this.controlling || this.controlEnded || this.ended) return;
+		this.controlEnded = true;
+		this.helper?.send(encodeHelperMessage(HELPER_MESSAGES.releaseAll));
+		this.handlers.onControlRevoked?.(reason);
+	}
 
 	waitHello(ms: number): Promise<HelperHello | null> {
 		return new Promise((resolve) => {
@@ -454,6 +558,12 @@ class StreamRecord {
 				if (tiles) this.handlers.onTiles(tiles);
 				return;
 			}
+			case HELPER_MESSAGES.inputResult: {
+				if (this.ended || !this.controlling) return;
+				const result = parseHelperInputResult(payload);
+				if (result) this.handlers.onInputResult?.(result);
+				return;
+			}
 			case HELPER_MESSAGES.displays: {
 				const displays = parseHelperDisplays(payload);
 				if (!displays) return;
@@ -491,6 +601,8 @@ class StreamRecord {
 	end(reason: DesktopStreamEnd): void {
 		if (this.ended) return;
 		this.ended = true;
+		// FR-39: never leave a key or a button held (the helper also releases on stop and on exit).
+		if (this.controlling) this.helper?.send(encodeHelperMessage(HELPER_MESSAGES.releaseAll));
 		this.helper?.stop(reason);
 		this.host.forget(this, false);
 		this.handlers.onEnded(reason);
@@ -506,6 +618,17 @@ class StreamRecord {
 			refresh: () => {
 				this.helper?.send(encodeHelperMessage(HELPER_MESSAGES.refresh));
 			},
+			input: (frame, picture) => {
+				if (!this.controlling || this.controlEnded || this.ended || !this.helper) return false;
+				const message = encodeHelperInput(frame, picture);
+				if (!message) return false;
+				this.helper.send(message);
+				return true;
+			},
+			releaseAll: () => {
+				if (!this.controlling || this.ended) return;
+				this.helper?.send(encodeHelperMessage(HELPER_MESSAGES.releaseAll));
+			},
 			setDisplay: (display) =>
 				new Promise((resolve) => {
 					if (!this.helper || this.ended) {
@@ -514,7 +637,10 @@ class StreamRecord {
 					}
 					const timer = setTimeout(() => {
 						this.startWaiter = null;
-						resolve({ ok: false, error: { code: 'timeout', message: 'the screen helper did not switch display' } });
+						resolve({
+							ok: false,
+							error: { code: 'timeout', message: 'the screen helper did not switch display' }
+						});
 					}, HELPER_START_TIMEOUT_MS);
 					timer.unref?.();
 					this.startWaiter = {
@@ -526,7 +652,10 @@ class StreamRecord {
 							} else {
 								resolve({
 									ok: false,
-									error: answer ?? { code: 'timeout', message: 'the screen helper did not switch display' }
+									error: answer ?? {
+										code: 'timeout',
+										message: 'the screen helper did not switch display'
+									}
 								});
 							}
 						}

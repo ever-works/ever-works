@@ -59,9 +59,19 @@ const WHEN_LEAF = {
  * sent only after the member ticks the confirmation. One run per job at a time: Run now is
  * disabled while a run is going or queued, and during a Deployment.
  */
-export function AppJobsList({ workId, jobs, canEdit, requests, deploying, onLogs, onRan }: AppJobsListProps) {
+export function AppJobsList({
+    workId,
+    jobs,
+    canEdit,
+    requests,
+    deploying,
+    onLogs,
+    onRan,
+}: AppJobsListProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.jobs');
-    const [running, setRunning] = useState<{ name: string; when?: AppJobRunView['when'] } | null>(null);
+    const [running, setRunning] = useState<{ name: string; when?: AppJobRunView['when'] } | null>(
+        null,
+    );
 
     if (jobs.length === 0) {
         return <p className="text-sm text-text-secondary">{t('empty')}</p>;
@@ -69,13 +79,20 @@ export function AppJobsList({ workId, jobs, canEdit, requests, deploying, onLogs
 
     const queued = new Set(
         (requests ?? [])
-            .filter((request) => request.op === 'job-run' && (request.state === 'queued' || request.state === 'running'))
+            .filter(
+                (request) =>
+                    request.op === 'job-run' &&
+                    (request.state === 'queued' || request.state === 'running'),
+            )
             .map((request) => request.jobName ?? ''),
     );
 
     return (
         <>
-            <ul className="divide-y divide-card-border dark:divide-white/9" data-testid="app-jobs-list">
+            <ul
+                className="divide-y divide-card-border dark:divide-white/9"
+                data-testid="app-jobs-list"
+            >
                 {jobs.map((job) => {
                     const last = job.last;
                     const busy = last?.status === 'running' || queued.has(job.name);
@@ -130,16 +147,27 @@ export function AppJobsList({ workId, jobs, canEdit, requests, deploying, onLogs
                                         aria-label={t('logsAria', { name: job.name })}
                                         data-testid="app-job-logs"
                                     >
-                                        <ScrollText className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                                        <ScrollText
+                                            className="mr-1 h-3.5 w-3.5"
+                                            aria-hidden="true"
+                                        />
                                         {t('logs')}
                                     </Button>
                                     <Button
                                         type="button"
                                         size="sm"
                                         variant="secondary"
-                                        onClick={() => setRunning({ name: job.name, when: last?.when })}
+                                        onClick={() =>
+                                            setRunning({ name: job.name, when: last?.when })
+                                        }
                                         disabled={busy || deploying === true}
-                                        title={deploying ? t('deployInProgress') : busy ? t('active') : undefined}
+                                        title={
+                                            deploying
+                                                ? t('deployInProgress')
+                                                : busy
+                                                  ? t('active')
+                                                  : undefined
+                                        }
                                         aria-label={t('runAria', { name: job.name })}
                                         data-testid="app-job-run-open"
                                     >
@@ -198,7 +226,9 @@ export function AppJobRunDialog({ workId, job, onOpenChange, onRan }: AppJobRunD
             const result = await appRuntimeOpsClient.runJob(workId, job.name);
             if (result.ok) {
                 toast.success(
-                    result.data?.dispatched === false ? t('notDispatched', { name: job.name }) : t('queued', { name: job.name }),
+                    result.data?.dispatched === false
+                        ? t('notDispatched', { name: job.name })
+                        : t('queued', { name: job.name }),
                 );
                 onRan();
                 return;
@@ -209,7 +239,9 @@ export function AppJobRunDialog({ workId, job, onOpenChange, onRan }: AppJobRunD
             setMessage(
                 leaf
                     ? t(`refusals.${leaf}`)
-                    : t('failed', { reason: result.message ?? result.code ?? String(result.status) }),
+                    : t('failed', {
+                          reason: result.message ?? result.code ?? String(result.status),
+                      }),
             );
         } finally {
             inFlight.current = false;
@@ -222,48 +254,52 @@ export function AppJobRunDialog({ workId, job, onOpenChange, onRan }: AppJobRunD
             <DialogContent className="max-w-lg">
                 <DialogClose onClose={() => onOpenChange(false)} />
                 <div className="space-y-4" data-testid="app-job-run-dialog">
-                <DialogHeader>
-                    <DialogTitle>{t('runTitle', { name: job.name })}</DialogTitle>
-                    <DialogDescription>{t('runDescription')}</DialogDescription>
-                </DialogHeader>
-                {job.when === 'first-deploy' && (
-                    <p
-                        className="rounded border border-amber-300 bg-amber-50/60 p-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-300"
-                        data-testid="app-job-first-deploy-warning"
-                    >
-                        {t('firstDeployWarning')}
-                    </p>
-                )}
-                <label htmlFor={checkboxId} className="flex items-start gap-2 text-sm">
-                    <input
-                        id={checkboxId}
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={confirmed}
-                        onChange={(event) => setConfirmed(event.target.checked)}
-                        data-testid="app-job-run-confirm"
-                    />
-                    <span>{t('confirmCheckbox')}</span>
-                </label>
-                {message && (
-                    <p className="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="app-job-run-error">
-                        {message}
-                    </p>
-                )}
-                <DialogFooter>
-                    <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-                        {t('cancel')}
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={() => void run()}
-                        disabled={!confirmed || pending}
-                        loading={pending}
-                        data-testid="app-job-run-submit"
-                    >
-                        {t('runConfirm')}
-                    </Button>
-                </DialogFooter>
+                    <DialogHeader>
+                        <DialogTitle>{t('runTitle', { name: job.name })}</DialogTitle>
+                        <DialogDescription>{t('runDescription')}</DialogDescription>
+                    </DialogHeader>
+                    {job.when === 'first-deploy' && (
+                        <p
+                            className="rounded border border-amber-300 bg-amber-50/60 p-2 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/10 dark:text-amber-300"
+                            data-testid="app-job-first-deploy-warning"
+                        >
+                            {t('firstDeployWarning')}
+                        </p>
+                    )}
+                    <label htmlFor={checkboxId} className="flex items-start gap-2 text-sm">
+                        <input
+                            id={checkboxId}
+                            type="checkbox"
+                            className="mt-0.5"
+                            checked={confirmed}
+                            onChange={(event) => setConfirmed(event.target.checked)}
+                            data-testid="app-job-run-confirm"
+                        />
+                        <span>{t('confirmCheckbox')}</span>
+                    </label>
+                    {message && (
+                        <p
+                            className="text-sm text-red-600 dark:text-red-400"
+                            role="alert"
+                            data-testid="app-job-run-error"
+                        >
+                            {message}
+                        </p>
+                    )}
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => void run()}
+                            disabled={!confirmed || pending}
+                            loading={pending}
+                            data-testid="app-job-run-submit"
+                        >
+                            {t('runConfirm')}
+                        </Button>
+                    </DialogFooter>
                 </div>
             </DialogContent>
         </Dialog>

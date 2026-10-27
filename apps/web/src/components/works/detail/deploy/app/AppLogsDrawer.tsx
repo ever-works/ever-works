@@ -69,7 +69,14 @@ type DrawerState =
  * and is held in memory only — nothing is written to the browser's storage, and closing the drawer
  * drops it.
  */
-export function AppLogsDrawer({ workId, open, onOpenChange, components, jobs, initialTarget }: AppLogsDrawerProps) {
+export function AppLogsDrawer({
+    workId,
+    open,
+    onOpenChange,
+    components,
+    jobs,
+    initialTarget,
+}: AppLogsDrawerProps) {
     const t = useTranslations('dashboard.workDetail.appDeploy.logs');
     const targetId = useId();
     const linesId = useId();
@@ -97,8 +104,12 @@ export function AppLogsDrawer({ workId, open, onOpenChange, components, jobs, in
         (code: string | undefined, status: number) => {
             if (status === 404) return t('errors.expired');
             if (status === 429) return t('errors.tooMany');
-            const leaf = code ? (LOG_ERRORS as Readonly<Record<string, LogErrorLeaf>>)[code] : undefined;
-            return leaf ? t(`errors.${leaf}`) : t('errors.failed', { code: code ?? String(status) });
+            const leaf = code
+                ? (LOG_ERRORS as Readonly<Record<string, LogErrorLeaf>>)[code]
+                : undefined;
+            return leaf
+                ? t(`errors.${leaf}`)
+                : t('errors.failed', { code: code ?? String(status) });
         },
         [t],
     );
@@ -181,109 +192,127 @@ export function AppLogsDrawer({ workId, open, onOpenChange, components, jobs, in
             <DialogContent className="max-w-4xl">
                 <DialogClose onClose={() => onOpenChange(false)} />
                 <div className="space-y-4" data-testid="app-logs-drawer">
-                <DialogHeader>
-                    <DialogTitle>{t('title')}</DialogTitle>
-                    <DialogDescription>{t('description')}</DialogDescription>
-                </DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle>{t('title')}</DialogTitle>
+                        <DialogDescription>{t('description')}</DialogDescription>
+                    </DialogHeader>
 
-                {options.length === 0 ? (
-                    <p className="text-sm text-text-secondary">{t('noTargets')}</p>
-                ) : (
-                    <div className="flex flex-wrap items-end gap-3 text-sm">
-                        <label htmlFor={targetId} className="space-y-1">
-                            <span className="block text-xs text-text-secondary">{t('target')}</span>
-                            <select
-                                id={targetId}
-                                className="rounded-md border border-card-border bg-transparent px-2 py-1 dark:border-white/9"
-                                value={target ? valueOf(target) : ''}
-                                onChange={(event) => {
-                                    const next = options.find((option) => valueOf(option) === event.target.value);
-                                    if (next) setTarget(next);
-                                }}
-                                data-testid="app-logs-target"
-                            >
-                                {components.length > 0 && (
-                                    <optgroup label={t('components')}>
-                                        {components.map((name) => (
-                                            <option key={`c-${name}`} value={`component:${name}`}>
-                                                {name}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                )}
-                                {jobs.length > 0 && (
-                                    <optgroup label={t('jobs')}>
-                                        {jobs.map((name) => (
-                                            <option key={`j-${name}`} value={`job:${name}`}>
-                                                {name}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-                                )}
-                            </select>
-                        </label>
-                        <label htmlFor={linesId} className="space-y-1">
-                            <span className="block text-xs text-text-secondary">{t('lines')}</span>
-                            <select
-                                id={linesId}
-                                className="rounded-md border border-card-border bg-transparent px-2 py-1 dark:border-white/9"
-                                value={lines}
-                                onChange={(event) => setLines(Number(event.target.value))}
-                                data-testid="app-logs-lines"
-                            >
-                                {LINE_CHOICES.map((choice) => (
-                                    <option key={choice} value={choice}>
-                                        {choice}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        {target?.kind === 'component' && (
-                            <label htmlFor={previousId} className="flex items-center gap-1.5">
-                                <input
-                                    id={previousId}
-                                    type="checkbox"
-                                    checked={previous}
-                                    onChange={(event) => setPrevious(event.target.checked)}
-                                    data-testid="app-logs-previous"
-                                />
-                                {t('previous')}
+                    {options.length === 0 ? (
+                        <p className="text-sm text-text-secondary">{t('noTargets')}</p>
+                    ) : (
+                        <div className="flex flex-wrap items-end gap-3 text-sm">
+                            <label htmlFor={targetId} className="space-y-1">
+                                <span className="block text-xs text-text-secondary">
+                                    {t('target')}
+                                </span>
+                                <select
+                                    id={targetId}
+                                    className="rounded-md border border-card-border bg-transparent px-2 py-1 dark:border-white/9"
+                                    value={target ? valueOf(target) : ''}
+                                    onChange={(event) => {
+                                        const next = options.find(
+                                            (option) => valueOf(option) === event.target.value,
+                                        );
+                                        if (next) setTarget(next);
+                                    }}
+                                    data-testid="app-logs-target"
+                                >
+                                    {components.length > 0 && (
+                                        <optgroup label={t('components')}>
+                                            {components.map((name) => (
+                                                <option
+                                                    key={`c-${name}`}
+                                                    value={`component:${name}`}
+                                                >
+                                                    {name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                    {jobs.length > 0 && (
+                                        <optgroup label={t('jobs')}>
+                                            {jobs.map((name) => (
+                                                <option key={`j-${name}`} value={`job:${name}`}>
+                                                    {name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    )}
+                                </select>
                             </label>
-                        )}
-                        <label htmlFor={followId} className="flex items-center gap-1.5">
-                            <input
-                                id={followId}
-                                type="checkbox"
-                                checked={follow}
-                                onChange={(event) => setFollow(event.target.checked)}
-                                data-testid="app-logs-follow"
-                            />
-                            {t('follow')}
-                        </label>
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => void fetchLogs()}
-                            loading={state.phase === 'loading'}
-                            disabled={state.phase === 'loading' || !target}
-                            data-testid="app-logs-refresh"
-                        >
-                            <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
-                            {t('refresh')}
-                        </Button>
-                    </div>
-                )}
-
-                <div className="max-h-[60vh] overflow-auto rounded-md bg-surface-tertiary p-2 dark:bg-surface-tertiary-dark" aria-live="polite">
-                    {state.phase === 'loading' && <p className="text-sm text-text-secondary">{t('loading')}</p>}
-                    {state.phase === 'error' && (
-                        <p className="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="app-logs-error">
-                            {state.message}
-                        </p>
+                            <label htmlFor={linesId} className="space-y-1">
+                                <span className="block text-xs text-text-secondary">
+                                    {t('lines')}
+                                </span>
+                                <select
+                                    id={linesId}
+                                    className="rounded-md border border-card-border bg-transparent px-2 py-1 dark:border-white/9"
+                                    value={lines}
+                                    onChange={(event) => setLines(Number(event.target.value))}
+                                    data-testid="app-logs-lines"
+                                >
+                                    {LINE_CHOICES.map((choice) => (
+                                        <option key={choice} value={choice}>
+                                            {choice}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            {target?.kind === 'component' && (
+                                <label htmlFor={previousId} className="flex items-center gap-1.5">
+                                    <input
+                                        id={previousId}
+                                        type="checkbox"
+                                        checked={previous}
+                                        onChange={(event) => setPrevious(event.target.checked)}
+                                        data-testid="app-logs-previous"
+                                    />
+                                    {t('previous')}
+                                </label>
+                            )}
+                            <label htmlFor={followId} className="flex items-center gap-1.5">
+                                <input
+                                    id={followId}
+                                    type="checkbox"
+                                    checked={follow}
+                                    onChange={(event) => setFollow(event.target.checked)}
+                                    data-testid="app-logs-follow"
+                                />
+                                {t('follow')}
+                            </label>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => void fetchLogs()}
+                                loading={state.phase === 'loading'}
+                                disabled={state.phase === 'loading' || !target}
+                                data-testid="app-logs-refresh"
+                            >
+                                <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                                {t('refresh')}
+                            </Button>
+                        </div>
                     )}
-                    {state.phase === 'ready' && <TailView tail={state.tail} />}
-                </div>
+
+                    <div
+                        className="max-h-[60vh] overflow-auto rounded-md bg-surface-tertiary p-2 dark:bg-surface-tertiary-dark"
+                        aria-live="polite"
+                    >
+                        {state.phase === 'loading' && (
+                            <p className="text-sm text-text-secondary">{t('loading')}</p>
+                        )}
+                        {state.phase === 'error' && (
+                            <p
+                                className="text-sm text-red-600 dark:text-red-400"
+                                role="alert"
+                                data-testid="app-logs-error"
+                            >
+                                {state.message}
+                            </p>
+                        )}
+                        {state.phase === 'ready' && <TailView tail={state.tail} />}
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>
@@ -292,11 +321,15 @@ export function AppLogsDrawer({ workId, open, onOpenChange, components, jobs, in
 
 function TailView({ tail }: { tail: AppLogTailView }) {
     const t = useTranslations('dashboard.workDetail.appDeploy.logs');
-    if (tail.containers.length === 0) return <p className="text-sm text-text-secondary">{t('empty')}</p>;
+    if (tail.containers.length === 0)
+        return <p className="text-sm text-text-secondary">{t('empty')}</p>;
     return (
         <div className="space-y-3" data-testid="app-logs-tail">
             {tail.containers.map((container) => (
-                <section key={`${container.pod}/${container.container}`} aria-label={`${container.pod} / ${container.container}`}>
+                <section
+                    key={`${container.pod}/${container.container}`}
+                    aria-label={`${container.pod} / ${container.container}`}
+                >
                     <p className="mb-1 text-xs font-medium text-text-secondary">
                         {container.pod} / {container.container}
                         {container.truncated ? ` · ${t('truncated')}` : ''}

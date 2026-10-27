@@ -72,7 +72,8 @@ const ENTITIES: Readonly<Record<string, string>> = {
 function decodeEntities(text: string): string {
 	return text.replace(/&(#x[0-9a-f]{1,6}|#\d{1,7}|[a-z]{2,8});/gi, (match, entity: string) => {
 		if (entity[0] === '#') {
-			const code = entity[1] === 'x' || entity[1] === 'X' ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
+			const code =
+				entity[1] === 'x' || entity[1] === 'X' ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10);
 			return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : match;
 		}
 		return ENTITIES[entity.toLowerCase()] ?? match;
@@ -158,10 +159,15 @@ function attempt(request: RequestFn, port: number, tls: boolean, timeoutMs: numb
 				const piece = chunk.length > room ? chunk.subarray(0, room) : chunk;
 				chunks.push(piece);
 				size += piece.length;
-				if (size >= bodyCap) finish({ kind: 'http', status, server, body: Buffer.concat(chunks).toString('utf8') });
+				if (size >= bodyCap)
+					finish({ kind: 'http', status, server, body: Buffer.concat(chunks).toString('utf8') });
 			});
-			response.on('end', () => finish({ kind: 'http', status, server, body: Buffer.concat(chunks).toString('utf8') }));
-			response.on('error', () => finish({ kind: 'http', status, server, body: Buffer.concat(chunks).toString('utf8') }));
+			response.on('end', () =>
+				finish({ kind: 'http', status, server, body: Buffer.concat(chunks).toString('utf8') })
+			);
+			response.on('error', () =>
+				finish({ kind: 'http', status, server, body: Buffer.concat(chunks).toString('utf8') })
+			);
 		});
 		const timer = setTimeout(() => {
 			// Headers arrived but the body is slow: the answer is still HTTP.
@@ -174,7 +180,12 @@ function attempt(request: RequestFn, port: number, tls: boolean, timeoutMs: numb
 				return;
 			}
 			const code = error.code ?? '';
-			if (code === 'ECONNREFUSED' || code === 'EADDRNOTAVAIL' || code === 'ENETUNREACH' || code === 'EHOSTUNREACH') {
+			if (
+				code === 'ECONNREFUSED' ||
+				code === 'EADDRNOTAVAIL' ||
+				code === 'ENETUNREACH' ||
+				code === 'EHOSTUNREACH'
+			) {
 				finish({ kind: 'refused' });
 			} else {
 				// A parse error, a reset, a TLS alert: something answered, not in this protocol.

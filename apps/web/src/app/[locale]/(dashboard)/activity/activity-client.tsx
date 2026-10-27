@@ -206,7 +206,9 @@ export function ActivityClient({
         return isAvailableView(fromUrl) ? fromUrl : 'log';
     });
     // FL-05: the Sessions view's own state (mode, filters) as query parameters.
-    const [sessionsQuery, setSessionsQuery] = useState(() => (sessions ? buildSessionsQuery(sessions.view) : ''));
+    const [sessionsQuery, setSessionsQuery] = useState(() =>
+        sessions ? buildSessionsQuery(sessions.view) : '',
+    );
 
     // The Runs ledger owns its window, filters and open receipt; it reports
     // every change here so this component stays the single URL writer. Seeded
@@ -248,13 +250,16 @@ export function ActivityClient({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleViewChange = useCallback((next: ActivityView) => {
-        if (next === 'sessions' && !sessionsEnabled) return;
-        setActiveView(next);
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('activity-tab', next);
-        }
-    }, [sessionsEnabled]);
+    const handleViewChange = useCallback(
+        (next: ActivityView) => {
+            if (next === 'sessions' && !sessionsEnabled) return;
+            setActiveView(next);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('activity-tab', next);
+            }
+        },
+        [sessionsEnabled],
+    );
 
     const isLogTab = activeView === 'log';
     const isRunsTab = activeView === 'runs';
@@ -657,7 +662,10 @@ export function ActivityClient({
     // never been written down anywhere. Labels come from the namespace that
     // owns the feature, so nothing is duplicated and nothing drifts.
     const extraShortcutRows: ShortcutRow[] = [
-        { keys: sessionsEnabled ? ['l', 'r', 'f', 's', 'n'] : ['l', 'r', 'f', 's'], label: t('shortcuts.switchView') },
+        {
+            keys: sessionsEnabled ? ['l', 'r', 'f', 's', 'n'] : ['l', 'r', 'f', 's'],
+            label: t('shortcuts.switchView'),
+        },
         { keys: ['a'], label: tFeed('filters.agentsGroup') },
         { keys: ['x'], label: tFeed('filters.onlyFailed') },
         { keys: ['1', '…', '5'], label: tFeed('filters.kindsGroup') },
@@ -670,7 +678,9 @@ export function ActivityClient({
         { key: 'feed' as const, icon: Radio, label: t('viewToggle.feed') },
         { key: 'schedules' as const, icon: CalendarClock, label: t('viewToggle.schedules') },
         // FL-05: every session on your computers, by what it needs from you.
-        ...(sessionsEnabled ? [{ key: 'sessions' as const, icon: TerminalSquare, label: t('viewToggle.sessions') }] : []),
+        ...(sessionsEnabled
+            ? [{ key: 'sessions' as const, icon: TerminalSquare, label: t('viewToggle.sessions') }]
+            : []),
     ];
 
     return (

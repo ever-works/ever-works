@@ -2359,9 +2359,15 @@ async function assertRealWriteTarget(
                               },
                           }
                         : {}),
-                    ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
-                    ...(fleetUsage && config.fleet.isUsageScanEnabled() ? { usage: fleetUsage } : {}),
-                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled() ? { runners: fleetRunners } : {}),
+                    ...(fleetVirtual && config.fleet.isVirtualEnabled()
+                        ? { virtual: fleetVirtual }
+                        : {}),
+                    ...(fleetUsage && config.fleet.isUsageScanEnabled()
+                        ? { usage: fleetUsage }
+                        : {}),
+                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled()
+                        ? { runners: fleetRunners }
+                        : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                     ...(fleetSessionActions && config.fleet.isSessionsEnabled()
                         ? {
@@ -2388,8 +2394,11 @@ async function assertRealWriteTarget(
                           fleetTasks: {
                               handoff: fleetTaskHandoff
                                   ? {
-                                        options: (userId: string, taskId: string, agentId: string | null) =>
-                                            fleetTaskHandoff.options(userId, taskId, agentId),
+                                        options: (
+                                            userId: string,
+                                            taskId: string,
+                                            agentId: string | null,
+                                        ) => fleetTaskHandoff.options(userId, taskId, agentId),
                                     }
                                   : null,
                               identity: fleetGitIdentity ?? null,

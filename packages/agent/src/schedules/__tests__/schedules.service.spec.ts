@@ -991,7 +991,9 @@ describe('SchedulesService — the App Works upstream sync source (APW-02 T53)',
 
         const page = await service.getPage(SCOPE);
 
-        expect(page.items.filter((item) => item.sourceType === 'app_upstream_sync')).toHaveLength(0);
+        expect(page.items.filter((item) => item.sourceType === 'app_upstream_sync')).toHaveLength(
+            0,
+        );
         expect(page.degradedSources).toContain('app_upstream_sync');
     });
 

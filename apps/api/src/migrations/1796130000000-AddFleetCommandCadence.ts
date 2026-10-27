@@ -37,7 +37,12 @@ export class AddFleetCommandCadence1796130000000 implements MigrationInterface {
     public async up(queryRunner: QueryRunner): Promise<void> {
         const commandColumns: TableColumn[] = [
             new TableColumn({ name: 'pausedAt', type: 'timestamp', isNullable: true }),
-            new TableColumn({ name: 'pausedReason', type: 'varchar', length: '24', isNullable: true }),
+            new TableColumn({
+                name: 'pausedReason',
+                type: 'varchar',
+                length: '24',
+                isNullable: true,
+            }),
             new TableColumn({ name: 'syncGeneration', type: 'int', default: 0 }),
             new TableColumn({ name: 'syncedGeneration', type: 'int', default: 0 }),
             new TableColumn({ name: 'deletedAt', type: 'timestamp', isNullable: true }),

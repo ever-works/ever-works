@@ -12,17 +12,20 @@ export const commandsListCommand = new Command('list')
     .description('My recent commands on my computers')
     .option('--json', 'Machine-readable output')
     .action(async (options: { json?: boolean }) => {
-        await runFleetVerb<unknown>(options.json === true, { method: 'GET', path: '/fleet/commands' }, (data) =>
-            printFleetList(
-                data,
-                [
-                    { key: 'id', label: 'COMMAND' },
-                    { key: 'commandLine', label: 'LINE' },
-                    { key: 'state', label: 'STATE' },
-                    { key: 'createdAt', label: 'STARTED' },
-                ],
-                'No commands.',
-            ),
+        await runFleetVerb<unknown>(
+            options.json === true,
+            { method: 'GET', path: '/fleet/commands' },
+            (data) =>
+                printFleetList(
+                    data,
+                    [
+                        { key: 'id', label: 'COMMAND' },
+                        { key: 'commandLine', label: 'LINE' },
+                        { key: 'state', label: 'STATE' },
+                        { key: 'createdAt', label: 'STARTED' },
+                    ],
+                    'No commands.',
+                ),
         );
     });
 
@@ -33,15 +36,18 @@ export const commandsGetCommand = new Command('get')
     .action(async (id: string, options: { json?: boolean }) => {
         const json = options.json === true;
         if (!FLEET_CLI_UUID.test(id)) fleetUsage(json, '<id> must be a command id', 'id');
-        await runFleetVerb<FleetCommandView>(json, { method: 'GET', path: `/fleet/commands/${id}` }, (command) =>
-            printFleetList(
-                command,
-                [
-                    { key: 'nodeName', label: 'COMPUTER' },
-                    { key: 'state', label: 'STATE' },
-                    { key: 'exitCode', label: 'EXIT' },
-                ],
-                'No runs.',
-            ),
+        await runFleetVerb<FleetCommandView>(
+            json,
+            { method: 'GET', path: `/fleet/commands/${id}` },
+            (command) =>
+                printFleetList(
+                    command,
+                    [
+                        { key: 'nodeName', label: 'COMPUTER' },
+                        { key: 'state', label: 'STATE' },
+                        { key: 'exitCode', label: 'EXIT' },
+                    ],
+                    'No runs.',
+                ),
         );
     });

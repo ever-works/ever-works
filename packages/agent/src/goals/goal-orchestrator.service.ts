@@ -373,7 +373,10 @@ export class GoalOrchestratorService {
                 `Definition of Done updated — ${summary.done} done, ${summary.waived} waived, ` +
                 `${summary.open} open${summary.proposed > 0 ? `, ${summary.proposed} awaiting approval` : ''}` +
                 `${options.relayedBy ? ` (relayed by ${options.relayedBy})` : ''}.`,
-            metadata: { summary, ...(options.provenance ? { provenance: options.provenance } : {}) },
+            metadata: {
+                summary,
+                ...(options.provenance ? { provenance: options.provenance } : {}),
+            },
         });
         await this.recordActivity(saved, ActivityActionType.GOAL_DOD_UPDATED, 'dod-set', {
             summary,

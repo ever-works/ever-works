@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 use std::ffi::c_void;
 
-use super::{Capturer, Display, Opened, PixelLayout, RawImage, dedupe_ids, order_displays};
+use super::{Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, dedupe_ids, order_displays};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -152,6 +152,21 @@ impl Capturer for CoreGraphicsCapturer {
             .map(|(display, id)| (display.id.clone(), id))
             .collect();
         Ok(order_displays(displays))
+    }
+
+    fn display_rect(&mut self, display_id: &str) -> Option<DisplayRect> {
+        if !self.ids.contains_key(display_id) {
+            let _ = self.displays();
+        }
+        let id = *self.ids.get(display_id)?;
+        // Global points: what Quartz events are posted in.
+        let bounds = unsafe { CGDisplayBounds(id) };
+        Some(DisplayRect {
+            x: bounds.origin.x,
+            y: bounds.origin.y,
+            width: bounds.size.width,
+            height: bounds.size.height,
+        })
     }
 
     fn capture(&mut self, display_id: &str) -> Result<RawImage, String> {

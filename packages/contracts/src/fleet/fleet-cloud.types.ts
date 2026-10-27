@@ -311,10 +311,7 @@ export interface FleetCloudMeta {
 // ─── Money ──────────────────────────────────────────────────────────────────
 
 /** `$24`, `$2.84`, `$0.036` — a cents figure in the provider's currency, for copy. */
-export function formatFleetCloudMoney(
-	cents: number,
-	options: { currency?: string; perHour?: boolean } = {}
-): string {
+export function formatFleetCloudMoney(cents: number, options: { currency?: string; perHour?: boolean } = {}): string {
 	const currency = (options.currency ?? 'USD').toUpperCase();
 	const symbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : `${currency} `;
 	const value = Number.isFinite(cents) ? cents / 100 : 0;
@@ -404,9 +401,13 @@ export function fleetCloudIsBilling(meta: FleetCloudMeta, nowMs: number): boolea
  *    capped at the monthly price;
  *  - `hourlyCents` — what it bills per hour right now.
  */
-export function fleetCloudCost(meta: FleetCloudMeta, nowMs: number = Date.now()): Omit<FleetCloudCostSnapshot, 'computedAt'> {
+export function fleetCloudCost(
+	meta: FleetCloudMeta,
+	nowMs: number = Date.now()
+): Omit<FleetCloudCostSnapshot, 'computedAt'> {
 	const rate = Number.isFinite(meta.hourlyRateCents) && meta.hourlyRateCents > 0 ? meta.hourlyRateCents : 0;
-	const cap = Number.isFinite(meta.monthlyPriceCents) && meta.monthlyPriceCents > 0 ? meta.monthlyPriceCents : Infinity;
+	const cap =
+		Number.isFinite(meta.monthlyPriceCents) && meta.monthlyPriceCents > 0 ? meta.monthlyPriceCents : Infinity;
 	const perMonth = new Map<number, number>();
 	for (const [from, to] of fleetCloudBilledIntervals(meta, nowMs)) {
 		let cursor = from;

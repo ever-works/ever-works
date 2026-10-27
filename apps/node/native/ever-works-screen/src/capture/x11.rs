@@ -14,7 +14,7 @@ use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, ImageOrder, Windo
 use x11rb::rust_connection::RustConnection;
 
 use super::{
-    Capturer, Display, Opened, PixelLayout, RawImage, blend_cursor, dedupe_ids, linux_session_reasons,
+    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, blend_cursor, dedupe_ids, linux_session_reasons,
     order_displays, sanitize_id,
 };
 
@@ -154,6 +154,18 @@ impl Capturer for X11Capturer {
             .map(|(display, rect)| (display.id.clone(), rect))
             .collect();
         Ok(order_displays(displays))
+    }
+
+    fn display_rect(&mut self, display_id: &str) -> Option<DisplayRect> {
+        if !self.rects.contains_key(display_id) {
+            let _ = self.displays();
+        }
+        self.rects.get(display_id).map(|rect| DisplayRect {
+            x: rect.x as f64,
+            y: rect.y as f64,
+            width: rect.w as f64,
+            height: rect.h as f64,
+        })
     }
 
     fn capture(&mut self, display_id: &str) -> Result<RawImage, String> {

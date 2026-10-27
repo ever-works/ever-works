@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import {
+    Controller,
+    Get,
+    HttpCode,
+    HttpStatus,
+    Param,
+    ParseUUIDPipe,
+    Query,
+    UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { FleetTaskHandoffOptions } from '@ever-works/contracts';
@@ -44,6 +53,11 @@ export class FleetTaskHandoffController {
         @Param('taskId', ParseUUIDPipe) taskId: string,
         @Query() query: FleetTaskHandoffOptionsQueryDto,
     ): Promise<FleetTaskHandoffOptions> {
-        return this.handoff.options(auth.userId, taskId, query.agentId ?? null, this.scopeContext.getScope());
+        return this.handoff.options(
+            auth.userId,
+            taskId,
+            query.agentId ?? null,
+            this.scopeContext.getScope(),
+        );
     }
 }

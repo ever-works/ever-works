@@ -90,7 +90,11 @@ describe('AppClusterOpRouter — the smoke op (lane aw-ops)', () => {
         const result = await r.handle({ op: 'smoke', workId: WORK_ID, requestId: REQUEST_ID });
 
         expect(result).toMatchObject({ state: 'done', code: 'smoke_failed' });
-        expect(cache.entries[0]?.value).toEqual({ op: 'smoke', state: 'done', code: 'smoke_failed' });
+        expect(cache.entries[0]?.value).toEqual({
+            op: 'smoke',
+            state: 'done',
+            code: 'smoke_failed',
+        });
     });
 
     it('reports the service’s own refusal as failed with its code', async () => {

@@ -43,17 +43,24 @@ export class FleetSessionRecordingService {
         const view = await this.sessions.get(id, actor);
         const stats = await this.transcripts.sessionRecordingStats(view.id);
         const durationMs =
-            stats.firstAt && stats.lastAt ? Math.max(0, stats.lastAt.getTime() - stats.firstAt.getTime()) : 0;
+            stats.firstAt && stats.lastAt
+                ? Math.max(0, stats.lastAt.getTime() - stats.firstAt.getTime())
+                : 0;
         const node = await this.nodes.findById(view.nodeId);
         const driverSpans: FleetSessionDriverSpan[] = [];
         if (node) {
-            for (const row of await this.audit.recentForOwnerNode(node.userId, node.id, SPAN_AUDIT_ROWS)) {
+            for (const row of await this.audit.recentForOwnerNode(
+                node.userId,
+                node.id,
+                SPAN_AUDIT_ROWS,
+            )) {
                 const details = row.details ?? {};
                 if (row.action !== 'node.session.input' || details.target !== view.id) continue;
                 if (typeof details.from !== 'string' || typeof details.to !== 'string') continue;
                 driverSpans.push({
                     userId: row.actorUserId,
-                    requestedBy: typeof details.requestedBy === 'string' ? details.requestedBy : null,
+                    requestedBy:
+                        typeof details.requestedBy === 'string' ? details.requestedBy : null,
                     from: details.from,
                     to: details.to,
                 });
@@ -67,7 +74,10 @@ export class FleetSessionRecordingService {
             firstAt: stats.firstAt?.toISOString() ?? null,
             lastAt: stats.lastAt?.toISOString() ?? null,
             driverSpans,
-            expired: view.recordingState === 'stored' && stats.count === 0 && isOlderThanRetention(view.endedAt),
+            expired:
+                view.recordingState === 'stored' &&
+                stats.count === 0 &&
+                isOlderThanRetention(view.endedAt),
             retentionDays: FLEET_SESSION_RECORDING_RETENTION_DAYS,
         };
     }
@@ -88,5 +98,8 @@ export class FleetSessionRecordingService {
 function isOlderThanRetention(endedAt: string | null): boolean {
     if (!endedAt) return false;
     const at = Date.parse(endedAt);
-    return Number.isFinite(at) && Date.now() - at > FLEET_SESSION_RECORDING_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    return (
+        Number.isFinite(at) &&
+        Date.now() - at > FLEET_SESSION_RECORDING_RETENTION_DAYS * 24 * 60 * 60 * 1000
+    );
 }

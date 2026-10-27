@@ -82,11 +82,7 @@ export function isFleetSessionBranchSource(value: unknown): value is FleetSessio
  */
 export function fleetSessionBranchSlug(text: unknown, max: number = FLEET_SESSION_BRANCH_SLUG_MAX_LENGTH): string {
 	if (typeof text !== 'string') return '';
-	const folded = text
-		.slice(0, 2000)
-		.normalize('NFKD')
-		.replace(/[̀-ͯ]/g, '')
-		.toLowerCase();
+	const folded = text.slice(0, 2000).normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 	const words = folded.split(/[^a-z0-9]+/).filter((word) => word.length > 0);
 	let out = '';
 	for (const word of words) {
@@ -507,7 +503,8 @@ export function unknownFleetSessionActionPlaceholders(template: string): string[
 	const out: string[] = [];
 	for (const match of template.matchAll(/\{([a-zA-Z]+)\}/g)) {
 		const name = match[1];
-		if (!(FLEET_SESSION_ACTION_PLACEHOLDERS as readonly string[]).includes(name) && !out.includes(name)) out.push(name);
+		if (!(FLEET_SESSION_ACTION_PLACEHOLDERS as readonly string[]).includes(name) && !out.includes(name))
+			out.push(name);
 	}
 	return out;
 }
@@ -609,7 +606,10 @@ function isOpenPullRequest(pr: FleetSessionActionContext['pr']): pr is NonNullab
  * available ones, the server refuses the rest with `invalid` naming the rule.
  */
 export function availableFleetSessionActions(context: FleetSessionActionContext): FleetSessionActionAvailability[] {
-	const hide = (id: FleetSessionActionId, reason: FleetSessionActionHiddenReason): FleetSessionActionAvailability => ({
+	const hide = (
+		id: FleetSessionActionId,
+		reason: FleetSessionActionHiddenReason
+	): FleetSessionActionAvailability => ({
 		id,
 		available: false,
 		reason

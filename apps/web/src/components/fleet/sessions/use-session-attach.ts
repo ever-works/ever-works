@@ -37,7 +37,13 @@ import {
  *
  * A watcher's `sendInput` is a no-op (the relay and the node refuse it again).
  */
-export type SessionAttachState = 'starting' | 'attached' | 'reconnecting' | 'ended' | 'refused' | 'detached';
+export type SessionAttachState =
+    | 'starting'
+    | 'attached'
+    | 'reconnecting'
+    | 'ended'
+    | 'refused'
+    | 'detached';
 
 export interface SessionAttachCallbacks {
     onBytes(bytes: Uint8Array): void;
@@ -205,12 +211,18 @@ export function useSessionAttach(
                 return;
             }
             if (verdict === 'refused') {
-                setError(close.mintError ?? close.attachError ?? {
-                    code: close.linkReason && close.linkReason !== 'normal' ? close.linkReason : 'internal',
-                    hint: close.hint,
-                    details: {},
-                    status: 0,
-                });
+                setError(
+                    close.mintError ??
+                        close.attachError ?? {
+                            code:
+                                close.linkReason && close.linkReason !== 'normal'
+                                    ? close.linkReason
+                                    : 'internal',
+                            hint: close.hint,
+                            details: {},
+                            status: 0,
+                        },
+                );
                 setState('refused');
                 return;
             }
@@ -249,7 +261,8 @@ export function useSessionAttach(
         if (socket?.granted === 'viewer') return;
         if (socket?.sendInput(data)) return;
         // Not attached right now (a drop, a reconnect): hold it, to offer later.
-        if (droppedRef.current || !socket?.isAttached) setHeld((current) => holdInput(current, data));
+        if (droppedRef.current || !socket?.isAttached)
+            setHeld((current) => holdInput(current, data));
     }, []);
 
     const sendResize = useCallback((cols: number, rows: number) => {

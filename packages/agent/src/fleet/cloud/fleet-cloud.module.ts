@@ -56,7 +56,12 @@ export class FleetCloudSweepService {
  */
 @Module({
     imports: [FleetModule, FleetSessionsModule, FacadesModule],
-    providers: [FleetCloudService, FleetCloudSweepService, CloudIdleNeedsALookProducer, FleetCloudProposalListener],
+    providers: [
+        FleetCloudService,
+        FleetCloudSweepService,
+        CloudIdleNeedsALookProducer,
+        FleetCloudProposalListener,
+    ],
     exports: [FleetCloudService, FleetCloudSweepService],
 })
 export class FleetCloudModule {}

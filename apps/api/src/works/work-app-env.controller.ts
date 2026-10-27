@@ -181,7 +181,11 @@ export class WorkAppEnvController {
     ): Promise<AppEnvImportPreview> {
         await this.authorize(id, auth.userId, 'edit');
         try {
-            return await this.editor.previewImport(id, { userId: auth.userId, canEdit: true }, body);
+            return await this.editor.previewImport(
+                id,
+                { userId: auth.userId, canEdit: true },
+                body,
+            );
         } catch (error) {
             throw mapEditorError(error);
         }

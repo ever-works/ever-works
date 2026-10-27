@@ -19,5 +19,8 @@ export const POST = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id, port: segment } = await ctx.params;
     const port = parsePortSegment(segment);
     if (!isUuid(id) || port === null) return invalidIdResponse();
-    return forwardFleetCall(fleetApiUrl(`/nodes/${id}/ports/${port}/watch-stopped`), { method: 'POST', headers });
+    return forwardFleetCall(fleetApiUrl(`/nodes/${id}/ports/${port}/watch-stopped`), {
+        method: 'POST',
+        headers,
+    });
 });

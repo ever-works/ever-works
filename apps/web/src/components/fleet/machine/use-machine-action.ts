@@ -45,33 +45,39 @@ export function useMachineAction<T>() {
     const [busyKey, setBusyKey] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
 
-    const call = useCallback((action: PendingMachineAction<T>, fields: FleetActionConfirmFields) => {
-        setBusyKey(action.key);
-        startTransition(async () => {
-            const result = await action.run(fields);
-            setBusyKey(null);
-            if (result.ok) {
+    const call = useCallback(
+        (action: PendingMachineAction<T>, fields: FleetActionConfirmFields) => {
+            setBusyKey(action.key);
+            startTransition(async () => {
+                const result = await action.run(fields);
+                setBusyKey(null);
+                if (result.ok) {
+                    setDialog(null);
+                    setPending(null);
+                    action.onDone(result.data);
+                    return;
+                }
+                const again = dialogFromRefusal(
+                    result.error,
+                    action.dialog?.title ?? action.actionLabel,
+                );
+                if (again) {
+                    setPending(action);
+                    setDialog(again);
+                    return;
+                }
                 setDialog(null);
                 setPending(null);
-                action.onDone(result.data);
-                return;
-            }
-            const again = dialogFromRefusal(result.error, action.dialog?.title ?? action.actionLabel);
-            if (again) {
-                setPending(action);
-                setDialog(again);
-                return;
-            }
-            setDialog(null);
-            setPending(null);
-            const rootModel = rootRequiredFrom(result.error);
-            if (rootModel) {
-                setRoot(rootModel);
-                return;
-            }
-            action.onError(result.error);
-        });
-    }, []);
+                const rootModel = rootRequiredFrom(result.error);
+                if (rootModel) {
+                    setRoot(rootModel);
+                    return;
+                }
+                action.onError(result.error);
+            });
+        },
+        [],
+    );
 
     const request = useCallback(
         (action: PendingMachineAction<T>) => {

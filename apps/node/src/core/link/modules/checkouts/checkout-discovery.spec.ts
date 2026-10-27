@@ -28,7 +28,9 @@ function fakeFs(rootPath: string, tree: Node) {
 		lstat: async (path: string) => {
 			if (path.endsWith(`${'.git'}`)) {
 				const parent = find(path.slice(0, -'.git'.length - 1));
-				return parent?.git ? { isDirectory: () => true, isFile: () => false, isSymbolicLink: () => false } : null;
+				return parent?.git
+					? { isDirectory: () => true, isFile: () => false, isSymbolicLink: () => false }
+					: null;
 			}
 			const node = find(path);
 			if (!node) return null;

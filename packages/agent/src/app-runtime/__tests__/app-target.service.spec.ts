@@ -183,7 +183,11 @@ describe('AppTargetService.putTarget / getTarget (PUT/GET app-target)', () => {
         expect(eligibility).toHaveBeenCalledWith('u-1', { workId: 'w-1' });
         expect(result).toMatchObject({
             ok: false,
-            refusal: { httpStatus: 422, code: 'APP_TARGET_REFUSED', unmet: [{ code: 'managed_ineligible' }] },
+            refusal: {
+                httpStatus: 422,
+                code: 'APP_TARGET_REFUSED',
+                unmet: [{ code: 'managed_ineligible' }],
+            },
         });
         expect(states.patchRuntimeState).not.toHaveBeenCalled();
     });
@@ -451,7 +455,12 @@ describe('AppTargetService — works-security: cluster credential provenance and
 
     it('records who saved a kubeconfig, and whether they were the owner', async () => {
         const editor = harness({ target: 'your-cluster', targetSettings: { tls: 'none' } });
-        await editor.service.check('w-1', 'u-editor', { kubeconfig: KUBECONFIG }, { isOwner: false });
+        await editor.service.check(
+            'w-1',
+            'u-editor',
+            { kubeconfig: KUBECONFIG },
+            { isOwner: false },
+        );
         const editorPatch = editor.states.patchRuntimeState.mock.calls.at(-1)?.[1] as {
             target?: string;
             targetSettings: { tls?: string; clusterCredential: Record<string, unknown> };
@@ -501,7 +510,9 @@ describe('AppTargetService — works-security: cluster credential provenance and
     it("the owner's confirmation is recorded and satisfies the rule", async () => {
         const h = harness({
             target: 'your-cluster',
-            targetSettings: { clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false } },
+            targetSettings: {
+                clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false },
+            },
         });
         await expect(h.service.confirmClusterCredential('w-1', 'u-owner')).resolves.toBe(true);
         expect(h.states.patchRuntimeState.mock.calls.at(-1)?.[1]).toMatchObject({
@@ -546,7 +557,9 @@ describe('AppTargetService — works-security: cluster credential provenance and
 
     it('a supported shape (or a plugin without the check) is stored as before', async () => {
         const h = harness();
-        (h.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({ ok: true }));
+        (h.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({
+            ok: true,
+        }));
         await expect(
             h.service.check('w-1', 'u-1', { kubeconfig: KUBECONFIG }),
         ).resolves.toMatchObject({ ok: true });
@@ -554,9 +567,15 @@ describe('AppTargetService — works-security: cluster credential provenance and
     });
 
     it('pendingTargetChange names a target or namespace change and nothing else', async () => {
-        const h = harness({ target: 'your-cluster', targetSettings: { namespaceOverride: 'app-a' } });
+        const h = harness({
+            target: 'your-cluster',
+            targetSettings: { namespaceOverride: 'app-a' },
+        });
         await expect(
-            h.service.pendingTargetChange('w-1', { target: 'your-cluster', settings: { tls: 'none' } }),
+            h.service.pendingTargetChange('w-1', {
+                target: 'your-cluster',
+                settings: { tls: 'none' },
+            }),
         ).resolves.toEqual({ targetChanges: false, namespaceChanges: false });
         await expect(
             h.service.pendingTargetChange('w-1', {
@@ -584,7 +603,9 @@ describe('AppTargetService — works-security: cluster credential provenance and
     it('putTarget keeps the credential provenance (the settings parser never accepts it)', async () => {
         const h = harness({
             target: 'your-cluster',
-            targetSettings: { clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false } },
+            targetSettings: {
+                clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false },
+            },
         });
         await h.service.putTarget('w-1', 'u-editor', {
             target: 'your-cluster',

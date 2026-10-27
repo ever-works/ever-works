@@ -32,7 +32,9 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     CURSOR_SHOWING, CURSORINFO, DI_NORMAL, DrawIconEx, GetCursorInfo, GetIconInfo, ICONINFO,
 };
 
-use super::{Capturer, Display, Opened, PixelLayout, RawImage, dedupe_ids, order_displays, sanitize_id};
+use super::{
+    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, dedupe_ids, order_displays, sanitize_id,
+};
 
 struct GdiCapturer {
     rects: HashMap<String, RECT>,
@@ -255,6 +257,18 @@ impl Capturer for GdiCapturer {
             .map(|(display, rect)| (display.id.clone(), rect))
             .collect();
         Ok(order_displays(displays))
+    }
+
+    fn display_rect(&mut self, display_id: &str) -> Option<DisplayRect> {
+        if !self.rects.contains_key(display_id) {
+            let _ = self.displays();
+        }
+        self.rects.get(display_id).map(|rect| DisplayRect {
+            x: rect.left as f64,
+            y: rect.top as f64,
+            width: (rect.right - rect.left) as f64,
+            height: (rect.bottom - rect.top) as f64,
+        })
     }
 
     fn capture(&mut self, display_id: &str) -> Result<RawImage, String> {

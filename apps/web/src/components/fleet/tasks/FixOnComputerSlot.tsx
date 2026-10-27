@@ -10,9 +10,19 @@ import { FixOnComputerButton } from '@/components/tasks/FixOnComputerButton';
  * computer. Decided on the server; a failed read renders nothing (the Task
  * page never breaks over the fleet).
  */
-export async function FixOnComputerSlot({ taskId, taskSlug }: { taskId: string; taskSlug: string }) {
-    const flags = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED', 'FLEET_CHECKOUTS_ENABLED'] as const);
-    if (flags.FLEET_SESSIONS_ENABLED !== true || flags.FLEET_CHECKOUTS_ENABLED !== true) return null;
+export async function FixOnComputerSlot({
+    taskId,
+    taskSlug,
+}: {
+    taskId: string;
+    taskSlug: string;
+}) {
+    const flags = readFleetFeatureFlags([
+        'FLEET_SESSIONS_ENABLED',
+        'FLEET_CHECKOUTS_ENABLED',
+    ] as const);
+    if (flags.FLEET_SESSIONS_ENABLED !== true || flags.FLEET_CHECKOUTS_ENABLED !== true)
+        return null;
     const nodes = await fleetAPI.listNodes().catch(() => null);
     if (!Array.isArray(nodes) || nodes.length === 0) return null;
     return <FixOnComputerButton taskId={taskId} taskSlug={taskSlug} hotkey />;

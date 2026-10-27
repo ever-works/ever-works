@@ -10,7 +10,12 @@ import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { FLEET_TONE_DOT_CLASS } from '../fleet-hub.shared';
 import { providerKey, sessionElapsed, sessionStateGlyph } from './sessions.shared';
-import { notifyReplaced, sessionGlyph, sessionStateWords, statusSourceNote } from './sessions-status.shared';
+import {
+    notifyReplaced,
+    sessionGlyph,
+    sessionStateWords,
+    statusSourceNote,
+} from './sessions-status.shared';
 import { SessionStateGlyph } from './SessionStateGlyph';
 
 /**
@@ -69,7 +74,10 @@ export function SessionHeader({
     // FL-05: the state in words with its reason or outcome, and where the status comes from (FR-11, §5.10).
     const words = sessionStateWords(session);
     const stateText = words.qualifier
-        ? t('states.withQualifier', { state: t(`states.${words.key}`), qualifier: t(`states.${words.qualifier}`) })
+        ? t('states.withQualifier', {
+              state: t(`states.${words.key}`),
+              qualifier: t(`states.${words.qualifier}`),
+          })
         : t(`states.${glyph.key}`);
     const statusGlyph = sessionGlyph(session);
     const sourceNote = statusSourceNote(session, { detail: true });
@@ -95,7 +103,10 @@ export function SessionHeader({
                         <span className="inline-flex items-center gap-1.5 text-sm font-normal text-text-muted dark:text-text-muted-dark">
                             {statusGlyph === 'none' ? (
                                 <span
-                                    className={cn('h-2 w-2 rounded-full', FLEET_TONE_DOT_CLASS[glyph.tone])}
+                                    className={cn(
+                                        'h-2 w-2 rounded-full',
+                                        FLEET_TONE_DOT_CLASS[glyph.tone],
+                                    )}
                                     aria-hidden="true"
                                 />
                             ) : (
@@ -117,7 +128,9 @@ export function SessionHeader({
                         <span>{t('detail.startedBy', { who })}</span>
                         {elapsed && (
                             <span className="tabular-nums">
-                                {live ? t('detail.runningFor', { elapsed }) : t('detail.ranFor', { elapsed })}
+                                {live
+                                    ? t('detail.runningFor', { elapsed })
+                                    : t('detail.ranFor', { elapsed })}
                             </span>
                         )}
                     </p>
@@ -127,7 +140,10 @@ export function SessionHeader({
                             data-testid="fleet-session-status-source"
                             data-source={sourceNote}
                         >
-                            {t(`statusSource.${sourceNote}`, { provider: providerName, node: nodeName })}
+                            {t(`statusSource.${sourceNote}`, {
+                                provider: providerName,
+                                node: nodeName,
+                            })}
                             {notifyReplaced(session) && <> · {t('statusSource.notifyReplaced')}</>}
                             {session.provider !== 'shell' && <> · {t('statusSource.noTokens')}</>}
                         </p>
@@ -137,25 +153,49 @@ export function SessionHeader({
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {live && canDrive && role === 'viewer' && (
-                        <Button size="sm" onClick={onTakeKeyboard} data-testid="fleet-session-take-keyboard">
+                        <Button
+                            size="sm"
+                            onClick={onTakeKeyboard}
+                            data-testid="fleet-session-take-keyboard"
+                        >
                             {t('detail.takeKeyboard')}
                         </Button>
                     )}
                     {live && role === 'driver' && (
-                        <Button size="sm" variant="secondary" onClick={onWatchOnly} data-testid="fleet-session-watch-only">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={onWatchOnly}
+                            data-testid="fleet-session-watch-only"
+                        >
                             {t('detail.watchOnly')}
                         </Button>
                     )}
                     {actionsSlot}
-                    <Button size="sm" variant="secondary" onClick={onRename} data-testid="fleet-session-rename">
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={onRename}
+                        data-testid="fleet-session-rename"
+                    >
                         {t('detail.rename')}
                     </Button>
                     {live ? (
-                        <Button size="sm" variant="danger" onClick={onEnd} data-testid="fleet-session-end">
+                        <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={onEnd}
+                            data-testid="fleet-session-end"
+                        >
                             {t('detail.end')}
                         </Button>
                     ) : (
-                        <Button size="sm" variant="secondary" onClick={onRestart} data-testid="fleet-session-restart">
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={onRestart}
+                            data-testid="fleet-session-restart"
+                        >
                             {t('detail.restart')}
                         </Button>
                     )}

@@ -44,7 +44,8 @@ export async function fleetRequest<T>(request: FleetCliRequest): Promise<T> {
         case 'PATCH':
             return (await client.patch<T>(url, request.body ?? {})).data;
         case 'DELETE':
-            return (await client.delete<T>(url, request.body ? { data: request.body } : undefined)).data;
+            return (await client.delete<T>(url, request.body ? { data: request.body } : undefined))
+                .data;
     }
 }
 
@@ -71,7 +72,10 @@ export async function runFleetVerb<T>(
         const extra = await confirmInteractively(refusal, json);
         if (extra) {
             try {
-                const data = await fleetRequest<T>({ ...request, body: { ...(body ?? {}), ...extra } });
+                const data = await fleetRequest<T>({
+                    ...request,
+                    body: { ...(body ?? {}), ...extra },
+                });
                 return emitFleetOk(json, data, human);
             } catch (error) {
                 return emitFleetError(json, readFleetCliError(error));
@@ -84,7 +88,11 @@ export async function runFleetVerb<T>(
 /** A computer as `--on` names it: its id, or its name (case-insensitive) among the visible ones. */
 export async function resolveFleetNodeId(json: boolean, ref: string | undefined): Promise<string> {
     if (!ref || ref.trim().length === 0) {
-        return emitFleetError(json, { code: 'invalid', hint: '--on <computer> is required', details: { field: 'on' } });
+        return emitFleetError(json, {
+            code: 'invalid',
+            hint: '--on <computer> is required',
+            details: { field: 'on' },
+        });
     }
     const value = ref.trim();
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) return value;
@@ -108,5 +116,9 @@ export async function resolveFleetNodeId(json: boolean, ref: string | undefined)
             details: { field: 'on', ids: matches.map((node) => node.id) },
         });
     }
-    return emitFleetError(json, { code: 'not_found', hint: `no computer named ${value}`, details: { field: 'on' } });
+    return emitFleetError(json, {
+        code: 'not_found',
+        hint: `no computer named ${value}`,
+        details: { field: 'on' },
+    });
 }

@@ -71,7 +71,9 @@ export default function HealthHistoryBlock({ nodes }: FleetOverviewBlockProps) {
             range={range}
             onRangeChange={setRange}
             visible={visible}
-            onToggle={(metric) => setVisible((previous) => ({ ...previous, [metric]: !previous[metric] }))}
+            onToggle={(metric) =>
+                setVisible((previous) => ({ ...previous, [metric]: !previous[metric] }))
+            }
             status={current?.status ?? 'loading'}
             history={current?.history ?? null}
             onRetry={() => setAttempt((value) => value + 1)}

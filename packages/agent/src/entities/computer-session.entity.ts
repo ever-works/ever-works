@@ -32,6 +32,9 @@ import { PortableDateColumn } from './_types';
 @Index('idx_computer_sessions_node_status', ['nodeId', 'status'])
 @Index('idx_computer_sessions_agent', ['agentId', 'createdAt'])
 @Index('idx_computer_sessions_run', ['runId'])
+// FL-07 P2 (slot `1796070100000`): the recording sweep and the session a view sits beside.
+@Index('idx_computer_sessions_recording_expires', ['recordingExpiresAt'])
+@Index('idx_computer_sessions_fleet_session', ['fleetSessionId'])
 export class ComputerSession {
     /** Also the relay channel id and the WebSocket path segment. */
     @PrimaryGeneratedColumn('uuid')
@@ -45,9 +48,13 @@ export class ComputerSession {
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
-    /** Whose computer this is. Set on open. */
-    @Column({ type: 'uuid' })
-    agentId: string;
+    /**
+     * Whose computer this is. Set on open. Null only for a Desktop-source view
+     * (`source: 'desktop'`, FL-07 P2) opened from the computer page, which has
+     * no Agent; every Agent read filters by it, so those rows never reach one.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    agentId: string | null;
 
     /** Which machine. Set on open; never changes. */
     @Column({ type: 'uuid' })
@@ -126,4 +133,46 @@ export class ComputerSession {
 
     @CreateDateColumn()
     createdAt: Date;
+
+    // ── Desktop view & control (FL-07 P2, CONTRACTS R-9, slot `1796070100000`) ──
+
+    /** `browser` (an Agent's browser, AW-11) · `desktop` (the machine's desktop, FL-07). Set on open. */
+    @Column({ type: 'varchar', length: 8, default: 'browser' })
+    source?: 'browser' | 'desktop';
+
+    /** The helper's display id a Desktop view shows (it may change). */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    displayId?: string | null;
+
+    /** The FL-04 session the view sits beside (the split). Not a foreign key: the view outlives it. */
+    @Column({ type: 'uuid', nullable: true })
+    fleetSessionId?: string | null;
+
+    /** The storage key prefix of the recording; never bytes. Written by the recording path. */
+    @Column({ type: 'varchar', length: 512, nullable: true })
+    recordingRef?: string | null;
+
+    /** Bytes stored for the recording. `bigint`: a STRING on Postgres. */
+    @Column({ type: 'bigint', default: 0 })
+    recordingBytes?: string | number;
+
+    /** How long the recording covers. */
+    @Column({ type: 'int', default: 0 })
+    recordingDurationMs?: number;
+
+    /** When the retention sweep deletes the recording (object first, row second). */
+    @PortableDateColumn({ nullable: true })
+    recordingExpiresAt?: Date | null;
+
+    /** Why recording stopped early (`size-cap` · `time-cap` · `storage-failed` · `view-ended` · `deleted`). */
+    @Column({ type: 'varchar', length: 24, nullable: true })
+    recordingStoppedReason?: string | null;
+
+    /**
+     * When a controlling socket of this Desktop view last attached or proved
+     * alive (any API replica) — the disconnect grace gives control back only
+     * when no driver came back since it started.
+     */
+    @PortableDateColumn({ nullable: true })
+    controlDriverAt?: Date | null;
 }

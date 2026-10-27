@@ -363,7 +363,13 @@ describe('IntegrationMissionsController', () => {
 
         it('takes it on a paused Mission, and other fields of an active one', async () => {
             const paused = setup('paused');
-            await paused.controller.update(user, 'mission-1', { title: 'Renamed' }, undefined, res());
+            await paused.controller.update(
+                user,
+                'mission-1',
+                { title: 'Renamed' },
+                undefined,
+                res(),
+            );
             expect(paused.missions.update).toHaveBeenCalled();
 
             const active = setup('active');

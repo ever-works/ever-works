@@ -50,7 +50,8 @@ const MAC_RULES: readonly BlastRadiusRule[] = [
 	{ kind: 'node', pattern: /ever-?works[.-]?node|node\.ever-?works/i },
 	{
 		kind: 'network',
-		pattern: /^com\.apple\.(configd|mDNSResponder|mDNSResponderHelper|networkd|airportd|wifid|wifivelocityd|netbiosd|symptomsd)$/
+		pattern:
+			/^com\.apple\.(configd|mDNSResponder|mDNSResponderHelper|networkd|airportd|wifid|wifivelocityd|netbiosd|symptomsd)$/
 	},
 	{ kind: 'ssh', pattern: /^(com\.openssh\.sshd|com\.apple\.screensharing|com\.apple\.RemoteDesktop.*)$/ },
 	{ kind: 'vpn', pattern: /tailscale|zerotier|wireguard|netbird|nebula|openvpn|cloudflared|twingate/i }
@@ -61,11 +62,15 @@ const MAC_DOCKER_RULE: BlastRadiusRule = { kind: 'docker', pattern: /^(com\.dock
 /** Windows (service names). */
 const WINDOWS_RULES: readonly BlastRadiusRule[] = [
 	{ kind: 'node', pattern: /^EverWorksNode/i },
-	{ kind: 'network', pattern: /^(Dnscache|Dhcp|NlaSvc|netprofm|Netman|WlanSvc|nsi|Wcmsvc|iphlpsvc|BFE|WinHttpAutoProxySvc)$/i },
+	{
+		kind: 'network',
+		pattern: /^(Dnscache|Dhcp|NlaSvc|netprofm|Netman|WlanSvc|nsi|Wcmsvc|iphlpsvc|BFE|WinHttpAutoProxySvc)$/i
+	},
 	{ kind: 'ssh', pattern: /^(sshd|TermService|WinRM)$/i },
 	{
 		kind: 'vpn',
-		pattern: /^(Tailscale|ZeroTierOneService|WireGuardTunnel\$.+|WireGuardManager|OpenVPNService.*|netbird|cloudflared|Twingate.*)$/i
+		pattern:
+			/^(Tailscale|ZeroTierOneService|WireGuardTunnel\$.+|WireGuardManager|OpenVPNService.*|netbird|cloudflared|Twingate.*)$/i
 	}
 ];
 

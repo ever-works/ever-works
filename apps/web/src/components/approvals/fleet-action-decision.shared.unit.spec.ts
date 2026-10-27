@@ -42,11 +42,21 @@ describe('readFleetActionDecision', () => {
 
     it('reads an FL-09 machine action with its blast-radius sentence and no expiry', () => {
         const view = readFleetActionDecision(
-            { kind: 'fleet-machine-action', verb: 'services.action', reason: 'blast-radius', sentence: 'This stops…' },
+            {
+                kind: 'fleet-machine-action',
+                verb: 'services.action',
+                reason: 'blast-radius',
+                sentence: 'This stops…',
+            },
             raisedAt,
             now,
         );
-        expect(view).toMatchObject({ sentence: 'This stops…', reason: 'blast-radius', expiresInMs: null, tool: 'services.action' });
+        expect(view).toMatchObject({
+            sentence: 'This stops…',
+            reason: 'blast-radius',
+            expiresInMs: null,
+            tool: 'services.action',
+        });
     });
 
     it('ignores other proposals', () => {
@@ -55,7 +65,10 @@ describe('readFleetActionDecision', () => {
     });
 
     it('formats hours and minutes left, never negative', () => {
-        expect(formatFleetDecisionExpiry(FLEET_HELD_CALL_MAX_AGE_MS - 2 * 60_000)).toEqual({ hours: 23, minutes: 58 });
+        expect(formatFleetDecisionExpiry(FLEET_HELD_CALL_MAX_AGE_MS - 2 * 60_000)).toEqual({
+            hours: 23,
+            minutes: 58,
+        });
         expect(formatFleetDecisionExpiry(-5)).toEqual({ hours: 0, minutes: 0 });
     });
 });

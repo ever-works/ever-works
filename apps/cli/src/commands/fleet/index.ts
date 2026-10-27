@@ -19,7 +19,13 @@ import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
 import { schedulesCommand } from './schedule';
 import { commandsGetCommand, commandsListCommand } from './commands-read';
-import { dockerCommand, logsCommand, portsCommand, processesCommand, servicesCommand } from './machine';
+import {
+    dockerCommand,
+    logsCommand,
+    portsCommand,
+    processesCommand,
+    servicesCommand,
+} from './machine';
 import { nodesCommand } from './nodes';
 import { operationsCommand } from './operations';
 import { attachCommand } from './session/attach';
@@ -68,7 +74,10 @@ checkoutsCommand.addCommand(checkoutChangesCommand).addCommand(checkoutPullReque
 nodesCommand.addCommand(gitIdentityCommand);
 
 // FL-19 T-10 — the reads beside FL-12's `fleet commands run`; P2 adds cancel.
-commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand).addCommand(commandsCancelCommand);
+commandsCommand
+    .addCommand(commandsListCommand)
+    .addCommand(commandsGetCommand)
+    .addCommand(commandsCancelCommand);
 
 // FL-19 P2 (T-16) — the acts, beside each family's reads, all through `--yes` / `--confirm-name`.
 fleetSessionCommand.addCommand(sessionsEndCommand).addCommand(sessionsRenameCommand);

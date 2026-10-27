@@ -36,7 +36,12 @@ export class AddFleetNodeVirtualFields1796160000000 implements MigrationInterfac
                 default: "'enrolled'",
             }),
             new TableColumn({ name: 'hostNodeId', type: 'uuid', isNullable: true }),
-            new TableColumn({ name: 'virtualKind', type: 'varchar', length: '16', isNullable: true }),
+            new TableColumn({
+                name: 'virtualKind',
+                type: 'varchar',
+                length: '16',
+                isNullable: true,
+            }),
             new TableColumn({ name: 'virtualMeta', type: 'text', isNullable: true }),
         ];
         for (const column of columns) {

@@ -697,7 +697,8 @@ export class FleetNodeSelfDescriptionDto {
         required: false,
         maxLength: 128,
         example: 'a1b2c3d4e5f60718',
-        description: 'Opaque hash of the network the primary interface is on (never an address). --manage only.',
+        description:
+            'Opaque hash of the network the primary interface is on (never an address). --manage only.',
     })
     @IsOptional()
     @IsString()
@@ -765,7 +766,8 @@ export class FleetNodeSelfDescriptionDto {
         required: false,
         maxLength: 32,
         example: 'hash-pinned',
-        description: "The screen helper's trust on this machine: none, hash-pinned (reduced trust) or signed.",
+        description:
+            "The screen helper's trust on this machine: none, hash-pinned (reduced trust) or signed.",
     })
     @IsOptional()
     @IsString()
@@ -792,7 +794,8 @@ export class FleetNodeSelfDescriptionDto {
     @ApiProperty({
         required: false,
         type: [Object],
-        description: 'The displays: id, name, width, height, scale, primary, virtual. Unknown or malformed entries are dropped.',
+        description:
+            'The displays: id, name, width, height, scale, primary, virtual. Unknown or malformed entries are dropped.',
     })
     @IsOptional()
     @IsArray()
@@ -804,7 +807,8 @@ export class FleetNodeSelfDescriptionDto {
         required: false,
         type: [String],
         example: ['helper-unadmitted'],
-        description: 'Why the Desktop source is unavailable on this machine right now (empty when it is available).',
+        description:
+            'Why the Desktop source is unavailable on this machine right now (empty when it is available).',
     })
     @IsOptional()
     @IsArray()
@@ -817,7 +821,8 @@ export class FleetNodeSelfDescriptionDto {
     @ApiProperty({
         required: false,
         type: [Object],
-        description: 'Screen helper admission events (admit, revoke, verify-failed), newest last. Each id is audited once.',
+        description:
+            'Screen helper admission events (admit, revoke, verify-failed), newest last. Each id is audited once.',
     })
     @IsOptional()
     @IsArray()

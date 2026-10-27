@@ -56,7 +56,10 @@ export default function LastCommandBlock({ nodes }: FleetOverviewBlockProps) {
             data-testid="fleet-last-command"
         >
             <span className="text-text-muted dark:text-text-muted-dark">{t('label')}</span>
-            <code className="max-w-[24rem] truncate font-mono text-text dark:text-text-dark" title={last.command}>
+            <code
+                className="max-w-[24rem] truncate font-mono text-text dark:text-text-dark"
+                title={last.command}
+            >
                 {last.command}
             </code>
             <span>·</span>

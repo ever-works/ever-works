@@ -9,7 +9,10 @@ import type { FleetSession } from '../../entities/fleet-session.entity';
 import { INBOX_PRODUCER, type InboxProducer } from '../../inbox/inbox-producer.port';
 import { NotificationService } from '../../notifications/notification.service';
 import { FleetNodeRepository } from '../fleet-node.repository';
-import type { FleetSessionAttentionAnswer, FleetSessionAttentionSink } from './fleet-session-attention.port';
+import type {
+    FleetSessionAttentionAnswer,
+    FleetSessionAttentionSink,
+} from './fleet-session-attention.port';
 
 /** Display names of the CLIs, as the Inbox provenance line reads them (spec §5.8). */
 const PROVIDER_NAMES: Readonly<Record<string, string>> = {
@@ -65,7 +68,8 @@ export class FleetSessionAttentionDelivery implements FleetSessionAttentionSink 
         context: { finished: boolean },
     ): Promise<void> {
         if (row.provider === 'shell') return;
-        const nodeName = (await this.nodes.findById(row.nodeId).catch(() => null))?.name ?? 'a computer';
+        const nodeName =
+            (await this.nodes.findById(row.nodeId).catch(() => null))?.name ?? 'a computer';
         const who = await this.who(row);
         const prompt = attention.prompt || row.title;
 
@@ -74,7 +78,12 @@ export class FleetSessionAttentionDelivery implements FleetSessionAttentionSink 
             try {
                 await this.inbox?.sessionAttentionRaised?.({
                     userId: row.userId,
-                    kind: attention.reason === 'permission' ? 'approval' : decision ? 'question' : 'notice',
+                    kind:
+                        attention.reason === 'permission'
+                            ? 'approval'
+                            : decision
+                              ? 'question'
+                              : 'notice',
                     title:
                         attention.reason === 'failed'
                             ? `${who} failed on ${nodeName}: ${prompt}`
@@ -140,7 +149,11 @@ export class FleetSessionAttentionDelivery implements FleetSessionAttentionSink 
                 attentionKey: attention.key,
                 reason: !answer && row.state === 'ended' ? 'expired' : 'answered',
                 optionId: answer?.optionId ?? null,
-                note: answer ? null : isFleetSessionDecisionReason(attention.reason) ? 'Answered in the terminal' : null,
+                note: answer
+                    ? null
+                    : isFleetSessionDecisionReason(attention.reason)
+                      ? 'Answered in the terminal'
+                      : null,
             });
         } catch (error) {
             this.warn(row, 'the Inbox item was not closed', error);

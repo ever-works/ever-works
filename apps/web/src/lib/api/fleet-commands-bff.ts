@@ -47,13 +47,15 @@ export function sanitizeRunBody(raw: Record<string, unknown>): Partial<FleetComm
     ) {
         body.cwd = raw.cwd;
     }
-    if (typeof raw.timeoutSec === 'number' && Number.isFinite(raw.timeoutSec)) body.timeoutSec = raw.timeoutSec;
+    if (typeof raw.timeoutSec === 'number' && Number.isFinite(raw.timeoutSec))
+        body.timeoutSec = raw.timeoutSec;
     if (raw.confirm === true) body.confirm = true;
     // Schedules on computers (FL-13): a cadence makes it a schedule on ONE computer.
     const cadence = sanitizeCadence(raw.cadence);
     if (cadence) body.cadence = cadence;
     const schedule = body as Partial<FleetCommandRunRequest> & { name?: string; nodeId?: string };
-    if (typeof raw.name === 'string' && raw.name.length <= FLEET_SCHEDULE_NAME_MAX_LENGTH * 4) schedule.name = raw.name;
+    if (typeof raw.name === 'string' && raw.name.length <= FLEET_SCHEDULE_NAME_MAX_LENGTH * 4)
+        schedule.name = raw.name;
     if (isUuid(raw.nodeId)) schedule.nodeId = raw.nodeId;
     return body;
 }
@@ -64,7 +66,10 @@ export function sanitizeCadence(raw: unknown): Record<string, unknown> | null {
     const record = raw as Record<string, unknown>;
     const out: Record<string, unknown> = { timezone: 'node' };
     if (typeof record.kind === 'string' && record.kind.length <= 16) out.kind = record.kind;
-    if ((typeof record.expr === 'string' && record.expr.length <= 120) || typeof record.expr === 'number') {
+    if (
+        (typeof record.expr === 'string' && record.expr.length <= 120) ||
+        typeof record.expr === 'number'
+    ) {
         out.expr = record.expr;
     }
     if (typeof record.at === 'string' && record.at.length <= 5) out.at = record.at;
@@ -72,14 +77,20 @@ export function sanitizeCadence(raw: unknown): Record<string, unknown> | null {
 }
 
 /** The schedule edit body (`PATCH /api/fleet/commands/:id`, FL-13), rebuilt. */
-export function sanitizeScheduleUpdateBody(raw: Record<string, unknown>): FleetScheduleUpdateRequest {
+export function sanitizeScheduleUpdateBody(
+    raw: Record<string, unknown>,
+): FleetScheduleUpdateRequest {
     const body: FleetScheduleUpdateRequest = {};
-    if (typeof raw.name === 'string' && raw.name.length <= FLEET_SCHEDULE_NAME_MAX_LENGTH * 4) body.name = raw.name;
+    if (typeof raw.name === 'string' && raw.name.length <= FLEET_SCHEDULE_NAME_MAX_LENGTH * 4)
+        body.name = raw.name;
     if (isUuid(raw.nodeId)) body.nodeId = raw.nodeId;
     if (typeof raw.command === 'string' && raw.command.length <= FLEET_COMMAND_MAX_LENGTH * 10) {
         body.command = raw.command;
     }
-    if (raw.cwd === null || (typeof raw.cwd === 'string' && raw.cwd.length <= FLEET_COMMAND_CWD_MAX_LENGTH * 4)) {
+    if (
+        raw.cwd === null ||
+        (typeof raw.cwd === 'string' && raw.cwd.length <= FLEET_COMMAND_CWD_MAX_LENGTH * 4)
+    ) {
         body.cwd = raw.cwd;
     }
     const cadence = sanitizeCadence(raw.cadence);
@@ -91,7 +102,9 @@ export function sanitizeScheduleUpdateBody(raw: Record<string, unknown>): FleetS
 /** The runs query: only `limit` (1–30) survives, as a `?…` string. */
 export function sanitizeRunsQuery(params: URLSearchParams): string {
     const limit = Number(params.get('limit'));
-    return Number.isInteger(limit) && limit >= 1 && limit <= FLEET_SCHEDULE_HISTORY ? `?limit=${limit}` : '';
+    return Number.isInteger(limit) && limit >= 1 && limit <= FLEET_SCHEDULE_HISTORY
+        ? `?limit=${limit}`
+        : '';
 }
 
 /** The list query: only `limit` (1–50) survives, as a `?…` string. */

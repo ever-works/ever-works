@@ -29,15 +29,19 @@ describe('helperPathsFor', () => {
 			eventsPath: '/home/me/.config/ever-works-node/helper-events.json',
 			installPath: '/home/me/.config/ever-works-node/screen-helper/ever-works-screen'
 		});
-		expect(helperPathsFor('C:\\Users\\me\\AppData\\Roaming\\ever-works-node\\node-config.json', 'win32').installPath).toBe(
-			'C:\\Users\\me\\AppData\\Roaming\\ever-works-node\\screen-helper\\ever-works-screen.exe'
-		);
+		expect(
+			helperPathsFor('C:\\Users\\me\\AppData\\Roaming\\ever-works-node\\node-config.json', 'win32').installPath
+		).toBe('C:\\Users\\me\\AppData\\Roaming\\ever-works-node\\screen-helper\\ever-works-screen.exe');
 	});
 });
 
 describe('verifyHelper', () => {
 	it('reads no helper as helper-missing', async () => {
-		expect(await verifyHelper(memoryHelperFs(), paths)).toMatchObject({ ok: false, reason: 'helper-missing', present: false });
+		expect(await verifyHelper(memoryHelperFs(), paths)).toMatchObject({
+			ok: false,
+			reason: 'helper-missing',
+			present: false
+		});
 	});
 
 	it('reads an installed helper without a record as helper-unadmitted (never started)', async () => {

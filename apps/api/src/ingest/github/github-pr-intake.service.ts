@@ -94,7 +94,9 @@ function logins(entries: Array<{ login?: string }> | undefined): string[] {
  * repository, whether it is a fork and whether the fork allows maintainer
  * edits (spec FR-20).
  */
-export function normalizeGitHubPullRequest(body: GitHubPullRequestWebhookBody): IngestedEventEnvelope | null {
+export function normalizeGitHubPullRequest(
+    body: GitHubPullRequestWebhookBody,
+): IngestedEventEnvelope | null {
     const action = nonEmpty(body?.action);
     if (!action || !GITHUB_PR_INTAKE_ACTIONS.includes(action)) return null;
     const fullName = nonEmpty(body.repository?.full_name);
@@ -113,7 +115,8 @@ export function normalizeGitHubPullRequest(body: GitHubPullRequestWebhookBody): 
     const updatedAt = isoOrNow(pr.updated_at ?? pr.created_at);
     const headRepo = nonEmpty(pr.head?.repo?.full_name);
     const fork =
-        pr.head?.repo?.fork === true || (headRepo !== undefined && headRepo.toLowerCase() !== fullName.toLowerCase());
+        pr.head?.repo?.fork === true ||
+        (headRepo !== undefined && headRepo.toLowerCase() !== fullName.toLowerCase());
     const actor = nonEmpty(body.sender?.login) ?? author ?? 'unknown';
     const revisionDetail =
         action === 'review_requested' || action === 'review_request_removed'
@@ -128,13 +131,19 @@ export function normalizeGitHubPullRequest(body: GitHubPullRequestWebhookBody): 
     return {
         id: randomUUID(),
         source: GITHUB_PLUGIN_ID,
-        sourceEventId: capped(`pr-intake:${fullName}#${number}@${revision}`, INGESTED_EVENT_SOURCE_EVENT_ID_MAX_CHARS),
+        sourceEventId: capped(
+            `pr-intake:${fullName}#${number}@${revision}`,
+            INGESTED_EVENT_SOURCE_EVENT_ID_MAX_CHARS,
+        ),
         kind: GITHUB_PR_EVENT_KIND,
         occurredAt: updatedAt,
         actor: { name: capped(actor, INGESTED_EVENT_ACTOR_MAX_CHARS) },
         subject: {
             type: 'pull_request',
-            externalId: capped(`${fullName}#${number}`, INGESTED_EVENT_SUBJECT_EXTERNAL_ID_MAX_CHARS),
+            externalId: capped(
+                `${fullName}#${number}`,
+                INGESTED_EVENT_SUBJECT_EXTERNAL_ID_MAX_CHARS,
+            ),
             title: capped(title, INGESTED_EVENT_TITLE_MAX_CHARS),
         },
         workHint: { kind: 'repo', externalId: fullName },
@@ -197,7 +206,9 @@ export class GitHubPrIntakeService implements OnModuleInit, GitHubWebhookConsume
         body: GitHubWebhookBody,
     ): Promise<{ ingested: IngestResult | null }> {
         if (eventName !== 'pull_request') return { ingested: null };
-        const envelope = normalizeGitHubPullRequest(body as unknown as GitHubPullRequestWebhookBody);
+        const envelope = normalizeGitHubPullRequest(
+            body as unknown as GitHubPullRequestWebhookBody,
+        );
         if (!envelope) return { ingested: null };
         const ingested = await this.eventIngestService.ingest(binding.userId, [envelope]);
         if (ingested.inserted > 0) {

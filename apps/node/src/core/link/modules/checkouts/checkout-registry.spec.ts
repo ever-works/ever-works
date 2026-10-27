@@ -15,9 +15,7 @@ describe('checkout registry (FL-14 T-06)', () => {
 		const second = mergeDiscovery(first, ['/code/web', '/code/cli'], false, 't2');
 		expect(second.entries.map((entry) => entry.path)).toEqual(['/code/api', '/code/web', '/code/cli']);
 		expect(second.scannedAt).toBe('t2');
-		expect(second.entries.every((entry) => entry.kind === 'discovered' && entry.origin === 'discovery')).toBe(
-			true
-		);
+		expect(second.entries.every((entry) => entry.kind === 'discovered' && entry.origin === 'discovery')).toBe(true);
 	});
 
 	it('never registers one path twice (spec U13)', () => {

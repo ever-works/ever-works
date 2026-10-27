@@ -76,7 +76,9 @@ describe('SessionHookOverlay', () => {
 			expect(written).not.toContain('/.codex/');
 		}
 		const settings = JSON.parse(files.get(file) ?? '{}') as { hooks: Record<string, unknown[]> };
-		expect(Object.keys(settings.hooks)).toEqual(expect.arrayContaining(['Stop', 'PermissionRequest', 'UserPromptSubmit']));
+		expect(Object.keys(settings.hooks)).toEqual(
+			expect.arrayContaining(['Stop', 'PermissionRequest', 'UserPromptSubmit'])
+		);
 		expect(result?.hooks).toMatchObject({ provider: 'claude-code', injected: true });
 		expect(result?.env.EVER_WORKS_SESSION_ID).toBe(SESSION);
 	});
@@ -118,15 +120,15 @@ describe('SessionHookOverlay', () => {
 
 describe('hook command line', () => {
 	it('quotes POSIX paths with single quotes', () => {
-		expect(hookCommandLine("/opt/my node/node", '/x/hook-client.cjs', 'claude', SESSION, 'linux')).toBe(
+		expect(hookCommandLine('/opt/my node/node', '/x/hook-client.cjs', 'claude', SESSION, 'linux')).toBe(
 			`'/opt/my node/node' '/x/hook-client.cjs' claude ${SESSION}`
 		);
 	});
 
 	it('uses forward slashes in double quotes on Windows and refuses unsafe paths', () => {
-		expect(hookCommandLine('C:\\Program Files\\nodejs\\node.exe', 'C:\\s\\hook-client.cjs', 'claude', SESSION, 'win32')).toBe(
-			`"C:/Program Files/nodejs/node.exe" "C:/s/hook-client.cjs" claude ${SESSION}`
-		);
+		expect(
+			hookCommandLine('C:\\Program Files\\nodejs\\node.exe', 'C:\\s\\hook-client.cjs', 'claude', SESSION, 'win32')
+		).toBe(`"C:/Program Files/nodejs/node.exe" "C:/s/hook-client.cjs" claude ${SESSION}`);
 		expect(hookCommandLine('C:\\%TEMP%\\node.exe', 'C:\\c.cjs', 'claude', SESSION, 'win32')).toBeNull();
 	});
 

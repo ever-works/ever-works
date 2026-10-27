@@ -1,4 +1,8 @@
-import { APP_ENV_DOTENV_MAX_LINES, type AppEnvEntryView, type AppSpec } from '@ever-works/contracts';
+import {
+    APP_ENV_DOTENV_MAX_LINES,
+    type AppEnvEntryView,
+    type AppSpec,
+} from '@ever-works/contracts';
 import {
     AppEnvEditorRefusal,
     AppEnvEditorService,
@@ -72,7 +76,16 @@ const TABLE: AppEnvEntryView[] = [
 function harness(options: { spec?: AppSpec | null } = {}) {
     const apply = jest.fn(async () => ({
         workId: WORK,
-        results: [{ name: 'FIXTURE_MARKER', line: 1, action: 'created', code: null, message: null, version: 1 }],
+        results: [
+            {
+                name: 'FIXTURE_MARKER',
+                line: 1,
+                action: 'created',
+                code: null,
+                message: null,
+                version: 1,
+            },
+        ],
         warnings: [],
         changed: ['FIXTURE_MARKER'],
         activityRecorded: true,
@@ -86,7 +99,9 @@ function harness(options: { spec?: AppSpec | null } = {}) {
     } as unknown as AppEnvService & { apply: jest.Mock; rotate: jest.Mock };
     const spec: AppEnvSpecSource = {
         read: jest.fn(async () =>
-            options.spec === null ? null : { spec: options.spec ?? SPEC, specHash: 'h', commitSha: 'c' },
+            options.spec === null
+                ? null
+                : { spec: options.spec ?? SPEC, specHash: 'h', commitSha: 'c' },
         ),
     };
     return { env, editor: new AppEnvEditorService(env, spec) };
@@ -109,15 +124,21 @@ describe('previewDotenv — what a paste would change', () => {
 
         const preview = previewDotenv(WORK, text, DECLARED, VIEWS);
 
-        expect(preview.lines.map((line) => [line.line, line.name, line.action, line.code])).toEqual([
-            [2, 'FIXTURE_MARKER', 'skipped', null],
-            [3, 'API_TOKEN', 'replace', null],
-            [4, 'MAIL_TO', 'remove', null],
-            [5, 'SESSION', 'refused', 'generatedValueUseRotate'],
-            [6, null, 'refused', 'invalidName'],
-            [7, 'FIXTURE_MARKER', 'add', null],
-        ]);
-        expect(preview.changes).toEqual({ add: ['FIXTURE_MARKER'], replace: ['API_TOKEN'], remove: ['MAIL_TO'] });
+        expect(preview.lines.map((line) => [line.line, line.name, line.action, line.code])).toEqual(
+            [
+                [2, 'FIXTURE_MARKER', 'skipped', null],
+                [3, 'API_TOKEN', 'replace', null],
+                [4, 'MAIL_TO', 'remove', null],
+                [5, 'SESSION', 'refused', 'generatedValueUseRotate'],
+                [6, null, 'refused', 'invalidName'],
+                [7, 'FIXTURE_MARKER', 'add', null],
+            ],
+        );
+        expect(preview.changes).toEqual({
+            add: ['FIXTURE_MARKER'],
+            replace: ['API_TOKEN'],
+            remove: ['MAIL_TO'],
+        });
         expect(preview.refused).toBe(2);
         expect(preview.undeclared).toEqual([]);
         expect(JSON.stringify(preview)).not.toContain(SECRET);
@@ -126,7 +147,11 @@ describe('previewDotenv — what a paste would change', () => {
     it('lists undeclared names so the import can refuse them', () => {
         const preview = previewDotenv(WORK, `TYPO_NAME=${SECRET}\nMAIL_TO=a@b.c`, DECLARED, VIEWS);
         expect(preview.undeclared).toEqual(['TYPO_NAME']);
-        expect(preview.lines[0]).toMatchObject({ name: 'TYPO_NAME', action: 'refused', code: 'undeclaredName' });
+        expect(preview.lines[0]).toMatchObject({
+            name: 'TYPO_NAME',
+            action: 'refused',
+            code: 'undeclaredName',
+        });
         expect(JSON.stringify(preview)).not.toContain(SECRET);
     });
 
@@ -153,7 +178,9 @@ describe('AppEnvEditorService — the import', () => {
 
     it('previews without writing anything', async () => {
         const { editor, env } = harness();
-        const preview = await editor.previewImport(WORK, ACTOR, { import: { dotenv: `FIXTURE_MARKER=${SECRET}` } });
+        const preview = await editor.previewImport(WORK, ACTOR, {
+            import: { dotenv: `FIXTURE_MARKER=${SECRET}` },
+        });
         expect(preview.changes.add).toEqual(['FIXTURE_MARKER']);
         expect(env.apply).not.toHaveBeenCalled();
         expect(JSON.stringify(preview)).not.toContain(SECRET);
@@ -161,8 +188,12 @@ describe('AppEnvEditorService — the import', () => {
 
     it('applies a clean paste through AppEnvService.apply({ import }) and answers no value', async () => {
         const { editor, env } = harness();
-        const answer = await editor.patch(WORK, ACTOR, { import: { dotenv: `FIXTURE_MARKER=${SECRET}` } });
-        expect(env.apply).toHaveBeenCalledWith(WORK, ACTOR, { import: { text: `FIXTURE_MARKER=${SECRET}` } });
+        const answer = await editor.patch(WORK, ACTOR, {
+            import: { dotenv: `FIXTURE_MARKER=${SECRET}` },
+        });
+        expect(env.apply).toHaveBeenCalledWith(WORK, ACTOR, {
+            import: { text: `FIXTURE_MARKER=${SECRET}` },
+        });
         expect(answer.changed).toEqual(['FIXTURE_MARKER']);
         expect(JSON.stringify(answer)).not.toContain(SECRET);
     });
@@ -176,11 +207,13 @@ describe('AppEnvEditorService — the import', () => {
     });
 
     it('refuses a body without text, and a Work without an App spec', async () => {
-        await expect(harness().editor.previewImport(WORK, ACTOR, { import: {} })).rejects.toBeInstanceOf(
-            AppEnvEditorRefusal,
-        );
         await expect(
-            harness({ spec: null }).editor.previewImport(WORK, ACTOR, { import: { dotenv: 'A=b' } }),
+            harness().editor.previewImport(WORK, ACTOR, { import: {} }),
+        ).rejects.toBeInstanceOf(AppEnvEditorRefusal);
+        await expect(
+            harness({ spec: null }).editor.previewImport(WORK, ACTOR, {
+                import: { dotenv: 'A=b' },
+            }),
         ).rejects.toMatchObject({ code: 'specUnavailable', status: 409 });
     });
 });
@@ -197,7 +230,10 @@ describe('AppEnvEditorService — Rotate', () => {
         const answer = await editor.rotate(WORK, ACTOR, 'SESSION', { confirmName: 'SESSION' });
         expect(env.rotate).toHaveBeenCalledWith(WORK, ACTOR, 'SESSION', { confirmName: 'SESSION' });
         expect(answer).toMatchObject({ workId: WORK, name: 'SESSION', version: 4 });
-        expect(answer.entries.find((entry) => entry.name === 'SESSION')).toMatchObject({ masked: true, editable: false });
+        expect(answer.entries.find((entry) => entry.name === 'SESSION')).toMatchObject({
+            masked: true,
+            editable: false,
+        });
     });
 
     it('lets the service’s own refusal (a mismatched name) through untouched', async () => {
@@ -208,6 +244,8 @@ describe('AppEnvEditorService — Rotate', () => {
             status: 422,
         });
         env.rotate.mockRejectedValueOnce(refusal);
-        await expect(editor.rotate(WORK, ACTOR, 'SESSION', { confirmName: 'SESION' })).rejects.toBe(refusal);
+        await expect(editor.rotate(WORK, ACTOR, 'SESSION', { confirmName: 'SESION' })).rejects.toBe(
+            refusal,
+        );
     });
 });

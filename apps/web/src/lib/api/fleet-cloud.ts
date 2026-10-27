@@ -23,7 +23,9 @@ export const fleetCloudAPI = {
     providers: async () => serverFetch<FleetCloudProvidersView>('/fleet/providers'),
 
     options: async (pluginId: string) =>
-        serverFetch<FleetCloudOptionsView>(`/fleet/providers/${encodeURIComponent(pluginId)}/options`),
+        serverFetch<FleetCloudOptionsView>(
+            `/fleet/providers/${encodeURIComponent(pluginId)}/options`,
+        ),
 
     list: async () => serverFetch<FleetCloudListView & FleetCloudProvidersView>('/fleet/cloud'),
 

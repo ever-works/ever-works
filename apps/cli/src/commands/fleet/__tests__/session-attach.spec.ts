@@ -12,12 +12,18 @@ const bytes = (...values: number[]) => Uint8Array.from(values);
 describe('fleet session attach — the detach chord (FL-04 P2, FR-53)', () => {
     it('passes ordinary keys through untouched', () => {
         const chord = createDetachChord();
-        expect(chord(bytes(0x6c, 0x73, 0x0d))).toEqual({ forward: bytes(0x6c, 0x73, 0x0d), detach: false });
+        expect(chord(bytes(0x6c, 0x73, 0x0d))).toEqual({
+            forward: bytes(0x6c, 0x73, 0x0d),
+            detach: false,
+        });
     });
 
     it('detaches on Ctrl-] then d, sending neither key', () => {
         const chord = createDetachChord();
-        expect(chord(bytes(0x61, DETACH_PREFIX, DETACH_KEY))).toEqual({ forward: bytes(0x61), detach: true });
+        expect(chord(bytes(0x61, DETACH_PREFIX, DETACH_KEY))).toEqual({
+            forward: bytes(0x61),
+            detach: true,
+        });
     });
 
     it('detaches across two reads', () => {

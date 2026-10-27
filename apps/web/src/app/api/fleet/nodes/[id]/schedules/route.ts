@@ -17,5 +17,8 @@ export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     // FL-13 P2: every source on this computer — Command schedules and the recurring
     // Tasks of Agents pinned here (Agent-session schedules).
     const query = new URLSearchParams({ node: id, limit: '50' });
-    return forwardFleetCall(`${API_URL}/schedules/page?${query.toString()}`, { method: 'GET', headers });
+    return forwardFleetCall(`${API_URL}/schedules/page?${query.toString()}`, {
+        method: 'GET',
+        headers,
+    });
 });

@@ -42,12 +42,20 @@ describe('checkFleetScheduleCreate (FR-5, FR-6, FR-28)', () => {
 
     it('takes exactly one computer from nodeIds and reads ~ as home', () => {
         const out = blank();
-        expect(checkFleetScheduleCreate({ ...valid, nodeId: undefined, nodeIds: [NODE], cwd: '~' }, out)).toBeNull();
+        expect(
+            checkFleetScheduleCreate(
+                { ...valid, nodeId: undefined, nodeIds: [NODE], cwd: '~' },
+                out,
+            ),
+        ).toBeNull();
         expect(out.nodeId).toBe(NODE);
         expect(out.cwd).toBeNull();
-        expect(checkFleetScheduleCreate({ ...valid, nodeId: undefined, nodeIds: [NODE, OTHER] }, blank())?.code).toBe(
-            'invalid',
-        );
+        expect(
+            checkFleetScheduleCreate(
+                { ...valid, nodeId: undefined, nodeIds: [NODE, OTHER] },
+                blank(),
+            )?.code,
+        ).toBe('invalid');
     });
 
     it.each([
@@ -91,7 +99,9 @@ describe('checkFleetScheduleUpdate (FR-10)', () => {
     });
 
     it('never changes the kind', () => {
-        expect(checkFleetScheduleUpdate({ prompt: 'triage' }, stored(), [])?.details).toEqual({ field: 'kind' });
+        expect(checkFleetScheduleUpdate({ prompt: 'triage' }, stored(), [])?.details).toEqual({
+            field: 'kind',
+        });
     });
 });
 
@@ -108,10 +118,12 @@ describe('limits and refusals', () => {
 
     it('holds schedules only on command-line nodes', () => {
         expect(fleetScheduleNodeRefusal({ name: 'b', kind: 'node', status: 'offline' })).toBeNull();
-        expect(fleetScheduleNodeRefusal({ name: 'b', kind: 'k8s', status: 'online' })?.code).toBe('unsupported_on_node');
-        expect(fleetScheduleNodeRefusal({ name: 'b', kind: 'desktop-node', status: 'online' })?.code).toBe(
+        expect(fleetScheduleNodeRefusal({ name: 'b', kind: 'k8s', status: 'online' })?.code).toBe(
             'unsupported_on_node',
         );
+        expect(
+            fleetScheduleNodeRefusal({ name: 'b', kind: 'desktop-node', status: 'online' })?.code,
+        ).toBe('unsupported_on_node');
     });
 });
 
@@ -119,19 +131,37 @@ describe('fleetScheduleNeverRuns (FR-21)', () => {
     const consents = (manage: boolean) => ({ work: true, attend: false, manage, usageScan: false });
 
     it('names the first reason, with a hint', () => {
-        expect(fleetScheduleNeverRuns({ nodeExists: false, nodeName: 'b', unsupported: false, consents: null })?.reason).toBe(
-            'node-removed',
-        );
         expect(
-            fleetScheduleNeverRuns({ nodeExists: true, nodeName: 'build-01', unsupported: true, consents: consents(true) })
-                ?.hint,
+            fleetScheduleNeverRuns({
+                nodeExists: false,
+                nodeName: 'b',
+                unsupported: false,
+                consents: null,
+            })?.reason,
+        ).toBe('node-removed');
+        expect(
+            fleetScheduleNeverRuns({
+                nodeExists: true,
+                nodeName: 'build-01',
+                unsupported: true,
+                consents: consents(true),
+            })?.hint,
         ).toBe('NEVER RUNS · update the node on build-01');
         expect(
-            fleetScheduleNeverRuns({ nodeExists: true, nodeName: 'build-01', unsupported: false, consents: consents(false) })
-                ?.reason,
+            fleetScheduleNeverRuns({
+                nodeExists: true,
+                nodeName: 'build-01',
+                unsupported: false,
+                consents: consents(false),
+            })?.reason,
         ).toBe('consent-missing');
         expect(
-            fleetScheduleNeverRuns({ nodeExists: true, nodeName: 'build-01', unsupported: false, consents: consents(true) }),
+            fleetScheduleNeverRuns({
+                nodeExists: true,
+                nodeName: 'build-01',
+                unsupported: false,
+                consents: consents(true),
+            }),
         ).toBeNull();
     });
 });

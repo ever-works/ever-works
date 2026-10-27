@@ -12,10 +12,16 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetVirtualService } from '@ever-works/agent/fleet';
-import type { FleetVirtualEnrollTokenResponse, FleetVirtualProgressReport } from '@ever-works/contracts';
+import type {
+    FleetVirtualEnrollTokenResponse,
+    FleetVirtualProgressReport,
+} from '@ever-works/contracts';
 import { Public } from '../../auth/decorators/public.decorator';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FLEET_NODE_UNAUTHORIZED_MESSAGE, FleetNodeAuthGuard } from '../guards/fleet-node-auth.guard';
+import {
+    FLEET_NODE_UNAUTHORIZED_MESSAGE,
+    FleetNodeAuthGuard,
+} from '../guards/fleet-node-auth.guard';
 import { FleetVirtualHostJobDto, FleetVirtualProgressDto } from './dto/fleet-virtual.dto';
 import { FleetVirtualEnabledGuard } from './fleet-virtual-enabled.guard';
 
@@ -86,7 +92,9 @@ export class FleetVirtualNodeController {
         if (body.state !== undefined) report.state = body.state;
         if (body.error !== undefined) report.error = body.error;
         if (body.image !== undefined) {
-            report.image = body.image ? { ref: body.image.ref, digest: body.image.digest ?? null } : null;
+            report.image = body.image
+                ? { ref: body.image.ref, digest: body.image.digest ?? null }
+                : null;
         }
         if (body.activated !== undefined) report.activated = body.activated;
         if (body.viewerPort !== undefined) report.viewerPort = body.viewerPort;

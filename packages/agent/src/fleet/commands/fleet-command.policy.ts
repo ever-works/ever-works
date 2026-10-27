@@ -89,10 +89,14 @@ export function checkFleetCommandRequest(
         if (!nodeIds.includes(lower)) nodeIds.push(lower);
     }
     if (nodeIds.length > FLEET_COMMAND_MAX_NODES) {
-        return refuse('limit_exceeded', `a command runs on at most ${FLEET_COMMAND_MAX_NODES} computers`, {
-            field: 'nodeIds',
-            limit: FLEET_COMMAND_MAX_NODES,
-        });
+        return refuse(
+            'limit_exceeded',
+            `a command runs on at most ${FLEET_COMMAND_MAX_NODES} computers`,
+            {
+                field: 'nodeIds',
+                limit: FLEET_COMMAND_MAX_NODES,
+            },
+        );
     }
     let cwd: string | null = null;
     if (raw.cwd !== undefined && raw.cwd !== null && raw.cwd !== '') {
@@ -180,7 +184,10 @@ export interface FleetCommandTargetFacts {
 export function fleetCommandTargetRefusal(facts: FleetCommandTargetFacts): FleetCommandRefusal {
     const { node } = facts;
     if (node.kind === 'k8s') {
-        return refuse('unsupported_on_node', `${node.name} is a cluster node; commands run on computers`);
+        return refuse(
+            'unsupported_on_node',
+            `${node.name} is a cluster node; commands run on computers`,
+        );
     }
     if (node.status === 'paused' || node.status === 'disabled' || node.status === 'enrolling') {
         const words: Record<string, string> = {

@@ -18,5 +18,7 @@ export function NewVirtualComputerLauncher() {
         setOpen(false);
         router.replace(pathname);
     }, [router, pathname]);
-    return <NewVirtualComputerDialog open={open} onClose={close} onCreated={() => router.refresh()} />;
+    return (
+        <NewVirtualComputerDialog open={open} onClose={close} onCreated={() => router.refresh()} />
+    );
 }

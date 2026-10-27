@@ -34,7 +34,14 @@ describe('docker-cli parsers', () => {
 					CreatedAt: '2026-10-21 07:00:00 +0000 UTC',
 					Labels: 'com.docker.compose.project=acme,com.docker.compose.service=api'
 				}),
-				JSON.stringify({ ID: 'ffffffffffff1111', Names: 'old-build', Image: 'node:22', State: 'exited', Status: 'Exited (1) 3 days ago', Ports: '' }),
+				JSON.stringify({
+					ID: 'ffffffffffff1111',
+					Names: 'old-build',
+					Image: 'node:22',
+					State: 'exited',
+					Status: 'Exited (1) 3 days ago',
+					Ports: ''
+				}),
 				'not json'
 			].join('\n')
 		);
@@ -49,11 +56,17 @@ describe('docker-cli parsers', () => {
 			actions: ['stop', 'restart'],
 			confirmation: { stop: 'confirm', restart: 'confirm' }
 		});
-		expect(rows[1]).toMatchObject({ state: 'exited', actions: ['start', 'remove'], confirmation: { remove: 'confirm-destructive' } });
+		expect(rows[1]).toMatchObject({
+			state: 'exited',
+			actions: ['start', 'remove'],
+			confirmation: { remove: 'confirm-destructive' }
+		});
 	});
 
 	it('reads exposed-only ports as internal', () => {
-		expect(parseDockerPorts('5432/tcp')).toEqual([{ hostIp: null, hostPort: null, containerPort: 5432, proto: 'tcp' }]);
+		expect(parseDockerPorts('5432/tcp')).toEqual([
+			{ hostIp: null, hostPort: null, containerPort: 5432, proto: 'tcp' }
+		]);
 	});
 
 	it('reads sizes, times and stats', () => {
@@ -123,7 +136,10 @@ describe('docker run (FR-28, FR-29, U13)', () => {
 		[{ image: 'redis:7', privileged: true }, 'privileged'],
 		[{ image: 'redis:7', network: 'host' }, 'network'],
 		[{ image: 'redis:7', pid: 'host' }, 'pid'],
-		[{ image: 'redis:7', volumes: [{ source: '/var/run/docker.sock', target: '/var/run/docker.sock' }] }, 'volumes'],
+		[
+			{ image: 'redis:7', volumes: [{ source: '/var/run/docker.sock', target: '/var/run/docker.sock' }] },
+			'volumes'
+		],
 		[{ image: 'redis:7', env: [{ name: 'DOCKER_HOST', value: 'tcp://x' }] }, 'env'],
 		[{ image: '--privileged' }, 'image'],
 		[{ image: 'redis:7; rm -rf /' }, 'image'],
@@ -136,12 +152,16 @@ describe('docker run (FR-28, FR-29, U13)', () => {
 	});
 
 	it('mounts host paths as binds with key=value syntax', () => {
-		expect(mountSpec('/srv/shared/data', '/data', true)).toBe('type=bind,source=/srv/shared/data,target=/data,readonly');
+		expect(mountSpec('/srv/shared/data', '/data', true)).toBe(
+			'type=bind,source=/srv/shared/data,target=/data,readonly'
+		);
 		expect(mountSpec('C:\\shared', '/data', false)).toBe('type=bind,source=C:\\shared,target=/data');
 	});
 
 	it('masks run values and scans every output line', () => {
-		expect(safeOutputLine('error: bad --requirepass hunter2-secret', ['--requirepass hunter2-secret'])).toBe('error: bad …');
+		expect(safeOutputLine('error: bad --requirepass hunter2-secret', ['--requirepass hunter2-secret'])).toBe(
+			'error: bad …'
+		);
 	});
 });
 
@@ -153,11 +173,15 @@ describe('pull progress and prune', () => {
 		expect(half?.percent).toBe(25);
 		const done = progress('a2abf6c4d29d: Pull complete');
 		expect(done?.percent).toBe(100);
-		expect(progress('Status: Downloaded newer image for redis:7')).toEqual({ message: 'Status: Downloaded newer image for redis:7' });
+		expect(progress('Status: Downloaded newer image for redis:7')).toEqual({
+			message: 'Status: Downloaded newer image for redis:7'
+		});
 	});
 
 	it('reads the prune summary', () => {
-		expect(parsePruneSummary(['deleted: sha256:aaa', 'deleted: sha256:bbb', 'Total reclaimed space: 1.6GB'])).toEqual({
+		expect(
+			parsePruneSummary(['deleted: sha256:aaa', 'deleted: sha256:bbb', 'Total reclaimed space: 1.6GB'])
+		).toEqual({
 			reclaimedBytes: 1_600_000_000,
 			removedCount: 2
 		});
@@ -173,7 +197,12 @@ describe('bind-mount sources under the shared folders (R-18, R-39)', () => {
 	};
 
 	it('accepts a folder inside a root and refuses one outside, missing, or escaping through a link', async () => {
-		const roots = resolveAllowedRoots({ workspaceRoot: '/srv/shared', extraRoots: ['relative'], purpose: 'files', platform: 'linux' });
+		const roots = resolveAllowedRoots({
+			workspaceRoot: '/srv/shared',
+			extraRoots: ['relative'],
+			purpose: 'files',
+			platform: 'linux'
+		});
 		expect(roots).toEqual(['/srv/shared']);
 		expect(await bindSourceAllowed('/srv/shared/data', roots, 'linux', realpath)).toBe(true);
 		expect(await bindSourceAllowed('/srv/shared', roots, 'linux', realpath)).toBe(true);

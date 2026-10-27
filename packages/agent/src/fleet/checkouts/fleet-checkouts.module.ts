@@ -44,11 +44,7 @@ export class FleetCheckoutReconcileService {
  * this repo has no `autoLoadEntities`.
  */
 @Module({
-    imports: [
-        FleetModule,
-        FleetSessionsModule,
-        TypeOrmModule.forFeature([FleetCheckout, Work]),
-    ],
+    imports: [FleetModule, FleetSessionsModule, TypeOrmModule.forFeature([FleetCheckout, Work])],
     providers: [FleetCheckoutRepository, FleetCheckoutService, FleetCheckoutReconcileService],
     exports: [FleetCheckoutRepository, FleetCheckoutService, FleetCheckoutReconcileService],
 })

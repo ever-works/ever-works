@@ -7,7 +7,11 @@ import type {
     MachineProviderOptions,
     MachineProviderUsage,
 } from '@ever-works/plugin';
-import { isMachineProviderError, PLUGIN_CAPABILITIES, type PluginSettings } from '@ever-works/plugin';
+import {
+    isMachineProviderError,
+    PLUGIN_CAPABILITIES,
+    type PluginSettings,
+} from '@ever-works/plugin';
 import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
 import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -74,14 +78,16 @@ export class MachineProviderFacadeService extends BaseFacadeService {
      * plugin prefers a saved `apiToken`. Never logged.
      */
     private async callSettings(pluginId: string, userId: string): Promise<PluginSettings> {
-        const settings = ((await this.getResolvedSettings(pluginId, { userId })) ?? {}) as PluginSettings;
+        const settings = ((await this.getResolvedSettings(pluginId, { userId })) ??
+            {}) as PluginSettings;
         if (!this.authAccounts || !userId) return settings;
         try {
             const account = await this.authAccounts.findConnectedProviderAccount(userId, pluginId, {
                 usePluginProviderId: true,
             });
             const token = account?.accessToken;
-            if (typeof token === 'string' && token.length > 0) return { ...settings, oauthAccessToken: token };
+            if (typeof token === 'string' && token.length > 0)
+                return { ...settings, oauthAccessToken: token };
         } catch (error) {
             this.logger.debug(
                 `machine provider ${pluginId}: the sign-in could not be read: ${error instanceof Error ? error.message : String(error)}`,
@@ -109,7 +115,10 @@ export class MachineProviderFacadeService extends BaseFacadeService {
             let configured = false;
             try {
                 const settings = await this.callSettings(plugin.id, userId);
-                configured = typeof plugin.isConfigured === 'function' ? plugin.isConfigured(settings) : false;
+                configured =
+                    typeof plugin.isConfigured === 'function'
+                        ? plugin.isConfigured(settings)
+                        : false;
             } catch (error) {
                 this.logger.debug(
                     `machine provider ${plugin.id}: settings could not be read: ${error instanceof Error ? error.message : String(error)}`,
@@ -161,7 +170,12 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    async power(pluginId: string, userId: string, machineRef: string, action: 'on' | 'off'): Promise<void> {
+    async power(
+        pluginId: string,
+        userId: string,
+        machineRef: string,
+        action: 'on' | 'off',
+    ): Promise<void> {
         const plugin = await this.resolveProvider(pluginId, userId);
         const settings = await this.callSettings(plugin.id, userId);
         try {
@@ -181,7 +195,11 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    async getMachine(pluginId: string, userId: string, machineRef: string): Promise<MachineProviderMachine> {
+    async getMachine(
+        pluginId: string,
+        userId: string,
+        machineRef: string,
+    ): Promise<MachineProviderMachine> {
         const plugin = await this.resolveProvider(pluginId, userId);
         const settings = await this.callSettings(plugin.id, userId);
         try {
@@ -191,7 +209,11 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    async listTagged(pluginId: string, userId: string, tag: string): Promise<MachineProviderMachine[]> {
+    async listTagged(
+        pluginId: string,
+        userId: string,
+        tag: string,
+    ): Promise<MachineProviderMachine[]> {
         const plugin = await this.resolveProvider(pluginId, userId);
         const settings = await this.callSettings(plugin.id, userId);
         try {
@@ -202,7 +224,11 @@ export class MachineProviderFacadeService extends BaseFacadeService {
     }
 
     /** The provider's own month-to-date figure, or null when the plugin cannot read one (P2). */
-    async usage(pluginId: string, userId: string, machineRefs: readonly string[]): Promise<MachineProviderUsage | null> {
+    async usage(
+        pluginId: string,
+        userId: string,
+        machineRefs: readonly string[],
+    ): Promise<MachineProviderUsage | null> {
         const plugin = await this.resolveProvider(pluginId, userId);
         if (typeof plugin.usage !== 'function') return null;
         const settings = await this.callSettings(plugin.id, userId);
@@ -213,7 +239,10 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    private async resolveProvider(pluginId: string, userId: string): Promise<IMachineProviderPlugin> {
+    private async resolveProvider(
+        pluginId: string,
+        userId: string,
+    ): Promise<IMachineProviderPlugin> {
         // An explicit pluginId behaves like a provider override: it must be a
         // loaded `machine-provider` plugin enabled for the owner, else
         // ProviderNotFoundError (the service turns that into "the plugin is

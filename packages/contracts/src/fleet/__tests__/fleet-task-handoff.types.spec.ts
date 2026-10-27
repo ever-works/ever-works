@@ -60,7 +60,11 @@ describe('judgeFleetHandoffComputer (spec FR-2, FR-3, U1–U6)', () => {
 
 	it('puts the kill switch before everything, the pin included', () => {
 		const verdict = judgeFleetHandoffComputer(
-			facts({ refusal: { code: 'kill_switch', hint: 'clear it' }, pinnedNodeId: 'n-2', pinnedNodeName: 'build-02' })
+			facts({
+				refusal: { code: 'kill_switch', hint: 'clear it' },
+				pinnedNodeId: 'n-2',
+				pinnedNodeName: 'build-02'
+			})
 		);
 		expect(verdict.reason).toBe('kill-switch');
 	});

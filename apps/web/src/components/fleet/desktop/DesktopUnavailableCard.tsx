@@ -74,7 +74,10 @@ export function DesktopUnavailableCard({
             <Monitor className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
             <h2 className="text-lg font-semibold">{t(`${key}.title`, { name: nodeName })}</h2>
             <p className="text-sm text-muted-foreground">
-                {t(`${key}.body`, { name: nodeName, lastSeen: formatLastSeen(lastSeen) ?? t('never') })}
+                {t(`${key}.body`, {
+                    name: nodeName,
+                    lastSeen: formatLastSeen(lastSeen) ?? t('never'),
+                })}
             </p>
             {command ? (
                 <div className="flex w-full items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 font-mono text-sm">
@@ -89,8 +92,12 @@ export function DesktopUnavailableCard({
                     {t('settingsOn', { name: nodeName, path: settingsPath })}
                 </p>
             ) : null}
-            {hint && !command && !settingsPath ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
-            {browserSourceAvailable && blocker !== 'permission-denied' && blocker !== 'kill-switch' ? (
+            {hint && !command && !settingsPath ? (
+                <p className="text-xs text-muted-foreground">{hint}</p>
+            ) : null}
+            {browserSourceAvailable &&
+            blocker !== 'permission-denied' &&
+            blocker !== 'kill-switch' ? (
                 <p className="text-sm text-muted-foreground">{t('browserStill')}</p>
             ) : null}
             {onRetry && desktopBlockerRetries(blocker) ? (

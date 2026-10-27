@@ -41,11 +41,11 @@ When GitHub cannot be reached the pill keeps the last answer and says _PR: unkno
 
 In **New session → Where**, pick one of the computer's checkouts, then:
 
-| Choice                | What happens                                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| **Existing checkout** | The session works in that folder as it is (the default for your own sessions).                               |
+| Choice                | What happens                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| **Existing checkout** | The session works in that folder as it is (the default for your own sessions).                                     |
 | **New worktree**      | A new worktree of it, on its own branch — the default for an Agent: two agents in one folder overwrite each other. |
-| **Fresh clone**       | A new clone of the same repository, on its own branch.                                                        |
+| **Fresh clone**       | A new clone of the same repository, on its own branch.                                                             |
 
 The branch is proposed as `<prefix>/<slug>`: the prefix is the Agent's slug (or your handle), the slug comes from the
 first message, else the title, else a short generated name. A name the repository ever had — on the remote, or on any
@@ -62,15 +62,15 @@ works, and stops at 1 MiB (64 KiB per file), saying how many files and bytes it 
 
 **Actions ▾** beside **End** (or `A`, then `1`–`7`) offers what you do around an agent's work:
 
-| Action                       | Offered when                                                                 |
-| ---------------------------- | ---------------------------------------------------------------------------- |
-| Commit                       | the session is in a checkout                                                 |
-| Commit and push              | on a branch — never to a protected branch for an Agent (you get a warning)    |
+| Action                         | Offered when                                                               |
+| ------------------------------ | -------------------------------------------------------------------------- |
+| Commit                         | the session is in a checkout                                               |
+| Commit and push                | on a branch — never to a protected branch for an Agent (you get a warning) |
 | Open / Update the pull request | on a branch that is not the default one                                    |
-| Review the changes           | the session is in a checkout (the prompt forbids changing code)               |
-| Fix the review comments (n)  | an open pull request has unresolved review comments                          |
-| Resolve conflicts            | the open pull request cannot be merged cleanly                               |
-| Write a recap                | always — the only one outside a checkout                                     |
+| Review the changes             | the session is in a checkout (the prompt forbids changing code)            |
+| Fix the review comments (n)    | an open pull request has unresolved review comments                        |
+| Resolve conflicts              | the open pull request cannot be merged cleanly                             |
+| Write a recap                  | always — the only one outside a checkout                                   |
 
 Picking one shows its prompt — the Agent's own template, or the Ever Works default — with the branch, base, pull request
 and Task filled in. You may edit it; **Send** types it into the session exactly as if you had typed it. The agent still
@@ -114,24 +114,24 @@ is (the editor warns).
 
 ## Tools, MCP and the CLI
 
-| Agent / MCP tool                    | CLI                                                      |
-| ----------------------------------- | -------------------------------------------------------- |
-| `fleet_sessions_actions_list`       | `ever-works fleet session actions <sessionId>`            |
-| `fleet_sessions_action`             | `ever-works fleet session action <sessionId> <actionId>`  |
-| `fleet_checkouts_changes`           | `ever-works fleet checkout changes <checkoutId>`          |
+| Agent / MCP tool                    | CLI                                                             |
+| ----------------------------------- | --------------------------------------------------------------- |
+| `fleet_sessions_actions_list`       | `ever-works fleet session actions <sessionId>`                  |
+| `fleet_sessions_action`             | `ever-works fleet session action <sessionId> <actionId>`        |
+| `fleet_checkouts_changes`           | `ever-works fleet checkout changes <checkoutId>`                |
 | `fleet_checkouts_open_pull_request` | `ever-works fleet checkout pull-request <checkoutId> --title …` |
-| `fleet_checkouts_delete` (clean up) | `ever-works fleet checkout delete <checkoutId> --clean-up` |
+| `fleet_checkouts_delete` (clean up) | `ever-works fleet checkout delete <checkoutId> --clean-up`      |
 
 ## When something is refused
 
-| You see                            | Why                                                                        |
-| ---------------------------------- | -------------------------------------------------------------------------- |
-| _build-01 is offline_              | Actions, Changes and Clean up need the computer; the git line stays as last known. |
-| _All computers are stopped_        | The fleet kill switch is on; a pull request already asked for still completes. |
-| _Not allowed on this computer_     | The computer needs `--manage` (your session) or `--work` (an Agent's).      |
-| _Not possible — not available on main_ | The action does not apply here; the menu never offered it.             |
-| _branch is not pushed yet_         | Push first; the pull request is opened from what is on GitHub.              |
-| _Nina may not open pull requests_  | Allow it on the Agent, or open it yourself from the dialog.                 |
+| You see                                | Why                                                                                |
+| -------------------------------------- | ---------------------------------------------------------------------------------- |
+| _build-01 is offline_                  | Actions, Changes and Clean up need the computer; the git line stays as last known. |
+| _All computers are stopped_            | The fleet kill switch is on; a pull request already asked for still completes.     |
+| _Not allowed on this computer_         | The computer needs `--manage` (your session) or `--work` (an Agent's).             |
+| _Not possible — not available on main_ | The action does not apply here; the menu never offered it.                         |
+| _branch is not pushed yet_             | Push first; the pull request is opened from what is on GitHub.                     |
+| _Nina may not open pull requests_      | Allow it on the Agent, or open it yourself from the dialog.                        |
 
 See also: [Sessions on computers](./fleet-sessions.md) · [Session status](./fleet-session-status.md) ·
 [Checkouts on computers](./fleet-checkouts.md) · [Task isolation](./task-isolation.md).

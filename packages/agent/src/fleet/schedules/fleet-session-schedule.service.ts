@@ -83,29 +83,43 @@ export class FleetSessionScheduleService {
         private readonly killSwitch: FleetKillSwitchService,
         @InjectRepository(Agent) private readonly agents: Repository<Agent>,
         @Optional() private readonly audit?: FleetAuditService,
-        @Optional() @Inject(FLEET_SCHEDULE_TASKS_PORT) private readonly tasks?: FleetScheduleTasksPort,
+        @Optional()
+        @Inject(FLEET_SCHEDULE_TASKS_PORT)
+        private readonly tasks?: FleetScheduleTasksPort,
     ) {}
 
     /**
      * The person's Agents for the dialog (spec §5.2, U9): pinned to this
      * computer first; every other Agent listed DISABLED with why.
      */
-    async listAgentsForNode(actor: FleetSessionScheduleActor, nodeId: string): Promise<FleetScheduleAgentOption[]> {
+    async listAgentsForNode(
+        actor: FleetSessionScheduleActor,
+        nodeId: string,
+    ): Promise<FleetScheduleAgentOption[]> {
         this.assertEnabled();
         const node = await this.resolveNode(nodeId, actor);
         const where = actor.organizationId
             ? { userId: actor.userId, organizationId: actor.organizationId }
             : { userId: actor.userId };
-        const agents = (await this.agents.find({ where, order: { name: 'ASC' }, take: 200 })).filter(
-            (agent) => agent.status !== AgentStatus.ARCHIVED,
-        );
+        const agents = (
+            await this.agents.find({ where, order: { name: 'ASC' }, take: 200 })
+        ).filter((agent) => agent.status !== AgentStatus.ARCHIVED);
         const options: FleetScheduleAgentOption[] = [];
         for (const agent of agents) {
             if (!actor.organizationId) {
-                options.push({ agentId: agent.id, name: agent.name, pinned: false, reason: 'needsOrganization' });
+                options.push({
+                    agentId: agent.id,
+                    name: agent.name,
+                    pinned: false,
+                    reason: 'needsOrganization',
+                });
                 continue;
             }
-            const affinity = await this.affinities.findForAgent(actor.userId, actor.organizationId, agent.id);
+            const affinity = await this.affinities.findForAgent(
+                actor.userId,
+                actor.organizationId,
+                agent.id,
+            );
             const pinned = affinity?.nodeId === node.id;
             options.push({
                 agentId: agent.id,
@@ -114,7 +128,9 @@ export class FleetSessionScheduleService {
                 reason: pinned ? null : affinity ? 'pinnedElsewhere' : 'notPinned',
             });
         }
-        return options.sort((a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name));
+        return options.sort(
+            (a, b) => Number(b.pinned) - Number(a.pinned) || a.name.localeCompare(b.name),
+        );
     }
 
     /** Create an Agent-session schedule (spec S3) — see the class comment for the order of checks. */
@@ -126,14 +142,20 @@ export class FleetSessionScheduleService {
         this.assertEnabled();
         const raw = (request ?? {}) as Partial<FleetAgentSessionScheduleRequest>;
         if (!isFleetScheduleName(raw.name)) {
-            throw fleetCommandError('invalid', 'name the schedule (1–120 characters, one line)', { field: 'name' });
+            throw fleetCommandError('invalid', 'name the schedule (1–120 characters, one line)', {
+                field: 'name',
+            });
         }
         if (typeof raw.agentId !== 'string' || !UUID.test(raw.agentId)) {
             throw fleetCommandError('invalid', 'choose the Agent', { field: 'agentId' });
         }
         const prompt = typeof raw.prompt === 'string' ? raw.prompt : '';
         if (prompt.trim().length < PROMPT_MIN_LENGTH || prompt.includes('\0')) {
-            throw fleetCommandError('invalid', 'tell the Agent what to do (at least 3 characters)', { field: 'prompt' });
+            throw fleetCommandError(
+                'invalid',
+                'tell the Agent what to do (at least 3 characters)',
+                { field: 'prompt' },
+            );
         }
         if (fleetCommandUtf8Length(prompt) > FLEET_SCHEDULE_PROMPT_MAX_BYTES) {
             throw fleetCommandError('limit_exceeded', 'a prompt is at most 16 KiB', {
@@ -143,15 +165,25 @@ export class FleetSessionScheduleService {
         }
         const provider = raw.provider;
         if (!provider || !(FLEET_AGENT_SESSION_PROVIDERS as readonly string[]).includes(provider)) {
-            throw fleetCommandError('invalid', 'an Agent session drives Claude Code or Codex', { field: 'provider' });
+            throw fleetCommandError('invalid', 'an Agent session drives Claude Code or Codex', {
+                field: 'provider',
+            });
         }
-        if (raw.checkoutId !== undefined && raw.checkoutId !== null && (typeof raw.checkoutId !== 'string' || !UUID.test(raw.checkoutId))) {
-            throw fleetCommandError('invalid', 'choose a checkout on this computer', { field: 'checkoutId' });
+        if (
+            raw.checkoutId !== undefined &&
+            raw.checkoutId !== null &&
+            (typeof raw.checkoutId !== 'string' || !UUID.test(raw.checkoutId))
+        ) {
+            throw fleetCommandError('invalid', 'choose a checkout on this computer', {
+                field: 'checkoutId',
+            });
         }
         const parsed = parseFleetScheduleCadence(raw.cadence);
         const cron = parsed.cadence ? fleetScheduleCadenceToCron(parsed.cadence) : null;
         if (!parsed.cadence || !cron) {
-            throw fleetCommandError('invalid', parsed.error ?? 'choose when it runs', { field: 'cadence' });
+            throw fleetCommandError('invalid', parsed.error ?? 'choose when it runs', {
+                field: 'cadence',
+            });
         }
 
         const node = await this.resolveNode(nodeId, actor);
@@ -162,15 +194,29 @@ export class FleetSessionScheduleService {
             );
         }
         if (!actor.organizationId) {
-            throw fleetCommandError('invalid', 'pinning an Agent to a computer needs an Organization; switch to one', {
-                field: 'agentId',
-            });
+            throw fleetCommandError(
+                'invalid',
+                'pinning an Agent to a computer needs an Organization; switch to one',
+                {
+                    field: 'agentId',
+                },
+            );
         }
-        const agent = await this.agents.findOne({ where: { id: raw.agentId, userId: actor.userId } });
-        if (!agent || agent.organizationId !== actor.organizationId || agent.status === AgentStatus.ARCHIVED) {
+        const agent = await this.agents.findOne({
+            where: { id: raw.agentId, userId: actor.userId },
+        });
+        if (
+            !agent ||
+            agent.organizationId !== actor.organizationId ||
+            agent.status === AgentStatus.ARCHIVED
+        ) {
             throw fleetCommandError('not_found', 'no such Agent', { field: 'agentId' });
         }
-        const affinity = await this.affinities.findForAgent(actor.userId, actor.organizationId, agent.id);
+        const affinity = await this.affinities.findForAgent(
+            actor.userId,
+            actor.organizationId,
+            agent.id,
+        );
         if (affinity?.nodeId !== node.id) {
             throw fleetCommandError(
                 'invalid',
@@ -193,7 +239,9 @@ export class FleetSessionScheduleService {
                 provider: provider as 'claude-code' | 'codex',
                 cadenceHuman,
                 nodeTimeZone: zone,
-                next: previewFleetScheduleFires(parsed.cadence, zone, this.now(), 3).map((ms) => new Date(ms).toISOString()),
+                next: previewFleetScheduleFires(parsed.cadence, zone, this.now(), 3).map((ms) =>
+                    new Date(ms).toISOString(),
+                ),
                 credentialSentence: fleetScheduleUnattendedCredentialSentence(node.name),
                 costSentence: FLEET_SCHEDULE_AGENT_COST_SENTENCE,
             };
@@ -203,7 +251,11 @@ export class FleetSessionScheduleService {
                 details as unknown as Record<string, unknown>,
             );
         }
-        if (!this.tasks) throw fleetCommandError('unreachable', 'this deployment does not file recurring Tasks here');
+        if (!this.tasks)
+            throw fleetCommandError(
+                'unreachable',
+                'this deployment does not file recurring Tasks here',
+            );
 
         let created: { taskId: string; nextOccurrenceAt: Date | null };
         try {
@@ -261,11 +313,17 @@ export class FleetSessionScheduleService {
         };
     }
 
-    private async resolveNode(nodeId: string, actor: FleetSessionScheduleActor): Promise<FleetNode> {
+    private async resolveNode(
+        nodeId: string,
+        actor: FleetSessionScheduleActor,
+    ): Promise<FleetNode> {
         try {
             const { node } = await this.access.resolveForFamily(nodeId, actor.userId, 'schedules');
             if (node.kind !== 'node') {
-                throw fleetCommandError('unsupported_on_node', `schedules are not available on ${node.name}`);
+                throw fleetCommandError(
+                    'unsupported_on_node',
+                    `schedules are not available on ${node.name}`,
+                );
             }
             return node;
         } catch (error) {
@@ -278,7 +336,8 @@ export class FleetSessionScheduleService {
     }
 
     private assertEnabled(): void {
-        if (!config.fleet.isCommandsEnabled()) throw fleetCommandError('not_found', 'no such schedule');
+        if (!config.fleet.isCommandsEnabled())
+            throw fleetCommandError('not_found', 'no such schedule');
     }
 
     private async assertNotStopped(): Promise<void> {
@@ -288,6 +347,10 @@ export class FleetSessionScheduleService {
         } catch {
             stopped = true;
         }
-        if (stopped) throw fleetCommandError('kill_switch', 'new schedules cannot be created while the kill switch is on');
+        if (stopped)
+            throw fleetCommandError(
+                'kill_switch',
+                'new schedules cannot be created while the kill switch is on',
+            );
     }
 }

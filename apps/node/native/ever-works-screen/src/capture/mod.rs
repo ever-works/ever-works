@@ -52,12 +52,24 @@ pub struct Display {
     pub is_virtual: bool,
 }
 
+/// Where a display sits in the coordinate space the OS injects pointer events in
+/// (X11 root pixels, Windows physical pixels, macOS global points) — P2 control.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DisplayRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
 /// A capture backend for the running session.
 pub trait Capturer {
     /// Every display, the primary first.
     fn displays(&mut self) -> Result<Vec<Display>, String>;
     /// One full picture of one display, cursor included where the OS allows it.
     fn capture(&mut self, display_id: &str) -> Result<RawImage, String>;
+    /// The display's place in the input coordinate space (after a `displays` call).
+    fn display_rect(&mut self, display_id: &str) -> Option<DisplayRect>;
 }
 
 /// What opening the session's capture gave: a backend, or the reasons there is none.

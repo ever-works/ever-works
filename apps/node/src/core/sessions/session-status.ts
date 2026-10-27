@@ -20,7 +20,13 @@ import {
 } from '@ever-works/contracts';
 import { systemScheduler, type Scheduler } from '../heartbeat';
 import type { Logger } from '../logger';
-import { drainHookSpool, materializeHookClient, writeHookEndpointFile, type HookFs, type HookPaths } from './hook-client';
+import {
+	drainHookSpool,
+	materializeHookClient,
+	writeHookEndpointFile,
+	type HookFs,
+	type HookPaths
+} from './hook-client';
 import { HookEndpoint, type HookEndpointEvent } from './hook-endpoint';
 import { normalizeHookEvent } from './hook-events';
 import type { SessionHookOverlay } from './hook-overlay';
@@ -281,7 +287,9 @@ export class SessionStatusPipeline {
 			await this.options.daemon.request('input', { sessionId, data: typed.keys });
 		} catch (error) {
 			const code =
-				typeof (error as { code?: unknown })?.code === 'string' ? ((error as { code: string }).code as FleetLinkError['code']) : null;
+				typeof (error as { code?: unknown })?.code === 'string'
+					? ((error as { code: string }).code as FleetLinkError['code'])
+					: null;
 			return {
 				ok: false,
 				error: makeFleetLinkError(code ?? 'operation_failed', 'the answer could not be typed into the session')

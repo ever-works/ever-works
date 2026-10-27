@@ -10,20 +10,18 @@ const ONLINE_OWNER = {
 
 describe('checkout row actions (FL-14 P2, spec FR-21 … FR-26)', () => {
     it('offers delete for a checkout Ever Works made, forget for one found or a Task worktree', () => {
-        expect(checkoutRowActions({ state: 'ready', kind: 'worktree', createdBy: 'user' })).toEqual([
-            'fetch',
-            'pull',
-            'push',
-            'refresh',
-            'archive',
-            'delete',
-        ]);
-        expect(checkoutRowActions({ state: 'ready', kind: 'discovered', createdBy: 'discovery' })).toContain('forget');
-        expect(checkoutRowActions({ state: 'ready', kind: 'worktree', createdBy: 'task' })).toContain('forget');
-        expect(checkoutRowActions({ state: 'archived', kind: 'clone', createdBy: 'user' })).toEqual([
-            'restore',
-            'delete',
-        ]);
+        expect(checkoutRowActions({ state: 'ready', kind: 'worktree', createdBy: 'user' })).toEqual(
+            ['fetch', 'pull', 'push', 'refresh', 'archive', 'delete'],
+        );
+        expect(
+            checkoutRowActions({ state: 'ready', kind: 'discovered', createdBy: 'discovery' }),
+        ).toContain('forget');
+        expect(
+            checkoutRowActions({ state: 'ready', kind: 'worktree', createdBy: 'task' }),
+        ).toContain('forget');
+        expect(checkoutRowActions({ state: 'archived', kind: 'clone', createdBy: 'user' })).toEqual(
+            ['restore', 'delete'],
+        );
     });
 
     it('lets fetch run beside a session but holds pull, push and delete (spec U9)', () => {
@@ -34,17 +32,34 @@ describe('checkout row actions (FL-14 P2, spec FR-21 … FR-26)', () => {
             createdBy: 'user' as const,
             kind: 'worktree' as const,
         };
-        expect(checkoutActionState('fetch', row, { node: ONLINE_OWNER })).toEqual({ enabled: true });
-        expect(checkoutActionState('pull', row, { node: ONLINE_OWNER })).toEqual({ enabled: false, reason: 'busy' });
-        expect(checkoutActionState('push', row, { node: ONLINE_OWNER })).toEqual({ enabled: false, reason: 'busy' });
-        expect(checkoutActionState('delete', row, { node: ONLINE_OWNER })).toEqual({ enabled: false, reason: 'busy' });
+        expect(checkoutActionState('fetch', row, { node: ONLINE_OWNER })).toEqual({
+            enabled: true,
+        });
+        expect(checkoutActionState('pull', row, { node: ONLINE_OWNER })).toEqual({
+            enabled: false,
+            reason: 'busy',
+        });
+        expect(checkoutActionState('push', row, { node: ONLINE_OWNER })).toEqual({
+            enabled: false,
+            reason: 'busy',
+        });
+        expect(checkoutActionState('delete', row, { node: ONLINE_OWNER })).toEqual({
+            enabled: false,
+            reason: 'busy',
+        });
     });
 
     it('never deletes a discovered checkout', () => {
         expect(
             checkoutActionState(
                 'delete',
-                { state: 'ready', busy: null, folderRemoved: false, createdBy: 'discovery', kind: 'discovered' },
+                {
+                    state: 'ready',
+                    busy: null,
+                    folderRemoved: false,
+                    createdBy: 'discovery',
+                    kind: 'discovered',
+                },
                 { node: ONLINE_OWNER },
             ),
         ).toEqual({ enabled: false, reason: 'discovered' });

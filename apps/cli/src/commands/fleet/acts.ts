@@ -36,27 +36,38 @@ type ActFlags = FleetConfirmFlags & { on?: string; json?: boolean };
 function withConfirmFlags(command: Command, destructive = false): Command {
     command
         .option('--yes', 'Confirm (class confirm)')
-        .option('--ack-blast-radius', 'Acknowledge the warning that the act could cut the computer off (with --yes)')
+        .option(
+            '--ack-blast-radius',
+            'Acknowledge the warning that the act could cut the computer off (with --yes)',
+        )
         .option('--no-wait', 'Answer with the operation id instead of waiting')
         .option('--json', 'Machine-readable output');
-    if (destructive) command.option('--confirm-name <name>', "Type the target's exact name (class confirm-destructive)");
+    if (destructive)
+        command.option(
+            '--confirm-name <name>',
+            "Type the target's exact name (class confirm-destructive)",
+        );
     return command;
 }
 
 function done(label: string): (data: unknown) => void {
     return (data) => {
         const operationId =
-            data && typeof data === 'object' && typeof (data as { operationId?: unknown }).operationId === 'string'
+            data &&
+            typeof data === 'object' &&
+            typeof (data as { operationId?: unknown }).operationId === 'string'
                 ? (data as { operationId: string }).operationId
                 : null;
         if (operationId) {
             console.log(chalk.cyan(`${label} — running as operation ${operationId}`));
-            console.log(chalk.gray(`Follow it with: ever-works fleet operations get ${operationId}`));
+            console.log(
+                chalk.gray(`Follow it with: ever-works fleet operations get ${operationId}`),
+            );
             return;
         }
         const held =
             data && typeof data === 'object' && (data as { held?: unknown }).held === true
-                ? (data as { hint?: string }).hint ?? 'held for the owner in My Decisions'
+                ? ((data as { hint?: string }).hint ?? 'held for the owner in My Decisions')
                 : null;
         console.log(held ? chalk.yellow(`${label} — ${held}`) : chalk.green(`✓ ${label}`));
     };
@@ -81,38 +92,54 @@ export const servicesActionCommand = withConfirmFlags(
         .requiredOption('--on <computer>', 'The computer (id or name)')
         .option('--scope <scope>', 'system (default) | user')
         .option('--manager <manager>', 'macOS only: launchd (default) | brew'),
-).action(async (service: string, action: string, flags: ActFlags & { scope?: string; manager?: string }) => {
-    const json = flags.json === true;
-    if (!['start', 'stop', 'restart', 'enable', 'disable'].includes(action)) {
-        fleetUsage(json, '<action> is start, stop, restart, enable or disable', 'action');
-    }
-    const nodeId = await resolveFleetNodeId(json, flags.on);
-    await runFleetVerb(
-        json,
-        {
-            method: 'POST',
-            path: `/fleet/nodes/${nodeId}/services/${encodeURIComponent(service)}/${action}`,
-            body: { ...(flags.scope ? { scope: flags.scope } : {}), ...(flags.manager ? { manager: flags.manager } : {}) },
-        },
-        done(`${action} ${service}`),
-        confirmOf(flags),
-    );
-});
+).action(
+    async (
+        service: string,
+        action: string,
+        flags: ActFlags & { scope?: string; manager?: string },
+    ) => {
+        const json = flags.json === true;
+        if (!['start', 'stop', 'restart', 'enable', 'disable'].includes(action)) {
+            fleetUsage(json, '<action> is start, stop, restart, enable or disable', 'action');
+        }
+        const nodeId = await resolveFleetNodeId(json, flags.on);
+        await runFleetVerb(
+            json,
+            {
+                method: 'POST',
+                path: `/fleet/nodes/${nodeId}/services/${encodeURIComponent(service)}/${action}`,
+                body: {
+                    ...(flags.scope ? { scope: flags.scope } : {}),
+                    ...(flags.manager ? { manager: flags.manager } : {}),
+                },
+            },
+            done(`${action} ${service}`),
+            confirmOf(flags),
+        );
+    },
+);
 
 export const processesSignalCommand = withConfirmFlags(
     new Command('signal')
-        .description('Send a signal to one process (TERM asks it to stop; KILL is held for an Agent)')
+        .description(
+            'Send a signal to one process (TERM asks it to stop; KILL is held for an Agent)',
+        )
         .argument('<pid>', 'The process id')
         .argument('[signal]', 'TERM (default) | KILL | HUP | INT | …', 'TERM')
         .requiredOption('--on <computer>', 'The computer (id or name)'),
 ).action(async (pid: string, signal: string, flags: ActFlags) => {
     const json = flags.json === true;
     const value = Number(pid);
-    if (!Number.isInteger(value) || value <= 0) fleetUsage(json, '<pid> must be a process id', 'pid');
+    if (!Number.isInteger(value) || value <= 0)
+        fleetUsage(json, '<pid> must be a process id', 'pid');
     const nodeId = await resolveFleetNodeId(json, flags.on);
     await runFleetVerb(
         json,
-        { method: 'POST', path: `/fleet/nodes/${nodeId}/processes/${value}/signal`, body: { signal } },
+        {
+            method: 'POST',
+            path: `/fleet/nodes/${nodeId}/processes/${value}/signal`,
+            body: { signal },
+        },
         done(`${signal} → ${value}`),
         confirmOf(flags),
     );
@@ -167,7 +194,10 @@ export const dockerImageRemoveCommand = withConfirmFlags(
     const nodeId = await resolveFleetNodeId(json, flags.on);
     await runFleetVerb(
         json,
-        { method: 'POST', path: `/fleet/nodes/${nodeId}/docker/images/${encodeURIComponent(image)}/remove` },
+        {
+            method: 'POST',
+            path: `/fleet/nodes/${nodeId}/docker/images/${encodeURIComponent(image)}/remove`,
+        },
         done(`remove ${image}`),
         confirmOf(flags),
     );
@@ -220,14 +250,17 @@ export const dockerComposeActionCommand = withConfirmFlags(
 
 export const portsOpenCommand = withConfirmFlags(
     new Command('open')
-        .description("Open a computer's web server ON that machine (its desktop or its preview browser)")
+        .description(
+            "Open a computer's web server ON that machine (its desktop or its preview browser)",
+        )
         .argument('<port>', 'The port')
         .requiredOption('--on <computer>', 'The computer (id or name)')
         .option('--target <target>', 'desktop | preview-profile'),
 ).action(async (port: string, flags: ActFlags & { target?: string }) => {
     const json = flags.json === true;
     const value = Number(port);
-    if (!Number.isInteger(value) || value < 1 || value > 65535) fleetUsage(json, '<port> is 1–65535', 'port');
+    if (!Number.isInteger(value) || value < 1 || value > 65535)
+        fleetUsage(json, '<port> is 1–65535', 'port');
     const nodeId = await resolveFleetNodeId(json, flags.on);
     await runFleetVerb(
         json,
@@ -249,7 +282,8 @@ export const portsPreviewCloseCommand = withConfirmFlags(
 ).action(async (port: string, flags: ActFlags) => {
     const json = flags.json === true;
     const value = Number(port);
-    if (!Number.isInteger(value) || value < 1 || value > 65535) fleetUsage(json, '<port> is 1–65535', 'port');
+    if (!Number.isInteger(value) || value < 1 || value > 65535)
+        fleetUsage(json, '<port> is 1–65535', 'port');
     const nodeId = await resolveFleetNodeId(json, flags.on);
     await runFleetVerb(
         json,
@@ -262,11 +296,18 @@ export const portsPreviewCloseCommand = withConfirmFlags(
 // ── sessions ──
 
 export const sessionsEndCommand = withConfirmFlags(
-    new Command('end').description('End a session (stops its process)').argument('<id>', 'Session id'),
+    new Command('end')
+        .description('End a session (stops its process)')
+        .argument('<id>', 'Session id'),
 ).action(async (id: string, flags: ActFlags) => {
     const json = flags.json === true;
     if (!FLEET_CLI_UUID.test(id)) fleetUsage(json, '<id> must be a session id', 'id');
-    await runFleetVerb(json, { method: 'POST', path: `/fleet/sessions/${id}/end` }, done('session ended'), confirmOf(flags));
+    await runFleetVerb(
+        json,
+        { method: 'POST', path: `/fleet/sessions/${id}/end` },
+        done('session ended'),
+        confirmOf(flags),
+    );
 });
 
 export const sessionsRenameCommand = new Command('rename')
@@ -278,7 +319,11 @@ export const sessionsRenameCommand = new Command('rename')
         const json = flags.json === true;
         if (!FLEET_CLI_UUID.test(id)) fleetUsage(json, '<id> must be a session id', 'id');
         if (title.trim().length === 0) fleetUsage(json, '<title> must not be empty', 'title');
-        await runFleetVerb(json, { method: 'PATCH', path: `/fleet/sessions/${id}`, body: { title } }, done('renamed'));
+        await runFleetVerb(
+            json,
+            { method: 'PATCH', path: `/fleet/sessions/${id}`, body: { title } },
+            done('renamed'),
+        );
     });
 
 // ── nodes ──
@@ -290,11 +335,19 @@ export const nodesWakeCommand = new Command('wake')
     .action(async (flags: { on: string; json?: boolean }) => {
         const json = flags.json === true;
         const nodeId = await resolveFleetNodeId(json, flags.on);
-        await runFleetVerb(json, { method: 'POST', path: `/fleet/nodes/${nodeId}/wake` }, (data) => {
-            const via = (data as { via?: { name?: string } } | null)?.via?.name;
-            console.log(chalk.green(`✓ wake sent${via ? ` through ${via}` : ''}`));
-            console.log(chalk.gray('Check in 20–60 seconds: ever-works fleet nodes health --on <computer>'));
-        });
+        await runFleetVerb(
+            json,
+            { method: 'POST', path: `/fleet/nodes/${nodeId}/wake` },
+            (data) => {
+                const via = (data as { via?: { name?: string } } | null)?.via?.name;
+                console.log(chalk.green(`✓ wake sent${via ? ` through ${via}` : ''}`));
+                console.log(
+                    chalk.gray(
+                        'Check in 20–60 seconds: ever-works fleet nodes health --on <computer>',
+                    ),
+                );
+            },
+        );
     });
 
 // ── commands / operations ──
@@ -306,7 +359,11 @@ export const commandsCancelCommand = new Command('cancel')
     .action(async (id: string, flags: { json?: boolean }) => {
         const json = flags.json === true;
         if (!FLEET_CLI_UUID.test(id)) fleetUsage(json, '<id> must be a command id', 'id');
-        await runFleetVerb(json, { method: 'POST', path: `/fleet/commands/${id}/cancel` }, done('cancel sent'));
+        await runFleetVerb(
+            json,
+            { method: 'POST', path: `/fleet/commands/${id}/cancel` },
+            done('cancel sent'),
+        );
     });
 
 export const operationsCancelCommand = new Command('cancel')
@@ -315,13 +372,18 @@ export const operationsCancelCommand = new Command('cancel')
     .option('--json', 'Machine-readable output')
     .action(async (id: string, flags: { json?: boolean }) => {
         const json = flags.json === true;
-        if (!id || id.length > 100) fleetUsage(json, '<id> is the operation id a verb answered with', 'id');
+        if (!id || id.length > 100)
+            fleetUsage(json, '<id> is the operation id a verb answered with', 'id');
         await runFleetVerb(
             json,
             { method: 'DELETE', path: `/fleet/operations/${encodeURIComponent(id)}` },
             (data) => {
                 const sent = (data as { sent?: boolean } | null)?.sent;
-                console.log(sent === false ? chalk.gray('It had already ended.') : chalk.green('✓ cancel sent'));
+                console.log(
+                    sent === false
+                        ? chalk.gray('It had already ended.')
+                        : chalk.green('✓ cancel sent'),
+                );
             },
         );
     });

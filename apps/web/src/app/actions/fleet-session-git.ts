@@ -49,7 +49,9 @@ async function ensureAuth() {
 
 function refusal(error: unknown): SessionGitActionResult<never> {
     if (error instanceof ApiResponseError) {
-        const envelope = (error.details as { error?: { hint?: unknown; details?: unknown } } | undefined)?.error;
+        const envelope = (
+            error.details as { error?: { hint?: unknown; details?: unknown } } | undefined
+        )?.error;
         return {
             success: false,
             code: error.code ?? null,
@@ -120,7 +122,10 @@ export async function sendSessionActionAction(
 ): Promise<SessionGitActionResult<FleetSessionActionSendResponse>> {
     await ensureAuth();
     try {
-        return { success: true, data: await fleetSessionGitAPI.sendAction(sessionId, { actionId, prompt }) };
+        return {
+            success: true,
+            data: await fleetSessionGitAPI.sendAction(sessionId, { actionId, prompt }),
+        };
     } catch (error) {
         return refusal(error);
     }
@@ -146,7 +151,10 @@ export async function resendSessionActionAction(
 ): Promise<SessionGitActionResult<FleetSessionActionSendResponse>> {
     await ensureAuth();
     try {
-        return { success: true, data: await fleetSessionGitAPI.resendAction(sessionId, ledgerId, prompt) };
+        return {
+            success: true,
+            data: await fleetSessionGitAPI.resendAction(sessionId, ledgerId, prompt),
+        };
     } catch (error) {
         return refusal(error);
     }

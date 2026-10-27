@@ -1,5 +1,8 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { FLEET_SESSION_MAX_OWNER_PER_NODE, type FleetSessionEventMessage } from '@ever-works/contracts';
+import {
+    FLEET_SESSION_MAX_OWNER_PER_NODE,
+    type FleetSessionEventMessage,
+} from '@ever-works/contracts';
 import type { FleetNode } from '../../../entities/fleet-node.entity';
 import type { FleetSession } from '../../../entities/fleet-session.entity';
 import { readFleetSessionError, fleetSessionError } from '../fleet-session.errors';
@@ -137,7 +140,8 @@ class FakeSessionRepository {
     }
 
     seed(overrides: Partial<FleetSession> = {}): FleetSession {
-        const id = overrides.id ?? `aaaaaaaa-0000-4000-8000-${String(this.rows.size).padStart(12, '0')}`;
+        const id =
+            overrides.id ?? `aaaaaaaa-0000-4000-8000-${String(this.rows.size).padStart(12, '0')}`;
         const past = new Date(Date.now() - 10 * 60_000);
         const row = {
             id,
@@ -219,7 +223,12 @@ function harness(
     const audit = { tryRecord: jest.fn(async () => undefined) };
     const port: jest.Mocked<FleetSessionNodePort> = {
         isConnected: jest.fn(() => true),
-        liveConsents: jest.fn(() => ({ work: true, attend: false, manage: true, usageScan: false })),
+        liveConsents: jest.fn(() => ({
+            work: true,
+            attend: false,
+            manage: true,
+            usageScan: false,
+        })),
         request: jest.fn(async () => ({ sessionId: 'x' })),
         ack: jest.fn(),
         ...(options.port ?? {}),
@@ -235,7 +244,9 @@ function harness(
     return { service, repo, node, port, audit, killSwitch };
 }
 
-async function refusalOf(promise: Promise<unknown>): Promise<{ code: string; hint: string; details?: unknown }> {
+async function refusalOf(
+    promise: Promise<unknown>,
+): Promise<{ code: string; hint: string; details?: unknown }> {
     try {
         await promise;
     } catch (error) {
@@ -272,7 +283,11 @@ describe('fleetSessionFolderTitle (CodeQL 276: no polynomial regex)', () => {
     });
 
     it('titles an agent CLI session by its first message, redacted and shortened', () => {
-        const title = defaultFleetSessionTitle('claude-code', '~/code/app', `  fix   the ${'x'.repeat(80)}`);
+        const title = defaultFleetSessionTitle(
+            'claude-code',
+            '~/code/app',
+            `  fix   the ${'x'.repeat(80)}`,
+        );
         expect(title.startsWith('fix the ')).toBe(true);
         expect(title.length).toBeLessThanOrEqual(60);
         expect(defaultFleetSessionTitle('shell', '~/code/app', 'ignored')).toBe('app');
@@ -286,12 +301,16 @@ describe('FleetSessionService.start', () => {
             expect(h.repo.rows.size).toBe(0);
             return { sessionId: 'ignored' };
         });
-        const view = await h.service.start(NODE_ID, { userId: OWNER }, {
-            kind: 'owner',
-            provider: 'claude-code',
-            cwd: '~/code/app',
-            firstMessage: 'deploy with token sk-ant-api03-SECRETSECRETSECRETSECRET',
-        });
+        const view = await h.service.start(
+            NODE_ID,
+            { userId: OWNER },
+            {
+                kind: 'owner',
+                provider: 'claude-code',
+                cwd: '~/code/app',
+                firstMessage: 'deploy with token sk-ant-api03-SECRETSECRETSECRETSECRET',
+            },
+        );
         expect(view.state).toBe('working');
         expect(view.nodeId).toBe(NODE_ID);
         expect(view.startedBy).toBe(`user:${OWNER}`);
@@ -305,7 +324,11 @@ describe('FleetSessionService.start', () => {
             expect.objectContaining({
                 action: 'node.session.start',
                 nodeId: NODE_ID,
-                details: expect.objectContaining({ family: 'sessions', target: view.id, outcome: 'started' }),
+                details: expect.objectContaining({
+                    family: 'sessions',
+                    target: view.id,
+                    outcome: 'started',
+                }),
             }),
         );
         expect(auditText(h.audit)).not.toContain('deploy with token');
@@ -329,21 +352,34 @@ describe('FleetSessionService.start', () => {
     it('refuses Agent sessions until P2, a folder that is not one, and checkout starts', async () => {
         const h = harness();
         expect(
-            (await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...START, kind: 'agent' }))).code,
+            (
+                await refusalOf(
+                    h.service.start(NODE_ID, { userId: OWNER }, { ...START, kind: 'agent' }),
+                )
+            ).code,
         ).toBe('invalid');
-        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...START, cwd: '  ' }))).code).toBe(
-            'invalid',
-        );
         expect(
-            (await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...START, cwd: 'a\0b' }))).code,
+            (await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...START, cwd: '  ' })))
+                .code,
         ).toBe('invalid');
         expect(
             (
                 await refusalOf(
-                    h.service.start(NODE_ID, { userId: OWNER }, {
-                        ...START,
-                        checkoutId: '55555555-5555-4555-8555-555555555555',
-                    }),
+                    h.service.start(NODE_ID, { userId: OWNER }, { ...START, cwd: 'a\0b' }),
+                )
+            ).code,
+        ).toBe('invalid');
+        expect(
+            (
+                await refusalOf(
+                    h.service.start(
+                        NODE_ID,
+                        { userId: OWNER },
+                        {
+                            ...START,
+                            checkoutId: '55555555-5555-4555-8555-555555555555',
+                        },
+                    ),
                 )
             ).code,
         ).toBe('invalid');
@@ -352,9 +388,13 @@ describe('FleetSessionService.start', () => {
 
     it('refuses under the kill switch, and when the kill switch cannot be read (fail-closed)', async () => {
         const h = harness({ stopped: true });
-        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe('kill_switch');
+        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe(
+            'kill_switch',
+        );
         h.killSwitch.isStopped.mockRejectedValueOnce(new Error('db down'));
-        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe('kill_switch');
+        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe(
+            'kill_switch',
+        );
         expect(h.port.request).not.toHaveBeenCalled();
         expect(h.audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -366,32 +406,51 @@ describe('FleetSessionService.start', () => {
 
     it('refuses without --manage, offline, without the daemon and without the CLI', async () => {
         const noManage = harness({
-            port: { liveConsents: jest.fn(() => ({ work: true, attend: false, manage: false, usageScan: false })) },
+            port: {
+                liveConsents: jest.fn(() => ({
+                    work: true,
+                    attend: false,
+                    manage: false,
+                    usageScan: false,
+                })),
+            },
         });
-        expect((await refusalOf(noManage.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe(
-            'consent_missing',
-        );
+        expect(
+            (await refusalOf(noManage.service.start(NODE_ID, { userId: OWNER }, START))).code,
+        ).toBe('consent_missing');
 
-        const offline = harness({ port: { isConnected: jest.fn(() => false), liveConsents: jest.fn(() => null) } });
-        expect((await refusalOf(offline.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe(
-            'unreachable',
-        );
+        const offline = harness({
+            port: { isConnected: jest.fn(() => false), liveConsents: jest.fn(() => null) },
+        });
+        expect(
+            (await refusalOf(offline.service.start(NODE_ID, { userId: OWNER }, START))).code,
+        ).toBe('unreachable');
 
         const noDaemon = harness({ node: { capabilities: ['managed'] } });
-        expect((await refusalOf(noDaemon.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe(
-            'unsupported_on_node',
-        );
+        expect(
+            (await refusalOf(noDaemon.service.start(NODE_ID, { userId: OWNER }, START))).code,
+        ).toBe('unsupported_on_node');
 
         const noCli = harness({ node: { capabilities: ['sessions', 'managed'] } });
         expect(
-            (await refusalOf(noCli.service.start(NODE_ID, { userId: OWNER }, { ...START, provider: 'codex' }))).code,
+            (
+                await refusalOf(
+                    noCli.service.start(
+                        NODE_ID,
+                        { userId: OWNER },
+                        { ...START, provider: 'codex' },
+                    ),
+                )
+            ).code,
         ).toBe('unsupported_on_node');
     });
 
     it('answers unreachable when the deployment binds no node port', async () => {
         const h = harness({ port: null });
         // No port: the link reads as not connected, so the policy refuses first.
-        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe('unreachable');
+        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START))).code).toBe(
+            'unreachable',
+        );
         expect(h.repo.rows.size).toBe(0);
     });
 
@@ -400,7 +459,9 @@ describe('FleetSessionService.start', () => {
         for (let i = 0; i < FLEET_SESSION_MAX_OWNER_PER_NODE; i += 1) h.repo.seed();
         const refusal = await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START));
         expect(refusal.code).toBe('limit_exceeded');
-        expect((refusal.details as { sessions: unknown[] }).sessions).toHaveLength(FLEET_SESSION_MAX_OWNER_PER_NODE);
+        expect((refusal.details as { sessions: unknown[] }).sessions).toHaveLength(
+            FLEET_SESSION_MAX_OWNER_PER_NODE,
+        );
         expect(h.port.request).not.toHaveBeenCalled();
     });
 
@@ -415,7 +476,9 @@ describe('FleetSessionService.start', () => {
         const refusal = await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START));
         expect(refusal.code).toBe('limit_exceeded');
         expect(h.repo.rows.size).toBe(before + 1); // only the racing row
-        const verbs = h.port.request.mock.calls.map((call) => (call[0] as FleetSessionNodeRequest).verb);
+        const verbs = h.port.request.mock.calls.map(
+            (call) => (call[0] as FleetSessionNodeRequest).verb,
+        );
         expect(verbs).toEqual(['session.start', 'session.end']);
     });
 
@@ -423,12 +486,17 @@ describe('FleetSessionService.start', () => {
         const h = harness({
             port: {
                 request: jest.fn(async () => {
-                    throw fleetSessionError('invalid', 'that folder is outside your home folder', { field: 'cwd' });
+                    throw fleetSessionError('invalid', 'that folder is outside your home folder', {
+                        field: 'cwd',
+                    });
                 }),
             },
         });
         const refusal = await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, START));
-        expect(refusal).toMatchObject({ code: 'invalid', hint: 'that folder is outside your home folder' });
+        expect(refusal).toMatchObject({
+            code: 'invalid',
+            hint: 'that folder is outside your home folder',
+        });
         expect(h.repo.rows.size).toBe(0);
     });
 
@@ -454,11 +522,15 @@ describe('FleetSessionService.rename / end / restart', () => {
         const row = h.repo.seed();
         const view = await h.service.rename(row.id, { userId: OWNER }, '  release build  ');
         expect(view.title).toBe('release build');
-        expect((h.port.request.mock.calls[0][0] as FleetSessionNodeRequest).verb).toBe('session.rename');
+        expect((h.port.request.mock.calls[0][0] as FleetSessionNodeRequest).verb).toBe(
+            'session.rename',
+        );
         expect(h.audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({ action: 'node.session.rename' }),
         );
-        expect((await refusalOf(h.service.rename(row.id, { userId: OWNER }, ''))).code).toBe('invalid');
+        expect((await refusalOf(h.service.rename(row.id, { userId: OWNER }, ''))).code).toBe(
+            'invalid',
+        );
     });
 
     it('end needs confirm, then ends on the machine and audits class confirm', async () => {
@@ -476,7 +548,10 @@ describe('FleetSessionService.rename / end / restart', () => {
         expect(h.audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({
                 action: 'node.session.end',
-                details: expect.objectContaining({ confirmationClass: 'confirm', outcome: 'ended' }),
+                details: expect.objectContaining({
+                    confirmationClass: 'confirm',
+                    outcome: 'ended',
+                }),
             }),
         );
     });
@@ -493,7 +568,9 @@ describe('FleetSessionService.rename / end / restart', () => {
         const view = await h.service.end(row.id, { userId: OWNER }, { confirm: true });
         expect(view.state).toBe('ended');
         expect(h.audit.tryRecord).toHaveBeenCalledWith(
-            expect.objectContaining({ details: expect.objectContaining({ outcome: 'ended-platform-side' }) }),
+            expect.objectContaining({
+                details: expect.objectContaining({ outcome: 'ended-platform-side' }),
+            }),
         );
         const again = await h.service.end(row.id, { userId: OWNER }, { confirm: true });
         expect(again.state).toBe('ended');
@@ -509,24 +586,35 @@ describe('FleetSessionService.rename / end / restart', () => {
             },
         });
         const row = h.repo.seed();
-        expect((await refusalOf(h.service.end(row.id, { userId: OWNER }, { confirm: true }))).code).toBe(
-            'kill_switch',
-        );
+        expect(
+            (await refusalOf(h.service.end(row.id, { userId: OWNER }, { confirm: true }))).code,
+        ).toBe('kill_switch');
         expect(h.repo.rows.get(row.id)!.state).toBe('working');
     });
 
     it('hides a session on a computer the caller may not see, and an id that is not one', async () => {
         const h = harness();
         const row = h.repo.seed();
-        expect((await refusalOf(h.service.get(row.id, { userId: STRANGER }))).code).toBe('not_found');
-        expect((await refusalOf(h.service.get('not-a-uuid', { userId: OWNER }))).code).toBe('not_found');
+        expect((await refusalOf(h.service.get(row.id, { userId: STRANGER }))).code).toBe(
+            'not_found',
+        );
+        expect((await refusalOf(h.service.get('not-a-uuid', { userId: OWNER }))).code).toBe(
+            'not_found',
+        );
     });
 
     it('restart refuses a live session, then starts a new one linked back', async () => {
         const h = harness();
         const live = h.repo.seed();
-        expect((await refusalOf(h.service.restart(live.id, { userId: OWNER }))).code).toBe('invalid');
-        const ended = h.repo.seed({ state: 'ended', endedReason: 'exit', outcome: 'success', title: 'tests' });
+        expect((await refusalOf(h.service.restart(live.id, { userId: OWNER }))).code).toBe(
+            'invalid',
+        );
+        const ended = h.repo.seed({
+            state: 'ended',
+            endedReason: 'exit',
+            outcome: 'success',
+            title: 'tests',
+        });
         const view = await h.service.restart(ended.id, { userId: OWNER });
         expect(view.restartOfSessionId).toBe(ended.id);
         expect(view.title).toBe('tests');
@@ -542,7 +630,12 @@ describe('FleetSessionService.rename / end / restart', () => {
         const h = harness();
         const ended = h.repo.seed({ state: 'ended', endedReason: 'exit' });
         const refusal = await refusalOf(
-            h.service.restart(ended.id, { userId: OWNER }, {}, { expectNodeId: '66666666-6666-4666-8666-666666666666' }),
+            h.service.restart(
+                ended.id,
+                { userId: OWNER },
+                {},
+                { expectNodeId: '66666666-6666-4666-8666-666666666666' },
+            ),
         );
         expect(refusal.code).toBe('invalid');
         expect(h.port.request).not.toHaveBeenCalled();
@@ -550,7 +643,10 @@ describe('FleetSessionService.rename / end / restart', () => {
 });
 
 describe('FleetSessionService — what the node reports', () => {
-    const event = (sessionId: string, patch: Partial<FleetSessionEventMessage>): FleetSessionEventMessage => ({
+    const event = (
+        sessionId: string,
+        patch: Partial<FleetSessionEventMessage>,
+    ): FleetSessionEventMessage => ({
         type: 'session.event',
         sessionId,
         event: 'activity',
@@ -563,7 +659,10 @@ describe('FleetSessionService — what the node reports', () => {
         await h.service.applyNodeEvent(NODE_ID, event(row.daemonSessionId, { event: 'started' }));
         expect(h.repo.rows.get(row.id)!.state).toBe('working');
         expect(h.repo.rows.get(row.id)!.startedAt).toBeInstanceOf(Date);
-        await h.service.applyNodeEvent(NODE_ID, event(row.daemonSessionId, { event: 'title', title: 'npm test' }));
+        await h.service.applyNodeEvent(
+            NODE_ID,
+            event(row.daemonSessionId, { event: 'title', title: 'npm test' }),
+        );
         expect(h.repo.rows.get(row.id)!.title).toBe('npm test');
     });
 
@@ -575,7 +674,12 @@ describe('FleetSessionService — what the node reports', () => {
             event(row.daemonSessionId, { event: 'exited', exitCode: 1, screen: 'FAIL 3 tests' }),
         );
         const stored = h.repo.rows.get(row.id)!;
-        expect(stored).toMatchObject({ state: 'ended', endedReason: 'exit', outcome: 'failure', exitCode: 1 });
+        expect(stored).toMatchObject({
+            state: 'ended',
+            endedReason: 'exit',
+            outcome: 'failure',
+            exitCode: 1,
+        });
         expect(stored.lastScreen).toBe('FAIL 3 tests');
         expect(h.port.ack).toHaveBeenCalledWith(NODE_ID, [row.daemonSessionId]);
     });
@@ -583,7 +687,10 @@ describe('FleetSessionService — what the node reports', () => {
     it('a drain end is audited as the system; a user end racing an exit keeps the first reason', async () => {
         const h = harness();
         const drained = h.repo.seed();
-        await h.service.applyNodeEvent(NODE_ID, event(drained.daemonSessionId, { event: 'exited', reason: 'drain' }));
+        await h.service.applyNodeEvent(
+            NODE_ID,
+            event(drained.daemonSessionId, { event: 'exited', reason: 'drain' }),
+        );
         expect(h.repo.rows.get(drained.id)!.endedReason).toBe('drain');
         expect(h.audit.tryRecord).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -609,7 +716,10 @@ describe('FleetSessionService — what the node reports', () => {
     it('lost ends the row node-restart, unconfirmed', async () => {
         const h = harness();
         const row = h.repo.seed();
-        await h.service.applyNodeEvent(NODE_ID, event(row.daemonSessionId, { event: 'lost', screen: 'last' }));
+        await h.service.applyNodeEvent(
+            NODE_ID,
+            event(row.daemonSessionId, { event: 'lost', screen: 'last' }),
+        );
         expect(h.repo.rows.get(row.id)).toMatchObject({
             state: 'ended',
             endedReason: 'node-restart',
@@ -634,7 +744,10 @@ describe('FleetSessionService.reconcileList and sweepStale', () => {
         const gone = h.repo.seed();
         const young = h.repo.seed({ createdAt: new Date() });
         await h.service.reconcileList(NODE_ID, { type: 'session.list', sessions: [], daemon });
-        expect(h.repo.rows.get(gone.id)).toMatchObject({ state: 'ended', endedReason: 'node-restart' });
+        expect(h.repo.rows.get(gone.id)).toMatchObject({
+            state: 'ended',
+            endedReason: 'node-restart',
+        });
         expect(h.repo.rows.get(young.id)!.state).toBe('working');
     });
 
@@ -679,7 +792,10 @@ describe('FleetSessionService.reconcileList and sweepStale', () => {
 
     it('the sweeper ends owner sessions still starting after a minute', async () => {
         const h = harness();
-        const stale = h.repo.seed({ state: 'starting', createdAt: new Date(Date.now() - 5 * 60_000) });
+        const stale = h.repo.seed({
+            state: 'starting',
+            createdAt: new Date(Date.now() - 5 * 60_000),
+        });
         const fresh = h.repo.seed({ state: 'starting', createdAt: new Date() });
         expect(await h.service.sweepStale()).toEqual({ ended: 1 });
         expect(h.repo.rows.get(stale.id)).toMatchObject({
@@ -703,9 +819,9 @@ describe('FleetSessionService reads', () => {
         expect(page.nextCursor).toEqual(expect.stringContaining('|'));
         const all = await h.service.listPage({ userId: OWNER }, { limit: 50 });
         expect(all.nextCursor).toBeNull();
-        expect((await refusalOf(h.service.listPage({ userId: STRANGER }, { nodeId: NODE_ID }))).code).toBe(
-            'not_found',
-        );
+        expect(
+            (await refusalOf(h.service.listPage({ userId: STRANGER }, { nodeId: NODE_ID }))).code,
+        ).toBe('not_found');
     });
 
     it('lists no sessions on computers the caller cannot see', async () => {
@@ -738,7 +854,9 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
         const base = harness();
         const agents = {
             findByIdAndUser: jest.fn(async (id: string, userId: string) =>
-                id === AGENT_ID && userId === (options.agentOwner ?? OWNER) ? { id, name: 'Nina' } : null,
+                id === AGENT_ID && userId === (options.agentOwner ?? OWNER)
+                    ? { id, name: 'Nina' }
+                    : null,
             ),
         };
         const runs = {
@@ -758,7 +876,10 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
         };
         const service = new FleetSessionService(
             base.repo as never,
-            { findById: jest.fn(async () => base.node), findByUser: jest.fn(async () => [base.node]) } as never,
+            {
+                findById: jest.fn(async () => base.node),
+                findByUser: jest.fn(async () => [base.node]),
+            } as never,
             {
                 resolveForFamily: jest.fn(async () => ({ node: base.node, role: 'owner' })),
                 listSharedWith: jest.fn(async () => []),
@@ -781,10 +902,20 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
         expect(view.agentRunId).toBe(RUN_ID);
         expect(view.startedBy).toBe(`agent:${AGENT_ID}`);
         expect(h.runs.createQueued).toHaveBeenCalledWith(
-            expect.objectContaining({ triggerKind: 'session', fleetSessionId: view.id, agentId: AGENT_ID }),
+            expect.objectContaining({
+                triggerKind: 'session',
+                fleetSessionId: view.id,
+                agentId: AGENT_ID,
+            }),
         );
-        const enqueued = (h.dispatcher.enqueue.mock.calls[0] as unknown[])[0] as { payload: Record<string, unknown> };
-        expect(enqueued.payload).toMatchObject({ fleetSessionId: view.id, nodeId: NODE_ID, agentRunId: RUN_ID });
+        const enqueued = (h.dispatcher.enqueue.mock.calls[0] as unknown[])[0] as {
+            payload: Record<string, unknown>;
+        };
+        expect(enqueued.payload).toMatchObject({
+            fleetSessionId: view.id,
+            nodeId: NODE_ID,
+            agentRunId: RUN_ID,
+        });
         // The machine is not asked on the link: the job carries the start.
         expect(h.port.request).not.toHaveBeenCalled();
     });
@@ -794,7 +925,12 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
         const view = await h.service.start(
             NODE_ID,
             { userId: OWNER, agentId: AGENT_ID },
-            { kind: 'owner', provider: 'claude-code', cwd: '~/code/app', firstMessage: 'do the thing now' },
+            {
+                kind: 'owner',
+                provider: 'claude-code',
+                cwd: '~/code/app',
+                firstMessage: 'do the thing now',
+            },
         );
         expect(view.kind).toBe('agent');
         expect(view.agentId).toBe(AGENT_ID);
@@ -802,19 +938,39 @@ describe('FleetSessionService — Agent sessions (FL-04 P2)', () => {
 
     it('refuses a shell, a short first message, somebody else’s Agent', async () => {
         const h = agentHarness();
-        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...AGENT_START, provider: 'shell' }))).code).toBe(
-            'invalid',
-        );
         expect(
-            (await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, { ...AGENT_START, firstMessage: 'hi' }))).code,
+            (
+                await refusalOf(
+                    h.service.start(
+                        NODE_ID,
+                        { userId: OWNER },
+                        { ...AGENT_START, provider: 'shell' },
+                    ),
+                )
+            ).code,
+        ).toBe('invalid');
+        expect(
+            (
+                await refusalOf(
+                    h.service.start(
+                        NODE_ID,
+                        { userId: OWNER },
+                        { ...AGENT_START, firstMessage: 'hi' },
+                    ),
+                )
+            ).code,
         ).toBe('invalid');
         const other = agentHarness({ agentOwner: MEMBER });
-        expect((await refusalOf(other.service.start(NODE_ID, { userId: OWNER }, AGENT_START))).code).toBe('not_found');
+        expect(
+            (await refusalOf(other.service.start(NODE_ID, { userId: OWNER }, AGENT_START))).code,
+        ).toBe('not_found');
     });
 
     it('ends the row and fails the Run when the job cannot be queued — no session waits on nothing', async () => {
         const h = agentHarness({ enqueueFails: true });
-        expect((await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, AGENT_START))).code).toBe('unreachable');
+        expect(
+            (await refusalOf(h.service.start(NODE_ID, { userId: OWNER }, AGENT_START))).code,
+        ).toBe('unreachable');
         expect(h.runs.markDispatchFailed).toHaveBeenCalledWith(RUN_ID, expect.any(String));
         expect([...h.repo.rows.values()].every((row) => row.state === 'ended')).toBe(true);
     });
@@ -846,7 +1002,10 @@ describe('FleetSessionService — recording (FL-04 P3)', () => {
         const recorder = { ensure: jest.fn(), stop: jest.fn() };
         const service = new FleetSessionService(
             base.repo as never,
-            { findById: jest.fn(async () => base.node), findByUser: jest.fn(async () => [base.node]) } as never,
+            {
+                findById: jest.fn(async () => base.node),
+                findByUser: jest.fn(async () => [base.node]),
+            } as never,
             {
                 resolveForFamily: jest.fn(async () => ({ node: base.node, role: 'owner' })),
                 listSharedWith: jest.fn(async () => []),
@@ -866,7 +1025,9 @@ describe('FleetSessionService — recording (FL-04 P3)', () => {
         const h = recordedHarness({ recordWatchSessions: true });
         const view = await h.service.start(NODE_ID, { userId: OWNER }, START);
         expect(view.recordingState).toBe('recording');
-        expect(h.recorder.ensure).toHaveBeenCalledWith(expect.objectContaining({ id: view.id, nodeId: NODE_ID }));
+        expect(h.recorder.ensure).toHaveBeenCalledWith(
+            expect.objectContaining({ id: view.id, nodeId: NODE_ID }),
+        );
     });
 
     it('does not record by default', async () => {
@@ -885,8 +1046,12 @@ describe('FleetSessionService — recording (FL-04 P3)', () => {
         const off = await h.service.setRecording(view.id, { userId: OWNER }, false);
         expect(off.recordingState).toBe('off');
         expect(h.recorder.stop).toHaveBeenCalledWith(view.id);
-        const actions = h.audit.tryRecord.mock.calls.map((call) => (call[0] as { action: string }).action);
-        expect(actions).toEqual(expect.arrayContaining(['node.session.recording.start', 'node.session.recording.stop']));
+        const actions = h.audit.tryRecord.mock.calls.map(
+            (call) => (call[0] as { action: string }).action,
+        );
+        expect(actions).toEqual(
+            expect.arrayContaining(['node.session.recording.start', 'node.session.recording.stop']),
+        );
     });
 
     it('stores the recording when the session ends, and stops the recorder', async () => {

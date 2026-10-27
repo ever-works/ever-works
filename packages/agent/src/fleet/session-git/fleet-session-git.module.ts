@@ -35,7 +35,12 @@ import { FleetSessionGitService } from './fleet-session-git.service';
         PolicyModule,
         TypeOrmModule.forFeature([Agent, User, AgentRunLog, FleetAudit]),
     ],
-    providers: [FleetSessionGitService, FleetSessionActionService, FleetAgentActionTemplatesService, AgentRepository],
+    providers: [
+        FleetSessionGitService,
+        FleetSessionActionService,
+        FleetAgentActionTemplatesService,
+        AgentRepository,
+    ],
     exports: [FleetSessionGitService, FleetSessionActionService, FleetAgentActionTemplatesService],
 })
 export class FleetSessionGitModule {}

@@ -67,7 +67,10 @@ describe('FL-03 health tools', () => {
 
     it('assembles the two read-only tools and never the wake', () => {
         const { built } = tools();
-        expect(built.map((tool) => tool.name)).toEqual(['fleet_nodes_health', 'fleet_nodes_needs_a_look']);
+        expect(built.map((tool) => tool.name)).toEqual([
+            'fleet_nodes_health',
+            'fleet_nodes_needs_a_look',
+        ]);
     });
 
     it('answers the same snapshot and state the page shows, scoped to the caller (spec S9)', async () => {
@@ -85,7 +88,10 @@ describe('FL-03 health tools', () => {
 
     it('adds the history when a range is asked for, and refuses an unknown range', async () => {
         const { built, history } = tools();
-        const result = (await built[0]!.invoke({ nodeId: NODE_ID, range: '7d' })) as Record<string, unknown>;
+        const result = (await built[0]!.invoke({ nodeId: NODE_ID, range: '7d' })) as Record<
+            string,
+            unknown
+        >;
         expect(history).toHaveBeenCalledWith(NODE_ID, '7d');
         expect(result.history).toEqual({ nodeId: NODE_ID, range: '7d', disabled: true });
         expect(await built[0]!.invoke({ nodeId: NODE_ID, range: '1y' })).toEqual({
@@ -107,7 +113,9 @@ describe('FL-03 health tools', () => {
     it('lists needs-a-look for the visible computers, or one of them', async () => {
         const { built, forNodes } = tools();
         await built[1]!.invoke({});
-        expect(forNodes).toHaveBeenCalledWith([expect.objectContaining({ id: NODE_ID })], { userId: 'user-1' });
+        expect(forNodes).toHaveBeenCalledWith([expect.objectContaining({ id: NODE_ID })], {
+            userId: 'user-1',
+        });
         expect(await built[1]!.invoke({ nodeId: 'someone-else' })).toEqual({
             error: { code: 'not_found', hint: 'no such computer' },
         });

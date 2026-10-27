@@ -39,17 +39,23 @@ const list = new Command('list')
     .option('--json', 'Machine-readable output')
     .action(async (options: { own?: boolean; kind?: string; status?: string; json?: boolean }) => {
         const json = options.json === true;
-        if (options.kind && !KINDS.includes(options.kind)) fleetUsage(json, '--kind is desktop-node, node or k8s', 'kind');
+        if (options.kind && !KINDS.includes(options.kind))
+            fleetUsage(json, '--kind is desktop-node, node or k8s', 'kind');
         if (options.status && !STATUSES.includes(options.status)) {
             fleetUsage(json, '--status is enrolling, online, offline or disabled', 'status');
         }
         await runFleetVerb<FleetNodeView[]>(
             json,
-            { method: 'GET', path: '/fleet/nodes', query: { scope: options.own ? 'own' : 'visible' } },
+            {
+                method: 'GET',
+                path: '/fleet/nodes',
+                query: { scope: options.own ? 'own' : 'visible' },
+            },
             (nodes) => {
                 const shown = nodes.filter(
                     (node) =>
-                        (!options.kind || node.kind === options.kind) && (!options.status || node.status === options.status),
+                        (!options.kind || node.kind === options.kind) &&
+                        (!options.status || node.status === options.status),
                 );
                 console.log(shown.length === 0 ? chalk.yellow('No computers.') : nodeRows(shown));
             },
@@ -86,19 +92,24 @@ const health = new Command('health')
     .option('--json', 'Machine-readable output')
     .action(async (options: { on: string; range?: string; json?: boolean }) => {
         const json = options.json === true;
-        if (options.range && !RANGES.includes(options.range)) fleetUsage(json, '--range is 1h, 24h, 7d or 90d', 'range');
+        if (options.range && !RANGES.includes(options.range))
+            fleetUsage(json, '--range is 1h, 24h, 7d or 90d', 'range');
         const nodeId = await resolveFleetNodeId(json, options.on);
         await runFleetVerb<FleetNodeHealthView>(
             json,
             {
                 method: 'GET',
-                path: options.range ? `/fleet/nodes/${nodeId}/health/history` : `/fleet/nodes/${nodeId}/health`,
+                path: options.range
+                    ? `/fleet/nodes/${nodeId}/health/history`
+                    : `/fleet/nodes/${nodeId}/health`,
                 ...(options.range ? { query: { range: options.range } } : {}),
             },
             (view) => {
                 const snapshot = (view as FleetNodeHealthView).snapshot;
                 if (!snapshot) {
-                    console.log(chalk.yellow('This computer reports no health (an older node version).'));
+                    console.log(
+                        chalk.yellow('This computer reports no health (an older node version).'),
+                    );
                     return;
                 }
                 const line = [
@@ -109,7 +120,9 @@ const health = new Command('health')
                 ]
                     .filter(Boolean)
                     .join(' · ');
-                console.log(`${line}${(view as FleetNodeHealthView).stale ? chalk.gray(' (stale)') : ''}`);
+                console.log(
+                    `${line}${(view as FleetNodeHealthView).stale ? chalk.gray(' (stale)') : ''}`,
+                );
                 console.log(chalk.gray(`read ${snapshot.at}`));
             },
         );
@@ -124,14 +137,22 @@ const needsALook = new Command('needs-a-look')
         const nodeId = options.on ? await resolveFleetNodeId(json, options.on) : null;
         await runFleetVerb<NeedsALookItem[]>(
             json,
-            { method: 'GET', path: nodeId ? `/fleet/nodes/${nodeId}/needs-a-look` : '/fleet/needs-a-look' },
+            {
+                method: 'GET',
+                path: nodeId ? `/fleet/nodes/${nodeId}/needs-a-look` : '/fleet/needs-a-look',
+            },
             (items) => {
                 if (items.length === 0) {
                     console.log(chalk.green('Nothing needs a look.'));
                     return;
                 }
                 for (const item of items) {
-                    const mark = item.severity === 'critical' ? chalk.red('●') : item.severity === 'warn' ? chalk.yellow('●') : chalk.gray('●');
+                    const mark =
+                        item.severity === 'critical'
+                            ? chalk.red('●')
+                            : item.severity === 'warn'
+                              ? chalk.yellow('●')
+                              : chalk.gray('●');
                     console.log(`${mark} ${item.title} ${chalk.gray(item.detail)}`);
                 }
             },

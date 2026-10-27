@@ -11,7 +11,14 @@ import {
 	parseLaunchctlPrintServices
 } from './launchd-manager';
 import { encodePowerShell, psLiteral } from './powershell';
-import { nameFromCommand, parseElapsed, parsePsRows, parseWindowsProcesses, safeCommandLine, topProcesses } from './process-list';
+import {
+	nameFromCommand,
+	parseElapsed,
+	parsePsRows,
+	parseWindowsProcesses,
+	safeCommandLine,
+	topProcesses
+} from './process-list';
 import { createRootRunner, isSudoRefusal, renderPosixCommand } from './root-runner';
 import { markProtected, nodeAncestry, protectionOf } from './self-protection';
 import {
@@ -46,7 +53,12 @@ function fakeRunner(answer: (call: Call) => { code: number; stdout?: string; std
 				const call = { command, args: [...args] };
 				calls.push(call);
 				const result = answer(call);
-				return { code: result.code, stdout: result.stdout ?? '', stderr: result.stderr ?? '', ...(result.spawnError ? { spawnError: result.spawnError } : {}) };
+				return {
+					code: result.code,
+					stdout: result.stdout ?? '',
+					stderr: result.stderr ?? '',
+					...(result.spawnError ? { spawnError: result.spawnError } : {})
+				};
 			}
 		}
 	};
@@ -182,7 +194,9 @@ describe('blast radius (FR-5)', () => {
 
 	it('treats Docker as a blast radius only when containers are computers (FL-16)', () => {
 		expect(serviceBlastRadiusKind({ name: 'docker', manager: 'systemd' }, linux)).toBeNull();
-		expect(serviceBlastRadiusKind({ name: 'docker', manager: 'systemd' }, { ...linux, hostsChildNodes: true })).toBe('docker');
+		expect(
+			serviceBlastRadiusKind({ name: 'docker', manager: 'systemd' }, { ...linux, hostsChildNodes: true })
+		).toBe('docker');
 	});
 
 	it('knows the node by its pid whatever its unit is called', () => {
@@ -207,7 +221,13 @@ describe('systemd parsers', () => {
 	it('reads list-units JSON', () => {
 		const units = parseSystemdJsonUnits(
 			JSON.stringify([
-				{ unit: 'postgresql.service', load: 'loaded', active: 'failed', sub: 'failed', description: 'PostgreSQL' },
+				{
+					unit: 'postgresql.service',
+					load: 'loaded',
+					active: 'failed',
+					sub: 'failed',
+					description: 'PostgreSQL'
+				},
 				{ unit: 'nginx.service', load: 'loaded', active: 'active', sub: 'running', description: 'nginx' }
 			])
 		);
@@ -223,8 +243,20 @@ describe('systemd parsers', () => {
 			].join('\n')
 		);
 		expect(units).toEqual([
-			{ unit: 'postgresql.service', load: 'loaded', active: 'failed', sub: 'failed', description: 'PostgreSQL RDBMS' },
-			{ unit: 'nginx.service', load: 'loaded', active: 'active', sub: 'running', description: 'A high performance web server' }
+			{
+				unit: 'postgresql.service',
+				load: 'loaded',
+				active: 'failed',
+				sub: 'failed',
+				description: 'PostgreSQL RDBMS'
+			},
+			{
+				unit: 'nginx.service',
+				load: 'loaded',
+				active: 'active',
+				sub: 'running',
+				description: 'A high performance web server'
+			}
 		]);
 	});
 
@@ -250,8 +282,17 @@ describe('systemd parsers', () => {
 			].join('\n'),
 			new Date('2026-10-21T12:00:00Z')
 		);
-		expect(shown[0]).toMatchObject({ id: 'postgresql.service', mainPid: null, exitStatus: 1, since: '2026-10-21T09:12:03.000Z' });
-		expect(shown[1]).toMatchObject({ id: 'nginx.service', mainPid: 1234, since: new Date(1761037923000).toISOString() });
+		expect(shown[0]).toMatchObject({
+			id: 'postgresql.service',
+			mainPid: null,
+			exitStatus: 1,
+			since: '2026-10-21T09:12:03.000Z'
+		});
+		expect(shown[1]).toMatchObject({
+			id: 'nginx.service',
+			mainPid: 1234,
+			since: new Date(1761037923000).toISOString()
+		});
 		expect(parseSystemdTimestamp('n/a')).toBeNull();
 	});
 
@@ -267,13 +308,24 @@ describe('systemd parsers', () => {
 
 describe('launchd and Homebrew parsers', () => {
 	it('reads launchctl list and the services block of launchctl print', () => {
-		expect(parseLaunchctlList('PID\tStatus\tLabel\n-\t0\tcom.example.idle\n412\t0\tcom.example.up\n-\t78\tcom.example.broken\n')).toEqual([
+		expect(
+			parseLaunchctlList(
+				'PID\tStatus\tLabel\n-\t0\tcom.example.idle\n412\t0\tcom.example.up\n-\t78\tcom.example.broken\n'
+			)
+		).toEqual([
 			{ pid: null, status: 0, label: 'com.example.idle' },
 			{ pid: 412, status: 0, label: 'com.example.up' },
 			{ pid: null, status: 78, label: 'com.example.broken' }
 		]);
 		const printed = parseLaunchctlPrintServices(
-			['system = {', '\tservices = {', '\t\t       0      -9 \tcom.apple.a', '\t\t     123       0 \tcom.openssh.sshd', '\t}', '}'].join('\n')
+			[
+				'system = {',
+				'\tservices = {',
+				'\t\t       0      -9 \tcom.apple.a',
+				'\t\t     123       0 \tcom.openssh.sshd',
+				'\t}',
+				'}'
+			].join('\n')
 		);
 		expect(printed).toEqual([
 			{ pid: null, status: -9, label: 'com.apple.a' },
@@ -284,7 +336,9 @@ describe('launchd and Homebrew parsers', () => {
 	});
 
 	it('reads the disabled list in both spellings', () => {
-		const disabled = parseLaunchctlDisabled('disabled services = {\n\t"com.a" => disabled\n\t"com.b" => enabled\n\t"com.c" => true\n}');
+		const disabled = parseLaunchctlDisabled(
+			'disabled services = {\n\t"com.a" => disabled\n\t"com.b" => enabled\n\t"com.c" => true\n}'
+		);
 		expect(disabled.get('com.a')).toBe(true);
 		expect(disabled.get('com.b')).toBe(false);
 		expect(disabled.get('com.c')).toBe(true);
@@ -315,9 +369,20 @@ describe('Windows services', () => {
 	});
 
 	it('reads one or many CIM rows', () => {
-		const one = parseWindowsServices(JSON.stringify({ Name: 'W3SVC', DisplayName: 'World Wide Web Publishing Service', State: 'Running', StartMode: 'Auto', ProcessId: 4100, ExitCode: 0 }));
+		const one = parseWindowsServices(
+			JSON.stringify({
+				Name: 'W3SVC',
+				DisplayName: 'World Wide Web Publishing Service',
+				State: 'Running',
+				StartMode: 'Auto',
+				ProcessId: 4100,
+				ExitCode: 0
+			})
+		);
 		expect(one[0]).toMatchObject({ name: 'W3SVC', state: 'running', atBoot: true, pid: 4100 });
-		const many = parseWindowsServices(JSON.stringify([{ Name: 'a', State: 'Stopped', StartMode: 'Disabled', ProcessId: 0, ExitCode: 0 }]));
+		const many = parseWindowsServices(
+			JSON.stringify([{ Name: 'a', State: 'Stopped', StartMode: 'Disabled', ProcessId: 0, ExitCode: 0 }])
+		);
 		expect(many[0]).toMatchObject({ name: 'a', state: 'inactive', atBoot: false, disabled: true, pid: null });
 	});
 
@@ -338,7 +403,14 @@ describe('process list (FR-9, FR-10)', () => {
 			].join('\n'),
 			'linux'
 		);
-		expect(rows[0]).toMatchObject({ pid: 4812, ppid: 1, owner: 'ops', cpuPercent: 97, runtimeSec: 724, name: 'node' });
+		expect(rows[0]).toMatchObject({
+			pid: 4812,
+			ppid: 1,
+			owner: 'ops',
+			cpuPercent: 97,
+			runtimeSec: 724,
+			name: 'node'
+		});
 		expect(rows[0].memBytes).toBe(1258291 * 1024);
 		expect(rows[2].name).toBe('postgres');
 		expect(rows[3].command).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz0123456789');
@@ -357,10 +429,27 @@ describe('process list (FR-9, FR-10)', () => {
 
 	it('reads the Windows script answer', () => {
 		const rows = parseWindowsProcesses(
-			JSON.stringify([{ Id: 4812, ParentId: 1000, Name: 'node', Cpu: 97, Mem: 1000, User: null, Start: '2026-10-21T09:00:00.000Z', CommandLine: 'node worker.js' }]),
+			JSON.stringify([
+				{
+					Id: 4812,
+					ParentId: 1000,
+					Name: 'node',
+					Cpu: 97,
+					Mem: 1000,
+					User: null,
+					Start: '2026-10-21T09:00:00.000Z',
+					CommandLine: 'node worker.js'
+				}
+			]),
 			Date.parse('2026-10-21T09:10:00.000Z')
 		);
-		expect(rows[0]).toMatchObject({ pid: 4812, ppid: 1000, cpuPercent: 97, runtimeSec: 600, command: 'node worker.js' });
+		expect(rows[0]).toMatchObject({
+			pid: 4812,
+			ppid: 1000,
+			cpuPercent: 97,
+			runtimeSec: 600,
+			command: 'node worker.js'
+		});
 	});
 
 	it('keeps the busiest 300 by CPU, or the largest by memory', () => {
@@ -388,22 +477,70 @@ describe('GPU stats (FR-14)', () => {
 	});
 
 	it('reports Apple utilisation as null, never 0', () => {
-		const gpus = parseAppleDisplays(JSON.stringify({ SPDisplaysDataType: [{ sppci_model: 'Apple M2 Max' }] }), 38 * 1024 ** 3);
-		expect(gpus[0]).toMatchObject({ vendor: 'apple', model: 'Apple M2 Max', utilizationPercent: null, sharedMemory: true, memTotalBytes: 38 * 1024 ** 3 });
+		const gpus = parseAppleDisplays(
+			JSON.stringify({ SPDisplaysDataType: [{ sppci_model: 'Apple M2 Max' }] }),
+			38 * 1024 ** 3
+		);
+		expect(gpus[0]).toMatchObject({
+			vendor: 'apple',
+			model: 'Apple M2 Max',
+			utilizationPercent: null,
+			sharedMemory: true,
+			memTotalBytes: 38 * 1024 ** 3
+		});
 	});
 
 	it('ignores a saturated Windows AdapterRAM', () => {
-		expect(parseWindowsVideoControllers(JSON.stringify({ Name: 'Intel(R) UHD Graphics', AdapterRAM: 4294967295 }))[0].memTotalBytes).toBeNull();
+		expect(
+			parseWindowsVideoControllers(JSON.stringify({ Name: 'Intel(R) UHD Graphics', AdapterRAM: 4294967295 }))[0]
+				.memTotalBytes
+		).toBeNull();
 	});
 });
 
 describe('self-protection (FR-12, U10)', () => {
 	const processes = [
-		{ pid: 1, ppid: null, name: 'systemd', cpuPercent: 0, memBytes: 1, owner: 'root', runtimeSec: 1, command: '/sbin/init' },
+		{
+			pid: 1,
+			ppid: null,
+			name: 'systemd',
+			cpuPercent: 0,
+			memBytes: 1,
+			owner: 'root',
+			runtimeSec: 1,
+			command: '/sbin/init'
+		},
 		{ pid: 800, ppid: 1, name: 'bash', cpuPercent: 0, memBytes: 1, owner: 'ops', runtimeSec: 1, command: 'bash' },
-		{ pid: 912, ppid: 800, name: 'node', cpuPercent: 0.8, memBytes: 1, owner: 'ops', runtimeSec: 1, command: 'node cli.js start --manage' },
-		{ pid: 913, ppid: 912, name: 'node', cpuPercent: 0, memBytes: 1, owner: 'ops', runtimeSec: 1, command: 'node cli.js session-daemon --state-dir /x --socket /y' },
-		{ pid: 4812, ppid: 912, name: 'node', cpuPercent: 97, memBytes: 1, owner: 'ops', runtimeSec: 1, command: 'node worker.js' }
+		{
+			pid: 912,
+			ppid: 800,
+			name: 'node',
+			cpuPercent: 0.8,
+			memBytes: 1,
+			owner: 'ops',
+			runtimeSec: 1,
+			command: 'node cli.js start --manage'
+		},
+		{
+			pid: 913,
+			ppid: 912,
+			name: 'node',
+			cpuPercent: 0,
+			memBytes: 1,
+			owner: 'ops',
+			runtimeSec: 1,
+			command: 'node cli.js session-daemon --state-dir /x --socket /y'
+		},
+		{
+			pid: 4812,
+			ppid: 912,
+			name: 'node',
+			cpuPercent: 97,
+			memBytes: 1,
+			owner: 'ops',
+			runtimeSec: 1,
+			command: 'node worker.js'
+		}
 	];
 	const context = { selfPid: 912, parentPid: 800 };
 
@@ -414,6 +551,12 @@ describe('self-protection (FR-12, U10)', () => {
 		expect(protectionOf(800, processes, context)).toBe('node');
 		expect(protectionOf(913, processes, context)).toBe('daemon');
 		expect(protectionOf(4812, processes, context)).toBeNull();
-		expect(markProtected(processes, processes, context).map((row) => row.protected)).toEqual(['init', 'node', 'node', 'daemon', null]);
+		expect(markProtected(processes, processes, context).map((row) => row.protected)).toEqual([
+			'init',
+			'node',
+			'node',
+			'daemon',
+			null
+		]);
 	});
 });

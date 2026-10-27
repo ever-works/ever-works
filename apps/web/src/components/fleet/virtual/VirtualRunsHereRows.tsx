@@ -4,7 +4,10 @@ import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import type { FleetVirtualChildrenListView } from '@ever-works/contracts';
-import { fleetVirtualPowerAction, listFleetVirtualChildrenAction } from '@/app/actions/fleet/virtual';
+import {
+    fleetVirtualPowerAction,
+    listFleetVirtualChildrenAction,
+} from '@/app/actions/fleet/virtual';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
@@ -22,10 +25,18 @@ const BUSY_REFRESH_MS = 5_000;
  * and the host's free memory net of what they reserve. Renders nothing for a
  * host with no virtual computers.
  */
-export function VirtualRunsHereRows({ hostNodeId, allowed }: { hostNodeId: string; allowed: boolean }) {
+export function VirtualRunsHereRows({
+    hostNodeId,
+    allowed,
+}: {
+    hostNodeId: string;
+    allowed: boolean;
+}) {
     const t = useTranslations('fleet.virtual');
     const [view, setView] = useState<FleetVirtualChildrenListView | null>(null);
-    const [stopping, setStopping] = useState<{ id: string; model: ConfirmDialogModel } | null>(null);
+    const [stopping, setStopping] = useState<{ id: string; model: ConfirmDialogModel } | null>(
+        null,
+    );
     const [pending, startTransition] = useTransition();
 
     const load = useCallback(async () => {
@@ -44,7 +55,12 @@ export function VirtualRunsHereRows({ hostNodeId, allowed }: { hostNodeId: strin
 
     const power = (childId: string, action: 'start' | 'stop', confirm: boolean) =>
         startTransition(async () => {
-            const result = await fleetVirtualPowerAction(hostNodeId, childId, action, confirm ? { confirm: true } : {});
+            const result = await fleetVirtualPowerAction(
+                hostNodeId,
+                childId,
+                action,
+                confirm ? { confirm: true } : {},
+            );
             setStopping(null);
             if (result.ok) void load();
             else toast.error(result.error.hint || t('power.failed'));
@@ -57,15 +73,31 @@ export function VirtualRunsHereRows({ hostNodeId, allowed }: { hostNodeId: strin
                     const state = child.virtual?.state ?? 'stopped';
                     const running = state === 'running';
                     return (
-                        <span key={child.id} className="inline-flex items-center gap-1" data-testid="fleet-virtual-runs-here-item">
-                            <span aria-hidden className={running ? 'text-success' : 'text-text-muted dark:text-text-muted-dark'}>
+                        <span
+                            key={child.id}
+                            className="inline-flex items-center gap-1"
+                            data-testid="fleet-virtual-runs-here-item"
+                        >
+                            <span
+                                aria-hidden
+                                className={
+                                    running
+                                        ? 'text-success'
+                                        : 'text-text-muted dark:text-text-muted-dark'
+                                }
+                            >
                                 {virtualStateGlyph(state)}
                             </span>
-                            <Link href={ROUTES.DASHBOARD_FLEET_COMPUTER(child.id)} className="hover:underline">
+                            <Link
+                                href={ROUTES.DASHBOARD_FLEET_COMPUTER(child.id)}
+                                className="hover:underline"
+                            >
                                 {child.name}
                             </Link>
                             <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                ({t(`state.${VIRTUAL_STATE_KEYS[state]}` as Parameters<typeof t>[0])})
+                                (
+                                {t(`state.${VIRTUAL_STATE_KEYS[state]}` as Parameters<typeof t>[0])}
+                                )
                             </span>
                             {allowed && (running || state === 'stopped') ? (
                                 <Button
@@ -79,7 +111,9 @@ export function VirtualRunsHereRows({ hostNodeId, allowed }: { hostNodeId: strin
                                                   id: child.id,
                                                   model: {
                                                       class: 'confirm',
-                                                      title: t('power.stopTitle', { name: child.name }),
+                                                      title: t('power.stopTitle', {
+                                                          name: child.name,
+                                                      }),
                                                       body:
                                                           child.virtualKind === 'vm'
                                                               ? t('power.stopBodyVm')
@@ -96,7 +130,10 @@ export function VirtualRunsHereRows({ hostNodeId, allowed }: { hostNodeId: strin
                     );
                 })}
             </div>
-            <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-virtual-free-memory">
+            <p
+                className="text-xs text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-virtual-free-memory"
+            >
                 {t('runsHere.freeMemory', {
                     free: formatGiB(view.freeMemoryMiB) ?? '—',
                     reserved: formatGiB(view.reservedMemoryMiB) ?? '0 GB',

@@ -13,7 +13,8 @@ function harness(decode?: (blob: Blob) => Promise<ImageBitmap>) {
         width: 0,
         height: 0,
         getContext: () => ({
-            drawImage: (_image: unknown, x: number, y: number, w: number, h: number) => drawn.push([x, y, w, h]),
+            drawImage: (_image: unknown, x: number, y: number, w: number, h: number) =>
+                drawn.push([x, y, w, h]),
         }),
     } as unknown as HTMLCanvasElement;
     const requestKeyframe = vi.fn();
@@ -25,7 +26,13 @@ function harness(decode?: (blob: Blob) => Promise<ImageBitmap>) {
     return { painter, canvas, drawn, requestKeyframe, painted };
 }
 
-const tile = (x: number, y: number) => ({ x, y, w: 64, h: 64, data: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]) });
+const tile = (x: number, y: number) => ({
+    x,
+    y,
+    w: 64,
+    h: 64,
+    data: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]),
+});
 
 describe('DesktopPainter', () => {
     it('resizes the canvas on a keyframe and paints it whole', async () => {
@@ -64,7 +71,11 @@ describe('DesktopPainter', () => {
             throw new Error('bad jpeg');
         });
         await painter.keyframe({ blob: new Blob([]), width: 192, height: 64 });
-        await painter.tiles({ width: 192, height: 64, tiles: [tile(0, 0), tile(64, 0), tile(128, 0)] });
+        await painter.tiles({
+            width: 192,
+            height: 64,
+            tiles: [tile(0, 0), tile(64, 0), tile(128, 0)],
+        });
         expect(requestKeyframe).toHaveBeenCalledTimes(1);
     });
 });

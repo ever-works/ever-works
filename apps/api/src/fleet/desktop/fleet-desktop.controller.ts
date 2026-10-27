@@ -17,8 +17,10 @@ import { Throttle } from '@nestjs/throttler';
 import {
     FLEET_DESKTOP_OPEN_RATE_LIMIT,
     isFleetDisplayId,
+    type ComputerControlStateView,
     type FleetDesktopAttachGrant,
     type FleetDesktopAvailabilityView,
+    type FleetDesktopControlResult,
     type FleetDesktopOpenResult,
     type FleetDesktopScreenshot,
     type FleetDesktopViewView,
@@ -28,7 +30,12 @@ import { CurrentUser } from '../../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { fleetLinkError } from '../../fleet-link/fleet-link.errors';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { OpenFleetDesktopViewDto, UpdateFleetDesktopViewDto } from './dto/fleet-desktop.dto';
+import {
+    AnswerFleetDesktopControlDto,
+    FleetDesktopControlDto,
+    OpenFleetDesktopViewDto,
+    UpdateFleetDesktopViewDto,
+} from './dto/fleet-desktop.dto';
 import { FleetDesktopEnabledGuard } from './fleet-desktop-enabled.guard';
 import { FleetDesktopService } from './fleet-desktop.service';
 
@@ -50,7 +57,17 @@ import { FleetDesktopService } from './fleet-desktop.service';
  *  - `POST views/:viewId/attach-token` — reconnect the same view;
  *  - `GET screenshot` — one Steady-width picture (the read-only Agent tool).
  *
- * Watching is read-only in this phase: every grant is role `viewer`.
+ * Control (P2, FR-36 … FR-42), on a view, through AW-11's control arbiter:
+ *
+ *  - `GET views/:viewId/control` — who holds the computer, until when, any request;
+ *  - `POST views/:viewId/control` — take it (`confirm: true`, class `confirm`;
+ *    audited `node.desktop.control.take`) and re-attach with the `driver` grant
+ *    it answers, or ask for it (`request: true`, `node.desktop.control.request`);
+ *  - `DELETE views/:viewId/control` — give it back (a `viewer` grant answers);
+ *  - `POST views/:viewId/control/{handover,keep,extend}`.
+ *
+ * A watcher's grant is always `viewer`; a `driver` grant goes only to the view
+ * holding the computer's control lock.
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
@@ -60,7 +77,8 @@ export class FleetDesktopController {
 
     @Get('nodes/:id/desktop/availability')
     @ApiOperation({
-        summary: "Whether this computer's desktop can be watched now, and if not the one reason and its fix.",
+        summary:
+            "Whether this computer's desktop can be watched now, and if not the one reason and its fix.",
     })
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     availability(
@@ -71,7 +89,9 @@ export class FleetDesktopController {
     }
 
     @Get('nodes/:id/desktop/displays')
-    @ApiOperation({ summary: 'The displays this computer last reported (id, name, size, scale, primary).' })
+    @ApiOperation({
+        summary: 'The displays this computer last reported (id, name, size, scale, primary).',
+    })
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     displays(
         @CurrentUser() auth: AuthenticatedUser,
@@ -92,12 +112,17 @@ export class FleetDesktopController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: OpenFleetDesktopViewDto,
     ): Promise<FleetDesktopOpenResult> {
-        return this.desktop.openView(auth.userId, id, {
-            ...(body.source ? { source: body.source } : {}),
-            ...(body.displayId ? { displayId: body.displayId } : {}),
-            ...(body.quality ? { quality: body.quality } : {}),
-            ...(body.fleetSessionId ? { fleetSessionId: body.fleetSessionId } : {}),
-        });
+        return this.desktop.openView(
+            auth.userId,
+            id,
+            {
+                ...(body.source ? { source: body.source } : {}),
+                ...(body.displayId ? { displayId: body.displayId } : {}),
+                ...(body.quality ? { quality: body.quality } : {}),
+                ...(body.fleetSessionId ? { fleetSessionId: body.fleetSessionId } : {}),
+            },
+            controllerNameOf(auth),
+        );
     }
 
     @Get('nodes/:id/desktop/views/:viewId')
@@ -107,13 +132,14 @@ export class FleetDesktopController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Param('viewId', ParseUUIDPipe) viewId: string,
-    ): FleetDesktopViewView {
-        return this.desktop.viewFor(auth.userId, id, viewId);
+    ): Promise<FleetDesktopViewView> {
+        return this.desktop.view(auth.userId, id, viewId);
     }
 
     @Patch('nodes/:id/desktop/views/:viewId')
     @ApiOperation({
-        summary: 'Show another display (audited) or change the quality; answers a fresh viewer token to re-attach with.',
+        summary:
+            'Show another display (audited) or change the quality; answers a fresh viewer token to re-attach with.',
     })
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     update(
@@ -136,8 +162,8 @@ export class FleetDesktopController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Param('viewId', ParseUUIDPipe) viewId: string,
-    ): void {
-        this.desktop.endView(auth.userId, id, viewId);
+    ): Promise<void> {
+        return this.desktop.endView(auth.userId, id, viewId);
     }
 
     @Post('nodes/:id/desktop/views/:viewId/attach-token')
@@ -152,6 +178,107 @@ export class FleetDesktopController {
         return this.desktop.attachToken(auth.userId, id, viewId);
     }
 
+    // ─── Control (P2) ──────────────────────────────────────────────────────
+
+    @Get('nodes/:id/desktop/views/:viewId/control')
+    @ApiOperation({
+        summary:
+            'Control of this computer as my view sees it: who holds it, until when, and any request.',
+    })
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    controlState(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+    ): Promise<ComputerControlStateView> {
+        return this.desktop.controlState(auth.userId, id, viewId);
+    }
+
+    @Post('nodes/:id/desktop/views/:viewId/control')
+    @ApiOperation({
+        summary:
+            "Take control of this computer's mouse and keyboard from my view (confirm: true; audited) and re-attach with the driver grant it answers — or, with request: true, ask whoever holds it to hand it over.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    takeControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+        @Body() body: FleetDesktopControlDto,
+    ): Promise<FleetDesktopControlResult> {
+        return this.desktop.takeControl(
+            auth.userId,
+            id,
+            viewId,
+            {
+                ...(body?.request ? { request: true } : {}),
+                ...(body?.confirm === true ? { confirm: true } : {}),
+            },
+            controllerNameOf(auth),
+        );
+    }
+
+    @Delete('nodes/:id/desktop/views/:viewId/control')
+    @ApiOperation({
+        summary:
+            'Give control back from my view (idempotent); answers the viewer grant to re-attach with.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    giveBackControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+    ): Promise<FleetDesktopControlResult> {
+        return this.desktop.giveBackControl(auth.userId, id, viewId);
+    }
+
+    @Post('nodes/:id/desktop/views/:viewId/control/handover')
+    @ApiOperation({
+        summary: 'The view holding control answers a request: hand control over, or keep it.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    answerControlRequest(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+        @Body() body: AnswerFleetDesktopControlDto,
+    ): Promise<FleetDesktopControlResult> {
+        return this.desktop.answerControlRequest(
+            auth.userId,
+            id,
+            viewId,
+            body.requestId,
+            body.decision,
+        );
+    }
+
+    @Post('nodes/:id/desktop/views/:viewId/control/keep')
+    @ApiOperation({ summary: 'Keep control: push back the automatic give-back after inactivity.' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    keepControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+    ): Promise<FleetDesktopControlResult> {
+        return this.desktop.keepControl(auth.userId, id, viewId);
+    }
+
+    @Post('nodes/:id/desktop/views/:viewId/control/extend')
+    @ApiOperation({ summary: 'Extend the current stretch of control once.' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    extendControl(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+    ): Promise<FleetDesktopControlResult> {
+        return this.desktop.extendControl(auth.userId, id, viewId);
+    }
+
     @Get('nodes/:id/desktop/screenshot')
     @ApiOperation({
         summary:
@@ -164,8 +291,15 @@ export class FleetDesktopController {
         @Query('displayId') displayId?: string,
     ): Promise<FleetDesktopScreenshot> {
         if (displayId !== undefined && !isFleetDisplayId(displayId)) {
-            throw fleetLinkError('invalid', 'displayId', { displayId: String(displayId).slice(0, 64) });
+            throw fleetLinkError('invalid', 'displayId', {
+                displayId: String(displayId).slice(0, 64),
+            });
         }
         return this.desktop.screenshot(auth.userId, id, displayId ?? null);
     }
+}
+
+/** The name the machine's console prints while this person controls it — the username, never an email. */
+function controllerNameOf(auth: AuthenticatedUser): string | null {
+    return auth.username || null;
 }

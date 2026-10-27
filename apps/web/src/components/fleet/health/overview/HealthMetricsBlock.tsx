@@ -86,16 +86,16 @@ export default function HealthMetricsBlock({ nodes, flags }: FleetOverviewBlockP
 
     const sendWake = useCallback(async (id: string) => {
         const result = await wakeFleetNodeAction(id);
-        return (result.success
-            ? { ok: true, data: result.data }
-            : { ok: false, error: result.error }) as WakeOutcome<NonNullable<typeof result.data>>;
+        return (
+            result.success ? { ok: true, data: result.data } : { ok: false, error: result.error }
+        ) as WakeOutcome<NonNullable<typeof result.data>>;
     }, []);
 
     const readWakeStatus = useCallback(async (id: string) => {
         const result = await fetchFleetNodeWakeStatusAction(id);
-        return (result.success
-            ? { ok: true, data: result.data }
-            : { ok: false, error: result.error }) as WakeOutcome<NonNullable<typeof result.data>>;
+        return (
+            result.success ? { ok: true, data: result.data } : { ok: false, error: result.error }
+        ) as WakeOutcome<NonNullable<typeof result.data>>;
     }, []);
 
     if (!node) return null;

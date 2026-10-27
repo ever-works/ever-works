@@ -10,7 +10,13 @@ import {
 } from '@ever-works/contracts';
 import { sendSessionActionAction } from '@/app/actions/fleet-session-git';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { sessionGitErrorTitleKey } from './session-git.shared';
 
 /**
@@ -70,7 +76,9 @@ export function SessionActionSheet({
         const result = await sendSessionActionAction(sessionId, action.id, text);
         setPending(false);
         if (!result.success) {
-            setError(`${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`);
+            setError(
+                `${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`,
+            );
             return;
         }
         const delivered = result.data.delivery === 'delivered';
@@ -86,17 +94,27 @@ export function SessionActionSheet({
                 <div data-testid="fleet-session-action-sheet" data-action={action.id}>
                     <DialogHeader>
                         <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
-                            {t('title', { action: label, who: who ?? t('yourSession'), node: nodeName })}
+                            {t('title', {
+                                action: label,
+                                who: who ?? t('yourSession'),
+                                node: nodeName,
+                            })}
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3">
                         {action.warning === 'pushes-protected' ? (
-                            <p className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-text dark:text-text-dark" role="status">
+                            <p
+                                className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-text dark:text-text-dark"
+                                role="status"
+                            >
                                 {t('pushesProtected', { branch: branch ?? 'main' })}
                             </p>
                         ) : null}
                         {action.readAsAnswer ? (
-                            <p className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-text dark:text-text-dark" role="status">
+                            <p
+                                className="rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-xs text-text dark:text-text-dark"
+                                role="status"
+                            >
                                 {t('readAsAnswer', { who: who ?? t('theAgent') })}
                             </p>
                         ) : null}
@@ -110,7 +128,9 @@ export function SessionActionSheet({
                             data-testid="fleet-session-action-prompt"
                         />
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {template?.source === 'agent' && who ? t('ownTemplate', { who }) : t('defaultTemplate')}
+                            {template?.source === 'agent' && who
+                                ? t('ownTemplate', { who })
+                                : t('defaultTemplate')}
                         </p>
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">
                             {who ? t('stillAsks', { who }) : t('stillAsksOwner')}
@@ -119,13 +139,22 @@ export function SessionActionSheet({
                             {who ? t('costAgent', { who }) : t('costOwner')}
                         </p>
                         {error ? (
-                            <p role="alert" className="text-sm text-danger" data-testid="fleet-session-action-error">
+                            <p
+                                role="alert"
+                                className="text-sm text-danger"
+                                data-testid="fleet-session-action-error"
+                            >
                                 {error}
                             </p>
                         ) : null}
                     </div>
                     <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => onOpenChange(false)}
+                            disabled={pending}
+                        >
                             {t('cancel')}
                         </Button>
                         <Button

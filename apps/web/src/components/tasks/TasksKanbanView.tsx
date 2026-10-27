@@ -406,7 +406,9 @@ function TaskKanbanCard({
                             onOpenChange={onPickerOpenChange}
                         />
                     </div>
-                    {fleetHandoff && <FixOnComputerButton taskId={task.id} taskSlug={task.slug} compact />}
+                    {fleetHandoff && (
+                        <FixOnComputerButton taskId={task.id} taskSlug={task.slug} compact />
+                    )}
                     <span className="text-[10px] text-text-muted dark:text-text-muted-dark">
                         {new Date(task.updatedAt).toLocaleDateString(undefined, {
                             month: 'short',

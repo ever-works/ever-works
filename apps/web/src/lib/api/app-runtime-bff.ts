@@ -31,7 +31,10 @@ export function isRuntimeName(value: unknown): value is string {
 }
 
 export function invalidIdResponse(): Response {
-    return NextResponse.json({ status: 'error', code: 'invalid_id', message: 'Invalid id' }, { status: 400 });
+    return NextResponse.json(
+        { status: 'error', code: 'invalid_id', message: 'Invalid id' },
+        { status: 400 },
+    );
 }
 
 /** `${API_URL}/works/<id><path>` — `path` starts with `/` and is built from checked parts only. */
@@ -57,7 +60,11 @@ export async function forwardAppRuntimeCall(
     } catch {
         // A transport fault never leaks the platform URL or the error text to the browser.
         return NextResponse.json(
-            { status: 'error', code: 'upstream_unavailable', message: 'The platform could not be reached.' },
+            {
+                status: 'error',
+                code: 'upstream_unavailable',
+                message: 'The platform could not be reached.',
+            },
             { status: 502 },
         );
     }
@@ -68,7 +75,10 @@ export async function forwardAppRuntimeCall(
     };
     const retryAfter = upstream.headers.get('retry-after');
     if (retryAfter && /^\d{1,5}$/.test(retryAfter)) headers['Retry-After'] = retryAfter;
-    return new Response(upstream.status === 204 ? null : text, { status: upstream.status, headers });
+    return new Response(upstream.status === 204 ? null : text, {
+        status: upstream.status,
+        headers,
+    });
 }
 
 /** Read a JSON body without throwing; anything unreadable is an empty object. */

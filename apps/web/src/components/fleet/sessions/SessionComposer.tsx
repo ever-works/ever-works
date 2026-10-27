@@ -43,7 +43,11 @@ export function SessionComposer({
     };
 
     return (
-        <form onSubmit={onSubmit} className="flex items-end gap-2" data-testid="fleet-session-composer">
+        <form
+            onSubmit={onSubmit}
+            className="flex items-end gap-2"
+            data-testid="fleet-session-composer"
+        >
             <label className="sr-only" htmlFor="fleet-session-composer-input">
                 {t('detail.sendTo', { who: providerName })}
             </label>

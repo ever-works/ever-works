@@ -81,15 +81,21 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
         service = {
             getVisibleForUser: jest.fn(async () => ({ view: view(), role: 'owner' })),
             listWakeSiblings: jest.fn(async () => [sibling]),
-            applyRefreshedHealth: jest.fn(async (_id: string, snapshot: Record<string, unknown>) => ({
-                ...snapshot,
-                at: new Date().toISOString(),
-            })),
+            applyRefreshedHealth: jest.fn(
+                async (_id: string, snapshot: Record<string, unknown>) => ({
+                    ...snapshot,
+                    at: new Date().toISOString(),
+                }),
+            ),
             recordWakeAttempt: jest.fn(async () => undefined),
         };
         history = {
             isHistoryEnabled: jest.fn(() => true),
-            history: jest.fn(async (nodeId: string, range: string) => ({ nodeId, range, disabled: true })),
+            history: jest.fn(async (nodeId: string, range: string) => ({
+                nodeId,
+                range,
+                disabled: true,
+            })),
         };
         link = {
             request: jest.fn(async () => ({ result: { snapshot: { cpuPercent: 12 } } })),
@@ -148,7 +154,9 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
 
     describe('POST /nodes/:id/health (Refresh now)', () => {
         beforeEach(() => {
-            nodes.findById.mockResolvedValue(row({ status: 'online', lastHeartbeatAt: new Date() }));
+            nodes.findById.mockResolvedValue(
+                row({ status: 'online', lastHeartbeatAt: new Date() }),
+            );
         });
 
         it('asks health.now over the link as the person, within 3 s, and stores the snapshot', async () => {
@@ -198,7 +206,8 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
         });
 
         it('refuses the 11th refresh in a minute with limit_exceeded', async () => {
-            for (let index = 0; index < 10; index += 1) await controller.refreshHealth(USER, TARGET);
+            for (let index = 0; index < 10; index += 1)
+                await controller.refreshHealth(USER, TARGET);
             await expect(controller.refreshHealth(USER, TARGET)).rejects.toMatchObject({
                 linkError: { code: 'limit_exceeded' },
             });
@@ -209,7 +218,11 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
     describe('POST /nodes/:id/wake', () => {
         it('sends wake.send through the sibling as the platform, stamps the attempt and audits both computers', async () => {
             const answer = await controller.wake(USER, TARGET);
-            expect(access.assertFamily).toHaveBeenCalledWith(expect.objectContaining({ id: TARGET }), 'user-1', 'machines');
+            expect(access.assertFamily).toHaveBeenCalledWith(
+                expect.objectContaining({ id: TARGET }),
+                'user-1',
+                'machines',
+            );
             expect(link.request).toHaveBeenCalledWith({
                 nodeId: SIBLING,
                 verb: 'wake.send',
@@ -226,7 +239,10 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
                     details: { target: TARGET, via: SIBLING, outcome: 'sent' },
                 }),
             );
-            expect(answer).toMatchObject({ via: { nodeId: SIBLING, name: 'build-01' }, checkAfterMs: [20_000, 60_000] });
+            expect(answer).toMatchObject({
+                via: { nodeId: SIBLING, name: 'build-01' },
+                checkAfterMs: [20_000, 60_000],
+            });
         });
 
         it('is refused outside the machines family, before anything is sent', async () => {
@@ -237,7 +253,9 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
 
         it('is refused kill_switch while all computers are stopped', async () => {
             killSwitch.isStopped.mockResolvedValue(true);
-            await expect(controller.wake(USER, TARGET)).rejects.toMatchObject({ linkError: { code: 'kill_switch' } });
+            await expect(controller.wake(USER, TARGET)).rejects.toMatchObject({
+                linkError: { code: 'kill_switch' },
+            });
         });
 
         it.each([
@@ -245,21 +263,29 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
             ['no hardware address', { macAddress: null }, 'unsupported_on_node'],
         ])('refuses %s', async (_label, overrides, code) => {
             nodes.findById.mockResolvedValue(row(overrides));
-            await expect(controller.wake(USER, TARGET)).rejects.toMatchObject({ linkError: { code } });
+            await expect(controller.wake(USER, TARGET)).rejects.toMatchObject({
+                linkError: { code },
+            });
             expect(link.request).not.toHaveBeenCalled();
         });
 
         it('refuses unsupported_on_node when no sibling on the network can wake it', async () => {
             service.listWakeSiblings.mockResolvedValue([]);
             await expect(controller.wake(USER, TARGET)).rejects.toMatchObject({
-                linkError: { code: 'unsupported_on_node', hint: "No online computer on win-lab's network can wake it" },
+                linkError: {
+                    code: 'unsupported_on_node',
+                    hint: "No online computer on win-lab's network can wake it",
+                },
             });
         });
 
         it('refuses the 4th attempt in 5 minutes with limit_exceeded', async () => {
             for (let index = 0; index < 3; index += 1) await controller.wake(USER, TARGET);
             await expect(controller.wake(USER, TARGET)).rejects.toMatchObject({
-                linkError: { code: 'limit_exceeded', hint: 'Already tried 3 times; give it a minute' },
+                linkError: {
+                    code: 'limit_exceeded',
+                    hint: 'Already tried 3 times; give it a minute',
+                },
             });
         });
 
@@ -279,7 +305,12 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
             expect(audit.tryRecord).toHaveBeenCalledWith(
                 expect.objectContaining({
                     action: 'node.wake',
-                    details: { target: TARGET, via: SIBLING, outcome: 'refused', code: 'unreachable' },
+                    details: {
+                        target: TARGET,
+                        via: SIBLING,
+                        outcome: 'refused',
+                        code: 'unreachable',
+                    },
                 }),
             );
             expect(service.recordWakeAttempt).not.toHaveBeenCalled();
@@ -289,7 +320,10 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
     describe('GET /nodes/:id/health — reach availability', () => {
         it('offers Wake to the owner, naming the sibling, with the wake action on the state', async () => {
             service.getVisibleForUser.mockResolvedValue({
-                view: view({ status: 'offline', lastHeartbeatAt: new Date(Date.now() - 7_200_000).toISOString() }),
+                view: view({
+                    status: 'offline',
+                    lastHeartbeatAt: new Date(Date.now() - 7_200_000).toISOString(),
+                }),
                 role: 'owner',
             });
             const answer = await controller.health(USER, TARGET);
@@ -304,10 +338,17 @@ describe('FleetHealthController — reach (FL-03 second phase)', () => {
         });
 
         it('tells a shared viewer outside machines why not, and never names the sibling', async () => {
-            service.getVisibleForUser.mockResolvedValue({ view: view({ viewerRole: 'org-member' }), role: 'org-member' });
+            service.getVisibleForUser.mockResolvedValue({
+                view: view({ viewerRole: 'org-member' }),
+                role: 'org-member',
+            });
             access.canAct.mockResolvedValue(false);
             const answer = await controller.health(USER, TARGET);
-            expect(answer.wake).toMatchObject({ available: false, reason: 'not-allowed', via: null });
+            expect(answer.wake).toMatchObject({
+                available: false,
+                reason: 'not-allowed',
+                via: null,
+            });
         });
     });
 

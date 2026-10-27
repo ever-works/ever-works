@@ -1,5 +1,10 @@
 import { bffProxy } from '@/lib/api/bff-proxy';
-import { fleetApiUrl, forwardGrantCall, invalidIdResponse, isUuid } from '@/lib/api/fleet-desktop-bff';
+import {
+    fleetApiUrl,
+    forwardGrantCall,
+    invalidIdResponse,
+    isUuid,
+} from '@/lib/api/fleet-desktop-bff';
 
 type RouteContext = { params: Promise<{ id: string; viewId: string }> };
 

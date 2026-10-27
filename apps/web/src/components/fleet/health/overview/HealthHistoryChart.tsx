@@ -2,7 +2,15 @@
 
 import { useId, useMemo, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+    CartesianGrid,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import {
     FLEET_NODE_HEALTH_RANGES,
     summarizeFleetHealthHistory,
@@ -86,7 +94,9 @@ export function HealthHistoryChart({
         () => (history && !history.disabled ? history.points : []),
         [history],
     );
-    const hasValues = points.some((point) => point.cpu !== null || point.mem !== null || point.disk !== null);
+    const hasValues = points.some(
+        (point) => point.cpu !== null || point.mem !== null || point.disk !== null,
+    );
     const rangeWord = t(`rangeWords.${range}`);
 
     const summaries = HEALTH_HISTORY_METRICS.map((metric) => {
@@ -108,13 +118,19 @@ export function HealthHistoryChart({
     let body: ReactNode;
     if (history?.disabled) {
         body = (
-            <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-history-off">
+            <p
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-history-off"
+            >
                 {t('off')}
             </p>
         );
     } else if (status === 'loading' && !history) {
         body = (
-            <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-history-loading">
+            <p
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-history-loading"
+            >
                 {t('loading')}
             </p>
         );
@@ -133,7 +149,10 @@ export function HealthHistoryChart({
         );
     } else if (!hasValues) {
         body = (
-            <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-history-empty">
+            <p
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-history-empty"
+            >
                 {t('empty')}
             </p>
         );
@@ -142,7 +161,10 @@ export function HealthHistoryChart({
             <>
                 <div className="h-48 w-full" aria-hidden="true" data-testid="fleet-history-plot">
                     <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={points} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                        <LineChart
+                            data={points}
+                            margin={{ top: 4, right: 8, left: -16, bottom: 0 }}
+                        >
                             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
                             <XAxis
                                 dataKey="at"
@@ -161,7 +183,9 @@ export function HealthHistoryChart({
                                 tickFormatter={(value: number) => t('valuePercent', { value })}
                             />
                             <Tooltip
-                                labelFormatter={(at) => (typeof at === 'string' ? formatFull(at, locale) : '')}
+                                labelFormatter={(at) =>
+                                    typeof at === 'string' ? formatFull(at, locale) : ''
+                                }
                                 formatter={(value: number, name: string) => [
                                     t('valuePercent', { value: Math.round(value) }),
                                     t(`metrics.${name as HealthHistoryMetric}`),
@@ -175,20 +199,22 @@ export function HealthHistoryChart({
                                 labelStyle={{ color: '#cbd5e1' }}
                                 itemStyle={{ color: '#f1f5f9' }}
                             />
-                            {HEALTH_HISTORY_METRICS.filter((metric) => visible[metric]).map((metric) => (
-                                <Line
-                                    key={metric}
-                                    type="monotone"
-                                    dataKey={metric}
-                                    name={metric}
-                                    stroke={METRIC_COLOUR[metric]}
-                                    strokeWidth={1.5}
-                                    dot={false}
-                                    isAnimationActive={false}
-                                    // An offline stretch is a break, never a line through it.
-                                    connectNulls={false}
-                                />
-                            ))}
+                            {HEALTH_HISTORY_METRICS.filter((metric) => visible[metric]).map(
+                                (metric) => (
+                                    <Line
+                                        key={metric}
+                                        type="monotone"
+                                        dataKey={metric}
+                                        name={metric}
+                                        stroke={METRIC_COLOUR[metric]}
+                                        strokeWidth={1.5}
+                                        dot={false}
+                                        isAnimationActive={false}
+                                        // An offline stretch is a break, never a line through it.
+                                        connectNulls={false}
+                                    />
+                                ),
+                            )}
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
@@ -234,7 +260,10 @@ export function HealthHistoryChart({
                     </div>
                     <div role="group" aria-label={t('metricsLabel')} className="flex gap-2">
                         {HEALTH_HISTORY_METRICS.map((metric) => (
-                            <label key={metric} className="flex items-center gap-1 text-xs text-text dark:text-text-dark">
+                            <label
+                                key={metric}
+                                className="flex items-center gap-1 text-xs text-text dark:text-text-dark"
+                            >
                                 <input
                                     type="checkbox"
                                     checked={visible[metric]}
@@ -255,7 +284,11 @@ export function HealthHistoryChart({
             </div>
             {body}
             {hasValues ? (
-                <ul id={summaryId} className="space-y-0.5 text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-history-summary">
+                <ul
+                    id={summaryId}
+                    className="space-y-0.5 text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-history-summary"
+                >
                     {summaries.map((summary, index) => (
                         <li key={HEALTH_HISTORY_METRICS[index]}>{summary}</li>
                     ))}

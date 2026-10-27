@@ -219,7 +219,8 @@ export const CORE_NOTIFICATION_EVENTS: readonly CoreNotificationEvent[] = [
         key: 'fleet_session_finished',
         category: 'agent',
         title: 'A session finished',
-        description: 'An agent session on one of your computers finished its turn while you were not looking at it.',
+        description:
+            'An agent session on one of your computers finished its turn while you were not looking at it.',
         urgent: false,
         defaultChannels: IN_APP,
     },

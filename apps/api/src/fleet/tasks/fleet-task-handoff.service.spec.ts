@@ -37,7 +37,13 @@ const node = (id: string, name: string, patch: Record<string, unknown> = {}) => 
     ...patch,
 });
 
-function make(options: { pinnedNodeId?: string | null; nodes?: ReturnType<typeof node>[]; connected?: string[] } = {}) {
+function make(
+    options: {
+        pinnedNodeId?: string | null;
+        nodes?: ReturnType<typeof node>[];
+        connected?: string[];
+    } = {},
+) {
     const nodes = options.nodes ?? [node(BUILD_01, 'build-01'), node(BUILD_02, 'build-02')];
     const connected = new Set(options.connected ?? nodes.map((row) => row.id));
     const tasks = {
@@ -51,10 +57,14 @@ function make(options: { pinnedNodeId?: string | null; nodes?: ReturnType<typeof
                 status: 'todo',
                 workId: 'work-1',
                 branchRef: 'task/login-form',
-                acceptanceChecks: [{ id: 'unit', name: 'unit tests', kind: 'test', command: 'pnpm test' }],
+                acceptanceChecks: [
+                    { id: 'unit', name: 'unit tests', kind: 'test', command: 'pnpm test' },
+                ],
             };
         }),
-        listRunCandidates: jest.fn(async () => [{ id: NINA, name: 'Nina', source: 'assignee' as const }]),
+        listRunCandidates: jest.fn(async () => [
+            { id: NINA, name: 'Nina', source: 'assignee' as const },
+        ]),
     };
     const works = {
         findById: jest.fn(async () => ({
@@ -79,11 +89,16 @@ function make(options: { pinnedNodeId?: string | null; nodes?: ReturnType<typeof
     const runs = { findInFlightForTaskAgent: jest.fn(async () => null) };
     const fleetNodes = { findByUser: jest.fn(async () => nodes) };
     const access = {
-        listSharedWith: jest.fn(async () => [{ node: node(SHARED, 'office-mac', { userId: 'someone' }), role: 'member' }]),
+        listSharedWith: jest.fn(async () => [
+            { node: node(SHARED, 'office-mac', { userId: 'someone' }), role: 'member' },
+        ]),
     };
     const killSwitch = { isStopped: jest.fn(async () => false) };
     const sessions = { countLiveAgentForNode: jest.fn(async () => 0) };
-    const sessionTasks = { pinnedNodeId: jest.fn(async () => options.pinnedNodeId ?? null), admit: jest.fn() };
+    const sessionTasks = {
+        pinnedNodeId: jest.fn(async () => options.pinnedNodeId ?? null),
+        admit: jest.fn(),
+    };
     const checkouts = {
         findForNode: jest.fn(async (nodeId: string) =>
             nodeId === BUILD_01
@@ -129,7 +144,12 @@ describe('FleetTaskHandoffService.options', () => {
         const { service } = make();
         const options = await service.options(OWNER, TASK_ID, null);
         expect(options.agents).toEqual([
-            expect.objectContaining({ id: NINA, source: 'assignee', cli: 'claude-code', modelId: 'claude-sonnet' }),
+            expect.objectContaining({
+                id: NINA,
+                source: 'assignee',
+                cli: 'claude-code',
+                modelId: 'claude-sonnet',
+            }),
         ]);
         expect(options.agentId).toBe(NINA);
     });
@@ -139,8 +159,12 @@ describe('FleetTaskHandoffService.options', () => {
         const options = await service.options(OWNER, TASK_ID, null);
         const byName = Object.fromEntries(options.computers.map((row) => [row.name, row]));
         expect(byName['build-01'].selectable).toBe(true);
-        expect(byName['build-02']).toEqual(expect.objectContaining({ selectable: false, reason: 'offline' }));
-        expect(byName['office-mac']).toEqual(expect.objectContaining({ selectable: false, reason: 'no-access' }));
+        expect(byName['build-02']).toEqual(
+            expect.objectContaining({ selectable: false, reason: 'offline' }),
+        );
+        expect(byName['office-mac']).toEqual(
+            expect.objectContaining({ selectable: false, reason: 'no-access' }),
+        );
         expect(options.computers[0].name).toBe('build-01');
     });
 
@@ -148,8 +172,12 @@ describe('FleetTaskHandoffService.options', () => {
         const { service, sessionTasks } = make({ pinnedNodeId: BUILD_01 });
         const options = await service.options(OWNER, TASK_ID, null);
         const byName = Object.fromEntries(options.computers.map((row) => [row.name, row]));
-        expect(byName['build-01']).toEqual(expect.objectContaining({ selectable: true, pinned: true }));
-        expect(byName['build-02']).toEqual(expect.objectContaining({ selectable: false, reason: 'not-pinned' }));
+        expect(byName['build-01']).toEqual(
+            expect.objectContaining({ selectable: true, pinned: true }),
+        );
+        expect(byName['build-02']).toEqual(
+            expect.objectContaining({ selectable: false, reason: 'not-pinned' }),
+        );
         expect(sessionTasks.admit).not.toHaveBeenCalled();
     });
 
@@ -157,7 +185,9 @@ describe('FleetTaskHandoffService.options', () => {
         const { service } = make({
             nodes: [
                 node(BUILD_01, 'build-01', { capabilities: ['sessions', 'codex'] }),
-                node(BUILD_02, 'build-02', { consents: { work: false, attend: false, manage: true, usageScan: false } }),
+                node(BUILD_02, 'build-02', {
+                    consents: { work: false, attend: false, manage: true, usageScan: false },
+                }),
             ],
         });
         const options = await service.options(OWNER, TASK_ID, null);
@@ -187,8 +217,8 @@ describe('FleetTaskHandoffService.options', () => {
 
     it('answers the 404 of an unknown Task', async () => {
         const { service } = make();
-        await expect(service.options(OWNER, '99999999-9999-4999-8999-999999999999', null)).rejects.toBeInstanceOf(
-            NotFoundException,
-        );
+        await expect(
+            service.options(OWNER, '99999999-9999-4999-8999-999999999999', null),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });

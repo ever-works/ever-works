@@ -35,16 +35,25 @@ export interface ConfirmDialogModel {
 }
 
 /** The dialog a `confirmation_required` refusal describes, or null when the error is something else. */
-export function dialogFromRefusal(error: FleetLinkError | null | undefined, fallbackTitle: string): ConfirmDialogModel | null {
+export function dialogFromRefusal(
+    error: FleetLinkError | null | undefined,
+    fallbackTitle: string,
+): ConfirmDialogModel | null {
     if (!error || error.code !== 'confirmation_required') return null;
     const details = (error.details ?? {}) as Record<string, unknown>;
     const cls = isFleetConfirmationClass(details.class) ? details.class : 'confirm';
-    const sentence = typeof details.sentence === 'string' && details.sentence ? details.sentence : undefined;
+    const sentence =
+        typeof details.sentence === 'string' && details.sentence ? details.sentence : undefined;
     return {
         class: cls,
-        title: typeof details.summary === 'string' && details.summary ? details.summary : fallbackTitle,
+        title:
+            typeof details.summary === 'string' && details.summary
+                ? details.summary
+                : fallbackTitle,
         ...(sentence ? { sentence } : {}),
-        ...(cls === 'confirm-destructive' && typeof details.target === 'string' ? { typeName: details.target } : {}),
+        ...(cls === 'confirm-destructive' && typeof details.target === 'string'
+            ? { typeName: details.target }
+            : {}),
     };
 }
 
@@ -69,7 +78,10 @@ export function dialogForRow(input: {
 }
 
 /** The CONTRACTS §2.2 fields that satisfy a dialog once the person confirmed it. */
-export function fieldsForDialog(model: ConfirmDialogModel, typed?: string): FleetActionConfirmFields {
+export function fieldsForDialog(
+    model: ConfirmDialogModel,
+    typed?: string,
+): FleetActionConfirmFields {
     const out: FleetActionConfirmFields = {};
     if (model.class === 'confirm-destructive') {
         if (typeof typed === 'string') out.confirmName = typed;
@@ -82,7 +94,11 @@ export function fieldsForDialog(model: ConfirmDialogModel, typed?: string): Flee
 
 /** True when a dialog's confirm button should be red ("Stop anyway"). */
 export function isDangerDialog(model: ConfirmDialogModel): boolean {
-    return model.class === 'blast-radius' || model.class === 'confirm-destructive' || Boolean(model.sentence);
+    return (
+        model.class === 'blast-radius' ||
+        model.class === 'confirm-destructive' ||
+        Boolean(model.sentence)
+    );
 }
 
 /** True when the typed text satisfies a `confirm-destructive` dialog (exactly, case included). */
@@ -96,7 +112,9 @@ export interface RootRequiredModel {
 }
 
 /** The root dialog a `root_required` refusal describes, or null. */
-export function rootRequiredFrom(error: FleetLinkError | null | undefined): RootRequiredModel | null {
+export function rootRequiredFrom(
+    error: FleetLinkError | null | undefined,
+): RootRequiredModel | null {
     if (!error || error.code !== 'root_required') return null;
     const details = (error.details ?? {}) as Record<string, unknown>;
     const command =
@@ -130,7 +148,8 @@ export function formatPercent(value: number | null | undefined): string {
 
 /** `12:04` under an hour, `2 h`, `3 d` — how long something has run. */
 export function formatRuntime(seconds: number | null | undefined): string {
-    if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return '—';
+    if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0)
+        return '—';
     if (seconds < 3600) {
         const minutes = Math.floor(seconds / 60);
         const rest = Math.floor(seconds % 60);
@@ -141,7 +160,10 @@ export function formatRuntime(seconds: number | null | undefined): string {
 }
 
 /** How long since an ISO time, as {@link formatRuntime}; null when unknown. */
-export function formatSince(iso: string | null | undefined, now: number = Date.now()): string | null {
+export function formatSince(
+    iso: string | null | undefined,
+    now: number = Date.now(),
+): string | null {
     if (!iso) return null;
     const at = Date.parse(iso);
     if (!Number.isFinite(at)) return null;

@@ -23,7 +23,9 @@ import { SessionDetailClient } from './SessionDetailClient';
  */
 export default async function SessionPage({ sessionId }: FleetSessionPageProps) {
     const t = await getTranslations('fleet.sessions');
-    const session: FleetSessionView | null = await fleetSessionsAPI.get(sessionId).catch(() => null);
+    const session: FleetSessionView | null = await fleetSessionsAPI
+        .get(sessionId)
+        .catch(() => null);
     const [detail, user, agent] = await Promise.all([
         session ? fleetAPI.nodeDetail(session.nodeId).catch(() => null) : Promise.resolve(null),
         getAuthFromCookie().catch(() => null),
@@ -34,7 +36,11 @@ export default async function SessionPage({ sessionId }: FleetSessionPageProps) 
 
     if (!session) {
         return (
-            <div className="w-full space-y-6" data-testid="fleet-session-page" data-state="not-found">
+            <div
+                className="w-full space-y-6"
+                data-testid="fleet-session-page"
+                data-state="not-found"
+            >
                 <Link
                     href={ROUTES.DASHBOARD_FLEET}
                     className="inline-flex items-center gap-1 text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark"

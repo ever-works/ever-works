@@ -54,7 +54,12 @@ const USAGE: FleetCloudUsageView = {
         },
     ],
     providerMonthToDate: [
-        { providerPluginId: 'machines-plugin', providerName: 'Provider', monthToDateCents: 5000, computedAt: '2026-10-21T12:00:00.000Z' },
+        {
+            providerPluginId: 'machines-plugin',
+            providerName: 'Provider',
+            monthToDateCents: 5000,
+            computedAt: '2026-10-21T12:00:00.000Z',
+        },
     ],
 };
 
@@ -65,31 +70,47 @@ describe('CloudUsageBlock (FL-17 P2)', () => {
         actions.fleetCloudUsageAction.mockResolvedValue({ ok: true, data: USAGE });
         render(<CloudUsageBlock />);
         await waitFor(() => expect(screen.getByTestId('fleet-cloud-usage')).toBeTruthy());
-        expect(screen.getByTestId('fleet-cloud-usage-totals').textContent).toBe('totals:$0.107,$14.44,$72');
+        expect(screen.getByTestId('fleet-cloud-usage-totals').textContent).toBe(
+            'totals:$0.107,$14.44,$72',
+        );
         const rows = screen.getAllByTestId('fleet-cloud-usage-row');
-        expect(rows.map((row) => row.textContent?.startsWith('fra-nina') || row.textContent?.startsWith('destroyedName'))).toEqual([
-            true,
-            true,
-        ]);
+        expect(
+            rows.map(
+                (row) =>
+                    row.textContent?.startsWith('fra-nina') ||
+                    row.textContent?.startsWith('destroyedName'),
+            ),
+        ).toEqual([true, true]);
         expect(rows[1].textContent).toContain('destroyedName:build-tmp,2026-10-12');
         expect(rows[1].textContent).toContain('states.destroyed');
-        expect(screen.getByTestId('fleet-cloud-usage-provider-mtd').textContent).toBe('providerMtd:Provider,$50');
+        expect(screen.getByTestId('fleet-cloud-usage-provider-mtd').textContent).toBe(
+            'providerMtd:Provider,$50',
+        );
         expect(screen.getByText('disclaimer')).toBeTruthy();
     });
 
     it('renders nothing when there is no cloud computer this month', async () => {
-        actions.fleetCloudUsageAction.mockResolvedValue({ ok: true, data: { ...USAGE, machines: [] } });
+        actions.fleetCloudUsageAction.mockResolvedValue({
+            ok: true,
+            data: { ...USAGE, machines: [] },
+        });
         const { container } = render(<CloudUsageBlock />);
         await waitFor(() => expect(actions.fleetCloudUsageAction).toHaveBeenCalled());
         expect(container.textContent).toBe('');
     });
 
     it('says so when the costs could not be loaded, and stays silent when cloud computers are off', async () => {
-        actions.fleetCloudUsageAction.mockResolvedValue({ ok: false, error: { code: 'internal', hint: '' } });
+        actions.fleetCloudUsageAction.mockResolvedValue({
+            ok: false,
+            error: { code: 'internal', hint: '' },
+        });
         render(<CloudUsageBlock />);
         await waitFor(() => expect(screen.getByTestId('fleet-cloud-usage-failed')).toBeTruthy());
 
-        actions.fleetCloudUsageAction.mockResolvedValue({ ok: false, error: { code: 'not_found', hint: '' } });
+        actions.fleetCloudUsageAction.mockResolvedValue({
+            ok: false,
+            error: { code: 'not_found', hint: '' },
+        });
         const second = render(<CloudUsageBlock />);
         await waitFor(() => expect(actions.fleetCloudUsageAction).toHaveBeenCalledTimes(2));
         expect(second.container.textContent).toBe('');

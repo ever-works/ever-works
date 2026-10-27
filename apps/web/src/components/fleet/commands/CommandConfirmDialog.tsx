@@ -1,9 +1,19 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { FLEET_COMMAND_SANDBOX_SENTENCE, type FleetCommandConfirmationDetails } from '@ever-works/contracts';
+import {
+    FLEET_COMMAND_SANDBOX_SENTENCE,
+    type FleetCommandConfirmationDetails,
+} from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 /**
  * Commands on computers (FL-12, spec FR-11, §5.1, CONTRACTS §2.2 class
@@ -70,14 +80,22 @@ export function CommandConfirmDialog({
                                               shell: line.shell,
                                               folder: line.folder,
                                           })
-                                    : t('refusedLine', { name: line.nodeName, hint: line.error?.hint ?? '' })}
+                                    : t('refusedLine', {
+                                          name: line.nodeName,
+                                          hint: line.error?.hint ?? '',
+                                      })}
                             </li>
                         ))}
                     </ul>
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {t('timeout', { minutes: Math.max(1, Math.round(details.timeoutSec / 60)) })}
+                        {t('timeout', {
+                            minutes: Math.max(1, Math.round(details.timeoutSec / 60)),
+                        })}
                     </p>
-                    <p className="text-sm font-medium text-warning" data-testid="fleet-command-confirm-sandbox">
+                    <p
+                        className="text-sm font-medium text-warning"
+                        data-testid="fleet-command-confirm-sandbox"
+                    >
                         {`⚠ ${FLEET_COMMAND_SANDBOX_SENTENCE}`}
                     </p>
                     {runnable === 0 && (

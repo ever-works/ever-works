@@ -81,7 +81,11 @@ import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
 import { buildFleetDesktopTools } from '../fleet/desktop/agent-fleet-desktop-tools';
-import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
+import {
+    buildFleetActTools,
+    buildFleetCoreTools,
+    decorateFleetTool,
+} from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -669,7 +673,9 @@ export class AgentToolService {
             // Usage & cost on the fleet (FL-20): `fleet_usage_get`, read-only, as the Agent's owner.
             if (fleet.usage) {
                 const usage = fleet.usage;
-                add('fleet-usage', () => buildFleetUsageTools({ userId: agent.userId, service: usage }));
+                add('fleet-usage', () =>
+                    buildFleetUsageTools({ userId: agent.userId, service: usage }),
+                );
             }
             // Actions runners (FL-18): list read-only; an install, a stop, a restart and a
             // remove are held for the owner's approval (spec S8); a start runs at once.
@@ -763,7 +769,11 @@ export class AgentToolService {
             if (fleet.desktop) {
                 const desktop = fleet.desktop;
                 add('fleet-desktop', () =>
-                    buildFleetDesktopTools({ agentId: agent.id, userId: agent.userId, reader: desktop.reader }),
+                    buildFleetDesktopTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: desktop.reader,
+                    }),
                 );
             }
             // Files on computers (FL-11): the read-only file tools, when bound.

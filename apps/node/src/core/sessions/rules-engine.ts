@@ -61,7 +61,10 @@ export class SessionRulesEngine {
 			}
 			this.byProvider.set(
 				checked.file.provider,
-				checked.file.rules.map((rule) => ({ rule, pattern: new RegExp(rule.when.match, rule.when.flags ?? '') }))
+				checked.file.rules.map((rule) => ({
+					rule,
+					pattern: new RegExp(rule.when.match, rule.when.flags ?? '')
+				}))
 			);
 		}
 	}
@@ -85,7 +88,8 @@ export class SessionRulesEngine {
 		const tail = lines.slice(-10).join('\n').toLowerCase();
 		let winner: RuleMatch | null = null;
 		for (const { rule, pattern } of rules) {
-			const region = rule.when.region === 'screen' ? regions.screen : rule.when.region === 'tail' ? tail : regions.title;
+			const region =
+				rule.when.region === 'screen' ? regions.screen : rule.when.region === 'tail' ? tail : regions.title;
 			const key = `${sessionId}:${rule.id}`;
 			const match = pattern.exec(region);
 			if (!match) {
@@ -106,7 +110,12 @@ export class SessionRulesEngine {
 		if (then.state !== 'needs_you') {
 			return {
 				ruleId: rule.id,
-				evidence: { source: 'rules', event: then.state === 'working' ? 'working' : 'idle-weak', at: now, rule: rule.id },
+				evidence: {
+					source: 'rules',
+					event: then.state === 'working' ? 'working' : 'idle-weak',
+					at: now,
+					rule: rule.id
+				},
 				keys: {}
 			};
 		}

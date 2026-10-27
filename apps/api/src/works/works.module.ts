@@ -71,6 +71,8 @@ import { AppsCatalogBlueprintsController } from './apps-catalog-blueprints.contr
 import { AppsCatalogBlueprintsService } from './apps-catalog-blueprints.service';
 // Lane aw-web-3 — the manifest-backed Apps catalog (APW-03).
 import { AppsCatalogController } from './apps-catalog.controller';
+// APW-03 T25 (lane aw-blueprints) — `GET /api/apps-catalog/licenses`, public.
+import { AppsCatalogLicensesController } from './apps-catalog-licenses.controller';
 import { AppsCatalogManifestService } from './apps-catalog-manifest.service';
 // APW-03 T30 (lane aw-blueprints) — the hourly Blueprint upgrade-notice pass.
 import { AppsCatalogUpgradeNoticeCronService } from './apps-catalog-upgrade-notice-cron.service';
@@ -242,6 +244,8 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkAppLicenseController,
         // `GET /api/apps-catalog/blueprints` — the create form's "Browse the Apps catalog".
         AppsCatalogBlueprintsController,
+        // APW-03 T25 — before `AppsCatalogController`, so `licenses` is matched before `:id`.
+        AppsCatalogLicensesController,
         // AFTER the Blueprint listing: its fixed `blueprints` segment must win over `:id`.
         AppsCatalogController,
         // APW-08 T25 + APW-04 (lane aw-ai) — `POST/GET /api/works/:id/evolve`,

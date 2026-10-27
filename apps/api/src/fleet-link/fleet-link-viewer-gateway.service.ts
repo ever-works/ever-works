@@ -65,7 +65,7 @@ export interface FleetLinkViewerObserver {
     /** The channel is open and bridged. */
     opened?(viewer: FleetLinkViewerHandle): void;
     /** The viewer sent one binary message of `bytes` bytes (forwarded, or refused by its role). */
-    inbound?(viewer: FleetLinkViewerHandle, bytes: number): void;
+    inbound?(viewer: FleetLinkViewerHandle, bytes: number, kind?: number): void;
     /** Asked on every ping tick while open: false closes the viewer (it lost the right to watch). */
     stillAllowed?(viewer: FleetLinkViewerHandle): Promise<boolean>;
     /**
@@ -122,6 +122,34 @@ export class FleetLinkViewerGatewayService
         this.observers.set(family, observer);
     }
 
+    /**
+     * Close the open viewers on THIS replica that `match` names, at once —
+     * without waiting for the next ping's `stillAllowed` (FL-07 P2: a desktop
+     * driver whose control just ended stops sending input now). Each closes
+     * `4013` like a viewer that lost its right; its channel ends with it.
+     * Returns how many were closed.
+     */
+    closeViewers(
+        match: (viewer: FleetLinkViewerHandle) => boolean,
+        reason = 'access changed',
+    ): number {
+        let closed = 0;
+        for (const [ws, state] of [...this.sockets]) {
+            if (!state.handle || !state.opened) continue;
+            let hit = false;
+            try {
+                hit = match(state.handle);
+            } catch {
+                hit = false;
+            }
+            if (!hit) continue;
+            state.bridge?.viewerClosed();
+            this.safeClose(ws, FLEET_LINK_VIEWER_CLOSE_CODES.channelClosed, reason);
+            closed += 1;
+        }
+        return closed;
+    }
+
     onApplicationShutdown(): void {
         if (this.pinger) clearInterval(this.pinger);
         for (const [ws, state] of [...this.sockets]) {
@@ -173,7 +201,13 @@ export class FleetLinkViewerGatewayService
                     state.bridge.fromViewer(bytes);
                     if (state.opened && state.handle) {
                         try {
-                            state.observer?.inbound?.(state.handle, bytes.byteLength);
+                            // FL-07 P2: the frame kind too (byte 4 of the frame header), so a
+                            // family can tell input from view controls — never the payload.
+                            state.observer?.inbound?.(
+                                state.handle,
+                                bytes.byteLength,
+                                bytes.byteLength > 4 ? bytes[4] : undefined,
+                            );
                         } catch {
                             // an observer never breaks the stream
                         }

@@ -1,6 +1,8 @@
 import {
     decodeComputerFrame,
     decodeDesktopTiles,
+    encodeComputerFrame,
+    encodeFleetLinkFrame,
     decodeFleetLinkFrame,
     decodeFleetLinkJson,
     encodeFleetLinkJson,
@@ -8,8 +10,11 @@ import {
     FLEET_LINK_FRAME_KINDS,
     FLEET_LINK_VIEWER_CHANNEL,
     normalizeFleetDisplay,
+    normalizeFleetDesktopInputRefusedCode,
     normalizeFleetDisplays,
+    type ComputerInputFrame,
     type ComputerQuality,
+    type FleetDesktopInputRefusedCode,
     type FleetDesktopTiles,
     type FleetDisplayView,
 } from '@ever-works/contracts';
@@ -29,6 +34,11 @@ import {
  *     `desktop.quality`, `desktop.refresh`, `desktop.displays`. Nothing it
  *     sends can reach the machine as input (the gateway refuses a watcher's).
  *  4. `channel.close { reason, hint }` precedes the socket's close.
+ *
+ * P2 (control): on a `driver` grant — only the view holding the computer's
+ * control lock is minted one — `sendInput` sends the person's pointer, wheel,
+ * keys and text as `INPUT` frames (the contracts' computer input frame); the
+ * machine answers an input it did not take with `desktop.inputRefused { code }`.
  */
 
 export interface DesktopSocketClose {
@@ -59,11 +69,16 @@ export interface DesktopSocketEvents {
     onDisplays?(displays: FleetDisplayView[], fallback: FleetDisplayView | null): void;
     onRefused?(hint: string): void;
     onClosed?(close: DesktopSocketClose): void;
+    /** P2: an input the machine did not take (a code only). */
+    onInputRefused?(code: FleetDesktopInputRefusedCode): void;
 }
+
+const utf8 = new TextEncoder();
 
 function messageBytes(data: unknown): Uint8Array | null {
     if (data instanceof ArrayBuffer) return new Uint8Array(data);
-    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (ArrayBuffer.isView(data))
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     return null;
 }
 
@@ -122,6 +137,26 @@ export class FleetDesktopSocket {
 
     quality(quality: ComputerQuality): void {
         this.sendJson({ type: FLEET_DESKTOP_MESSAGES.quality, quality });
+    }
+
+    /** P2: one input to the machine (a watcher's never reaches it — the gateway refuses it). False when it could not go. */
+    sendInput(input: ComputerInputFrame): boolean {
+        const socket = this.socket;
+        if (!this.ready || !socket || socket.readyState !== 1) return false;
+        const encoded = encodeComputerFrame(input);
+        if (!encoded) return false;
+        const frame = encodeFleetLinkFrame(
+            FLEET_LINK_VIEWER_CHANNEL,
+            FLEET_LINK_FRAME_KINDS.INPUT,
+            utf8.encode(encoded),
+        );
+        if (!frame) return false;
+        try {
+            socket.send(frame);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     close(): void {
@@ -197,14 +232,22 @@ export class FleetDesktopSocket {
                     fps: typeof message.fps === 'number' ? message.fps : 0,
                     bytesOut: typeof message.bytesOut === 'number' ? message.bytesOut : 0,
                     quality:
-                        message.quality === 'sharp' || message.quality === 'smooth' || message.quality === 'steady'
+                        message.quality === 'sharp' ||
+                        message.quality === 'smooth' ||
+                        message.quality === 'steady'
                             ? message.quality
                             : null,
                 });
                 return;
+            case FLEET_DESKTOP_MESSAGES.inputRefused:
+                this.events.onInputRefused?.(normalizeFleetDesktopInputRefusedCode(message.code));
+                return;
             case FLEET_DESKTOP_MESSAGES.displayChanged:
             case FLEET_DESKTOP_MESSAGES.displays:
-                this.events.onDisplays?.(normalizeFleetDisplays(message.displays), normalizeFleetDisplay(message.fallback));
+                this.events.onDisplays?.(
+                    normalizeFleetDisplays(message.displays),
+                    normalizeFleetDisplay(message.fallback),
+                );
                 return;
             default:
                 return;
@@ -215,6 +258,11 @@ export class FleetDesktopSocket {
         if (this.finished) return;
         this.finished = true;
         this.socket = null;
-        this.events.onClosed?.({ code, reason: this.reason, hint: this.hint, wasReady: this.ready });
+        this.events.onClosed?.({
+            code,
+            reason: this.reason,
+            hint: this.hint,
+            wasReady: this.ready,
+        });
     }
 }

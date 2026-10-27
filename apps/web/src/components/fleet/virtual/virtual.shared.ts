@@ -115,7 +115,10 @@ export interface VirtualForm {
     diskGiB: number;
 }
 
-export function initialVirtualForm(systemId: FleetVirtualSystem['id'], hostNodeId: string | null): VirtualForm {
+export function initialVirtualForm(
+    systemId: FleetVirtualSystem['id'],
+    hostNodeId: string | null,
+): VirtualForm {
     return {
         name: '',
         systemId,

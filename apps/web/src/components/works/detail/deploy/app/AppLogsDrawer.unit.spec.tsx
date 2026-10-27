@@ -24,7 +24,9 @@ const { client } = vi.hoisted(() => ({
 
 vi.mock('@/lib/api/app-runtime-ops.client', () => ({ appRuntimeOpsClient: client }));
 vi.mock('@/i18n/navigation', () => ({
-    Link: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
+    Link: ({ href, children }: { href: string; children: ReactNode }) => (
+        <a href={href}>{children}</a>
+    ),
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
@@ -33,7 +35,9 @@ import { AppLogsDrawer } from './AppLogsDrawer';
 const WORK_ID = '6f1c1b6e-2f7a-4c55-9a0e-2a1d4c8b9e10';
 const REQUEST_ID = 'b5e1c7a0-3333-4c4d-9e5f-607182930415';
 
-function renderDrawer(initial: { kind: 'component' | 'job'; name: string } = { kind: 'component', name: 'web' }) {
+function renderDrawer(
+    initial: { kind: 'component' | 'job'; name: string } = { kind: 'component', name: 'web' },
+) {
     render(
         <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
             <AppLogsDrawer
@@ -71,7 +75,11 @@ describe('AppLogsDrawer', () => {
             data: { status: 'accepted', op: 'logs', requestId: REQUEST_ID, dispatched: true },
         });
         client.readLogs
-            .mockResolvedValueOnce({ ok: true, status: 200, data: { requestId: REQUEST_ID, status: 'pending' } })
+            .mockResolvedValueOnce({
+                ok: true,
+                status: 200,
+                data: { requestId: REQUEST_ID, status: 'pending' },
+            })
             .mockResolvedValueOnce({
                 ok: true,
                 status: 200,
@@ -80,7 +88,12 @@ describe('AppLogsDrawer', () => {
                     status: 'ready',
                     tail: {
                         containers: [
-                            { pod: 'web-1', container: 'web', lines: ['listening with DATABASE_PASSWORD'], truncated: false },
+                            {
+                                pod: 'web-1',
+                                container: 'web',
+                                lines: ['listening with DATABASE_PASSWORD'],
+                                truncated: false,
+                            },
                         ],
                         redactedNames: ['DATABASE_PASSWORD'],
                         fetchedAt: '2026-10-27T00:00:00.000Z',
@@ -89,24 +102,43 @@ describe('AppLogsDrawer', () => {
             });
 
         renderDrawer({ kind: 'job', name: 'migrate' });
-        await waitFor(() => expect(client.requestLogs).toHaveBeenCalledWith(WORK_ID, { job: 'migrate', lines: 200 }));
+        await waitFor(() =>
+            expect(client.requestLogs).toHaveBeenCalledWith(WORK_ID, {
+                job: 'migrate',
+                lines: 200,
+            }),
+        );
         await vi.advanceTimersByTimeAsync(3_200);
-        expect(await screen.findByTestId('app-logs-tail')).toHaveTextContent('listening with DATABASE_PASSWORD');
-        expect(screen.getByTestId('app-logs-redacted')).toHaveTextContent('Hidden: DATABASE_PASSWORD');
+        expect(await screen.findByTestId('app-logs-tail')).toHaveTextContent(
+            'listening with DATABASE_PASSWORD',
+        );
+        expect(screen.getByTestId('app-logs-redacted')).toHaveTextContent(
+            'Hidden: DATABASE_PASSWORD',
+        );
         expect(client.readLogs).toHaveBeenCalledTimes(2);
         expect(setItem).not.toHaveBeenCalled();
         expect(sessionSetItem).not.toHaveBeenCalled();
     });
 
     it('asks for the previous container of a component when ticked', async () => {
-        client.requestLogs.mockResolvedValue({ ok: false, status: 503, code: 'logs_cache_unavailable' });
+        client.requestLogs.mockResolvedValue({
+            ok: false,
+            status: 503,
+            code: 'logs_cache_unavailable',
+        });
         renderDrawer();
         await waitFor(() => expect(client.requestLogs).toHaveBeenCalledTimes(1));
         fireEvent.click(screen.getByTestId('app-logs-previous'));
         await waitFor(() =>
-            expect(client.requestLogs).toHaveBeenLastCalledWith(WORK_ID, { component: 'web', lines: 200, previous: true }),
+            expect(client.requestLogs).toHaveBeenLastCalledWith(WORK_ID, {
+                component: 'web',
+                lines: 200,
+                previous: true,
+            }),
         );
-        expect(await screen.findByTestId('app-logs-error')).toHaveTextContent("Logs can't be fetched on this instance.");
+        expect(await screen.findByTestId('app-logs-error')).toHaveTextContent(
+            "Logs can't be fetched on this instance.",
+        );
     });
 
     it('explains a withheld tail and an expired request in their own words', async () => {
@@ -122,11 +154,19 @@ describe('AppLogsDrawer', () => {
         });
         renderDrawer();
         await vi.advanceTimersByTimeAsync(1_600);
-        expect(await screen.findByTestId('app-logs-error')).toHaveTextContent(/secret values couldn't be read/);
+        expect(await screen.findByTestId('app-logs-error')).toHaveTextContent(
+            /secret values couldn't be read/,
+        );
 
-        client.readLogs.mockResolvedValueOnce({ ok: false, status: 404, code: 'logs_request_not_found' });
+        client.readLogs.mockResolvedValueOnce({
+            ok: false,
+            status: 404,
+            code: 'logs_request_not_found',
+        });
         fireEvent.click(screen.getByTestId('app-logs-refresh'));
         await vi.advanceTimersByTimeAsync(1_600);
-        await waitFor(() => expect(screen.getByTestId('app-logs-error')).toHaveTextContent(/expired/));
+        await waitFor(() =>
+            expect(screen.getByTestId('app-logs-error')).toHaveTextContent(/expired/),
+        );
     });
 });

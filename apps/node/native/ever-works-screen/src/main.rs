@@ -15,10 +15,19 @@
 //! - exits as soon as its stdin closes, so it can never outlive the node.
 //!
 //! It never listens on a network port, never opens a file, never reads the
-//! clipboard and receives no credential (plan §11). Input (control) arrives in
-//! a later phase; until then `input` is answered `error unsupported`.
+//! clipboard and receives no credential (plan §11).
+//!
+//! Control (P2): `input` messages — sent by the node only while a view holds
+//! control, after its own blocked-shortcut check — are injected into the
+//! captured display (`input/`), with the blocked shortcuts refused a second
+//! time. Every key and button pressed on a controller's behalf is released on
+//! `releaseAll`, on `stop`, when the stream ends and when stdin closes (FR-39).
+//! The injector is opened on the first input only, so a helper that is only
+//! watched never asks the OS for input access. An input that was not injected
+//! is answered `inputResult` with a code (never the typed text).
 
 mod capture;
+mod input;
 mod protocol;
 mod scale;
 mod tiles;
@@ -32,9 +41,10 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use capture::{Capturer, Display};
+use input::{InputFrame, InputOutcome, InputState, Injector};
 use protocol::{
-    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_STARTED, MSG_TILES, PROTOCOL_VERSION,
-    StartRequest, StreamSettings,
+    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED, MSG_TILES,
+    PROTOCOL_VERSION, StartRequest, StreamSettings,
 };
 use tiles::RgbFrame;
 
@@ -143,6 +153,11 @@ struct Helper<W: Write> {
     displays: Vec<Display>,
     session: Option<Session>,
     last_display_check: Instant,
+    /// Opened on the first input (None until then, or after it failed to open).
+    injector: Option<Box<dyn Injector>>,
+    /// Why the injector could not be opened, once that was tried.
+    injector_refused: Option<&'static str>,
+    pressed: InputState,
 }
 
 fn run() -> io::Result<()> {
@@ -158,6 +173,9 @@ fn run() -> io::Result<()> {
         displays: Vec::new(),
         session: None,
         last_display_check: Instant::now(),
+        injector: None,
+        injector_refused: None,
+        pressed: InputState::default(),
     };
     helper.refresh_displays();
     helper.out.json(
@@ -168,6 +186,8 @@ fn run() -> io::Result<()> {
             "platform": capture::platform(),
             "reasons": helper.reasons,
             "displays": helper.displays,
+            // P2: what would stop input, known without opening anything (macOS Accessibility).
+            "inputReasons": input::probe(),
         }),
     )?;
     loop {
@@ -199,6 +219,8 @@ fn run() -> io::Result<()> {
             }
         }
     }
+    // Never leave a key or a button held on the machine (FR-39).
+    helper.release_all();
     helper.session = None;
     Ok(())
 }
@@ -220,6 +242,7 @@ impl<W: Write> Helper<W> {
         match command {
             Command::Start(request) => self.start(request),
             Command::Stop => {
+                self.release_all();
                 self.session = None;
                 Ok(())
             }
@@ -245,12 +268,61 @@ impl<W: Write> Helper<W> {
                 self.out
                     .json(MSG_DISPLAYS, &json!({ "displays": self.displays }))
             }
-            Command::Input => self.out.error(
-                "unsupported",
-                "control arrives in a later version of the screen helper",
-            ),
-            // Nothing is ever pressed by this version, so there is nothing to release.
-            Command::ReleaseAll => Ok(()),
+            Command::Input(payload) => self.input(&payload),
+            Command::ReleaseAll => {
+                self.release_all();
+                Ok(())
+            }
+        }
+    }
+
+    /// One input into the captured display; answered only when it was not injected.
+    fn input(&mut self, payload: &[u8]) -> io::Result<()> {
+        let Ok(frame) = serde_json::from_slice::<InputFrame>(payload) else {
+            return self.input_result("refused", "invalid");
+        };
+        let Some(display) = self.session.as_ref().map(|session| session.display.clone()) else {
+            return self.input_result("refused", "not-streaming");
+        };
+        let rect = self
+            .capturer
+            .as_mut()
+            .and_then(|capturer| capturer.display_rect(&display));
+        let Some(rect) = rect else {
+            return self.input_result("refused", "unknown-display");
+        };
+        if self.injector.is_none() {
+            if let Some(reason) = self.injector_refused {
+                return self.input_result("refused", reason);
+            }
+            match input::open() {
+                Ok(injector) => self.injector = Some(injector),
+                Err(reason) => {
+                    self.injector_refused = Some(reason);
+                    return self.input_result("refused", reason);
+                }
+            }
+        }
+        let Some(injector) = self.injector.as_mut() else {
+            return Ok(());
+        };
+        match self.pressed.apply(injector.as_mut(), rect, &frame) {
+            InputOutcome::Injected => Ok(()),
+            InputOutcome::Blocked => self.input_result("blocked", "blocked-shortcut"),
+            // The OS's own words are not passed on: keep the answer to a code.
+            InputOutcome::Refused(_) => self.input_result("refused", "inject-failed"),
+        }
+    }
+
+    fn input_result(&mut self, outcome: &str, code: &str) -> io::Result<()> {
+        self.out
+            .json(MSG_INPUT_RESULT, &json!({ "outcome": outcome, "code": code }))
+    }
+
+    /// Let go of everything pressed on the controller's behalf. Never fails.
+    fn release_all(&mut self) {
+        if let Some(injector) = self.injector.as_mut() {
+            self.pressed.release_all(injector.as_mut());
         }
     }
 
@@ -341,6 +413,7 @@ impl<W: Write> Helper<W> {
             }
         }
         if lost_everything {
+            self.release_all();
             self.session = None;
             return self.out.error("capture-failed", "every display went away");
         }
@@ -369,6 +442,7 @@ impl<W: Write> Helper<W> {
                 session.failures += 1;
                 if session.failures >= MAX_FAILED_PICTURES {
                     self.session = None;
+                    self.release_all();
                     return self.out.error("capture-failed", &message);
                 }
                 return Ok(());

@@ -12,15 +12,15 @@ what is and is not shipped.
 
 ## What it is
 
-| Concern     | P1 (this crate)                                                                                                 |
-| ----------- | --------------------------------------------------------------------------------------------------------------- |
-| Transport   | The helper's own stdin / stdout, length-prefixed (`src/protocol.rs`). Same user, same session. No network port. |
-| Linux       | X11: RandR monitors, `GetImage` of the monitor's rectangle, XFixes pointer. Wayland is refused by name.         |
-| Windows     | GDI `BitBlt` (with `CAPTUREBLT`) of the monitor's rectangle, the pointer drawn in; per-monitor DPI aware.       |
-| macOS       | CoreGraphics `CGDisplayCreateImage` after a Screen Recording preflight; Accessibility preflighted for control. |
-| Changes     | 64 × 64 tiles diffed at the stream's width, each JPEG-encoded; a keyframe on cadence; ≤ 512 KiB per publish.   |
-| Input       | Not in P1: `input` is answered `error unsupported`; `releaseAll` has nothing to release.                        |
-| Environment | The node passes `DISPLAY`, `XAUTHORITY`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` (Linux) and nothing else.      |
+| Concern     | P1 (this crate)                                                                                                                                                                                                                                                                                                                                 |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport   | The helper's own stdin / stdout, length-prefixed (`src/protocol.rs`). Same user, same session. No network port.                                                                                                                                                                                                                                 |
+| Linux       | X11: RandR monitors, `GetImage` of the monitor's rectangle, XFixes pointer. Wayland is refused by name.                                                                                                                                                                                                                                         |
+| Windows     | GDI `BitBlt` (with `CAPTUREBLT`) of the monitor's rectangle, the pointer drawn in; per-monitor DPI aware.                                                                                                                                                                                                                                       |
+| macOS       | CoreGraphics `CGDisplayCreateImage` after a Screen Recording preflight; Accessibility preflighted for control.                                                                                                                                                                                                                                  |
+| Changes     | 64 × 64 tiles diffed at the stream's width, each JPEG-encoded; a keyframe on cadence; ≤ 512 KiB per publish.                                                                                                                                                                                                                                    |
+| Input (P2)  | X11 XTest, Windows `SendInput` + `SetCursorPos`, macOS Quartz events (Accessibility). Pointer mapped from picture pixels to the display (`src/input/`); the blocked shortcuts refused a second time; every pressed key and button released on `releaseAll`, `stop`, a lost display and stdin close. The injector opens on the first input only. |
+| Environment | The node passes `DISPLAY`, `XAUTHORITY`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` (Linux) and nothing else.                                                                                                                                                                                                                                        |
 
 Faster capture paths are follow-ups behind the same `Capturer` trait: XShm on X11, DXGI desktop duplication on
 Windows (dirty rectangles for free), ScreenCaptureKit on macOS (`CGDisplayCreateImage` is deprecated on recent
@@ -51,6 +51,9 @@ record (`helper-policy.json` in the node's config directory, written `0600`):
 3. Before every start the node re-hashes the file; a different byte refuses the start with `helper-untrusted`, reports
    `helperTrust: none` and writes `node.helper.verify-failed` to the fleet audit.
 4. `ever-works-node helper revoke` removes the record and stops a running helper within 2 seconds.
+5. **Control** (P2) needs one more act on the machine: `ever-works-node helper control allow` explains what control
+   means and records it only after the owner types `control`, bound to this admission (approving the helper again
+   turns control off). `helper control deny` releases every key and button and ends a live control within a second.
 
 **Signed** admission (Developer ID + Team ID on macOS, Authenticode on Windows through the existing broker) is P3.
 Linux is always hash-pinned.

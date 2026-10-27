@@ -72,7 +72,8 @@ export interface LogSocketDeps {
 
 function messageBytes(data: unknown): Uint8Array | null {
     if (data instanceof ArrayBuffer) return new Uint8Array(data);
-    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (ArrayBuffer.isView(data))
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     return null;
 }
 
@@ -116,7 +117,10 @@ export class FleetLogSocket {
                     }),
                 },
             );
-            const body = (await response.json().catch(() => null)) as { token?: string; wsUrl?: string } | null;
+            const body = (await response.json().catch(() => null)) as {
+                token?: string;
+                wsUrl?: string;
+            } | null;
             if (!response.ok || !body?.token || !body.wsUrl) {
                 this.finish({ code: 0, mintError: readSessionError(response.status, body) });
                 return;
@@ -124,7 +128,10 @@ export class FleetLogSocket {
             token = body.token;
             wsUrl = body.wsUrl;
         } catch {
-            this.finish({ code: 0, mintError: { code: 'network', hint: null, details: {}, status: 0 } });
+            this.finish({
+                code: 0,
+                mintError: { code: 'network', hint: null, details: {}, status: 0 },
+            });
             return;
         }
         if (this.closedByUs) {
@@ -205,7 +212,8 @@ export class FleetLogSocket {
         const frame = decodeFleetLinkFrame(bytes);
         if (!frame) return;
         if (frame.channel === 0) {
-            if (frame.kind === FLEET_LINK_FRAME_KINDS.JSON) this.onControl(decodeFleetLinkJson(frame.payload));
+            if (frame.kind === FLEET_LINK_FRAME_KINDS.JSON)
+                this.onControl(decodeFleetLinkJson(frame.payload));
             return;
         }
         if (frame.channel !== FLEET_LINK_VIEWER_CHANNEL) return;
@@ -219,7 +227,14 @@ export class FleetLogSocket {
             }
             // Consumed: credit it back so the node may send the next frame.
             const ack = encodeFleetLinkAck(frame.payload.byteLength);
-            if (ack) this.send(encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.ACK, ack));
+            if (ack)
+                this.send(
+                    encodeFleetLinkFrame(
+                        FLEET_LINK_VIEWER_CHANNEL,
+                        FLEET_LINK_FRAME_KINDS.ACK,
+                        ack,
+                    ),
+                );
             return;
         }
         if (frame.kind === FLEET_LINK_FRAME_KINDS.JSON) {
@@ -248,7 +263,9 @@ export class FleetLogSocket {
                 return;
             case 'channel.close':
                 this.linkReason =
-                    typeof message.reason === 'string' ? (message.reason as FleetLinkCloseReason) : null;
+                    typeof message.reason === 'string'
+                        ? (message.reason as FleetLinkCloseReason)
+                        : null;
                 this.hint = typeof message.hint === 'string' ? message.hint : null;
                 return;
             default:

@@ -51,7 +51,11 @@ export function safeHttpsUrl(raw: string | null | undefined): string | null {
 }
 
 /** How the age beside a git line reads: amber past five minutes, dimmed when the computer is offline. */
-export function gitLineAgeTone(line: Pick<FleetGitLine, 'at'> | null, now: number, offline: boolean): 'normal' | 'stale' | 'offline' {
+export function gitLineAgeTone(
+    line: Pick<FleetGitLine, 'at'> | null,
+    now: number,
+    offline: boolean,
+): 'normal' | 'stale' | 'offline' {
     if (offline) return 'offline';
     return fleetGitLineFreshness(line, now) === 'stale' ? 'stale' : 'normal';
 }
@@ -62,7 +66,9 @@ export function withoutPullRequest(line: FleetGitLine | null): FleetGitLine | nu
 }
 
 /** Whether a session has a git line to show, or the "Not in a checkout" state (spec §5.1). */
-export function sessionGitState(git: FleetSessionGitRef | null | undefined): 'none' | 'missing' | 'line' {
+export function sessionGitState(
+    git: FleetSessionGitRef | null | undefined,
+): 'none' | 'missing' | 'line' {
     if (!git) return 'none';
     if (git.state === 'missing' || git.state === 'archived') return 'missing';
     return 'line';
@@ -87,13 +93,17 @@ export function diffLineTone(line: string): string {
         return 'text-text-muted dark:text-text-muted-dark';
     }
     if (line.startsWith('@@')) return 'text-sky-600 dark:text-sky-400';
-    if (line.startsWith('+')) return 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/60 dark:bg-emerald-900/20';
-    if (line.startsWith('-')) return 'text-red-700 dark:text-red-300 bg-red-50/60 dark:bg-red-900/20';
+    if (line.startsWith('+'))
+        return 'text-emerald-700 dark:text-emerald-300 bg-emerald-50/60 dark:bg-emerald-900/20';
+    if (line.startsWith('-'))
+        return 'text-red-700 dark:text-red-300 bg-red-50/60 dark:bg-red-900/20';
     return 'text-text dark:text-text-dark';
 }
 
 /** `+12 −3`, or the status word for a file without counts (binary, untracked without a patch). */
-export function changedFileCounts(file: Pick<FleetCheckoutChangedFile, 'added' | 'removed'>): string | null {
+export function changedFileCounts(
+    file: Pick<FleetCheckoutChangedFile, 'added' | 'removed'>,
+): string | null {
     if (file.added === null && file.removed === null) return null;
     return `+${file.added ?? 0} −${file.removed ?? 0}`;
 }
@@ -150,22 +160,31 @@ export function minutesSince(iso: string | null | undefined, now: number): numbe
 }
 
 /** An action's `fleet.sessionGit.actions.labels.*` key (the ids are camelCase already). */
-export function actionLabelKey(id: FleetSessionActionId, _update?: { number: number } | null): string {
+export function actionLabelKey(
+    id: FleetSessionActionId,
+    _update?: { number: number } | null,
+): string {
     return id;
 }
 
 /** The actions the menu lists: the offered ones, in the platform's order (spec FR-15 — hidden ones never show). */
-export function menuActions(actions: readonly FleetSessionActionAvailability[]): FleetSessionActionAvailability[] {
+export function menuActions(
+    actions: readonly FleetSessionActionAvailability[],
+): FleetSessionActionAvailability[] {
     return actions.filter((action) => action.available);
 }
 
 /** How a ledger row's cost reads (spec FR-21): unknown until the usage scan, "session total only" for owner sessions. */
 export function ledgerCostText(
     entry: Pick<FleetSessionActionLedgerEntry, 'tokens' | 'costCents' | 'costScope'>,
-): { kind: 'unknown' } | { kind: 'sessionTotal' } | { kind: 'known'; tokens: string; cost: string } {
+):
+    | { kind: 'unknown' }
+    | { kind: 'sessionTotal' }
+    | { kind: 'known'; tokens: string; cost: string } {
     if (entry.costScope === 'session-total') return { kind: 'sessionTotal' };
     if (entry.tokens === null || entry.costCents === null) return { kind: 'unknown' };
-    const tokens = entry.tokens >= 1000 ? `${(entry.tokens / 1000).toFixed(1)}k` : String(entry.tokens);
+    const tokens =
+        entry.tokens >= 1000 ? `${(entry.tokens / 1000).toFixed(1)}k` : String(entry.tokens);
     return { kind: 'known', tokens, cost: `$${(entry.costCents / 100).toFixed(2)}` };
 }
 

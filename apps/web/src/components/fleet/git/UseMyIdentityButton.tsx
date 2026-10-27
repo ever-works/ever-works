@@ -5,7 +5,13 @@ import { useTranslations } from 'next-intl';
 import type { FleetGitIdentitySetResult } from '@ever-works/contracts';
 import { setGitIdentityAction } from '@/app/actions/fleet-task-handoff';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 interface Proposal {
     summary: string;
@@ -17,8 +23,14 @@ interface Proposal {
 function readProposal(details: Record<string, unknown> | null): Proposal | null {
     if (!details) return null;
     const { summary, name, email, emailSource } = details;
-    if (typeof summary !== 'string' || typeof name !== 'string' || typeof email !== 'string') return null;
-    return { summary, name, email, emailSource: emailSource === 'account' ? 'account' : 'github-noreply' };
+    if (typeof summary !== 'string' || typeof name !== 'string' || typeof email !== 'string')
+        return null;
+    return {
+        summary,
+        name,
+        email,
+        emailSource: emailSource === 'account' ? 'account' : 'github-noreply',
+    };
 }
 
 /**
@@ -91,7 +103,10 @@ export function UseMyIdentityButton({
                     {error}
                 </span>
             )}
-            <Dialog open={proposal !== null} onOpenChange={(open) => !pending && !open && setProposal(null)}>
+            <Dialog
+                open={proposal !== null}
+                onOpenChange={(open) => !pending && !open && setProposal(null)}
+            >
                 <DialogContent className="max-w-md">
                     <DialogHeader>
                         <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
@@ -101,15 +116,19 @@ export function UseMyIdentityButton({
                     {proposal && (
                         <div className="space-y-2 text-sm" data-testid="fleet-git-identity-confirm">
                             <p>
-                                {t('confirm.name')}: <span className="font-medium">{proposal.name}</span>
+                                {t('confirm.name')}:{' '}
+                                <span className="font-medium">{proposal.name}</span>
                             </p>
                             <p>
-                                {t('confirm.email')}: <span className="font-mono">{proposal.email}</span>
+                                {t('confirm.email')}:{' '}
+                                <span className="font-mono">{proposal.email}</span>
                             </p>
                             {proposal.emailSource === 'account' && (
                                 <p className="text-warning">{t('warnings.accountEmail')}</p>
                             )}
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('confirm.nothingElse')}</p>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('confirm.nothingElse')}
+                            </p>
                             {error && (
                                 <p role="alert" className="text-danger">
                                     {error}
@@ -118,10 +137,20 @@ export function UseMyIdentityButton({
                         </div>
                     )}
                     <DialogFooter>
-                        <Button type="button" variant="secondary" onClick={() => setProposal(null)} disabled={pending}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setProposal(null)}
+                            disabled={pending}
+                        >
                             {t('confirm.cancel')}
                         </Button>
-                        <Button type="button" onClick={() => void confirm()} disabled={pending} data-testid="fleet-git-identity-confirm-button">
+                        <Button
+                            type="button"
+                            onClick={() => void confirm()}
+                            disabled={pending}
+                            data-testid="fleet-git-identity-confirm-button"
+                        >
                             {t('confirm.set')}
                         </Button>
                     </DialogFooter>

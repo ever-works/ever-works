@@ -80,7 +80,8 @@ export class FleetSessionGitController {
 
     @Get('checkouts/:id/pull-request/draft')
     @ApiOperation({
-        summary: 'What the pull-request dialog is prefilled with: branch, base, a title, and the open pull request when there is one.',
+        summary:
+            'What the pull-request dialog is prefilled with: branch, base, a title, and the open pull request when there is one.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })

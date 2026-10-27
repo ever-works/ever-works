@@ -59,7 +59,9 @@ function board(): FleetSessionBoardResponse {
 describe('the view state in the address bar (FR-44)', () => {
     it('round-trips, dropping defaults and unknown values', () => {
         const view = parseSessionsViewState(
-            new URLSearchParams('mode=list&g=week&kind=agent&state=done&node=not-a-uuid&agent=11111111-1111-4111-8111-111111111111'),
+            new URLSearchParams(
+                'mode=list&g=week&kind=agent&state=done&node=not-a-uuid&agent=11111111-1111-4111-8111-111111111111',
+            ),
         );
         expect(view).toMatchObject({
             mode: 'list',
@@ -77,7 +79,12 @@ describe('the view state in the address bar (FR-44)', () => {
 describe('the board (FR-41, FR-43)', () => {
     it('counts each column and filters to one state', () => {
         expect(boardCounts(board())).toEqual({ needs_you: 1, working: 2, done: 1, idle: 0 });
-        expect(boardCounts(filterBoard(board(), { state: 'working' }))).toEqual({ needs_you: 0, working: 2, done: 0, idle: 0 });
+        expect(boardCounts(filterBoard(board(), { state: 'working' }))).toEqual({
+            needs_you: 0,
+            working: 2,
+            done: 0,
+            idle: 0,
+        });
     });
 
     it('names the cards that changed column, not the new ones', () => {
@@ -95,11 +102,20 @@ describe('the list (FR-41, FR-42)', () => {
             [
                 session('x', { agentId: 'agent-1', stateChangedAt: '2026-10-21T08:00:00.000Z' }),
                 session('y', { stateChangedAt: '2026-10-21T11:00:00.000Z' }),
-                session('z', { state: 'ended', provider: 'shell', stateChangedAt: '2026-10-20T11:00:00.000Z' }),
+                session('z', {
+                    state: 'ended',
+                    provider: 'shell',
+                    stateChangedAt: '2026-10-20T11:00:00.000Z',
+                }),
             ],
             'day',
         );
         expect(groups.map((group) => group.whoKey)).toEqual(['you', 'agent-1', 'shell']);
-        expect(filterList(groups.flatMap((group) => group.sessions), { state: 'ended' }).map((s) => s.id)).toEqual(['z']);
+        expect(
+            filterList(
+                groups.flatMap((group) => group.sessions),
+                { state: 'ended' },
+            ).map((s) => s.id),
+        ).toEqual(['z']);
     });
 });

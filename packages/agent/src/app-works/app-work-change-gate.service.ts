@@ -105,7 +105,11 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 // guard named human-merge paths, so every other answer keeps
                 // its exact shape.
                 return verdict.humanMergePaths && verdict.humanMergePaths.length > 0
-                    ? { allowed: true, note: verdict.note, humanMergePaths: verdict.humanMergePaths }
+                    ? {
+                          allowed: true,
+                          note: verdict.note,
+                          humanMergePaths: verdict.humanMergePaths,
+                      }
                     : { allowed: true, note: verdict.note };
             }
             return {

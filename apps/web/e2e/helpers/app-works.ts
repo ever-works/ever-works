@@ -270,7 +270,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/apps-catalog/licenses',
         wrapper: 'listAppCatalogLicenses',
-        shipped: false,
+        // APW-03 T25 (lane aw-blueprints, 2026-10-27) — `AppsCatalogLicensesController`.
+        shipped: true,
     },
     {
         id: '03-4',
@@ -1001,7 +1002,7 @@ export function getAppsCatalogEntry(
     return rawApi(request, 'GET', `/api/apps-catalog/${seg(input.catalogId)}`, input);
 }
 
-/** **Unshipped / contract-only** (APW-03): `GET /api/apps-catalog/licenses` (public). */
+/** **Shipped** (APW-03 T25, 2026-10-27): `GET /api/apps-catalog/licenses` (public). */
 export function listAppCatalogLicenses(
     request: APIRequestContext,
     input: WrapperOptions = {},

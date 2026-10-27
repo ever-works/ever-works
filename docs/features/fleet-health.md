@@ -16,16 +16,16 @@ measured; nothing here is ever pushed back down to it. It spends no tokens or cr
 
 Each check-in carries a **health snapshot**:
 
-| Fact            | Shown as                                                         |
-| --------------- | ---------------------------------------------------------------- |
-| CPU             | percent busy since the last check-in                             |
-| Memory          | percent used, and used / total                                   |
-| Disk            | percent full, free space, and the computer's own disk floor      |
+| Fact            | Shown as                                                                                       |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| CPU             | percent busy since the last check-in                                                           |
+| Memory          | percent used, and used / total                                                                 |
+| Disk            | percent full, free space, and the computer's own disk floor                                    |
 | GPU             | vendor and model, and — when the vendor tool says — busy and memory; "No GPU" when it has none |
-| Load            | the one-minute load average with the core count (not on Windows) |
-| Uptime          | how long the machine has been up                                 |
-| Pending reboot  | whether the operating system waits for a restart (Linux, Windows) |
-| Failed services | how many services the service manager reports as failed          |
+| Load            | the one-minute load average with the core count (not on Windows)                               |
+| Uptime          | how long the machine has been up                                                               |
+| Pending reboot  | whether the operating system waits for a restart (Linux, Windows)                              |
+| Failed services | how many services the service manager reports as failed                                        |
 
 A fact a computer could not read is shown as **—**, never as zero: "no failed services" and "we could not
 ask" are different facts. A computer running a node version older than health reporting shows "—" in every
@@ -37,14 +37,14 @@ The time on a snapshot is the platform's receipt time — never the machine's ow
 
 A computer is always in exactly one state, written in words beside its dot (never colour alone):
 
-| State            | Reads                                                         | Fix                                  |
-| ---------------- | ------------------------------------------------------------- | ------------------------------------ |
-| Online / Busy    | Online · Busy · 2 jobs                                        | —                                    |
-| Offline          | Offline · last seen 2 h ago                                   | **Wake**, when possible (below)      |
-| Quarantined      | Stopped itself: _the computer's own reason_                   | the exact command to run on it       |
-| Throttled        | Pausing new work — CPU is above its ceiling (92% of 85%)      | **Change limits**                    |
-| Limited          | Waiting for Claude Code's limit to reset at Sun 03:00         | **Clear limit now** (audited)        |
-| Upgrade required | Upgrade required — takes no work until updated                | the upgrade command                  |
+| State            | Reads                                                    | Fix                             |
+| ---------------- | -------------------------------------------------------- | ------------------------------- |
+| Online / Busy    | Online · Busy · 2 jobs                                   | —                               |
+| Offline          | Offline · last seen 2 h ago                              | **Wake**, when possible (below) |
+| Quarantined      | Stopped itself: _the computer's own reason_              | the exact command to run on it  |
+| Throttled        | Pausing new work — CPU is above its ceiling (92% of 85%) | **Change limits**               |
+| Limited          | Waiting for Claude Code's limit to reset at Sun 03:00    | **Clear limit now** (audited)   |
+| Upgrade required | Upgrade required — takes no work until updated           | the upgrade command             |
 
 The hub cards, the Computers table and the computer header show the state's _why_ next to the word — the
 reset time of a usage limit, the computer's own reason, "can be woken from build-01". A reset time is in
@@ -119,13 +119,13 @@ wake act's tool shape. The Fleet agent tools epic binds them behind the Agent pe
 
 All under `/api/fleet`, authenticated, `FLEET_ENABLED`-gated:
 
-| Method | Path                         | What                                                          |
-| ------ | ---------------------------- | ------------------------------------------------------------- |
-| GET    | `/nodes/:id/health`          | snapshot, staleness, state and fix, wake and refresh availability |
-| GET    | `/nodes/:id/health/history`  | `?range=1h\|24h\|7d\|90d`, ≤ 500 points, `{ disabled: true }` when off |
-| POST   | `/nodes/:id/health`          | Refresh now                                                   |
-| POST   | `/nodes/:id/wake`            | wake through a sibling (202)                                  |
-| GET    | `/nodes/:id/wake`            | has it answered the last wake?                                |
+| Method | Path                        | What                                                                   |
+| ------ | --------------------------- | ---------------------------------------------------------------------- |
+| GET    | `/nodes/:id/health`         | snapshot, staleness, state and fix, wake and refresh availability      |
+| GET    | `/nodes/:id/health/history` | `?range=1h\|24h\|7d\|90d`, ≤ 500 points, `{ disabled: true }` when off |
+| POST   | `/nodes/:id/health`         | Refresh now                                                            |
+| POST   | `/nodes/:id/wake`           | wake through a sibling (202)                                           |
+| GET    | `/nodes/:id/wake`           | has it answered the last wake?                                         |
 
 Refusals carry `{ error: { code, hint } }`: `unreachable`, `consent_missing`, `kill_switch`,
 `limit_exceeded`, `unsupported_on_node`, `permission_denied`, `not_found`, `invalid`.

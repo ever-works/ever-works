@@ -52,7 +52,11 @@ export const appEnvAPI = {
     },
 
     /** Lane aw-ops — `POST …/app-env/:name/rotate` with the typed name. */
-    rotate: async (workId: string, name: string, confirmName: string): Promise<AppEnvRotateView> => {
+    rotate: async (
+        workId: string,
+        name: string,
+        confirmName: string,
+    ): Promise<AppEnvRotateView> => {
         return serverMutation<AppEnvRotateView>({
             endpoint: `/works/${encodeURIComponent(workId)}/app-env/${encodeURIComponent(name)}/rotate`,
             data: { confirmName },

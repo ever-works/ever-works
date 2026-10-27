@@ -20,10 +20,10 @@ Inbox or My Decisions is described in [Session status and the Sessions board](./
 
 ## Two kinds
 
-| Kind              | Who works in it                         | Needs on the computer             | Runs as                                                                                       | Cost                                                         |
-| ----------------- | --------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Your session**  | You                                     | `ever-works-node start --manage`  | You, in your own login, with your own CLI configuration                                       | Your own CLI login; Ever Works bills nothing                 |
-| **Agent session** | One of your Agents (it owns one **Run**) | `ever-works-node start --work`    | Isolated, exactly as a Task run: its own configuration home, no MCP server or hook of yours   | The Run carries the cost, in Activity → Runs                 |
+| Kind              | Who works in it                          | Needs on the computer            | Runs as                                                                                     | Cost                                         |
+| ----------------- | ---------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **Your session**  | You                                      | `ever-works-node start --manage` | You, in your own login, with your own CLI configuration                                     | Your own CLI login; Ever Works bills nothing |
+| **Agent session** | One of your Agents (it owns one **Run**) | `ever-works-node start --work`   | Isolated, exactly as a Task run: its own configuration home, no MCP server or hook of yours | The Run carries the cost, in Activity → Runs |
 
 An Agent session waits for a free slot when the computer is busy (it counts against `--concurrency` like any Task run) and says so; ending the session ends its Run, and ending the Run ends the session. An Agent session never runs in your own configuration: a computer that cannot give it the Task-run isolation refuses it and says why. For now Agent sessions run on your own computers (not ones shared with you through an Organization).
 

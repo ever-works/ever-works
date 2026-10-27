@@ -26,8 +26,13 @@ const display = (id: string, extra: Partial<FleetDisplayView> = {}): FleetDispla
 
 describe('desktop.shared (FL-07)', () => {
     it('has a card (title and body) for every blocker, with camelCase keys', () => {
-        const cards = (en as unknown as { fleet: { desktop: { unavailable: Record<string, { title?: string; body?: string }> } } })
-            .fleet.desktop.unavailable;
+        const cards = (
+            en as unknown as {
+                fleet: {
+                    desktop: { unavailable: Record<string, { title?: string; body?: string }> };
+                };
+            }
+        ).fleet.desktop.unavailable;
         for (const blocker of FLEET_DESKTOP_BLOCKERS) {
             const key = DESKTOP_BLOCKER_KEYS[blocker];
             expect(key).toMatch(/^[a-z][A-Za-z]*$/);
@@ -42,7 +47,9 @@ describe('desktop.shared (FL-07)', () => {
         expect(desktopBlockerCommand('helper-untrusted')).toBe('ever-works-node helper status');
         expect(desktopBlockerCommand('consent-missing')).toBe('ever-works-node start --attend');
         expect(desktopBlockerCommand('offline')).toBeNull();
-        expect(desktopBlockerSettingsPath('permission-screen-recording')).toContain('Screen Recording');
+        expect(desktopBlockerSettingsPath('permission-screen-recording')).toContain(
+            'Screen Recording',
+        );
         expect(desktopBlockerSettingsPath('helper-missing')).toBeNull();
     });
 
@@ -53,7 +60,10 @@ describe('desktop.shared (FL-07)', () => {
     });
 
     it('labels displays in the machine order, 1-based', () => {
-        const displays = [display('a', { primary: true }), display('b', { scale: 2, width: 3024, height: 1964 })];
+        const displays = [
+            display('a', { primary: true }),
+            display('b', { scale: 2, width: 3024, height: 1964 }),
+        ];
         expect(displayPosition(displays, 'b')).toEqual({ index: 2, count: 2 });
         expect(displayPosition(displays, 'gone')).toEqual({ index: 1, count: 2 });
         expect(displayPosition([], null)).toEqual({ index: 1, count: 1 });
