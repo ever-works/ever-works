@@ -166,3 +166,12 @@ export * from './agent-app-change-tools';
 
 // APW-04 — the provisioning feedback loop (build / deploy / smoke → the provisioning Task).
 export * from './app-provisioning-feedback.service';
+
+// APW-03 T27–T31 (lane aw-blueprints) — Blueprint apply-after-create and upgrades: the
+// three-way merge, the `app-blueprint-apply` job contract, the service behind the App spec
+// routes and the worker's RPC runner. Declared under `apps-catalog/`, which has no
+// package export of its own; exported here because `AppWorksModule` binds them.
+export * from '../apps-catalog/app-spec-merge';
+export * from '../apps-catalog/app-blueprint-apply.job';
+export * from '../apps-catalog/app-blueprint-upgrade.service';
+export * from '../apps-catalog/app-blueprint-apply.runner';

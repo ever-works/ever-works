@@ -47,6 +47,10 @@ describe('WorkAppSpecState entity', () => {
                 'blueprintSha',
                 'blueprintUpgradeDismissedVersion',
                 'blueprintUpgradePr',
+                // APW-03 T28 (lane aw-blueprints, migration 1796600000000) — the run columns.
+                'blueprintUpgradeError',
+                'blueprintUpgradeRequestedAt',
+                'blueprintUpgradeStatus',
                 'blueprintVersion',
                 'createdAt',
                 'dispatchedAt',
@@ -92,7 +96,7 @@ describe('WorkAppSpecState entity', () => {
                 'workId',
             ].sort(),
         );
-        expect(columns).toHaveLength(55);
+        expect(columns).toHaveLength(58);
     });
 
     describe('the three indexes of plan §3.1:451-452', () => {
@@ -183,6 +187,7 @@ describe('WorkAppSpecState entity', () => {
         // plan §3.1:399-401 mandates `PortableDateColumn` for exactly this.
         const dateColumns = [
             'blueprintMatchedAt',
+            'blueprintUpgradeRequestedAt',
             'dispatchedAt',
             'effectiveAt',
             'lastEvaluatedAt',
@@ -284,6 +289,8 @@ describe('WorkAppSpecState entity', () => {
             ['blueprintApplyError', 64, true],
             ['blueprintLatestVersion', 32, true],
             ['blueprintUpgradeDismissedVersion', 32, true],
+            ['blueprintUpgradeStatus', 16, true],
+            ['blueprintUpgradeError', 64, true],
             ['licenseSpdx', 200, true],
             ['licenseClass', 8, true],
             ['licenseSource', 16, true],

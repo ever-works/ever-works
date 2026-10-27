@@ -579,6 +579,93 @@ export class WorkAppSpecStateRepository {
     }
 
     /**
+     * APW-03 T28 (lane aw-blueprints) — claim the Work's one Blueprint apply / upgrade
+     * run: `blueprintUpgradeStatus = 'queued'`, stamped `now`, **only** when no run is in
+     * flight. The guard is the `WHERE` clause, so two concurrent requests cannot both
+     * claim:
+     *
+     * ```sql
+     * UPDATE work_app_spec_states
+     *    SET "blueprintUpgradeStatus" = 'queued', "blueprintUpgradeError" = NULL,
+     *        "blueprintUpgradeRequestedAt" = :now
+     *  WHERE "workId" = :workId
+     *    AND ("blueprintUpgradeStatus" IS NULL
+     *         OR "blueprintUpgradeStatus" NOT IN ('queued', 'running')
+     *         OR "blueprintUpgradeRequestedAt" IS NULL
+     *         OR "blueprintUpgradeRequestedAt" < :staleBefore)
+     * ```
+     *
+     * A claim older than `staleBefore` is retaken: a dispatch that was lost (no runtime,
+     * a worker that died) must not block the App Work forever. `false` ⇒ `409
+     * applyInProgress`.
+     */
+    async claimBlueprintRun(workId: string, now: Date, staleBefore: Date): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppSpecState)
+            .set({
+                blueprintUpgradeStatus: 'queued',
+                blueprintUpgradeError: null,
+                blueprintUpgradeRequestedAt: now,
+            })
+            .where('workId = :workId', { workId })
+            .andWhere(
+                '("blueprintUpgradeStatus" IS NULL' +
+                    ` OR "blueprintUpgradeStatus" NOT IN ('queued', 'running')` +
+                    ' OR "blueprintUpgradeRequestedAt" IS NULL' +
+                    ' OR "blueprintUpgradeRequestedAt" < :staleBefore)',
+                { staleBefore },
+            )
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * APW-03 T28–T31 (lane aw-blueprints) — write the Blueprint run columns: the run's
+     * status / error, the proposal (`blueprintUpgradePr`), and — when a proposal lands —
+     * the version the App Work now follows. `null` clears a column; an absent field is
+     * left untouched. Unguarded on purpose: the run holds the per-Work lock
+     * (`app-blueprint-apply:<workId>`) while it writes.
+     */
+    async patchBlueprintRun(
+        workId: string,
+        patch: Partial<
+            Pick<
+                WorkAppSpecState,
+                | 'blueprintUpgradeStatus'
+                | 'blueprintUpgradeError'
+                | 'blueprintUpgradeRequestedAt'
+                | 'blueprintUpgradePr'
+                | 'blueprintVersion'
+                | 'blueprintSha'
+                | 'blueprintRepo'
+                | 'blueprintApplyStatus'
+                | 'blueprintApplyError'
+                | 'blueprintApplyRef'
+                | 'blueprintLatestVersion'
+                | 'blueprintUpgradeDismissedVersion'
+            >
+        >,
+    ): Promise<boolean> {
+        const set: Partial<WorkAppSpecState> = {};
+        for (const [key, value] of Object.entries(patch)) {
+            if (value !== undefined) {
+                (set as Record<string, unknown>)[key] = value;
+            }
+        }
+        if (Object.keys(set).length === 0) {
+            return false;
+        }
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkAppSpecState)
+            .set(set)
+            .where('workId = :workId', { workId })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * APW-03 T44 — store (or clear, with `null`) the owner's single attestation
      * record (C3, R-3). Guarded by the licence the caller judged, so an attest
      * that raced a re-classification writes nothing (`409 licenseChanged`).

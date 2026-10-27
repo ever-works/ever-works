@@ -500,7 +500,7 @@ export function previewMergeValue(value: unknown): string {
 }
 
 /** The one-line note a kept value carries in the file. Never echoes the member's value. */
-export function conflictComment(conflict: AppSpecMergeConflict, version?: string): string {
+export function mergeConflictNote(conflict: AppSpecMergeConflict, version?: string): string {
     const who = version ? `Blueprint ${version}` : 'The new Blueprint version';
     switch (conflict.kind) {
         case 'deleted_by_blueprint':
@@ -645,7 +645,7 @@ function annotate(doc: yaml.Document, merged: unknown, conflict: AppSpecMergeCon
     if (!path || path.length === 0) {
         return;
     }
-    const note = conflictComment(conflict, version);
+    const note = mergeConflictNote(conflict, version);
     const last = path[path.length - 1];
     if (typeof last === 'number') {
         const node = doc.getIn(path, true) as { commentBefore?: string | null } | undefined;

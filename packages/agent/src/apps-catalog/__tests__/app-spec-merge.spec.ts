@@ -1,7 +1,7 @@
 import * as yaml from 'yaml';
 import {
     APP_SPEC_MERGE_COMMENT_PREFIX,
-    conflictComment,
+    mergeConflictNote,
     formatMergePath,
     isNamedArray,
     mergeAppSpecDocuments,
@@ -613,7 +613,7 @@ describe('APW-03 T27 — helpers', () => {
     });
 
     it('never echoes the member value in a conflict note', () => {
-        const note = conflictComment(
+        const note = mergeConflictNote(
             {
                 path: 'spec.env[name=A].value',
                 segments: ['spec', 'env', { name: 'A' }, 'value'],

@@ -12,6 +12,7 @@ import type {
     AppBlueprintApplyRef,
     AppBlueprintApplyStatus,
     AppBlueprintUpgradePr,
+    AppBlueprintUpgradeStatus,
     AppLicenseEvidence,
     AppSpec,
     AppSpecEvaluationTrigger,
@@ -278,6 +279,23 @@ export class WorkAppSpecState {
     /** `{ number, url, version, breaking }` of the open upgrade pull request (FR-51). */
     @Column({ type: 'simple-json', nullable: true })
     blueprintUpgradePr?: AppBlueprintUpgradePr | null;
+
+    /**
+     * APW-03 T28 (lane aw-blueprints, migration `1796600000000`) — where the latest
+     * Blueprint apply / upgrade run is: `queued` · `running` · `proposed` · `unchanged` ·
+     * `failed` (`APP_BLUEPRINT_UPGRADE_STATUSES`). `queued` / `running` are the in-flight
+     * guard the request claims with one guarded UPDATE (`409 applyInProgress`).
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    blueprintUpgradeStatus?: AppBlueprintUpgradeStatus | null;
+
+    /** The reason code of a `failed` run. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    blueprintUpgradeError?: string | null;
+
+    /** When the latest run was claimed — a claim older than the stale window can be retaken. */
+    @PortableDateColumn({ nullable: true })
+    blueprintUpgradeRequestedAt?: Date | null;
 
     // ── Licence (plan §2.6, §3.1:433-449) ──────────────────────────────────
 
