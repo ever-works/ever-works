@@ -909,7 +909,10 @@ export class AppUpstreamSyncService {
             return await this.pullRequestPath(context, row, base);
         }
 
-        if (comparison.aheadBy === 0) {
+        // T46: a range let through on the owner's workflow release never fast-forwards the
+        // tracked branch — it goes through the one sync pull request, so the workflow change
+        // reaches the default branch only when a person merges it.
+        if (comparison.aheadBy === 0 && context.workflowReleaseUsed !== true) {
             // FR-35: behind-only — the one case a fast-forward is written for. (R-4
             // gives every fork a commit of its own, so this stays the exception;
             // ACC-02-25 is the rule.)

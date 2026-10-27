@@ -5,6 +5,7 @@ import { TaskRepository } from '../../database/repositories/task.repository';
 import { WorkMemberRepository } from '../../database/repositories/work-member.repository';
 import { WorkRepository } from '../../database/repositories/work.repository';
 import { WorkUpstreamStateRepository } from '../../database/repositories/work-upstream-state.repository';
+import { Task } from '../../entities/task.entity';
 import { WorkMember } from '../../entities/work-member.entity';
 import { WorkMemberRole } from '../../entities/types';
 import { Work } from '../../entities/work.entity';
@@ -57,7 +58,6 @@ describe('AppUpstreamStateService — T46 release and T47 sync pull request chec
         states = new WorkUpstreamStateRepository(dataSource.getRepository(WorkUpstreamState));
         works = new WorkRepository(dataSource.getRepository(Work));
         members = new WorkMemberRepository(dataSource.getRepository(WorkMember));
-        const { Task } = await import('../../entities/task.entity');
         taskRepository = new TaskRepository(dataSource.getRepository(Task));
     });
 

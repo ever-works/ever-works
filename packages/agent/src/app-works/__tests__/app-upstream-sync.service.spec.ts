@@ -2764,6 +2764,27 @@ describe('AppUpstreamSyncService — the owner release of a held workflow change
         expect(harness.hygiene.apply).toHaveBeenCalledTimes(1);
     });
 
+    it('never fast-forwards a behind-only fork on a release: the pull request carries it', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowRelease: release() }),
+            handlers: {
+                getForkDivergence: () => ({
+                    aheadBy: 0,
+                    behindBy: 2,
+                    upstreamHeadSha: SHA_B,
+                    forkHeadSha: SHA_A,
+                }),
+                getCompareDiff: () => compareOf([WORKFLOW]),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.result).toBe('pull_request_opened');
+        expect(trackedBranchMoves(harness)).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(1);
+    });
+
     it('holds again when upstream moved past the released head', async () => {
         const harness = makeHarness({
             row: makeRow({ workflowRelease: release({ headSha: SHA_A }) }),
