@@ -7418,6 +7418,58 @@
                         "undeclaredName": "Специфікація застосунку не оголошує цю назву.",
                         "specUnavailable": "У цього застосунку ще немає придатної специфікації.",
                         "failed": "Не вдалося зберегти значення. Спробуйте ще раз."
+                    },
+                    "import": {
+                        "open": "Import .env",
+                        "title": "Import a .env file",
+                        "description": "Paste the contents of a .env file, or pick one. Only names the App spec declares are imported, and generated values are never overwritten. Values are sent once and never shown again.",
+                        "pasteLabel": "Contents",
+                        "fileLabel": "Or pick a file:",
+                        "preview": "Preview changes",
+                        "import": "{count, plural, =0 {Nothing to import} one {Import # change} other {Import # changes}}",
+                        "cancel": "Cancel",
+                        "imported": "{count, plural, =0 {Nothing changed} one {# value imported} other {# values imported}}",
+                        "failed": "Couldn't import: {reason}",
+                        "summary": "{add} new · {replace} replaced · {remove} removed · {refused} refused",
+                        "undeclared": "The App spec doesn't declare {names}. Remove those lines to import the rest.",
+                        "line": "line {line}",
+                        "actions": {
+                            "add": "will be added",
+                            "replace": "will replace the stored value",
+                            "remove": "will remove the stored value",
+                            "skipped": "skipped",
+                            "refused": "refused"
+                        },
+                        "refusals": {
+                            "undeclaredName": "Some lines name values the App spec doesn't declare. Remove them and try again.",
+                            "specUnavailable": "This app has no usable App spec yet.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so values can't be saved.",
+                            "storeUnavailable": "The environment store isn't available right now. Nothing was changed.",
+                            "tooLarge": "This file is larger than 1 MiB.",
+                            "tooMany": "This file has more lines than allowed.",
+                            "forbidden": "You need edit access to this App to import values.",
+                            "invalid": "This isn't a .env file Ever Works can read."
+                        }
+                    },
+                    "rotate": {
+                        "open": "Rotate",
+                        "aria": "Rotate {name}",
+                        "title": "Rotate {name}?",
+                        "description": "Ever Works generates a fresh value. The app uses it from its next Deployment.",
+                        "warning": "Data the app encrypted or signed with the current value may become unreadable, and sessions or tokens made with it stop working. This can't be undone.",
+                        "typeToConfirm": "Type {name} to confirm",
+                        "confirm": "Rotate",
+                        "cancel": "Cancel",
+                        "rotated": "{name} rotated.",
+                        "failed": "Couldn't rotate: {reason}",
+                        "refusals": {
+                            "mismatch": "The name you typed doesn't match.",
+                            "notGenerated": "This value isn't generated, so it can't be rotated.",
+                            "generatorUnavailable": "This value's generator isn't available on this installation.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation.",
+                            "rateLimited": "Too many rotations. Try again later.",
+                            "forbidden": "You need edit access to this App to rotate values."
+                        }
                     }
                 },
                 "dependencies": {
@@ -7451,10 +7503,217 @@
                         "requested": "Дані {kind} видаляються.",
                         "failed": "Не вдалося видалити дані. {reason}"
                     },
-                    "deleteDataOwnerOnly": "Лише власник роботи може видалити ці дані."
+                    "deleteDataOwnerOnly": "Лише власник роботи може видалити ці дані.",
+                    "configure": {
+                        "open": "Configure",
+                        "aria": "Configure {kind}",
+                        "title": "Configure {kind}",
+                        "description": "Choose where it runs and give its settings. Secret settings are sent once and never shown again.",
+                        "provider": "Provider",
+                        "size": "Volume size (GiB)",
+                        "sizeHint": "Leave empty to use the default size.",
+                        "sizeGrowOnly": "Currently {size} GiB. A volume can only grow.",
+                        "sizeTooSmall": "The size must be a whole number of at least {size} GiB.",
+                        "required": "required",
+                        "stored": "A value is set.",
+                        "secretStored": "A value is stored. Type a new one to replace it, or leave this empty to keep it.",
+                        "save": "Save and provision",
+                        "cancel": "Cancel",
+                        "saved": "{kind}: settings saved. A new provisioning attempt is scheduled.",
+                        "failed": "Couldn't save: {reason}",
+                        "refusals": {
+                            "providerNotSupported": "That provider can't serve this dependency here.",
+                            "sizeShrink": "A volume can't be made smaller.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so settings can't be saved.",
+                            "notDeclared": "The App spec doesn't declare this dependency.",
+                            "forbidden": "You need edit access to this App to configure dependencies.",
+                            "invalid": "Check the settings and try again.",
+                            "leaseHeld": "This dependency is being provisioned right now. Try again in a moment."
+                        }
+                    }
                 },
                 "ownerRequired": "Це може зробити лише власник роботи.",
-                "ownerConfirmCluster": "Це підключення до кластера зберіг інший учасник, тож власник роботи має один раз виконати розгортання, щоб його підтвердити."
+                "ownerConfirmCluster": "Це підключення до кластера зберіг інший учасник, тож власник роботи має один раз виконати розгортання, щоб його підтвердити.",
+                "live": {
+                    "title": "Running now",
+                    "notObserved": "The cluster hasn't been observed yet. Refresh to read it.",
+                    "observed": "Observed",
+                    "observedRecently": "Checked in the last few minutes",
+                    "refresh": "Refresh",
+                    "refreshIn": "Refresh in {seconds}s",
+                    "runSmoke": "Run smoke checks",
+                    "notDispatched": "No isolated worker is available to run this right now.",
+                    "refreshQueued": "Refreshing the status…",
+                    "smokeQueued": "Smoke checks started.",
+                    "refreshWait": "Refresh is allowed once every 15 seconds. Try again in {seconds}s.",
+                    "actionFailed": "Couldn't do that: {reason}",
+                    "refusals": {
+                        "notDeployed": "Nothing of this app is deployed right now.",
+                        "paused": "The app is paused. Resume it to run the smoke checks.",
+                        "deployInProgress": "A Deployment is running. Wait for it to finish.",
+                        "deleting": "This App Work is being deleted.",
+                        "forbidden": "You need permission to deploy this app to do that."
+                    },
+                    "requests": {
+                        "refresh": "Status refresh",
+                        "job": "Run of {name}",
+                        "smoke": "Smoke checks",
+                        "inFlight": "{what} — in progress",
+                        "failed": "{what} failed ({code})"
+                    },
+                    "components": "Components",
+                    "smoke": "Smoke checks",
+                    "jobs": "Jobs",
+                    "cron": "Scheduled calls",
+                    "noSnapshot": "The cluster hasn't been observed yet."
+                },
+                "components": {
+                    "empty": "No components are running.",
+                    "caption": "Components and their replicas",
+                    "name": "Component",
+                    "ready": "Ready",
+                    "restarts": "Restarts",
+                    "lastStop": "Last stop",
+                    "logs": "Logs",
+                    "logsAria": "Logs of {name}",
+                    "roles": {
+                        "web": "web",
+                        "worker": "worker"
+                    },
+                    "readyOf": "{ready}/{desired}",
+                    "oomRecent": "out of memory in the last 24 hours"
+                },
+                "smoke": {
+                    "none": "No smoke checks have run on this Deployment yet.",
+                    "inCluster": "Inside",
+                    "public": "Public",
+                    "hairpin": "Own address",
+                    "count": "{label} {passed}/{total}",
+                    "isolation": {
+                        "enforced": "Network isolation: enforced",
+                        "notEnforced": "Network isolation: not enforced",
+                        "unknown": "Network isolation: unknown"
+                    },
+                    "classifications": {
+                        "dnsNotPointing": "DNS doesn't point at the cluster yet",
+                        "tlsNotReady": "the certificate isn't ready yet",
+                        "unreachable": "unreachable",
+                        "checkFailed": "the check failed"
+                    },
+                    "httpStatus": "answered HTTP {status}",
+                    "failed": "failed"
+                },
+                "jobs": {
+                    "empty": "The App spec declares no jobs.",
+                    "when": {
+                        "preDeploy": "before each Deployment",
+                        "firstDeploy": "first Deployment only",
+                        "postDeploy": "after each Deployment"
+                    },
+                    "status": {
+                        "succeeded": "Succeeded",
+                        "failed": "Failed",
+                        "timeout": "Timed out",
+                        "running": "Running…",
+                        "queued": "Queued…"
+                    },
+                    "lastRunWithDuration": "{status} · {seconds}s",
+                    "neverRun": "Hasn't run yet",
+                    "exitCode": "exit code {code}",
+                    "logs": "Logs",
+                    "logsAria": "Logs of the {name} job",
+                    "run": "Run now",
+                    "runAria": "Run the {name} job now",
+                    "deployInProgress": "Wait for the current Deployment to finish.",
+                    "active": "A run of this job is still going.",
+                    "notDispatched": "{name}: no isolated worker is available to run it right now.",
+                    "queued": "{name} started.",
+                    "failed": "Couldn't start the job: {reason}",
+                    "refusals": {
+                        "jobActive": "A run of this job is still going. Wait for it to finish.",
+                        "deployInProgress": "Wait for the current Deployment to finish, or cancel it.",
+                        "confirmRequired": "Confirm the run first.",
+                        "notDeployed": "Nothing is deployed, so there is no live version to run the job with.",
+                        "deleting": "This App Work is being deleted.",
+                        "invalidName": "That job name isn't valid.",
+                        "forbidden": "You need permission to deploy this app to run its jobs."
+                    },
+                    "runTitle": "Run {name} now?",
+                    "runDescription": "The job runs once, with the image and env of the live version. It can change the app's data — a migration or a seed acts on the real database.",
+                    "firstDeployWarning": "This job is meant to run only on the first Deployment. Running it again can overwrite or duplicate data.",
+                    "confirmCheckbox": "I understand this runs against the live app and its data.",
+                    "cancel": "Cancel",
+                    "runConfirm": "Run"
+                },
+                "cron": {
+                    "lastRun": "last run {when}",
+                    "lastSuccess": "last success {when}",
+                    "neverRun": "hasn't run yet"
+                },
+                "logs": {
+                    "title": "Logs",
+                    "description": "The last lines of one component or job. Secret values are replaced by their names, and nothing is kept after you close this.",
+                    "noTargets": "Nothing has been observed on the cluster yet, so there are no logs to show.",
+                    "target": "Show logs of",
+                    "components": "Components",
+                    "jobs": "Jobs",
+                    "lines": "Lines",
+                    "previous": "Previous container (after a restart)",
+                    "follow": "Follow",
+                    "refresh": "Refresh",
+                    "loading": "Fetching logs…",
+                    "empty": "No containers were found.",
+                    "noOutput": "No output.",
+                    "truncated": "truncated",
+                    "redacted": "Hidden: {names}",
+                    "errors": {
+                        "expired": "These logs expired. Refresh to fetch them again.",
+                        "tooMany": "Too many log requests. Wait a minute and try again.",
+                        "failed": "Couldn't fetch the logs ({code}).",
+                        "timedOut": "The cluster didn't answer in time. Try again.",
+                        "clusterUnreachable": "Ever Works couldn't reach the cluster.",
+                        "workerUnavailable": "No isolated worker is available to fetch logs right now.",
+                        "redactionUnavailable": "The logs can't be shown: the app's secret values couldn't be read to hide them.",
+                        "unsupported": "This target can't show logs.",
+                        "targetNone": "This app runs nowhere yet.",
+                        "unavailable": "Logs can't be fetched on this instance.",
+                        "deleting": "This App Work is being deleted.",
+                        "forbidden": "You need permission to deploy this app to read its logs."
+                    }
+                },
+                "history": {
+                    "title": "History",
+                    "loading": "Reading the history…",
+                    "error": "Couldn't read the history.",
+                    "empty": "No Deployments yet.",
+                    "caption": "Deployments of this app, newest first",
+                    "state": "State",
+                    "trigger": "Started by",
+                    "version": "Version",
+                    "when": "When",
+                    "smoke": "Smoke",
+                    "states": {
+                        "live": "Live",
+                        "failed": "Failed",
+                        "timedOut": "Timed out",
+                        "rolledBack": "Rolled back",
+                        "cancelled": "Cancelled",
+                        "skipped": "Skipped",
+                        "queued": "Queued",
+                        "inProgress": "In progress"
+                    },
+                    "current": "current",
+                    "triggers": {
+                        "manual": "Deploy",
+                        "build": "Build",
+                        "rollback": "Rollback",
+                        "specApplied": "App spec change",
+                        "envChange": "Env change",
+                        "domainChange": "Domain change"
+                    },
+                    "build": "Build",
+                    "smokeCount": "{passed}/{total} passed"
+                }
             },
             "appEnv": {
                 "errors": {

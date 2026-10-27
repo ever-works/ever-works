@@ -86,7 +86,11 @@ export class PublishedModelListPrices implements ModelListPrices {
         if (!found || typeof model !== 'string') return null;
         const entry = findModelListPriceEntry(found, model);
         if (!entry) return null;
-        return { cents: priceModelTokensCents(tokens, entry), version: found.version, model: entry.model };
+        return {
+            cents: priceModelTokensCents(tokens, entry),
+            version: found.version,
+            model: entry.model,
+        };
     }
 }
 

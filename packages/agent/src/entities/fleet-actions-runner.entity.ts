@@ -45,7 +45,10 @@ import { PortableDateColumn } from './_types';
 @Index('idx_fleet_actions_runners_owner_state', ['ownerUserId', 'state'])
 @Index('idx_fleet_actions_runners_installation', ['installationEntityId'])
 // Unique among the rows still on the computer: a removed runner's name may be used again.
-@Index('uq_fleet_actions_runners_node_name', ['nodeId', 'name'], { unique: true, where: '"removedAt" IS NULL' })
+@Index('uq_fleet_actions_runners_node_name', ['nodeId', 'name'], {
+    unique: true,
+    where: '"removedAt" IS NULL',
+})
 export class FleetActionsRunner {
     @PrimaryGeneratedColumn('uuid')
     id: string;

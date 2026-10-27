@@ -32,7 +32,13 @@ function plugin(overrides: Partial<IActionsRunnersPlugin> = {}): IPlugin {
 		settingsSchema: { type: 'object', properties: {} },
 		onLoad: async () => undefined,
 		onUnload: async () => undefined,
-		listRunners: async () => ({ runners: [], etag: null, notModified: false, rateLimitedUntil: null, rateLimitRemaining: null }),
+		listRunners: async () => ({
+			runners: [],
+			etag: null,
+			notModified: false,
+			rateLimitedUntil: null,
+			rateLimitRemaining: null
+		}),
 		mintRegistrationToken: async () => ({ token: 't', expiresAt: null }),
 		...overrides
 	} as unknown as IPlugin;

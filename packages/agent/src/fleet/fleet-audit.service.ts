@@ -206,6 +206,26 @@ export class FleetAuditService {
         });
         return rows.map(toAuditView);
     }
+
+    /**
+     * Cloud computers (FL-17 P3, spec FR-30) — every owner's rows of ONE action
+     * since an instant, newest first, bounded: reconciliation reads the recent
+     * `node.cloud.create` rows to find owners (and their provider plugin) who
+     * may have a machine at the provider but no registration left, so an
+     * unclaimed machine is found even when its owner has no cloud computer.
+     */
+    async forActionSince(
+        action: FleetAuditAction,
+        since: Date,
+        limit: number = FLEET_AUDIT_MAX_LIMIT,
+    ): Promise<FleetAuditView[]> {
+        const rows = await this.repository.find({
+            where: { action, occurredAt: MoreThanOrEqual(since) },
+            order: { occurredAt: 'DESC' },
+            take: clampLimit(limit),
+        });
+        return rows.map(toAuditView);
+    }
 }
 
 function clampLimit(limit: number): number {

@@ -211,7 +211,10 @@ export function fleetActionsRunnerSettingsUrl(scope: FleetActionsRunnerScope, ta
 }
 
 /** The labels GitHub adds itself (`self-hosted`, the OS, the architecture), for display and for the duplicate check. */
-export function fleetActionsRunnerDefaultLabels(os: string | null | undefined, arch: string | null | undefined): string[] {
+export function fleetActionsRunnerDefaultLabels(
+	os: string | null | undefined,
+	arch: string | null | undefined
+): string[] {
 	const out = ['self-hosted'];
 	const osLabel =
 		os === 'linux'
@@ -264,7 +267,10 @@ export function normalizeFleetActionsRunnerLabels(
 export function fleetActionsRunnerNameStem(computerName: string | null | undefined): string {
 	// Bounded first, then trimmed with index scans rather than an end-anchored `-+$`
 	// (polynomial on a long run of dashes).
-	const cleaned = (computerName ?? '').trim().slice(0, 200).replace(/[^A-Za-z0-9._-]+/g, '-');
+	const cleaned = (computerName ?? '')
+		.trim()
+		.slice(0, 200)
+		.replace(/[^A-Za-z0-9._-]+/g, '-');
 	let start = 0;
 	while (start < cleaned.length && !isAsciiAlphanumeric(cleaned.charCodeAt(start))) start += 1;
 	let end = cleaned.length;
@@ -792,6 +798,233 @@ function toMs(value: Date | string | null | undefined): number | null {
 	if (!value) return null;
 	const ms = value instanceof Date ? value.getTime() : new Date(value).getTime();
 	return Number.isFinite(ms) ? ms : null;
+}
+
+// ─── Actions jobs (P2, spec FR-20 – FR-26, plan §4.3) ───────────────────────
+
+/** A watched repository or organisation of the Actions jobs panel (FR-21). */
+export interface FleetActionsWatchedTarget {
+	scope: FleetActionsRunnerScope;
+	/** `owner/repo` or `org`. */
+	target: string;
+}
+
+/** Targets one person may watch at once (each is one GitHub read per refresh). */
+export const FLEET_ACTIONS_MAX_WATCHED_TARGETS = 20;
+
+/** Jobs the panel lists at most (queued first, then in progress). */
+export const FLEET_ACTIONS_MAX_LISTED_JOBS = 100;
+
+/** How long the API keeps one person's jobs answer (FR-25: the page re-reads every 30 s). */
+export const FLEET_ACTIONS_JOBS_CACHE_MS = 30_000;
+
+/**
+ * Why a queued job has no runner of the owner taking it (FR-22) — a closed set:
+ *
+ *  - `offline-matching-runner` — "the only matching runner is offline";
+ *  - `missing-label` — "no runner has the label <label>";
+ *  - `wrong-scope` — "no runner is registered to <repository or organisation>";
+ *  - `all-busy` — "waiting for <runner>" (not a problem: every matching runner is working).
+ */
+export const FLEET_ACTIONS_JOB_DIAGNOSES = [
+	'offline-matching-runner',
+	'missing-label',
+	'wrong-scope',
+	'all-busy'
+] as const;
+
+export type FleetActionsJobDiagnosis = (typeof FLEET_ACTIONS_JOB_DIAGNOSES)[number];
+
+export function isFleetActionsJobDiagnosis(value: unknown): value is FleetActionsJobDiagnosis {
+	return typeof value === 'string' && (FLEET_ACTIONS_JOB_DIAGNOSES as readonly string[]).includes(value);
+}
+
+/** True for the diagnoses that are a problem (raise `job-unassignable` after five minutes). `all-busy` is not. */
+export function isFleetActionsJobProblem(diagnosis: FleetActionsJobDiagnosis | null | undefined): boolean {
+	return diagnosis === 'offline-matching-runner' || diagnosis === 'missing-label' || diagnosis === 'wrong-scope';
+}
+
+/** One runner as the diagnosis reads it. */
+export interface FleetActionsDiagnosisRunner {
+	name: string;
+	scope: FleetActionsRunnerScope;
+	target: string;
+	/** Every label: the ones GitHub adds itself AND the extra ones. */
+	labels: readonly string[];
+	state: FleetActionsRunnerState;
+}
+
+/** One job as the diagnosis reads it. */
+export interface FleetActionsDiagnosisJob {
+	/** `owner/repo`. */
+	repository: string;
+	labels: readonly string[];
+	status: 'queued' | 'in_progress';
+}
+
+export interface FleetActionsJobDiagnosisResult {
+	diagnosis: FleetActionsJobDiagnosis | null;
+	/** The label no runner has, the runner waited for, the offline runner, or the repository. */
+	detail: string | null;
+}
+
+/** True when a runner registered at `scope`/`target` can take a job of `repository`. */
+export function fleetActionsRunnerCovers(
+	runner: Pick<FleetActionsDiagnosisRunner, 'scope' | 'target'>,
+	repository: string
+): boolean {
+	const repo = repository.toLowerCase();
+	const target = runner.target.toLowerCase();
+	if (runner.scope === 'repo') return target === repo;
+	const slash = repo.indexOf('/');
+	return slash > 0 && repo.slice(0, slash) === target;
+}
+
+/**
+ * Whether any of the owner's runners could take a queued job (FR-22), as one
+ * diagnosis from the closed set — pure, so the truth table is a spec. A job in
+ * progress (or a queued job a runner can take now) has none.
+ *
+ * Order: no runner registered for the repository (or its organisation) →
+ * `wrong-scope`; none of those carries every label the job asks for →
+ * `missing-label` (the first label no candidate has); every runner that matches
+ * is offline or stopped → `offline-matching-runner`; every one that is online is
+ * working → `all-busy`.
+ */
+export function diagnoseFleetActionsJob(
+	job: FleetActionsDiagnosisJob,
+	runners: readonly FleetActionsDiagnosisRunner[]
+): FleetActionsJobDiagnosisResult {
+	if (job.status !== 'queued') return { diagnosis: null, detail: null };
+	const live = runners.filter((runner) => runner.state !== 'removed');
+	const candidates = live.filter((runner) => fleetActionsRunnerCovers(runner, job.repository));
+	if (candidates.length === 0) return { diagnosis: 'wrong-scope', detail: job.repository };
+	const wanted = job.labels.map((label) => label.toLowerCase());
+	const has = (runner: FleetActionsDiagnosisRunner, label: string) =>
+		runner.labels.some((own) => own.toLowerCase() === label);
+	const matching = candidates.filter((runner) => wanted.every((label) => has(runner, label)));
+	if (matching.length === 0) {
+		const missing =
+			job.labels.find((label) => !candidates.some((runner) => has(runner, label.toLowerCase()))) ??
+			job.labels.find((label) => !has(candidates[0], label.toLowerCase())) ??
+			null;
+		return { diagnosis: 'missing-label', detail: missing };
+	}
+	const online = matching.filter((runner) => runner.state === 'idle' || runner.state === 'working');
+	if (online.length === 0) return { diagnosis: 'offline-matching-runner', detail: matching[0].name };
+	if (online.every((runner) => runner.state === 'working')) return { diagnosis: 'all-busy', detail: online[0].name };
+	return { diagnosis: null, detail: null };
+}
+
+/**
+ * True when a queued job should raise `job-unassignable` (FR-24): its diagnosis
+ * is a problem and it has waited {@link FLEET_ACTIONS_JOB_UNASSIGNABLE_AFTER_MIN}
+ * minutes since it was queued.
+ */
+export function isFleetActionsJobUnassignable(input: {
+	status: 'queued' | 'in_progress';
+	diagnosis: FleetActionsJobDiagnosis | null;
+	queuedAt: Date | string | null | undefined;
+	now: Date;
+}): boolean {
+	if (input.status !== 'queued' || !isFleetActionsJobProblem(input.diagnosis)) return false;
+	const since = toMs(input.queuedAt);
+	if (since === null) return false;
+	return input.now.getTime() - since >= FLEET_ACTIONS_JOB_UNASSIGNABLE_AFTER_MIN * 60_000;
+}
+
+/** One queued or in-progress job of the Actions jobs panel (FR-20). */
+export interface FleetActionsJobView {
+	repository: string;
+	runId: number;
+	runNumber: number | null;
+	jobId: number;
+	/** "test · ubuntu". */
+	name: string;
+	workflowName: string | null;
+	labels: string[];
+	status: 'queued' | 'in_progress';
+	runnerName: string | null;
+	startedAt: string | null;
+	queuedAt: string | null;
+	/** The job on GitHub. */
+	url: string | null;
+	diagnosis: FleetActionsJobDiagnosis | null;
+	diagnosisDetail: string | null;
+	/** Queued five minutes with a problem diagnosis (the `job-unassignable` item, FR-24). */
+	unassignable: boolean;
+}
+
+/** `GET /api/fleet/runners/jobs` (FR-20 – FR-25). */
+export interface FleetActionsJobsView {
+	jobs: FleetActionsJobView[];
+	/** The owner's runners working right now / all of them (not removed). */
+	busyRunners: number;
+	totalRunners: number;
+	/** What the panel watches (FR-21): the saved list, else every target the owner has runners for. */
+	watched: FleetActionsWatchedTarget[];
+	/** True when `watched` is the saved list (false: the default). */
+	watchedSaved: boolean;
+	/** Every repository and organisation the caller's GitHub App covers (what the watched list may name, FR-21). */
+	available: FleetActionsWatchedTarget[];
+	/** Targets that could not be read (permission, not covered) with the reason, for the panel's note. */
+	unreadable: Array<FleetActionsWatchedTarget & { reason: string; grantUrl: string | null }>;
+	checkedAt: string | null;
+	/** GitHub is rate-limiting: the next read waits until then (U17). */
+	rateLimitedUntil: string | null;
+	/** The kill switch is on: cancelling is paused, runners keep running. */
+	killSwitch: boolean;
+	/** The caller may cancel workflow runs here (`machines`, FR-23). */
+	canCancel: boolean;
+}
+
+/** `PUT /api/fleet/runners/jobs/watched`. */
+export interface FleetActionsWatchedTargetsRequest {
+	targets: FleetActionsWatchedTarget[];
+}
+
+/** `POST /api/fleet/runners/jobs/cancel` (FR-23). The confirmation fields are CONTRACTS §2.2's. */
+export interface FleetActionsCancelRunRequest extends FleetActionConfirmFields {
+	repository: string;
+	runId: number;
+	/** For the confirmation sentence ("Cancel workflow run #4822 of acme/api?"). */
+	runNumber?: number | null;
+}
+
+/** `GET /api/fleet/runners/jobs/permission?scope=org&target=acme` (FR-26, spec §5.6). */
+export interface FleetActionsRunnersPermissionView {
+	scope: FleetActionsRunnerScope;
+	target: string;
+	ok: boolean;
+	/** The exact GitHub permission name when missing ("Self-hosted runners: Read and write"). */
+	missing: string | null;
+	/** The installation's page on GitHub ("Grant access"). */
+	grantUrl: string | null;
+}
+
+/** Normalise a watched list: valid, de-duplicated (case-insensitively), at most {@link FLEET_ACTIONS_MAX_WATCHED_TARGETS}. */
+export function normalizeFleetActionsWatchedTargets(raw: unknown): FleetActionsWatchedTarget[] | null {
+	if (!Array.isArray(raw)) return null;
+	const out: FleetActionsWatchedTarget[] = [];
+	const seen = new Set<string>();
+	for (const entry of raw) {
+		const scope = (entry as { scope?: unknown } | null)?.scope;
+		const target = (entry as { target?: unknown } | null)?.target;
+		if (!isFleetActionsRunnerScope(scope) || typeof target !== 'string') return null;
+		const trimmed = target.trim();
+		if (!isFleetActionsRunnerTarget(scope, trimmed)) return null;
+		const key = `${scope}:${trimmed.toLowerCase()}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push({ scope, target: trimmed });
+		if (out.length > FLEET_ACTIONS_MAX_WATCHED_TARGETS) return null;
+	}
+	return out;
+}
+
+/** The `job-unassignable` item's id: one per job, so it clears when that job starts or is cancelled. */
+export function fleetActionsJobItemId(repository: string, jobId: number): string {
+	return `fleet-actions-job:${repository.toLowerCase()}:${jobId}:unassignable`;
 }
 
 /** The FL-08 log source id of a runner's newest diagnostic log (FR-18). */

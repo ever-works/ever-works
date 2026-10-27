@@ -1062,6 +1062,23 @@ export const WHITELIST: WhitelistEntry[] = [
 			'Remove one Actions runner: deregister it at GitHub, uninstall its service and delete its folder on the computer. Irreversible; needs `confirmName` = its name. Refused while it runs a job.',
 		annotations: { destructiveHint: true }
 	},
+	// FL-18 P2 — the Actions jobs read and Cancel workflow run (`confirm: true`; the 409 names the run).
+	{
+		method: 'GET',
+		path: '/api/fleet/runners/jobs',
+		toolName: 'fleet_runners_jobs',
+		description:
+			'The queued and running GitHub Actions jobs that target self-hosted runners in the watched repositories and organisations, each queued one with why no runner of yours takes it (the only matching runner is offline · no runner has a label · no runner is registered for the repository · all matching runners are busy), and how many runners are busy. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/runners/jobs/cancel',
+		toolName: 'fleet_runners_cancel_run',
+		description:
+			'Cancel a whole GitHub Actions workflow run of a repository your GitHub App covers (`repository`, `runId`). Every job in it stops; it cannot be undone. Needs `confirm: true`; without it the answer is 409 naming the run and repository.',
+		annotations: { destructiveHint: true }
+	},
 
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
 	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,

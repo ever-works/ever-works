@@ -244,6 +244,11 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         source: 'apps/api/src/app-launcher/platform-catalog.service.ts:127-132',
     },
     {
+        key: 'AppWorksModule[agent] | AppProvisioningService | AppSpecService',
+        reason: "The agent module deliberately does not import AppSpecModule (see the AppSourceInitializerService row); the service reads the effective spec through its own non-strict ModuleRef fallback, which finds the API's AppSpecService. Red on develop since 7fa3daadc (the opt-in read was added without a row); placed 2026-10-26 by lane aw-safety.",
+        source: 'packages/agent/src/app-works/app-provisioning.service.ts:451-457 (effectiveSpecOf: `this.specs ?? getOptionalProvider(this.moduleRef, AppSpecService)`)',
+    },
+    {
         key: 'AppWorksModule[agent] | AppSourceInitializerService | AppSpecService',
         reason: "The agent module's COPY, which deliberately imports neither AppSpecModule nor WorkModule; the wired copy is the API module's.",
         source: 'apps/api/src/app-works/app-works.module.ts:138-144 (APW-01 T15)',
@@ -266,11 +271,10 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         reason: 'C43, closed 2026-10-17 (lane aw-deploy-2): FacadesModule cannot import the module that provides `AppDomainsService` without a cycle, so in the API the facade reaches it through a non-strict `ModuleRef` lookup (`AppDeployRequestModule` provides it); the constructor parameter stays for the worker, which binds it directly.',
         source: 'packages/agent/src/facades/deploy.facade.ts:137-152,543-551; packages/agent/src/app-runtime/app-deploy-request.module.ts',
     },
-    {
-        key: 'WorkModule | WorkLifecycleService | APP_WORK_DELETION_PORT',
-        reason: "APW-06 T33 binds `AppRuntimeDeletionService` to it in the API's ports module; unbound, `deleteWork` reads 'no App runtime exists' and deletes the row as before.",
-        source: 'packages/agent/src/services/work-lifecycle.service.ts:204-211; packages/agent/src/app-runtime/app-runtime-deletion.service.ts:24-27 (APW-06 T33, APW-06/tasks.md:577)',
-    },
+    // `WorkModule | WorkLifecycleService | APP_WORK_DELETION_PORT` left this list on 2026-10-26
+    // (lane aw-safety): the `@Global()` `AppRuntimePortsModule` (`apps/api/src/app-works/`) binds it
+    // to `AppRuntimeDeletionService`, so deleting an App Work removes its workloads, dependencies and
+    // managed DNS record before the row goes, instead of orphaning them.
 ];
 
 /**
@@ -318,11 +322,11 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER` row for the reason.",
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
-    {
-        key: 'AppDependencyProvisionWorkerModule :: APP_WORK_DELETION_COMPLETION',
-        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION` row for the reason.",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
-    },
+    // `AppDependencyProvisionWorkerModule :: APP_WORK_DELETION_COMPLETION` and
+    // `TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION` left this list on 2026-10-26 (lane
+    // aw-safety): `TriggerAppRuntimeModule` binds it to `workerAppWorkDeletionCompletion`, a
+    // one-member proxy of the API's `AppRuntimeDeletionService.finishDeletion`, so a finished
+    // removal deletes the Work row (guarded in the API: the row must record a deletion).
     {
         key: 'AppUpstreamSyncWorkerModule :: ActivityLogService',
         reason: 'The worker has no `ActivityLogService` and no database module; the sync outcome is settled on the row through the state-service proxy, but its `app.upstream.*` / `app.actions.*` Activity rows are not written from the worker.',
@@ -342,11 +346,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: "APW-05's rebuild requester is unwritten.",
         source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
-    },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_WORK_DELETION_COMPLETION',
-        reason: 'Deletes the Work row; its binding is owed by T33/T58 and, unbound, a finished removal keeps the row (the fail-closed answer).',
-        source: 'packages/agent/src/app-runtime/app-runtime-deletion.service.ts:320-331 (APW-06 T33/T58)',
     },
 ];
 

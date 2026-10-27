@@ -98,7 +98,7 @@ The switch also governs two arguments: `create_task` / `update_task` do not offe
 
 Three more rules close the paths that would make a held-back run starter one call away (review of #2804): `create_mission` / `update_mission` do not offer or forward `schedule`, `autoBuildWorks` and `guardrailsOverride` (a one-shot Mission can still be filed and edited; a person starts it in the app); `transition_task` refuses a move to `in_progress`, `in_review` or `done` (those moves dispatch the Task's agents, its reviewers or its dependents; every other move still runs); and `post_task_chat_message` refuses a body with an `@mention` (a mention starts the mentioned Agent; the platform's mention grammar also matches an e-mail address, so write names without the @). A refused call sends nothing upstream and says which switch would allow it.
 
-## Available Tools (127)
+## Available Tools (205)
 
 The authoritative list is `src/openapi-tools/whitelist.ts`; the tables below cover the main domains, and `test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts here against it.
 

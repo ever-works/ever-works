@@ -34,9 +34,9 @@ Ever Works GitHub App configured (the same App the GitHub integration uses).
   allowed to run the runners' own `svc.sh` without one. When it is not, the install is refused with the exact one-time
   command to run on the machine — it allows only `svc.sh` under the node's runners folder:
 
-  ```bash
-  echo '<user> ALL=(root) NOPASSWD: <config dir>/actions-runners/*/svc.sh' | sudo tee /etc/sudoers.d/ever-works-actions-runners >/dev/null && sudo chmod 0440 /etc/sudoers.d/ever-works-actions-runners
-  ```
+    ```bash
+    echo '<user> ALL=(root) NOPASSWD: <config dir>/actions-runners/*/svc.sh' | sudo tee /etc/sudoers.d/ever-works-actions-runners >/dev/null && sudo chmod 0440 /etc/sudoers.d/ever-works-actions-runners
+    ```
 
 - **Windows:** the node must run elevated (as Administrator) to install a Windows service; the runner's own service
   mode is the only mode on Windows.
@@ -92,21 +92,47 @@ raises a **runner stopped** item with **Start**; it clears when the runner is id
 While **Stop all computers** is on, installing and controlling runners is refused and no registration token is handed
 out. Runners that are already running keep running — they are your CI, not Ever Works work — and the block says so.
 
+## Actions jobs
+
+The hub's Overview carries an **Actions jobs** panel: the queued and running jobs that target self-hosted runners in
+the repositories and organisations you watch, with the workflow and job name, the run number, the runner (or how long
+it has been queued) and how many of your runners are busy. It re-reads GitHub every 30 seconds while the hub is open and
+every 5 minutes otherwise.
+
+- **Watched** — by default every repository and organisation you have runners for; **Change** lets you add or remove
+  any target the Ever Works GitHub App covers (up to 20). The list is your own setting.
+- **Why a queued job has no runner** — one of: _the only matching runner is offline_ · _no runner has the label
+  windows_ · _no runner is registered to acme/web_ · _waiting for build-01-2_ (every matching runner is busy — not a
+  problem). A job that has waited 5 minutes for one of the first three raises a **job unassignable** "needs a look"
+  item with the reason and **Cancel workflow run…**; it clears when the job starts or is cancelled.
+- **Cancel workflow run…** stops every job of that run, after a confirmation that names the run and the repository.
+  It is refused while **Stop all computers** is on, and writes a `node.runner.job.cancel` audit row.
+- A watched target that can no longer be read (the App lost access, a permission is missing) is listed with the reason
+  and **Grant access** — never hidden.
+
+Organisation runners need the App's **Self-hosted runners** permission. When you pick an organisation in the Install
+dialog, Ever Works checks it first; when it is missing, the dialog names the exact permission with **Grant access**,
+**Check again** and **Use a repository instead**.
+
 ## Agents, MCP and the API
 
-| Tool                    | What it does                                                                | Confirmation                       |
-| ----------------------- | --------------------------------------------------------------------------- | ---------------------------------- |
-| `fleet_runners_list`    | The runners on one computer, or on all of them                              | read-only                          |
-| `fleet_runners_install` | Install 1–16 runners for a repository or organisation                       | `confirm: true`                    |
-| `fleet_runners_action`  | Start, stop or restart one runner                                           | `confirm: true` for stop / restart |
-| `fleet_runners_remove`  | Remove one runner (deregister, uninstall, delete its folder)                | `confirmName` = its name           |
+| Tool                       | What it does                                                              | Confirmation                       |
+| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------- |
+| `fleet_runners_list`       | The runners on one computer, or on all of them                            | read-only                          |
+| `fleet_runners_install`    | Install 1–16 runners for a repository or organisation                     | `confirm: true`                    |
+| `fleet_runners_action`     | Start, stop or restart one runner                                         | `confirm: true` for stop / restart |
+| `fleet_runners_remove`     | Remove one runner (deregister, uninstall, delete its folder)              | `confirmName` = its name           |
+| `fleet_runners_jobs`       | The Actions jobs of the watched targets, each with why no runner takes it | read-only                          |
+| `fleet_runners_cancel_run` | Cancel a whole workflow run of one of your repositories                   | `confirm: true`                    |
 
-An Agent's install, stop, restart and remove are held for your approval; the same names are the MCP tools. The routes:
+An Agent's install, stop, restart, remove and cancel are held for your approval; the same names are the MCP tools. The routes:
 
 - `GET /api/fleet/runners` — every runner you may see, per computer
 - `GET /api/fleet/nodes/:id/runners` · `GET /api/fleet/nodes/:id/runners/options`
 - `POST /api/fleet/nodes/:id/runners` — install (`202`)
 - `POST /api/fleet/nodes/:id/runners/:runnerId/start|stop|restart|remove` (`202`)
+- `GET /api/fleet/runners/jobs` · `PUT /api/fleet/runners/jobs/watched` · `POST /api/fleet/runners/jobs/cancel` (`202`) ·
+  `GET /api/fleet/runners/jobs/permission?scope=org&target=acme`
 
 Every act writes one `fleet_audit` row per runner (`node.runner.install`, `node.runner.start`, `node.runner.stop`,
 `node.runner.restart`, `node.runner.remove`) with the target, labels, mode and version — never a token.
@@ -120,6 +146,4 @@ Each call uses a short-lived installation token narrowed to the one permission i
 
 ## Coming next
 
-- An **Actions jobs** panel on the hub Overview: queued and running jobs of the repositories you watch, why a queued
-  job has no runner, and **Cancel workflow run…**.
 - Docker-isolated runners on Linux, runner version updates, and `ever-works fleet runners` in the CLI.

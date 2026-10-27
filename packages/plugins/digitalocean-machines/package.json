@@ -48,7 +48,8 @@
 			"version": "1.0.0",
 			"category": "machine-provider",
 			"capabilities": [
-				"machine-provider"
+				"machine-provider",
+				"oauth"
 			],
 			"description": "Create cloud computers at DigitalOcean that join your Fleet, with the price shown before you create one",
 			"author": {
