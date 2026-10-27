@@ -716,7 +716,7 @@ _Delivers FR-52…FR-55; ACC-04-30 (automatic half), 31._
       and after (ACC-04-23).
       **Done when**: `pnpm --filter @ever-works/agent test -- app-provisioning.verification-env` passes.
 
-- [ ] **T47 (P1, lands with T7–T8). Classify new tables for workspace backup (R-25).**
+- [x] **T47 (P1, lands with T7–T8). Classify new tables for workspace backup (R-25).** _(2026-10-27, #2964: `works/app-provisionings.jsonl`; also drops `suggestionBundle`, `suggestionUpstream`, `lastRunOutput`, `verificationNamespace` — never on the wire.)_
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain:
       `{ file: 'app-provisionings.jsonl', entity: 'WorkAppProvisioning', scope: { by: 'parent', column: 'workId', from: 'workIds' } }`
       (through the Work, never `by: 'user'`, which would also export runs the person started in other workspaces).

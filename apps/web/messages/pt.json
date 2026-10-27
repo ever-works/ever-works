@@ -7277,6 +7277,40 @@
                     "deployableOther": "Build implantável: {sha}",
                     "noDeployable": "Nenhum build implantável ainda",
                     "open": "Abrir Builds"
+                },
+                "settings": {
+                    "open": "Build settings",
+                    "title": "Build settings",
+                    "description": "How this App is built. Changes apply to the next Build.",
+                    "loading": "Loading the Build settings…",
+                    "loadFailed": "The Build settings could not be loaded. Close this dialog and try again.",
+                    "largerRunner": {
+                        "title": "Larger runner",
+                        "help": "Private repositories only. Use a larger runner when the build needs more memory than the standard one. Leave the label blank to use the standard runner.",
+                        "label": "Runner label",
+                        "memory": "Memory (GiB)",
+                        "vcpu": "vCPU (optional)"
+                    },
+                    "reclaimDisk": "Reclaim runner disk before building",
+                    "reclaimDiskHelp": "Removes preinstalled tools the build does not need, so a large image fits on the runner.",
+                    "attestations": "Publish build provenance attestations",
+                    "attestationsHelp": "Public repositories only. Anyone can check where the image was built.",
+                    "allowBuildValuesOnPullRequests": "Send stored build values to pull requests",
+                    "allowBuildValuesOnPullRequestsHelp": "Off by default. Pull requests from this repository then build without the stored values.",
+                    "allowBuildValuesOnPullRequestsWarning": "Any code in a pull request can read these values while it builds. Turn this on only if a pull request build cannot work without a stored value.",
+                    "verificationPromptedValuesRequireApproval": "Require approval before a verification uses prompted values",
+                    "verificationPromptedValuesRequireApprovalHelp": "A verification gets your prompted values only when the change touches no build file, or after you approve it.",
+                    "errors": {
+                        "labelInvalid": "Use 1 to 64 letters, digits, dots, underscores or hyphens.",
+                        "memoryRequired": "Enter the runner memory. The memory check needs it when a label is set.",
+                        "memoryRange": "Enter a whole number from {min} to {max}.",
+                        "vcpuRange": "Enter a whole number from {min} to {max}, or leave it blank."
+                    },
+                    "save": "Save",
+                    "cancel": "Cancel",
+                    "saved": "Build settings saved. They apply to the next Build.",
+                    "saveFailed": "The Build settings could not be saved. Try again.",
+                    "viewerDisabled": "Only members who can edit this App can change its Build settings."
                 }
             },
             "appsTierEligibility": {

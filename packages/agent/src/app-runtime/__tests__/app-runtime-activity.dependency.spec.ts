@@ -100,7 +100,11 @@ describe('App dependency lifecycle events', () => {
             providerId: 'minio',
             kept: ['PersistentVolumeClaim/data-minio-0'],
         });
-        await listener.onDependencyDataDeleted({ workId: 'w1', kind: 'postgres', providerId: 'cnpg' });
+        await listener.onDependencyDataDeleted({
+            workId: 'w1',
+            kind: 'postgres',
+            providerId: 'cnpg',
+        });
 
         expect(rows.map((row) => [row.action, row.actionType, row.status, row.userId])).toEqual([
             [
