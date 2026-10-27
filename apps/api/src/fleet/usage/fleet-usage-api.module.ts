@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { RUN_RECEIPT_FLEET_USAGE_READER } from '@ever-works/agent/agents';
+import { DIGEST_FLEET_USAGE_READER } from '@ever-works/agent/digest';
 import { FleetModule, FleetUsageModule, FleetUsageViewService } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetUsageController } from './fleet-usage.controller';
@@ -38,7 +39,9 @@ import { FleetUsageScanCronService } from './fleet-usage-scan-cron.service';
         // The Run receipt's fleet line (FR-11): `RunReceiptService` (AW-09) reads it
         // through this optional port; exported from this @Global module so it resolves.
         { provide: RUN_RECEIPT_FLEET_USAGE_READER, useExisting: FleetUsageViewService },
+        // The digest's fleet line (P3): `DigestService` reads it through this optional port.
+        { provide: DIGEST_FLEET_USAGE_READER, useExisting: FleetUsageViewService },
     ],
-    exports: [FleetUsageModule, RUN_RECEIPT_FLEET_USAGE_READER],
+    exports: [FleetUsageModule, RUN_RECEIPT_FLEET_USAGE_READER, DIGEST_FLEET_USAGE_READER],
 })
 export class FleetUsageApiModule {}

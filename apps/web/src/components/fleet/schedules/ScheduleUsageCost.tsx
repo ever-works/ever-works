@@ -22,7 +22,10 @@ export function ScheduleUsageCost({ cost }: { cost: FleetUsageTaskCost | null | 
             title={t('payerNote')}
             data-testid="fleet-schedule-usage-cost"
         >
-            {t('schedule.cost', { last: last ?? t('schedule.none'), month: month ?? t('schedule.none') })}
+            {t('schedule.cost', {
+                last: last ?? t('schedule.none'),
+                month: month ?? t('schedule.none'),
+            })}
         </span>
     );
 }

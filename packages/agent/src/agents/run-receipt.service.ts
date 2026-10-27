@@ -79,15 +79,16 @@ export class RunReceiptService {
             throw error;
         }
 
-        const [[row], cost, messages, toolCalls, truncatedMarkers, citations, fleetUsage] = await Promise.all([
-            this.ledger.toRows([run]),
-            this.costs.getRunCostBreakdown(run, now),
-            this.runLogs.countByRunSteps(run.id, MESSAGE_STEPS),
-            this.runLogs.countByRunSteps(run.id, TOOL_STEPS),
-            this.runLogs.countByRunSteps(run.id, CAPTURE_TRUNCATED_STEPS),
-            this.citations.listForConsumer(KbCitationConsumerType.AGENT_RUN, run.id),
-            this.readFleetUsage(run.id),
-        ]);
+        const [[row], cost, messages, toolCalls, truncatedMarkers, citations, fleetUsage] =
+            await Promise.all([
+                this.ledger.toRows([run]),
+                this.costs.getRunCostBreakdown(run, now),
+                this.runLogs.countByRunSteps(run.id, MESSAGE_STEPS),
+                this.runLogs.countByRunSteps(run.id, TOOL_STEPS),
+                this.runLogs.countByRunSteps(run.id, CAPTURE_TRUNCATED_STEPS),
+                this.citations.listForConsumer(KbCitationConsumerType.AGENT_RUN, run.id),
+                this.readFleetUsage(run.id),
+            ]);
 
         const filesTouched = (run.workspaceMeta?.filesTouched ?? []).filter(
             (path): path is string => typeof path === 'string' && path.length > 0,

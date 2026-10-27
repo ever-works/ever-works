@@ -126,7 +126,18 @@ export async function runUsageScan(
 			unreadBytes += file.size - at;
 			continue;
 		}
-		const next = await readFile(deps, file, offset ?? null, budgetBytes - spent, stats, dedupe, state, allowed, now, signal);
+		const next = await readFile(
+			deps,
+			file,
+			offset ?? null,
+			budgetBytes - spent,
+			stats,
+			dedupe,
+			state,
+			allowed,
+			now,
+			signal
+		);
 		state.files[file.path] = next;
 		spent += next.o - at;
 		unreadBytes += Math.max(0, file.size - next.o);

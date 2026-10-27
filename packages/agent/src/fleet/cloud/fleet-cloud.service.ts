@@ -9,6 +9,7 @@ import {
     FLEET_CLOUD_IDLE_REQUESTER,
     FLEET_CLOUD_MAX_PER_OWNER,
     FLEET_CLOUD_OPTIONS_CACHE_MS,
+    FLEET_CLOUD_RECONCILE_REQUESTER,
     FLEET_CLOUD_SOFTWARE_IDS,
     FLEET_CLOUD_TAG,
     FLEET_CLOUD_UNENROLLED_AFTER_MIN,
@@ -18,9 +19,12 @@ import {
     fleetCloudIdleHours,
     fleetCloudMonthStartMs,
     fleetCloudDestroySummary,
+    fleetCloudNodeIdFromTags,
     fleetCloudNodeTag,
     fleetCloudPowerOffSummary,
     fleetCloudPriceSentence,
+    fleetCloudSiteFromTags,
+    fleetCloudSiteTag,
     fleetMissingConfirmation,
     formatFleetCloudMoney,
     isFleetCloudIdlePolicyMode,
@@ -46,7 +50,7 @@ import {
     type FleetNodeView,
     type FleetViewerRole,
 } from '@ever-works/contracts';
-import { isMachineProviderError, type MachineProviderOptions } from '@ever-works/plugin';
+import { isMachineProviderError, type MachineProviderMachine, type MachineProviderOptions } from '@ever-works/plugin';
 import { config } from '../../config';
 import type { FleetNode } from '../../entities/fleet-node.entity';
 import { NoProviderError, ProviderNotFoundError } from '../../facades/base.facade';
@@ -68,7 +72,13 @@ import { FleetSessionRepository } from '../sessions/fleet-session.repository';
 import { FleetNodeHealthSampleRepository } from '../fleet-node-health-sample.repository';
 import { INBOX_PRODUCER, type InboxProducer } from '../../inbox/inbox-producer.port';
 import { evaluateCloudIdle } from './idle-policy';
-import { buildCloudBootstrap, FLEET_CLOUD_DEFAULT_RUNTIME_VERSION } from './bootstrap-script';
+import {
+    buildCloudBootstrap,
+    FLEET_CLOUD_DEFAULT_RUNTIME_VERSION,
+    isFleetCloudVpnAuthKey,
+    isFleetCloudVpnJoinCommand,
+    type CloudBootstrapInput,
+} from './bootstrap-script';
 import {
     appendPowerEvent,
     cloudHasMachine,
@@ -115,6 +125,29 @@ const ASKING_PROVIDER_TIMEOUT_MS = 10 * 60 * 1000;
  * cadences, so a pass that ran late still sees every sample since the last.
  */
 const IDLE_SAMPLE_LOOKBACK_MS = 20 * 60 * 1000;
+
+/** P3 — owners with a `node.cloud.create` row this recent are scanned for unclaimed machines even without a row. */
+const UNCLAIMED_OWNER_LOOKBACK_MS = 35 * 24 * 60 * 60 * 1000;
+
+/** P3 — at most this many unclaimed machines are adopted per provider + owner in one pass. */
+const MAX_ADOPTED_PER_PASS = 5;
+
+/**
+ * P3 — a Fleet name for an adopted machine: its provider name when it is a
+ * valid computer name, else `unclaimed-<ref>`, with a numeric suffix until it
+ * is unique among the owner's computers.
+ */
+export function unclaimedName(providerName: string | undefined, ref: string, taken: ReadonlySet<string>): string {
+    const lower = typeof providerName === 'string' ? providerName.toLowerCase() : '';
+    const tail = ref.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 24) || 'machine';
+    const base = isFleetCloudName(lower) ? lower : `unclaimed-${tail}`;
+    if (!taken.has(base)) return base;
+    for (let i = 2; i < 1000; i += 1) {
+        const candidate = `${base.slice(0, 34)}-${i}`;
+        if (!taken.has(candidate)) return candidate;
+    }
+    return `unclaimed-${randomBytes(4).toString('hex')}`;
+}
 
 /** The hint for a disabled / unusable provider plugin (spec U5). */
 function pluginDisabledHint(providerName: string): string {
@@ -653,9 +686,38 @@ export class FleetCloudService {
             );
         }
         const software = normalizeFleetCloudSoftware(input.software ?? undefined).filter(
-            // The overlay-VPN client needs its operator install script (P3); not offered until then.
+            // The overlay-VPN client needs its operator install script; not offered without it.
             (id) => id !== 'overlay-vpn' || this.overlayVpnInstallUrl() !== null,
         );
+        // P3 (FR-32): the overlay-VPN auth key — checked here, handed to the bootstrap
+        // once, never stored, echoed, logged or audited (no refusal quotes it).
+        const vpnAuthKey =
+            typeof input.vpnAuthKey === 'string' && input.vpnAuthKey.trim() ? input.vpnAuthKey.trim() : null;
+        if (vpnAuthKey !== null) {
+            if (!software.includes('overlay-vpn')) {
+                throw fleetMachineError(
+                    'invalid',
+                    this.overlayVpnInstallUrl() === null
+                        ? 'this deployment offers no overlay-VPN client, so an auth key cannot be used'
+                        : 'tick the overlay-VPN client to use an auth key',
+                    { field: 'vpnAuthKey' },
+                );
+            }
+            if (this.overlayVpnJoinCommand() === null) {
+                throw fleetMachineError(
+                    'invalid',
+                    'this deployment installs the overlay-VPN client but has no join command (FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND); leave the key empty',
+                    { field: 'vpnAuthKey' },
+                );
+            }
+            if (!isFleetCloudVpnAuthKey(vpnAuthKey)) {
+                throw fleetMachineError(
+                    'invalid',
+                    'the auth key may hold only letters, digits, _, : and -, 8 to 200 of them',
+                    { field: 'vpnAuthKey' },
+                );
+            }
+        }
         // Fresh prices: the acknowledged price is checked against what the provider says NOW (FR-4).
         const options = await this.readOptions(pluginId, userId, true);
         const region = options.regions.find((entry) => entry.id === input.regionId);
@@ -761,7 +823,10 @@ export class FleetCloudService {
             providerMeta: meta,
         });
         // The per-Node tag needs the id the insert just generated (FR-10).
-        const tags = [FLEET_CLOUD_TAG, fleetCloudNodeTag(node.id)];
+        // P3: plus this deployment's site tag, so reconciliation can tell its own
+        // unclaimed machines from another deployment's on the same account (FR-30).
+        const site = this.siteFingerprint();
+        const tags = [FLEET_CLOUD_TAG, fleetCloudNodeTag(node.id), ...(site ? [fleetCloudSiteTag(site)] : [])];
         await this.nodes.update(node.id, { providerMeta: { ...meta, tags } });
 
         // Then the provider — not awaited, so Create answers within 500 ms (FR-7);
@@ -777,6 +842,7 @@ export class FleetCloudService {
             software,
             tags,
             requestedBy,
+            overlayVpn: this.overlayVpnFor(software, vpnAuthKey),
         });
 
         await this.record('node.cloud.create', userId, userId, node.id, {
@@ -813,6 +879,8 @@ export class FleetCloudService {
             software: FleetCloudSoftwareId[];
             tags: string[];
             requestedBy: string;
+            /** P3: in memory only, for the bootstrap — never on the row, in a log or an audit row. */
+            overlayVpn?: CloudBootstrapInput['overlayVpn'];
         },
     ): Promise<void> {
         try {
@@ -826,7 +894,7 @@ export class FleetCloudService {
                 runtimeSpec: this.runtimeSpec(),
                 software: args.software,
                 publicKey,
-                overlayVpn: null,
+                overlayVpn: args.overlayVpn ?? null,
             });
             const result = await this.machines.create(args.pluginId, args.userId, {
                 name: args.name,
@@ -1014,13 +1082,226 @@ export class FleetCloudService {
         if (!config.fleet.isCloudEnabled() || !this.machines) return { machines: 0, changed: 0 };
         let machines = 0;
         let changed = 0;
-        for (const node of await this.nodes.findCloudNodes()) {
+        const nodes = await this.nodes.findCloudNodes();
+        for (const node of nodes) {
             const meta = normalizeCloudMeta(node.providerMeta);
             if (!meta || !cloudHasMachine(node) || meta.powerState === 'gone' || !node.providerPluginId) continue;
             machines += 1;
             if (await this.refreshMachine(node, meta)) changed += 1;
         }
-        return { machines, changed };
+        // P3 (FR-30, U7): what the provider holds that the rows do not know.
+        const tagged = await this.reconcileTagged(nodes).catch((error) => {
+            this.logger.warn(
+                `cloud reconcile (tagged machines) failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return { repaired: 0, adopted: 0 };
+        });
+        return { machines, changed: changed + tagged.repaired + tagged.adopted };
+    }
+
+    /**
+     * P3 (spec FR-30, U7) — per provider + owner, the machines carrying the
+     * `ever-works` tag that no row knows by reference:
+     *
+     *  - **repair**: the machine's Node tag names this owner's row and that row
+     *    has no machine reference (the provider answered after the create gave
+     *    up, or the reference was never recorded) — the reference, the create
+     *    time and the power state are written onto the row;
+     *  - **adopt**: the machine carries THIS deployment's site tag and no row
+     *    of this deployment is (or was) its registration — a row is written for
+     *    it (`unclaimedAt`, status `offline`, a credential nobody holds, idle
+     *    policy `nothing`) so its owner sees the machine and its bill, and
+     *    Destroy… works through the ordinary chain. A machine without this
+     *    deployment's site tag is never touched: it may belong to another Ever
+     *    Works on the same provider account.
+     *
+     * Owners are those with a cloud row, plus those with a `node.cloud.create`
+     * audit row in the last 35 days (a machine whose row is gone). Both acts
+     * are audited `node.cloud.create` by `system:cloud-reconcile`. Nothing is
+     * created, powered or destroyed at the provider.
+     */
+    private async reconcileTagged(
+        nodes: readonly FleetNode[],
+        nowMs: number = Date.now(),
+    ): Promise<{ repaired: number; adopted: number }> {
+        if (!this.machines) return { repaired: 0, adopted: 0 };
+        const site = this.siteFingerprint();
+        const groups = new Map<string, { pluginId: string; userId: string }>();
+        const add = (pluginId: unknown, userId: unknown) => {
+            if (typeof pluginId !== 'string' || !pluginId || typeof userId !== 'string' || !userId) return;
+            groups.set(`${pluginId}::${userId}`, { pluginId, userId });
+        };
+        for (const node of nodes) add(node.providerPluginId, node.userId);
+        if (this.audit && typeof this.audit.forActionSince === 'function') {
+            const since = new Date(nowMs - UNCLAIMED_OWNER_LOOKBACK_MS);
+            const rows = await this.audit.forActionSince('node.cloud.create', since).catch(() => []);
+            for (const row of rows) add((row.details ?? {})['providerPluginId'], row.ownerUserId);
+        }
+        const knownRefs = new Set(
+            nodes.filter((node) => cloudHasMachine(node)).map((node) => `${node.providerPluginId}::${node.providerMachineRef}`),
+        );
+        let repaired = 0;
+        let adopted = 0;
+        for (const { pluginId, userId } of groups.values()) {
+            let machines: MachineProviderMachine[];
+            try {
+                machines = await this.machines.listTagged(pluginId, userId, FLEET_CLOUD_TAG);
+            } catch (error) {
+                this.logger.debug(
+                    `cloud reconcile: the ${pluginId} machines of ${userId} could not be listed: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                continue;
+            }
+            let adoptedHere = 0;
+            for (const machine of machines.slice(0, 200)) {
+                const ref = typeof machine.machineRef === 'string' ? machine.machineRef.slice(0, 128) : '';
+                if (!ref || machine.state === 'gone' || knownRefs.has(`${pluginId}::${ref}`)) continue;
+                const nodeId = fleetCloudNodeIdFromTags(machine.tags);
+                const row = nodeId ? nodes.find((node) => node.id === nodeId) : undefined;
+                if (row) {
+                    if (row.userId === userId && row.providerPluginId === pluginId && !cloudHasMachine(row)) {
+                        if (await this.repairRow(row, machine, ref, nowMs)) {
+                            repaired += 1;
+                            knownRefs.add(`${pluginId}::${ref}`);
+                        }
+                    }
+                    continue;
+                }
+                if (!site || fleetCloudSiteFromTags(machine.tags) !== site) continue;
+                if (adoptedHere >= MAX_ADOPTED_PER_PASS) break;
+                if (await this.adoptMachine(pluginId, userId, machine, ref, nowMs)) {
+                    adopted += 1;
+                    adoptedHere += 1;
+                    knownRefs.add(`${pluginId}::${ref}`);
+                }
+            }
+        }
+        return { repaired, adopted };
+    }
+
+    /** The provider's machine state as the row keeps it. */
+    private static powerStateOf(machine: MachineProviderMachine): FleetCloudMeta['powerState'] {
+        return machine.state === 'provisioning' || machine.state === 'running' || machine.state === 'off'
+            ? machine.state
+            : 'unknown';
+    }
+
+    /** Write a machine the provider holds onto its own row, which had no reference (U7). */
+    private async repairRow(node: FleetNode, machine: MachineProviderMachine, ref: string, nowMs: number): Promise<boolean> {
+        const fresh = await this.nodes.findById(node.id);
+        const meta = fresh ? normalizeCloudMeta(fresh.providerMeta) : null;
+        if (!fresh || !meta || cloudHasMachine(fresh)) return false;
+        const now = new Date(nowMs).toISOString();
+        const created = machine.createdAt && Number.isFinite(Date.parse(machine.createdAt)) ? machine.createdAt : now;
+        let timeline = appendPowerEvent(meta.powerTimeline, 'running', created);
+        if (machine.state === 'off') timeline = appendPowerEvent(timeline, 'off', now);
+        const stillCreating = meta.phase === 'asking-provider' || meta.phase === 'failed';
+        await this.nodes.update(node.id, {
+            providerMachineRef: ref,
+            providerMeta: {
+                ...meta,
+                machineCreatedAt: meta.machineCreatedAt ?? created,
+                phase: stillCreating ? (machine.state === 'running' ? 'installing' : 'booting') : meta.phase,
+                phaseAt: stillCreating ? now : meta.phaseAt,
+                error: stillCreating ? null : meta.error,
+                powerState: FleetCloudService.powerStateOf(machine),
+                powerStateAt: now,
+                powerTimeline: timeline,
+                ipv4: machine.ipv4 ?? meta.ipv4 ?? null,
+            },
+        });
+        await this.record('node.cloud.create', null, node.userId, node.id, {
+            targetName: node.name,
+            requestedBy: FLEET_CLOUD_RECONCILE_REQUESTER,
+            confirmationClass: FLEET_CLOUD_ACTION_CLASS['retry-enrollment'],
+            outcome: 'ok',
+            act: 'repaired',
+            ...this.priceExtra(node, meta),
+        });
+        return true;
+    }
+
+    /** Register an unclaimed machine of this deployment, so its owner sees it and can destroy it (U7). */
+    private async adoptMachine(
+        pluginId: string,
+        userId: string,
+        machine: MachineProviderMachine,
+        ref: string,
+        nowMs: number,
+    ): Promise<boolean> {
+        if (await this.nodes.findByProviderMachine(pluginId, ref)) return false;
+        const owned = await this.nodes.findByUser(userId);
+        const name = unclaimedName(machine.name, ref, new Set(owned.map((node) => node.name.toLowerCase())));
+        const options = await this.readOptions(pluginId, userId, false).catch(() => null);
+        const size = options?.sizes.find((entry) => entry.id === machine.sizeId) ?? null;
+        const region = options?.regions.find((entry) => entry.id === machine.regionId) ?? null;
+        const providerName = options?.providerName ?? (await this.machines?.providerName(pluginId, userId)) ?? 'the provider';
+        const now = new Date(nowMs).toISOString();
+        const created = machine.createdAt && Number.isFinite(Date.parse(machine.createdAt)) ? machine.createdAt : now;
+        let timeline = appendPowerEvent([], 'running', created);
+        if (machine.state === 'off') timeline = appendPowerEvent(timeline, 'off', now);
+        const meta: FleetCloudMeta = {
+            providerName,
+            regionId: machine.regionId ?? '',
+            regionLabel: region?.label ?? machine.regionId ?? '',
+            sizeId: machine.sizeId ?? '',
+            sizeLabel: size?.label ?? machine.sizeId ?? '',
+            vcpus: size?.vcpus ?? 0,
+            memoryMiB: size?.memoryMiB ?? 0,
+            diskGiB: size?.diskGiB ?? 0,
+            // An unknown size has no estimate (0) rather than a guessed one.
+            hourlyRateCents: size?.priceHourlyCents ?? 0,
+            monthlyPriceCents: size?.priceMonthlyCents ?? 0,
+            currency: options?.currency ?? 'USD',
+            billsWhileOff: options?.billsWhileOff ?? true,
+            imageLabel: options?.imageLabel ?? null,
+            createdAt: now,
+            machineCreatedAt: created,
+            phase: 'online',
+            phaseAt: now,
+            powerState: FleetCloudService.powerStateOf(machine),
+            powerStateAt: now,
+            pending: null,
+            powerTimeline: timeline,
+            error: null,
+            // The unclaimed item speaks for it; the idle policy stays quiet.
+            idlePolicy: { mode: 'nothing', afterHours: FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours },
+            idleSince: null,
+            cost: null,
+            software: [],
+            tags: (machine.tags ?? []).filter((tag): tag is string => typeof tag === 'string').slice(0, 20),
+            ipv4: machine.ipv4 ?? null,
+            unclaimedAt: now,
+        };
+        const node = await this.nodes.create({
+            userId,
+            organizationId: null,
+            name,
+            kind: 'node',
+            status: 'offline',
+            // A credential nobody holds: the adopted row can never enrol or authenticate.
+            enrollmentTokenHash: sha256Hex(randomBytes(32).toString('base64url')),
+            credentialIssuedAt: new Date(nowMs),
+            capabilities: [],
+            origin: 'cloud',
+            providerPluginId: pluginId,
+            providerMachineRef: ref,
+            providerMeta: meta,
+        });
+        await this.record('node.cloud.create', null, userId, node.id, {
+            targetName: name,
+            requestedBy: FLEET_CLOUD_RECONCILE_REQUESTER,
+            confirmationClass: FLEET_CLOUD_ACTION_CLASS['retry-enrollment'],
+            outcome: 'ok',
+            act: 'adopted-unclaimed',
+            providerPluginId: pluginId,
+            regionId: meta.regionId,
+            sizeId: meta.sizeId,
+            hourlyRateCents: meta.hourlyRateCents,
+        });
+        return true;
     }
 
     /**
@@ -1338,6 +1619,17 @@ export class FleetCloudService {
         };
     }
 
+    /**
+     * P3 (FR-30) — this deployment's site fingerprint for the `ever-works-site:`
+     * tag: the first 16 hex characters of the SHA-256 of the API origin new
+     * machines enrol against. Null when no origin is configured (no create can
+     * run then either).
+     */
+    private siteFingerprint(): string | null {
+        const apiUrl = this.enrollApiUrl();
+        return apiUrl ? sha256Hex(apiUrl.toLowerCase()).slice(0, 16) : null;
+    }
+
     /** The API origin a new machine enrols against (`FLEET_NODE_API_URL`, else `PLATFORM_API_URL`). */
     private enrollApiUrl(): string | null {
         const raw = config.fleetNode.getApiUrl() ?? process.env.PLATFORM_API_URL ?? '';
@@ -1353,6 +1645,27 @@ export class FleetCloudService {
     private overlayVpnInstallUrl(): string | null {
         const raw = process.env.FLEET_CLOUD_OVERLAY_VPN_INSTALL_URL?.trim();
         return raw && /^https:\/\//.test(raw) ? raw : null;
+    }
+
+    /**
+     * P3: the operator's overlay-VPN join command (`FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND`,
+     * an absolute path with a `{keyFile}` placeholder — the key is handed over as a
+     * 0600 file, never on a command line), or null (install the client only).
+     */
+    private overlayVpnJoinCommand(): string | null {
+        const raw = process.env.FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND?.trim();
+        return raw && isFleetCloudVpnJoinCommand(raw) ? raw : null;
+    }
+
+    /** What the bootstrap installs for the overlay-VPN preset (FR-32), or null when it is not ticked. */
+    private overlayVpnFor(
+        software: readonly FleetCloudSoftwareId[],
+        authKey: string | null,
+    ): CloudBootstrapInput['overlayVpn'] {
+        const installScriptUrl = this.overlayVpnInstallUrl();
+        if (!software.includes('overlay-vpn') || installScriptUrl === null) return null;
+        const joinCommand = this.overlayVpnJoinCommand();
+        return { installScriptUrl, joinCommand, authKey: joinCommand ? authKey : null };
     }
 
     private async resolve(

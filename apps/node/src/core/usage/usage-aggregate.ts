@@ -95,7 +95,12 @@ export function addToUsageBucket(
 		v: 0,
 		u: now
 	};
-	bucket.t = [bucket.t[0] + delta.in, bucket.t[1] + delta.out, bucket.t[2] + delta.cacheRead, bucket.t[3] + delta.cacheWrite];
+	bucket.t = [
+		bucket.t[0] + delta.in,
+		bucket.t[1] + delta.out,
+		bucket.t[2] + delta.cacheRead,
+		bucket.t[3] + delta.cacheWrite
+	];
 	if (admission.isNew) bucket.r += 1;
 	bucket.a = Math.min(bucket.a, record.at);
 	bucket.z = Math.max(bucket.z, record.at);
@@ -107,7 +112,12 @@ export function addToUsageBucket(
 }
 
 export function usageBucketRow(bucket: UsageBucket): FleetUsageRow {
-	const tokens: FleetUsageTokens = { in: bucket.t[0], out: bucket.t[1], cacheRead: bucket.t[2], cacheWrite: bucket.t[3] };
+	const tokens: FleetUsageTokens = {
+		in: bucket.t[0],
+		out: bucket.t[1],
+		cacheRead: bucket.t[2],
+		cacheWrite: bucket.t[3]
+	};
 	return {
 		provider: bucket.p,
 		providerSessionId: bucket.s,

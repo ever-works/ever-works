@@ -93,6 +93,8 @@ export * from './ports';
 export * from './default-ports';
 export * from './worker-context';
 export * from './app-runtime-deletion.service';
+// Lane aw-safety (2026-10-26) — the API's guarded APP_WORK_DELETION_COMPLETION (built by apps/api's ports module).
+export * from './app-work-deletion-completion.service';
 export * from './app-verification-target.service';
 export * from './app-license-gate';
 export * from './app-deploy-preconditions.service';

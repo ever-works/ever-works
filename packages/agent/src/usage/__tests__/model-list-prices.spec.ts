@@ -1,5 +1,8 @@
 import type { ModelListPriceListVersion } from '@ever-works/contracts';
-import { MODEL_LIST_PRICEBOOK_HISTORY, MODEL_LIST_PRICEBOOK_VERSION } from '../model-list-pricebook';
+import {
+    MODEL_LIST_PRICEBOOK_HISTORY,
+    MODEL_LIST_PRICEBOOK_VERSION,
+} from '../model-list-pricebook';
 import { PublishedModelListPrices } from '../model-list-prices';
 
 /** FL-20 (CONTRACTS R-30) — the published model list prices and the port over them. */
@@ -18,13 +21,16 @@ describe('model list pricebook', () => {
                 expect(entry.perMillionUsd.cacheRead).toBeGreaterThan(0);
                 expect(entry.perMillionUsd.cacheWrite).toBeGreaterThanOrEqual(0);
                 // Only the Codex (OpenAI) families bill no cache write.
-                if (entry.provider === 'claude-code') expect(entry.perMillionUsd.cacheWrite).toBeGreaterThan(0);
+                if (entry.provider === 'claude-code')
+                    expect(entry.perMillionUsd.cacheWrite).toBeGreaterThan(0);
             }
         }
     });
 
     it('lists every family once', () => {
-        const models = MODEL_LIST_PRICEBOOK_HISTORY[MODEL_LIST_PRICEBOOK_VERSION].entries.map((e) => e.model);
+        const models = MODEL_LIST_PRICEBOOK_HISTORY[MODEL_LIST_PRICEBOOK_VERSION].entries.map(
+            (e) => e.model,
+        );
         expect(new Set(models).size).toBe(models.length);
     });
 });
@@ -53,7 +59,9 @@ describe('PublishedModelListPrices', () => {
     });
 
     it('answers null for an unknown model — never zero', () => {
-        expect(prices.price({ in: 10, out: 10, cacheRead: 0, cacheWrite: 0 }, 'local-7b')).toBeNull();
+        expect(
+            prices.price({ in: 10, out: 10, cacheRead: 0, cacheWrite: 0 }, 'local-7b'),
+        ).toBeNull();
         expect(prices.find('claude-opus-9')).toBeNull();
     });
 
@@ -74,7 +82,9 @@ describe('PublishedModelListPrices', () => {
             ...v1,
             version: 2,
             effectiveFrom: '2026-10-12',
-            entries: [{ ...v1.entries[0], perMillionUsd: { in: 2, out: 2, cacheRead: 2, cacheWrite: 0 } }],
+            entries: [
+                { ...v1.entries[0], perMillionUsd: { in: 2, out: 2, cacheRead: 2, cacheWrite: 0 } },
+            ],
         };
         const book = new PublishedModelListPrices({ 1: v1, 2: v2 }, 2);
         const tokens = { in: 1_000_000, out: 0, cacheRead: 0, cacheWrite: 0 };

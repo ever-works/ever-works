@@ -452,7 +452,8 @@ const sidebars: SidebarsConfig = {
 						'plugin-system/creating-content-extractor-plugin',
 						'plugin-system/creating-pipeline-plugin',
 						'plugin-system/creating-deployment-plugin',
-						'plugin-system/creating-data-source-plugin'
+						'plugin-system/creating-data-source-plugin',
+						'plugin-system/creating-machine-provider-plugin'
 					]
 				},
 				'plugin-system/built-in-plugins',

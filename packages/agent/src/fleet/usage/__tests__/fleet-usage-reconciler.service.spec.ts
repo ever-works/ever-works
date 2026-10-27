@@ -90,7 +90,11 @@ function harness() {
     const ledger: Array<{ runId: string; pluginId: string; costCents: number }> = [];
     const pluginUsage = {
         record: jest.fn(async (input: { runId: string; pluginId: string; costCents: number }) => {
-            ledger.push({ runId: input.runId, pluginId: input.pluginId, costCents: input.costCents });
+            ledger.push({
+                runId: input.runId,
+                pluginId: input.pluginId,
+                costCents: input.costCents,
+            });
             return { id: `event-${ledger.length}` };
         }),
     };
@@ -110,7 +114,9 @@ function harness() {
             await runs.update(runId, { costCents });
         }),
     };
-    const nodes = { findById: jest.fn(async (id: string) => (id === NODE ? { id: NODE, userId: OWNER } : null)) };
+    const nodes = {
+        findById: jest.fn(async (id: string) => (id === NODE ? { id: NODE, userId: OWNER } : null)),
+    };
     const service = new FleetUsageReconcilerService(
         samples as never,
         sessions as never,
@@ -126,7 +132,14 @@ function harness() {
 }
 
 async function seedSession(h: ReturnType<typeof harness>, providerSessionId = 'sess-1') {
-    await h.runs.save({ id: RUN, userId: OWNER, agentId: AGENT, taskId: null, workId: null, costCents: null } as Row);
+    await h.runs.save({
+        id: RUN,
+        userId: OWNER,
+        agentId: AGENT,
+        taskId: null,
+        workId: null,
+        costCents: null,
+    } as Row);
     await h.sessions.save({
         id: 'session-a',
         nodeId: NODE,
@@ -143,13 +156,29 @@ describe('FleetUsageReconcilerService', () => {
         const h = harness();
         await seedSession(h);
         const summary = await h.service.ingest(NODE, report([row()]));
-        expect(summary).toMatchObject({ accepted: true, rows: 1, created: 1, sessions: 1, other: 0 });
+        expect(summary).toMatchObject({
+            accepted: true,
+            rows: 1,
+            created: 1,
+            sessions: 1,
+            other: 0,
+        });
         const session = h.sessions.rows[0];
         expect(session.costCents).toBe(450);
-        expect(session.tokens).toMatchObject({ priceListVersion: 1, requests: 4, unknownModels: [] });
-        expect(h.ledger).toEqual([{ runId: RUN, pluginId: 'fleet-node:claude-code', costCents: 450 }]);
+        expect(session.tokens).toMatchObject({
+            priceListVersion: 1,
+            requests: 4,
+            unknownModels: [],
+        });
+        expect(h.ledger).toEqual([
+            { runId: RUN, pluginId: 'fleet-node:claude-code', costCents: 450 },
+        ]);
         expect(h.runs.rows[0].costCents).toBe(450);
-        expect(h.samples.rows[0]).toMatchObject({ fleetSessionId: 'session-a', priceListVersion: 1, costCents: 450 });
+        expect(h.samples.rows[0]).toMatchObject({
+            fleetSessionId: 'session-a',
+            priceListVersion: 1,
+            costCents: 450,
+        });
     });
 
     it('re-reporting the same rows changes nothing and writes no second ledger row (U4)', async () => {
@@ -166,9 +195,17 @@ describe('FleetUsageReconcilerService', () => {
         const h = harness();
         await seedSession(h);
         await h.service.ingest(NODE, report([row()]));
-        await h.service.ingest(NODE, report([row({ tokens: { in: 10, out: 10, cacheRead: 0, cacheWrite: 0 }, requests: 1 })]));
+        await h.service.ingest(
+            NODE,
+            report([
+                row({ tokens: { in: 10, out: 10, cacheRead: 0, cacheWrite: 0 }, requests: 1 }),
+            ]),
+        );
         expect(h.sessions.rows[0].costCents).toBe(450);
-        await h.service.ingest(NODE, report([row({ tokens: { in: 2_000_000, out: 100_000, cacheRead: 0, cacheWrite: 0 } })]));
+        await h.service.ingest(
+            NODE,
+            report([row({ tokens: { in: 2_000_000, out: 100_000, cacheRead: 0, cacheWrite: 0 } })]),
+        );
         expect(h.sessions.rows[0].costCents).toBe(750);
         expect(h.ledger.map((line) => line.costCents)).toEqual([450, 300]);
         expect(h.runs.rows[0].costCents).toBe(750);
@@ -183,7 +220,14 @@ describe('FleetUsageReconcilerService', () => {
         await seedSession(h, 'late-1');
         await h.service.ingest(
             NODE,
-            report([row({ providerSessionId: 'late-1', bucketStart: '2026-10-20T11:00:00.000Z', firstAt: '2026-10-20T11:00:00.000Z', lastAt: '2026-10-20T11:10:00.000Z' })]),
+            report([
+                row({
+                    providerSessionId: 'late-1',
+                    bucketStart: '2026-10-20T11:00:00.000Z',
+                    firstAt: '2026-10-20T11:00:00.000Z',
+                    lastAt: '2026-10-20T11:10:00.000Z',
+                }),
+            ]),
         );
         expect(h.samples.rows.every((sample) => sample.fleetSessionId === 'session-a')).toBe(true);
         // Both hours now count toward the Session and its Run.
@@ -207,7 +251,9 @@ describe('FleetUsageReconcilerService', () => {
         const summary = await h.service.ingest(NODE, report([row({ providerSessionId: 'cli-9' })]));
         expect(summary).toMatchObject({ runs: 1, sessions: 0, other: 0 });
         expect(h.samples.rows[0].agentRunId).toBe(TASK_RUN);
-        expect(h.ledger).toEqual([{ runId: TASK_RUN, pluginId: 'fleet-node:claude-code', costCents: 450 }]);
+        expect(h.ledger).toEqual([
+            { runId: TASK_RUN, pluginId: 'fleet-node:claude-code', costCents: 450 },
+        ]);
     });
 
     it('tops up a headless run’s own ledger row instead of counting it twice', async () => {
@@ -234,7 +280,10 @@ describe('FleetUsageReconcilerService', () => {
         const h = harness();
         const tooMany = report(Array.from({ length: 501 }, () => row()));
         expect((await h.service.ingest(NODE, tooMany)).accepted).toBe(false);
-        expect((await h.service.ingest('99999999-9999-4999-8999-999999999999', report([row()]))).accepted).toBe(false);
+        expect(
+            (await h.service.ingest('99999999-9999-4999-8999-999999999999', report([row()])))
+                .accepted,
+        ).toBe(false);
         await h.jobs.save({ id: 'job-1', result: null } as Row);
         await h.service.ingest(NODE, report([row()], 7), 'job-1');
         expect(h.jobs.rows[0].result).toMatchObject({ watermark: 7 });

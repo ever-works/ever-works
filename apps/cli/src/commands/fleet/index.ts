@@ -37,6 +37,7 @@ import {
 } from './session/actions';
 import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
 import { virtualCommand } from './virtual';
+import { cloudCommand } from './cloud';
 import { usageCommand } from './usage';
 
 /**
@@ -122,5 +123,7 @@ export const fleetCommand = new Command('fleet')
     .addCommand(fleetTasksCommand)
     // Virtual computers (FL-16 P3): `fleet virtual list|options|create|start|stop|power|resize|rebuild|destroy`.
     .addCommand(virtualCommand)
+    // Cloud computers (FL-17 P3): `fleet cloud providers|options|list|create|power|destroy|usage|idle-policy`.
+    .addCommand(cloudCommand)
     // Usage & cost on the fleet (FL-20): `fleet usage [--days] [--on] [--model]` (read-only).
     .addCommand(usageCommand);

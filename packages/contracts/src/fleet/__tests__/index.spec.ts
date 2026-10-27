@@ -1571,7 +1571,10 @@ const USAGE_EXPORTS = [
 	'formatFleetUsageCents',
 	'formatFleetUsageTokens',
 	// FL-20 P2 — the schedule rows' Task cost read.
-	'FLEET_USAGE_TASK_COSTS_MAX_IDS'
+	'FLEET_USAGE_TASK_COSTS_MAX_IDS',
+	// FL-20 P3 — the CSV export.
+	'fleetUsageCsv',
+	'fleetUsageCsvFilename'
 ] as const;
 
 /** Cloud computers P2 (FL-17, #2899) — the idle policy and the usage freshness; it landed without guard rows. */
@@ -1583,11 +1586,15 @@ const CLOUD_P2_EXPORTS = [
 	'fleetCloudIdleHours'
 ] as const;
 
-const MODEL_LIST_PRICES_EXPORTS = [
-	'MODEL_TOKEN_CLASSES',
-	'findModelListPriceEntry',
-	'priceModelTokensCents'
+/** Cloud computers P3 (FL-17, #2902) — the deployment site tag and the reconcile requester (same module). */
+const CLOUD_P3_EXPORTS = [
+	'FLEET_CLOUD_SITE_TAG_PREFIX',
+	'FLEET_CLOUD_RECONCILE_REQUESTER',
+	'fleetCloudSiteTag',
+	'fleetCloudSiteFromTags'
 ] as const;
+
+const MODEL_LIST_PRICES_EXPORTS = ['MODEL_TOKEN_CLASSES', 'findModelListPriceEntry', 'priceModelTokensCents'] as const;
 
 const ALL_EXPORTS = [
 	...HEALTH_EXPORTS,
@@ -1637,6 +1644,7 @@ const ALL_EXPORTS = [
 	...USAGE_EXPORTS,
 	...MODEL_LIST_PRICES_EXPORTS,
 	...CLOUD_P2_EXPORTS,
+	...CLOUD_P3_EXPORTS,
 	...ACTIONS_RUNNERS_EXPORTS
 ];
 
@@ -2095,6 +2103,8 @@ const FUNCTION_EXPORTS = [
 	'isFleetVirtualState',
 	'fleetCloudNodeTag',
 	'fleetCloudNodeIdFromTags',
+	'fleetCloudSiteTag',
+	'fleetCloudSiteFromTags',
 	'isFleetCloudName',
 	'isFleetCloudSoftwareId',
 	'normalizeFleetCloudSoftware',
@@ -2214,7 +2224,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1340 runtime symbols', () => {
+	it('exposes exactly these 1346 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2311,12 +2321,14 @@ describe('fleet barrel', () => {
 		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
 		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
 		// → +1 with FL-20 P2 (`FLEET_USAGE_TASK_COSTS_MAX_IDS`).
+		// → +2 with FL-20 P3 (`fleetUsageCsv`, `fleetUsageCsvFilename`).
 		// → +52 with FL-18 (Actions runners on computers): the fifty-one symbols of
 		// `fleet-actions-runners.types.ts` — a NEW module, one row below — and
 		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
+		// → +4 with FL-17 P3 (site tag, reconcile requester), same module (`CLOUD_P3_EXPORTS`).
 		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
 		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 52 + 70);
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 4 + 70);
 	});
 
 	it.each([
