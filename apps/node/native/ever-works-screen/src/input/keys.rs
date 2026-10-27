@@ -17,10 +17,10 @@ pub fn x11_keysym(code: &str) -> Option<u32> {
             return Some(c as u32);
         }
     }
-    if let Some(n) = code.strip_prefix('F').and_then(|n| n.parse::<u32>().ok()) {
-        if (1..=12).contains(&n) {
-            return Some(0xffbe + n - 1);
-        }
+    if let Some(n) = code.strip_prefix('F').and_then(|n| n.parse::<u32>().ok())
+        && (1..=12).contains(&n)
+    {
+        return Some(0xffbe + n - 1);
     }
     Some(match code {
         "Enter" | "NumpadEnter" => 0xff0d,
@@ -75,10 +75,10 @@ pub fn windows_vk(code: &str) -> Option<(u16, bool)> {
             return Some((c as u16, false));
         }
     }
-    if let Some(n) = code.strip_prefix('F').and_then(|n| n.parse::<u16>().ok()) {
-        if (1..=12).contains(&n) {
-            return Some((0x70 + n - 1, false));
-        }
+    if let Some(n) = code.strip_prefix('F').and_then(|n| n.parse::<u16>().ok())
+        && (1..=12).contains(&n)
+    {
+        return Some((0x70 + n - 1, false));
     }
     Some(match code {
         "Enter" => (0x0d, false),
@@ -214,7 +214,17 @@ mod tests {
 
     #[test]
     fn maps_common_keys_on_every_os() {
-        for code in ["KeyA", "KeyZ", "Digit0", "F1", "F12", "Enter", "ArrowLeft", "ShiftLeft", "Space"] {
+        for code in [
+            "KeyA",
+            "KeyZ",
+            "Digit0",
+            "F1",
+            "F12",
+            "Enter",
+            "ArrowLeft",
+            "ShiftLeft",
+            "Space",
+        ] {
             assert!(x11_keysym(code).is_some(), "x11 {code}");
             assert!(windows_vk(code).is_some(), "win {code}");
             assert!(mac_keycode(code).is_some(), "mac {code}");

@@ -26,7 +26,9 @@ import type { GitPullRequestStatus } from '@ever-works/plugin';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
 import { ownershipScopeOf, type OwnershipScope } from '../database/ownership-scope';
+import { OrganizationRepository } from '../database/repositories/organization.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { TenantRepository } from '../database/repositories/tenant.repository';
 import { WorkMemberRepository } from '../database/repositories/work-member.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkUpstreamStateRepository } from '../database/repositories/work-upstream-state.repository';
@@ -532,6 +534,10 @@ export const APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS = 600_000;
 /** T47 — and the Upstream card's read checks it when the last check is older than 60 s. */
 export const APP_SYNC_PULL_REQUEST_ON_VIEW_MS = 60_000;
 
+/** The `owner_required` refusal's text (owner decision 2026-10-27: creator or Organization Owner). */
+const OWNER_REQUIRED_MESSAGE =
+    'Only the Work owner or an Owner of its Organization can accept upstream workflow changes.';
+
 @Injectable()
 export class AppUpstreamStateService {
     private readonly logger = new Logger(AppUpstreamStateService.name);
@@ -559,6 +565,11 @@ export class AppUpstreamStateService {
         @Optional()
         @Inject(APP_UPSTREAM_SYNC_DISPATCHER)
         private readonly syncDispatcher?: AppUpstreamSyncDispatcher,
+        // Owner decision 2026-10-27 — "Sync anyway" is also open to an Owner of the Work's
+        // Organization (the Tenant owner, `tenants.ownerUserId`). Unbound, the Organization
+        // path answers "not an Owner" and only the creator may release (fail closed).
+        @Optional() private readonly organizations?: OrganizationRepository,
+        @Optional() private readonly tenants?: TenantRepository,
     ) {}
 
     // ── §4.1 — the read ──────────────────────────────────────────────────────
@@ -582,6 +593,13 @@ export class AppUpstreamStateService {
         const work = await this.requireVisibleAppWork(workId, userId);
         const state = await this.requireState(workId);
         const now = Date.now();
+        // "Sync anyway" is offered only while a hold is shown, and only to a viewer the
+        // release route would accept: the Work owner, or an Owner of its Organization who
+        // can edit this Work (the route's edit-access rule still applies to them).
+        const mayRelease =
+            state.relation !== 'link' && activeWorkflowHold(state)
+                ? await this.mayReleaseOnVisibleWork(work, userId)
+                : false;
 
         const upstream =
             state.relation === 'link' || !state.upstreamOwner || !state.upstreamRepo
@@ -623,9 +641,7 @@ export class AppUpstreamStateService {
             divergence: this.divergenceOf(state, now),
             // §3.4: a linked App Work has no upstream and no sync at all (FR-44).
             sync:
-                state.relation === 'link'
-                    ? null
-                    : this.syncOf(state, now, { isOwner: work.userId === userId }),
+                state.relation === 'link' ? null : this.syncOf(state, now, { isOwner: mayRelease }),
             actions: this.actionsOf(state),
             warnings: this.warningsOf(state, now),
         };
@@ -1260,15 +1276,11 @@ export class AppUpstreamStateService {
         const hold = activeWorkflowHold(state);
         const confirming = options.confirmWorkflowChanges === true;
         if (confirming) {
-            // Defence in depth: the API route already refused anyone but the Work owner in a
-            // signed-in session (`requireAppWorkOwnerSession`). This service is also reachable
-            // from other callers, so it re-checks the one fact it can see: the owner.
-            if (work.userId !== userId) {
-                throw new AppUpstreamRefusalError(
-                    'owner_required',
-                    403,
-                    'Only the Work owner can accept upstream workflow changes.',
-                );
+            // Defence in depth: the API route already refused anyone but the Work owner or an
+            // Owner of its Organization in a signed-in session. This service is also reachable
+            // from other callers, so it re-checks the one fact it can see: who is releasing.
+            if (!(await this.isWorkflowReleaser(work, userId))) {
+                throw new AppUpstreamRefusalError('owner_required', 403, OWNER_REQUIRED_MESSAGE);
             }
             if (!hold) {
                 throw new AppUpstreamRefusalError(
@@ -1293,7 +1305,7 @@ export class AppUpstreamStateService {
             throw new AppUpstreamRefusalError(
                 'workflow_confirmation_required',
                 409,
-                'Upstream changed workflow files. The Work owner must review and accept them before this App Work can sync.',
+                'Upstream changed workflow files. The Work owner or an Owner of its Organization must review and accept them before this App Work can sync.',
                 workflowHoldDetails(hold),
             );
         }
@@ -1326,11 +1338,15 @@ export class AppUpstreamStateService {
                 releasedAt: new Date(now).toISOString(),
             };
             await this.states.update(workId, { workflowRelease: release });
+            const releasedAs = work.userId === userId ? 'work_owner' : 'organization_owner';
             await this.emit(workId, {
                 actionType: ActivityActionType.APP_UPSTREAM,
                 action: 'app.upstream.workflow_released',
                 status: ActivityStatus.COMPLETED,
-                summary: 'The owner accepted upstream workflow changes',
+                summary:
+                    releasedAs === 'work_owner'
+                        ? 'The owner accepted upstream workflow changes'
+                        : 'An Owner of the Organization accepted upstream workflow changes',
                 details: {
                     reason: 'workflow_release',
                     upstreamHeadSha: hold.headSha,
@@ -1338,6 +1354,7 @@ export class AppUpstreamStateService {
                     pathCount: hold.pathCount,
                     complete: hold.complete,
                     releasedByUserId: userId,
+                    releasedAs,
                 },
             });
         }
@@ -1409,6 +1426,21 @@ export class AppUpstreamStateService {
     async isWorkOwner(workId: string, userId: string): Promise<boolean> {
         const work = await this.requireVisibleAppWork(workId, userId);
         return !!work.userId && work.userId === userId;
+    }
+
+    /**
+     * The "Sync anyway" gate (owner decision 2026-10-27): whether `userId` may release a held
+     * upstream workflow change on this Work — its OWNER (creator), or an **Owner of the
+     * Work's Organization**. Nobody else: a member of any Work role (co-owner included) and an
+     * Organization Admin or Member answer `false`. Visibility is decided first, so a Work the
+     * caller cannot see answers the same `404 not_found` every other route gives — an
+     * Organization Owner who is neither the creator nor a member of the Work still cannot see
+     * it here. Who the caller is (a signed-in person, never a key, a run token or an Agent) is
+     * the route's half of the gate (`requireHumanSession`).
+     */
+    async mayReleaseWorkflowChanges(workId: string, userId: string): Promise<boolean> {
+        const work = await this.requireVisibleAppWork(workId, userId);
+        return this.isWorkflowReleaser(work, userId);
     }
 
     // ── §6.3 — the sync run's two state transitions ──────────────────────────
@@ -1729,6 +1761,53 @@ export class AppUpstreamStateService {
             );
         }
         return work;
+    }
+
+    /**
+     * Who may release a held workflow change: the Work's creator, or the Owner of the
+     * Organization the Work belongs to. A personal Work (no Organization) has only its creator.
+     */
+    private async isWorkflowReleaser(work: Work, userId: string): Promise<boolean> {
+        if (!userId) return false;
+        if (work.userId && work.userId === userId) return true;
+        return this.isOrganizationOwnerOf(work, userId);
+    }
+
+    /**
+     * Whether `userId` holds the **Owner** role in the Organization `work` belongs to. The
+     * Organization Owner is the owner of its Tenant (`tenants.ownerUserId`, UNIQUE, reached
+     * through `organizations.tenantId`) — the same rule `OrganizationInvitationFlowService.
+     * isTenantOwner` and `MergeApprovalService.isTenantOwner` apply; the roster's `role` column
+     * is display-only and never read as an authorisation input. Fails closed on anything
+     * missing or inconsistent: no Organization, an unbound repository, a read that throws, or a
+     * Work whose own Tenant stamp disagrees with its Organization's.
+     */
+    private async isOrganizationOwnerOf(work: Work, userId: string): Promise<boolean> {
+        if (!work.organizationId || !this.organizations || !this.tenants) return false;
+        const organization = await this.organizations
+            .findById(work.organizationId)
+            .catch(() => null);
+        if (!organization?.tenantId) return false;
+        if (work.tenantId && work.tenantId !== organization.tenantId) return false;
+        const tenant = await this.tenants.findById(organization.tenantId).catch(() => null);
+        return !!tenant?.ownerUserId && tenant.ownerUserId === userId;
+    }
+
+    /**
+     * The card's "Sync anyway" offer for a Work already shown to `userId`: a releaser who can
+     * also edit the Work (the release goes through **Sync now**, which needs edit access).
+     */
+    private async mayReleaseOnVisibleWork(work: Work, userId: string): Promise<boolean> {
+        if (!(await this.isWorkflowReleaser(work, userId))) return false;
+        if (work.userId === userId) return true;
+        const member = this.workMembers?.findMember
+            ? await this.workMembers.findMember(work.id, userId).catch(() => null)
+            : null;
+        return (
+            !!member &&
+            typeof member.hasRoleOrHigher === 'function' &&
+            member.hasRoleOrHigher(WorkMemberRole.EDITOR)
+        );
     }
 
     /** The state row of one App Work, or `404 not_found` — there is nothing to report. */

@@ -25,6 +25,11 @@
 //! The injector is opened on the first input only, so a helper that is only
 //! watched never asks the OS for input access. An input that was not injected
 //! is answered `inputResult` with a code (never the typed text).
+//!
+//! After a crash during control (owner question 14): the node sends a FRESH
+//! helper `releaseHeld` before anything else, which lets go of every modifier
+//! key and mouse button the OS reports held; and a helper that panics after
+//! injecting anything does the same from its panic hook before it aborts.
 
 mod capture;
 mod input;
@@ -41,10 +46,10 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use capture::{Capturer, Display};
-use input::{InputFrame, InputOutcome, InputState, Injector};
+use input::{Injector, InputFrame, InputOutcome, InputState};
 use protocol::{
-    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED, MSG_TILES,
-    PROTOCOL_VERSION, StartRequest, StreamSettings,
+    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED,
+    MSG_TILES, PROTOCOL_VERSION, StartRequest, StreamSettings,
 };
 use tiles::RgbFrame;
 
@@ -75,6 +80,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     }
+    install_release_on_panic();
     match run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -82,6 +88,20 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// A panic (built `panic = abort`) must not leave a controller's keys held: after the
+/// usual report, a helper that injected anything releases what the OS reports held.
+fn install_release_on_panic() {
+    let report = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        report(info);
+        if input::injected()
+            && let Ok(mut injector) = input::open()
+        {
+            let _ = input::release_held(injector.as_mut());
+        }
+    }));
 }
 
 fn spawn_reader() -> Receiver<Inbound> {
@@ -227,10 +247,10 @@ fn run() -> io::Result<()> {
 
 impl<W: Write> Helper<W> {
     fn refresh_displays(&mut self) {
-        if let Some(capturer) = self.capturer.as_mut() {
-            if let Ok(displays) = capturer.displays() {
-                self.displays = displays;
-            }
+        if let Some(capturer) = self.capturer.as_mut()
+            && let Ok(displays) = capturer.displays()
+        {
+            self.displays = displays;
         }
     }
 
@@ -273,6 +293,44 @@ impl<W: Write> Helper<W> {
                 self.release_all();
                 Ok(())
             }
+            Command::ReleaseHeld => self.release_held(),
+        }
+    }
+
+    /// The injector, opened on first use; the reason input is unavailable otherwise.
+    fn open_injector(&mut self) -> Result<(), &'static str> {
+        if self.injector.is_some() {
+            return Ok(());
+        }
+        if let Some(reason) = self.injector_refused {
+            return Err(reason);
+        }
+        match input::open() {
+            Ok(injector) => {
+                self.injector = Some(injector);
+                Ok(())
+            }
+            Err(reason) => {
+                self.injector_refused = Some(reason);
+                Err(reason)
+            }
+        }
+    }
+
+    /// Owner question 14: let go of what this helper pressed, then of every modifier and
+    /// button the OS still reports held (a previous helper may have died holding them).
+    /// Only ever releases. Answered only when it could not be done.
+    fn release_held(&mut self) -> io::Result<()> {
+        if let Err(reason) = self.open_injector() {
+            return self.input_result("refused", reason);
+        }
+        let Some(injector) = self.injector.as_mut() else {
+            return Ok(());
+        };
+        self.pressed.release_all(injector.as_mut());
+        match input::release_held(injector.as_mut()) {
+            Ok(_) => Ok(()),
+            Err(_) => self.input_result("refused", "inject-failed"),
         }
     }
 
@@ -291,21 +349,14 @@ impl<W: Write> Helper<W> {
         let Some(rect) = rect else {
             return self.input_result("refused", "unknown-display");
         };
-        if self.injector.is_none() {
-            if let Some(reason) = self.injector_refused {
-                return self.input_result("refused", reason);
-            }
-            match input::open() {
-                Ok(injector) => self.injector = Some(injector),
-                Err(reason) => {
-                    self.injector_refused = Some(reason);
-                    return self.input_result("refused", reason);
-                }
-            }
+        if let Err(reason) = self.open_injector() {
+            return self.input_result("refused", reason);
         }
         let Some(injector) = self.injector.as_mut() else {
             return Ok(());
         };
+        // From here on a panic releases what the OS reports held.
+        input::mark_injected();
         match self.pressed.apply(injector.as_mut(), rect, &frame) {
             InputOutcome::Injected => Ok(()),
             InputOutcome::Blocked => self.input_result("blocked", "blocked-shortcut"),
@@ -315,8 +366,10 @@ impl<W: Write> Helper<W> {
     }
 
     fn input_result(&mut self, outcome: &str, code: &str) -> io::Result<()> {
-        self.out
-            .json(MSG_INPUT_RESULT, &json!({ "outcome": outcome, "code": code }))
+        self.out.json(
+            MSG_INPUT_RESULT,
+            &json!({ "outcome": outcome, "code": code }),
+        )
     }
 
     /// Let go of everything pressed on the controller's behalf. Never fails.
@@ -367,8 +420,15 @@ impl<W: Write> Helper<W> {
         if !self.displays.iter().any(|display| display.id == id) {
             self.refresh_displays();
         }
-        let Some(display) = self.displays.iter().find(|display| display.id == id).cloned() else {
-            return self.out.error("unknown-display", "that display is not attached");
+        let Some(display) = self
+            .displays
+            .iter()
+            .find(|display| display.id == id)
+            .cloned()
+        else {
+            return self
+                .out
+                .error("unknown-display", "that display is not attached");
         };
         if let Some(session) = self.session.as_mut() {
             session.display = display.id.clone();
@@ -398,18 +458,21 @@ impl<W: Write> Helper<W> {
         self.displays = current;
         let mut fallback: Option<Display> = None;
         let mut lost_everything = false;
-        if let Some(session) = self.session.as_mut() {
-            if !self.displays.iter().any(|display| display.id == session.display) {
-                match self.displays.first() {
-                    Some(primary) => {
-                        session.display = primary.id.clone();
-                        session.previous = None;
-                        session.force_keyframe = true;
-                        session.next_at = Instant::now();
-                        fallback = Some(primary.clone());
-                    }
-                    None => lost_everything = true,
+        if let Some(session) = self.session.as_mut()
+            && !self
+                .displays
+                .iter()
+                .any(|display| display.id == session.display)
+        {
+            match self.displays.first() {
+                Some(primary) => {
+                    session.display = primary.id.clone();
+                    session.previous = None;
+                    session.force_keyframe = true;
+                    session.next_at = Instant::now();
+                    fallback = Some(primary.clone());
                 }
+                None => lost_everything = true,
             }
         }
         if lost_everything {
@@ -426,7 +489,8 @@ impl<W: Write> Helper<W> {
     /// Take one picture and publish what changed: a keyframe when one is due, else the tiles.
     fn publish(&mut self) -> io::Result<()> {
         let now = Instant::now();
-        let (Some(session), Some(capturer)) = (self.session.as_mut(), self.capturer.as_mut()) else {
+        let (Some(session), Some(capturer)) = (self.session.as_mut(), self.capturer.as_mut())
+        else {
             return Ok(());
         };
         session.next_at = now + session.frame_interval();
@@ -468,21 +532,21 @@ impl<W: Write> Helper<W> {
             if changed.is_empty() {
                 return Ok(());
             }
-            if !tiles::mostly_changed(changed.len(), picture.width, picture.height) {
-                if let Ok(payloads) = tiles::tiles_payloads(
+            if !tiles::mostly_changed(changed.len(), picture.width, picture.height)
+                && let Ok(payloads) = tiles::tiles_payloads(
                     &picture,
                     &changed,
                     session.settings.quality,
                     tiles::MAX_PUBLISH_BYTES,
-                ) {
-                    for payload in &payloads {
-                        self.out.bytes(MSG_TILES, payload)?;
-                    }
-                    session.previous = Some(picture);
-                    return Ok(());
+                )
+            {
+                for payload in &payloads {
+                    self.out.bytes(MSG_TILES, payload)?;
                 }
-                // A tile that would not fit falls through to a keyframe.
+                session.previous = Some(picture);
+                return Ok(());
             }
+            // Mostly changed, or a tile that would not fit: fall through to a keyframe.
         }
         match tiles::frame_payload(&picture, session.settings.quality, tiles::MAX_PUBLISH_BYTES) {
             Ok(payload) => {

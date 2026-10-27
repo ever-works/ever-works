@@ -386,6 +386,59 @@ export class DesktopHelperHost {
 			clearInterval(this.watchTimer);
 			this.watchTimer = null;
 		}
+		// Owner question 14: a helper that died while it was controlled may have left keys or buttons held.
+		if (crashed && record.controlling) void this.releaseHeldAfterCrash();
+	}
+
+	/**
+	 * Owner question 14 (FR-39): only a helper knows what it pressed, so one that
+	 * dies during control can leave a key or a button held on the machine. Start
+	 * a fresh helper — verified like every start (FR-14) — whose first and only
+	 * command is `releaseHeld` (it lets go of every modifier and mouse button the
+	 * OS reports held; it presses nothing), then stop it. Never throws.
+	 */
+	private async releaseHeldAfterCrash(): Promise<void> {
+		try {
+			const verification = await verifyHelper(
+				this.options.fs,
+				this.options.paths,
+				this.now,
+				this.options.checkSignature
+			);
+			if (!verification.ok) return;
+			let resolveHello: (hello: HelperHello | null) => void = () => undefined;
+			const helloPromise = new Promise<HelperHello | null>((resolve) => {
+				resolveHello = resolve;
+			});
+			const helper = HelperProcess.start(
+				verification.record.path,
+				helperEnvironment(this.options.env, this.options.platform),
+				{
+					onMessage: (message) => {
+						if (message.kind === HELPER_MESSAGES.hello) resolveHello(parseHelperHello(message.payload));
+					},
+					onExit: () => resolveHello(null)
+				},
+				{
+					...(this.options.spawner ? { spawner: this.options.spawner } : {}),
+					...(this.options.logger ? { logger: this.options.logger } : {})
+				}
+			);
+			const timer = setTimeout(() => resolveHello(null), HELPER_HELLO_TIMEOUT_MS);
+			timer.unref?.();
+			const hello = await helloPromise;
+			clearTimeout(timer);
+			if (hello) {
+				helper.send(encodeHelperMessage(HELPER_MESSAGES.releaseHeld));
+				this.options.logger?.warn(
+					'The screen helper stopped while this computer was being controlled; every held key and mouse button was released'
+				);
+			}
+			// Stopping closes its stdin: the helper handles `releaseHeld` first, then exits.
+			helper.stop(hello ? 'released after a crash' : 'no hello');
+		} catch {
+			// Best effort: a failure here must never take the node down.
+		}
 	}
 
 	/** A helper's own report updates the facts the heartbeat carries. */

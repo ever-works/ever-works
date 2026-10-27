@@ -191,3 +191,65 @@ describe('controlling streams', () => {
 		if (opened.ok) expect(opened.stream.input(POINTER, { width: 64, height: 64 })).toBe(false);
 	});
 });
+
+describe('a helper that dies during control (owner question 14)', () => {
+	const FILES = { [paths.installPath]: BINARY, [paths.policyPath]: RECORD, [helperControlPath(paths)]: ALLOWED };
+
+	it('starts a fresh, verified helper whose first and only command is releaseHeld, then stops it', async () => {
+		const { desktop, fake } = host(FILES);
+		const sink = handlers();
+		const opened = await desktop.openStream({ display: null, quality: 'smooth', controlling: true }, sink);
+		if (!opened.ok) throw new Error('open');
+		const crashed = fake.children.length - 1;
+		fake.children[crashed].crash();
+		await vi.waitFor(() => expect(fake.children.length).toBe(crashed + 2));
+		const fresh = fake.children[crashed + 1];
+		await vi.waitFor(() =>
+			expect(fresh.received.map((message) => message.kind)).toEqual([HELPER_MESSAGES.releaseHeld])
+		);
+		expect(fresh.path).toBe(paths.installPath);
+		expect(sink.ended).toEqual(['helper-exited']);
+		// Stopped once it has released: its stdin was closed, nothing else was asked of it.
+		expect(fresh.received.some((message) => message.kind === HELPER_MESSAGES.start)).toBe(false);
+	});
+
+	it('does nothing of the kind for a watching stream, nor when the node ended the stream itself', async () => {
+		const watching = host(FILES);
+		const opened = await watching.desktop.openStream({ display: null, quality: 'smooth' }, handlers());
+		if (!opened.ok) throw new Error('open');
+		const before = watching.fake.children.length;
+		watching.fake.children[before - 1].crash();
+		await flush();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(watching.fake.children.length).toBe(before);
+
+		const stopped = host(FILES);
+		const controlled = await stopped.desktop.openStream(
+			{ display: null, quality: 'smooth', controlling: true },
+			handlers()
+		);
+		if (!controlled.ok) throw new Error('open');
+		const count = stopped.fake.children.length;
+		controlled.stream.stop();
+		await flush();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(stopped.fake.children.length).toBe(count);
+		expect(
+			stopped.fake.children.some((child) =>
+				child.received.some((message) => message.kind === HELPER_MESSAGES.releaseHeld)
+			)
+		).toBe(false);
+	});
+
+	it('starts nothing when the helper is no longer approved (FR-14 holds for the release too)', async () => {
+		const { desktop, fs, fake } = host(FILES);
+		const opened = await desktop.openStream({ display: null, quality: 'smooth', controlling: true }, handlers());
+		if (!opened.ok) throw new Error('open');
+		await fs.remove(paths.policyPath);
+		const count = fake.children.length;
+		fake.children[count - 1].crash();
+		await flush();
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		expect(fake.children.length).toBe(count);
+	});
+});

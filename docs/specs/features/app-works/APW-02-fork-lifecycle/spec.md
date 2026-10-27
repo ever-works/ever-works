@@ -226,6 +226,12 @@ each end in a named state with a next step — never a silent stop.
   untouched. Confirming records one Activity entry naming the changed workflow paths (paths only, never file
   contents).
 
+    **Who may confirm (owner decision 2026-10-27):** the Work's owner (its creator) or an **Owner of the Work's
+    Organization** (the Tenant owner), from a signed-in session, with edit access to the Work. Never a member of
+    another role (Work editor, manager or co-owner; Organization Admin or Member), an API key, an integration key,
+    a fleet-run token or an Agent. The Activity entry names who confirmed (`releasedByUserId`) and as what
+    (`releasedAs`: `work_owner` | `organization_owner`).
+
 - **S30 — A sync pull request is merged.** **Given** a sync pull request opened by S5, **when** the member merges
   it, **then** the App Work notices within one dispatcher tick (and within 60 seconds of being viewed): "Last
   synced" and the divergence badge update to the commit the pull request carried, one "upstream synced" Activity

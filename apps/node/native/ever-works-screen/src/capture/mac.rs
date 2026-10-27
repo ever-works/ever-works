@@ -10,7 +10,9 @@
 use std::collections::HashMap;
 use std::ffi::c_void;
 
-use super::{Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, dedupe_ids, order_displays};
+use super::{
+    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, dedupe_ids, order_displays,
+};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -35,7 +37,11 @@ struct CGRect {
 
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
-    fn CGGetActiveDisplayList(max_displays: u32, active_displays: *mut u32, display_count: *mut u32) -> i32;
+    fn CGGetActiveDisplayList(
+        max_displays: u32,
+        active_displays: *mut u32,
+        display_count: *mut u32,
+    ) -> i32;
     fn CGMainDisplayID() -> u32;
     fn CGDisplayBounds(display: u32) -> CGRect;
     fn CGDisplayIsBuiltin(display: u32) -> u32;
@@ -85,7 +91,9 @@ pub fn open() -> Opened {
     }
     Opened {
         capturer: if screen {
-            Some(Box::new(CoreGraphicsCapturer { ids: HashMap::new() }))
+            Some(Box::new(CoreGraphicsCapturer {
+                ids: HashMap::new(),
+            }))
         } else {
             None
         },
@@ -114,7 +122,12 @@ impl Capturer for CoreGraphicsCapturer {
             let (pixel_w, pixel_h) = if mode.is_null() {
                 (bounds.size.width as usize, bounds.size.height as usize)
             } else {
-                let size = unsafe { (CGDisplayModeGetPixelWidth(mode), CGDisplayModeGetPixelHeight(mode)) };
+                let size = unsafe {
+                    (
+                        CGDisplayModeGetPixelWidth(mode),
+                        CGDisplayModeGetPixelHeight(mode),
+                    )
+                };
                 unsafe { CGDisplayModeRelease(mode) };
                 size
             };
@@ -220,11 +233,16 @@ fn read_picture(
         return Err("no picture data".to_string());
     }
     if bits != 32 || width == 0 || height == 0 || stride < width * 4 {
-        return Err(format!("unsupported picture format ({bits} bits per pixel)"));
+        return Err(format!(
+            "unsupported picture format ({bits} bits per pixel)"
+        ));
     }
     let little = info & BYTE_ORDER_MASK == BYTE_ORDER_32_LITTLE;
     let alpha = info & ALPHA_INFO_MASK;
-    let alpha_last = matches!(alpha, ALPHA_PREMULTIPLIED_LAST | ALPHA_LAST | ALPHA_NONE_SKIP_LAST);
+    let alpha_last = matches!(
+        alpha,
+        ALPHA_PREMULTIPLIED_LAST | ALPHA_LAST | ALPHA_NONE_SKIP_LAST
+    );
     let layout = match (little, alpha_last) {
         (true, false) => PixelLayout::Bgra,
         (false, false) => PixelLayout::Argb,

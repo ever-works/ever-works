@@ -19,6 +19,7 @@
 //! | 0x06 | node → helper  | `listDisplays` | —                                                |
 //! | 0x10 | node → helper  | `input`        | JSON input frame + `pictureWidth`, `pictureHeight` |
 //! | 0x11 | node → helper  | `releaseAll`   | — (let go of every pressed key and button)       |
+//! | 0x12 | node → helper  | `releaseHeld`  | — (let go of every modifier and button the OS reports held; sent to a fresh helper after a crash during control) |
 //! | 0x81 | helper → node  | `hello`        | JSON `{ protocol, version, platform, reasons, displays, inputReasons }` |
 //! | 0x82 | helper → node  | `frame`        | `[width u16][height u16][JPEG]` — a keyframe     |
 //! | 0x83 | helper → node  | `tiles`        | the contracts `TILES` payload, verbatim          |
@@ -50,6 +51,7 @@ pub const MSG_QUALITY: u8 = 0x05;
 pub const MSG_LIST_DISPLAYS: u8 = 0x06;
 pub const MSG_INPUT: u8 = 0x10;
 pub const MSG_RELEASE_ALL: u8 = 0x11;
+pub const MSG_RELEASE_HELD: u8 = 0x12;
 
 pub const MSG_HELLO: u8 = 0x81;
 pub const MSG_FRAME: u8 = 0x82;
@@ -92,6 +94,8 @@ pub enum Command {
     /// One input (JSON: the contracts' input frame + the picture size), P2 control.
     Input(Vec<u8>),
     ReleaseAll,
+    /// Owner question 14: release every modifier and button the OS reports held.
+    ReleaseHeld,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -176,10 +180,10 @@ pub fn decode_command(kind: u8, payload: &[u8]) -> Result<Command, DecodeError> 
         MSG_START => {
             let json: StartJson =
                 serde_json::from_slice(payload).map_err(|_| DecodeError::BadPayload("start"))?;
-            if let Some(display) = &json.display {
-                if !is_display_id(display) {
-                    return Err(DecodeError::BadPayload("display"));
-                }
+            if let Some(display) = &json.display
+                && !is_display_id(display)
+            {
+                return Err(DecodeError::BadPayload("display"));
             }
             Ok(Command::Start(StartRequest {
                 display: json.display,
@@ -214,6 +218,7 @@ pub fn decode_command(kind: u8, payload: &[u8]) -> Result<Command, DecodeError> 
             Ok(Command::Input(payload.to_vec()))
         }
         MSG_RELEASE_ALL => empty(payload, Command::ReleaseAll),
+        MSG_RELEASE_HELD => empty(payload, Command::ReleaseHeld),
         other => Err(DecodeError::UnknownType(other)),
     }
 }
@@ -227,7 +232,10 @@ fn empty(payload: &[u8], command: Command) -> Result<Command, DecodeError> {
 }
 
 /// Read one message: `Ok(None)` on a clean end of stream before a header.
-pub fn read_message<R: Read>(reader: &mut R, max_bytes: usize) -> io::Result<Option<(u8, Vec<u8>)>> {
+pub fn read_message<R: Read>(
+    reader: &mut R,
+    max_bytes: usize,
+) -> io::Result<Option<(u8, Vec<u8>)>> {
     let mut header = [0u8; 4];
     let mut filled = 0;
     while filled < header.len() {
@@ -236,7 +244,10 @@ pub fn read_message<R: Read>(reader: &mut R, max_bytes: usize) -> io::Result<Opt
             if filled == 0 {
                 return Ok(None);
             }
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "truncated header"));
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "truncated header",
+            ));
         }
         filled += read;
     }
@@ -245,7 +256,10 @@ pub fn read_message<R: Read>(reader: &mut R, max_bytes: usize) -> io::Result<Opt
         return Err(io::Error::new(io::ErrorKind::InvalidData, "empty message"));
     }
     if length > max_bytes {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "message too large"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "message too large",
+        ));
     }
     let mut body = vec![0u8; length];
     reader.read_exact(&mut body)?;
@@ -258,7 +272,10 @@ pub fn read_message<R: Read>(reader: &mut R, max_bytes: usize) -> io::Result<Opt
 pub fn write_message<W: Write>(writer: &mut W, kind: u8, payload: &[u8]) -> io::Result<()> {
     let length = payload.len() + 1;
     if length > MAX_OUTBOUND_BYTES {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "message too large"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "message too large",
+        ));
     }
     writer.write_all(&(length as u32).to_be_bytes())?;
     writer.write_all(&[kind])?;
@@ -355,10 +372,21 @@ mod tests {
     #[test]
     fn carries_an_input_payload_and_bounds_it() {
         let text = br#"{"kind":"text","text":"a"}"#;
-        assert_eq!(decode_command(MSG_INPUT, text).unwrap(), Command::Input(text.to_vec()));
+        assert_eq!(
+            decode_command(MSG_INPUT, text).unwrap(),
+            Command::Input(text.to_vec())
+        );
         assert!(decode_command(MSG_INPUT, &[]).is_err());
         assert!(decode_command(MSG_INPUT, &vec![b'x'; 16 * 1024 + 1]).is_err());
-        assert_eq!(decode_command(MSG_RELEASE_ALL, &[]).unwrap(), Command::ReleaseAll);
+        assert_eq!(
+            decode_command(MSG_RELEASE_ALL, &[]).unwrap(),
+            Command::ReleaseAll
+        );
+        assert_eq!(
+            decode_command(MSG_RELEASE_HELD, &[]).unwrap(),
+            Command::ReleaseHeld
+        );
+        assert!(decode_command(MSG_RELEASE_HELD, &[0]).is_err());
     }
 
     #[test]
