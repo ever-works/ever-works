@@ -290,6 +290,9 @@ const BOUND: readonly string[] = [
     'APP_HOSTS_APPS_DOMAIN',
     'APP_HOSTS_DEPLOYMENT_STORE',
     'APP_HOSTS_DEPLOY_REQUESTER',
+    // Lane aw-safety (2026-10-26) — `AppDeployRequestModule` binds it to
+    // `appHostsRebuildRequester` over APW-05's `AppBuildsService.requestRebuild` (lazy).
+    'APP_HOSTS_REBUILD_REQUESTER',
     'APP_HOSTS_WORK_STORE',
     // APW-03 T42 (2026-10-17) — `AppLicenseService` (`useExisting`), bound by
     // `AppLicenseModule` for APW-06's gate and APW-01's ready handler.
@@ -441,7 +444,7 @@ const UNBOUND: readonly string[] = [
     // module in `packages/agent` provides it, which is all this list claims.
     'APP_FORK_READY_HANDLER',
     'APP_HEALTH_EGRESS_SOURCE',
-    'APP_HOSTS_REBUILD_REQUESTER',
+    // `APP_HOSTS_REBUILD_REQUESTER` left this list on 2026-10-26 (lane aw-safety): see BOUND.
     'APP_IMAGE_PULL_CREDENTIAL_SOURCE',
     'APP_IMAGE_REFERENCE_RESOLVER',
     // 2026-10-21 (#2826) — the registry `USER` pre-check (`APP_WORKS_IMAGE_USER_PRECHECK_ENABLED`,
@@ -597,8 +600,10 @@ describe('App Works port dormancy register (§5.10)', () => {
         // port, born bound by `AppBuildsModule` — nothing moved from UNBOUND.
         // 28/47 → 29/47 on 2026-10-26 (lane aw-safety): `APP_IMAGE_USER_INSPECTOR` (#2826) was
         // declared but classified nowhere; it is provided by the worker only — nothing was bound.
-        expect(UNBOUND).toHaveLength(29);
-        expect(BOUND).toHaveLength(47);
+        // 29/47 → 28/48 on 2026-10-26 (lane aw-safety): `APP_HOSTS_REBUILD_REQUESTER` is bound by
+        // `AppDeployRequestModule` (APW-05's rebuild behind T26's primary-domain change).
+        expect(UNBOUND).toHaveLength(28);
+        expect(BOUND).toHaveLength(48);
     });
 
     it('names where the worker binds what this package does not', () => {
