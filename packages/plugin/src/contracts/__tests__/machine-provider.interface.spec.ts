@@ -62,12 +62,17 @@ function fakeProvider(overrides: Partial<IMachineProviderPlugin> = {}): IMachine
 }
 
 describe('the machine-provider capability (FL-17)', () => {
-	it('names the capability once, appended last to the table', () => {
+	it('names the capability once, appended to the table right after DOMAIN_EVENT_SUBSCRIBER', () => {
 		expect(MACHINE_PROVIDER_CAPABILITY).toBe('machine-provider');
 		expect(PLUGIN_CAPABILITIES.MACHINE_PROVIDER).toBe(MACHINE_PROVIDER_CAPABILITY);
-		const keys = Object.keys(PLUGIN_CAPABILITIES);
+		// Pinned net of the capabilities appended after it (FL-18's ACTIONS_RUNNERS), the way
+		// domain-event-subscriber.spec pins its own position: the table only ever grows at the end.
+		const appendedLater = ['ACTIONS_RUNNERS'];
+		const keys = Object.keys(PLUGIN_CAPABILITIES).filter((key) => !appendedLater.includes(key));
 		expect(keys[keys.length - 1]).toBe('MACHINE_PROVIDER');
 		expect(keys.indexOf('DOMAIN_EVENT_SUBSCRIBER')).toBe(keys.length - 2);
+		const all = Object.keys(PLUGIN_CAPABILITIES);
+		expect(all.indexOf('MACHINE_PROVIDER')).toBeLessThan(all.indexOf('ACTIONS_RUNNERS'));
 		expect(ALL_PLUGIN_CAPABILITIES.filter((value) => value === 'machine-provider')).toHaveLength(1);
 		expect(isValidPluginCapability('machine-provider')).toBe(true);
 		expect(isValidPluginCapability('machine-providers')).toBe(false);
