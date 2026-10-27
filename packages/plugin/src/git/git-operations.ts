@@ -14,8 +14,12 @@ import type {
 	GitCloneBranchOptions,
 	GitPushOptions,
 	GitFileChange,
-	GitFileStatus
+	GitFileStatus,
+	GitFetchBranchOptions,
+	GitCommitRangeOptions,
+	GitCommitRangeCount
 } from '../contracts/capabilities/git-provider.interface.js';
+import { countCommitRange } from './commit-range.js';
 
 /**
  * Node >= 19 ships `http(s).globalAgent` with `timeout: 5000` - a SOCKET-IDLE deadline, not a
@@ -633,6 +637,106 @@ export class GitOperations implements IGitOperations {
 		});
 
 		return result.oid ?? '';
+	}
+
+	// ── APW-02 T48 — the private copy's sync (FR-63) ──────────────────────
+	//
+	// The read and the move a private copy's upstream sync needs, built so a
+	// provider plugin never has to reach for isomorphic-git itself. Every network
+	// call names its URL (computed by this provider from the coordinates, never
+	// read from the checkout's config), its remote and an empty CORS proxy — see
+	// the credential note in the repository's CLAUDE.md.
+
+	/** The remote name `fetchBranch` files a second repository's history under by default. */
+	static readonly FETCH_BRANCH_DEFAULT_REMOTE = 'upstream';
+
+	async fetchBranch(options: GitFetchBranchOptions): Promise<string | null> {
+		const { dir, owner, repo, branch, token } = options;
+		const remote = options.remote || GitOperations.FETCH_BRANCH_DEFAULT_REMOTE;
+		if (!token) {
+			throw new Error('Git token is required for fetch operation');
+		}
+		const auth = this.getAuth(token);
+		try {
+			const result = await git.fetch({
+				onAuth: () => auth,
+				fs,
+				http,
+				dir,
+				remote,
+				url: this.getCloneUrl(owner, repo),
+				ref: branch,
+				remoteRef: branch,
+				singleBranch: true,
+				tags: false,
+				corsProxy: NO_CORS_PROXY
+			});
+			if (result?.fetchHead) return result.fetchHead;
+			return await this.resolveRef(dir, `refs/remotes/${remote}/${branch}`);
+		} catch (error: unknown) {
+			const err = error as { code?: string };
+			// The repository has no such branch: an answer, not a failure.
+			if (err?.code === 'NotFoundError') return null;
+			throw error;
+		}
+	}
+
+	async resolveRef(dir: string, ref: string): Promise<string | null> {
+		try {
+			return await git.resolveRef({ fs, dir, ref });
+		} catch (error: unknown) {
+			const err = error as { code?: string };
+			if (err?.code === 'NotFoundError') return null;
+			throw error;
+		}
+	}
+
+	async hasCommit(dir: string, oid: string): Promise<boolean> {
+		if (!/^[0-9a-f]{40}$/i.test(oid)) return false;
+		try {
+			await git.readCommit({ fs, dir, oid });
+			return true;
+		} catch (error: unknown) {
+			const err = error as { code?: string };
+			if (err?.code === 'NotFoundError' || err?.code === 'ObjectTypeError') return false;
+			throw error;
+		}
+	}
+
+	async findMergeBase(dir: string, oids: readonly [string, string]): Promise<string | null> {
+		const bases = (await git.findMergeBase({ fs, dir, oids: [...oids] })) as string[];
+		return Array.isArray(bases) && bases.length > 0 ? bases[0] : null;
+	}
+
+	async countCommitsBetween(dir: string, options: GitCommitRangeOptions): Promise<GitCommitRangeCount> {
+		const cache = {};
+		return countCommitRange(
+			async (oid) => {
+				const { commit } = await git.readCommit({ fs, dir, oid, cache });
+				return { parents: commit.parent, timestamp: commit.committer?.timestamp ?? 0 };
+			},
+			options.include,
+			options.exclude,
+			options.max
+		);
+	}
+
+	async writeBranchRef(dir: string, branch: string, oid: string): Promise<void> {
+		if (!branch || branch.startsWith('refs/') || branch.includes('..')) {
+			throw new Error(`Refusing to write the local branch '${branch}'`);
+		}
+		await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: oid, force: true });
+	}
+
+	async removeWorkingCopy(dir: string): Promise<void> {
+		// Only a directory under this instance's base directory — the place
+		// `cloneBranch` creates them — and never the base directory itself.
+		const base = path.resolve(this.baseDir);
+		const target = path.resolve(dir);
+		if (target === base || !target.startsWith(base + path.sep)) {
+			throw new Error('Refusing to remove a directory outside the working-copy base directory');
+		}
+		await this.removeDirSafe(target);
 	}
 
 	private mergeCommitter(committer?: GitCommitter): GitCommitter {

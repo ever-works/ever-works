@@ -1248,6 +1248,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             protectedBranches?: string[];
             /** APW-08 T17 — the sixth, optional argument. Absent by default. */
             appChangeGate?: unknown;
+            /** APW-04 T10 — the seventh, optional argument (the run's Task). Absent by default. */
+            taskRows?: unknown;
         } = {},
     ): Harness => {
         const git = options.git ?? makeGit();
@@ -1274,6 +1276,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             works,
             mergePolicy,
             options.appChangeGate,
+            options.taskRows,
         ) as GitTools;
         return { facade, git, works, mergePolicy, prGate };
     };
@@ -1565,6 +1568,102 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                     /change gate is not available/,
                 );
                 expect(git.createPullRequest).not.toHaveBeenCalled();
+            });
+        });
+
+        /**
+         * APW-04 T10 — a run that executes THIS Work's App provisioning Task is
+         * judged with the Task's server-written origin, so the gate holds it to
+         * `.works/works.yml` / `.works/overlay/**` (rule 3b) exactly as the
+         * finalize path does. `taskId` is the platform's (run context), never the
+         * model's; any other Task — or one of another Work — changes nothing.
+         */
+        describe('APW-04 T10 — an App provisioning Task run', () => {
+            const provisioningTask = { id: 'task-p', workId: WORK_ID, origin: 'app-provisioning' };
+            const rowsFor = (task: unknown) => ({ findById: jest.fn().mockResolvedValue(task) });
+
+            it('commitToRepo judges a provisioning Task WITH its origin', async () => {
+                const gate = allow();
+                const taskRows = rowsFor(provisioningTask);
+                const { facade } = build({
+                    git: gitIn(),
+                    work: appWork(),
+                    appChangeGate: gate,
+                    taskRows,
+                });
+
+                await facade.commitToRepo(
+                    commitInput({ branch: 'works/provision', files, taskId: 'task-p' }),
+                );
+
+                expect(taskRows.findById).toHaveBeenCalledWith('task-p');
+                expect(gate.checkPaths.mock.calls[0][0].taskOrigin).toBe('app-provisioning');
+            });
+
+            it('commitToRepo passes NO origin for another Task, another Work, or no Task', async () => {
+                for (const [task, taskId] of [
+                    [{ id: 't', workId: WORK_ID, origin: null }, 't'],
+                    [{ ...provisioningTask, workId: 'another-work' }, 'task-p'],
+                    [provisioningTask, undefined],
+                ] as const) {
+                    const gate = allow();
+                    const { facade } = build({
+                        git: gitIn(),
+                        work: appWork(),
+                        appChangeGate: gate,
+                        taskRows: rowsFor(task),
+                    });
+                    await facade.commitToRepo(
+                        commitInput({
+                            branch: 'feature/pricing',
+                            files,
+                            ...(taskId ? { taskId } : {}),
+                        }),
+                    );
+                    expect(gate.checkPaths.mock.calls[0][0]).not.toHaveProperty('taskOrigin');
+                }
+            });
+
+            it('commitToRepo refuses BEFORE writing when the Task cannot be read', async () => {
+                const gate = allow();
+                const git = gitIn();
+                const { facade } = build({
+                    git,
+                    work: appWork(),
+                    appChangeGate: gate,
+                    taskRows: { findById: jest.fn().mockRejectedValue(new Error('db down')) },
+                });
+
+                await expect(
+                    facade.commitToRepo(
+                        commitInput({ branch: 'works/provision', files, taskId: 'task-p' }),
+                    ),
+                ).rejects.toThrow(
+                    /Task could not be read.*Nothing was written, committed or pushed/,
+                );
+                expect(gate.checkPaths).not.toHaveBeenCalled();
+                expect(git.add).not.toHaveBeenCalled();
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it('openPullRequest judges a provisioning Task WITH its origin, and others with null', async () => {
+                const gate = allow();
+                const { facade } = build({
+                    work: appWork(),
+                    appChangeGate: gate,
+                    taskRows: rowsFor(provisioningTask),
+                });
+                await facade.openPullRequest(prInput({ taskId: 'task-p' }));
+                expect(gate.evaluate.mock.calls[0][0].taskOrigin).toBe('app-provisioning');
+
+                const other = allow();
+                const { facade: plain } = build({
+                    work: appWork(),
+                    appChangeGate: other,
+                    taskRows: rowsFor({ id: 't', workId: WORK_ID, origin: null }),
+                });
+                await plain.openPullRequest(prInput({ taskId: 't' }));
+                expect(other.evaluate.mock.calls[0][0].taskOrigin).toBeNull();
             });
         });
 

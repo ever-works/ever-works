@@ -12,6 +12,15 @@ import {
 // A value import from the ring-free port (it has no runtime imports of its own).
 import { APP_WORK_SPEC_PATH } from '../tasks-domain/app-work-change-gate.port';
 import { TASK_ORIGIN_APP_PROVISIONING } from '../entities/task-origin';
+import {
+    appProvisioningOutputGuardEnforced,
+    provisioningPathViolations,
+    provisioningSecretFindings,
+    provisioningSizeViolation,
+    provisioningSpecViolations,
+    APP_PROVISIONING_MAX_FILES,
+    APP_PROVISIONING_MAX_LINES,
+} from './app-provisioning-output.guard';
 import type { AppWorkRules } from './app-work-rules.service';
 
 /**
@@ -69,6 +78,16 @@ import type { AppWorkRules } from './app-work-rules.service';
  * legitimately writes `source` and `blueprint` into the spec. The exemption
  * covers **rule 4 only**. A provisioning Task has no more business editing a
  * protected path or a workflow than any other, and the size rule still applies.
+ *
+ * ## …and a provisioning Task is held to MORE, not less (APW-04 T10/T57)
+ *
+ * Since the lane-A2 overnight build (2026-10-27) a Task whose server-written
+ * origin is `app-provisioning` also meets rule **3b** right after the workflow
+ * rule: it may write only `.works/works.yml` and `.works/overlay/**` (FR-28), at
+ * most 12 files / 3,000 lines (FR-29), and no credential-shaped literal; and its
+ * rule-4 exemption no longer covers the owner-owned switches (FR-30 —
+ * `app-provisioning-output.guard.ts`). Rules 2 and 3 still answer first, with
+ * their own codes. Off only with `APP_PROVISIONING_OUTPUT_GUARD_ENFORCED=false`.
  */
 
 /** The file cap: a diff bigger than this cannot be policed, so it is refused. */
@@ -93,7 +112,8 @@ export const REFUSAL_MULTIPLE = 3;
  * `upstreamSync` change, switching on `upstreamPullRequests.enabled` or
  * `provisioning.autoReprovision`). On unless the operator sets this to `false`.
  */
-export const APP_CHANGE_GUARD_SPEC_SWITCHES_ENV = 'APP_CHANGE_GUARD_SPEC_SWITCHES_ENFORCED' as const;
+export const APP_CHANGE_GUARD_SPEC_SWITCHES_ENV =
+    'APP_CHANGE_GUARD_SPEC_SWITCHES_ENFORCED' as const;
 
 /** Default-safe: only an explicit `false` turns the extra rule-4 refusals off. */
 export function appChangeGuardSpecSwitchesEnforced(): boolean {
@@ -145,7 +165,15 @@ export type AppChangeRefusalCode =
     | 'protectedPath'
     | 'workflowPath'
     | 'guardedSpecBlock'
-    | 'tooManyLines';
+    | 'tooManyLines'
+    /** APW-04 FR-28 — a provisioning run wrote outside `.works/works.yml` / `.works/overlay/**`. */
+    | 'provisioningPathNotWritable'
+    /** APW-04 FR-29 — a provisioning proposal over 12 files or 3,000 lines. */
+    | 'provisioningTooLarge'
+    /** APW-04 T10 — a credential-shaped literal in what a provisioning run wrote. */
+    | 'secretLiteral'
+    /** APW-04 FR-30 / T57 — a provisioning run changed an owner-owned App spec switch. */
+    | 'provisioningOwnedField';
 
 /** What the guard decided. */
 export interface AppChangeVerdict {
@@ -240,6 +268,10 @@ export class AppChangeGuard {
             );
         }
 
+        // ---- 3b · APW-04 — what a provisioning run may write -------------------
+        const provisioningVerdict = this.provisioningVerdict(input);
+        if (provisioningVerdict) return provisioningVerdict;
+
         // ---- 4 · the guarded spec blocks ------------------------------------
         const specVerdict = this.specVerdict(input);
         if (specVerdict) return specVerdict;
@@ -319,6 +351,87 @@ export class AppChangeGuard {
         return hits.slice(0, MAX_LISTED_PATHS);
     }
 
+    /**
+     * Rule 3b (APW-04 T10, FR-28/FR-29) — a provisioning Task's paths, size and
+     * secret literals. `null` for every other Task, and when the operator turned
+     * the provisioning output guard off.
+     */
+    private provisioningVerdict(input: AppChangeGuardInput): AppChangeVerdict | null {
+        if (input.taskOrigin !== TASK_ORIGIN_APP_PROVISIONING) return null;
+        if (!appProvisioningOutputGuardEnforced()) return null;
+        const { diff } = input;
+
+        const outside = provisioningPathViolations(diff.files);
+        if (outside.length > 0) {
+            return refusal(
+                'provisioningPathNotWritable',
+                'The App Provisioner may write only `.works/works.yml` and files under ' +
+                    '`.works/overlay/`, and this change writes outside them.',
+                outside,
+                changedLines(diff.files),
+            );
+        }
+
+        const size = provisioningSizeViolation(diff.files, diff.totalFiles);
+        if (size) {
+            return refusal(
+                'provisioningTooLarge',
+                size.code === 'tooManyFiles'
+                    ? `This provisioning change touches ${size.count} files; a proposal may change at most ` +
+                          `${APP_PROVISIONING_MAX_FILES}.`
+                    : `This provisioning change is ${size.count} lines; a proposal may change at most ` +
+                          `${APP_PROVISIONING_MAX_LINES}.`,
+                [],
+                changedLines(diff.files),
+            );
+        }
+
+        const secrets = provisioningSecretFindings({
+            headSpec: input.headSpec ?? null,
+            files: diff.files,
+        });
+        if (secrets.length > 0) {
+            // The pattern names only — never the matched text.
+            return refusal(
+                'secretLiteral',
+                `This provisioning change writes a value that looks like a credential ` +
+                    `(${secrets.join(', ')}). Secrets belong in the App's environment, never in the repository.`,
+                [],
+                changedLines(diff.files),
+            );
+        }
+        return null;
+    }
+
+    /**
+     * Rule 4 for a provisioning Task (T57, FR-30): the exemption keeps `source` /
+     * `blueprint`, never the owner-owned switches; a head spec that does not parse
+     * is refused as for every other Task.
+     */
+    private provisioningSpecVerdict(input: AppChangeGuardInput): AppChangeVerdict | null {
+        if (!appProvisioningOutputGuardEnforced()) return null;
+        const { diff } = input;
+        if (input.headSpec === null) {
+            return refusal(
+                'guardedSpecBlock',
+                'This change leaves `.works/works.yml` invalid, so the Work could no longer be built ' +
+                    'or deployed from it.',
+                [APP_SPEC_PATH],
+                changedLines(diff.files),
+            );
+        }
+        if (input.headSpec === undefined) return null;
+        const fields = provisioningSpecViolations(input.baseSpec ?? null, input.headSpec);
+        if (fields.length === 0) return null;
+        return refusal(
+            'provisioningOwnedField',
+            `The App Provisioner may not change ${fields.map((field) => `\`${field}\``).join(', ')} ` +
+                'in `.works/works.yml` — those settings are the Work owner’s.',
+            [APP_SPEC_PATH],
+            changedLines(diff.files),
+        );
+    }
+
     /** Rule 4, or `null` when it does not apply or does not refuse. */
     private specVerdict(input: AppChangeGuardInput): AppChangeVerdict | null {
         const { diff } = input;
@@ -334,7 +447,9 @@ export class AppChangeGuard {
             this.logger.log(
                 `App change guard: skipping the guarded-spec-block rule for an App provisioning Task.`,
             );
-            return null;
+            // T57 / FR-30 — but not for the owner-owned switches, and not for a
+            // spec the run left unparseable (`provisioningOwnedField`).
+            return this.provisioningSpecVerdict(input);
         }
 
         if (input.headSpec === null) {

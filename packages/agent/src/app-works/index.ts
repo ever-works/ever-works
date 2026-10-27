@@ -100,6 +100,9 @@ export * from './upstream-schedule';
 export * from './app-upstream-conflict.copy';
 export * from './upstream-workflow-diff';
 export * from './app-upstream-sync.service';
+// APW-02 T48 (FR-63) — the private copy's compare/move capability, bound to
+// `APP_UPSTREAM_PRIVATE_COPY_PORT` where the sync run is composed (the worker).
+export * from './app-upstream-private-copy.adapter';
 export * from './app-upstream-sync-dispatcher.service';
 export * from './app-source-catalog.port';
 export * from './app-prompted-values.port';
@@ -139,6 +142,10 @@ export {
     type AppChangeRefusalCode,
     type AppChangeVerdict,
 } from './app-change-guard';
+
+// APW-04 T10/T57 — what an App provisioning run may write (FR-28/FR-29/FR-30), enforced
+// by the guard above and by the agent git tools before they write.
+export * from './app-provisioning-output.guard';
 
 // APW-08 T17 — the change gate `TasksDomainModule` binds to `APP_WORK_CHANGE_GATE`.
 export { AppWorkChangeGateService } from './app-work-change-gate.service';

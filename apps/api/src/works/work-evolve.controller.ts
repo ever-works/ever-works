@@ -30,6 +30,7 @@ import {
     EVOLVE_APP_AGENT_TEMPLATE,
     PROVISION_LABEL,
     type AppChangeRequestResult,
+    type AppProvisioningCancelResult,
 } from '@ever-works/agent/app-works';
 import { ownershipScopeOf } from '@ever-works/agent/database';
 import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
@@ -52,6 +53,7 @@ import { EvolveWorkDto, ProvisionWorkDto, UpstreamPullRequestDto } from './dto/e
  * | `POST /api/works/:id/evolve` | chat-to-modify: a Task on the Work for the resolved Agent, started now → `202 { taskId, taskSlug, runId, agentId, … }` |
  * | `GET  /api/works/:id/evolve` | the Work's change Tasks, newest first (the chat panel's history) |
  * | `POST /api/works/:id/provision` | APW-04 manual start (or `dryRun` inspection) |
+ * | `POST /api/works/:id/provision/cancel` | APW-04: stop the open provisioning Task and its live runs |
  * | `GET  /api/works/:id/provisioning` | the open and recent `app-provision` Tasks |
  * | `POST /api/works/:id/upstream-pr` | APW-09: offer a fork branch (or a Task's branch) upstream as a draft PR |
  *
@@ -257,6 +259,48 @@ export class WorkEvolveController {
         };
     }
 
+    /**
+     * APW-04 (plan §4, "added, 202") — stop the open provisioning: its live runs are
+     * cancelled and the `app-provision` Task moves to `cancelled` through the Task state
+     * machine. Idempotent: a repeat answers the same Task with `alreadyCancelled: true`.
+     * `edit` access, like the start; a missing or invisible Work is `404`.
+     */
+    @Post(':id/provision/cancel')
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Cancel the running provisioning of an App Work (APW-04)',
+        description:
+            'Cancels the live runs of the open `app-provision` Task and moves the Task to `cancelled`. ' +
+            'Answers `202 { status: "cancelled", taskId, alreadyCancelled, cancelledRunIds }`; a repeat ' +
+            'after the Task is cancelled answers the same Task with `alreadyCancelled: true`. ' +
+            '`409 nothingToCancel` when no provisioning is open.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({
+        status: 202,
+        description: '`AppProvisioningCancelResult` (`status: "cancelled"`).',
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'The Work is missing, not visible, or another account’s.',
+    })
+    @ApiResponse({
+        status: 409,
+        description:
+            '`nothingToCancel`, or `cancelRefused` when the Task state machine refused the move.',
+    })
+    @ApiResponse({ status: 422, description: '`notAppWork`.' })
+    async cancelProvisioning(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Res({ passthrough: true }) response: StatusOnlyResponse,
+    ): Promise<AppProvisioningCancelResult> {
+        await this.authorize(id, auth.userId, 'edit', true);
+        const result = await this.provisioning.cancel({ workId: id, userId: auth.userId });
+        response.status(result.httpStatus);
+        return result;
+    }
+
     @Get(':id/provisioning')
     @ApiOperation({ summary: 'The open and recent provisioning Tasks of an App Work (APW-04)' })
     @ApiParam({ name: 'id', description: 'Work ID' })
@@ -281,6 +325,12 @@ export class WorkEvolveController {
             prState: task.prState ?? null,
             createdAt: task.createdAt ?? null,
             updatedAt: task.updatedAt ?? null,
+            // APW-04 T25/T36 (additive) — why the Task was filed, read back from the brief
+            // the provisioner wrote (`Trigger: \`smoke-failed\`.`), and whether it is held
+            // for the Work owner (`awaiting-owner`). The card's headline and banner read
+            // these; nothing else changes.
+            trigger: provisioningTriggerOf(task.description),
+            awaitingOwner: Array.isArray(task.labels) && task.labels.includes('awaiting-owner'),
         }));
         const active = recent.find((task) => !['done', 'cancelled'].includes(task.status)) ?? null;
         // Live e2e 2026-10-18 — an empty list is now explained instead of looking like a
@@ -304,6 +354,10 @@ export class WorkEvolveController {
             active,
             recent,
             canEdit: access.role !== 'viewer',
+            // APW-04 T36 (additive) — the newest provisioning Task reacts to an upstream sync
+            // that broke the smoke tests and is still open: the card shows the banner.
+            upstreamSmokeBroken:
+                !!active && active === recent[0] && active.trigger === 'smoke-failed',
             notStartedReason,
             ...(notStartedReason === 'blueprintSpec'
                 ? { blueprintId: source.blueprintId ?? null }
@@ -383,6 +437,17 @@ export class WorkEvolveController {
         }
         return access;
     }
+}
+
+/**
+ * The trigger a provisioning Task was filed for, as `AppProvisioningService`'s brief
+ * records it (`Trigger: \`<trigger>\`.`), or `null`. A closed set of word characters
+ * and dashes, so nothing a member typed elsewhere in the description is echoed.
+ */
+function provisioningTriggerOf(description: unknown): string | null {
+    if (typeof description !== 'string') return null;
+    const match = /^Trigger: `([a-z][a-z-]{0,39})`\.$/m.exec(description);
+    return match ? match[1] : null;
 }
 
 /** The `@Res({ passthrough: true })` surface this controller needs — nothing else. */
