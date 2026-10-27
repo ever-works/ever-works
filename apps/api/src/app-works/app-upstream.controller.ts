@@ -5,7 +5,6 @@ import {
     HttpCode,
     HttpException,
     HttpStatus,
-    Optional,
     Param,
     Post,
 } from '@nestjs/common';
@@ -19,10 +18,10 @@ import {
     type AppUpstreamDispatchResult,
     type AppUpstreamErrorCode,
 } from '@ever-works/agent/app-works';
-import { WorkOwnershipService } from '@ever-works/agent/services';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
-import { APP_OWNER_REQUIRED_CODE, requireAppWorkOwnerSession } from '../works/app-owner-gate';
+import { requireHumanSession } from '../auth/machine-principal';
+import { APP_OWNER_REQUIRED_CODE } from '../works/app-owner-gate';
 import { AppUpstreamSyncDto } from './dto/app-upstream-sync.dto';
 
 /**
@@ -71,10 +70,6 @@ export class AppUpstreamController {
     constructor(
         private readonly upstream: AppUpstreamStateService,
         private readonly dispatcher: AppUpstreamSyncDispatcherService,
-        // APW-02 T46 — the owner-and-session gate of "Sync anyway". `@Optional()` so a
-        // context that does not provide it still boots; absent ⇒ every release is refused
-        // `403 ownerRequired` (fail closed), never admitted.
-        @Optional() private readonly ownership?: WorkOwnershipService,
     ) {}
 
     /**
@@ -184,12 +179,16 @@ export class AppUpstreamController {
     }
 
     /**
-     * T46 — the owner-and-session gate. Visibility first (the service's own read answers
-     * the same `404` a stranger always gets), then the shared App Works owner gate.
+     * T46 — the owner-and-session gate, in the order and with the answers of the shared App
+     * Works owner gate (`app-owner-gate.ts`, #2802): visibility first (the service's own check
+     * answers the same `404` a stranger always gets), then **the owner** — the Work's creator,
+     * whose repository and secrets a released workflow runs with — `403 ownerRequired`, then
+     * **a person** (`requireHumanSession`): the owner's own API key, an integration key, a
+     * fleet-run token or an Agent cannot take this decision.
      */
     private async requireOwnerSession(id: string, auth: AuthenticatedUser): Promise<void> {
-        await this.translate(() => this.upstream.get(id, auth.userId));
-        if (!this.ownership) {
+        const isOwner = await this.translate(() => this.upstream.isWorkOwner(id, auth.userId));
+        if (!isOwner) {
             throw new HttpException(
                 {
                     status: 'error',
@@ -199,12 +198,7 @@ export class AppUpstreamController {
                 HttpStatus.FORBIDDEN,
             );
         }
-        await requireAppWorkOwnerSession(
-            this.ownership,
-            id,
-            auth,
-            'accept upstream workflow changes',
-        );
+        requireHumanSession(auth, 'accept upstream workflow changes');
     }
 
     /**

@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { ForbiddenException, HttpException, ValidationPipe } from '@nestjs/common';
+import { HttpException, ValidationPipe } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { AppUpstreamRefusalError } from '@ever-works/agent/app-works';
@@ -36,9 +36,11 @@ function user(userId: string, authMethod?: AuthenticatedUser['authMethod']): Aut
     } as AuthenticatedUser;
 }
 
-function build(options: { ownership?: boolean } = {}) {
+function build() {
     const upstream = {
         get: jest.fn().mockResolvedValue({ workId: WORK_ID }),
+        // The creator check (visibility first, inside the service).
+        isWorkOwner: jest.fn(async (_workId: string, userId: string) => userId === OWNER),
         requestSync: jest.fn().mockResolvedValue({ queued: true, runId: 'run-1' }),
         retryReadiness: jest.fn(),
     };
@@ -47,18 +49,8 @@ function build(options: { ownership?: boolean } = {}) {
         requestSetupPullRequestCheck: jest.fn(),
         requestSyncPullRequestCheck: jest.fn(),
     };
-    const ownership = {
-        ensureIsOwner: jest.fn(async (_workId: string, userId: string) => {
-            if (userId !== OWNER) throw new ForbiddenException('Not the owner');
-            return { role: 'owner' };
-        }),
-    };
-    const controller = new AppUpstreamController(
-        upstream as never,
-        dispatcher as never,
-        options.ownership === false ? undefined : (ownership as never),
-    );
-    return { controller, upstream, dispatcher, ownership };
+    const controller = new AppUpstreamController(upstream as never, dispatcher as never);
+    return { controller, upstream, dispatcher };
 }
 
 async function statusOf(promise: Promise<unknown>): Promise<{ status: number; body: unknown }> {
@@ -84,7 +76,7 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
             }),
         ).resolves.toEqual({ queued: true, runId: 'run-1' });
 
-        expect(h.ownership.ensureIsOwner).toHaveBeenCalledWith(WORK_ID, OWNER);
+        expect(h.upstream.isWorkOwner).toHaveBeenCalledWith(WORK_ID, OWNER);
         expect(h.upstream.requestSync).toHaveBeenCalledWith(WORK_ID, OWNER, {
             confirmWorkflowChanges: true,
             workflowHeadSha: HEAD,
@@ -121,8 +113,9 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
         expect(h.upstream.requestSync).not.toHaveBeenCalled();
     });
 
-    it('fails closed when no ownership service is bound', async () => {
-        const h = build({ ownership: false });
+    it('refuses a co-owner member too — the release runs with the creator’s secrets', async () => {
+        const h = build();
+        h.upstream.isWorkOwner.mockResolvedValue(false);
 
         const refusal = await statusOf(
             h.controller.syncUpstream(user(OWNER, 'session'), WORK_ID, {
@@ -131,12 +124,13 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
         );
 
         expect(refusal.status).toBe(403);
+        expect(refusal.body).toMatchObject({ code: 'ownerRequired' });
         expect(h.upstream.requestSync).not.toHaveBeenCalled();
     });
 
     it('answers a stranger 404 before the owner gate (visibility first)', async () => {
         const h = build();
-        h.upstream.get.mockRejectedValue(
+        h.upstream.isWorkOwner.mockRejectedValue(
             new AppUpstreamRefusalError('not_found', 404, 'No such App Work.'),
         );
 
@@ -147,7 +141,7 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
         );
 
         expect(refusal.status).toBe(404);
-        expect(h.ownership.ensureIsOwner).not.toHaveBeenCalled();
+        expect(h.upstream.requestSync).not.toHaveBeenCalled();
     });
 
     it('keeps a plain Sync now exactly as before — no owner gate, no options', async () => {
@@ -155,7 +149,7 @@ describe('AppUpstreamController — Sync anyway (APW-02 T46)', () => {
 
         await h.controller.syncUpstream(user(EDITOR, 'api-key'), WORK_ID, {});
 
-        expect(h.ownership.ensureIsOwner).not.toHaveBeenCalled();
+        expect(h.upstream.isWorkOwner).not.toHaveBeenCalled();
         expect(h.upstream.requestSync).toHaveBeenCalledWith(WORK_ID, EDITOR, {});
     });
 

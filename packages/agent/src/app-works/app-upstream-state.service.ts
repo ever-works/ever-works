@@ -1296,6 +1296,18 @@ export class AppUpstreamStateService {
         return { queued: true, runId };
     }
 
+    /**
+     * APW-02 T46 — whether `userId` is the Work's OWNER (its creator), for the "Sync anyway"
+     * gate. Visibility is decided first, so a Work the caller cannot see answers the same
+     * `404 not_found` every other route gives; a visible Work answers `true` only for the
+     * creator — a member of any role, a co-owner included, answers `false`, because a released
+     * workflow runs with the creator's repository secrets.
+     */
+    async isWorkOwner(workId: string, userId: string): Promise<boolean> {
+        const work = await this.requireVisibleAppWork(workId, userId);
+        return !!work.userId && work.userId === userId;
+    }
+
     // ── §6.3 — the sync run's two state transitions ──────────────────────────
 
     /**
