@@ -53,7 +53,7 @@ export const APP_BLUEPRINT_APPLY_RUNNER_SEAM = Symbol('APP_BLUEPRINT_APPLY_RUNNE
         {
             provide: APP_BLUEPRINT_APPLY_RUNNER_SEAM,
             useFactory: (apiClient: TriggerInternalApiClient) =>
-                createRemoteProxy(apiClient, APP_BLUEPRINT_APPLY_RUNNER_REMOTE_NAME),
+                createRemoteProxy(apiClient, 'AppBlueprintApplyRunner'),
             inject: [TriggerInternalApiClient],
         },
     ],
