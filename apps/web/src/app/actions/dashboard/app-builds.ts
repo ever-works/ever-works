@@ -14,7 +14,6 @@ import { appBuildsWebAPI as appBuildsAPI, type AppBuildsListQuery } from '@/lib/
 import type { AppBuildsList, AppBuildsPullAccess } from '@/lib/works/app-builds.shared';
 import { pluginsAPI } from '@/lib/api/plugins';
 import {
-    APP_BUILD_SETTINGS_KEYS,
     normalizeAppBuildSettings,
     type AppBuildSettings,
 } from '@/lib/works/app-build-settings.shared';
@@ -259,10 +258,9 @@ export async function saveAppBuildSettingsAction(
     ) {
         return invalid();
     }
-    const body: Record<string, unknown> = {};
-    for (const key of APP_BUILD_SETTINGS_KEYS) {
-        if (key in parsed.data) body[key] = parsed.data[key];
-    }
+    // `strict()` already refused every key outside the six the schema names, so the
+    // parsed object IS the patch (the seventh dialog key is never writable here).
+    const body: Record<string, unknown> = { ...parsed.data };
     try {
         await pluginsAPI.updateWorkSettings(workId, pluginId, { settings: body });
         revalidateBuilds(workId);
