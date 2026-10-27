@@ -57,6 +57,30 @@ export function fleetCloudNodeTag(nodeId: string): string {
 	return `${FLEET_CLOUD_NODE_TAG_PREFIX}${nodeId}`;
 }
 
+/**
+ * P3 (spec FR-30, U7) — the tag naming the Ever Works deployment that created
+ * a machine (`ever-works-site:<fingerprint>`, a short hash of its API origin).
+ * Reconciliation adopts an unclaimed machine ONLY when it carries this
+ * deployment's site tag: another deployment's machines on the same provider
+ * account are never touched.
+ */
+export const FLEET_CLOUD_SITE_TAG_PREFIX = 'ever-works-site:';
+
+export function fleetCloudSiteTag(fingerprint: string): string {
+	return `${FLEET_CLOUD_SITE_TAG_PREFIX}${fingerprint}`;
+}
+
+/** The site fingerprint inside a provider tag list, or null. */
+export function fleetCloudSiteFromTags(tags: readonly string[] | null | undefined): string | null {
+	for (const tag of tags ?? []) {
+		if (typeof tag === 'string' && tag.startsWith(FLEET_CLOUD_SITE_TAG_PREFIX)) {
+			const value = tag.slice(FLEET_CLOUD_SITE_TAG_PREFIX.length).trim().toLowerCase();
+			if (/^[0-9a-f]{8,64}$/.test(value)) return value;
+		}
+	}
+	return null;
+}
+
 /** The Node id inside a provider tag list, or null. */
 export function fleetCloudNodeIdFromTags(tags: readonly string[] | null | undefined): string | null {
 	for (const tag of tags ?? []) {
@@ -276,6 +300,12 @@ export interface FleetCloudMeta {
 	idleNotifiedKey?: string | null;
 	/** P2 (spec S7) — when the idle policy powered the machine off; cleared when it runs again. */
 	poweredOffByPolicyAt?: string | null;
+	/**
+	 * P3 (spec FR-30, U7) — when reconciliation found this machine at the
+	 * provider carrying this deployment's tags with no registration and adopted
+	 * it as this row, so its owner sees it (and its bill) and can destroy it.
+	 */
+	unclaimedAt?: string | null;
 }
 
 // ─── Money ──────────────────────────────────────────────────────────────────
@@ -637,6 +667,8 @@ export interface FleetNodeCloudView {
 	idleWindowReached?: boolean;
 	/** P2 (spec S7): when the idle policy powered it off (still billing while off where the provider does). */
 	poweredOffByPolicyAt?: string | null;
+	/** P3 (spec FR-30, U7): when reconciliation adopted it as an unclaimed machine (no Ever Works computer created it here). */
+	unclaimedAt?: string | null;
 	/** True when a machine exists (or existed) at the provider. */
 	hasMachine: boolean;
 	/** CONTRACTS R-36: whether "Remove from Fleet" may run now. */
@@ -696,6 +728,9 @@ export interface FleetCloudListView {
 }
 
 // ─── Idle policy, P2 (spec FR-25 – FR-28) ───────────────────────────────────
+
+/** `requestedBy` of the audit rows reconciliation writes when it repairs or adopts a machine (CONTRACTS §2.3). */
+export const FLEET_CLOUD_RECONCILE_REQUESTER = 'system:cloud-reconcile';
 
 /** `requestedBy` of the audit row the idle policy writes when it powers a machine off (CONTRACTS §2.3). */
 export const FLEET_CLOUD_IDLE_REQUESTER = 'system:idle-policy';
