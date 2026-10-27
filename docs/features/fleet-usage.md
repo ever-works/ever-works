@@ -146,6 +146,11 @@ write) — `GET /api/fleet/usage/prices` lists the version in effect and its his
 version it was priced at; a new version never re-prices old figures. A model the table does not know is shown in
 **tokens only** and left out of every dollar total, with a note — it is never priced at $0.
 
+The version in effect is **v2** (from 2026-10-27): v1's rates checked against Anthropic's and OpenAI's public pricing
+pages on that date, with one correction — Claude Sonnet 5.5 cache reads at $0.10 per million tokens. Cache writes are
+priced at the 5-minute rate (1.25 × input); Claude Haiku 5.5 at its rate for prompts up to 100 K tokens. OpenAI rates
+are the Standard tier.
+
 ## Errors
 
 | Code                  | When                                              | Hint                                                                         |
