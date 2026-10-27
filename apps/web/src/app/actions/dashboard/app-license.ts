@@ -16,7 +16,7 @@ import {
  * Both check the session first: a server action is a POST endpoint.
  */
 
-const workIdSchema = z.string().uuid();
+const workIdSchema = z.guid();
 
 function failure<T>(context: string, error: unknown): AppLicenseActionResult<T> {
     if (error instanceof ApiResponseError) {

@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import { authAPI } from '@/lib/api/auth';
 import { getAuthFromCookie } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
@@ -56,11 +57,11 @@ export async function updateProfile(data: {
         }
 
         // Validate input
-        const validation = updateProfileSchema.safeParse(data);
+        const validation = updateProfileSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -103,11 +104,11 @@ export async function updatePassword(data: { currentPassword: string; newPasswor
         }
 
         // Validate input
-        const validation = updatePasswordSchema.safeParse(data);
+        const validation = updatePasswordSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -169,11 +170,11 @@ export async function updateNotificationPreferences(preferences: {
         }
 
         // Validate input
-        const validation = notificationPreferencesSchema.safeParse(preferences);
+        const validation = notificationPreferencesSchema.safeParse(preferences, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 

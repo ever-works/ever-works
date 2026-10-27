@@ -9,3 +9,4 @@ export * from './code-edit-prompt.js';
 // component. Import the SSRF guard directly:
 //     import { isSafeWebhookUrl, safeFetchWithDnsPin } from '@ever-works/plugin/helpers/ssrf-guard';
 // (or from `@ever-works/agent/utils/ssrf-guard` which re-exports the same.)
+export * from './zod3-error-messages.js';
