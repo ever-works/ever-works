@@ -93,7 +93,12 @@ export function AppTargetCard({
     // says it — "verify your email", "a paid plan", … — after the generic one.
     const tEligibility = useTranslations('dashboard.workDetail.appsTierEligibility.reasons');
     const managedReasons = (target.eligibility?.managed?.reasons ?? [])
-        .map((reason) => appsTierReasonText(tEligibility, String(reason)))
+        .map((reason) =>
+            appsTierReasonText(
+                tEligibility as unknown as (key: string, values?: Record<string, string>) => string,
+                String(reason),
+            ),
+        )
         .join(' ');
     const managedReason =
         target.eligibility?.managed && target.eligibility.managed.eligible === false
