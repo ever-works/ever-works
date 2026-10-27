@@ -255,6 +255,13 @@ export interface OidcOutboundResult {
 	readonly body?: unknown;
 	/** Why it failed, when not `ok`. */
 	readonly failure?: OidcOutboundFailure;
+	/**
+	 * APW-12 C28 (lane aw-safety, 2026-10-26) — the RFC 6749 §5.2 `error` CODE of a refused
+	 * `400`/`401` answer (`invalid_grant`, `invalid_client`, …), when its body carried one. The code
+	 * only, matched against `^[a-z_]{1,64}$`: never `error_description`, never any other text the
+	 * provider wrote (FR-16).
+	 */
+	readonly oauthError?: string;
 	/** How many attempts were started — 1 or 2 (FR-15). */
 	readonly attempts: number;
 }
@@ -369,6 +376,21 @@ async function attemptJsonFetch(
 	return { ...last, attempts: attempts.count };
 }
 
+/**
+ * APW-12 C28 — the RFC 6749 §5.2 `error` code of a refused token response, and nothing else. A body
+ * that is not JSON, or whose `error` is not a bare lower-case code, answers `undefined`; the read
+ * never throws (a refused answer is reported as the refusal it is, not as a parse failure).
+ */
+async function oauthErrorCodeOf(response: { json(): Promise<unknown> }): Promise<string | undefined> {
+	try {
+		const body = (await response.json()) as { error?: unknown } | null;
+		const code = body && typeof body === 'object' ? body.error : undefined;
+		return typeof code === 'string' && /^[a-z_]{1,64}$/.test(code) ? code : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /** One GET: 5,000 ms, one JSON parse, and no error text that could carry a body. */
 async function readJsonOnce(
 	request: OidcOutboundRequest,
@@ -392,7 +414,16 @@ async function readJsonOnce(
 			}
 		});
 		if (!response || typeof response.status !== 'number' || response.ok !== true) {
-			return { ok: false, failure: 'httpStatus', status: response?.status };
+			const oauthError =
+				response && (response.status === 400 || response.status === 401)
+					? await oauthErrorCodeOf(response)
+					: undefined;
+			return {
+				ok: false,
+				failure: 'httpStatus',
+				status: response?.status,
+				...(oauthError ? { oauthError } : {})
+			};
 		}
 		try {
 			return { ok: true, status: response.status, body: await response.json() };

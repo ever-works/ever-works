@@ -111,6 +111,12 @@ import {
     APP_UPSTREAM_SYNC_TASK_ID,
     type appUpstreamSyncTask,
 } from '../tasks/trigger/app-upstream-sync.task';
+// APW-03 T28 (lane aw-blueprints) — the `app-blueprint-apply` one-shot (plan §6.1).
+// The id is imported from the task module, as the readiness and sync ids are.
+import {
+    APP_BLUEPRINT_APPLY_TASK_ID,
+    type appBlueprintApplyTask,
+} from '../tasks/trigger/app-blueprint-apply.task';
 import type { runPluginOperationTask } from '../tasks/trigger/run-plugin-operation.task';
 import { pluginOperationRunPayload } from './plugin-operation-run-payload';
 import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facades';
@@ -118,6 +124,7 @@ import type { NotificationChannelDeliveryPayload } from '@ever-works/agent/facad
 // `app-upstream-state.service.ts`, imported as a TYPE only: the service that produces the
 // payload is API-side, and this file only needs the shape the SDK call is checked against.
 import type {
+    AppBlueprintApplyJobPayload,
     AppForkReadinessJobPayload,
     AppUpstreamSyncJobPayload,
 } from '@ever-works/agent/app-works';
@@ -1600,6 +1607,45 @@ export class TriggerService
             return handle.id;
         } catch (error) {
             this.logger.error('Failed to dispatch app-upstream-sync task', error as Error);
+            return null;
+        }
+    }
+
+    /**
+     * APW-03 T28 (lane aw-blueprints) — the `app-blueprint-apply` job (plan §6.1:657):
+     * one Blueprint apply-after-create or upgrade of one App Work.
+     *
+     * The agent `AppWorksModule` binds `APP_BLUEPRINT_APPLY_DISPATCHER` to this method
+     * (`BLUEPRINT_APPLY_DISPATCH_METHOD` there). Same `null` contract as
+     * {@link dispatchAppForkReadiness}: unconfigured or a failed enqueue resolves `null`,
+     * and `AppBlueprintUpgradeService.request` then runs the job in the API process.
+     *
+     * `concurrencyKey` is per Work (the run's own lock is the real exclusion);
+     * `idempotencyKey` is per Work, mode, version and request time, so a retried
+     * enqueue of the same request collapses while a later request still runs.
+     */
+    async dispatchAppBlueprintApply(payload: AppBlueprintApplyJobPayload): Promise<string | null> {
+        if (!this.ensureConfigured()) {
+            return null;
+        }
+
+        try {
+            const handle = await tasks.trigger<typeof appBlueprintApplyTask>(
+                APP_BLUEPRINT_APPLY_TASK_ID,
+                payload,
+                this.stampTenantOptions({
+                    tags: ['app-blueprint-apply', `work:${payload.workId}`, `mode:${payload.mode}`],
+                    idempotencyKey: `app-blueprint-apply:${payload.workId}:${payload.mode}:${payload.version}:${
+                        payload.requestedAt ?? ''
+                    }`,
+                    machine: this.machine() as any,
+                    concurrencyKey: `app-blueprint-apply:${payload.workId}`,
+                }),
+            );
+
+            return handle.id;
+        } catch (error) {
+            this.logger.error('Failed to dispatch app-blueprint-apply task', error as Error);
             return null;
         }
     }

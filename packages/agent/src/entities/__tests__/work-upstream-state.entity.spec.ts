@@ -113,6 +113,14 @@ describe('WorkUpstreamState entity', () => {
      */
     const APW09_COLUMNS = ['credentialMemberUserId'];
 
+    /**
+     * APW-02 T46/T47 (2026-10-27) — the three columns
+     * `1796500000000-AddWorkUpstreamSyncRelease` adds: the sync pull request check stamp,
+     * the held range and the owner's release. Named separately for the same reason
+     * {@link APW09_COLUMNS} is.
+     */
+    const APW02_LOOP_COLUMNS = ['syncPullRequestCheckedAt', 'workflowHold', 'workflowRelease'];
+
     /** Every time column the plan gives a `bigint ts`. */
     const TIMESTAMP_COLUMNS = [
         'readinessStartedAt',
@@ -142,8 +150,19 @@ describe('WorkUpstreamState entity', () => {
             // does not have. The 55 are the plan's; the one APW-09 T43 adds is
             // named separately (APW09_COLUMNS) so the plan's own count stays a
             // separate, checkable claim.
-            expect(columns).toHaveLength(56);
-            expect([...propertyNames].sort()).toEqual([...PLAN_COLUMNS, ...APW09_COLUMNS].sort());
+            expect(columns).toHaveLength(59);
+            expect([...propertyNames].sort()).toEqual(
+                [...PLAN_COLUMNS, ...APW09_COLUMNS, ...APW02_LOOP_COLUMNS].sort(),
+            );
+        });
+
+        it('adds the three T46/T47 columns nullable and default-free', () => {
+            for (const name of APW02_LOOP_COLUMNS) {
+                expect(column(name)?.options.nullable).toBe(true);
+                expect(column(name)?.options.default).toBeUndefined();
+            }
+            expect(column('workflowHold')?.options.type).toBe('simple-json');
+            expect(column('workflowRelease')?.options.type).toBe('simple-json');
         });
 
         it('carries the required coordinates NOT NULL and the optional ones nullable', () => {

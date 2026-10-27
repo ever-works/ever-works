@@ -16,6 +16,7 @@ import { Throttle, ThrottlerException } from '@nestjs/throttler';
 import {
     APP_SPEC_FILE_MAX_BYTES,
     APP_SOURCE_SPEC_FILE,
+    BLUEPRINT_APPLY_PER_HOUR,
     LICENSE_ATTEST_PER_MIN,
 } from '@ever-works/contracts';
 import type { LicenseAttestation } from '@ever-works/contracts';
@@ -26,7 +27,11 @@ import {
     type AppSpecDraftValidation,
     type AppSpecStateRead,
 } from '@ever-works/agent/app-spec';
-import { APP_WORK_GIT_PROVIDER_ID } from '@ever-works/agent/app-works';
+import {
+    APP_WORK_GIT_PROVIDER_ID,
+    AppBlueprintUpgradeService,
+    type AppBlueprintRequestOutcome,
+} from '@ever-works/agent/app-works';
 import { WorkOwnershipService, type WorkAccessResult } from '@ever-works/agent/services';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import type { Work } from '@ever-works/agent/entities';
@@ -35,6 +40,10 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { requireHumanSession } from '../auth/machine-principal';
 import { appLicenseAttestSessionOnly } from './app-owner-gate';
 import {
+    AppBlueprintApplyRequestDto,
+    AppBlueprintDismissRequestDto,
+    AppBlueprintRunAcceptedDto,
+    AppBlueprintUpgradeRequestDto,
     AppSpecDraftValidationDto,
     AppSpecErrorDto,
     AppSpecEvaluationPendingDto,
@@ -119,6 +128,14 @@ export const APP_SPEC_CONTENT_VALIDATIONS_PER_MINUTE = 30;
 export const APP_SPEC_VALIDATE_WINDOW_MS = 60_000;
 
 /**
+ * APW-03 T29 (lane aw-blueprints) — plan §4.1:554-556: apply and upgrade share ONE
+ * bucket of `BLUEPRINT_APPLY_PER_HOUR` (5) per Work per hour (each run reads the
+ * Blueprint repository and may open a pull request); dismiss is 30 per minute per member.
+ */
+export const APP_BLUEPRINT_RUN_WINDOW_MS = 3_600_000;
+export const APP_BLUEPRINT_DISMISSALS_PER_MINUTE = 30;
+
+/**
  * The two per-resource allowances of §4.1:548.
  *
  * A fixed window that starts at the first counted request, per key: "the 7th
@@ -191,7 +208,148 @@ export class WorkAppSpecController {
          */
         @Optional()
         private readonly licenses?: AppLicenseService,
+        /**
+         * APW-03 T29 (lane aw-blueprints) — the Blueprint apply / upgrade / dismiss
+         * service (bound in the agent `AppWorksModule`, which `WorksModule` imports).
+         * Appended LAST and `@Optional()` for the same reason as `licenses`; absent, the
+         * three Blueprint routes answer `503 dependenciesUnavailable`.
+         */
+        @Optional()
+        private readonly blueprints?: AppBlueprintUpgradeService,
     ) {}
+
+    /**
+     * `POST /api/works/:id/app-spec/blueprint` — apply a Blueprint to an App Work that has
+     * none (plan §4.1:554, FR-45/46). **Edit** access. The run three-way merges the
+     * Blueprint into the Work's own `.works/works.yml` (an empty base, so nothing of the
+     * member's is overwritten) and proposes the result as ONE pull request — never a push.
+     * Answers `202` as soon as the run is queued, never after it.
+     */
+    @Post(':id/app-spec/blueprint')
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Apply a Blueprint to an App Work (edit)',
+        description:
+            'Queues the `app-blueprint-apply` run and answers 202 without waiting for it. The run opens one pull ' +
+            'request on `ever-works/blueprint/<id>`; nothing is pushed to the tracked branch. Errors: 404 ' +
+            'blueprintNotFound / blueprintVersionNotFound, 409 applyInProgress / blueprintAlreadyApplied, 422 ' +
+            'notAnAppWork, 429 past 5 runs per hour per App Work, 503 catalogUnavailable.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 202, type: AppBlueprintRunAcceptedDto })
+    @ApiResponse({
+        status: 200,
+        description: 'An open proposal already exists.',
+        type: AppBlueprintRunAcceptedDto,
+    })
+    @ApiResponse({ status: 404, type: AppSpecErrorDto })
+    @ApiResponse({ status: 409, type: AppSpecErrorDto })
+    @ApiResponse({ status: 422, type: AppSpecErrorDto })
+    async applyBlueprint(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: AppBlueprintApplyRequestDto,
+        @Res({ passthrough: true }) response: StatusOnlyResponse,
+    ): Promise<AppBlueprintRunAcceptedDto> {
+        await this.authorize(id, auth.userId, 'edit');
+        const blueprints = this.requireBlueprints();
+        this.takeAllowance(
+            `blueprint:${id}`,
+            BLUEPRINT_APPLY_PER_HOUR,
+            APP_BLUEPRINT_RUN_WINDOW_MS,
+        );
+        const outcome = await blueprints.request({
+            workId: id,
+            userId: auth.userId,
+            mode: 'apply',
+            blueprintId: dto.blueprintId,
+            version: dto.version ? dto.version.replace(/^v/, '') : null,
+        });
+        return this.answerRun(outcome, response);
+    }
+
+    /**
+     * `POST /api/works/:id/app-spec/blueprint/upgrade` — review an upgrade to a newer
+     * Blueprint version (plan §4.1:555, FR-50/51, ACC-03-29). **Edit** access. `202` when the
+     * run is queued, `200` with the open pull request when one already proposes that
+     * version. A newer version later UPDATES that pull request rather than opening a second.
+     */
+    @Post(':id/app-spec/blueprint/upgrade')
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Propose a Blueprint upgrade as a pull request (edit)',
+        description:
+            'Three-way merges the applied Blueprint version, the App Work file and the new version: a value the ' +
+            'member changed is never overwritten — a conflict keeps it and is listed in the pull request. Errors: 422 ' +
+            'noBlueprint / noUpgrade / notAnAppWork, 404 blueprintVersionNotFound, 409 applyInProgress, 429 past 5 ' +
+            'runs per hour per App Work.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 202, type: AppBlueprintRunAcceptedDto })
+    @ApiResponse({
+        status: 200,
+        description: 'The open pull request for that version.',
+        type: AppBlueprintRunAcceptedDto,
+    })
+    @ApiResponse({ status: 404, type: AppSpecErrorDto })
+    @ApiResponse({ status: 409, type: AppSpecErrorDto })
+    @ApiResponse({ status: 422, type: AppSpecErrorDto })
+    async upgradeBlueprint(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: AppBlueprintUpgradeRequestDto,
+        @Res({ passthrough: true }) response: StatusOnlyResponse,
+    ): Promise<AppBlueprintRunAcceptedDto> {
+        await this.authorize(id, auth.userId, 'edit');
+        const blueprints = this.requireBlueprints();
+        this.takeAllowance(
+            `blueprint:${id}`,
+            BLUEPRINT_APPLY_PER_HOUR,
+            APP_BLUEPRINT_RUN_WINDOW_MS,
+        );
+        const outcome = await blueprints.request({
+            workId: id,
+            userId: auth.userId,
+            mode: 'upgrade',
+            version: dto?.version ? dto.version.replace(/^v/, '') : null,
+        });
+        return this.answerRun(outcome, response);
+    }
+
+    /**
+     * `POST /api/works/:id/app-spec/blueprint/dismiss` — hide the upgrade notice for ONE
+     * version (plan §4.1:556, FR-50). **Edit** access, 30 per minute per member. A newer
+     * version raises the notice again.
+     */
+    @Post(':id/app-spec/blueprint/dismiss')
+    @Throttle({ long: { limit: APP_BLUEPRINT_DISMISSALS_PER_MINUTE, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Dismiss a Blueprint upgrade notice for one version (edit)',
+        description: 'Errors: 422 noBlueprint / noUpgrade / notAnAppWork, 404 not_found.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: '`{ status: "dismissed", version }`.' })
+    @ApiResponse({ status: 422, type: AppSpecErrorDto })
+    async dismissBlueprintUpgrade(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: AppBlueprintDismissRequestDto,
+        @Res({ passthrough: true }) response: StatusOnlyResponse,
+    ): Promise<{ status: 'dismissed'; version: string }> {
+        await this.authorize(id, auth.userId, 'edit');
+        const blueprints = this.requireBlueprints();
+        this.takeAllowance(`dismiss:${auth.userId}`, APP_BLUEPRINT_DISMISSALS_PER_MINUTE);
+        const outcome = await blueprints.dismiss({
+            workId: id,
+            userId: auth.userId,
+            version: dto.version.replace(/^v/, ''),
+        });
+        if (outcome.status === 'refused') {
+            throw this.refusal(outcome.code, outcome.message, outcome.httpStatus);
+        }
+        response.status(HttpStatus.OK);
+        return outcome;
+    }
 
     /**
      * `POST /api/works/:id/app-license/attest` — the OWNER attests the App Work's
@@ -523,10 +681,59 @@ export class WorkAppSpecController {
     }
 
     /** Take one allowance of `key`'s window, or answer the platform's own `429`. */
-    private takeAllowance(key: string, limit: number): void {
-        if (!this.throttle.take(key, limit)) {
+    private takeAllowance(key: string, limit: number, windowMs?: number): void {
+        if (!this.throttle.take(key, limit, windowMs)) {
             throw new ThrottlerException();
         }
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // APW-03 T29 — the Blueprint routes' answers
+    // ────────────────────────────────────────────────────────────────────────
+
+    private requireBlueprints(): AppBlueprintUpgradeService {
+        if (!this.blueprints) {
+            throw this.refusal(
+                'dependenciesUnavailable',
+                'Blueprint apply and upgrade are not available in this installation.',
+                HttpStatus.SERVICE_UNAVAILABLE,
+            );
+        }
+        return this.blueprints;
+    }
+
+    /** §4.2's body for every refusal: `{ status: 'error', code, message }`. */
+    private refusal(code: string, message: string, status: number): HttpException {
+        return new HttpException({ status: 'error', code, message }, status);
+    }
+
+    /** `202` queued · `200` an open proposal · the refusal's own status otherwise. */
+    private answerRun(
+        outcome: AppBlueprintRequestOutcome,
+        response: StatusOnlyResponse,
+    ): AppBlueprintRunAcceptedDto {
+        if (outcome.status === 'refused') {
+            throw this.refusal(outcome.code, outcome.message, outcome.httpStatus);
+        }
+        if (outcome.status === 'existing') {
+            response.status(HttpStatus.OK);
+            return {
+                status: 'existing',
+                mode: outcome.mode,
+                blueprintId: outcome.blueprintId,
+                version: outcome.version,
+                pullRequest: outcome.pullRequest,
+            };
+        }
+        response.status(HttpStatus.ACCEPTED);
+        return {
+            status: 'queued',
+            mode: outcome.mode,
+            blueprintId: outcome.blueprintId,
+            version: outcome.version,
+            runId: outcome.runId,
+            ...(outcome.mode === 'apply' ? { applyStatus: 'applying' as const } : {}),
+        };
     }
 
     // ────────────────────────────────────────────────────────────────────────

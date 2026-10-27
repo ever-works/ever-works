@@ -7589,7 +7589,24 @@
                     "openOnGitHub": "Open on GitHub",
                     "enableBuildWorkflow": "Enable the build workflow"
                 },
-                "editAccessRequired": "You need edit access to this App Work to do that."
+                "editAccessRequired": "You need edit access to this App Work to do that.",
+                "resultPullRequestMerged": "{count, plural, =1 {Sync pull request merged (1 commit)} other {Sync pull request merged (# commits)}}",
+                "workflowHold": {
+                    "title": "Upstream changed {count, plural, =1 {1 workflow file} other {# workflow files}}. Nothing was synced.",
+                    "incomplete": "Upstream's changes are too large to check every file for workflow changes. Nothing was synced.",
+                    "explain": "Syncing lets these workflows run in this repository with its secrets. Review the changes first.",
+                    "review": "Review the changes",
+                    "syncAnyway": "Sync anyway",
+                    "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
+                    "confirmYes": "Yes, sync anyway",
+                    "cancel": "Cancel",
+                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
+                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "changed": "Upstream moved since you reviewed it. Review the new changes first.",
+                    "noHold": "No upstream workflow change is waiting for review.",
+                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                }
             },
             "appDependencies": {
                 "status": {
@@ -7760,6 +7777,63 @@
                         "buildStrategyUnavailable": "No enabled build plugin supports the `{strategy}` strategy.",
                         "dependencyUnavailable": "No {kind} provider is available.",
                         "trackedBranchMissing": "The tracked branch does not exist."
+                    },
+                    "blueprint": {
+                        "title": "Blueprint",
+                        "follows": "Follows the {id} Blueprint, version {version}.",
+                        "none": "This App Work follows no Blueprint.",
+                        "applyLabel": "Blueprint id",
+                        "apply": "Apply a Blueprint",
+                        "applyFailed": "The Blueprint could not be applied ({code}).",
+                        "upgradeAvailable": "Version {version} of this Blueprint is available.",
+                        "breaking": "Breaking",
+                        "reviewUpgrade": "Review upgrade",
+                        "dismiss": "Dismiss",
+                        "runPending": "Preparing the pull request…",
+                        "proposalUpgrade": "Pull request #{number} upgrades to version {version}",
+                        "proposalApply": "Pull request #{number} applies version {version}",
+                        "baseUnknown": "The version you applied could not be read, so every difference was treated as a conflict and your values were kept.",
+                        "conflicts": "{count, plural, =1 {1 conflict: your value was kept.} other {# conflicts: your values were kept.}}",
+                        "noConflicts": "No conflicts: nothing you changed is touched.",
+                        "proposed": "the Blueprint proposes {value}",
+                        "unchanged": "Your App spec already matches the latest Blueprint version.",
+                        "runFailed": "The last Blueprint run could not open a pull request ({code}).",
+                        "match": {
+                            "manifest": "Listed",
+                            "alias": "Listed",
+                            "fork": "Fork of a listed app",
+                            "probe": "Unlisted",
+                            "explicit": "Chosen for this repository",
+                            "file": "From the file"
+                        },
+                        "refusal": {
+                            "blueprintNotFound": "No Blueprint has that id.",
+                            "blueprintVersionNotFound": "That Blueprint version could not be found.",
+                            "blueprintAlreadyApplied": "This App Work already follows a Blueprint. Upgrade it instead.",
+                            "applyInProgress": "A Blueprint run is already in progress for this App Work.",
+                            "noBlueprint": "This App Work follows no Blueprint.",
+                            "noUpgrade": "That version is not newer than the one applied.",
+                            "notAnAppWork": "This Work is not an App Work.",
+                            "catalogUnavailable": "The Blueprint repositories cannot be read right now. Please try again later.",
+                            "dependenciesUnavailable": "Blueprint upgrades are not available on this instance.",
+                            "notFound": "This App Work could not be found.",
+                            "throttled": "Blueprint runs are limited to 5 an hour per App Work. Please try again later.",
+                            "forbidden": "You do not have permission to change this App Work.",
+                            "unknown": "Something went wrong. Please try again."
+                        },
+                        "dialog": {
+                            "applyTitle": "Apply the {id} Blueprint",
+                            "applyBody": "Ever Works composes the Blueprint into this App Work’s App spec.",
+                            "upgradeTitle": "Upgrade the {id} Blueprint to {version}",
+                            "upgradeBody": "From version {from} to version {version}.",
+                            "pointPullRequest": "A pull request is opened on the App’s repository. Only .works/works.yml changes.",
+                            "pointKept": "Values you changed are kept, never overwritten. Every conflict is listed in the pull request.",
+                            "pointMerge": "Nothing takes effect until you merge the pull request.",
+                            "breaking": "This is a major version bump. Read the pull request before you merge it.",
+                            "cancel": "Cancel",
+                            "confirmApply": "Open the pull request",
+                            "confirmUpgrade": "Open the pull request"
+                        }
                     }
                 },
                 "budgets": {
@@ -9066,6 +9140,81 @@
                 },
                 "editAccessRequired": "You need edit access to this App Work to try again."
             },
+            "appProvisioning": {
+                "title": "Provisioning",
+                "headline": {
+                    "notStarted": "Not provisioned yet. Provisioning inspects the repository and writes its App spec (.works/works.yml) through a pull request.",
+                    "blueprintSpec": "Not needed: this App's spec comes from its Blueprint.",
+                    "autoProvisionOff": "Not started: automatic provisioning was turned off when this App Work was created.",
+                    "awaitingOwner": "Waiting for the Work owner to start it.",
+                    "queued": "Queued — waiting for its Agent to start.",
+                    "running": "Provisioning is running.",
+                    "inReview": "A pull request with the App spec is ready for review.",
+                    "blocked": "Provisioning is blocked and needs your input on the Task.",
+                    "succeeded": "Provisioned.",
+                    "cancelled": "The last provisioning was cancelled."
+                },
+                "trigger": {
+                    "autoCreate": "Started when the App Work was created.",
+                    "manual": "Started by a member.",
+                    "smokeFailed": "Started because the smoke tests failed after an upstream sync.",
+                    "targetUpdated": "Started because the deploy target changed.",
+                    "buildFailed": "Started because the merged App spec failed to build or boot."
+                },
+                "status": {
+                    "backlog": "Backlog",
+                    "todo": "To do",
+                    "inProgress": "In progress",
+                    "inReview": "In review",
+                    "blocked": "Blocked",
+                    "done": "Done",
+                    "cancelled": "Cancelled",
+                    "unknown": "Unknown"
+                },
+                "banner": {
+                    "upstreamBroke": "The last upstream sync broke this App's smoke tests. A re-provisioning Task is looking at what changed upstream."
+                },
+                "awaitingOwnerNote": "Starting it runs the owner's Agent with the owner's credentials, so only the owner can press Run on the Task.",
+                "openTask": "Open Task {slug}",
+                "openPullRequest": "Open the pull request",
+                "actions": {
+                    "provision": "Provision",
+                    "reprovision": "Re-provision",
+                    "restart": "Start over",
+                    "cancel": "Cancel"
+                },
+                "dialog": {
+                    "back": "Back",
+                    "start": {
+                        "title": "Provision this App Work?",
+                        "description": "An Agent inspects the repository and opens a pull request that writes only .works/works.yml and .works/overlay/. Nothing else in the repository changes, and nothing is merged without you.",
+                        "confirm": "Provision"
+                    },
+                    "restart": {
+                        "title": "Start provisioning over?",
+                        "description": "A provisioning Task is already open. Starting over files a new provisioning Task; the open one is left as it is, so cancel it if you no longer need it.",
+                        "confirm": "Start over"
+                    },
+                    "cancel": {
+                        "title": "Cancel provisioning?",
+                        "description": "The running provisioning is stopped and its Task is cancelled. Anything it already pushed stays on its branch; no pull request is merged.",
+                        "confirm": "Cancel provisioning"
+                    }
+                },
+                "toasts": {
+                    "start": "Provisioning started.",
+                    "restart": "Provisioning started over.",
+                    "cancel": "Provisioning cancelled."
+                },
+                "errors": {
+                    "alreadyProvisioning": "A provisioning Task is already open.",
+                    "nothingToCancel": "No provisioning is running.",
+                    "cancelRefused": "The provisioning Task could not be cancelled. Open the Task to see why.",
+                    "notAppWork": "Only App Works can be provisioned.",
+                    "notFound": "This Work could not be found.",
+                    "failed": "That did not work. Try again in a moment."
+                }
+            },
             "builds": {
                 "title": "Builds",
                 "subtitle": "Built on GitHub-hosted runners in {repository} · image {imageRepository}",
@@ -9289,6 +9438,16 @@
                     "deployableOther": "Deployable build: {sha}",
                     "noDeployable": "No deployable build yet",
                     "open": "Open Builds"
+                }
+            },
+            "appsTierEligibility": {
+                "reasons": {
+                    "emailUnverified": "Verify the email address of your account first.",
+                    "planRequired": "Ever Works Apps needs a paid plan.",
+                    "ownerQuarantined": "An App of this account is quarantined.",
+                    "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
+                    "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
+                    "unknown": "Not eligible ({reason})."
                 }
             },
             "appDeploy": {
@@ -16169,7 +16328,8 @@
                 "logs": "Logs",
                 "logsOf": "Logs of {name}",
                 "openJob": "Open job on GitHub",
-                "openOnGitHub": "Open on GitHub"
+                "openOnGitHub": "Open on GitHub",
+                "updateAvailable": "Update available: {version}"
             },
             "actions": {
                 "start": "Start",
@@ -16233,7 +16393,8 @@
                 "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
                 "failed": "The runners could not be installed.",
                 "choose": "Choose a repository or organisation",
-                "checkingPermission": "Checking the GitHub App’s permission on {target}…"
+                "checkingPermission": "Checking the GitHub App’s permission on {target}…",
+                "shareWarning": "Ticked, these runners can control every container on {name} and run anything as root there. Leave it unticked unless your jobs need it."
             },
             "palette": {
                 "install": "Install Actions runners on {name}",
@@ -16310,6 +16471,13 @@
                 "checkAgain": "Check again",
                 "checking": "Checking…",
                 "useRepository": "Use a repository instead"
+            },
+            "reinstall": {
+                "button": "Reinstall…",
+                "retry": "Retry",
+                "confirm": "Reinstall",
+                "reinstalling": "Reinstalling {name}…",
+                "failed": "The runner could not be reinstalled."
             }
         }
     }

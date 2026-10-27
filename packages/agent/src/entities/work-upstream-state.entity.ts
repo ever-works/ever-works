@@ -89,6 +89,31 @@ import { TimestampColumn } from './_types';
  * three index names, the single `@ManyToOne` and the scope columns are exactly
  * as the plan fixes them.
  */
+/**
+ * APW-02 T46 — the held range as stored in `workflowHold` (paths only, never content).
+ * `heldAt` is ISO-8601: it lives inside a JSON value, not a `TimestampColumn`.
+ */
+export interface WorkUpstreamWorkflowHold {
+    headSha: string;
+    paths: string[];
+    pathCount: number;
+    complete: boolean;
+    heldAt: string;
+}
+
+/**
+ * APW-02 T46 — the owner's release of one held head, as stored in `workflowRelease`.
+ * `paths`/`pathCount`/`complete` are the hold the owner was shown when releasing.
+ */
+export interface WorkUpstreamWorkflowRelease {
+    headSha: string;
+    paths: string[];
+    pathCount: number;
+    complete: boolean;
+    releasedByUserId: string;
+    releasedAt: string;
+}
+
 @Entity({ name: 'work_upstream_states' })
 @Index('uq_work_upstream_states_work', ['workId'], { unique: true })
 @Index('idx_work_upstream_states_next_sync', ['nextSyncAt'])
@@ -328,6 +353,34 @@ export class WorkUpstreamState {
      */
     @Column({ type: 'uuid', nullable: true })
     credentialMemberUserId?: string | null;
+
+    // APW-02 T46/T47 (2026-10-27, lane aw-loops) — three nullable, default-free
+    // columns. Migration: `apps/api/src/migrations/1796500000000-AddWorkUpstreamSyncRelease.ts`.
+
+    /**
+     * T47 (FR-62) — when the open sync pull request was last checked for a merge.
+     * The dispatcher's `claimSyncPullRequestChecks` reads and stamps it, exactly as
+     * `setupCheckedAt` gates the setup pull request check.
+     */
+    @TimestampColumn({ nullable: true })
+    syncPullRequestCheckedAt?: Date | null;
+
+    /**
+     * T46 (FR-60/FR-61) — the range the last run held for workflow review: the exact
+     * upstream head it checked and the protected paths (never their content). Written
+     * by the sync run when it holds, cleared when a run finds the range clean.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    workflowHold?: WorkUpstreamWorkflowHold | null;
+
+    /**
+     * T46 — the Work owner's release of ONE held head ("Sync anyway"), written only by
+     * `AppUpstreamStateService.requestSync` after the owner-and-session gate. The run
+     * honours it only for that exact head and only while the range shows no protected
+     * path the owner was not shown.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    workflowRelease?: WorkUpstreamWorkflowRelease | null;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs, plain
     // columns with no relation (see the class docstring).

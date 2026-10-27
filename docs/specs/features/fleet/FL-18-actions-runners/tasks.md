@@ -194,24 +194,24 @@
 
 # PHASE 3 — Docker-isolated runners, versions, CLI
 
-- [ ] **T-27**. Node: `runner-docker.ts` (container per runner from the official runner image pinned by
+- [x] **T-27**. Node: `runner-docker.ts` (container per runner from the official runner image pinned by
       digest, runner folder mounted, `--restart unless-stopped`; the Docker socket shared only with the
       explicit labelled option); dialog mode offered when `docker` on Linux.
       **Test**: `runner-docker.spec.ts` — no socket mount by default; argv assertions.
-- [ ] **T-28**. Version visibility: poll task compares installed version with GitHub's latest download;
+- [x] **T-28**. Version visibility: poll task compares installed version with GitHub's latest download;
       **Update available** note; reinstall action (`runner-control` `reinstall`).
       **Test**: poll spec; row renders the note.
-- [ ] **T-29**. CLI `apps/cli/src/commands/fleet/runners.ts` under FL-19's `fleet` root.
+- [x] **T-29**. CLI `apps/cli/src/commands/fleet/runners.ts` under FL-19's `fleet` root.
       **Test**: `apps/cli/src/commands/fleet/__tests__/runners.spec.ts` — `--json` shapes equal DTOs.
 
 ---
 
 # Docs & rollout
 
-- [ ] **T-30**. Finish `docs/features/fleet-actions-runners.md` (what is installed where, token
+- [x] **T-30**. Finish `docs/features/fleet-actions-runners.md` (what is installed where, token
       handling, permissions needed, diagnosis meanings, Windows service-only, Docker mode caveats).
       **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
-- [ ] **T-31**. Update `docs/specs/features/fleet/TRACKER.md`; plugin count only in the canonical doc.
+- [x] **T-31**. Update `docs/specs/features/fleet/TRACKER.md`; plugin count only in the canonical doc.
       **Test**: the FL-18 TRACKER row shows `FLEET_ACTIONS_RUNNERS_ENABLED` and slot `1796180000000`.
 - [ ] **T-32**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; banned-terms grep over
       this folder, the plugin and the docs prints nothing.

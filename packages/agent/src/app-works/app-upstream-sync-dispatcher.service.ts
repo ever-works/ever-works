@@ -12,6 +12,9 @@ import {
     APP_FORK_READINESS_DISPATCHER,
     APP_SETUP_PULL_REQUEST_CHECK_INTERVAL_MS,
     APP_SETUP_PULL_REQUEST_ON_VIEW_MS,
+    APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS,
+    APP_SYNC_PULL_REQUEST_ON_VIEW_MS,
+    type AppSyncPullRequestCheck,
     APP_UPSTREAM_SYNC_DISPATCHER,
     type AppForkReadinessDispatcher,
     type AppForkReadinessJobPayload,
@@ -106,6 +109,11 @@ export interface AppUpstreamDispatchCounters {
     failed: number;
     /** Claimed rows deliberately not dispatched: `link` (FR-44) or rate-limited (FR-52). */
     skipped: number;
+    /**
+     * APW-02 T47 (FR-62) — open sync pull requests checked for a merge this tick (additive).
+     * A check the provider would not answer counts in `failed`, as the setup check's does.
+     */
+    syncPullRequestChecked: number;
 }
 
 /**
@@ -171,6 +179,7 @@ export class AppUpstreamSyncDispatcherService {
             setupChecked: 0,
             failed: 0,
             skipped: 0,
+            syncPullRequestChecked: 0,
         };
 
         await this.guard(counters, 'the due rows', () => this.dispatchDueRows(now, counters));
@@ -183,12 +192,16 @@ export class AppUpstreamSyncDispatcherService {
         await this.guard(counters, 'the setup pull request check', () =>
             this.checkSetupPullRequests(now, counters),
         );
+        await this.guard(counters, 'the sync pull request check', () =>
+            this.checkSyncPullRequests(now, counters),
+        );
 
         this.pruneDivergenceWindow(now);
         this.logger.debug(
             `App upstream dispatcher: ${counters.dueCount} due, ${counters.dispatched} dispatched, ` +
                 `${counters.redispatchedReadiness} readiness re-dispatched, ${counters.timedOut} timed out, ` +
                 `${counters.rechecked} re-checked, ${counters.setupChecked} setup pull requests checked, ` +
+                `${counters.syncPullRequestChecked} sync pull requests checked, ` +
                 `${counters.skipped} skipped, ${counters.failed} failed.`,
         );
 
@@ -354,6 +367,76 @@ export class AppUpstreamSyncDispatcherService {
                 continue;
             }
             counters.setupChecked++;
+        }
+    }
+
+    /**
+     * APW-02 T47 (FR-62) — the fifth leg: a merged sync pull request finishes the sync.
+     *
+     * `claimSyncPullRequestChecks(now, 600 000, 50)` hands over the rows with an open sync pull
+     * request whose last check is missing or older than ten minutes, stamped in the same
+     * statement; each is read once through the state service, which queues the `merged` finish
+     * run or records the close.
+     */
+    private async checkSyncPullRequests(
+        now: number,
+        counters: AppUpstreamDispatchCounters,
+    ): Promise<void> {
+        const due = await this.rows.claimSyncPullRequestChecks(
+            now,
+            APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS,
+            APP_UPSTREAM_SYNC_DISPATCH_BATCH,
+        );
+
+        for (const row of due) {
+            const check = await this.states.checkSyncPullRequest(row.workId);
+            if (check.status === 'unknown') {
+                counters.failed++;
+                continue;
+            }
+            if (check.status === 'busy' || check.status === 'not_open') {
+                counters.skipped++;
+                continue;
+            }
+            counters.syncPullRequestChecked++;
+        }
+    }
+
+    /**
+     * T47 — the Upstream card's read checks an open sync pull request when the last check is
+     * older than {@link APP_SYNC_PULL_REQUEST_ON_VIEW_MS}, so a member who merges it and reloads
+     * sees the sync finish within a minute. The row's `syncPullRequestCheckedAt` is the whole
+     * rate limit. Never throws; `null` = nothing to do.
+     */
+    async requestSyncPullRequestCheck(
+        workId: string,
+        now: number = Date.now(),
+    ): Promise<AppSyncPullRequestCheck | null> {
+        const id = typeof workId === 'string' ? workId.trim() : '';
+        if (!id) {
+            return null;
+        }
+        const row = await this.readRow(id);
+        if (!row || row.relation === 'link' || typeof row.syncPullRequestNumber !== 'number') {
+            return null;
+        }
+        const checkedAt = row.syncPullRequestCheckedAt
+            ? new Date(row.syncPullRequestCheckedAt).getTime()
+            : null;
+        if (
+            checkedAt !== null &&
+            Number.isFinite(checkedAt) &&
+            now - checkedAt <= APP_SYNC_PULL_REQUEST_ON_VIEW_MS
+        ) {
+            return null;
+        }
+        try {
+            return await this.states.checkSyncPullRequest(id);
+        } catch (error) {
+            this.logger.warn(
+                `App upstream dispatcher: the on-view sync pull request check of work ${id} failed (${errorText(error)}).`,
+            );
+            return null;
         }
     }
 

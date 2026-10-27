@@ -40,7 +40,11 @@ import { NotificationCategory, NotificationType } from '../entities/notification
 import type { Task, TaskStatus } from '../entities/task.entity';
 import { WorkMemberRole } from '../entities/types';
 import type { Work } from '../entities/work.entity';
-import type { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+import type {
+    WorkUpstreamState,
+    WorkUpstreamWorkflowHold,
+    WorkUpstreamWorkflowRelease,
+} from '../entities/work-upstream-state.entity';
 import { GitFacadeService, NoGitCredentialsError } from '../facades/git.facade';
 import { NotificationService } from '../notifications/notification.service';
 import { TaskChatService } from '../tasks-domain/task-chat.service';
@@ -186,7 +190,12 @@ export type AppUpstreamErrorCode =
     | 'sync_paused'
     | 'not_retryable'
     | 'retry_limit_reached'
-    | 'edit_access_required';
+    | 'edit_access_required'
+    // APW-02 T46 (2026-10-27) — the workflow-change hold's four refusals, appended.
+    | 'workflow_confirmation_required'
+    | 'workflow_hold_changed'
+    | 'no_workflow_hold'
+    | 'owner_required';
 
 /**
  * The typed refusal every route of plan §4.1 answers with — `{ status: 'error', code,
@@ -280,6 +289,17 @@ export interface AppReadinessResolution {
 export interface AppUpstreamDispatchResult {
     queued: boolean;
     runId: string | null;
+}
+
+/**
+ * APW-02 T46 — what **Sync now** may carry. Empty = an ordinary sync, exactly as before.
+ * `confirmWorkflowChanges` is the owner's "Sync anyway" for the held range; the API route
+ * admits it only from the Work owner's signed-in session.
+ */
+export interface AppUpstreamSyncRequestOptions {
+    confirmWorkflowChanges?: boolean;
+    /** The held head the owner reviewed; a different hold on record ⇒ `409 workflow_hold_changed`. */
+    workflowHeadSha?: string | null;
 }
 
 /** Why a sync run was dispatched (`plan.md:656`). */
@@ -441,6 +461,77 @@ export interface AppSetupPullRequestCheck {
     readonly runId?: string | null;
 }
 
+/**
+ * What one sync-pull-request check did (FR-62, APW-02 T47).
+ *
+ * `merged` queued the `merged` finish run; `closed` recorded `pull_request_closed` and cleared
+ * the pull request; `open` changed nothing but the stamp; `busy` = a sync is running right now,
+ * so the check waits for the next door rather than racing it; `unknown` = the provider would
+ * not answer; `not_open` = there is no sync pull request on record.
+ */
+export interface AppSyncPullRequestCheck {
+    readonly found: boolean;
+    readonly checked: boolean;
+    readonly status: 'open' | 'merged' | 'closed' | 'busy' | 'unknown' | 'not_open';
+    /** The sync run id, when this check dispatched the `merged` finish run. */
+    readonly runId?: string | null;
+}
+
+/**
+ * The Activity actions the upstream sync WORKER may record through this service
+ * ({@link AppUpstreamStateService.recordWorkerActivity}) — the sync run's own one-time
+ * events and Actions hygiene's `app.actions.disabled`. A closed set: the worker's RPC hop
+ * can never write an Activity row of any other kind.
+ */
+export const APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS = [
+    'app.upstream.behind',
+    'app.upstream.unavailable',
+    'app.upstream.held',
+    'app.upstream.workflow_release_used',
+    'app.fork.missing',
+    'app.actions.disabled',
+] as const;
+
+/** One Activity entry as the worker hands it over (owner, workspace and type are re-derived here). */
+export interface AppUpstreamWorkerActivityEntry {
+    action: string;
+    status?: string | null;
+    summary?: string | null;
+    details?: Record<string, unknown> | null;
+}
+
+/** The largest `details` bag a worker Activity entry may carry, serialised. */
+const WORKER_ACTIVITY_MAX_DETAILS_BYTES = 16_384;
+
+/**
+ * The `ActivityLogService` the upstream sync worker is given (lane aw-safety's open item,
+ * 2026-10-26): the sync run and Actions hygiene call `log(entry)` exactly as in-process, and
+ * every call becomes {@link AppUpstreamStateService.recordWorkerActivity} over the state
+ * service's existing remote proxy — so the worker needs no database module and the API stays
+ * the only writer, stamping the Work's own owner and workspace.
+ */
+export function appUpstreamWorkerActivitySink(
+    states: Pick<AppUpstreamStateService, 'recordWorkerActivity'>,
+): Pick<ActivityLogService, 'log'> {
+    return {
+        log: (async (entry: CreateActivityLogDto) => {
+            await states.recordWorkerActivity(String(entry?.workId ?? ''), {
+                action: String(entry?.action ?? ''),
+                status: entry?.status ?? null,
+                summary: entry?.summary ?? null,
+                details: (entry?.details as Record<string, unknown> | undefined) ?? null,
+            });
+            return undefined;
+        }) as unknown as ActivityLogService['log'],
+    };
+}
+
+/** T47 — the dispatcher checks an open sync pull request at most every 10 minutes. */
+export const APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS = 600_000;
+
+/** T47 — and the Upstream card's read checks it when the last check is older than 60 s. */
+export const APP_SYNC_PULL_REQUEST_ON_VIEW_MS = 60_000;
+
 @Injectable()
 export class AppUpstreamStateService {
     private readonly logger = new Logger(AppUpstreamStateService.name);
@@ -531,7 +622,10 @@ export class AppUpstreamStateService {
             },
             divergence: this.divergenceOf(state, now),
             // §3.4: a linked App Work has no upstream and no sync at all (FR-44).
-            sync: state.relation === 'link' ? null : this.syncOf(state, now),
+            sync:
+                state.relation === 'link'
+                    ? null
+                    : this.syncOf(state, now, { isOwner: work.userId === userId }),
             actions: this.actionsOf(state),
             warnings: this.warningsOf(state, now),
         };
@@ -874,6 +968,97 @@ export class AppUpstreamStateService {
     }
 
     /**
+     * **FR-62 — a merged sync pull request finishes the sync** (APW-02 T47).
+     *
+     * The sync run opens ONE pull request from `ever-works/upstream-sync` and leaves it for the
+     * member (FR-39: nothing is merged automatically). Until now nothing watched it, so a merged
+     * sync pull request left the row saying "pull request opened" forever. This is the watcher,
+     * reached from the dispatcher's tick (`claimSyncPullRequestChecks`, at most once per row per
+     * {@link APP_SYNC_PULL_REQUEST_CHECK_INTERVAL_MS}) and from the card's read (when the last
+     * check is older than {@link APP_SYNC_PULL_REQUEST_ON_VIEW_MS}).
+     *
+     *   - **merged** ⇒ queue `app-upstream-sync` with `trigger: 'merged'`. The run's finish path
+     *     records the merged head, clears the pull request, asks for the licence re-evaluation
+     *     (`upstream_merged`) and runs Actions hygiene — once, guarded by the row: a second
+     *     dispatch finds no pull request on record and changes nothing.
+     *   - **closed without merging** ⇒ the pull request fields are cleared and
+     *     `skipped / pull_request_closed` is recorded with its head (S26), so the next sync does
+     *     not reopen the very range the member said no to. The tracked branch is not touched.
+     *   - **open** ⇒ nothing but the stamp.
+     *   - the provider would not answer ⇒ `unknown`, nothing but the stamp.
+     *
+     * Reads with the Work owner's own credential, like {@link checkSetupPullRequest}.
+     */
+    async checkSyncPullRequest(workId: string): Promise<AppSyncPullRequestCheck> {
+        const state = await this.states.findByWorkId(workId);
+        if (!state) {
+            return { found: false, checked: false, status: 'not_open' };
+        }
+        const number = state.syncPullRequestNumber;
+        if (
+            state.relation === 'link' ||
+            typeof number !== 'number' ||
+            !state.dataOwner ||
+            !state.dataRepo
+        ) {
+            return { found: true, checked: false, status: 'not_open' };
+        }
+
+        const now = Date.now();
+        if (
+            this.runningSince(state) !== null &&
+            now - (state.syncStartedAt as Date).getTime() < APP_UPSTREAM_SYNC_LOCK_TTL_MS
+        ) {
+            // A run is moving the sync branch or reading this very pull request: let it settle.
+            return { found: true, checked: false, status: 'busy' };
+        }
+
+        const work = await this.loadWork(workId);
+        if (!this.git || !work) {
+            return { found: true, checked: false, status: 'unknown' };
+        }
+
+        let status: GitPullRequestStatus | null = null;
+        try {
+            status = await this.git.getPullRequestStatus(state.dataOwner, state.dataRepo, number, {
+                userId: work.userId,
+                providerId: APP_WORK_GIT_PROVIDER_ID,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `App upstream: the sync pull request check for work ${workId} could not read the provider (${errorText(error)}).`,
+            );
+            await this.states.update(workId, { syncPullRequestCheckedAt: new Date(now) });
+            return { found: true, checked: true, status: 'unknown' };
+        }
+
+        await this.states.update(workId, { syncPullRequestCheckedAt: new Date(now) });
+
+        if (!status) {
+            return { found: true, checked: true, status: 'unknown' };
+        }
+
+        if (status.merged || status.state === 'merged') {
+            const runId = await this.dispatchSync(workId, { workId, trigger: 'merged' });
+            return { found: true, checked: true, status: 'merged', runId };
+        }
+
+        if (status.state === 'closed') {
+            const headSha = typeof status.headSha === 'string' ? status.headSha.trim() : '';
+            await this.states.update(workId, {
+                syncPullRequestNumber: null,
+                syncPullRequestUrl: null,
+                ...(headSha ? { syncPullRequestClosedHeadSha: headSha } : {}),
+                lastSyncResult: 'skipped',
+                lastSyncReason: 'pull_request_closed',
+            });
+            return { found: true, checked: true, status: 'closed' };
+        }
+
+        return { found: true, checked: true, status: 'open' };
+    }
+
+    /**
      * Step 3's deadline (`plan.md:682-683`, FR-18): 15 minutes of polling ended with
      * nothing to show, so the Work is `timed_out` and `app.fork.timeout` is recorded
      * **once per attempt**.
@@ -1025,8 +1210,12 @@ export class AppUpstreamStateService {
      * the Work in {@link beginSync}, and a request that stamped it would deny its own
      * run.
      */
-    async requestSync(workId: string, userId: string): Promise<AppUpstreamDispatchResult> {
-        await this.requireEditableAppWork(workId, userId);
+    async requestSync(
+        workId: string,
+        userId: string,
+        options: AppUpstreamSyncRequestOptions = {},
+    ): Promise<AppUpstreamDispatchResult> {
+        const work = await this.requireEditableAppWork(workId, userId);
         const state = await this.requireState(workId);
         const now = Date.now();
 
@@ -1067,6 +1256,47 @@ export class AppUpstreamStateService {
             );
         }
 
+        // ── APW-02 T46 — the workflow-change hold (FR-60, FR-61) ──────────────
+        const hold = activeWorkflowHold(state);
+        const confirming = options.confirmWorkflowChanges === true;
+        if (confirming) {
+            // Defence in depth: the API route already refused anyone but the Work owner in a
+            // signed-in session (`requireAppWorkOwnerSession`). This service is also reachable
+            // from other callers, so it re-checks the one fact it can see: the owner.
+            if (work.userId !== userId) {
+                throw new AppUpstreamRefusalError(
+                    'owner_required',
+                    403,
+                    'Only the Work owner can accept upstream workflow changes.',
+                );
+            }
+            if (!hold) {
+                throw new AppUpstreamRefusalError(
+                    'no_workflow_hold',
+                    409,
+                    'No upstream workflow change is waiting for review on this App Work.',
+                );
+            }
+            const reviewed = typeof options.workflowHeadSha === 'string' ? options.workflowHeadSha.trim() : '';
+            if (reviewed && reviewed.toLowerCase() !== hold.headSha.toLowerCase()) {
+                throw new AppUpstreamRefusalError(
+                    'workflow_hold_changed',
+                    409,
+                    'Upstream moved since you reviewed it; review the new changes first.',
+                    workflowHoldDetails(hold),
+                );
+            }
+        } else if (hold && holdIsForCurrentHead(state, hold)) {
+            // The same head would be held again: say why, and name the paths, instead of
+            // spending one of the six hourly syncs on a run that cannot move anything.
+            throw new AppUpstreamRefusalError(
+                'workflow_confirmation_required',
+                409,
+                'Upstream changed workflow files. The Work owner must review and accept them before this App Work can sync.',
+                workflowHoldDetails(hold),
+            );
+        }
+
         const attempt = await this.states.incrementManualSync(
             workId,
             now,
@@ -1082,8 +1312,99 @@ export class AppUpstreamStateService {
             );
         }
 
+        if (confirming && hold) {
+            // Recorded on the ROW, never on the job payload: the run reads it from the row
+            // it already loads, so a worker that predates this field simply keeps holding
+            // (fail closed), and nothing in a queue message can grant it.
+            const release: WorkUpstreamWorkflowRelease = {
+                headSha: hold.headSha,
+                paths: [...hold.paths],
+                pathCount: hold.pathCount,
+                complete: hold.complete,
+                releasedByUserId: userId,
+                releasedAt: new Date(now).toISOString(),
+            };
+            await this.states.update(workId, { workflowRelease: release });
+            await this.emit(workId, {
+                actionType: ActivityActionType.APP_UPSTREAM,
+                action: 'app.upstream.workflow_released',
+                status: ActivityStatus.COMPLETED,
+                summary: 'The owner accepted upstream workflow changes',
+                details: {
+                    reason: 'workflow_release',
+                    upstreamHeadSha: hold.headSha,
+                    paths: hold.paths,
+                    pathCount: hold.pathCount,
+                    complete: hold.complete,
+                    releasedByUserId: userId,
+                },
+            });
+        }
+
         const runId = await this.dispatchSync(workId, { workId, trigger: 'manual' });
         return { queued: true, runId };
+    }
+
+    /**
+     * The upstream sync worker's Activity rows (the worker has no `ActivityLogService`), via
+     * {@link appUpstreamWorkerActivitySink}. Only {@link APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS}
+     * are written; the type is derived from the action, the status is coerced into the closed
+     * enum, the owner and workspace are the Work's own ({@link emit}), and an oversized
+     * `details` bag is dropped rather than stored. Answers whether the row was handed over.
+     */
+    async recordWorkerActivity(
+        workId: string,
+        entry: AppUpstreamWorkerActivityEntry,
+    ): Promise<boolean> {
+        const action = typeof entry?.action === 'string' ? entry.action : '';
+        if (!isUuid(workId) || !(APP_UPSTREAM_WORKER_ACTIVITY_ACTIONS as readonly string[]).includes(action)) {
+            this.logger.warn(
+                `App upstream: refused a worker Activity entry (${action || 'no action'}) for work ${String(workId)}.`,
+            );
+            return false;
+        }
+        const actionType = action.startsWith('app.fork.')
+            ? ActivityActionType.APP_FORK
+            : action.startsWith('app.actions.')
+              ? ActivityActionType.APP_ACTIONS
+              : ActivityActionType.APP_UPSTREAM;
+        const statuses = Object.values(ActivityStatus) as string[];
+        const status = (
+            typeof entry?.status === 'string' && statuses.includes(entry.status)
+                ? entry.status
+                : ActivityStatus.COMPLETED
+        ) as ActivityStatus;
+        let details: Record<string, unknown> | undefined;
+        if (entry?.details && typeof entry.details === 'object' && !Array.isArray(entry.details)) {
+            try {
+                const serialised = JSON.stringify(entry.details);
+                if (serialised.length <= WORKER_ACTIVITY_MAX_DETAILS_BYTES) {
+                    details = JSON.parse(serialised) as Record<string, unknown>;
+                }
+            } catch {
+                details = undefined;
+            }
+        }
+        await this.emit(workId, {
+            actionType,
+            action,
+            status,
+            summary: (typeof entry?.summary === 'string' ? entry.summary : action).slice(0, 300),
+            ...(details ? { details } : {}),
+        });
+        return true;
+    }
+
+    /**
+     * APW-02 T46 — whether `userId` is the Work's OWNER (its creator), for the "Sync anyway"
+     * gate. Visibility is decided first, so a Work the caller cannot see answers the same
+     * `404 not_found` every other route gives; a visible Work answers `true` only for the
+     * creator — a member of any role, a co-owner included, answers `false`, because a released
+     * workflow runs with the creator's repository secrets.
+     */
+    async isWorkOwner(workId: string, userId: string): Promise<boolean> {
+        const work = await this.requireVisibleAppWork(workId, userId);
+        return !!work.userId && work.userId === userId;
     }
 
     // ── §6.3 — the sync run's two state transitions ──────────────────────────
@@ -1481,8 +1802,39 @@ export class AppUpstreamStateService {
         };
     }
 
-    private syncOf(state: WorkUpstreamState, now: number): AppUpstreamStateResponse['sync'] {
+    private syncOf(
+        state: WorkUpstreamState,
+        now: number,
+        viewer: { isOwner: boolean } = { isOwner: false },
+    ): AppUpstreamStateResponse['sync'] {
+        const hold = activeWorkflowHold(state);
+        const release = state.workflowRelease ?? null;
+        const workflowHold = hold
+            ? {
+                  headSha: hold.headSha,
+                  paths: hold.paths,
+                  pathCount: hold.pathCount,
+                  complete: hold.complete,
+                  heldAt: hold.heldAt,
+                  compareUrl: workflowHoldCompareUrl(state, hold.headSha),
+                  canRelease: viewer.isOwner === true,
+              }
+            : undefined;
+        const releaseShown =
+            release &&
+            typeof release.headSha === 'string' &&
+            (release.headSha === hold?.headSha || release.headSha === state.lastSyncedUpstreamSha);
         return {
+            ...(workflowHold ? { workflowHold } : {}),
+            ...(releaseShown
+                ? {
+                      workflowRelease: {
+                          headSha: release.headSha,
+                          releasedAt: release.releasedAt,
+                          releasedByUserId: release.releasedByUserId,
+                      },
+                  }
+                : {}),
             schedule: state.syncSchedule ?? null,
             nextRunAt: isoOf(state.nextSyncAt),
             running: this.runningSince(state) !== null,
@@ -2064,6 +2416,63 @@ export class AppUpstreamStateService {
  * caller's, or has no state row yet (ACC-02-21). One factory, so no door can drift into
  * telling a stranger which of those it was.
  */
+/**
+ * APW-02 T46 — the hold the last run recorded, when it is well-formed. A row whose
+ * JSON is damaged or partial reports no hold rather than a hold nobody can release.
+ */
+function activeWorkflowHold(state: WorkUpstreamState): WorkUpstreamWorkflowHold | null {
+    const hold = state.workflowHold;
+    if (!hold || typeof hold !== 'object') return null;
+    if (typeof hold.headSha !== 'string' || hold.headSha.trim().length === 0) return null;
+    return {
+        headSha: hold.headSha.trim(),
+        paths: Array.isArray(hold.paths)
+            ? hold.paths.filter((path): path is string => typeof path === 'string')
+            : [],
+        pathCount: typeof hold.pathCount === 'number' ? hold.pathCount : 0,
+        complete: hold.complete === true,
+        heldAt: typeof hold.heldAt === 'string' ? hold.heldAt : new Date(0).toISOString(),
+    };
+}
+
+/**
+ * T46 — `true` ⇔ the held head is still upstream's head as last read. When the divergence
+ * reading has since seen a NEWER head, a plain **Sync now** is a new range to check, so it
+ * is not refused.
+ */
+function holdIsForCurrentHead(state: WorkUpstreamState, hold: WorkUpstreamWorkflowHold): boolean {
+    const current = typeof state.upstreamHeadSha === 'string' ? state.upstreamHeadSha.trim() : '';
+    return current.length === 0 || current.toLowerCase() === hold.headSha.toLowerCase();
+}
+
+/** T46 — the refusal `details` for a held range (`Record<string, string>`, as §4.1 fixes). */
+function workflowHoldDetails(hold: WorkUpstreamWorkflowHold): Record<string, string> {
+    return {
+        headSha: hold.headSha,
+        pathCount: String(hold.pathCount),
+        complete: hold.complete ? 'true' : 'false',
+        paths: hold.paths.join('\n'),
+    };
+}
+
+/**
+ * T46 — "Review the changes": the provider's compare page for the held range. A fork
+ * shares its objects with upstream, so the range is read in the Work Repository from its
+ * tracked branch; a private copy shares none, so the page is upstream's own history at
+ * the held head.
+ */
+function workflowHoldCompareUrl(state: WorkUpstreamState, headSha: string): string | undefined {
+    const head = encodeURIComponent(headSha);
+    if (state.relation === 'private-copy') {
+        if (!state.upstreamOwner || !state.upstreamRepo) return undefined;
+        const base = state.copyPushedSha ? encodeURIComponent(state.copyPushedSha) : null;
+        const repo = repositoryWebUrl(state.upstreamOwner, state.upstreamRepo);
+        return base ? `${repo}/compare/${base}...${head}` : `${repo}/commits/${head}`;
+    }
+    const branch = encodeURIComponent(state.dataDefaultBranch);
+    return `${repositoryWebUrl(state.dataOwner, state.dataRepo)}/compare/${branch}...${head}`;
+}
+
 function notFound(): AppUpstreamRefusalError {
     return new AppUpstreamRefusalError('not_found', 404, 'No such App Work.');
 }

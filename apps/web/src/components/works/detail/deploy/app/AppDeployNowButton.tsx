@@ -12,6 +12,9 @@ import {
     type AppDeployNotice,
 } from '@/lib/api/app-runtime.types';
 
+/** The managed-tier refusals whose API message names the reason (lane aw-safety). */
+const MANAGED_REFUSAL_CODES = new Set(['quota_exceeded', 'managed_ineligible']);
+
 export interface AppDeployNowButtonProps {
     workId: string;
     /** A specific Build to deploy; omitted = the latest deployable Build. */
@@ -62,6 +65,12 @@ export function AppDeployNowButton({
 
     const describe = (notice: AppDeployNotice) => {
         const leaf = appPreconditionLeaf(notice.code);
+        // Lane aw-safety (2026-10-26): the managed tier's two refusals carry the API's precise
+        // reason (the cap and the counted Apps; the unverified email; the paid plan), which the
+        // generic leaf cannot say — so it follows the leaf.
+        if (leaf && MANAGED_REFUSAL_CODES.has(notice.code) && notice.message) {
+            return `${tPre(leaf)} ${notice.message}`;
+        }
         return leaf ? tPre(leaf) : notice.message || notice.code;
     };
 

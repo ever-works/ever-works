@@ -1061,7 +1061,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/runners/{runnerId}/{action}',
 		toolName: 'fleet_runners_action',
 		description:
-			'Start, stop or restart one Actions runner ({action} = start | stop | restart; stop and restart need `confirm: true`). Remove is fleet_runners_remove.',
+			'Start, stop, restart or reinstall one Actions runner ({action} = start | stop | restart | reinstall; stop, restart and reinstall need `confirm: true`; reinstall takes GitHub’s current build with the same name and labels). Remove is fleet_runners_remove.',
 		annotations: { destructiveHint: true }
 	},
 	{

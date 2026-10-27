@@ -16,12 +16,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
     fleetActionsRunnerControlAction,
+    reinstallFleetActionsRunnerAction,
     removeFleetActionsRunnerAction,
 } from '@/app/actions/fleet/runners';
 import { ConfirmActionDialog } from '../machine/ConfirmActionDialog';
 import { RootRequiredDialog } from '../machine/RootRequiredDialog';
 import { useMachineAction } from '../machine/use-machine-action';
-import { runnerActAvailability, runnerActDialog, type RunnerRowAct } from './runners.shared';
+import {
+    runnerActAvailability,
+    runnerActDialog,
+    runnerReinstallAvailability,
+    runnerReinstallDialog,
+    runnerReinstallPlacement,
+    type RunnerRowAct,
+} from './runners.shared';
 
 /**
  * Actions runners on computers (FL-18 P1, spec §4.3, §5.2, §5.3, FR-15,
@@ -35,6 +43,11 @@ import { runnerActAvailability, runnerActDialog, type RunnerRowAct } from './run
  * exact command (FL-09's dialog). Disabled with the reason when the viewer is
  * outside the computer's `machines` audience or while all computers are
  * stopped.
+ *
+ * P3 (FR-28): **Reinstall…** (`confirm`, with the contracts' sentence naming
+ * the newer build) for an idle, offline, stopped or failed runner — in the row
+ * as **Retry** on a failed install or when an update is available, else in the
+ * ⋯ menu beside Remove runner….
  */
 export function RunnerActionsMenu({
     runner,
@@ -109,6 +122,26 @@ export function RunnerActionsMenu({
         });
     };
 
+    // P3 (FR-28): Reinstall — the same confirm loop, its own route.
+    const reinstall = runnerReinstallAvailability(runner);
+    const reinstallPlacement = runnerReinstallPlacement(runner);
+    const reinstallDisabled = reinstall === 'disabled' || Boolean(blocked) || busy;
+    const requestReinstall = () => {
+        if (blocked) return;
+        action.request({
+            key: `${runner.id}:reinstall`,
+            dialog: runnerReinstallDialog(runner),
+            actionLabel: t('reinstall.confirm'),
+            run: (fields) =>
+                reinstallFleetActionsRunnerAction(nodeId, runner.id, fields.confirm === true),
+            onDone: () => {
+                toast.success(t('reinstall.reinstalling', { name: runner.name }));
+                onChanged();
+            },
+            onError: (error) => toast.error(error.hint || t('reinstall.failed')),
+        });
+    };
+
     const button = (act: Exclude<RunnerRowAct, 'remove'>) =>
         availability[act] === 'hidden' ? null : (
             <Button
@@ -130,6 +163,19 @@ export function RunnerActionsMenu({
             {button('start')}
             {button('stop')}
             {button('restart')}
+            {reinstall !== 'hidden' && reinstallPlacement !== 'menu' ? (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={requestReinstall}
+                    disabled={reinstallDisabled}
+                    title={blocked}
+                    data-testid="fleet-runner-reinstall"
+                >
+                    {reinstallPlacement === 'retry' ? t('reinstall.retry') : t('reinstall.button')}
+                </Button>
+            ) : null}
             {availability.remove !== 'hidden' ? (
                 <div className="w-8 shrink-0">
                     <DropdownMenu>
@@ -140,6 +186,16 @@ export function RunnerActionsMenu({
                             <MoreHorizontal className="h-4 w-4" aria-hidden />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            {reinstall !== 'hidden' && reinstallPlacement === 'menu' ? (
+                                <DropdownMenuItem
+                                    onClick={requestReinstall}
+                                    disabled={reinstallDisabled}
+                                >
+                                    <span data-testid="fleet-runner-reinstall-menu">
+                                        {t('reinstall.button')}
+                                    </span>
+                                </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuItem
                                 onClick={() => request('remove')}
                                 disabled={

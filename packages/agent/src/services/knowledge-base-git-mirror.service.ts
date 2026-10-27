@@ -8,6 +8,7 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { Work } from '../entities/work.entity';
+import { isAppWork } from '../works/app-work-guard';
 import { User } from '../entities/user.entity';
 import {
     KbDecisionState,
@@ -876,6 +877,11 @@ export class KnowledgeBaseGitMirrorService {
         message: string,
         committer: { name: string; email: string },
     ): Promise<string | null> {
+        // APW-01 T10 (lane aw-safety) — never commit a knowledge-base mirror into an App Work's
+        // repository: it is the member's application code.
+        if (isAppWork(work)) {
+            return null;
+        }
         const providerId = work.gitProvider;
 
         await this.gitFacade.addAll(providerId, dir);
