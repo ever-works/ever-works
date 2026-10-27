@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import type { RunKnowledgeCitation, RunReceipt } from '@ever-works/contracts';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
@@ -11,6 +11,10 @@ import {
     type RunCostBreakdownReader,
 } from './run-cost-breakdown-reader';
 import { RunLedgerService } from './run-ledger.service';
+import {
+    RUN_RECEIPT_FLEET_USAGE_READER,
+    type RunReceiptFleetUsageReader,
+} from './run-receipt-fleet-usage-reader';
 
 /**
  * Step names the receipt counts are composed from — the same literals the
@@ -37,6 +41,8 @@ const CAPTURE_TRUNCATED_STEPS = ['capture-truncated'] as const;
  */
 @Injectable()
 export class RunReceiptService {
+    private readonly logger = new Logger(RunReceiptService.name);
+
     constructor(
         private readonly runs: AgentRunRepository,
         private readonly runLogs: AgentRunLogRepository,
@@ -46,6 +52,11 @@ export class RunReceiptService {
         // Bound api-side to CostsSummaryService — the Costs dashboard's own
         // producer — so the two surfaces share one source of cost figures.
         @Inject(RUN_COST_BREAKDOWN_READER) private readonly costs: RunCostBreakdownReader,
+        // FL-20 (spec FR-11): the fleet line — bound api-side to the fleet usage
+        // view; APPENDED LAST and optional, so every existing construction holds.
+        @Optional()
+        @Inject(RUN_RECEIPT_FLEET_USAGE_READER)
+        private readonly fleetUsage?: RunReceiptFleetUsageReader | null,
     ) {}
 
     async getReceipt(
@@ -68,13 +79,14 @@ export class RunReceiptService {
             throw error;
         }
 
-        const [[row], cost, messages, toolCalls, truncatedMarkers, citations] = await Promise.all([
+        const [[row], cost, messages, toolCalls, truncatedMarkers, citations, fleetUsage] = await Promise.all([
             this.ledger.toRows([run]),
             this.costs.getRunCostBreakdown(run, now),
             this.runLogs.countByRunSteps(run.id, MESSAGE_STEPS),
             this.runLogs.countByRunSteps(run.id, TOOL_STEPS),
             this.runLogs.countByRunSteps(run.id, CAPTURE_TRUNCATED_STEPS),
             this.citations.listForConsumer(KbCitationConsumerType.AGENT_RUN, run.id),
+            this.readFleetUsage(run.id),
         ]);
 
         const filesTouched = (run.workspaceMeta?.filesTouched ?? []).filter(
@@ -94,6 +106,7 @@ export class RunReceiptService {
             },
             filesTouched,
             captureTruncated: truncatedMarkers > 0,
+            ...(this.fleetUsage ? { fleetUsage } : {}),
             knowledge: citations.map(
                 (citation): RunKnowledgeCitation => ({
                     documentId: citation.documentId,
@@ -103,5 +116,18 @@ export class RunReceiptService {
                 }),
             ),
         };
+    }
+
+    /** The fleet line (FL-20); a failing read never fails the receipt. */
+    private async readFleetUsage(runId: string) {
+        if (!this.fleetUsage) return null;
+        try {
+            return await this.fleetUsage.runFleetUsage(runId);
+        } catch (error) {
+            this.logger.warn(
+                `Run ${runId}: the fleet usage line could not be read: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return null;
+        }
     }
 }

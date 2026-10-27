@@ -24,11 +24,15 @@ const FleetVirtualFlagContext = createContext<boolean>(false);
 /** Cloud computers (FL-17): `FLEET_CLOUD_ENABLED` (with the hub), for "New cloud computer" in the palette. */
 const FleetCloudFlagContext = createContext<boolean>(false);
 
+/** Usage & cost (FL-20): `FLEET_USAGE_SCAN_ENABLED` (with the hub), for "Fleet usage" in the palette. */
+const FleetUsageFlagContext = createContext<boolean>(false);
+
 export function FleetHubFlagProvider({
     enabled,
     machineFacts = false,
     virtual = false,
     cloud = false,
+    usage = false,
     children,
 }: {
     enabled: boolean;
@@ -38,13 +42,17 @@ export function FleetHubFlagProvider({
     virtual?: boolean;
     /** FL-17: cloud computers are on for this deployment (never without the hub). */
     cloud?: boolean;
+    /** FL-20: the usage scan is on for this deployment (never without the hub). */
+    usage?: boolean;
     children: ReactNode;
 }) {
     return (
         <FleetHubFlagContext.Provider value={enabled}>
             <FleetMachineFactsFlagContext.Provider value={enabled && machineFacts}>
                 <FleetVirtualFlagContext.Provider value={enabled && virtual}>
-                    <FleetCloudFlagContext.Provider value={enabled && cloud}>{children}</FleetCloudFlagContext.Provider>
+                    <FleetCloudFlagContext.Provider value={enabled && cloud}>
+                        <FleetUsageFlagContext.Provider value={enabled && usage}>{children}</FleetUsageFlagContext.Provider>
+                    </FleetCloudFlagContext.Provider>
                 </FleetVirtualFlagContext.Provider>
             </FleetMachineFactsFlagContext.Provider>
         </FleetHubFlagContext.Provider>
@@ -69,4 +77,9 @@ export function useFleetVirtualEnabled(): boolean {
 /** True when the hub and `FLEET_CLOUD_ENABLED` are both on (FL-17). */
 export function useFleetCloudEnabled(): boolean {
     return useContext(FleetCloudFlagContext);
+}
+
+/** True when the hub and `FLEET_USAGE_SCAN_ENABLED` are both on (FL-20). */
+export function useFleetUsageEnabled(): boolean {
+    return useContext(FleetUsageFlagContext);
 }

@@ -70,6 +70,7 @@ import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../
 import {
 	compareFleetNodeVersions,
 	FLEET_NODE_UPGRADE_COMMAND,
+	FLEET_USAGE_PRIVACY_SENTENCE,
 	isFleetLinkEligible,
 	isFleetNodeVersionBelowFloor
 } from '@ever-works/contracts';
@@ -513,6 +514,14 @@ export interface StartCommandOptions {
 	 */
 	manage?: boolean;
 	/**
+	 * Usage & cost on the fleet (FL-20, CONTRACTS §1.1) — the periodic
+	 * transcript scan: token counts, models and session ids from this
+	 * machine's Claude Code and Codex records, never prompts, output or file
+	 * contents. A consent of its own, process-scoped like `--manage`; off by
+	 * default.
+	 */
+	usageScan?: boolean;
+	/**
 	 * Fleet node link (FL-02 T-25) — let this machine upgrade itself when the
 	 * platform raises its version floor or names a recommended version: it
 	 * waits for running jobs, installs through npm, and exits 75 so its
@@ -701,6 +710,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const workerEnabled = options.work === true;
 	const attendEnabled = options.attend === true;
 	const manageEnabled = options.manage === true;
+	const usageScanEnabled = options.usageScan === true;
 	// Fleet node link (FL-02 T-25): the opt-in self-update. Built after the
 	// runtime (it needs the lanes to know when the machine is idle), reached
 	// through these closures from the heartbeat.
@@ -790,6 +800,13 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// link opens on the first accepted heartbeat when any of --work,
 		// --attend, --manage is on; its state is recorded for `status`.
 		manageEnabled,
+		// Usage & cost on the fleet (FL-20): the transcript scan's consent and its
+		// state folder beside the config (offsets, buckets, counted record ids).
+		usageScanEnabled,
+		usageStateDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'usage'
+		),
 		// Logs on computers (FL-08): the folders this machine shares (R-18).
 		...(filesRoots.length > 0 ? { filesRoots } : {}),
 		nodeLink: true,
@@ -1035,6 +1052,10 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 			? `Consents — ${describeConsents(runtime.consents)}; the node link opens after the first accepted heartbeat`
 			: 'Consents — none: the node link stays closed and this computer only reports health (pass --work, --attend or --manage)'
 	);
+	// Usage & cost on the fleet (FL-20, spec S1): say what the scan reads, and what it never reads.
+	if (runtime.consents.usageScan) {
+		deps.out(`Usage scan on — reads ${FLEET_USAGE_PRIVACY_SENTENCE}`);
+	}
 
 	// Block until shutdown is requested: the injected hook (tests) or a signal
 	// (the real service). With neither wired there is nothing that could ever
@@ -1445,6 +1466,16 @@ export async function runStatus(deps: CliDeps): Promise<void> {
 	const linkRecord = await readNodeLinkRecord(deps.fs, deps.configPath);
 	deps.out(
 		`consents     ${linkRecord ? describeConsents(linkRecord.consents) : 'unknown (the service has not reported them yet)'}`
+	);
+	// Usage & cost on the fleet (FL-20, spec S1): what the scan reads, and what it never reads.
+	deps.out(
+		`usage scan   ${
+			!linkRecord
+				? 'unknown (the service has not reported it yet)'
+				: linkRecord.consents?.usageScan === true
+					? `on — reads ${FLEET_USAGE_PRIVACY_SENTENCE}`
+					: 'off (start the node with --usage-scan to report what its model work would cost)'
+		}`
 	);
 	deps.out(`link         ${describeLinkRecord(linkRecord, (deps.now ?? (() => Date.now()))())}`);
 	deps.out(
@@ -2095,6 +2126,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--manage',
 			'Allow managing this machine from the dashboard — owner sessions, logs, services, Docker, processes, ports, files, commands, schedules (off by default; independent of --work and --attend)'
+		)
+		.option(
+			'--usage-scan',
+			'Report what the model work on this machine would cost: reads token counts, models and session ids from Claude Code and Codex records — never prompts, output or file contents (off by default)'
 		)
 		.option(
 			'--auto-update',

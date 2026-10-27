@@ -3,11 +3,18 @@
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { fleetNodeScheduleRowId, type FleetNodeView, type FleetScheduleView } from '@ever-works/contracts';
+import {
+    fleetNodeScheduleRowId,
+    type FleetNodeView,
+    type FleetScheduleView,
+    type FleetUsageTaskCost,
+} from '@ever-works/contracts';
+import { getFleetUsageTaskCostsAction } from '@/app/actions/fleet/usage';
 import { pauseSchedule, resumeSchedule, runScheduleNow } from '@/app/actions/dashboard/schedules';
 import { Button } from '@/components/ui/button';
 import { NewNodeScheduleDialog } from './NewNodeScheduleDialog';
 import { ScheduleRunHistory } from './ScheduleRunHistory';
+import { ScheduleUsageCost } from './ScheduleUsageCost';
 import { schedulesClient } from './schedules.client';
 import {
     runStatusKey,
@@ -35,12 +42,38 @@ type DialogState =
  * Pause / Resume, Edit, Duplicate, Delete — Move is the dialog's computer
  * field). Selecting a row opens its history. `N` opens New schedule.
  */
-export function SchedulesPanel({ node, nodes }: { node: FleetNodeView; nodes: FleetNodeView[] }) {
+export function SchedulesPanel({
+    node,
+    nodes,
+    usage = false,
+}: {
+    node: FleetNodeView;
+    nodes: FleetNodeView[];
+    /** FL-20 P2 (spec FR-16): `FLEET_USAGE_SCAN_ENABLED` — Agent-session rows show their list-price cost. */
+    usage?: boolean;
+}) {
     const t = useTranslations('fleet.schedules');
     const search = useSearchParams();
     const [rows, setRows] = useState<FleetScheduleView[] | null>(null);
     // FL-13 P2 — Agent-session schedules (pinned recurring Tasks) and the breaker's Undo.
     const [agentRows, setAgentRows] = useState<AgentSessionScheduleRow[]>([]);
+    // FL-20 P2 — each Agent-session schedule's last-run and 30-day cost, by Task id.
+    const [taskCosts, setTaskCosts] = useState<Map<string, FleetUsageTaskCost>>(new Map());
+    const taskIdsKey = agentRows
+        .map((row) => row.taskId)
+        .filter(Boolean)
+        .sort()
+        .join(',');
+    useEffect(() => {
+        if (!usage || !taskIdsKey) return;
+        let cancelled = false;
+        void getFleetUsageTaskCostsAction(taskIdsKey.split(',')).then((result) => {
+            if (!cancelled && result.ok) setTaskCosts(new Map(result.data.tasks.map((cost) => [cost.taskId, cost])));
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [usage, taskIdsKey]);
     const [breaker, setBreaker] = useState<{ breakerAt: string; undoUntil: number; count: number } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [expanded, setExpanded] = useState<string | null>(null);
@@ -379,6 +412,7 @@ export function SchedulesPanel({ node, nodes }: { node: FleetNodeView; nodes: Fl
                                                 })
                                               : ''}
                                     </span>
+                                    {usage && <ScheduleUsageCost cost={taskCosts.get(row.taskId)} />}
                                     <div className="flex flex-wrap gap-1">
                                         <Button variant="secondary" size="sm" disabled={disabled} onClick={() => void actAgentSession(row, 'run')}>
                                             {t('actions.runNow')}

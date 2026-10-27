@@ -74,6 +74,16 @@ export function isFleetCloudEnabled(): boolean {
 }
 
 /**
+ * Usage & cost on the fleet (FL-20) — `FLEET_USAGE_SCAN_ENABLED`, matching
+ * `config.fleet.isUsageScanEnabled()` on the API. Default OFF; on only for the
+ * literal `'true'` and only with the hub on, because the Usage tab and its
+ * palette entries live on the hub.
+ */
+export function isFleetUsageScanEnabled(): boolean {
+    return isFleetHubEnabled() && process.env.FLEET_USAGE_SCAN_ENABLED === 'true';
+}
+
+/**
  * The per-epic Fleet flags of CONTRACTS §9, read on the server and passed
  * down to the hub so a tab whose epic shipped behind a flag can say "switched
  * off on this deployment" instead of rendering (spec U4). Every flag is
