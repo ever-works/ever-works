@@ -30,7 +30,12 @@
  */
 
 import type { AppDependencyKind } from './app-dependencies.js';
-import type { ManagedHostingAvailability, BlueprintMatchSource, LicenseClass } from './app-license.types.js';
+import type {
+	ManagedHostingAvailability,
+	BlueprintMatchSource,
+	LicenseClass,
+	LicenseRegistrySource
+} from './app-license.types.js';
 
 import type { AppBlueprintPrompt } from './app-source.js';
 
@@ -644,6 +649,24 @@ export interface AppsCatalogListingItem {
 	trademark: { notice: string | null; displayNameSuffix: string | null } | null;
 	/** Every listed row may run on Your cluster (a `red` row is never listed, R-3). */
 	yourCluster: boolean;
+	/**
+	 * Additive (APW-03 T23 + APW-10 T31, lane aw-blueprints): FR-35's managed-hosting
+	 * availability — `available`, or the FIRST failing reason in
+	 * `MANAGED_HOSTING_REASONS` order (`licenseNotGreen`, `upstreamAgreementMissing`,
+	 * `entryDisallows`, `blueprintNotVerified`, `managedTierDisabled`). The tier part is
+	 * read through `APPS_TIER_POLICY` (`isOpen()` / `managedScope()`) on every answer, so a
+	 * closed tier is `managedTierDisabled` even for an entry that allows managed hosting.
+	 * Absent on an older API.
+	 */
+	managed?: ManagedHostingAvailability;
+}
+
+/** Additive (APW-10 T31): the managed tier as the catalog answer judged it. */
+export interface AppsCatalogManagedTier {
+	/** `AppsTierPolicy.isOpen()`; `false` while the policy is unbound (R-5). */
+	open: boolean;
+	/** `AppsTierPolicy.managedScope()`; `verified-blueprints` while the policy is unbound. */
+	scope: 'verified-blueprints' | 'any';
 }
 
 /** `GET /api/apps-catalog` — one page of {@link AppsCatalogListingItem}. */
@@ -658,4 +681,40 @@ export interface AppsCatalogListingResponse {
 	/** The catalog repository and ref the rows came from (`EVER_WORKS_APPS_CATALOG_REPO` / `_REF`). */
 	repo: string;
 	ref: string;
+	/** Additive (APW-10 T31): the tier state every row's `managed` was judged against. */
+	managedTier?: AppsCatalogManagedTier;
+}
+
+/**
+ * APW-03 T25 (lane aw-blueprints) — one row of `GET /api/apps-catalog/licenses`
+ * (plan §4.1:549): a licence the registry classifies, its obligations, and the id of
+ * the attestation text an owner confirms for it (amber and red).
+ */
+export interface AppsLicenseRegistryItem {
+	spdx: string;
+	name: string;
+	class: 'green' | 'amber' | 'red';
+	obligations: readonly string[];
+	attestationTextId?: string;
+}
+
+/** One class's hosting rules as the registry states them (CONTRACTS R-3). */
+export interface AppsLicenseRegistryClassRules {
+	managedHosting: boolean | 'upstream-agreement';
+	yourCluster: boolean;
+	attestation: boolean;
+}
+
+/** `GET /api/apps-catalog/licenses` — the licence registry in force. */
+export interface AppsLicenseRegistryResponse {
+	items: readonly AppsLicenseRegistryItem[];
+	/** `live` · `last_good` · `snapshot` — `snapshot` until the live read (T40) lands. */
+	registrySource: LicenseRegistrySource;
+	/** The registry's own `updatedAt`. */
+	updatedAt: string;
+	/** `false` while the registry has not been legal-reviewed (catalog.md §4). */
+	legalReviewed: boolean;
+	classes: Readonly<Record<'green' | 'amber' | 'red', AppsLicenseRegistryClassRules>>;
+	/** The class a licence the registry does not know gets (never `green`). */
+	unknownClass: 'amber' | 'red';
 }

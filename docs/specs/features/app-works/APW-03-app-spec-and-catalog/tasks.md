@@ -439,6 +439,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `pnpm --filter @ever-works/github-plugin test` and `pnpm --filter @ever-works/agent test -- git.facade.app-works` pass.
 
 - [ ] **T23 (parallel). Catalog sanitizer and managed availability.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2932): managed availability done** on the live listing — `managedHostingAvailability(item, tier)` (pure, tier passed in) in `apps/api/src/works/apps-catalog-manifest.service.ts`, the tier read through `APPS_TIER_POLICY`; spec `apps-catalog-manifest.availability.spec.ts` (each reason, the order, the purity guard, the closed default). The `apps-catalog.mapper.ts` / `AppsCatalogService` split of the plan was not made: the manifest service is the one reader.
       **Create** `packages/agent/src/apps-catalog/apps-catalog.mapper.ts` and `packages/agent/src/apps-catalog/apps-catalog.types.ts`
       — every rule of [catalog.md §3](./catalog.md), `isVerified`, and the pure
       `managedHostingAvailability(entry, registry, tier, match?)` of plan §2.4: drops a row whose license classifies
@@ -474,6 +475,7 @@ _Delivers spec FR-27…FR-52, FR-71…FR-73, FR-81 and FR-82._
       **Done when**: `pnpm --filter @ever-works/agent test -- apps-catalog.service` passes.
 
 - [ ] **T25. Public catalog API and web client.**
+      **Status (2026-10-27, lane aw-blueprints, PR #2932): `GET /api/apps-catalog/licenses` done** (public, cached 5 min, before `:id`). `GET /api/apps-catalog` and `/:id` stay behind the session guard (only the create form reads them).
       **Create** `apps/api/src/apps-catalog/apps-catalog.controller.ts` and `apps/api/src/apps-catalog/apps-catalog.module.ts`
       — the three public routes of plan §4.1 (`licenses` declared before `:id`), `@Throttle` 120/min,
       `Cache-Control: public, max-age=300`.
