@@ -49,6 +49,7 @@ import { CACHE_MANAGER, type Cache } from '../cache';
 import { WORK_APP_RUNTIME_STATES } from '../app-launcher/app-launcher.service';
 import { AppRuntimeDeletionService } from './app-runtime-deletion.service';
 import { AppVerificationTargetService } from './app-verification-target.service';
+import { AppSmokeService } from './app-smoke.service';
 import {
     APP_OP_CACHE_TTL_MS,
     AppLifecycleOpsService,
@@ -76,6 +77,14 @@ export const APP_CLUSTER_OP_PREPARE_NAMESPACE = 'prepare-namespace' as const;
 /** T48's op (§8.3) — registered here when the managed-host resolver lands. */
 export const APP_CLUSTER_OP_DNS_RECONCILE = 'dns-reconcile' as const;
 
+/**
+ * Lane aw-ops (2026-10-27) — the on-demand smoke run behind `POST :id/app-smoke` (FR-36/FR-37).
+ * The `app-smoke` task has no API dispatcher, so the API queues it as this op on the same
+ * isolated `app-cluster-io` queue, and the router hands it to the same `AppSmokeService.run`
+ * the task calls (§5.7: `smokeResult` on the Deployment, `app.smoke.*`, never a rollback).
+ */
+export const APP_CLUSTER_OP_SMOKE = 'smoke' as const;
+
 /** Every op the task's classifier lets through, in §9.2's own order (`app-cluster-op.task.ts:67-83`). */
 export const APP_CLUSTER_OP_IDS = [
     'status-refresh',
@@ -93,6 +102,7 @@ export const APP_CLUSTER_OP_IDS = [
     APP_CLUSTER_OP_VERIFICATION_DEPLOY,
     APP_CLUSTER_OP_VERIFICATION_STATUS,
     APP_CLUSTER_OP_VERIFICATION_DESTROY,
+    APP_CLUSTER_OP_SMOKE,
 ] as const;
 
 export type AppClusterOpId = (typeof APP_CLUSTER_OP_IDS)[number];
@@ -103,6 +113,7 @@ export type AppClusterOpRoute =
     | 'lifecycle-ops'
     | 'deletion'
     | 'verification'
+    | 'smoke'
     | 'unowned';
 
 /** An op whose owner task has not landed: the task that will `register` it, and the file it owes. */
@@ -233,6 +244,10 @@ export class AppClusterOpRouter {
         @Optional()
         @Inject(CACHE_MANAGER)
         private readonly cache?: Cache,
+        // Lane aw-ops — the `smoke` op's owner (appended, so positional specs still build).
+        @Optional()
+        @Inject(AppSmokeService)
+        private readonly smoke?: AppSmokeService,
     ) {}
 
     /* ---------------------------------------------------------------------- *
@@ -267,6 +282,9 @@ export class AppClusterOpRouter {
             }
             if (op === APP_CLUSTER_OP_DELETE_WORK) {
                 return 'deletion';
+            }
+            if (op === APP_CLUSTER_OP_SMOKE) {
+                return 'smoke';
             }
             if ((APP_CLUSTER_OP_OWNERS[op] ?? null) !== null) {
                 return 'unowned';
@@ -410,6 +428,29 @@ export class AppClusterOpRouter {
                 ](payload);
         }
 
+        if (route === 'smoke') {
+            return hasMember<AppSmokeService['run']>(this.smoke, 'run')
+                ? async (payload) => {
+                      const result = await this.smoke.run({
+                          workId: text(payload?.workId),
+                          deploymentId: text(payload?.deploymentId) || null,
+                          trigger: text(payload?.trigger) || 'manual',
+                          userId: text(payload?.userId) || null,
+                      });
+                      // A completed run that did not pass is still `done`; the code says so, and
+                      // the checks themselves are on the Deployment's `smokeResult`.
+                      return {
+                          ...result,
+                          code:
+                              result?.code ??
+                              (result?.state === 'done' && result?.passed !== true
+                                  ? 'smoke_failed'
+                                  : null),
+                      };
+                  }
+                : null;
+        }
+
         return null;
     }
 
@@ -423,6 +464,9 @@ export class AppClusterOpRouter {
         }
         if (route === 'verification') {
             return `AppVerificationTargetService.${VERIFICATION_MEMBERS[op] ?? 'handleVerification*'}`;
+        }
+        if (route === 'smoke') {
+            return 'AppSmokeService.run';
         }
         return null;
     }

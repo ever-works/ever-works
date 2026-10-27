@@ -874,6 +874,21 @@ export const config = {
             );
         },
         /**
+         * Actions runners on computers (FL-18, CONTRACTS §9) —
+         * `FLEET_ACTIONS_RUNNERS_ENABLED`. Off unless set to `true`, and never
+         * without `FLEET_ENABLED`: with it off every `/api/fleet/nodes/:id/runners/**`
+         * and `/api/fleet/runners/**` route (and the node-facing
+         * `/api/internal/fleet/runners/**`) answers 404, the poll does nothing and
+         * no `runner-*` job is enqueued. Read per call: flipping it needs no
+         * restart. Runners already installed keep running (they are the owner's CI).
+         */
+        isActionsRunnersEnabled(): boolean {
+            return (
+                process.env.FLEET_ENABLED !== 'false' &&
+                process.env.FLEET_ACTIONS_RUNNERS_ENABLED === 'true'
+            );
+        },
+        /**
          * Checkouts on computers (FL-14 P3, spec §8b) — the image a
          * container-isolated checkout's sessions and commands run in
          * (`FLEET_CHECKOUT_CONTAINER_IMAGE`). One deployment default; no per-Work

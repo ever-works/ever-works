@@ -1024,6 +1024,45 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: false }
 	},
 
+	// Actions runners on computers (FL-18, plan §9, CONTRACTS §11.3) —
+	// `apps/api/src/fleet/runners/fleet-actions-runners.controller.ts`. Same names as the
+	// in-platform Agent tools. Acts satisfy their confirmation class with the request fields
+	// (`confirm: true`, `confirmName`); without them the API answers 409 `confirmation_required`
+	// with the summary to show. No token is ever in an answer. Dark unless
+	// FLEET_ACTIONS_RUNNERS_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/runners',
+		toolName: 'fleet_runners_list',
+		description:
+			'List the GitHub Actions self-hosted runners on a fleet computer, with repository or organisation, labels, state (installing, idle, working, offline, stopped, failed, unknown), its source and the last check. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/runners',
+		toolName: 'fleet_runners_install',
+		description:
+			'Install 1–16 GitHub Actions runners on a fleet computer for a repository (owner/repo) or organisation the Ever Works GitHub App covers, as services. Runners cost nothing in Ever Works. Needs `confirm: true`; without it the answer is 409 with the target, count, mode and computer to confirm.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/runners/{runnerId}/{action}',
+		toolName: 'fleet_runners_action',
+		description:
+			'Start, stop or restart one Actions runner ({action} = start | stop | restart; stop and restart need `confirm: true`). Remove is fleet_runners_remove.',
+		annotations: { destructiveHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/nodes/{id}/runners/{runnerId}/remove',
+		toolName: 'fleet_runners_remove',
+		description:
+			'Remove one Actions runner: deregister it at GitHub, uninstall its service and delete its folder on the computer. Irreversible; needs `confirmName` = its name. Refused while it runs a job.',
+		annotations: { destructiveHint: true }
+	},
+
 	// Agent, MCP & CLI surface (FL-19 P1, CONTRACTS §11.3) — the read-only half of the fleet tool
 	// catalogue (`FLEET_TOOL_CATALOGUE`): `fleet_status`, computer health (FL-03), services,
 	// processes and Docker (FL-09), long operations (FL-02). Same names as the Agent tools; each

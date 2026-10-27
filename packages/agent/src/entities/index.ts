@@ -177,6 +177,8 @@ export * from './fleet-port-tunnel.entity';
 export * from './fleet-checkout.entity';
 // Usage & cost on the fleet (FL-20) — hourly token samples from the node's transcript scan.
 export * from './fleet-usage-sample.entity';
+// Actions runners on computers (FL-18) — GitHub Actions self-hosted runners on a Node
+export * from './fleet-actions-runner.entity';
 // Streaming-terminal M9 / founder decision D1 — persisted, redacted,
 // retention-capped terminal transcripts.
 export * from './terminal-transcript-chunk.entity';

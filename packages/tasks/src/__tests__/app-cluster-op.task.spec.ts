@@ -151,6 +151,9 @@ describe('app-cluster-op (APW-06 T32 + T70)', () => {
             'verification-deploy',
             'verification-status',
             'verification-destroy',
+            // Lane aw-ops (2026-10-27) — `POST :id/app-smoke`'s on-demand run, routed to
+            // `AppSmokeService.run` by the router.
+            'smoke',
         ]);
     });
 

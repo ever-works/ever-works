@@ -53,6 +53,15 @@ import { AppDeployRequestService, type AppDeployRequestResult } from './app-depl
 import { AppLicenseGate } from './app-license-gate';
 import { clusterCredentialNeedsOwnerConfirmation } from './app-owner-gates';
 import type { AppClusterCredentialProvenance } from '../entities/work-app-runtime-state.entity';
+import type { AppLogTail } from '@ever-works/plugin';
+import { CACHE_MANAGER, type Cache } from '../cache';
+import { APP_RUNTIME_ENV_SOURCE } from './ports';
+import {
+    APP_OP_CACHE_TTL_MS,
+    appLogsCacheKey,
+    appOpCacheKey,
+} from './app-lifecycle-ops.service';
+import { redactAppLogTail } from './app-log-redaction';
 
 /**
  * Works-security (2026-10-18) — the save-time kubeconfig shape check (`POST app-target/check`):
@@ -161,6 +170,8 @@ export interface AppTargetRefusal {
     code: string;
     message: string;
     unmet?: AppPrecondition[];
+    /** Lane aw-ops — a `429`'s wait, in whole seconds (`POST app-status/refresh`). */
+    retryAfterSeconds?: number;
 }
 
 /** `GET app-status`'s body. */
@@ -175,6 +186,117 @@ export interface AppStatusBody {
     currentDeployment: { id: string; state: string; phase?: string; cancelReason?: string } | null;
     snapshot: unknown;
     ops: AppStatusOpEntry[];
+    /**
+     * Lane aw-ops — the operations the Deploy tab queued in the last 5 minutes (refresh, job run,
+     * smoke), newest first, read from the `app-op:` cache the worker overwrites (plan §2.3).
+     */
+    requests?: AppStatusRequestEntry[];
+    /** Lane aw-ops — the live Deployment's latest smoke result (names and outcomes only). */
+    smoke?: AppSmokeView | null;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Lane aw-ops (2026-10-27) — the Deploy tab's operations (plan §9.1)
+ * -------------------------------------------------------------------------- */
+
+/** The ops the Deploy tab queues, as the `app-cluster-op` router names them. */
+export type AppOpsRequestKind = 'status-refresh' | 'logs' | 'job-run' | 'smoke';
+
+/** The `202` every queued op answers. */
+export interface AppOpsAccepted {
+    ok: true;
+    httpStatus: 202;
+    op: AppOpsRequestKind;
+    requestId: string;
+    /** `false` ⇔ no isolated worker took it; the entry already reads `failed`. */
+    dispatched: boolean;
+}
+
+/** `GET app-logs/:requestId` (plan §9.1 "Response shapes"). */
+export interface AppLogsReadBody {
+    requestId: string;
+    status: 'pending' | 'ready' | 'failed';
+    tail?: AppLogTail;
+    code?: string;
+}
+
+/** One `requests[]` entry of `GET app-status`. */
+export interface AppStatusRequestEntry {
+    requestId: string;
+    op: string;
+    state: 'queued' | 'running' | 'done' | 'failed';
+    at: string;
+    code?: string;
+    jobName?: string;
+}
+
+/** One smoke check as the Deploy tab shows it — no response body excerpt. */
+export interface AppSmokeCheckView {
+    name: string;
+    status: 'passed' | 'failed' | 'skipped';
+    httpStatus?: number;
+    latencyMs?: number;
+    failedExpectation?: string;
+    classification?: string;
+}
+
+/** `work_deployments.smokeResult`, reduced to what a viewer may see (S28). */
+export interface AppSmokeView {
+    deploymentId: string;
+    observedAt: string | null;
+    inCluster: AppSmokeCheckView[];
+    public: AppSmokeCheckView[];
+    hairpin: AppSmokeCheckView | null;
+}
+
+/** One row of `GET app-deployments` — ids, states and times; never env, hosts' secrets or logs. */
+export interface AppDeploymentHistoryEntry {
+    id: string;
+    state: string;
+    trigger: string | null;
+    buildId: string | null;
+    commitSha: string | null;
+    imageDigest: string | null;
+    createdAt: string | null;
+    completedAt: string | null;
+    current: boolean;
+    code: string | null;
+    smoke: { passed: number; failed: number; observedAt: string | null } | null;
+}
+
+/** APW-07's `AppEnvRuntimeSource`, narrowed to the one read-only call the log read makes. */
+export interface AppLogRedactionSource {
+    secretValuesForRedaction?(
+        workId: string,
+        target?: AppDeployTarget,
+    ): Promise<Record<string, string> | null>;
+}
+
+/** FR-46 — "Refresh is allowed once per 15 seconds", per Work. */
+export const APP_STATUS_REFRESH_INTERVAL_MS = 15_000;
+
+/** FR-48 — 200 lines by default, at most 500. */
+export const APP_LOG_LINES_DEFAULT = 200;
+export const APP_LOG_LINES_MAX = 500;
+
+/** How many queued requests `GET app-status` remembers per Work (5 minutes of them). */
+export const APP_OPS_REQUESTS_LIMIT = 10;
+
+/** S28 / T39 — the history the Deploy tab lists. */
+export const APP_DEPLOYMENT_HISTORY_LIMIT = 20;
+
+/** A component or job name as the App spec declares one; anything else is refused before dispatch. */
+const APP_RUNTIME_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The per-Work index of queued requests (the cache cannot be listed by prefix). */
+export function appOpsRequestIndexKey(workId: string): string {
+    return `app-op-index:${workId}`;
+}
+
+/** The FR-46 refresh gate. */
+export function appStatusRefreshGateKey(workId: string): string {
+    return `app-status-refresh:${workId}`;
 }
 
 /**
@@ -223,6 +345,13 @@ export class AppTargetService {
         // and the status reads the source offer through T21's licence gate.
         @Optional() private readonly requests?: AppDeployRequestService,
         @Optional() private readonly licenseGate?: AppLicenseGate,
+        // Lane aw-ops (2026-10-27) — the 300 s cache the worker writes `app-op:` / `app-logs:`
+        // entries to (the worker's CACHE_MANAGER proxies this one), and APW-07's env source for
+        // the read-time log redaction (FR-48). Both appended, so existing positional specs build.
+        @Optional() @Inject(CACHE_MANAGER) private readonly cache?: Cache,
+        @Optional()
+        @Inject(APP_RUNTIME_ENV_SOURCE)
+        private readonly envSource?: AppLogRedactionSource,
     ) {}
 
     /* ---------------------------------------------------------------------- *
@@ -444,6 +573,8 @@ export class AppTargetService {
                 : null,
             snapshot: row?.statusSnapshot ?? null,
             ops: await this.recentOps(workId, row),
+            requests: await this.recentRequests(workId),
+            smoke: live ? smokeViewOf(String(live.id), live.smokeResult) : null,
         };
     }
 
@@ -590,6 +721,392 @@ export class AppTargetService {
             ...(action === 'cancel-deploy' ? { deploymentId: lockId } : {}),
         });
         return { ok: true, httpStatus: 202, requestId, dispatched, action };
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Lane aw-ops (2026-10-27) — POST app-status/refresh (FR-46)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Queue a `status-refresh` op. Once per {@link APP_STATUS_REFRESH_INTERVAL_MS} per Work
+     * (FR-46): a second press inside the window answers `429 refresh_too_soon` with the wait.
+     * The snapshot itself lands in the runtime-state row; `GET app-status` reads it.
+     */
+    async refreshStatus(
+        workId: string,
+        userId: string,
+    ): Promise<AppOpsAccepted | { ok: false; refusal: AppTargetRefusal }> {
+        const row = await this.readState(workId);
+        const blocked = refuseUnlessDeployed(row);
+        if (blocked) return blocked;
+
+        const gateKey = appStatusRefreshGateKey(workId);
+        const gate = await this.cacheGet<{ at?: number }>(gateKey);
+        const since = typeof gate?.at === 'number' ? Date.now() - gate.at : null;
+        if (since !== null && since >= 0 && since < APP_STATUS_REFRESH_INTERVAL_MS) {
+            const refusal = refuse(
+                429,
+                'refresh_too_soon',
+                'Status can be refreshed once every 15 seconds.',
+            );
+            refusal.refusal.retryAfterSeconds = Math.max(
+                1,
+                Math.ceil((APP_STATUS_REFRESH_INTERVAL_MS - since) / 1000),
+            );
+            return refusal;
+        }
+        await this.cacheSet(gateKey, { at: Date.now() }, APP_STATUS_REFRESH_INTERVAL_MS);
+
+        return this.queueOp(workId, userId, 'status-refresh', {});
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Lane aw-ops — POST app-logs / GET app-logs/:requestId (FR-48)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Queue a `logs` op for ONE component or ONE job: `{ component? | job?, deploymentId?,
+     * previous?, lines? }` (1–500, 200 by default). The tail lands in `app-logs:<workId>:<id>`
+     * for 300 s; the payload carries names and ids only — never a secret value.
+     */
+    async requestLogs(
+        workId: string,
+        userId: string,
+        body: {
+            component?: unknown;
+            job?: unknown;
+            deploymentId?: unknown;
+            previous?: unknown;
+            lines?: unknown;
+        },
+    ): Promise<AppOpsAccepted | { ok: false; refusal: AppTargetRefusal }> {
+        const component = text(body?.component);
+        const job = text(body?.job);
+        if ((component && !APP_RUNTIME_NAME.test(component)) || (job && !APP_RUNTIME_NAME.test(job))) {
+            return refuse(400, 'invalid_log_target', 'Name one component or job of this App.');
+        }
+        if (component && job) {
+            return refuse(400, 'log_target_ambiguous', 'Ask for the logs of a component or a job, not both.');
+        }
+        if (!component && !job) {
+            return refuse(400, 'log_target_required', 'Name the component or the job to read logs from.');
+        }
+        const deploymentId = text(body?.deploymentId);
+        if (deploymentId && !UUID.test(deploymentId)) {
+            return refuse(400, 'invalid_deployment_id', 'deploymentId must be a Deployment id.');
+        }
+        if (body?.previous !== undefined && typeof body.previous !== 'boolean') {
+            return refuse(400, 'invalid_previous', 'previous must be a boolean.');
+        }
+        let lines = APP_LOG_LINES_DEFAULT;
+        if (body?.lines !== undefined && body.lines !== null) {
+            const asked = Number(body.lines);
+            if (!Number.isFinite(asked) || asked < 1) {
+                return refuse(400, 'invalid_lines', `lines must be between 1 and ${APP_LOG_LINES_MAX}.`);
+            }
+            lines = Math.min(APP_LOG_LINES_MAX, Math.floor(asked));
+        }
+        if (!this.cache || typeof this.cache.set !== 'function') {
+            return refuse(
+                503,
+                'logs_cache_unavailable',
+                'Logs cannot be fetched on this instance: there is nowhere to hold them.',
+            );
+        }
+
+        const row = await this.readState(workId);
+        if (row?.deletionRequestedAt) {
+            return refuse(409, 'APP_WORK_DELETING', 'This App Work is being deleted.');
+        }
+        if (!row?.target || row.target === 'none') {
+            return refuse(409, 'app_target_none', 'This App runs nowhere yet, so it has no logs.');
+        }
+
+        const requestId = randomUUID();
+        const key = appLogsCacheKey(workId, requestId);
+        // Written BEFORE the dispatch, so a fast worker's `done` is never overwritten by it.
+        await this.cacheSet(key, { state: 'pending' }, APP_OP_CACHE_TTL_MS);
+        const dispatched = await this.dispatchOp({
+            op: 'logs',
+            workId,
+            userId,
+            requestId,
+            ...(component ? { component } : {}),
+            ...(job ? { job } : {}),
+            ...(deploymentId ? { deploymentId } : {}),
+            previous: body?.previous === true,
+            lines,
+        });
+        if (!dispatched) {
+            await this.cacheSet(key, { state: 'failed', code: 'worker_unavailable' }, APP_OP_CACHE_TTL_MS);
+        }
+        return { ok: true, httpStatus: 202, op: 'logs', requestId, dispatched };
+    }
+
+    /**
+     * Read one log request back. The key is `app-logs:<workId>:<requestId>`, so another Work's id
+     * misses (404), and so does one older than 300 s. A ready tail is redacted AGAIN here with the
+     * App's secret env values (FR-48, `app-log-redaction.ts`); when those cannot be read the tail
+     * is withheld (`failed`, `redaction_unavailable`) rather than shown unredacted.
+     */
+    async readLogs(
+        workId: string,
+        requestId: string,
+    ): Promise<{ ok: true; body: AppLogsReadBody } | { ok: false; refusal: AppTargetRefusal }> {
+        const id = text(requestId);
+        const notFound = refuse(
+            404,
+            'logs_request_not_found',
+            'That log request is unknown or expired (logs are kept for 5 minutes).',
+        );
+        if (!UUID.test(id)) return notFound;
+
+        const entry = await this.cacheGet<{ state?: unknown; tail?: AppLogTail; code?: unknown }>(
+            appLogsCacheKey(workId, id),
+        );
+        if (!entry || typeof entry !== 'object') return notFound;
+
+        const state = text(entry.state);
+        if (state === 'pending') return { ok: true, body: { requestId: id, status: 'pending' } };
+        if (state !== 'done') {
+            return {
+                ok: true,
+                body: { requestId: id, status: 'failed', code: text(entry.code) || 'logs_failed' },
+            };
+        }
+
+        const row = await this.readState(workId);
+        const target = (TARGETS.find((choice) => choice === row?.target) ??
+            'your-cluster') as AppDeployTarget;
+        const secrets = await this.redactionValues(workId, target);
+        if (secrets === null) {
+            return {
+                ok: true,
+                body: { requestId: id, status: 'failed', code: 'redaction_unavailable' },
+            };
+        }
+        const tail = redactAppLogTail(entry.tail ?? null, secrets);
+        if (!tail) {
+            return { ok: true, body: { requestId: id, status: 'failed', code: 'logs_failed' } };
+        }
+        return { ok: true, body: { requestId: id, status: 'ready', tail } };
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Lane aw-ops — POST app-jobs/:name/run (FR-51)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Run one App spec job now, with the live image and env (FR-51). A job changes the app's data
+     * (a migration, a seed), so the request must carry `confirmFirstDeploy: true` — the member's
+     * confirmation; the your-cluster plugin refuses an unconfirmed run anyway
+     * (`job_confirmation_required`), so refusing here saves a worker run. Refused while a
+     * Deployment holds the lock and while the snapshot shows a run of the same job (`409`).
+     */
+    async runJob(
+        workId: string,
+        userId: string,
+        name: string,
+        body: { confirmFirstDeploy?: unknown },
+    ): Promise<AppOpsAccepted | { ok: false; refusal: AppTargetRefusal }> {
+        const jobName = text(name);
+        if (!APP_RUNTIME_NAME.test(jobName)) {
+            return refuse(400, 'invalid_job_name', 'Name a job the App spec declares.');
+        }
+        if (body?.confirmFirstDeploy !== true) {
+            return refuse(
+                422,
+                'job_confirmation_required',
+                'Confirm the run: a job can change the app’s data, and it runs against the live app.',
+            );
+        }
+
+        const row = await this.readState(workId);
+        const blocked = refuseUnlessDeployed(row);
+        if (blocked) return blocked;
+        if (text(row?.deployLockId)) {
+            return refuse(
+                409,
+                'deploy_in_progress',
+                'Wait for the current Deployment to finish, or cancel it.',
+            );
+        }
+        if (jobIsRunning(row?.statusSnapshot, jobName)) {
+            return refuse(409, 'job_active', `A run of ${jobName} is still going.`);
+        }
+
+        return this.queueOp(workId, userId, 'job-run', { jobName, confirmFirstDeploy: true }, jobName);
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Lane aw-ops — POST app-smoke (FR-36/FR-37)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Run the App spec's smoke checks against the live Deployment, on demand: an `app-cluster-op
+     * { op: 'smoke' }` the worker routes to `AppSmokeService` (§5.7 — it writes `smokeResult` on
+     * that Deployment and never rolls back). Refused when nothing is live, while paused, and while
+     * a Deployment holds the lock.
+     */
+    async runSmoke(
+        workId: string,
+        userId: string,
+    ): Promise<AppOpsAccepted | { ok: false; refusal: AppTargetRefusal }> {
+        const row = await this.readState(workId);
+        const blocked = refuseUnlessDeployed(row);
+        if (blocked) return blocked;
+        if (row?.paused === true || row?.pausedAt) {
+            return refuse(409, 'app_paused', 'The app is paused. Resume it to run the smoke checks.');
+        }
+        if (text(row?.deployLockId)) {
+            return refuse(
+                409,
+                'deploy_in_progress',
+                'A Deployment is running; its own smoke checks run as part of it.',
+            );
+        }
+        return this.queueOp(workId, userId, 'smoke', {
+            deploymentId: text(row?.currentDeploymentId),
+            trigger: 'manual',
+        });
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Lane aw-ops — GET app-deployments (T39 history)
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * The last {@link APP_DEPLOYMENT_HISTORY_LIMIT} Deployments of this App Work, newest first,
+     * reduced to ids, states, times and a smoke count — the existing website deployments route
+     * answers whole rows (render facts included), which a viewer has no need for.
+     */
+    async listDeployments(workId: string): Promise<AppDeploymentHistoryEntry[]> {
+        let rows: Array<Record<string, unknown>> = [];
+        try {
+            rows = ((await this.deployments?.findByWork?.(workId, {
+                limit: APP_DEPLOYMENT_HISTORY_LIMIT,
+            })) ?? []) as unknown as Array<Record<string, unknown>>;
+        } catch {
+            rows = [];
+        }
+        const row = await this.readState(workId);
+        const current = text(row?.currentDeploymentId);
+        return rows.map((deployment) => historyEntryOf(deployment, current));
+    }
+
+    /* ---------------------------------------------------------------------- *
+     * Lane aw-ops — internals
+     * ---------------------------------------------------------------------- */
+
+    /**
+     * Queue one op: the `app-op:` entry reads `queued` BEFORE the dispatch (so the worker's own
+     * write always wins), the request joins the Work's index for `GET app-status`, and a dispatch
+     * nobody took turns the entry `failed` with `worker_unavailable` at once.
+     */
+    private async queueOp(
+        workId: string,
+        userId: string,
+        op: Exclude<AppOpsRequestKind, 'logs'>,
+        extra: Record<string, unknown>,
+        jobName?: string,
+    ): Promise<AppOpsAccepted> {
+        const requestId = randomUUID();
+        const key = appOpCacheKey(workId, requestId);
+        await this.cacheSet(key, { op, state: 'queued' }, APP_OP_CACHE_TTL_MS);
+        await this.recordRequest(workId, {
+            requestId,
+            op,
+            at: new Date().toISOString(),
+            ...(jobName ? { jobName } : {}),
+        });
+        const dispatched = await this.dispatchOp({ op, workId, userId, requestId, ...extra });
+        if (!dispatched) {
+            await this.cacheSet(
+                key,
+                { op, state: 'failed', code: 'worker_unavailable' },
+                APP_OP_CACHE_TTL_MS,
+            );
+        }
+        return { ok: true, httpStatus: 202, op, requestId, dispatched };
+    }
+
+    /** Prepend one request to the Work's index (best effort: a lost race loses a display row). */
+    private async recordRequest(
+        workId: string,
+        entry: { requestId: string; op: string; at: string; jobName?: string },
+    ): Promise<void> {
+        const key = appOpsRequestIndexKey(workId);
+        const previous = await this.cacheGet<unknown>(key);
+        const list = Array.isArray(previous) ? previous : [];
+        await this.cacheSet(
+            key,
+            [entry, ...list.filter((item) => item?.requestId !== entry.requestId)].slice(
+                0,
+                APP_OPS_REQUESTS_LIMIT,
+            ),
+            APP_OP_CACHE_TTL_MS,
+        );
+    }
+
+    /** The indexed requests whose `app-op:` entry still exists, newest first. */
+    private async recentRequests(workId: string): Promise<AppStatusRequestEntry[]> {
+        const index = await this.cacheGet<unknown>(appOpsRequestIndexKey(workId));
+        if (!Array.isArray(index)) return [];
+        const out: AppStatusRequestEntry[] = [];
+        for (const item of index.slice(0, APP_OPS_REQUESTS_LIMIT)) {
+            const requestId = text(item?.requestId);
+            if (!UUID.test(requestId)) continue;
+            const entry = await this.cacheGet<{ op?: unknown; state?: unknown; code?: unknown }>(
+                appOpCacheKey(workId, requestId),
+            );
+            if (!entry) continue;
+            const state = text(entry.state);
+            out.push({
+                requestId,
+                op: text(entry.op) || text(item?.op),
+                state:
+                    state === 'running' || state === 'done' || state === 'failed'
+                        ? state
+                        : 'queued',
+                at: text(item?.at),
+                ...(text(entry.code) ? { code: text(entry.code).slice(0, 60) } : {}),
+                ...(text(item?.jobName) ? { jobName: text(item.jobName) } : {}),
+            });
+        }
+        return out;
+    }
+
+    /** The secret values to redact, or `null` when they cannot be known (fail closed). */
+    private async redactionValues(
+        workId: string,
+        target: AppDeployTarget,
+    ): Promise<Record<string, string> | null> {
+        if (typeof this.envSource?.secretValuesForRedaction !== 'function') return null;
+        try {
+            const values = await this.envSource.secretValuesForRedaction(workId, target);
+            return values && typeof values === 'object' ? values : null;
+        } catch {
+            return null;
+        }
+    }
+
+    private async cacheGet<T>(key: string): Promise<T | null> {
+        if (!this.cache || typeof this.cache.get !== 'function') return null;
+        try {
+            return ((await this.cache.get<T>(key)) ?? null) as T | null;
+        } catch (error) {
+            this.logger.warn(`Reading the cache entry ${key} failed: ${messageOf(error)}`);
+            return null;
+        }
+    }
+
+    private async cacheSet(key: string, value: unknown, ttlMs: number): Promise<void> {
+        if (!this.cache || typeof this.cache.set !== 'function') return;
+        try {
+            await this.cache.set(key, value, ttlMs);
+        } catch (error) {
+            this.logger.warn(`Writing the cache entry ${key} failed: ${messageOf(error)}`);
+        }
     }
 
     /* ---------------------------------------------------------------------- *
@@ -1078,6 +1595,102 @@ function iso(value: Date | string | null | undefined): string | null {
 function messageOf(error: unknown): string {
     if (error instanceof Error) return error.message.slice(0, 300);
     return typeof error === 'string' ? error.slice(0, 300) : 'unknown error';
+}
+
+/**
+ * Lane aw-ops — the refusal every live-app op shares: a deleting Work (`409 APP_WORK_DELETING`)
+ * and one with nothing deployed (`409 app_not_deployed`). `null` ⇔ the op may go on.
+ */
+export function refuseUnlessDeployed(
+    row: AppTargetStateRow | null | undefined,
+): { ok: false; refusal: AppTargetRefusal } | null {
+    if (row?.deletionRequestedAt) {
+        return refuse(409, 'APP_WORK_DELETING', 'This App Work is being deleted.');
+    }
+    if (!row?.currentDeploymentId || row.removedAt) {
+        return refuse(409, 'app_not_deployed', 'Nothing of this App is deployed right now.');
+    }
+    return null;
+}
+
+/** Whether the status snapshot shows a run of `jobName` still going. */
+export function jobIsRunning(snapshot: unknown, jobName: string): boolean {
+    const jobs = (snapshot as { jobs?: unknown } | null)?.jobs;
+    if (!Array.isArray(jobs)) return false;
+    return jobs.some(
+        (job: { name?: unknown; last?: { status?: unknown } }) =>
+            text(job?.name) === jobName && text(job?.last?.status) === 'running',
+    );
+}
+
+function checkViewOf(raw: unknown): AppSmokeCheckView | null {
+    const check = raw as Record<string, unknown> | null;
+    const name = text(check?.name);
+    const status = text(check?.status);
+    if (!name || (status !== 'passed' && status !== 'failed' && status !== 'skipped')) return null;
+    const view: AppSmokeCheckView = { name: name.slice(0, 120), status };
+    if (typeof check?.httpStatus === 'number') view.httpStatus = check.httpStatus;
+    if (typeof check?.latencyMs === 'number') view.latencyMs = check.latencyMs;
+    if (text(check?.failedExpectation)) {
+        view.failedExpectation = text(check?.failedExpectation).slice(0, 200);
+    }
+    if (text(check?.classification)) view.classification = text(check?.classification);
+    return view;
+}
+
+function checksOf(raw: unknown): AppSmokeCheckView[] {
+    return Array.isArray(raw)
+        ? raw.map(checkViewOf).filter((check): check is AppSmokeCheckView => check !== null)
+        : [];
+}
+
+/**
+ * `work_deployments.smokeResult` → what the Deploy tab shows. The checks' `found` excerpt (a
+ * response body fragment) is dropped: viewers see smoke results too (S28).
+ */
+export function smokeViewOf(deploymentId: string, raw: unknown): AppSmokeView | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const result = raw as Record<string, unknown>;
+    return {
+        deploymentId,
+        observedAt: iso(result.observedAt as string | null | undefined),
+        inCluster: checksOf(result.inCluster),
+        public: checksOf(result.public),
+        hairpin: checkViewOf(result.hairpin),
+    };
+}
+
+/** One Deployment row → one history entry (ids, states, times; never render facts). */
+export function historyEntryOf(
+    deployment: Record<string, unknown>,
+    currentDeploymentId: string,
+): AppDeploymentHistoryEntry {
+    const render = (deployment.appRender ?? {}) as {
+        specCommitSha?: unknown;
+        image?: { digest?: unknown };
+    };
+    const lastError = text(deployment.lastError);
+    const smoke = smokeViewOf(String(deployment.id), deployment.smokeResult);
+    const checks = smoke ? [...smoke.inCluster, ...smoke.public] : [];
+    return {
+        id: String(deployment.id),
+        state: String(deployment.state ?? ''),
+        trigger: text(deployment.appTrigger) || null,
+        buildId: text(deployment.buildId) || null,
+        commitSha: text(render.specCommitSha) || text(deployment.commitSha) || null,
+        imageDigest: text(render.image?.digest) || null,
+        createdAt: iso(deployment.createdAt as Date | string | null | undefined),
+        completedAt: iso(deployment.completedAt as Date | string | null | undefined),
+        current: Boolean(currentDeploymentId) && String(deployment.id) === currentDeploymentId,
+        code: lastError ? lastError.split(':')[0].slice(0, 60) : null,
+        smoke: smoke
+            ? {
+                  passed: checks.filter((check) => check.status === 'passed').length,
+                  failed: checks.filter((check) => check.status === 'failed').length,
+                  observedAt: smoke.observedAt,
+              }
+            : null,
+    };
 }
 
 function opStateOf(state: string): AppStatusOpEntry['state'] {

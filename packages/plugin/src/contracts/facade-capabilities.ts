@@ -156,7 +156,14 @@ export const PLUGIN_CAPABILITIES = {
 	// `capabilities/machine-provider.interface.ts`. Appended **last**, so every
 	// existing constant keeps its value and its position, and landed in the same
 	// change as the `machine-provider` category in `plugin-manifest.types.ts`.
-	MACHINE_PROVIDER: 'machine-provider'
+	MACHINE_PROVIDER: 'machine-provider',
+	// Actions runners on computers (FL-18, CONTRACTS R-14) — GitHub's self-hosted
+	// runner API through the Ever Works GitHub App (`github-actions-runners`),
+	// consumed only through `ActionsRunnersFacadeService`; see
+	// `capabilities/actions-runners.interface.ts`. Appended last, so every
+	// existing constant keeps its value and its position; no category is added
+	// (the plugin is an `integration`, which exists).
+	ACTIONS_RUNNERS: 'actions-runners'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

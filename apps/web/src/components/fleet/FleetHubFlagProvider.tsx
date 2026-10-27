@@ -26,6 +26,8 @@ const FleetCloudFlagContext = createContext<boolean>(false);
 
 /** Usage & cost (FL-20): `FLEET_USAGE_SCAN_ENABLED` (with the hub), for "Fleet usage" in the palette. */
 const FleetUsageFlagContext = createContext<boolean>(false);
+/** Actions runners (FL-18): `FLEET_ACTIONS_RUNNERS_ENABLED` (with the hub), for "Install Actions runners on <computer>". */
+const FleetActionsRunnersFlagContext = createContext<boolean>(false);
 
 export function FleetHubFlagProvider({
     enabled,
@@ -33,6 +35,7 @@ export function FleetHubFlagProvider({
     virtual = false,
     cloud = false,
     usage = false,
+    runners = false,
     children,
 }: {
     enabled: boolean;
@@ -44,6 +47,8 @@ export function FleetHubFlagProvider({
     cloud?: boolean;
     /** FL-20: the usage scan is on for this deployment (never without the hub). */
     usage?: boolean;
+    /** FL-18: Actions runners are on for this deployment (never without the hub). */
+    runners?: boolean;
     children: ReactNode;
 }) {
     return (
@@ -51,7 +56,11 @@ export function FleetHubFlagProvider({
             <FleetMachineFactsFlagContext.Provider value={enabled && machineFacts}>
                 <FleetVirtualFlagContext.Provider value={enabled && virtual}>
                     <FleetCloudFlagContext.Provider value={enabled && cloud}>
-                        <FleetUsageFlagContext.Provider value={enabled && usage}>{children}</FleetUsageFlagContext.Provider>
+                        <FleetUsageFlagContext.Provider value={enabled && usage}>
+                            <FleetActionsRunnersFlagContext.Provider value={enabled && runners}>
+                                {children}
+                            </FleetActionsRunnersFlagContext.Provider>
+                        </FleetUsageFlagContext.Provider>
                     </FleetCloudFlagContext.Provider>
                 </FleetVirtualFlagContext.Provider>
             </FleetMachineFactsFlagContext.Provider>
@@ -82,4 +91,9 @@ export function useFleetCloudEnabled(): boolean {
 /** True when the hub and `FLEET_USAGE_SCAN_ENABLED` are both on (FL-20). */
 export function useFleetUsageEnabled(): boolean {
     return useContext(FleetUsageFlagContext);
+}
+
+/** True when the hub and `FLEET_ACTIONS_RUNNERS_ENABLED` are both on (FL-18). */
+export function useFleetActionsRunnersEnabled(): boolean {
+    return useContext(FleetActionsRunnersFlagContext);
 }
