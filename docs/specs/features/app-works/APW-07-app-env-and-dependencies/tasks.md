@@ -643,7 +643,7 @@ kinds)` calling providers with `ephemeral: true` and returning outputs in memory
       **Done when**: `pnpm --filter @ever-works/agent test -- app-dependencies.deletion` and
       `pnpm --filter @ever-works/k8s-plugin test -- deprovision` are green.
 
-- [ ] **T45 (P1, lands with T5–T7). Classify new tables for workspace backup (R-25).**
+- [x] **T45 (P1, lands with T5–T7). Classify new tables for workspace backup (R-25).** _(2026-10-27, #2964: `app-env-values.jsonl` + `app-dependencies.jsonl`; the three envelopes `{ wasSet }`, `valueBytes` dropped.)_
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain:
       `{ file: 'app-env-values.jsonl', entity: 'WorkAppEnvValue', scope: { by: 'parent', column: 'workId', from: 'workIds' } }`
       and
