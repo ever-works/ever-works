@@ -7602,12 +7602,12 @@
                     "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
                     "confirmYes": "Yes, sync anyway",
                     "cancel": "Cancel",
-                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
-                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
-                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "ownerOnly": "Only the Work owner or an Owner of its Organization can accept upstream workflow changes.",
+                    "released": "These upstream workflow changes were accepted {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner or an Owner of its Organization must review them before this App Work can sync.",
                     "changed": "Upstream moved since you reviewed it. Review the new changes first.",
                     "noHold": "No upstream workflow change is waiting for review.",
-                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                    "ownerRequired": "Only the Work owner or an Owner of its Organization can accept upstream workflow changes."
                 }
             },
             "appDependencies": {
