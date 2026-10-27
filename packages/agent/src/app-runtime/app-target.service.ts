@@ -157,7 +157,13 @@ export interface AppTargetBody {
     namespace: string | null;
     clusterCheck: unknown;
     clusterCheckedAt: string | null;
-    eligibility: { managed: { eligible: boolean; reasons: string[] } } | null;
+    /**
+     * `paidPlanAllowsMore` (additive, owner decision 2026-10-27): present and `true` only beside
+     * `capReached` for an owner on an unpaid plan when a paid plan would admit the App.
+     */
+    eligibility: {
+        managed: { eligible: boolean; reasons: string[]; paidPlanAllowsMore?: boolean };
+    } | null;
 }
 
 /** A refusal the controller answers verbatim. */
@@ -1311,6 +1317,10 @@ export class AppTargetService {
                         reasons: [...(answer?.reasons ?? [])],
                     },
                 };
+                // Owner decision 2026-10-27: a free owner at the cap is told a paid plan lifts it.
+                if (answer?.paidPlanAllowsMore === true) {
+                    eligibility.managed.paidPlanAllowsMore = true;
+                }
             } catch {
                 eligibility = null;
             }
@@ -1352,11 +1362,16 @@ export class AppTargetService {
             // Choosing the managed tier is judged like a deploy to it: the cap counts the owner's other App Works.
             const answer = await this.tier!.eligibility(userId, { workId: workId ?? null });
             if (answer?.eligible !== true) {
+                // Owner decision 2026-10-27: a free owner at the cap is told a paid plan lifts it.
+                const upgrade =
+                    answer?.paidPlanAllowsMore === true
+                        ? ' A paid plan allows more App Works on Ever Works Apps: upgrade to lift this limit.'
+                        : '';
                 return [
                     {
                         code: 'managed_ineligible',
                         names: [...(answer?.reasons ?? [])],
-                        message: 'Your account is not eligible for Ever Works Apps hosting.',
+                        message: `Your account is not eligible for Ever Works Apps hosting.${upgrade}`,
                     },
                 ];
             }
