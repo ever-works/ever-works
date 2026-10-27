@@ -776,6 +776,14 @@ export const APP_RUNTIME_RELAYED_EVENTS: ReadonlySet<string> = new Set([
     'app.dependency.ready',
     'app.dependency.failed',
     'app.dependency.removed',
+    // Lane aw-builds-bindings (2026-10-27) — the names `AppDependenciesService.emit` REALLY emits,
+    // which are CONTRACTS §6's APW-07 Activity names (`app.dependency.provisioned`, `.failed`,
+    // `.released`, `.data_deleted`). Only `.failed` was catalogued, so a worker's "Postgres is
+    // ready" and every release or data deletion was refused here, and no dependency lifecycle
+    // Activity row was ever written. The three above stay (additive); nothing emits them.
+    'app.dependency.provisioned',
+    'app.dependency.released',
+    'app.dependency.data_deleted',
 ]);
 
 /**
