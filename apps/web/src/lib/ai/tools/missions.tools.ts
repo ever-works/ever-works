@@ -74,7 +74,7 @@ export const getMissionDetails = tool({
     description: 'Get detailed info about a specific Mission.',
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
+        missionId: z.guid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await missionsAPI.get(missionId);
@@ -88,7 +88,7 @@ export const getMissionBudget = tool({
         'Get current-period spend + global cap status for a Mission. Use when the user asks about cost or budget.',
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
+        missionId: z.guid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         try {
@@ -234,7 +234,7 @@ export function createUpdateMissionTool(userConfirmed?: UserConfirmationCheck) {
         ].join(' '),
         inputSchema: z.object({
             // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-            missionId: z.string().uuid().describe('Mission ID'),
+            missionId: z.guid().describe('Mission ID'),
             title: z.string().optional(),
             description: z.string().optional(),
             type: z.enum(['one-shot', 'scheduled']).optional(),
@@ -274,7 +274,7 @@ export const pauseMission = tool({
         'Pause an active Mission. The cron tick worker will skip it until resumed. Only valid when status="active".',
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
+        missionId: z.guid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await pauseMissionAction(missionId);
@@ -294,7 +294,7 @@ export function createResumeMissionTool(userConfirmed?: UserConfirmationCheck) {
         ].join(' '),
         inputSchema: z.object({
             // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-            missionId: z.string().uuid().describe('Mission ID'),
+            missionId: z.guid().describe('Mission ID'),
             confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
         }),
         execute: async ({ missionId, confirmed }) => {
@@ -324,7 +324,7 @@ export const completeMission = tool({
     ].join(' '),
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
+        missionId: z.guid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         const mission = await completeMissionAction(missionId);
@@ -345,7 +345,7 @@ export function createDeleteMissionTool(userConfirmed?: UserConfirmationCheck) {
         ].join(' '),
         inputSchema: z.object({
             // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-            missionId: z.string().uuid().describe('Mission ID'),
+            missionId: z.guid().describe('Mission ID'),
             confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
         }),
         execute: async ({ missionId, confirmed }) => {
@@ -380,7 +380,7 @@ export function createRunMissionNowTool(userConfirmed?: UserConfirmationCheck) {
         ].join(' '),
         inputSchema: z.object({
             // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-            missionId: z.string().uuid().describe('Mission ID'),
+            missionId: z.guid().describe('Mission ID'),
             confirmed: z.boolean().optional().describe(CONFIRMED_FIELD_DESCRIPTION),
         }),
         execute: async ({ missionId, confirmed }) => {
@@ -416,7 +416,7 @@ export function createCloneMissionTool(userConfirmed?: UserConfirmationCheck) {
         ].join(' '),
         inputSchema: z.object({
             // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-            missionId: z.string().uuid().describe('Source Mission ID to clone from'),
+            missionId: z.guid().describe('Source Mission ID to clone from'),
             title: z
                 .string()
                 .optional()
@@ -496,7 +496,7 @@ export const listMissionWorks = tool({
     ].join(' '),
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
+        missionId: z.guid().describe('Mission ID'),
     }),
     execute: async ({ missionId }) => {
         try {
@@ -521,8 +521,8 @@ export const attachWorkToMission = tool({
     ].join(' '),
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
-        workId: z.string().uuid().describe('ID of an existing Work owned by the user'),
+        missionId: z.guid().describe('Mission ID'),
+        workId: z.guid().describe('ID of an existing Work owned by the user'),
         relation: z
             .enum(MISSION_WORK_RELATION_VALUES)
             .describe('How the Mission relates to the Work'),
@@ -551,8 +551,8 @@ export const detachWorkFromMission = tool({
     ].join(' '),
     inputSchema: z.object({
         // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
-        missionId: z.string().uuid().describe('Mission ID'),
-        workId: z.string().uuid().describe('Work ID of the relation to detach'),
+        missionId: z.guid().describe('Mission ID'),
+        workId: z.guid().describe('Work ID of the relation to detach'),
         relation: z
             .enum(MISSION_WORK_RELATION_VALUES)
             .describe('Relation kind of the edge to detach'),

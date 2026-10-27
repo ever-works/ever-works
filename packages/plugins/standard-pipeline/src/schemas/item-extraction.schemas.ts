@@ -126,7 +126,7 @@ const badgeSchema = z.object({
 /**
  * Schema for item badges
  */
-export const itemBadgesSchema = z.record(badgeSchema.nullable());
+export const itemBadgesSchema = z.record(z.string(), badgeSchema.nullable());
 
 /**
  * Schema for item data with badges

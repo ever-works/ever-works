@@ -1003,22 +1003,22 @@
                             "type": "object",
                             "properties": {
                                 "relation": {
-                                    "description": "How the App Work relates to its repository (§5:123): fork · private-copy · link. Required.",
                                     "type": "string",
                                     "enum": [
                                         "fork",
                                         "private-copy",
                                         "link"
-                                    ]
+                                    ],
+                                    "description": "How the App Work relates to its repository (§5:123): fork · private-copy · link. Required."
                                 },
                                 "upstream": {
                                     "description": "The repository followed (§5:124); forbidden when `relation` is `link` (R13).",
                                     "type": "object",
                                     "properties": {
                                         "repo": {
-                                            "description": "The upstream repository, `owner/repo` (§5:124); required unless `relation` is `link`.",
                                             "type": "string",
-                                            "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
+                                            "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$",
+                                            "description": "The upstream repository, `owner/repo` (§5:124); required unless `relation` is `link`."
                                         },
                                         "defaultBranch": {
                                             "description": "The upstream branch to follow (§5:125); default: the upstream default at creation.",
@@ -1053,24 +1053,24 @@
                             "type": "object",
                             "properties": {
                                 "id": {
-                                    "description": "The Blueprint id (§6:137): ^[a-z0-9][a-z0-9-]{0,63}$. Required.",
                                     "type": "string",
-                                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                                    "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                                    "description": "The Blueprint id (§6:137): ^[a-z0-9][a-z0-9-]{0,63}$. Required."
                                 },
                                 "version": {
-                                    "description": "The Blueprint version (§6:138): a semantic version `MAJOR.MINOR.PATCH`. Required.",
                                     "type": "string",
-                                    "pattern": "^\\d+\\.\\d+\\.\\d+$"
+                                    "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                                    "description": "The Blueprint version (§6:138): a semantic version `MAJOR.MINOR.PATCH`. Required."
                                 },
                                 "repo": {
-                                    "description": "The Blueprint repository (§6:139): ^ever-works/[a-z0-9-]+$. Required.",
                                     "type": "string",
-                                    "pattern": "^ever-works\\/[a-z0-9-]+$"
+                                    "pattern": "^ever-works\\/[a-z0-9-]+$",
+                                    "description": "The Blueprint repository (§6:139): ^ever-works/[a-z0-9-]+$. Required."
                                 },
                                 "sha": {
-                                    "description": "The pinned Blueprint commit (§6:140): 40 lowercase hex characters. Required.",
                                     "type": "string",
-                                    "pattern": "^[0-9a-f]{40}$"
+                                    "pattern": "^[0-9a-f]{40}$",
+                                    "description": "The pinned Blueprint commit (§6:140): 40 lowercase hex characters. Required."
                                 }
                             },
                             "required": [
@@ -1144,9 +1144,9 @@
                                     "maxItems": 50,
                                     "type": "array",
                                     "items": {
-                                        "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`.",
                                         "type": "string",
-                                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$"
+                                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$",
+                                        "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`."
                                     }
                                 }
                             },
@@ -1198,9 +1198,9 @@
                                         "type": "object",
                                         "properties": {
                                             "name": {
-                                                "description": "The build argument name (§9:175). Required.",
                                                 "type": "string",
-                                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+                                                "description": "The build argument name (§9:175). Required."
                                             },
                                             "value": {
                                                 "description": "A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10). No `${`, line break or control character: it is written into the build workflow.",
@@ -1231,15 +1231,15 @@
                                         "type": "object",
                                         "properties": {
                                             "name": {
-                                                "description": "The service name (§9:176). Required.",
                                                 "type": "string",
-                                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                                "description": "The service name (§9:176). Required."
                                             },
                                             "image": {
-                                                "description": "The service image (§9:176). Required.",
                                                 "type": "string",
                                                 "maxLength": 512,
-                                                "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::\\d+)?\\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$"
+                                                "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::\\d+)?\\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$",
+                                                "description": "The service image (§9:176). Required."
                                             },
                                             "port": {
                                                 "description": "The service port, 1–65535 (§9:176).",
@@ -1255,14 +1255,14 @@
                                                     "type": "object",
                                                     "properties": {
                                                         "name": {
-                                                            "description": "The variable name of a build service’s environment entry (§9:176): ^[A-Za-z_][A-Za-z0-9_.]{0,127}$.",
                                                             "type": "string",
-                                                            "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$"
+                                                            "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$",
+                                                            "description": "The variable name of a build service’s environment entry (§9:176): ^[A-Za-z_][A-Za-z0-9_.]{0,127}$."
                                                         },
                                                         "value": {
-                                                            "description": "The value of a build service’s environment entry (§9:176). No `${`, line break or control character: it is written into the build workflow.",
                                                             "type": "string",
-                                                            "pattern": "^(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]*$"
+                                                            "pattern": "^(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]*$",
+                                                            "description": "The value of a build service’s environment entry (§9:176). No `${`, line break or control character: it is written into the build workflow."
                                                         }
                                                     },
                                                     "required": [
@@ -1327,17 +1327,17 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "A DNS-label name, unique among components (§10:194, R4). Required.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "A DNS-label name, unique among components (§10:194, R4). Required."
                                     },
                                     "role": {
-                                        "description": "web (Service + Ingress) or worker (§10:195). Required.",
                                         "type": "string",
                                         "enum": [
                                             "web",
                                             "worker"
-                                        ]
+                                        ],
+                                        "description": "web (Service + Ingress) or worker (§10:195). Required."
                                     },
                                     "command": {
                                         "description": "Image entrypoint override, ≤ 20 items × 1000 characters (§10:196); default: the image entrypoint.",
@@ -1564,19 +1564,19 @@
                                             "type": "object",
                                             "properties": {
                                                 "name": {
-                                                    "description": "The volume name (§10:208). Required.",
                                                     "type": "string",
-                                                    "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                                    "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                                    "description": "The volume name (§10:208). Required."
                                                 },
                                                 "path": {
-                                                    "description": "An absolute mount path of at most 255 characters (§10:208). Required.",
                                                     "type": "string",
-                                                    "pattern": "^\\/[\\s\\S]{0,254}$"
+                                                    "pattern": "^\\/[\\s\\S]{0,254}$",
+                                                    "description": "An absolute mount path of at most 255 characters (§10:208). Required."
                                                 },
                                                 "size": {
-                                                    "description": "The volume size, `100Mi`–`500Gi` (§10:208). Required.",
                                                     "type": "string",
-                                                    "pattern": "^\\d+(?:Mi|Gi)$"
+                                                    "pattern": "^\\d+(?:Mi|Gi)$",
+                                                    "description": "The volume size, `100Mi`–`500Gi` (§10:208). Required."
                                                 },
                                                 "backup": {
                                                     "description": "Whether the volume is backed up (§10:208); default: true.",
@@ -1679,23 +1679,23 @@
                                     "type": "object",
                                     "properties": {
                                         "buckets": {
-                                            "description": "The buckets to create, 1–10 unique names (§11:225). Required.",
                                             "minItems": 1,
                                             "maxItems": 10,
                                             "type": "array",
                                             "items": {
-                                                "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only.",
                                                 "type": "string",
-                                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
-                                            }
+                                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                                "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only."
+                                            },
+                                            "description": "The buckets to create, 1–10 unique names (§11:225). Required."
                                         },
                                         "publicBuckets": {
                                             "description": "Buckets that are publicly readable, a subset of `buckets` (§11:226); default: [].",
                                             "type": "array",
                                             "items": {
-                                                "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only.",
                                                 "type": "string",
-                                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                                "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only."
                                             }
                                         }
                                     },
@@ -1735,9 +1735,9 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The variable name (§12:246). Required.",
                                         "type": "string",
-                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+                                        "description": "The variable name (§12:246). Required."
                                     },
                                     "secret": {
                                         "description": "Stored encrypted, never logged or returned (§12:247, Constitution VII); default: false.",
@@ -1776,7 +1776,6 @@
                                         "type": "object",
                                         "properties": {
                                             "kind": {
-                                                "description": "The generator (§12:261): base64 · hex · chars · uuid · keypair. Required.",
                                                 "type": "string",
                                                 "enum": [
                                                     "base64",
@@ -1784,7 +1783,8 @@
                                                     "chars",
                                                     "uuid",
                                                     "keypair"
-                                                ]
+                                                ],
+                                                "description": "The generator (§12:261): base64 · hex · chars · uuid · keypair. Required."
                                             },
                                             "bytes": {
                                                 "description": "16–128, `base64` and `hex` only (§12:262); default: 32.",
@@ -1896,10 +1896,10 @@
                                         "type": "object",
                                         "properties": {
                                             "description": {
-                                                "description": "The question, 1–300 characters (§12:255). Required.",
                                                 "type": "string",
                                                 "minLength": 1,
-                                                "maxLength": 300
+                                                "maxLength": 300,
+                                                "description": "The question, 1–300 characters (§12:255). Required."
                                             },
                                             "required": {
                                                 "description": "Whether the answer is required (§12:255); default: true.",
@@ -1942,18 +1942,18 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The job name, unique among jobs (§13:319, R4). Required.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "The job name, unique among jobs (§13:319, R4). Required."
                                     },
                                     "when": {
-                                        "description": "pre-deploy · first-deploy · post-deploy (§13:320). Required.",
                                         "type": "string",
                                         "enum": [
                                             "pre-deploy",
                                             "first-deploy",
                                             "post-deploy"
-                                        ]
+                                        ],
+                                        "description": "pre-deploy · first-deploy · post-deploy (§13:320). Required."
                                     },
                                     "component": {
                                         "description": "Must name a component (§13:321, R14); default: `domains.primaryComponent`.",
@@ -1985,9 +1985,9 @@
                                                 ]
                                             },
                                             "path": {
-                                                "description": "The in-cluster request path (§13:324). Required.",
                                                 "type": "string",
-                                                "pattern": "^\\/[^\\s]{0,511}$"
+                                                "pattern": "^\\/[^\\s]{0,511}$",
+                                                "description": "The in-cluster request path (§13:324). Required."
                                             },
                                             "body": {
                                                 "description": "A JSON body of at most 16 KiB serialized (§13:325)."
@@ -2070,14 +2070,14 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The cron name, unique among cron entries (§14:338, R4). Required.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "The cron name, unique among cron entries (§14:338, R4). Required."
                                     },
                                     "schedule": {
-                                        "description": "A five-field cron expression, UTC (§14:339). Required; unparsable is `cron_invalid`.",
                                         "type": "string",
-                                        "pattern": "^\\S+(?:\\s+\\S+){4}$"
+                                        "pattern": "^\\S+(?:\\s+\\S+){4}$",
+                                        "description": "A five-field cron expression, UTC (§14:339). Required; unparsable is `cron_invalid`."
                                     },
                                     "component": {
                                         "description": "Defaults to `domains.primaryComponent` (§14:340).",
@@ -2109,9 +2109,9 @@
                                                 ]
                                             },
                                             "path": {
-                                                "description": "The in-cluster request path (§13:324). Required.",
                                                 "type": "string",
-                                                "pattern": "^\\/[^\\s]{0,511}$"
+                                                "pattern": "^\\/[^\\s]{0,511}$",
+                                                "description": "The in-cluster request path (§13:324). Required."
                                             },
                                             "body": {
                                                 "description": "A JSON body of at most 16 KiB serialized (§13:325)."
@@ -2198,9 +2198,9 @@
                                     "maxItems": 10,
                                     "type": "array",
                                     "items": {
-                                        "description": "EnvName (schema.md §0): ^[A-Z_][A-Z0-9_]{0,127}$.",
                                         "type": "string",
-                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+                                        "description": "EnvName (schema.md §0): ^[A-Z_][A-Z0-9_]{0,127}$."
                                     }
                                 },
                                 "onChange": {
@@ -2229,12 +2229,11 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The smoke check name, unique among smoke checks (§16:355, R4). Required.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "The smoke check name, unique among smoke checks (§16:355, R4). Required."
                                     },
                                     "http": {
-                                        "description": "The request to make (§16:361-363). Required.",
                                         "type": "object",
                                         "properties": {
                                             "method": {
@@ -2247,9 +2246,9 @@
                                                 ]
                                             },
                                             "path": {
-                                                "description": "The path requested (§16:362). Required.",
                                                 "type": "string",
-                                                "pattern": "^\\/[^\\s]{0,511}$"
+                                                "pattern": "^\\/[^\\s]{0,511}$",
+                                                "description": "The path requested (§16:362). Required."
                                             },
                                             "body": {
                                                 "description": "A JSON body of at most 16 KiB, `POST` only (§16:363)."
@@ -2259,6 +2258,7 @@
                                             "path"
                                         ],
                                         "additionalProperties": false,
+                                        "description": "The request to make (§16:361-363). Required.",
                                         "patternProperties": {
                                             "^x-": {}
                                         }
@@ -2340,12 +2340,11 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The check name, unique among checks (§17:377, R4). Required.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "The check name, unique among checks (§17:377, R4). Required."
                                     },
                                     "command": {
-                                        "description": "The command to run, 1–500 characters with no control characters (§17:378). Required.",
                                         "type": "string",
                                         "minLength": 1,
                                         "maxLength": 500,
@@ -2356,7 +2355,8 @@
                                             {
                                                 "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
                                             }
-                                        ]
+                                        ],
+                                        "description": "The command to run, 1–500 characters with no control characters (§17:378). Required."
                                     },
                                     "required": {
                                         "description": "Whether the check gates a Task (§17:379); default: true; false warns `advisory_check`.",
@@ -2388,9 +2388,9 @@
                                     "maxItems": 10,
                                     "type": "array",
                                     "items": {
-                                        "description": "RelPath (schema.md §0): 1–255 characters, relative, no `..` segment, not under `.git/`.",
                                         "type": "string",
-                                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$",
+                                        "description": "RelPath (schema.md §0): 1–255 characters, relative, no `..` segment, not under `.git/`."
                                     }
                                 },
                                 "maxPullRequestChangedLines": {
@@ -2410,9 +2410,9 @@
                                     "maxItems": 50,
                                     "type": "array",
                                     "items": {
-                                        "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`.",
                                         "type": "string",
-                                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$"
+                                        "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$",
+                                        "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`."
                                     }
                                 }
                             },
@@ -2570,22 +2570,22 @@
                     "type": "object",
                     "properties": {
                         "relation": {
-                            "description": "How the App Work relates to its repository (§5:123): fork · private-copy · link. Required.",
                             "type": "string",
                             "enum": [
                                 "fork",
                                 "private-copy",
                                 "link"
-                            ]
+                            ],
+                            "description": "How the App Work relates to its repository (§5:123): fork · private-copy · link. Required."
                         },
                         "upstream": {
                             "description": "The repository followed (§5:124); forbidden when `relation` is `link` (R13).",
                             "type": "object",
                             "properties": {
                                 "repo": {
-                                    "description": "The upstream repository, `owner/repo` (§5:124); required unless `relation` is `link`.",
                                     "type": "string",
-                                    "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$"
+                                    "pattern": "^[A-Za-z0-9-]{1,39}\\/[A-Za-z0-9._-]{1,100}$",
+                                    "description": "The upstream repository, `owner/repo` (§5:124); required unless `relation` is `link`."
                                 },
                                 "defaultBranch": {
                                     "description": "The upstream branch to follow (§5:125); default: the upstream default at creation.",
@@ -2620,24 +2620,24 @@
                     "type": "object",
                     "properties": {
                         "id": {
-                            "description": "The Blueprint id (§6:137): ^[a-z0-9][a-z0-9-]{0,63}$. Required.",
                             "type": "string",
-                            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+                            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+                            "description": "The Blueprint id (§6:137): ^[a-z0-9][a-z0-9-]{0,63}$. Required."
                         },
                         "version": {
-                            "description": "The Blueprint version (§6:138): a semantic version `MAJOR.MINOR.PATCH`. Required.",
                             "type": "string",
-                            "pattern": "^\\d+\\.\\d+\\.\\d+$"
+                            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+                            "description": "The Blueprint version (§6:138): a semantic version `MAJOR.MINOR.PATCH`. Required."
                         },
                         "repo": {
-                            "description": "The Blueprint repository (§6:139): ^ever-works/[a-z0-9-]+$. Required.",
                             "type": "string",
-                            "pattern": "^ever-works\\/[a-z0-9-]+$"
+                            "pattern": "^ever-works\\/[a-z0-9-]+$",
+                            "description": "The Blueprint repository (§6:139): ^ever-works/[a-z0-9-]+$. Required."
                         },
                         "sha": {
-                            "description": "The pinned Blueprint commit (§6:140): 40 lowercase hex characters. Required.",
                             "type": "string",
-                            "pattern": "^[0-9a-f]{40}$"
+                            "pattern": "^[0-9a-f]{40}$",
+                            "description": "The pinned Blueprint commit (§6:140): 40 lowercase hex characters. Required."
                         }
                     },
                     "required": [
@@ -2711,9 +2711,9 @@
                             "maxItems": 50,
                             "type": "array",
                             "items": {
-                                "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`.",
                                 "type": "string",
-                                "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$"
+                                "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$",
+                                "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`."
                             }
                         }
                     },
@@ -2765,9 +2765,9 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The build argument name (§9:175). Required.",
                                         "type": "string",
-                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                        "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+                                        "description": "The build argument name (§9:175). Required."
                                     },
                                     "value": {
                                         "description": "A literal build-argument value ≤ 1000 characters (§9:175); never a secret (R10). No `${`, line break or control character: it is written into the build workflow.",
@@ -2798,15 +2798,15 @@
                                 "type": "object",
                                 "properties": {
                                     "name": {
-                                        "description": "The service name (§9:176). Required.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "The service name (§9:176). Required."
                                     },
                                     "image": {
-                                        "description": "The service image (§9:176). Required.",
                                         "type": "string",
                                         "maxLength": 512,
-                                        "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::\\d+)?\\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$"
+                                        "pattern": "^(?:[A-Za-z0-9][A-Za-z0-9._-]*(?::\\d+)?\\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*(?::[A-Za-z0-9._-]+)?(?:@sha256:[0-9a-f]{64})?$",
+                                        "description": "The service image (§9:176). Required."
                                     },
                                     "port": {
                                         "description": "The service port, 1–65535 (§9:176).",
@@ -2822,14 +2822,14 @@
                                             "type": "object",
                                             "properties": {
                                                 "name": {
-                                                    "description": "The variable name of a build service’s environment entry (§9:176): ^[A-Za-z_][A-Za-z0-9_.]{0,127}$.",
                                                     "type": "string",
-                                                    "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$"
+                                                    "pattern": "^[A-Za-z_][A-Za-z0-9_.]{0,127}$",
+                                                    "description": "The variable name of a build service’s environment entry (§9:176): ^[A-Za-z_][A-Za-z0-9_.]{0,127}$."
                                                 },
                                                 "value": {
-                                                    "description": "The value of a build service’s environment entry (§9:176). No `${`, line break or control character: it is written into the build workflow.",
                                                     "type": "string",
-                                                    "pattern": "^(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]*$"
+                                                    "pattern": "^(?![\\s\\S]*\\$\\{)[^\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029\\ufeff]*$",
+                                                    "description": "The value of a build service’s environment entry (§9:176). No `${`, line break or control character: it is written into the build workflow."
                                                 }
                                             },
                                             "required": [
@@ -2894,17 +2894,17 @@
                         "type": "object",
                         "properties": {
                             "name": {
-                                "description": "A DNS-label name, unique among components (§10:194, R4). Required.",
                                 "type": "string",
-                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                "description": "A DNS-label name, unique among components (§10:194, R4). Required."
                             },
                             "role": {
-                                "description": "web (Service + Ingress) or worker (§10:195). Required.",
                                 "type": "string",
                                 "enum": [
                                     "web",
                                     "worker"
-                                ]
+                                ],
+                                "description": "web (Service + Ingress) or worker (§10:195). Required."
                             },
                             "command": {
                                 "description": "Image entrypoint override, ≤ 20 items × 1000 characters (§10:196); default: the image entrypoint.",
@@ -3131,19 +3131,19 @@
                                     "type": "object",
                                     "properties": {
                                         "name": {
-                                            "description": "The volume name (§10:208). Required.",
                                             "type": "string",
-                                            "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                            "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                            "description": "The volume name (§10:208). Required."
                                         },
                                         "path": {
-                                            "description": "An absolute mount path of at most 255 characters (§10:208). Required.",
                                             "type": "string",
-                                            "pattern": "^\\/[\\s\\S]{0,254}$"
+                                            "pattern": "^\\/[\\s\\S]{0,254}$",
+                                            "description": "An absolute mount path of at most 255 characters (§10:208). Required."
                                         },
                                         "size": {
-                                            "description": "The volume size, `100Mi`–`500Gi` (§10:208). Required.",
                                             "type": "string",
-                                            "pattern": "^\\d+(?:Mi|Gi)$"
+                                            "pattern": "^\\d+(?:Mi|Gi)$",
+                                            "description": "The volume size, `100Mi`–`500Gi` (§10:208). Required."
                                         },
                                         "backup": {
                                             "description": "Whether the volume is backed up (§10:208); default: true.",
@@ -3246,23 +3246,23 @@
                             "type": "object",
                             "properties": {
                                 "buckets": {
-                                    "description": "The buckets to create, 1–10 unique names (§11:225). Required.",
                                     "minItems": 1,
                                     "maxItems": 10,
                                     "type": "array",
                                     "items": {
-                                        "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
-                                    }
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only."
+                                    },
+                                    "description": "The buckets to create, 1–10 unique names (§11:225). Required."
                                 },
                                 "publicBuckets": {
                                     "description": "Buckets that are publicly readable, a subset of `buckets` (§11:226); default: [].",
                                     "type": "array",
                                     "items": {
-                                        "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only.",
                                         "type": "string",
-                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                        "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                        "description": "Name (schema.md §0): a DNS label of 1–32 characters, lowercase, digits and dashes only."
                                     }
                                 }
                             },
@@ -3302,9 +3302,9 @@
                         "type": "object",
                         "properties": {
                             "name": {
-                                "description": "The variable name (§12:246). Required.",
                                 "type": "string",
-                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+                                "description": "The variable name (§12:246). Required."
                             },
                             "secret": {
                                 "description": "Stored encrypted, never logged or returned (§12:247, Constitution VII); default: false.",
@@ -3343,7 +3343,6 @@
                                 "type": "object",
                                 "properties": {
                                     "kind": {
-                                        "description": "The generator (§12:261): base64 · hex · chars · uuid · keypair. Required.",
                                         "type": "string",
                                         "enum": [
                                             "base64",
@@ -3351,7 +3350,8 @@
                                             "chars",
                                             "uuid",
                                             "keypair"
-                                        ]
+                                        ],
+                                        "description": "The generator (§12:261): base64 · hex · chars · uuid · keypair. Required."
                                     },
                                     "bytes": {
                                         "description": "16–128, `base64` and `hex` only (§12:262); default: 32.",
@@ -3463,10 +3463,10 @@
                                 "type": "object",
                                 "properties": {
                                     "description": {
-                                        "description": "The question, 1–300 characters (§12:255). Required.",
                                         "type": "string",
                                         "minLength": 1,
-                                        "maxLength": 300
+                                        "maxLength": 300,
+                                        "description": "The question, 1–300 characters (§12:255). Required."
                                     },
                                     "required": {
                                         "description": "Whether the answer is required (§12:255); default: true.",
@@ -3509,18 +3509,18 @@
                         "type": "object",
                         "properties": {
                             "name": {
-                                "description": "The job name, unique among jobs (§13:319, R4). Required.",
                                 "type": "string",
-                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                "description": "The job name, unique among jobs (§13:319, R4). Required."
                             },
                             "when": {
-                                "description": "pre-deploy · first-deploy · post-deploy (§13:320). Required.",
                                 "type": "string",
                                 "enum": [
                                     "pre-deploy",
                                     "first-deploy",
                                     "post-deploy"
-                                ]
+                                ],
+                                "description": "pre-deploy · first-deploy · post-deploy (§13:320). Required."
                             },
                             "component": {
                                 "description": "Must name a component (§13:321, R14); default: `domains.primaryComponent`.",
@@ -3552,9 +3552,9 @@
                                         ]
                                     },
                                     "path": {
-                                        "description": "The in-cluster request path (§13:324). Required.",
                                         "type": "string",
-                                        "pattern": "^\\/[^\\s]{0,511}$"
+                                        "pattern": "^\\/[^\\s]{0,511}$",
+                                        "description": "The in-cluster request path (§13:324). Required."
                                     },
                                     "body": {
                                         "description": "A JSON body of at most 16 KiB serialized (§13:325)."
@@ -3637,14 +3637,14 @@
                         "type": "object",
                         "properties": {
                             "name": {
-                                "description": "The cron name, unique among cron entries (§14:338, R4). Required.",
                                 "type": "string",
-                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                "description": "The cron name, unique among cron entries (§14:338, R4). Required."
                             },
                             "schedule": {
-                                "description": "A five-field cron expression, UTC (§14:339). Required; unparsable is `cron_invalid`.",
                                 "type": "string",
-                                "pattern": "^\\S+(?:\\s+\\S+){4}$"
+                                "pattern": "^\\S+(?:\\s+\\S+){4}$",
+                                "description": "A five-field cron expression, UTC (§14:339). Required; unparsable is `cron_invalid`."
                             },
                             "component": {
                                 "description": "Defaults to `domains.primaryComponent` (§14:340).",
@@ -3676,9 +3676,9 @@
                                         ]
                                     },
                                     "path": {
-                                        "description": "The in-cluster request path (§13:324). Required.",
                                         "type": "string",
-                                        "pattern": "^\\/[^\\s]{0,511}$"
+                                        "pattern": "^\\/[^\\s]{0,511}$",
+                                        "description": "The in-cluster request path (§13:324). Required."
                                     },
                                     "body": {
                                         "description": "A JSON body of at most 16 KiB serialized (§13:325)."
@@ -3765,9 +3765,9 @@
                             "maxItems": 10,
                             "type": "array",
                             "items": {
-                                "description": "EnvName (schema.md §0): ^[A-Z_][A-Z0-9_]{0,127}$.",
                                 "type": "string",
-                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+                                "pattern": "^[A-Z_][A-Z0-9_]{0,127}$",
+                                "description": "EnvName (schema.md §0): ^[A-Z_][A-Z0-9_]{0,127}$."
                             }
                         },
                         "onChange": {
@@ -3796,12 +3796,11 @@
                         "type": "object",
                         "properties": {
                             "name": {
-                                "description": "The smoke check name, unique among smoke checks (§16:355, R4). Required.",
                                 "type": "string",
-                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                "description": "The smoke check name, unique among smoke checks (§16:355, R4). Required."
                             },
                             "http": {
-                                "description": "The request to make (§16:361-363). Required.",
                                 "type": "object",
                                 "properties": {
                                     "method": {
@@ -3814,9 +3813,9 @@
                                         ]
                                     },
                                     "path": {
-                                        "description": "The path requested (§16:362). Required.",
                                         "type": "string",
-                                        "pattern": "^\\/[^\\s]{0,511}$"
+                                        "pattern": "^\\/[^\\s]{0,511}$",
+                                        "description": "The path requested (§16:362). Required."
                                     },
                                     "body": {
                                         "description": "A JSON body of at most 16 KiB, `POST` only (§16:363)."
@@ -3826,6 +3825,7 @@
                                     "path"
                                 ],
                                 "additionalProperties": false,
+                                "description": "The request to make (§16:361-363). Required.",
                                 "patternProperties": {
                                     "^x-": {}
                                 }
@@ -3907,12 +3907,11 @@
                         "type": "object",
                         "properties": {
                             "name": {
-                                "description": "The check name, unique among checks (§17:377, R4). Required.",
                                 "type": "string",
-                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$"
+                                "pattern": "^[a-z](?:[-a-z0-9]{0,30}[a-z0-9])?$",
+                                "description": "The check name, unique among checks (§17:377, R4). Required."
                             },
                             "command": {
-                                "description": "The command to run, 1–500 characters with no control characters (§17:378). Required.",
                                 "type": "string",
                                 "minLength": 1,
                                 "maxLength": 500,
@@ -3923,7 +3922,8 @@
                                     {
                                         "pattern": "^[^\\u0000-\\u001f\\u007f]*$"
                                     }
-                                ]
+                                ],
+                                "description": "The command to run, 1–500 characters with no control characters (§17:378). Required."
                             },
                             "required": {
                                 "description": "Whether the check gates a Task (§17:379); default: true; false warns `advisory_check`.",
@@ -3955,9 +3955,9 @@
                             "maxItems": 10,
                             "type": "array",
                             "items": {
-                                "description": "RelPath (schema.md §0): 1–255 characters, relative, no `..` segment, not under `.git/`.",
                                 "type": "string",
-                                "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$"
+                                "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,255}$",
+                                "description": "RelPath (schema.md §0): 1–255 characters, relative, no `..` segment, not under `.git/`."
                             }
                         },
                         "maxPullRequestChangedLines": {
@@ -3977,9 +3977,9 @@
                             "maxItems": 50,
                             "type": "array",
                             "items": {
-                                "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`.",
                                 "type": "string",
-                                "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$"
+                                "pattern": "^(?!\\/)(?!.*\\\\)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))(?!.*(?:^|\\/)\\.git(?:\\/|$))[\\s\\S]{1,200}$",
+                                "description": "Glob (schema.md §0): a RelPath of 1–200 characters that may contain `*`, `**` or `?`."
                             }
                         }
                     },

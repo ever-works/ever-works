@@ -1,6 +1,7 @@
 import { consumeStream, type UIMessage } from 'ai';
 import { after } from 'next/server';
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import { runAgent } from '@/lib/ai/agent';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
 
     let parsed;
     try {
-        parsed = chatBodySchema.safeParse(await request.json());
+        parsed = chatBodySchema.safeParse(await request.json(), ZOD3_ERROR_MESSAGES);
     } catch {
         return new Response('invalid JSON body', { status: 400 });
     }

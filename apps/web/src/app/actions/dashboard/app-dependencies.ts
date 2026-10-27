@@ -22,7 +22,7 @@ import {
  * check of **Delete data**.
  */
 
-const workIdSchema = z.string().uuid();
+const workIdSchema = z.guid();
 const kindSchema = z.enum(APP_DEPENDENCY_KINDS);
 const slugSchema = z.string().trim().min(1).max(200);
 

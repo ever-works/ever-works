@@ -204,7 +204,7 @@ If you find a stray doc in the root, move it into `docs/` (most likely
 | React              | React                                          | 19.2.5           |
 | ORM                | TypeORM                                        | 0.3.31           |
 | AI                 | LangChain (@langchain/core, @langchain/openai) | ^0.3.80, ^0.6.17 |
-| Validation         | class-validator / zod                          | 0.14.3 / ^3.25   |
+| Validation         | class-validator / zod                          | 0.14.3 / ^4.6    |
 | Background jobs    | BullMQ / Trigger.dev                           | ^5.66 / 4.7.4    |
 | TypeScript         | TypeScript                                     | 5.9.3            |
 

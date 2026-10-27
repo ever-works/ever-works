@@ -113,7 +113,7 @@ const badgeSchema = z.object({
     details: z.string().nullable(),
 });
 
-export const itemBadgesSchema = z.record(badgeSchema.nullable());
+export const itemBadgesSchema = z.record(z.string(), badgeSchema.nullable());
 
 export const itemDataWithBadgesSchema = baseSchema.extend({
     source_url: z

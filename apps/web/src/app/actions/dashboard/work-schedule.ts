@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import { workAPI } from '@/lib/api';
 import { WorkScheduleBillingMode, WorkScheduleCadence } from '@/lib/api/enums';
 import { getAuthFromCookie } from '@/lib/auth';
@@ -21,8 +22,8 @@ const providerOverridesSchema = z
 const updateScheduleSchema = z.object({
     enable: z.boolean(),
     runImmediately: z.boolean().optional(),
-    cadence: z.nativeEnum(WorkScheduleCadence),
-    billingMode: z.nativeEnum(WorkScheduleBillingMode),
+    cadence: z.enum(WorkScheduleCadence),
+    billingMode: z.enum(WorkScheduleBillingMode),
     maxFailureBeforePause: z.number().int().min(1).max(10),
     alwaysCreatePullRequest: z.boolean().optional(),
     providerOverrides: providerOverridesSchema,
@@ -39,9 +40,9 @@ export async function updateWorkSchedule(
 
     const t = await getTranslations('dashboard.workDetail.schedule.actions');
 
-    const validation = updateScheduleSchema.safeParse(payload);
+    const validation = updateScheduleSchema.safeParse(payload, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
-        return { success: false, error: validation.error.errors[0]?.message || t('invalid') };
+        return { success: false, error: validation.error.issues[0]?.message || t('invalid') };
     }
 
     try {
