@@ -2,6 +2,7 @@ import { FindOperator } from 'typeorm';
 import type { FleetUsageReport, FleetUsageRow } from '@ever-works/contracts';
 import { FleetUsageReconcilerService } from '../fleet-usage-reconciler.service';
 import { PublishedModelListPrices } from '../../../usage/model-list-prices';
+import { MODEL_LIST_PRICEBOOK_VERSION } from '../../../usage/model-list-pricebook';
 
 /**
  * FL-20 T-12, T-13, T-23 — the report → samples → Session → Run → ledger
@@ -166,7 +167,8 @@ describe('FleetUsageReconcilerService', () => {
         const session = h.sessions.rows[0];
         expect(session.costCents).toBe(450);
         expect(session.tokens).toMatchObject({
-            priceListVersion: 1,
+            // New figures carry the version in effect (v2 since 2026-10-27).
+            priceListVersion: MODEL_LIST_PRICEBOOK_VERSION,
             requests: 4,
             unknownModels: [],
         });
@@ -176,7 +178,7 @@ describe('FleetUsageReconcilerService', () => {
         expect(h.runs.rows[0].costCents).toBe(450);
         expect(h.samples.rows[0]).toMatchObject({
             fleetSessionId: 'session-a',
-            priceListVersion: 1,
+            priceListVersion: MODEL_LIST_PRICEBOOK_VERSION,
             costCents: 450,
         });
     });

@@ -16,6 +16,7 @@ import { ScheduleStore } from '../core/link/modules/schedule/schedule-store';
 import { describeSelf } from '../core/capabilities';
 import {
 	helperAdmit,
+	helperAdmitSigned,
 	HelperAdmissionError,
 	helperInstall,
 	helperRevoke,
@@ -24,6 +25,7 @@ import {
 } from '../core/screen/helper/helper-admission';
 import { helperControlAllow, helperControlDeny, helperControlStatus } from '../core/screen/helper/helper-control';
 import { BAKED_HELPER_MANIFEST } from '../core/screen/helper/helper-manifest';
+import { nodeHelperSignatureChecker } from '../core/screen/helper/helper-signature';
 import { createHelperFs, helperPathsFor, type HelperFs } from '../core/screen/helper/helper-trust';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
@@ -2337,7 +2339,17 @@ export function buildProgram(deps: CliDeps): Command {
 		.description('Approve the screen helper on this machine after comparing its fingerprint (type "admit")')
 		.option('--path <file>', 'Approve this helper file instead of the installed one')
 		.option('--allow-unpublished', 'Approve a helper this node version does not publish (a build of your own)')
-		.action(async (options: { path?: string; allowUnpublished?: boolean }) => {
+		.option(
+			'--signed',
+			'Approve it by its code signature (macOS Developer ID / Windows Authenticode of the publisher this node version names): updates keep the approval'
+		)
+		.action(async (options: { path?: string; allowUnpublished?: boolean; signed?: boolean }) => {
+			if (options.signed) {
+				await runHelperCommand(deps, (helperDeps) =>
+					helperAdmitSigned(helperDeps, options.path ? { path: options.path } : {})
+				);
+				return;
+			}
 			await runHelperCommand(deps, (helperDeps) => helperAdmit(helperDeps, options));
 		});
 	helper
@@ -2498,19 +2510,23 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
 
 /** The screen helper's admission deps for this CLI (FL-07). */
 export function helperAdmissionDeps(deps: CliDeps): HelperAdmissionDeps {
+	const arch = deps.arch ?? deps.io.environment.arch;
+	// P3: the OS signature check (macOS, Windows), bound to the signer this node version publishes.
+	const checkSignature = nodeHelperSignatureChecker(deps.io.runner, deps.platform, arch, BAKED_HELPER_MANIFEST);
 	return {
 		fs:
 			deps.helperFs ??
 			createHelperFs({ platform: deps.platform, ...(deps.restrictFile ? { restrict: deps.restrictFile } : {}) }),
 		paths: helperPathsFor(deps.configPath, deps.platform),
 		platform: deps.platform,
-		arch: deps.arch ?? deps.io.environment.arch,
+		arch,
 		manifest: BAKED_HELPER_MANIFEST,
 		hostName: safeHostname(),
 		out: deps.out,
 		...(deps.readLine ? { readLine: deps.readLine } : {}),
 		...(deps.helperFetch ? { fetchFn: deps.helperFetch } : {}),
-		...(deps.now ? { now: deps.now } : {})
+		...(deps.now ? { now: deps.now } : {}),
+		...(checkSignature ? { checkSignature } : {})
 	};
 }
 

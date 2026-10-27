@@ -16,8 +16,8 @@ use windows_sys::Win32::Foundation::{LPARAM, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
     BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, CreateCompatibleBitmap,
     CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, EnumDisplayMonitors, GetDC,
-    GetDIBits, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW, MONITORINFOF_PRIMARY,
-    ReleaseDC, SRCCOPY, SelectObject,
+    GetDIBits, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW, ReleaseDC, SRCCOPY,
+    SelectObject,
 };
 use windows_sys::Win32::System::RemoteDesktop::ProcessIdToSessionId;
 use windows_sys::Win32::System::StationsAndDesktops::{
@@ -30,10 +30,12 @@ use windows_sys::Win32::UI::HiDpi::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CURSOR_SHOWING, CURSORINFO, DI_NORMAL, DrawIconEx, GetCursorInfo, GetIconInfo, ICONINFO,
+    MONITORINFOF_PRIMARY,
 };
 
 use super::{
-    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, dedupe_ids, order_displays, sanitize_id,
+    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, dedupe_ids, order_displays,
+    sanitize_id,
 };
 
 struct GdiCapturer {
@@ -103,7 +105,9 @@ fn monitors() -> Vec<(Display, RECT)> {
     for (index, handle) in handles.into_iter().enumerate() {
         let mut info: MONITORINFOEXW = unsafe { zeroed() };
         info.monitorInfo.cbSize = size_of::<MONITORINFOEXW>() as u32;
-        let ok = unsafe { GetMonitorInfoW(handle, &mut info as *mut MONITORINFOEXW as *mut MONITORINFO) };
+        let ok = unsafe {
+            GetMonitorInfoW(handle, &mut info as *mut MONITORINFOEXW as *mut MONITORINFO)
+        };
         if ok == 0 {
             continue;
         }
@@ -113,10 +117,17 @@ fn monitors() -> Vec<(Display, RECT)> {
         if width <= 0 || height <= 0 {
             continue;
         }
-        let device_len = info.szDevice.iter().position(|&c| c == 0).unwrap_or(info.szDevice.len());
+        let device_len = info
+            .szDevice
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(info.szDevice.len());
         let device = String::from_utf16_lossy(&info.szDevice[..device_len]);
         let (mut dpi_x, mut dpi_y) = (96u32, 96u32);
-        let scale = if unsafe { GetDpiForMonitor(handle, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y) } == 0 {
+        let scale = if unsafe {
+            GetDpiForMonitor(handle, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y)
+        } == 0
+        {
             (dpi_x as f64 / 96.0 * 100.0).round() / 100.0
         } else {
             1.0
@@ -142,7 +153,10 @@ fn draw_cursor(memory: HDC, rect: &RECT) {
     unsafe {
         let mut cursor: CURSORINFO = zeroed();
         cursor.cbSize = size_of::<CURSORINFO>() as u32;
-        if GetCursorInfo(&mut cursor) == 0 || cursor.flags & CURSOR_SHOWING == 0 || cursor.hCursor.is_null() {
+        if GetCursorInfo(&mut cursor) == 0
+            || cursor.flags & CURSOR_SHOWING == 0
+            || cursor.hCursor.is_null()
+        {
             return;
         }
         let mut icon: ICONINFO = zeroed();
@@ -232,7 +246,9 @@ fn grab(rect: &RECT) -> Result<RawImage, String> {
         (copied, lines)
     };
     if copied == 0 || lines <= 0 {
-        return Err("the screen could not be copied (locked, or switched to another desktop)".into());
+        return Err(
+            "the screen could not be copied (locked, or switched to another desktop)".into(),
+        );
     }
     Ok(RawImage {
         width: width as u32,

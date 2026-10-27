@@ -683,12 +683,12 @@ describe('AppUpstreamCard — the workflow hold (T46) and the merged sync PR lin
         expect(screen.queryByTestId('app-upstream-sync-anyway-confirm')).toBeNull();
     });
 
-    it('offers no Sync anyway to anyone but the owner, and says who can', () => {
+    it('offers no Sync anyway to anyone but the owner or an Organization Owner, and says who can', () => {
         renderCard(heldState(false));
 
         expect(screen.queryByTestId('app-upstream-sync-anyway')).toBeNull();
         expect(screen.getByTestId('app-upstream-workflow-hold')).toHaveTextContent(
-            'Only the Work owner can accept upstream workflow changes.',
+            'Only the Work owner or an Owner of its Organization can accept upstream workflow changes.',
         );
     });
 

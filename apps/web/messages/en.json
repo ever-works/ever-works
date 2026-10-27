@@ -7602,12 +7602,12 @@
                     "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
                     "confirmYes": "Yes, sync anyway",
                     "cancel": "Cancel",
-                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
-                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
-                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "ownerOnly": "Only the Work owner or an Owner of its Organization can accept upstream workflow changes.",
+                    "released": "These upstream workflow changes were accepted {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner or an Owner of its Organization must review them before this App Work can sync.",
                     "changed": "Upstream moved since you reviewed it. Review the new changes first.",
                     "noHold": "No upstream workflow change is waiting for review.",
-                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                    "ownerRequired": "Only the Work owner or an Owner of its Organization can accept upstream workflow changes."
                 }
             },
             "appDependencies": {
@@ -15920,7 +15920,8 @@
             "helper": {
                 "reducedTrust": "Reduced trust — the screen helper on {name} is hash-pinned, not signed.",
                 "fingerprint": "Fingerprint {prefix}…",
-                "unpublished": "It is a build its owner approved themselves."
+                "unpublished": "It is a build its owner approved themselves.",
+                "signedAvailable": "A signed helper is available for it — on that computer, run"
             },
             "stage": {
                 "label": "Desktop of {name}, watching"
@@ -16020,6 +16021,17 @@
                 }
             },
             "recordings": {
+                "settings": {
+                    "title": "Desktop recordings",
+                    "body": "A Desktop view of this computer is always recorded while someone controls it.",
+                    "watch": "Record watching sessions",
+                    "watchHint": "Also record views that only watch. Off by default.",
+                    "retention": "Keep recordings for",
+                    "days": "{count, plural, one {# day} other {# days}}",
+                    "retentionHint": "A new value applies to recordings that stop from now on.",
+                    "saved": "Saved.",
+                    "failed": "Could not save the recording settings."
+                },
                 "title": "Recordings of {name}",
                 "none": "Nothing recorded yet. A view is recorded whenever someone has control.",
                 "error": "The recordings could not be read.",
@@ -16353,6 +16365,7 @@
                     "docker": "container-isolated"
                 },
                 "sourceGithub": "as GitHub reports it",
+                "acceptPermission": "The Ever Works GitHub App lacks “{permission}” here. Accept the App’s updated permissions on GitHub (installation settings → “Review request” → “Accept new permissions”), then Reinstall.",
                 "sourceNode": "as {name} reports it",
                 "job": "“{job}”",
                 "jobRun": "“{job}” run #{run}",
@@ -16428,6 +16441,7 @@
                 "failed": "The runners could not be installed.",
                 "choose": "Choose a repository or organisation",
                 "checkingPermission": "Checking the GitHub App’s permission on {target}…",
+                "repoPermissionHint": "Repository runners need the Ever Works GitHub App to have “Administration: Read and write” on the repository. If its installation predates that permission, accept the App’s updated permissions on GitHub first: installation settings → “Review request” → “Accept new permissions”.",
                 "shareWarning": "Ticked, these runners can control every container on {name} and run anything as root there. Leave it unticked unless your jobs need it."
             },
             "palette": {
@@ -16504,7 +16518,9 @@
                 "grant": "Grant access",
                 "checkAgain": "Check again",
                 "checking": "Checking…",
-                "useRepository": "Use a repository instead"
+                "useRepository": "Use a repository instead",
+                "accept": "What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, check that “{permission}” is listed, then press “Accept new permissions”. No request there? The App does not ask for that permission yet: whoever manages the App adds it under “Permissions & events” first.",
+                "acceptUnnamed": "What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, then “Accept new permissions”. No request there? The App does not ask for that permission yet: whoever manages the App adds it under “Permissions & events” first."
             },
             "reinstall": {
                 "button": "Reinstall…",

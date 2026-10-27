@@ -192,6 +192,8 @@ Anyone else is refused, including a read-only collaborator who can see the insta
 
 For the organization check, also give the App the **organization permission "Members: read"**. Without it, GitHub refuses the membership lookup. In that case an organization installation can only be linked by its installer, after the installation webhook has arrived.
 
+For [Actions runners on computers](../features/fleet-actions-runners.md), also give the App the **repository permission "Administration: Read and write"** (repository runners) and the **organization permission "Self-hosted runners: Read and write"** (organisation runners). The hosted Ever Works App asks for both by default. Every runner call mints a short-lived installation token narrowed to that one permission (and, for a repository, that one repository). Without them, runner installs on that target fail and name the missing permission. An installation made before you added them sees a request on GitHub: **Configure** → **Review request** → **Accept new permissions**.
+
 The setup and callback routes redirect the browser to the web app's public origin, `NEXT_PUBLIC_WEB_URL` (or `WEB_URL`) on the web deployment. Set it to the browser-facing URL. The address the web server listens on is never used.
 
 ### How to: turn on review for a single repository, without the App

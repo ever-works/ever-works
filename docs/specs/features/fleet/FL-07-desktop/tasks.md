@@ -318,14 +318,14 @@
 
 ## P3 — Signed admission and virtual displays
 
-- [ ] **T-43**. Signed verification in `apps/node/src/core/screen/helper/helper-trust.ts`: macOS
+- [x] **T-43**. Signed verification in `apps/node/src/core/screen/helper/helper-trust.ts`: macOS
       `codesign --verify --strict` + Team ID from `apps/node/helper-manifest.json` (`signer`);
       Windows reuses the Authenticode broker in `windows-job-helper-trust.internal.ts`; `admit`
       records `level: signed`; Linux stays hash-pinned.
       **Test**: `helper-trust.signed.spec.ts` with the test-signing fixture pattern from
       `apps/node/native/windows-job-launcher/prepare-test-signed-manifest.ps1`; a wrong signer →
       `helper-untrusted`.
-- [ ] **T-44**. Helper note removal and drawer copy for `signed`; `DesktopHelperNote.tsx` shows
+- [x] **T-44**. Helper note removal and drawer copy for `signed`; `DesktopHelperNote.tsx` shows
       "A signed helper is available" when the manifest has one and the node is hash-pinned.
       **Test**: `DesktopHelperNote.unit.spec.tsx` — three states.
 - [ ] **T-45**. Linux X11 virtual displays: helper `src/virtual_display_x11.rs` (`xrandr` mode on a
@@ -335,17 +335,30 @@
       `node.desktop.display.add|remove`.
       **Test**: `tests/virtual_display.rs` (fake X); `fleet-desktop.controller.virtual.spec.ts`
       (`unsupported_on_node` on macOS/Windows nodes); picker unit spec.
+      **Status (2026-10-27, lane H):** helper side merged (#2951): `src/virtual_display.rs` +
+      `src/virtual_display_x11.rs` (RandR requests, no `xrandr` process), protocol `addDisplay` / `removeDisplay` /
+      `displayChange`, verified against Xorg + the dummy driver. Node messages, API routes, picker, tools and audit
+      are open.
 - [ ] **T-46**. Accessibility: `apps/web/e2e/flow-fleet-desktop-a11y.spec.ts` — keyboard-only
       operation of every control, live-region announcements, axe pass on tab, split and player.
       **Test**: the spec itself; fix findings.
 
+> **P3 status (2026-10-27):** T-43 is the mechanism (`helper-signature.ts`: macOS `codesign` and Windows Authenticode by
+> their system paths; `helper admit --signed`; a signed record re-verified by its signature before every start) with
+> `helper-signature.spec.ts` and `helper-signed.spec.ts` over a fake command runner — no test-signed fixture on the
+> lane PC, and the manifest publishes no `signer` yet (owner question 7). The job launcher's broker is not reused
+> (lane log decision 34). T-44 is the note's offer of `helper admit --signed` (`signedAvailable` on the heartbeat) with
+> `DesktopHelperNote.unit.spec.tsx`. Added: the recording settings' first writer (decision 36). T-45 and T-46 are not
+> built (owner question 19; the e2e needs the web e2e stack).
+
 ## Docs & rollout
 
-- [ ] **T-47**. User doc `docs/features/fleet-desktop.md` (what the Desktop source shows, admission
+- [x] **T-47**. User doc `docs/features/fleet-desktop.md` (what the Desktop source shows, admission
       and the two trust levels, permissions per OS, control rules, recordings and retention, what
       it costs); add to `apps/docs/sidebarsPlatform.ts`; cross-link from `docs/features/fleet.md`.
-      **Test**: `pnpm --filter ever-works-docs build` — no broken links.
-- [ ] **T-48**. Update `docs/specs/features/fleet/TRACKER.md` (FL-07 spec/impl per phase) and the
+      **Test**: `pnpm --filter ever-works-docs build` — no broken links. (Not run on the lane PC: every link in the
+      page is to an existing sibling page.)
+- [x] **T-48**. Update `docs/specs/features/fleet/TRACKER.md` (FL-07 spec/impl per phase) and the
       spec/plan status fields; add the remaining CONTRACTS additions from spec §8b (§1.1 heartbeat
       fields and §3.3 desktop open params and messages) in the same PR — the audit names, R-9
       columns, R-25 family and R-26 IPC already landed in CONTRACTS rev 2.

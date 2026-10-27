@@ -27,7 +27,7 @@ import {
  * logged, never echoed and never returned.
  */
 
-const workIdSchema = z.string().uuid();
+const workIdSchema = z.guid();
 
 const valuesSchema = z
     .record(

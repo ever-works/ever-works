@@ -405,6 +405,8 @@ export interface FleetHelperStatusView {
 	control?: FleetHelperControlState;
 	/** P2: what would stop input on this machine (the helper's `hello`), e.g. `permission-accessibility`. */
 	inputReasons?: FleetDesktopControlReason[];
+	/** P3 (T-44): this node version publishes a SIGNED helper for the machine, and the one here is not it. */
+	signedAvailable?: boolean;
 }
 
 /** The fingerprint prefix shown and audited — never a full hash under a key a redactor eats. */
@@ -437,7 +439,8 @@ export function normalizeFleetHelperStatus(value: unknown): FleetHelperStatusVie
 		...(isFleetHelperControlState(raw.control) ? { control: raw.control } : {}),
 		...(Array.isArray(raw.inputReasons)
 			? { inputReasons: normalizeFleetDesktopControlReasons(raw.inputReasons) }
-			: {})
+			: {}),
+		...(raw.signedAvailable === true ? { signedAvailable: true } : {})
 	};
 }
 

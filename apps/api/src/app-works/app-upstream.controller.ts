@@ -162,10 +162,12 @@ export class AppUpstreamController {
     ): Promise<AppUpstreamDispatchResult> {
         const confirmWorkflowChanges = body?.confirmWorkflowChanges === true;
         if (confirmWorkflowChanges) {
-            // APW-02 T46 — the security rule of #2802/#2806 stands: only the Work OWNER, in a
-            // signed-in session, may accept upstream workflow changes. A member (editor,
-            // manager), the owner's own API key, an integration key, a fleet-run token or an
-            // Agent is refused here, before the service is even asked.
+            // APW-02 T46 — the security rule of #2802/#2806 stands, widened by the owner's
+            // decision of 2026-10-27: only the Work OWNER or an OWNER of the Work's
+            // Organization, in a signed-in session, may accept upstream workflow changes. A
+            // member of any other role (Work editor/manager/co-owner, Organization Admin or
+            // Member), an API key, an integration key, a fleet-run token or an Agent is refused
+            // here, before the service is even asked.
             await this.requireOwnerSession(id, auth);
         }
         return this.translate(() =>
@@ -181,19 +183,23 @@ export class AppUpstreamController {
     /**
      * T46 — the owner-and-session gate, in the order and with the answers of the shared App
      * Works owner gate (`app-owner-gate.ts`, #2802): visibility first (the service's own check
-     * answers the same `404` a stranger always gets), then **the owner** — the Work's creator,
-     * whose repository and secrets a released workflow runs with — `403 ownerRequired`, then
-     * **a person** (`requireHumanSession`): the owner's own API key, an integration key, a
-     * fleet-run token or an Agent cannot take this decision.
+     * answers the same `404` a stranger always gets), then **who may release** — the Work's
+     * creator, whose repository and secrets a released workflow runs with, or (owner decision
+     * 2026-10-27) an Owner of the Work's Organization — `403 ownerRequired`, then **a person**
+     * (`requireHumanSession`): an API key, an integration key, a fleet-run token or an Agent
+     * cannot take this decision, whoever it belongs to.
      */
     private async requireOwnerSession(id: string, auth: AuthenticatedUser): Promise<void> {
-        const isOwner = await this.translate(() => this.upstream.isWorkOwner(id, auth.userId));
-        if (!isOwner) {
+        const mayRelease = await this.translate(() =>
+            this.upstream.mayReleaseWorkflowChanges(id, auth.userId),
+        );
+        if (!mayRelease) {
             throw new HttpException(
                 {
                     status: 'error',
                     code: APP_OWNER_REQUIRED_CODE,
-                    message: 'Only the Work owner can accept upstream workflow changes.',
+                    message:
+                        'Only the Work owner or an Owner of its Organization can accept upstream workflow changes.',
                 },
                 HttpStatus.FORBIDDEN,
             );

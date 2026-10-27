@@ -4,9 +4,9 @@ import * as os from 'os';
 import * as http from 'http';
 import * as https from 'https';
 import { createHash } from 'node:crypto';
-import extractZip from 'extract-zip';
 import * as tar from 'tar';
 import { detectPlatform, getBinaryPath } from './platform.js';
+import { readZipCentralDirectory } from './zip-entries.js';
 import { DEFAULT_CLI_VERSION, OPENCODE_GITHUB_REPO } from '../types.js';
 
 interface Logger {
@@ -203,27 +203,47 @@ function isSymlinkEntry(entry: { externalFileAttributes: number }): boolean {
 	return (unixMode & 0o170000) === 0o120000;
 }
 
-async function unzipArchive(archivePath: string, outputDir: string): Promise<void> {
+// Security: what the previous extractor's zip reader refused on its own (it validated every entry name)
+// and the two guards below do not cover: a backslash, which a Windows extractor treats as a separator
+// while the posix containment check reads it as a plain character, and an embedded NUL.
+function hasUnsafeZipNameCharacters(fileName: string): boolean {
+	return fileName.includes('\\') || fileName.includes('\0');
+}
+
+/**
+ * Unpack a zip release archive into `outputDir`. Exported for the extraction specs.
+ *
+ * Security: `extract-zip` <=2.0.1 has two symlink advisories with no patched release
+ * (GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3), so the archive is unpacked by the maintained drop-in
+ * fork `@electron-internal/extract-zip`. It takes no per-entry callback, so the plugin's own guards
+ * run over the archive's central directory FIRST, and nothing is written unless every entry passes.
+ */
+export async function unzipArchive(archivePath: string, outputDir: string): Promise<void> {
 	const root = path.resolve(outputDir);
-	await extractZip(archivePath, {
-		dir: outputDir,
-		onEntry: (entry) => {
-			// Security: defense-in-depth zip-slip guard (does not rely solely on extract-zip's
-			// internal confinement, which could regress on a downgrade).
-			if (!isPathWithin(root, entry.fileName)) {
-				throw new Error(`Refusing to extract path-traversing zip entry: ${entry.fileName}`);
-			}
-			// Security: extract-zip <=2.0.1 does not validate symlink TARGETS
-			// (GHSA-jmr9-qjv8-65gv) and has no patched release. The entry name above can be
-			// perfectly benign while the link points outside the tree, so a later entry
-			// written through it escapes. An OpenCode release archive is a single binary
-			// plus data files and never legitimately contains a symlink — refuse them
-			// outright rather than trying to validate targets.
-			if (isSymlinkEntry(entry)) {
-				throw new Error(`Refusing to extract symlink zip entry: ${entry.fileName}`);
-			}
+	const entries = readZipCentralDirectory(await fs.readFile(archivePath));
+	for (const entry of entries) {
+		// Security: defense-in-depth zip-slip guard (does not rely solely on the extractor's
+		// internal confinement, which could regress on a downgrade).
+		if (!isPathWithin(root, entry.fileName)) {
+			throw new Error(`Refusing to extract path-traversing zip entry: ${entry.fileName}`);
 		}
-	});
+		// Security: extract-zip <=2.0.1 does not validate symlink TARGETS
+		// (GHSA-jmr9-qjv8-65gv) and has no patched release. The entry name above can be
+		// perfectly benign while the link points outside the tree, so a later entry
+		// written through it escapes. An OpenCode release archive is a single binary
+		// plus data files and never legitimately contains a symlink — refuse them
+		// outright rather than trying to validate targets.
+		if (isSymlinkEntry(entry)) {
+			throw new Error(`Refusing to extract symlink zip entry: ${entry.fileName}`);
+		}
+		if (hasUnsafeZipNameCharacters(entry.fileName)) {
+			throw new Error(`Refusing to extract zip entry with an unsafe name: ${JSON.stringify(entry.fileName)}`);
+		}
+	}
+	// Loaded on first use: the extractor is a native addon, and only the macOS and Windows archives
+	// are zips (Linux, where the API and workers run, unpacks a .tar.gz), so a server never loads it.
+	const { extract } = await import('@electron-internal/extract-zip');
+	await extract(archivePath, { dir: root });
 }
 
 async function extractTarGzArchive(archivePath: string, outputDir: string): Promise<void> {

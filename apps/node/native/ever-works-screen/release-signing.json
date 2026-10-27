@@ -1,0 +1,11 @@
+{
+	"$comment": "The PUBLIC half of the screen helper's release signing (FL-07 P3, owner questions 7 and 17). Read by sign-release.sh / sign-release.ps1. `identifier` is stamped into every macOS signature and pinned by the signing scripts' check; the node's requirement may pin it too once it is final. `darwin.teamId` (Apple Team ID) and `win32.subject` (the Authenticode signer certificate's subject) are what a release publishes as the manifest target's `signer`; null until the owner decides who signs helper releases. No secret belongs here: the signing identity itself (keychain identity, certificate thumbprint) comes from the environment of the machine that signs.",
+	"schemaVersion": 1,
+	"identifier": "works.ever.screen-helper",
+	"darwin": {
+		"teamId": null
+	},
+	"win32": {
+		"subject": null
+	}
+}

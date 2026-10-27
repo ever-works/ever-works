@@ -39,8 +39,22 @@ export const HELPER_MESSAGES = {
 	refresh: 0x04,
 	quality: 0x05,
 	listDisplays: 0x06,
+	/** P3 (T-45, Linux X11): `{ name, width, height }` — add a virtual display; answered `displayChange`. */
+	addDisplay: 0x07,
+	/** P3 (T-45): `{ display }` — remove a virtual display the helper added; answered `displayChange`. */
+	removeDisplay: 0x08,
 	input: 0x10,
 	releaseAll: 0x11,
+	/**
+	 * Owner question 14: let go of every modifier key and mouse button the OS reports held,
+	 * whoever pressed them — sent to a FRESH helper after one died during control. Only releases.
+	 */
+	releaseHeld: 0x12,
+	/**
+	 * Owner question 10: `{ visible }` — draw (or remove) the border around the controlled display.
+	 * Sent only to a helper whose hello offers `controlMarker`.
+	 */
+	controlMarker: 0x13,
 	hello: 0x81,
 	frame: 0x82,
 	tiles: 0x83,
@@ -48,7 +62,9 @@ export const HELPER_MESSAGES = {
 	error: 0x85,
 	started: 0x86,
 	/** P2: an input the helper did not inject (`{ outcome, code }`; injected inputs are not answered). */
-	inputResult: 0x87
+	inputResult: 0x87,
+	/** P3 (T-45): `{ action, ok, code?, display?, displays }` — the answer to `addDisplay` / `removeDisplay`. */
+	displayChange: 0x88
 } as const;
 
 export type HelperMessageKind = (typeof HELPER_MESSAGES)[keyof typeof HELPER_MESSAGES];
@@ -152,7 +168,13 @@ export interface HelperHello {
 	displays: FleetDisplayView[];
 	/** P2: what would stop input, known without opening anything (e.g. `permission-accessibility`). */
 	inputReasons: FleetDesktopControlReason[];
+	/** What the helper can do beyond protocol 1's first messages (known names only; none from an older helper). */
+	features: HelperFeature[];
 }
+
+/** The `hello.features` the node knows. */
+export const HELPER_FEATURES = ['releaseHeld', 'controlMarker'] as const;
+export type HelperFeature = (typeof HELPER_FEATURES)[number];
 
 export function parseHelperHello(payload: Uint8Array): HelperHello | null {
 	const json = readJson(payload);
@@ -169,7 +191,10 @@ export function parseHelperHello(payload: Uint8Array): HelperHello | null {
 		// A helper that says nothing about input (one built before control) cannot inject.
 		inputReasons: Array.isArray(json.inputReasons)
 			? normalizeFleetDesktopControlReasons(json.inputReasons)
-			: ['input-unavailable']
+			: ['input-unavailable'],
+		features: Array.isArray(json.features)
+			? HELPER_FEATURES.filter((feature) => (json.features as unknown[]).includes(feature))
+			: []
 	};
 }
 

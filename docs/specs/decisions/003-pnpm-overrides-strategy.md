@@ -192,6 +192,19 @@ mailer 3 no longer installs the template engines as optional dependencies.
 (or `micromatch` stops using it), or if any code starts passing a user- or
 LLM-supplied pattern to a glob.
 
+**Update 2026-10-27 — `extract-zip` is out of the tree.** On the owner's decision the OpenCode
+plugin now unpacks zips with Electron's maintained drop-in fork, `@electron-internal/extract-zip`
+(1.0.6), and `extract-zip` 2.0.1 (with `yauzl` 2.10.0, `fd-slicer`, `@types/yauzl`) is gone from
+`pnpm-lock.yaml` (`pnpm why extract-zip` prints nothing). The fork takes no `onEntry` callback, so
+the plugin's two guards below (zip-slip containment, symlink refusal) now run over the archive's
+central directory BEFORE anything is written (`packages/plugins/opencode/src/utils/zip-entries.ts`),
+plus a refusal of a backslash or NUL in an entry name, which the old zip reader enforced on its own.
+The fork's README says it is internal to the Electron project and that untrusted archives are out of
+its threat model; our archive is sha256-pinned to the release and the guards stay ours, so neither
+point depends on the fork. The two `extract-zip` GHSAs stay in `ignoreGhsas` for now (no removal
+without the owner's word): they now match nothing, and should come out so a future reintroduction of
+`extract-zip` is reported again.
+
 **On `GHSA-7pqw-9j4j-h8q3`.** Added 2026-09-13. The advisory needs the
 archive to contain a symlink entry followed by a regular file of the same
 name. extract-zip 2.0.1 calls `onEntry` before it writes the entry itself,

@@ -660,6 +660,29 @@ export async function setFleetNodePreviewProfileAction(
 }
 
 /**
+ * Desktop view & control (FL-07 P3) — a computer's recording settings
+ * (owner only; audited `node.policy.change` by the API): record watch-only
+ * Desktop views too, and how many days a recording is kept (1–90).
+ */
+export async function setFleetNodeDesktopRecordingSettingsAction(
+    nodeId: string,
+    settings: { recordWatchSessions?: boolean; recordingRetentionDays?: number },
+): Promise<FleetActionResult<FleetNodeView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setDesktopRecordingSettings(nodeId, settings);
+        revalidatePath(HUB_LAYOUT_PATTERN, 'layout');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to save the recording settings'),
+        };
+    }
+}
+
+/**
  * Fleet hub (FL-01) — change who may act in some action families on one
  * computer (owner only; audited `node.policy.change` by the API).
  */

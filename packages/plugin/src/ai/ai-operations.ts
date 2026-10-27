@@ -28,6 +28,13 @@ import type {
 } from '../contracts/capabilities/ai-provider.interface.js';
 import { TokenUsageTracker } from './token-usage.tracker.js';
 import { getReasoningConfig } from './reasoning.utils.js';
+import {
+	STRUCTURED_OUTPUT_NAME,
+	findOptionalWithoutNullable,
+	optionalWithoutNullableError,
+	toStructuredOutputJsonSchema,
+	usesJsonSchemaResponseFormat
+} from './structured-output-schema.js';
 // Security (SSRF): `baseURL` originates from the user-scoped `baseUrl` plugin
 // setting (ollama/lm-studio/vllm/openrouter/etc., x-scope:user) and flows here
 // via BaseAiProvider.resolveConfig. Every outbound request built from it must
@@ -372,7 +379,13 @@ export class AiOperations {
 	// Private helpers
 	// ========================================================================
 
-	/** Attempt structured output; re-throw cacheable rejections, fall back to jsonrepair for other errors. */
+	/**
+	 * Attempt structured output; re-throw cacheable rejections, fall back to jsonrepair for other errors.
+	 *
+	 * LangChain gets plain JSON Schema, never the zod schema itself (see
+	 * `structured-output-schema.ts` for why), and the answer is validated with the
+	 * caller's schema here, exactly as LangChain's zod output parser did.
+	 */
 	private async invokeStructured(
 		llm: ChatOpenAI,
 		prompt: string,
@@ -381,9 +394,21 @@ export class AiOperations {
 		tracker: TokenUsageTracker
 	): Promise<unknown> {
 		try {
-			return await llm.withStructuredOutput(schema).invoke([new HumanMessage(prompt)], {
-				callbacks: [tracker]
-			});
+			const strict = usesJsonSchemaResponseFormat(llm.model ?? model);
+			if (strict) {
+				const pointer = findOptionalWithoutNullable(schema);
+				if (pointer) throw optionalWithoutNullableError(pointer);
+			}
+			const jsonSchema = toStructuredOutputJsonSchema(schema, strict);
+			const raw = await llm
+				.withStructuredOutput(jsonSchema, {
+					name: STRUCTURED_OUTPUT_NAME,
+					...(strict ? { strict: true } : {})
+				})
+				.invoke([new HumanMessage(prompt)], {
+					callbacks: [tracker]
+				});
+			return await schema.parseAsync(raw);
 		} catch (error) {
 			if (this.parseRejectedParam(error)) throw error;
 

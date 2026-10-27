@@ -71,6 +71,8 @@ export interface FakeHelperOptions {
 	inputReasons?: string[];
 	/** P2: answer every input `refused` with this code (e.g. `permission-accessibility`). */
 	refuseInput?: string;
+	/** The hello's `features` (absent: an older helper that announces none). */
+	features?: string[];
 }
 
 type Listener = (...args: never[]) => void;
@@ -109,7 +111,8 @@ export class FakeHelperChild implements HelperChild {
 						platform: 'linux',
 						reasons: options.reasons ?? [],
 						displays: this.displays(),
-						inputReasons: options.inputReasons ?? []
+						inputReasons: options.inputReasons ?? [],
+						...(options.features ? { features: options.features } : {})
 					})
 				)
 			);

@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ALLOWED_REDIRECT_URLS, ROUTES, withAppUrl } from '@/lib/constants';
 import { PASSWORD_RULES, VALIDATION_RULES } from './validation';
@@ -113,11 +114,11 @@ export async function login(identifier: string, password: string, redirectUrl: s
     });
 
     // Validate input
-    const validation = loginSchema.safeParse({ email: identifier, password });
+    const validation = loginSchema.safeParse({ email: identifier, password }, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 
@@ -259,11 +260,14 @@ export async function register(
     });
 
     // Validate input
-    const validation = registerSchema.safeParse({ username, email, password, terms });
+    const validation = registerSchema.safeParse(
+        { username, email, password, terms },
+        ZOD3_ERROR_MESSAGES,
+    );
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 
@@ -430,11 +434,11 @@ export async function requestVerificationEmail(email: string) {
     const t = await getTranslations('validation.auth');
 
     const emailSchema = z.string().email(t('email.invalid'));
-    const validation = emailSchema.safeParse(email);
+    const validation = emailSchema.safeParse(email, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 
@@ -468,11 +472,11 @@ export async function forgotPassword(email: string) {
     // Validation
     const emailSchema = z.string().email(t('email.invalid'));
 
-    const validation = emailSchema.safeParse(email);
+    const validation = emailSchema.safeParse(email, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 
@@ -516,11 +520,11 @@ export async function resetPassword(token: string, newPassword: string) {
             .regex(PASSWORD_RULES.NOT_STARTING_WITH_DOT_OR_NEWLINE, t('password.cannotStartWith')),
     });
 
-    const validation = resetSchema.safeParse({ token, password: newPassword });
+    const validation = resetSchema.safeParse({ token, password: newPassword }, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 
@@ -579,11 +583,11 @@ export async function issueMagicLink(email: string) {
     const t = await getTranslations('validation.auth');
 
     const emailSchema = z.string().email(t('email.invalid'));
-    const validation = emailSchema.safeParse(email);
+    const validation = emailSchema.safeParse(email, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 
@@ -647,11 +651,11 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
     const t = await getTranslations('validation.auth');
 
     const tokenSchema = z.string().min(1, t('token.required'));
-    const validation = tokenSchema.safeParse(token);
+    const validation = tokenSchema.safeParse(token, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
         return {
             success: false,
-            error: validation.error.errors[0].message,
+            error: validation.error.issues[0].message,
         };
     }
 

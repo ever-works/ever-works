@@ -7,14 +7,14 @@ use std::collections::HashMap;
 
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{
-    BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, ConnectionExt as _, KEY_PRESS_EVENT, KEY_RELEASE_EVENT,
-    MOTION_NOTIFY_EVENT, Window,
+    BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, ConnectionExt as _, KEY_PRESS_EVENT,
+    KEY_RELEASE_EVENT, KeyButMask, MOTION_NOTIFY_EVENT, Window,
 };
 use x11rb::protocol::xtest::ConnectionExt as _;
 use x11rb::rust_connection::RustConnection;
 
 use super::keys::x11_keysym;
-use super::{Button, Injector};
+use super::{Button, Held, Injector, RELEASABLE_MODIFIERS};
 use crate::capture::linux_session_reasons;
 
 const SHIFT_L: u32 = 0xffe1;
@@ -30,8 +30,12 @@ pub fn open() -> Result<Box<dyn Injector>, &'static str> {
     let session_type = std::env::var("XDG_SESSION_TYPE").ok();
     let display = std::env::var("DISPLAY").ok();
     let wayland = std::env::var("WAYLAND_DISPLAY").ok();
-    if let Some(reason) =
-        linux_session_reasons(session_type.as_deref(), display.as_deref(), wayland.as_deref()).first()
+    if let Some(reason) = linux_session_reasons(
+        session_type.as_deref(),
+        display.as_deref(),
+        wayland.as_deref(),
+    )
+    .first()
     {
         return Err(*reason);
     }
@@ -76,8 +80,20 @@ impl XTestInjector {
     }
 
     fn keysym(&self, keysym: u32, down: bool) -> Result<(), String> {
-        let (keycode, _) = *self.keymap.get(&keysym).ok_or("no key for that on this keyboard")?;
-        self.fake(if down { KEY_PRESS_EVENT } else { KEY_RELEASE_EVENT }, keycode, 0, 0)
+        let (keycode, _) = *self
+            .keymap
+            .get(&keysym)
+            .ok_or("no key for that on this keyboard")?;
+        self.fake(
+            if down {
+                KEY_PRESS_EVENT
+            } else {
+                KEY_RELEASE_EVENT
+            },
+            keycode,
+            0,
+            0,
+        )
     }
 }
 
@@ -93,12 +109,27 @@ impl Injector for XTestInjector {
             Button::Middle => 2,
             Button::Right => 3,
         };
-        self.fake(if down { BUTTON_PRESS_EVENT } else { BUTTON_RELEASE_EVENT }, detail, 0, 0)
+        self.fake(
+            if down {
+                BUTTON_PRESS_EVENT
+            } else {
+                BUTTON_RELEASE_EVENT
+            },
+            detail,
+            0,
+            0,
+        )
     }
 
     fn scroll(&mut self, dx: i32, dy: i32) -> Result<(), String> {
         // One wheel click per 100 pixels of browser delta, at least one when it moved.
-        let clicks = |delta: i32| if delta == 0 { 0 } else { ((delta.abs() + 99) / 100).min(20) };
+        let clicks = |delta: i32| {
+            if delta == 0 {
+                0
+            } else {
+                ((delta.abs() + 99) / 100).min(20)
+            }
+        };
         for (delta, negative, positive) in [(dy, 4u8, 5u8), (dx, 6u8, 7u8)] {
             let button = if delta < 0 { negative } else { positive };
             for _ in 0..clicks(delta) {
@@ -137,5 +168,43 @@ impl Injector for XTestInjector {
             }
         }
         Ok(())
+    }
+
+    fn held(&mut self) -> Result<Held, String> {
+        let keymap = self
+            .conn
+            .query_keymap()
+            .map_err(|error| error.to_string())?
+            .reply()
+            .map_err(|error| error.to_string())?
+            .keys;
+        let is_down = |keycode: u8| keymap[usize::from(keycode / 8)] & (1u8 << (keycode % 8)) != 0;
+        // The keycodes this injector presses for each modifier (the same keysym → keycode map).
+        let keys = RELEASABLE_MODIFIERS
+            .into_iter()
+            .filter(|code| {
+                x11_keysym(code)
+                    .and_then(|keysym| self.keymap.get(&keysym))
+                    .is_some_and(|&(keycode, _)| is_down(keycode))
+            })
+            .collect();
+        let mask = u16::from(
+            self.conn
+                .query_pointer(self.root)
+                .map_err(|error| error.to_string())?
+                .reply()
+                .map_err(|error| error.to_string())?
+                .mask,
+        );
+        let buttons = [
+            (KeyButMask::BUTTON1, Button::Left),
+            (KeyButMask::BUTTON2, Button::Middle),
+            (KeyButMask::BUTTON3, Button::Right),
+        ]
+        .into_iter()
+        .filter(|(bit, _)| mask & u16::from(*bit) != 0)
+        .map(|(_, button)| button)
+        .collect();
+        Ok(Held { keys, buttons })
     }
 }

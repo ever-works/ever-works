@@ -4,23 +4,27 @@ The native screen helper behind the **Desktop** source of a computer's live view
 the machine and hands the node JPEG keyframes and changed 64 × 64 tiles over its stdin / stdout. This file states
 what is and is not shipped.
 
-> **Unverified build.** This crate was written on a workstation with no Rust toolchain. Nothing here has been
-> compiled, linted or run: `cargo test`, `cargo clippy` and both release scripts are unverified until the
-> `Screen Helper` workflow (`.github/workflows/screen-helper.yml`, `workflow_dispatch` only, not a required check)
-> runs them on each OS. `Cargo.lock` is not committed yet — the first successful run must generate and commit it
-> before any release build is called reproducible.
+> **Build status (2026-10-27).** First compiled with the pinned Rust 1.88.0. On Windows (MSVC) `cargo build`,
+> `cargo test`, `cargo clippy -- -D warnings` and `cargo fmt --check` pass, and `cargo clippy` is also clean for
+> Linux x64 and macOS x64 / arm64. `Cargo.lock` is committed and `build-release.ps1` produces byte-identical builds.
+> A Windows build streamed this machine's desktop end to end (hello, keyframe, tiles, exit on stdin close). The
+> `Screen Helper` workflow (`.github/workflows/screen-helper.yml`, not a required check) runs the same on Windows,
+> Linux and macOS for pull requests that touch this folder, and on demand. How to build and admit a build of your
+> own: [`README.md`](README.md).
 
 ## What it is
 
-| Concern     | P1 (this crate)                                                                                                                                                                                                                                                                                                                                 |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Transport   | The helper's own stdin / stdout, length-prefixed (`src/protocol.rs`). Same user, same session. No network port.                                                                                                                                                                                                                                 |
-| Linux       | X11: RandR monitors, `GetImage` of the monitor's rectangle, XFixes pointer. Wayland is refused by name.                                                                                                                                                                                                                                         |
-| Windows     | GDI `BitBlt` (with `CAPTUREBLT`) of the monitor's rectangle, the pointer drawn in; per-monitor DPI aware.                                                                                                                                                                                                                                       |
-| macOS       | CoreGraphics `CGDisplayCreateImage` after a Screen Recording preflight; Accessibility preflighted for control.                                                                                                                                                                                                                                  |
-| Changes     | 64 × 64 tiles diffed at the stream's width, each JPEG-encoded; a keyframe on cadence; ≤ 512 KiB per publish.                                                                                                                                                                                                                                    |
-| Input (P2)  | X11 XTest, Windows `SendInput` + `SetCursorPos`, macOS Quartz events (Accessibility). Pointer mapped from picture pixels to the display (`src/input/`); the blocked shortcuts refused a second time; every pressed key and button released on `releaseAll`, `stop`, a lost display and stdin close. The injector opens on the first input only. |
-| Environment | The node passes `DISPLAY`, `XAUTHORITY`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` (Linux) and nothing else.                                                                                                                                                                                                                                        |
+| Concern      | P1 (this crate)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Transport    | The helper's own stdin / stdout, length-prefixed (`src/protocol.rs`). Same user, same session. No network port.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Linux        | X11: RandR monitors, `GetImage` of the monitor's rectangle, XFixes pointer. Wayland is refused by name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| Windows      | GDI `BitBlt` (with `CAPTUREBLT`) of the monitor's rectangle, the pointer drawn in; per-monitor DPI aware.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| macOS        | CoreGraphics `CGDisplayCreateImage` after a Screen Recording preflight; Accessibility preflighted for control.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| Changes      | 64 × 64 tiles diffed at the stream's width, each JPEG-encoded; a keyframe on cadence; ≤ 512 KiB per publish.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Input (P2)   | X11 XTest, Windows `SendInput` + `SetCursorPos`, macOS Quartz events (Accessibility). Pointer mapped from picture pixels to the display (`src/input/`); the blocked shortcuts refused a second time; every pressed key and button released on `releaseAll`, `stop`, a lost display and stdin close. The injector opens on the first input only. After a crash during control, the node starts a fresh helper whose only command is `releaseHeld` (every modifier and button the OS reports held is released; nothing is pressed), and a helper that panics after injecting does the same before it aborts. |
+| Marker       | While the node says a stream is controlled (`controlMarker`, offered in `hello.features`), a 6-pixel orange-red border inside the controlled display. Windows: topmost, click-through, never-activated windows, excluded from screen capture. X11: override-redirect windows with an empty input shape (no marker without the Shape extension). macOS: not yet, so not offered. Removed when control ends, the stream stops or the helper exits.                                                                                                                                                           |
+| Virtual (P3) | Linux X11 only (`addDisplay` / `removeDisplay`, answered `displayChange`): a display with a name and a size from a fixed list, made with RandR requests on a free output (no `xrandr` process), tagged in the X server so every later helper lists it as virtual. It lasts until removed or the X server stops. Only a tagged display can be removed. Refused by name elsewhere: `unsupported` (macOS, Windows), `unsupported-session`, `randr-unavailable`, `no-free-output` (Xvfb, or every output in use), `screen-too-large`, `size-not-offered`, `invalid-name`, `not-virtual`.                       |
+| Environment  | The node passes `DISPLAY`, `XAUTHORITY`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY` (Linux) and nothing else.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Faster capture paths are follow-ups behind the same `Capturer` trait: XShm on X11, DXGI desktop duplication on
 Windows (dirty rectangles for free), ScreenCaptureKit on macOS (`CGDisplayCreateImage` is deprecated on recent
@@ -55,8 +59,11 @@ record (`helper-policy.json` in the node's config directory, written `0600`):
    means and records it only after the owner types `control`, bound to this admission (approving the helper again
    turns control off). `helper control deny` releases every key and button and ends a live control within a second.
 
-**Signed** admission (Developer ID + Team ID on macOS, Authenticode on Windows through the existing broker) is P3.
-Linux is always hash-pinned.
+**Signed** admission (P3, `ever-works-node helper admit --signed`): the node accepts a helper the operating system
+judges signed by the publisher the node package names as the manifest target's `signer` — the Developer ID Team ID on
+macOS, the Authenticode signer's subject under a machine root on Windows. The check is
+`apps/node/src/core/screen/helper/helper-signature.ts`. Linux is always hash-pinned. Producing such a helper is the
+release signing below.
 
 ## Release builds
 
@@ -66,3 +73,36 @@ target directories and compare the SHA-256 of both outputs; a mismatch fails the
 artifact — and the fingerprint the node package's `helper-manifest.json` (`helper-manifest.schema.json`) must carry
 for that version and target. Publishing a helper and baking its fingerprints into a node release are separate,
 owner-approved steps; nothing here uploads anything.
+
+The fingerprint is reproducible on the machine that built it: two builds there are byte-identical. A build on another
+machine matches only with the same linker and system libraries (the CI runners' fingerprints differ from a
+workstation's), so a release takes its fingerprint from the one release machine, and anyone checking it rebuilds
+with that machine's toolchain.
+
+## Release signing
+
+`release-signing.json` holds the public half: the signing **identifier** stamped into every macOS signature
+(`works.ever.screen-helper`), and the publisher a release names as `signer` — `darwin.teamId` and `win32.subject`, both
+`null` until the owner decides who signs and publishes helper releases (FL-07 owner question 7). The identity itself
+(a keychain identity, a certificate with its private key) never enters the repository; the signing machine provides it
+through the environment.
+
+| OS      | Command (after the release build)                                                                               | Environment                                                            |
+| ------- | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| macOS   | `bash sign-release.sh dist`: `codesign` with Developer ID, the identifier, the hardened runtime and a timestamp | `SCREEN_HELPER_SIGN_IDENTITY`, `SCREEN_HELPER_TEAM_ID` (or the config) |
+| Windows | `./sign-release.ps1 -OutDir dist`: Authenticode SHA-256, chain without the root, RFC 3161 timestamp             | `SCREEN_HELPER_SIGN_CERT_THUMBPRINT`, `SCREEN_HELPER_TIMESTAMP_URL`    |
+
+Each script then checks the signature the way the node will — macOS: the Developer ID requirement of the Team ID, and
+the identifier as well; Windows: `Valid`, a machine root, a timestamp — and refuses to finish otherwise. It writes
+`dist/signed/` with the signed binary and `signed-release-metadata.json`, whose `sha256` (the reproducible unsigned
+build), `signedSha256` and `signer` are the manifest target's fields in
+`apps/node/src/core/screen/helper/helper-manifest.ts`; a release adds the download `url`. Neither script uploads
+anything. The `Screen Helper` workflow
+runs both as dry runs (`SCREEN_HELPER_DRY_RUN=1`: an ad hoc signature; `-DryRun`: a throwaway self-signed certificate,
+removed again), which prove the commands and that such a signature is not mistaken for a release.
+
+Open, for the owner: who holds the identities and signs (question 7); the final identifier (question 17: changing it
+after the first signed release re-asks every macOS permission and breaks a requirement that pins it); and whether the
+node should pin the identifier and a minimum helper version beside the Team ID (question 17), and the issuing CA on
+Windows (question 18). `helper install` checks a download against `sha256` only, so a release that serves the signed
+build also needs the node to accept `signedSha256` there.

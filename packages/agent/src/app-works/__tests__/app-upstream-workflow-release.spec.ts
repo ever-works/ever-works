@@ -2,10 +2,15 @@ import { DataSource } from 'typeorm';
 import { APP_UPSTREAM_SYNC_MANUAL_PER_HOUR } from '@ever-works/contracts';
 import { ENTITIES } from '../../database/_entities-inventory';
 import { TaskRepository } from '../../database/repositories/task.repository';
+import { OrganizationRepository } from '../../database/repositories/organization.repository';
+import { TenantRepository } from '../../database/repositories/tenant.repository';
 import { WorkMemberRepository } from '../../database/repositories/work-member.repository';
 import { WorkRepository } from '../../database/repositories/work.repository';
 import { WorkUpstreamStateRepository } from '../../database/repositories/work-upstream-state.repository';
+import { Organization } from '../../entities/organization.entity';
+import { OrganizationMember } from '../../entities/organization-member.entity';
 import { Task } from '../../entities/task.entity';
+import { Tenant } from '../../entities/tenant.entity';
 import { WorkMember } from '../../entities/work-member.entity';
 import { WorkMemberRole } from '../../entities/types';
 import { Work } from '../../entities/work.entity';
@@ -312,6 +317,234 @@ describe('AppUpstreamStateService — T46 release and T47 sync pull request chec
                 compareUrl: `https://github.com/ever-works/cal/compare/main...${HELD}`,
             });
             expect(forEditor.sync?.workflowHold?.canRelease).toBe(false);
+        });
+    });
+
+    // ── Owner decision 2026-10-27 — "Sync anyway" by an Owner of the Organization ──
+
+    describe('Sync anyway — the Work owner or an Owner of the Work’s Organization (2026-10-27)', () => {
+        const TENANT_ID = '33333333-3333-4333-8333-333333333301';
+        const OTHER_TENANT_ID = '33333333-3333-4333-8333-333333333302';
+        const ORG_ID = '44444444-4444-4444-8444-444444444401';
+        const ORG_OWNER = '11111111-1111-4111-8111-111111111104';
+        const ORG_ADMIN = '11111111-1111-4111-8111-111111111105';
+        const ORG_MEMBER = '11111111-1111-4111-8111-111111111106';
+        const STRANGER = '11111111-1111-4111-8111-111111111107';
+
+        function orgService(): AppUpstreamStateService {
+            return new AppUpstreamStateService(
+                states,
+                works,
+                members,
+                git as never,
+                taskRepository,
+                undefined,
+                undefined,
+                activity as never,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                syncDispatcher as never,
+                new OrganizationRepository(dataSource.getRepository(Organization)),
+                new TenantRepository(dataSource.getRepository(Tenant)),
+            );
+        }
+
+        async function addWorkMember(userId: string, role: WorkMemberRole): Promise<void> {
+            const repo = dataSource.getRepository(WorkMember);
+            await repo.save(repo.create({ workId: WORK_ID, userId, role } as Partial<WorkMember>));
+        }
+
+        beforeEach(async () => {
+            await dataSource.getRepository(OrganizationMember).clear();
+            await dataSource.getRepository(Organization).clear();
+            await dataSource.getRepository(Tenant).clear();
+
+            await dataSource.getRepository(Tenant).save(
+                dataSource.getRepository(Tenant).create({
+                    id: TENANT_ID,
+                    ownerUserId: ORG_OWNER,
+                    slug: 'acme-tenant',
+                    displayName: 'Acme',
+                } as Partial<Tenant>),
+            );
+            await dataSource.getRepository(Organization).save(
+                dataSource.getRepository(Organization).create({
+                    id: ORG_ID,
+                    tenantId: TENANT_ID,
+                    slug: 'acme',
+                    displayName: 'Acme',
+                } as Partial<Organization>),
+            );
+            // The roster: an Admin and a Member (the Owner holds no roster row by construction).
+            const roster = dataSource.getRepository(OrganizationMember);
+            for (const [userId, role] of [
+                [ORG_ADMIN, 'admin'],
+                [ORG_MEMBER, 'member'],
+            ] as const) {
+                await roster.save(
+                    roster.create({
+                        organizationId: ORG_ID,
+                        tenantId: TENANT_ID,
+                        userId,
+                        role,
+                        joinedAt: new Date(),
+                    } as Partial<OrganizationMember>),
+                );
+            }
+            // The Work belongs to the Organization; the three Organization people can edit it.
+            await dataSource
+                .getRepository(Work)
+                .update({ id: WORK_ID }, { organizationId: ORG_ID, tenantId: TENANT_ID } as never);
+            await addWorkMember(ORG_OWNER, WorkMemberRole.EDITOR);
+            await addWorkMember(ORG_ADMIN, WorkMemberRole.EDITOR);
+            await addWorkMember(ORG_MEMBER, WorkMemberRole.EDITOR);
+        });
+
+        it('lets an Owner of the Organization release, and the audit row names them and how', async () => {
+            await seedState(heldState());
+
+            await expect(
+                orgService().requestSync(WORK_ID, ORG_OWNER, {
+                    confirmWorkflowChanges: true,
+                    workflowHeadSha: HELD,
+                }),
+            ).resolves.toEqual({ queued: true, runId: 'run-sync-1' });
+
+            expect((await stored()).workflowRelease).toMatchObject({
+                headSha: HELD,
+                releasedByUserId: ORG_OWNER,
+            });
+            const [audit] = events('app.upstream.workflow_released');
+            expect(audit.summary).toBe(
+                'An Owner of the Organization accepted upstream workflow changes',
+            );
+            expect(audit.details).toMatchObject({
+                releasedByUserId: ORG_OWNER,
+                releasedAs: 'organization_owner',
+                upstreamHeadSha: HELD,
+            });
+        });
+
+        it('still lets the Work owner release, recorded as the Work owner', async () => {
+            await seedState(heldState());
+
+            await orgService().requestSync(WORK_ID, OWNER, { confirmWorkflowChanges: true });
+
+            expect((await stored()).workflowRelease).toMatchObject({ releasedByUserId: OWNER });
+            const [audit] = events('app.upstream.workflow_released');
+            expect(audit.summary).toBe('The owner accepted upstream workflow changes');
+            expect(audit.details).toMatchObject({
+                releasedByUserId: OWNER,
+                releasedAs: 'work_owner',
+            });
+        });
+
+        it.each([
+            ['an Organization Admin', ORG_ADMIN],
+            ['an Organization Member', ORG_MEMBER],
+            ['a Work editor outside the Organization', EDITOR],
+        ])(
+            'refuses %s with edit access — 403 owner_required, nothing recorded',
+            async (_label, who) => {
+                await seedState(heldState());
+
+                const refusal = await refusalOf(
+                    orgService().requestSync(WORK_ID, who, { confirmWorkflowChanges: true }),
+                );
+
+                expect(refusal.code).toBe('owner_required');
+                expect(refusal.status).toBe(403);
+                expect((await stored()).workflowRelease ?? null).toBeNull();
+                expect(events('app.upstream.workflow_released')).toHaveLength(0);
+                expect(syncDispatcher.dispatch).not.toHaveBeenCalled();
+            },
+        );
+
+        it('answers the release gate: creator and Organization Owner only; a stranger is 404', async () => {
+            await seedState(heldState());
+            const gate = orgService();
+
+            await expect(gate.mayReleaseWorkflowChanges(WORK_ID, OWNER)).resolves.toBe(true);
+            await expect(gate.mayReleaseWorkflowChanges(WORK_ID, ORG_OWNER)).resolves.toBe(true);
+            await expect(gate.mayReleaseWorkflowChanges(WORK_ID, ORG_ADMIN)).resolves.toBe(false);
+            await expect(gate.mayReleaseWorkflowChanges(WORK_ID, ORG_MEMBER)).resolves.toBe(false);
+            await expect(gate.mayReleaseWorkflowChanges(WORK_ID, EDITOR)).resolves.toBe(false);
+            expect((await refusalOf(gate.mayReleaseWorkflowChanges(WORK_ID, STRANGER))).code).toBe(
+                'not_found',
+            );
+            // The creator-only check is unchanged.
+            await expect(gate.isWorkOwner(WORK_ID, ORG_OWNER)).resolves.toBe(false);
+        });
+
+        it('offers Sync anyway on the card to the Organization Owner, not to an Admin or Member', async () => {
+            await seedState(heldState());
+            const view = orgService();
+
+            expect((await view.get(WORK_ID, ORG_OWNER)).sync?.workflowHold?.canRelease).toBe(true);
+            expect((await view.get(WORK_ID, OWNER)).sync?.workflowHold?.canRelease).toBe(true);
+            expect((await view.get(WORK_ID, ORG_ADMIN)).sync?.workflowHold?.canRelease).toBe(false);
+            expect((await view.get(WORK_ID, ORG_MEMBER)).sync?.workflowHold?.canRelease).toBe(
+                false,
+            );
+        });
+
+        it('keeps the edit-access rule for the Organization Owner: a viewer is offered nothing and refused', async () => {
+            await dataSource
+                .getRepository(WorkMember)
+                .update({ workId: WORK_ID, userId: ORG_OWNER }, { role: WorkMemberRole.VIEWER });
+            await seedState(heldState());
+
+            expect(
+                (await orgService().get(WORK_ID, ORG_OWNER)).sync?.workflowHold?.canRelease,
+            ).toBe(false);
+            const refusal = await refusalOf(
+                orgService().requestSync(WORK_ID, ORG_OWNER, { confirmWorkflowChanges: true }),
+            );
+            expect(refusal.code).toBe('edit_access_required');
+            expect((await stored()).workflowRelease ?? null).toBeNull();
+        });
+
+        it('fails closed when the Work’s Tenant stamp disagrees with its Organization’s', async () => {
+            await dataSource
+                .getRepository(Work)
+                .update({ id: WORK_ID }, { tenantId: OTHER_TENANT_ID } as never);
+            await seedState(heldState());
+
+            const refusal = await refusalOf(
+                orgService().requestSync(WORK_ID, ORG_OWNER, { confirmWorkflowChanges: true }),
+            );
+            expect(refusal.code).toBe('owner_required');
+        });
+
+        it('gives a personal Work (no Organization) only its creator, and an unbound graph too', async () => {
+            await dataSource
+                .getRepository(Work)
+                .update({ id: WORK_ID }, { organizationId: null, tenantId: null } as never);
+            await seedState(heldState());
+
+            expect(
+                (
+                    await refusalOf(
+                        orgService().requestSync(WORK_ID, ORG_OWNER, {
+                            confirmWorkflowChanges: true,
+                        }),
+                    )
+                ).code,
+            ).toBe('owner_required');
+
+            // Organization-scoped again, but without the two repositories bound: creator only.
+            await dataSource
+                .getRepository(Work)
+                .update({ id: WORK_ID }, { organizationId: ORG_ID, tenantId: TENANT_ID } as never);
+            expect(
+                (
+                    await refusalOf(
+                        service().requestSync(WORK_ID, ORG_OWNER, { confirmWorkflowChanges: true }),
+                    )
+                ).code,
+            ).toBe('owner_required');
         });
     });
 
