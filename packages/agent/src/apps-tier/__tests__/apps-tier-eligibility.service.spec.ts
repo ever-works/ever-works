@@ -30,7 +30,9 @@ function harness(
     const counted: Array<{ owner: string; exclude: string | null | undefined }> = [];
     const users = {
         findById: jest.fn(async (id: string) =>
-            options.userMissing ? null : { id, emailVerified: options.emailVerified ?? true },
+            options.userMissing
+                ? null
+                : { id, emailVerified: 'emailVerified' in options ? options.emailVerified : true },
         ),
     };
     const works = {
