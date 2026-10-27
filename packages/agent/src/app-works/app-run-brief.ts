@@ -1,4 +1,5 @@
 import { fenceUntrusted, neutralizeControlTokens } from '../utils/untrusted-content';
+import { ALWAYS_PROTECTED } from './app-change-guard';
 import type { AppWorkRules } from './app-work-rules.service';
 
 /**
@@ -22,7 +23,8 @@ import type { AppWorkRules } from './app-work-rules.service';
  *   ({@link instructionFilePathRefusal}). Nothing in either block can change the run's tool list:
  *   that is decided from platform rows only (T47).
  *
- * 🛑 A leaf: the untrusted-content helpers and a type import only.
+ * Imports the untrusted-content helpers and the change guard's `ALWAYS_PROTECTED` (so the brief
+ * names exactly the paths the guard refuses), never a service.
  */
 
 /** The run brief's own budget for instruction files (T18: 5 / 32 KB / 64 KB). */
@@ -133,10 +135,11 @@ export function buildAppRunRulesBlock(
         APP_RUN_BRIEF_PUSH_LINE,
         '',
         'Protected paths — never create, edit, rename or delete a file matching these; the platform refuses the pull request if you do:',
-        ...listOrNone(
-            rules.protectedPaths,
-            '- (none declared besides `.github/workflows/**`, which is always protected)',
-        ),
+        // The guard's own always-protected list first (not a copy of it), then the spec's.
+        ...ALWAYS_PROTECTED.map((path) => `- ${codePath(path)} (always protected)`),
+        ...rules.protectedPaths
+            .filter((path) => !ALWAYS_PROTECTED.includes(path))
+            .map((path) => `- ${codePath(path)}`),
         '',
         'Paths that wait for a person — a change here is allowed, but its pull request is merged only after a person approves it:',
         ...listOrNone(rules.humanMergePaths, '- (none declared)'),

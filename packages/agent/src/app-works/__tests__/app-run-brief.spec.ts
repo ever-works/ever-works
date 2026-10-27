@@ -39,6 +39,8 @@ describe('APW-08 T18 — the rules block (platform text)', () => {
         expect(block).toContain('# APP RULES');
         expect(block).toContain('`src/billing/**`');
         expect(block).toContain('`migrations/**`');
+        // The guard's always-protected list is named even when the spec declares its own.
+        expect(block).toContain('`.github/workflows/**` (always protected)');
         expect(block).toContain('`config/production.yml`');
         expect(block).toContain('under 400 changed lines');
         expect(block).toContain('over 1200 changed lines is refused');

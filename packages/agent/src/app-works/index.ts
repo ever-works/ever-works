@@ -194,4 +194,5 @@ export * from './app-work-switches';
 // APW-08 T18 (lane B2) — the App Work run brief from the App rules at the base commit, and the
 // source both run paths (AgentRunService, the fleet planner) ask for it.
 export * from './app-run-brief';
+export * from './app-run-brief.port';
 export * from './app-run-brief.service';

@@ -11,13 +11,14 @@ import {
     type AppRunInstructionFileRead,
     type AppRunInstructionFileRefusal,
 } from './app-run-brief';
+import type { AppRunBrief, AppRunBriefSource } from './app-run-brief.port';
 import { AppSpecUnreadableError, type AppWorkRules } from './app-work-rules.service';
 
 /**
  * APW-08 T18 — the source both run paths ask for an App Work run's brief: the cloud path through
  * `AgentRunService` (in the API process) and the fleet path through the planner's
  * `composeInstructions`. Bound by the API's `@Global()` `AgentsModule` under
- * {@link APP_RUN_BRIEF_SOURCE}; unbound, a run is briefed exactly as before.
+ * `APP_RUN_BRIEF_SOURCE` (`app-run-brief.port.ts`); unbound, a run is briefed exactly as before.
  *
  * Reads, in order, from platform rows and the git provider only: the Task, its Work (not an App
  * Work → `null`), the Work's repository (`resolveTaskRepository`), the base branch (the run's
@@ -30,25 +31,6 @@ import { AppSpecUnreadableError, type AppWorkRules } from './app-work-rules.serv
  * "could not be read" rules block (the change gate refuses the pull request on its own); any
  * other failure yields `null` and a warning.
  */
-export const APP_RUN_BRIEF_SOURCE = Symbol('APP_RUN_BRIEF_SOURCE');
-
-export interface AppRunBrief {
-    /** Platform text: the rules at the base commit, or the "could not be read" notice. */
-    readonly rules: string;
-    /** Untrusted repository content, fenced; `null` when no instruction file was included. */
-    readonly instructions: string | null;
-    readonly branch: string;
-    readonly baseSha: string | null;
-    readonly includedFiles: readonly string[];
-    readonly truncatedFiles: readonly string[];
-    readonly refusedFiles: ReadonlyArray<{ path: string; reason: AppRunInstructionFileRefusal }>;
-}
-
-export interface AppRunBriefSource {
-    /** The brief for a run of `taskId`, or `null` when the Task is not on an App Work. */
-    forTask(input: { taskId: string; baseRef?: string | null }): Promise<AppRunBrief | null>;
-}
-
 type GitOptions = { userId: string; providerId: string; workId: string };
 
 /** What the service reads — structural, so a spec passes plain doubles. */

@@ -94,7 +94,7 @@ import {
     readAppWorkSwitches,
 } from '../app-works/app-work-switches';
 // APW-08 T18 — the token and its interface only (the service itself is bound API-side).
-import { APP_RUN_BRIEF_SOURCE, type AppRunBriefSource } from '../app-works/app-run-brief.service';
+import { APP_RUN_BRIEF_SOURCE, type AppRunBriefSource } from '../app-works/app-run-brief.port';
 
 export interface AgentRunContext {
     runId: string;
