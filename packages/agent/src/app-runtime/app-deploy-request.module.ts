@@ -53,6 +53,7 @@ import { AppBuildSucceededListener } from './app-build-succeeded.listener';
 import { AppEnvRedeployListener } from './app-env-redeploy.listener';
 import { AppSpecAppliedListener } from './app-spec-applied.listener';
 import { AppRuntimeActivityListener } from './app-runtime-activity.listener';
+import { AppRuntimeTelemetryListener } from './app-runtime.telemetry';
 import { AppManagedDnsListener } from './app-managed-dns.listener';
 import { AppsDomainDnsServiceImpl } from '../ever-works-providers/apps-domain-dns.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -247,6 +248,9 @@ import {
         // (one row per relayed runtime event) — lane aw-deploy-2.
         AppSpecAppliedListener,
         AppRuntimeActivityListener,
+        // APW-06 T55 / APW-07 T39 (lane aw-builds-bindings, 2026-10-27) — telemetry off the same
+        // relayed `app.*` events (codes and counts only), over the global telemetry sink.
+        AppRuntimeTelemetryListener,
         // T47/T48 (lane aw-deploy-2) — the apps-domain DNS service (label allocation + the managed
         // record) and the listener that points the record at the ingress after a live Deployment.
         {
