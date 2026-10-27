@@ -9450,6 +9450,9 @@
                     "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
                     "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
                     "unknown": "Not eligible ({reason})."
+                },
+                "hints": {
+                    "capReachedPaidPlan": "A paid plan allows more Apps on Ever Works Apps. Upgrade your plan to lift this limit."
                 }
             },
             "appDeploy": {

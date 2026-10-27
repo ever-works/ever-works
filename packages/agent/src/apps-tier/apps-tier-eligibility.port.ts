@@ -15,10 +15,20 @@ export const APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON = 'eligibilityUnavailable'
 export interface AppsTierEligibilityAnswer {
     eligible: boolean;
     reasons: string[];
-    /** The configured cap (`config.everWorks.apps.getMaxPerUser()`), when the cap was evaluated. */
+    /**
+     * The cap that was applied, when one was evaluated: `config.everWorks.apps.getMaxPerUser()`
+     * for a free/unpaid owner, `getMaxPerPaidUser()` for a paid one (absent when a paid owner has
+     * no limit — owner decision 2026-10-27).
+     */
     max?: number;
     /** The slugs of the OTHER App Works counted against the cap, when it was reached. */
     counted?: string[];
+    /**
+     * `true` only beside `capReached` for an owner whose plan was READ as unpaid while billing is
+     * on, when a paid plan would admit the App — so the refusal can say that upgrading lifts the
+     * limit (owner decision 2026-10-27). Absent otherwise; never a reason of its own.
+     */
+    paidPlanAllowsMore?: boolean;
 }
 
 /** The facts behind `AppsTierPolicy.eligibility` (bound in the API; proxied in the worker). */
