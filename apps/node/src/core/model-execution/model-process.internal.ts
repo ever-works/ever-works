@@ -186,7 +186,32 @@ const WINDOWS_TREE_KILL_TIMEOUT_MS = 2000;
 const MODEL_RUN_ROOT_CLEANUP_ATTEMPTS = 3;
 const MODEL_RUN_ROOT_CLEANUP_ATTEMPT_TIMEOUT_MS = 250;
 const MODEL_CLI_VERSION_PROBE_TIMEOUT_MS = 10_000;
-const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
+/** `scheme://user:password@` anywhere in a value (a credential in a URL), in linear time. */
+function hasCredentialedUrl(value: string): boolean {
+	// Same rule as the former `/[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i`, which was polynomial
+	// on long scheme-like runs (CodeQL js/polynomial-redos): a scheme (a letter in the run of
+	// [a-z0-9+.-] just before `://`), then an authority with no `/`, whitespace or `@` that holds a
+	// `:` with at least one character after it, ended by `@`.
+	let from = 0;
+	for (;;) {
+		const sep = value.indexOf('://', from);
+		if (sep < 0) return false;
+		from = sep + 3;
+		let hasLetter = false;
+		for (let i = sep - 1; i >= 0 && /[a-z0-9+.-]/i.test(value[i]!); i -= 1) {
+			if (/[a-z]/i.test(value[i]!)) hasLetter = true;
+		}
+		if (!hasLetter) continue;
+		let firstColon = -1;
+		let j = sep + 3;
+		for (; j < value.length; j += 1) {
+			const ch = value[j]!;
+			if (ch === '/' || ch === '@' || /\s/.test(ch)) break;
+			if (ch === ':' && firstColon < 0) firstColon = j;
+		}
+		if (j < value.length && value[j] === '@' && firstColon >= 0 && firstColon < j - 1) return true;
+	}
+}
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 const PROXY_ENV_NAMES = new Set(['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']);
 
@@ -918,7 +943,7 @@ function buildModelEnvironment(
 	for (const [upper, key] of byUpper) {
 		if (!upper.startsWith('LC_')) continue;
 		const value = parentEnv[key];
-		if (typeof value === 'string' && !CREDENTIALED_URL_PATTERN.test(value)) env[key] = value;
+		if (typeof value === 'string' && !hasCredentialedUrl(value)) env[key] = value;
 	}
 
 	if (!hasEnvironmentName(env, 'PATH') && platform !== 'win32') {
@@ -947,7 +972,7 @@ function buildModelEnvironment(
 }
 
 function isSafeForwardedEnvironmentValue(name: string, value: string): boolean {
-	if (CREDENTIALED_URL_PATTERN.test(value)) return false;
+	if (hasCredentialedUrl(value)) return false;
 	if (!PROXY_ENV_NAMES.has(name.toUpperCase())) return true;
 
 	let proxy: URL;
