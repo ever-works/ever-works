@@ -2,9 +2,14 @@ import {
 	decodeDesktopTiles,
 	FLEET_DESKTOP_MAX_DIMENSION,
 	FLEET_DESKTOP_MAX_PUBLISH_BYTES,
+	normalizeFleetDesktopControlReasons,
+	normalizeFleetDesktopInputRefusedCode,
 	normalizeFleetDesktopReasons,
 	normalizeFleetDisplay,
 	normalizeFleetDisplays,
+	type ComputerInputFrame,
+	type FleetDesktopControlReason,
+	type FleetDesktopInputRefusedCode,
 	type FleetDesktopReason,
 	type FleetDisplayView
 } from '@ever-works/contracts';
@@ -41,7 +46,9 @@ export const HELPER_MESSAGES = {
 	tiles: 0x83,
 	displays: 0x84,
 	error: 0x85,
-	started: 0x86
+	started: 0x86,
+	/** P2: an input the helper did not inject (`{ outcome, code }`; injected inputs are not answered). */
+	inputResult: 0x87
 } as const;
 
 export type HelperMessageKind = (typeof HELPER_MESSAGES)[keyof typeof HELPER_MESSAGES];
@@ -143,6 +150,8 @@ export interface HelperHello {
 	platform: string | null;
 	reasons: FleetDesktopReason[];
 	displays: FleetDisplayView[];
+	/** P2: what would stop input, known without opening anything (e.g. `permission-accessibility`). */
+	inputReasons: FleetDesktopControlReason[];
 }
 
 export function parseHelperHello(payload: Uint8Array): HelperHello | null {
@@ -156,7 +165,11 @@ export function parseHelperHello(payload: Uint8Array): HelperHello | null {
 		version,
 		platform,
 		reasons: normalizeFleetDesktopReasons(json.reasons),
-		displays: normalizeFleetDisplays(json.displays)
+		displays: normalizeFleetDisplays(json.displays),
+		// A helper that says nothing about input (one built before control) cannot inject.
+		inputReasons: Array.isArray(json.inputReasons)
+			? normalizeFleetDesktopControlReasons(json.inputReasons)
+			: ['input-unavailable']
 	};
 }
 
@@ -231,4 +244,41 @@ export function parseHelperFrame(payload: Uint8Array): HelperFrame | null {
 /** A tiles payload, accepted only when it is a valid contracts `TILES` payload within the publish cap. */
 export function acceptHelperTiles(payload: Uint8Array): Uint8Array | null {
 	return decodeDesktopTiles(payload, FLEET_DESKTOP_MAX_PUBLISH_BYTES) ? payload : null;
+}
+
+// ─── Control (P2) ──────────────────────────────────────────────────────────
+
+/** The largest `input` the node sends (a text input is capped well inside it). */
+export const HELPER_INPUT_MAX_BYTES = 16 * 1024;
+
+/** The size of the picture a controller's coordinates are in (the stream's last keyframe). */
+export interface HelperPictureSize {
+	width: number;
+	height: number;
+}
+
+/**
+ * `input` (0x10): the contracts' input frame plus the picture size the helper
+ * maps pointer coordinates from (FR-38). Null when it would not fit.
+ */
+export function encodeHelperInput(frame: ComputerInputFrame, picture: HelperPictureSize): Uint8Array | null {
+	const body: Record<string, unknown> = { ...frame, pictureWidth: picture.width, pictureHeight: picture.height };
+	const bytes = encoder.encode(JSON.stringify(body));
+	if (bytes.byteLength > HELPER_INPUT_MAX_BYTES) return null;
+	return encodeHelperMessage(HELPER_MESSAGES.input, bytes);
+}
+
+/** `inputResult` (0x87): an input that was not injected — by code only. */
+export interface HelperInputResult {
+	outcome: 'blocked' | 'refused';
+	code: FleetDesktopInputRefusedCode;
+}
+
+export function parseHelperInputResult(payload: Uint8Array): HelperInputResult | null {
+	const json = readJson(payload);
+	if (!json || (json.outcome !== 'blocked' && json.outcome !== 'refused')) return null;
+	return {
+		outcome: json.outcome,
+		code: json.outcome === 'blocked' ? 'blocked-shortcut' : normalizeFleetDesktopInputRefusedCode(json.code)
+	};
 }

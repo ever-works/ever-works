@@ -220,28 +220,38 @@
 
 ## P2.A — Input and control
 
-- [ ] **T-30**. Helper input per OS at `apps/node/native/ever-works-screen/src/input/{macos,windows,x11}.rs`
+- [x] **T-30**. Helper input per OS at `apps/node/native/ever-works-screen/src/input/{macos,windows,x11}.rs`
       (pointer in display pixels from picture pixels × scale; wheel; key down/up; text) and
       `releaseAll` (every pressed key/button released within 1 s); macOS reports
       `permission-accessibility` when `CGPreflightPostEventAccess` is false.
       **Test**: `tests/input_release.rs`; coordinate mapping at @2× scale; blocked shortcut arriving
       at the helper is refused.
-- [ ] **T-31**. Node: `DesktopHelperBackend.dispatchInput` feeding `apps/node/src/core/screen/input-injector.ts`
+- [x] **T-31**. Node: `DesktopHelperBackend.dispatchInput` feeding `apps/node/src/core/screen/input-injector.ts`
       unchanged; `desktop.mode` handling in `apps/node/src/core/link/modules/desktop.ts` (resume
       marker only when the view is bound to an Agent; `releaseAll` on `watching`); advertise `input`
       in `capabilities.ts` when either injector exists.
       **Test**: extend `apps/node/src/core/link/modules/desktop.spec.ts` and `capabilities.spec.ts` — INPUT dropped while
       watching; `input` tag iff an injector; the stale comment is gone (`grep -n "nothing on this node injects" apps/node/src/core/capabilities.ts` returns nothing).
-- [ ] **T-32**. Platform control on views: add the control routes to `fleet-desktop.controller.ts`
+- [x] **T-32**. Platform control on views: add the control routes to `fleet-desktop.controller.ts`
       calling `packages/agent/src/computer/control-arbiter.service.ts` unchanged; relay forwards
       `INPUT` only from the holding viewer and emits `desktop.mode` to the node; `agent:` actor on
       the lock; audit `node.desktop.control.take|release|request`.
       **Test**: `fleet-desktop.controller.control.spec.ts`, extend `control-arbiter.spec.ts` for an
       Agent actor losing to a person's take-over.
-- [ ] **T-33**. Web control UI: amber state, `✋ YOU`, status sentences (three variants), blocked
+- [x] **T-33**. Web control UI: amber state, `✋ YOU`, status sentences (three variants), blocked
       shortcut list, countdown and extend, request/hand-over dialog reuse from
       `apps/web/src/components/computer/ComputerControlRequestDialog.tsx`.
       **Test**: `DesktopTab.control.unit.spec.tsx`; `apps/web/e2e/flow-fleet-desktop-control.spec.ts`.
+
+> **P2.A status (2026-10-27, PR #2923):** T-30 written, never compiled (`src/input/{mod,keys,x11,win,mac}.rs`; no Rust
+> toolchain on the lane PC). T-31: input goes through the Desktop source's own path (`desktop-source.ts` →
+> `DesktopHelperStream.input`), not `input-injector.ts`, which is the browser source's; `input` comes from the helper's
+> tags module; the owner's on-machine permission (`helper control allow`) is a lane addition (lane log decision 20).
+> T-32: specs are `fleet-desktop-control.service.spec.ts` and `control-arbiter.desktop.spec.ts` (no Agent actor yet —
+> T-36). T-33: the strip, confirmation, request / hand-over and idle prompts are `DesktopControlBar.tsx` (AW-11's
+> prompts are Agent-worded, so not reused); pure parts in `desktop-control.unit.spec.ts`; the Playwright flow is not
+> written. T-37 shipped with control (desktop views need rows to be locked); its recording columns are unused until
+> T-38.
 
 ## P2.B — Beside the terminal and the hooks
 
@@ -263,7 +273,7 @@
 
 ## P2.C — Recording and re-watch (closes AW-11 P3)
 
-- [ ] **T-37**. Slot 01 migration `apps/api/src/migrations/1796070100000-AddComputerSessionRecordingColumns.ts`
+- [x] **T-37**. Slot 01 migration `apps/api/src/migrations/1796070100000-AddComputerSessionRecordingColumns.ts`
       (CONTRACTS §13 name; R-9) and entity columns in `packages/agent/src/entities/computer-session.entity.ts`
       (`source`, `displayId`, `fleetSessionId`, `recordingRef`, `recordingBytes`,
       `recordingDurationMs`, `recordingExpiresAt`, `recordingStoppedReason`; `agentId` nullable via

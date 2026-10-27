@@ -60,7 +60,9 @@ export function applyReportedDesktop(
         refresh.helperEvents !== undefined;
     if (!said) return null;
     const previous = stored(node);
-    const seen = new Set<string>(Array.isArray(previous?.seenEventIds) ? previous!.seenEventIds : []);
+    const seen = new Set<string>(
+        Array.isArray(previous?.seenEventIds) ? previous!.seenEventIds : [],
+    );
     const events = normalizeFleetHelperEvents(refresh.helperEvents);
     const newEvents = events.filter((event) => !seen.has(event.id));
     const seenEventIds = [
@@ -79,7 +81,9 @@ export function applyReportedDesktop(
 }
 
 /** The view block of a row's desktop facts (never the audited ids). */
-export function fleetNodeDesktopViewOf(node: Pick<FleetNode, 'desktopFacts'>): FleetNodeDesktopView | null {
+export function fleetNodeDesktopViewOf(
+    node: Pick<FleetNode, 'desktopFacts'>,
+): FleetNodeDesktopView | null {
     const facts = stored(node);
     if (!facts) return null;
     return {

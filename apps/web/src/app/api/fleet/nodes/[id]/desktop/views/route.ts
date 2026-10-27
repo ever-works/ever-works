@@ -20,5 +20,9 @@ export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => 
     const { id } = await ctx.params;
     if (!isUuid(id)) return invalidIdResponse();
     const body = sanitizeDesktopViewBody(await readJsonBody(request));
-    return forwardGrantCall(fleetApiUrl(`/nodes/${id}/desktop/views`), { method: 'POST', headers, body }, 'open');
+    return forwardGrantCall(
+        fleetApiUrl(`/nodes/${id}/desktop/views`),
+        { method: 'POST', headers, body },
+        'open',
+    );
 });

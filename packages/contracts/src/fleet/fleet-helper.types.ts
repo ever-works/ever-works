@@ -176,7 +176,14 @@ export function parseFleetHelperPolicyRecord(value: unknown): FleetHelperPolicyR
 
 // ─── Admission events (heartbeat `helperEvents`, audit `node.helper.*`) ─────
 
-export const FLEET_HELPER_EVENT_KINDS = ['admit', 'revoke', 'verify-failed'] as const;
+export const FLEET_HELPER_EVENT_KINDS = [
+	'admit',
+	'revoke',
+	'verify-failed',
+	// P2: the owner allowed or withdrew control on the machine (`helper control allow|deny`).
+	'control-allow',
+	'control-deny'
+] as const;
 
 export type FleetHelperEventKind = (typeof FLEET_HELPER_EVENT_KINDS)[number];
 
@@ -241,8 +248,24 @@ export function normalizeFleetHelperEvents(value: unknown): FleetHelperEvent[] {
 /** The audit action an event is written as (CONTRACTS §7). */
 export function fleetHelperEventAuditAction(
 	kind: FleetHelperEventKind
-): 'node.helper.admit' | 'node.helper.revoke' | 'node.helper.verify-failed' {
-	return kind === 'admit' ? 'node.helper.admit' : kind === 'revoke' ? 'node.helper.revoke' : 'node.helper.verify-failed';
+):
+	| 'node.helper.admit'
+	| 'node.helper.revoke'
+	| 'node.helper.verify-failed'
+	| 'node.helper.control-allow'
+	| 'node.helper.control-deny' {
+	switch (kind) {
+		case 'admit':
+			return 'node.helper.admit';
+		case 'revoke':
+			return 'node.helper.revoke';
+		case 'control-allow':
+			return 'node.helper.control-allow';
+		case 'control-deny':
+			return 'node.helper.control-deny';
+		default:
+			return 'node.helper.verify-failed';
+	}
 }
 
 /** Event ids the platform remembers per computer, so a re-sent event writes no second row. */

@@ -108,7 +108,10 @@ async function flush(): Promise<void> {
 describe('desktop source refusals', () => {
 	it('refuses bad params and the kill switch before touching the helper', async () => {
 		const { opener, fake } = setup({ [paths.installPath]: BINARY, [paths.policyPath]: RECORD });
-		expect(await opener(harness({ source: 'desktop' }).context)).toMatchObject({ ok: false, error: { code: 'invalid' } });
+		expect(await opener(harness({ source: 'desktop' }).context)).toMatchObject({
+			ok: false,
+			error: { code: 'invalid' }
+		});
 		expect(await opener(harness({ source: 'desktop', viewId: VIEW_ID }, true).context)).toMatchObject({
 			ok: false,
 			error: { code: 'kill_switch' }
@@ -153,7 +156,12 @@ describe('a live desktop view', () => {
 		expect(json).toEqual([]);
 		expect(binary).toEqual([]);
 		runTimers();
-		expect(json[0]).toMatchObject({ type: 'desktop.started', quality: 'steady', fellBack: false, display: { id: 'DP-1' } });
+		expect(json[0]).toMatchObject({
+			type: 'desktop.started',
+			quality: 'steady',
+			fellBack: false,
+			display: { id: 'DP-1' }
+		});
 		await flush();
 		fake.children[0].sendTiles();
 		const frames = binary.filter((frame) => frame.kind === FLEET_LINK_FRAME_KINDS.FRAME);
@@ -187,7 +195,9 @@ describe('a live desktop view', () => {
 		expect(json).toContainEqual({ requestId: 'r1', ok: true });
 		expect(json.find((message) => message.requestId === 'r2')).toMatchObject({ error: { code: 'invalid' } });
 		expect(json.find((message) => message.requestId === 'r3')).toMatchObject({ type: 'desktop.displays' });
-		expect(json.find((message) => message.requestId === 'r4')).toMatchObject({ error: { code: 'unsupported_on_node' } });
+		expect(json.find((message) => message.requestId === 'r4')).toMatchObject({
+			error: { code: 'unsupported_on_node' }
+		});
 	});
 
 	it('ends at once when the kill switch is thrown', async () => {

@@ -44,13 +44,14 @@ describe('desktop TILES codec', () => {
 	});
 
 	it('refuses an over-cap payload before reading it', () => {
-		const encoded = encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg(3) }] });
+		const encoded = encodeDesktopTiles({
+			width: 64,
+			height: 64,
+			tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg(3) }]
+		});
 		expect(decodeDesktopTiles(encoded!, encoded!.byteLength - 1)).toBeNull();
 		expect(
-			encodeDesktopTiles(
-				{ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg(3, 100) }] },
-				50
-			)
+			encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg(3, 100) }] }, 50)
 		).toBeNull();
 	});
 
@@ -62,7 +63,11 @@ describe('desktop TILES codec', () => {
 			encodeDesktopTiles({ width: 256, height: 256, tiles: [{ x: 0, y: 0, w: 128, h: 64, data: jpeg(1) }] })
 		).toBeNull();
 		// Hand-built: a tile that runs past the right edge.
-		const bytes = encodeDesktopTiles({ width: 128, height: 64, tiles: [{ x: 64, y: 0, w: 64, h: 64, data: jpeg(1) }] })!;
+		const bytes = encodeDesktopTiles({
+			width: 128,
+			height: 64,
+			tiles: [{ x: 64, y: 0, w: 64, h: 64, data: jpeg(1) }]
+		})!;
 		const forged = bytes.slice();
 		new DataView(forged.buffer).setUint16(FLEET_DESKTOP_TILES_HEADER_BYTES, 65);
 		expect(decodeDesktopTiles(forged)).toBeNull();
@@ -70,12 +75,20 @@ describe('desktop TILES codec', () => {
 
 	it('refuses a tile that is not a JPEG', () => {
 		expect(
-			encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: new Uint8Array(16) }] })
+			encodeDesktopTiles({
+				width: 64,
+				height: 64,
+				tiles: [{ x: 0, y: 0, w: 64, h: 64, data: new Uint8Array(16) }]
+			})
 		).toBeNull();
 	});
 
 	it('answers null for truncated, padded or nonsense payloads, never throws', () => {
-		const encoded = encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg(9) }] })!;
+		const encoded = encodeDesktopTiles({
+			width: 64,
+			height: 64,
+			tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg(9) }]
+		})!;
 		expect(decodeDesktopTiles(encoded.subarray(0, encoded.byteLength - 1))).toBeNull();
 		const padded = new Uint8Array(encoded.byteLength + 1);
 		padded.set(encoded);

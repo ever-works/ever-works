@@ -125,7 +125,9 @@ describe('resolveFleetDesktopBlocker', () => {
 		expect(resolveFleetDesktopBlocker({ ...open, killSwitch: true, online: false })).toBe('kill-switch');
 		expect(resolveFleetDesktopBlocker({ ...open, kind: 'desktop-node' })).toBe('kind-unsupported');
 		expect(resolveFleetDesktopBlocker({ ...open, online: false, attend: false })).toBe('offline');
-		expect(resolveFleetDesktopBlocker({ ...open, attend: false, inDesktopAudience: false })).toBe('consent-missing');
+		expect(resolveFleetDesktopBlocker({ ...open, attend: false, inDesktopAudience: false })).toBe(
+			'consent-missing'
+		);
 		expect(resolveFleetDesktopBlocker({ ...open, inDesktopAudience: false, reasons: ['helper-missing'] })).toBe(
 			'permission-denied'
 		);

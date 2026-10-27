@@ -25,7 +25,11 @@ import type { TaskToolDescriptor } from '../../tasks-domain/agent-task-tools';
 export const FLEET_DESKTOP_DISPLAYS_TOOL_NAME = 'fleet_desktop_displays';
 
 export const FLEET_DESKTOP_TOOL_ANNOTATIONS = {
-    [FLEET_DESKTOP_DISPLAYS_TOOL_NAME]: { readOnly: true, destructive: false, confirmationClass: 'plain' },
+    [FLEET_DESKTOP_DISPLAYS_TOOL_NAME]: {
+        readOnly: true,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
 } as const;
 
 /** Who is asking: the Agent and the person it works for. */
@@ -49,11 +53,22 @@ function refusal(err: unknown): ToolError {
     const response = (err as { getResponse?: () => unknown } | null)?.getResponse?.();
     const envelope = (response as { error?: { code?: unknown; hint?: unknown } } | null)?.error;
     if (envelope && typeof envelope.code === 'string') {
-        return { error: { code: envelope.code, hint: typeof envelope.hint === 'string' ? envelope.hint : '' } };
+        return {
+            error: {
+                code: envelope.code,
+                hint: typeof envelope.hint === 'string' ? envelope.hint : '',
+            },
+        };
     }
     const status = (err as { getStatus?: () => number } | null)?.getStatus?.();
     if (status === 404) return { error: { code: 'not_found', hint: 'no such computer' } };
-    if (status === 403) return { error: { code: 'permission_denied', hint: err instanceof Error ? err.message : 'not allowed' } };
+    if (status === 403)
+        return {
+            error: {
+                code: 'permission_denied',
+                hint: err instanceof Error ? err.message : 'not allowed',
+            },
+        };
     return { error: { code: 'internal', hint: err instanceof Error ? err.message : String(err) } };
 }
 
@@ -74,7 +89,10 @@ export function buildFleetDesktopTools(args: {
             parameters: {
                 type: 'object',
                 properties: {
-                    nodeId: { type: 'string', description: 'The computer (its id, from list_fleet_nodes).' },
+                    nodeId: {
+                        type: 'string',
+                        description: 'The computer (its id, from list_fleet_nodes).',
+                    },
                 },
                 required: ['nodeId'],
             },

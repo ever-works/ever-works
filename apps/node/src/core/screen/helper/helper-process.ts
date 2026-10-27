@@ -34,7 +34,12 @@ export type HelperSpawner = (path: string, env: Record<string, string>) => Helpe
 
 /** The real spawner: no shell, no window, piped stdio, the minimal environment. */
 export const spawnHelperChild: HelperSpawner = (path, env) =>
-	spawn(path, [], { env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, shell: false }) as unknown as HelperChild;
+	spawn(path, [], {
+		env,
+		stdio: ['pipe', 'pipe', 'pipe'],
+		windowsHide: true,
+		shell: false
+	}) as unknown as HelperChild;
 
 const ENVIRONMENT_KEYS: Readonly<Record<string, readonly string[]>> = {
 	linux: ['DISPLAY', 'XAUTHORITY', 'XDG_SESSION_TYPE', 'WAYLAND_DISPLAY'],
@@ -43,7 +48,10 @@ const ENVIRONMENT_KEYS: Readonly<Record<string, readonly string[]>> = {
 };
 
 /** The only environment the helper receives (plan §11 "helper least privilege"). */
-export function helperEnvironment(env: Readonly<Record<string, string | undefined>>, platform: string): Record<string, string> {
+export function helperEnvironment(
+	env: Readonly<Record<string, string | undefined>>,
+	platform: string
+): Record<string, string> {
 	const out: Record<string, string> = {};
 	for (const key of ENVIRONMENT_KEYS[platform] ?? []) {
 		const value = env[key];

@@ -9,7 +9,14 @@ import {
 	type FleetHelperManifest,
 	type FleetHelperPolicyRecord
 } from '@ever-works/contracts';
-import { admitEventFor, appendHelperEvent, readHelperPolicy, verifyHelper, type HelperFs, type HelperPaths } from './helper-trust';
+import {
+	admitEventFor,
+	appendHelperEvent,
+	readHelperPolicy,
+	verifyHelper,
+	type HelperFs,
+	type HelperPaths
+} from './helper-trust';
 
 /**
  * Desktop view & control (FL-07, FR-15 … FR-21, plan §6.1) — the four
@@ -208,7 +215,10 @@ export interface HelperStatusReport {
 }
 
 /** `helper status [--json]`. */
-export async function helperStatus(deps: HelperAdmissionDeps, options: { json?: boolean } = {}): Promise<HelperStatusReport> {
+export async function helperStatus(
+	deps: HelperAdmissionDeps,
+	options: { json?: boolean } = {}
+): Promise<HelperStatusReport> {
 	const target = fleetHelperTarget(deps.platform, deps.arch);
 	const verification = await verifyHelper(deps.fs, deps.paths, deps.now);
 	const record = verification.record;
@@ -234,9 +244,12 @@ export async function helperStatus(deps: HelperAdmissionDeps, options: { json?: 
 	deps.out(`installed     ${report.installed ? deps.paths.installPath : 'no'}`);
 	deps.out(`approved      ${report.admitted ? `yes, ${record?.acknowledgedAt}` : 'no'}`);
 	deps.out(`trust         ${report.trust === 'hash-pinned' ? 'hash-pinned (Reduced trust)' : report.trust}`);
-	if (report.fingerprintPrefix) deps.out(`fingerprint   ${report.fingerprintPrefix}…${report.published ? '' : ' (unpublished build)'}`);
+	if (report.fingerprintPrefix)
+		deps.out(`fingerprint   ${report.fingerprintPrefix}…${report.published ? '' : ' (unpublished build)'}`);
 	if (report.reason === 'helper-untrusted') {
-		deps.out('The helper file has CHANGED since it was approved; nothing starts until you reinstall it (helper install) and approve it again (helper admit).');
+		deps.out(
+			'The helper file has CHANGED since it was approved; nothing starts until you reinstall it (helper install) and approve it again (helper admit).'
+		);
 	} else if (report.reason === 'helper-unadmitted') {
 		deps.out('Installed but not approved. Run: ever-works-node helper admit');
 	} else if (report.reason === 'helper-missing') {

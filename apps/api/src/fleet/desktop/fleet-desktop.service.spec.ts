@@ -29,9 +29,21 @@ function node(overrides: Record<string, unknown> = {}) {
         workerState: null,
         helperTrust: 'hash-pinned',
         desktopFacts: {
-            helper: { trust: 'hash-pinned', present: true, admitted: true, fingerprintPrefix: 'abcdef12' },
+            helper: {
+                trust: 'hash-pinned',
+                present: true,
+                admitted: true,
+                fingerprintPrefix: 'abcdef12',
+            },
             displays: [
-                { id: 'DP-1', name: 'Display 1', width: 1920, height: 1080, scale: 1, primary: true },
+                {
+                    id: 'DP-1',
+                    name: 'Display 1',
+                    width: 1920,
+                    height: 1080,
+                    scale: 1,
+                    primary: true,
+                },
                 { id: 'DP-2', name: 'Display 2', width: 1280, height: 1024, scale: 1 },
             ],
             reasons: [],
@@ -42,7 +54,14 @@ function node(overrides: Record<string, unknown> = {}) {
     };
 }
 
-function build(options: { row?: Record<string, unknown>; stopped?: boolean; openSessions?: number; connected?: boolean } = {}) {
+function build(
+    options: {
+        row?: Record<string, unknown>;
+        stopped?: boolean;
+        openSessions?: number;
+        connected?: boolean;
+    } = {},
+) {
     const row = node(options.row);
     const audits: Array<{ action: string; extra: Record<string, unknown> }> = [];
     const mints: Array<Record<string, unknown>> = [];
@@ -53,7 +72,9 @@ function build(options: { row?: Record<string, unknown>; stopped?: boolean; open
             }
             return { node: row, role: caller.userId === OWNER ? 'owner' : 'org-member' };
         }),
-        canAct: jest.fn(async (_node: unknown, caller: { userId: string }) => caller.userId === OWNER),
+        canAct: jest.fn(
+            async (_node: unknown, caller: { userId: string }) => caller.userId === OWNER,
+        ),
     };
     const links = {
         isConnected: jest.fn(() => options.connected ?? true),
@@ -63,22 +84,33 @@ function build(options: { row?: Record<string, unknown>; stopped?: boolean; open
     const attach = {
         mint: jest.fn(async (input: Record<string, unknown>) => {
             mints.push(input);
-            return { token: 'viewer-token', wsPath: `/ws/fleet/desktop/${input.target}`, expiresInSec: 60, role: input.role };
+            return {
+                token: 'viewer-token',
+                wsPath: `/ws/fleet/desktop/${input.target}`,
+                expiresInSec: 60,
+                role: input.role,
+            };
         }),
     };
     const sessions = {
-        findOpenForNode: jest.fn(async () => Array.from({ length: options.openSessions ?? 0 }, (_, i) => ({ id: `s${i}` }))),
-        findOpenForScope: jest.fn(async () => Array.from({ length: options.openSessions ?? 0 }, (_, i) => ({ id: `s${i}` }))),
+        findOpenForNode: jest.fn(async () =>
+            Array.from({ length: options.openSessions ?? 0 }, (_, i) => ({ id: `s${i}` })),
+        ),
+        findOpenForScope: jest.fn(async () =>
+            Array.from({ length: options.openSessions ?? 0 }, (_, i) => ({ id: `s${i}` })),
+        ),
     };
     const service = new FleetDesktopService(
         { findById: jest.fn(async () => row) } as never,
         access as never,
         { isStopped: jest.fn(async () => options.stopped === true) } as never,
         {
-            recordNodeAction: jest.fn(async (input: { action: string; extra: Record<string, unknown> }) => {
-                audits.push({ action: input.action, extra: input.extra });
-                return true;
-            }),
+            recordNodeAction: jest.fn(
+                async (input: { action: string; extra: Record<string, unknown> }) => {
+                    audits.push({ action: input.action, extra: input.extra });
+                    return true;
+                },
+            ),
         } as never,
         links as never,
         attach as never,
@@ -87,7 +119,9 @@ function build(options: { row?: Record<string, unknown>; stopped?: boolean; open
     return { service, audits, mints, links, access };
 }
 
-async function refusal(promise: Promise<unknown>): Promise<{ code: string; hint: string; details?: Record<string, unknown> }> {
+async function refusal(
+    promise: Promise<unknown>,
+): Promise<{ code: string; hint: string; details?: Record<string, unknown> }> {
     try {
         await promise;
     } catch (error) {
@@ -101,7 +135,13 @@ describe('FleetDesktopService.availability', () => {
     it('answers available with the helper and the displays', async () => {
         const { service } = build();
         const view = await service.availability(OWNER, NODE_ID);
-        expect(view).toMatchObject({ available: true, blocker: null, hint: null, browserSourceAvailable: true, maxViews: 2 });
+        expect(view).toMatchObject({
+            available: true,
+            blocker: null,
+            hint: null,
+            browserSourceAvailable: true,
+            maxViews: 2,
+        });
         expect(view.displays.map((display) => display.id)).toEqual(['DP-1', 'DP-2']);
         expect(view.helper?.fingerprintPrefix).toBe('abcdef12');
     });
@@ -110,9 +150,41 @@ describe('FleetDesktopService.availability', () => {
         [{ stopped: true }, 'kill-switch', 'Settings → Fleet'],
         [{ row: { kind: 'desktop-node' } }, 'kind-unsupported', 'kind of computer'],
         [{ row: { lastHeartbeatAt: new Date(Date.now() - 6 * 3_600_000) } }, 'offline', 'offline'],
-        [{ row: { consents: { work: true, attend: false, manage: false, usageScan: false } } }, 'consent-missing', '--attend'],
-        [{ row: { desktopFacts: { helper: null, displays: [], reasons: ['helper-unadmitted'], reportedAt: '', seenEventIds: [] } } }, 'helper-unadmitted', 'helper admit'],
-        [{ row: { desktopFacts: { helper: null, displays: [], reasons: ['wayland-unsupported'], reportedAt: '', seenEventIds: [] } } }, 'wayland-unsupported', 'X11'],
+        [
+            { row: { consents: { work: true, attend: false, manage: false, usageScan: false } } },
+            'consent-missing',
+            '--attend',
+        ],
+        [
+            {
+                row: {
+                    desktopFacts: {
+                        helper: null,
+                        displays: [],
+                        reasons: ['helper-unadmitted'],
+                        reportedAt: '',
+                        seenEventIds: [],
+                    },
+                },
+            },
+            'helper-unadmitted',
+            'helper admit',
+        ],
+        [
+            {
+                row: {
+                    desktopFacts: {
+                        helper: null,
+                        displays: [],
+                        reasons: ['wayland-unsupported'],
+                        reportedAt: '',
+                        seenEventIds: [],
+                    },
+                },
+            },
+            'wayland-unsupported',
+            'X11',
+        ],
         [{ row: { helperTrust: 'none', desktopFacts: null } }, 'helper-missing', 'helper install'],
         [{ connected: false }, 'link-unavailable', 'not connected'],
     ])('names the blocker %#', async (options, blocker, hint) => {
@@ -125,7 +197,9 @@ describe('FleetDesktopService.availability', () => {
 
     it('tells a viewer outside the desktop audience why, without the picture', async () => {
         const { service, access } = build();
-        access.resolveVisible.mockImplementationOnce(async () => ({ node: node(), role: 'org-member' }) as never);
+        access.resolveVisible.mockImplementationOnce(
+            async () => ({ node: node(), role: 'org-member' }) as never,
+        );
         const view = await service.availability('member-1', NODE_ID);
         expect(view).toMatchObject({ available: false, blocker: 'permission-denied' });
     });
@@ -134,8 +208,15 @@ describe('FleetDesktopService.availability', () => {
 describe('FleetDesktopService.openView', () => {
     it('opens a read-only view: viewer grant, desktop params, audited', async () => {
         const { service, mints, audits } = build();
-        const result = await service.openView(OWNER, NODE_ID, { displayId: 'DP-2', quality: 'sharp' });
-        expect(result.attach).toMatchObject({ token: 'viewer-token', role: 'viewer', expiresInSec: 60 });
+        const result = await service.openView(OWNER, NODE_ID, {
+            displayId: 'DP-2',
+            quality: 'sharp',
+        });
+        expect(result.attach).toMatchObject({
+            token: 'viewer-token',
+            role: 'viewer',
+            expiresInSec: 60,
+        });
         expect(result.display?.id).toBe('DP-2');
         expect(result.fellBack).toBe(false);
         expect(mints[0]).toMatchObject({
@@ -143,7 +224,12 @@ describe('FleetDesktopService.openView', () => {
             family: 'desktop',
             role: 'viewer',
             caller: { kind: 'user', userId: OWNER },
-            params: { source: 'desktop', viewId: result.view.viewId, quality: 'sharp', display: 'DP-2' },
+            params: {
+                source: 'desktop',
+                viewId: result.view.viewId,
+                quality: 'sharp',
+                display: 'DP-2',
+            },
             requirement: { actionFamily: 'desktop', target: result.view.viewId },
         });
         expect(audits).toEqual([
@@ -169,19 +255,34 @@ describe('FleetDesktopService.openView', () => {
 
     it('refuses with the CONTRACTS code and hint, and audits the refusal (U3, U8, U10)', async () => {
         const killed = build({ stopped: true });
-        expect(await refusal(killed.service.openView(OWNER, NODE_ID, {}))).toMatchObject({ code: 'kill_switch' });
-        expect(killed.audits[0]).toMatchObject({ action: 'node.desktop.view', extra: { outcome: 'refused', code: 'kill_switch' } });
+        expect(await refusal(killed.service.openView(OWNER, NODE_ID, {}))).toMatchObject({
+            code: 'kill_switch',
+        });
+        expect(killed.audits[0]).toMatchObject({
+            action: 'node.desktop.view',
+            extra: { outcome: 'refused', code: 'kill_switch' },
+        });
         expect(killed.mints).toEqual([]);
 
         const changed = build({
-            row: { desktopFacts: { helper: null, displays: [], reasons: ['helper-untrusted'], reportedAt: '', seenEventIds: [] } },
+            row: {
+                desktopFacts: {
+                    helper: null,
+                    displays: [],
+                    reasons: ['helper-untrusted'],
+                    reportedAt: '',
+                    seenEventIds: [],
+                },
+            },
         });
         expect(await refusal(changed.service.openView(OWNER, NODE_ID, {}))).toMatchObject({
             code: 'unsupported_on_node',
             details: { reason: 'helper-untrusted' },
         });
 
-        const unattended = build({ row: { consents: { work: true, attend: false, manage: false, usageScan: false } } });
+        const unattended = build({
+            row: { consents: { work: true, attend: false, manage: false, usageScan: false } },
+        });
         const consent = await refusal(unattended.service.openView(OWNER, NODE_ID, {}));
         expect(consent).toMatchObject({ code: 'consent_missing' });
         expect(consent.hint).toContain('--attend');
@@ -207,12 +308,21 @@ describe('FleetDesktopService views', () => {
     it('audits a display change and answers a fresh grant', async () => {
         const { service, audits, mints } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
-        const updated = await service.updateView(OWNER, NODE_ID, opened.view.viewId, { displayId: 'DP-2' });
+        const updated = await service.updateView(OWNER, NODE_ID, opened.view.viewId, {
+            displayId: 'DP-2',
+        });
         expect(updated.view.displayId).toBe('DP-2');
         expect(mints).toHaveLength(2);
-        expect(audits.map((row) => row.action)).toEqual(['node.desktop.view', 'node.desktop.display.set']);
+        expect(audits.map((row) => row.action)).toEqual([
+            'node.desktop.view',
+            'node.desktop.display.set',
+        ]);
         expect(audits[1].extra).toMatchObject({ displayId: 'DP-2', previousDisplayId: 'DP-1' });
-        expect(await refusal(service.updateView(OWNER, NODE_ID, opened.view.viewId, { displayId: 'HDMI-9' }))).toMatchObject({
+        expect(
+            await refusal(
+                service.updateView(OWNER, NODE_ID, opened.view.viewId, { displayId: 'HDMI-9' }),
+            ),
+        ).toMatchObject({
             code: 'unsupported_on_node',
         });
     });
@@ -220,10 +330,14 @@ describe('FleetDesktopService views', () => {
     it('keeps a view its owner’s alone', async () => {
         const { service } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
-        expect(() => service.viewFor('someone-else', NODE_ID, opened.view.viewId)).toThrow(FleetLinkException);
+        expect(() => service.viewFor('someone-else', NODE_ID, opened.view.viewId)).toThrow(
+            FleetLinkException,
+        );
         expect(service.viewFor(OWNER, NODE_ID, opened.view.viewId).role).toBe('viewer');
         service.endView(OWNER, NODE_ID, opened.view.viewId);
-        expect(() => service.viewFor(OWNER, NODE_ID, opened.view.viewId)).toThrow(FleetLinkException);
+        expect(() => service.viewFor(OWNER, NODE_ID, opened.view.viewId)).toThrow(
+            FleetLinkException,
+        );
     });
 });
 
@@ -231,7 +345,15 @@ describe('FleetDesktopService as the viewer observer', () => {
     const handle = (target: string, userId: string, source: string) => ({
         id: 'h1',
         acceptedAt: Date.now(),
-        claims: { userId, nodeId: NODE_ID, family: 'desktop' as const, target, role: 'viewer' as const, params: { source }, requirement: {} },
+        claims: {
+            userId,
+            nodeId: NODE_ID,
+            family: 'desktop' as const,
+            target,
+            role: 'viewer' as const,
+            params: { source },
+            requirement: {},
+        },
     });
 
     it('lets the preview browser through untouched', async () => {
@@ -243,8 +365,12 @@ describe('FleetDesktopService as the viewer observer', () => {
     it('admits only a view this person opened, and closes it when they leave the audience', async () => {
         const { service, access } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
-        expect(() => service.admit(handle('00000000-0000-4000-8000-000000000000', OWNER, 'desktop'))).toThrow(FleetLinkException);
-        expect(() => service.admit(handle(opened.view.viewId, 'someone-else', 'desktop'))).toThrow(FleetLinkException);
+        expect(() =>
+            service.admit(handle('00000000-0000-4000-8000-000000000000', OWNER, 'desktop')),
+        ).toThrow(FleetLinkException);
+        expect(() => service.admit(handle(opened.view.viewId, 'someone-else', 'desktop'))).toThrow(
+            FleetLinkException,
+        );
         const viewer = handle(opened.view.viewId, OWNER, 'desktop');
         expect(() => service.admit(viewer)).not.toThrow();
         service.opened(viewer);
@@ -258,22 +384,37 @@ describe('FleetDesktopService as the viewer observer', () => {
 describe('FleetDesktopService.screenshot', () => {
     it('takes one Steady picture on a short-lived channel and audits it', async () => {
         const { service, links, audits } = build();
-        links.openChannel.mockImplementation(async (input: { params: Record<string, unknown>; events: { binary: (kind: number, payload: Uint8Array) => void } }) => {
-            const frame = encodeComputerFrame({
-                kind: 'frame',
-                seq: 0,
-                keyframe: true,
-                width: 800,
-                height: 500,
-                mime: 'image/jpeg',
-                data: Buffer.from([0xff, 0xd8, 1, 2, 0xff, 0xd9]).toString('base64'),
-            })!;
-            setTimeout(() => input.events.binary(FLEET_LINK_FRAME_KINDS.FRAME, new TextEncoder().encode(frame)), 0);
-            expect(input.params).toMatchObject({ source: 'desktop', quality: 'steady' });
-            return { close: jest.fn() };
-        });
+        links.openChannel.mockImplementation(
+            async (input: {
+                params: Record<string, unknown>;
+                events: { binary: (kind: number, payload: Uint8Array) => void };
+            }) => {
+                const frame = encodeComputerFrame({
+                    kind: 'frame',
+                    seq: 0,
+                    keyframe: true,
+                    width: 800,
+                    height: 500,
+                    mime: 'image/jpeg',
+                    data: Buffer.from([0xff, 0xd8, 1, 2, 0xff, 0xd9]).toString('base64'),
+                })!;
+                setTimeout(
+                    () =>
+                        input.events.binary(
+                            FLEET_LINK_FRAME_KINDS.FRAME,
+                            new TextEncoder().encode(frame),
+                        ),
+                    0,
+                );
+                expect(input.params).toMatchObject({ source: 'desktop', quality: 'steady' });
+                return { close: jest.fn() };
+            },
+        );
         const picture = await service.screenshot(OWNER, NODE_ID, null);
         expect(picture).toMatchObject({ width: 800, height: 500, mime: 'image/jpeg', bytes: 6 });
-        expect(audits[0]).toMatchObject({ action: 'node.desktop.view', extra: { purpose: 'screenshot', outcome: 'done' } });
+        expect(audits[0]).toMatchObject({
+            action: 'node.desktop.view',
+            extra: { purpose: 'screenshot', outcome: 'done' },
+        });
     });
 });

@@ -101,7 +101,13 @@ describe('admission events', () => {
 
 	it('keeps usable events once each, newest last, capped', () => {
 		const events = normalizeFleetHelperEvents([
-			{ id: id(1), kind: 'admit', at: '2026-10-26T01:00:00Z', level: 'hash-pinned', fingerprintPrefix: 'abcdef12' },
+			{
+				id: id(1),
+				kind: 'admit',
+				at: '2026-10-26T01:00:00Z',
+				level: 'hash-pinned',
+				fingerprintPrefix: 'abcdef12'
+			},
 			{ id: id(1), kind: 'admit', at: '2026-10-26T01:00:00Z' },
 			{ id: 'nope', kind: 'admit', at: '2026-10-26T01:00:00Z' },
 			{ id: id(2), kind: 'explode', at: '2026-10-26T01:00:00Z' },
@@ -114,7 +120,11 @@ describe('admission events', () => {
 			at: '2026-10-26T02:00:00Z',
 			reason: 'helper-untrusted'
 		});
-		const many = Array.from({ length: 50 }, (_, n) => ({ id: id(n + 10), kind: 'revoke', at: '2026-10-26T01:00:00Z' }));
+		const many = Array.from({ length: 50 }, (_, n) => ({
+			id: id(n + 10),
+			kind: 'revoke',
+			at: '2026-10-26T01:00:00Z'
+		}));
 		const capped = normalizeFleetHelperEvents(many);
 		expect(capped).toHaveLength(FLEET_HELPER_MAX_EVENTS);
 		expect(capped[capped.length - 1].id).toBe(id(59));

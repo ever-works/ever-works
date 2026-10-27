@@ -339,7 +339,14 @@ export type FleetAuditAction =
 	 */
 	| 'node.helper.admit'
 	| 'node.helper.revoke'
-	| 'node.helper.verify-failed';
+	| 'node.helper.verify-failed'
+	/**
+	 * The owner allowed or withdrew control of the desktop ON the machine
+	 * (FL-07 P2, `ever-works-node helper control allow|deny`) — written from the
+	 * heartbeat's `helperEvents` like the admission rows.
+	 */
+	| 'node.helper.control-allow'
+	| 'node.helper.control-deny';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -464,7 +471,9 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.runner.stop',
 	'node.runner.restart',
 	'node.runner.remove',
-	'node.runner.job.cancel'
+	'node.runner.job.cancel',
+	'node.helper.control-allow',
+	'node.helper.control-deny'
 ];
 
 /**

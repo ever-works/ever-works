@@ -59,11 +59,19 @@ describe('helper messages', () => {
 					version: '0.1.0',
 					platform: 'linux',
 					reasons: ['wayland-unsupported', 'rm -rf'],
-					displays: [{ id: 'DP-1', width: 10, height: 10, primary: true }, { id: '', width: 1, height: 1 }]
+					displays: [
+						{ id: 'DP-1', width: 10, height: 10, primary: true },
+						{ id: '', width: 1, height: 1 }
+					]
 				})
 			)
 		);
-		expect(hello).toMatchObject({ protocol: 1, version: '0.1.0', platform: 'linux', reasons: ['wayland-unsupported'] });
+		expect(hello).toMatchObject({
+			protocol: 1,
+			version: '0.1.0',
+			platform: 'linux',
+			reasons: ['wayland-unsupported']
+		});
 		expect(hello?.displays.map((display) => display.id)).toEqual(['DP-1']);
 		expect(parseHelperHello(new TextEncoder().encode('not json'))).toBeNull();
 	});
@@ -81,7 +89,11 @@ describe('helper messages', () => {
 	});
 
 	it('forwards only valid TILES payloads', () => {
-		const tiles = encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: fakeJpeg() }] })!;
+		const tiles = encodeDesktopTiles({
+			width: 64,
+			height: 64,
+			tiles: [{ x: 0, y: 0, w: 64, h: 64, data: fakeJpeg() }]
+		})!;
 		expect(acceptHelperTiles(tiles)).toBe(tiles);
 		expect(acceptHelperTiles(tiles.subarray(0, tiles.byteLength - 2))).toBeNull();
 	});
