@@ -3,13 +3,16 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     Param,
+    ParseIntPipe,
     ParseUUIDPipe,
     Patch,
     Post,
     Query,
+    StreamableFile,
     UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -21,6 +24,7 @@ import {
     type FleetDesktopAttachGrant,
     type FleetDesktopAvailabilityView,
     type FleetDesktopControlResult,
+    type FleetDesktopRecordingView,
     type FleetDesktopOpenResult,
     type FleetDesktopScreenshot,
     type FleetDesktopViewView,
@@ -32,6 +36,7 @@ import { fleetLinkError } from '../../fleet-link/fleet-link.errors';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import {
     AnswerFleetDesktopControlDto,
+    DeleteFleetDesktopRecordingDto,
     FleetDesktopControlDto,
     OpenFleetDesktopViewDto,
     UpdateFleetDesktopViewDto,
@@ -277,6 +282,71 @@ export class FleetDesktopController {
         @Param('viewId', ParseUUIDPipe) viewId: string,
     ): Promise<FleetDesktopControlResult> {
         return this.desktop.extendControl(auth.userId, id, viewId);
+    }
+
+    // ─── Recordings (P2.C) ─────────────────────────────────────────────────
+
+    @Get('nodes/:id/desktop/recordings')
+    @ApiOperation({
+        summary:
+            "This computer's desktop recordings (people in its desktop audience): when, how long, how big, until when.",
+    })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    recordings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<FleetDesktopRecordingView[]> {
+        return this.desktop.recordings(auth.userId, id);
+    }
+
+    @Get('nodes/:id/desktop/recordings/:viewId')
+    @ApiOperation({
+        summary: 'One desktop recording with its chunks and control spans (for the player).',
+    })
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    recording(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+    ): Promise<FleetDesktopRecordingView> {
+        return this.desktop.recordingFor(auth.userId, id, viewId);
+    }
+
+    @Get('nodes/:id/desktop/recordings/:viewId/chunks/:seq')
+    @ApiOperation({
+        summary: 'One chunk of a desktop recording (an EWR1 container the player paints).',
+    })
+    @Header('X-Content-Type-Options', 'nosniff')
+    @Header('Cache-Control', 'private, no-store')
+    @Throttle({ long: { limit: 600, ttl: 60_000 } })
+    async recordingChunk(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+        @Param('seq', ParseIntPipe) seq: number,
+    ): Promise<StreamableFile> {
+        const bytes = await this.desktop.recordingChunk(auth.userId, id, viewId, seq);
+        return new StreamableFile(Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength), {
+            type: 'application/octet-stream',
+            disposition: `attachment; filename="desktop-recording-${seq}.ewrec"`,
+            length: bytes.byteLength,
+        });
+    }
+
+    @Delete('nodes/:id/desktop/recordings/:viewId')
+    @ApiOperation({
+        summary:
+            'Delete a desktop recording now (confirm: true; audited). It cannot be brought back.',
+    })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    deleteRecording(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('viewId', ParseUUIDPipe) viewId: string,
+        @Body() body: DeleteFleetDesktopRecordingDto,
+    ): Promise<void> {
+        return this.desktop.deleteRecording(auth.userId, id, viewId, body?.confirm === true);
     }
 
     @Get('nodes/:id/desktop/screenshot')

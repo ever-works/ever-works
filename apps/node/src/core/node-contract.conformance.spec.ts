@@ -151,7 +151,10 @@ describe('what the node actually puts on the wire', () => {
 		// 16 → 17 with FL-02 T-25: the opt-in self-update report.
 		// 17 → 18 with FL-13: the machine's IANA time zone, sent only when
 		// `describeSelf` resolved a valid one.
-		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(18);
+		// 18 → 23 with FL-07 (desktop view & control): the helper's trust level,
+		// its status, the displays, the desktop reasons and the helper events,
+		// sent only by a node whose `describeSelf` has a screen helper backend.
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(23);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -265,7 +268,25 @@ describe('what the node actually puts on the wire', () => {
 			// Fleet node link (FL-02 T-25).
 			selfUpdate: { enabled: false },
 			// Schedules on computers (FL-13).
-			timeZone: 'Europe/Berlin'
+			timeZone: 'Europe/Berlin',
+			// Desktop view & control (FL-07).
+			helperTrust: 'hash-pinned',
+			helper: {
+				trust: 'hash-pinned',
+				present: true,
+				admitted: true,
+				version: '0.1.0',
+				fingerprintPrefix: 'a1b2c3d4e5f6',
+				verifiedAt: '2026-10-27T00:00:00.000Z',
+				published: true
+			},
+			displays: [
+				{ id: 'DP-1', name: 'DP-1', width: 1920, height: 1080, scale: 1, primary: true, virtual: false }
+			],
+			desktopReasons: ['no-display-session'],
+			helperEvents: [
+				{ id: '0f8f6a2e-6a0c-4d3e-9a43-5b4d2f1e0c11', kind: 'admit', at: '2026-10-27T00:00:00.000Z' }
+			]
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual(
@@ -279,6 +300,8 @@ describe('what the node actually puts on the wire', () => {
 		expect(bodyOf(sent)).toMatchObject(baseline.limitCeiling.reportedLimits);
 		expect(bodyOf(sent)).toHaveProperty('maxMemoryMb', null);
 		expect(bodyOf(sent).health).toEqual({ cpuPercent: 31.2, cpuCores: 4, gpu: null });
+		expect(bodyOf(sent).helperTrust).toBe('hash-pinned');
+		expect(bodyOf(sent).desktopReasons).toEqual(['no-display-session']);
 	});
 
 	it('a beat with a health snapshot sends exactly the pinned body (FL-03)', async () => {

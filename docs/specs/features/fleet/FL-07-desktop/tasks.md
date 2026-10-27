@@ -281,31 +281,40 @@
       indexes; guarded FK to `fleet_sessions`.
       **Test**: applies twice; `migration:generate` empty; existing `computer-session.service.spec.ts`
       green.
-- [ ] **T-38**. `DesktopRecordingService` at `packages/agent/src/fleet/desktop/desktop-recording.service.ts`:
+- [x] **T-38**. `DesktopRecordingService` at `packages/agent/src/fleet/desktop/desktop-recording.service.ts`:
       starts on control (both sources) or owner opt-in (`recordWatchSessions`), samples ≤ 1 fps,
       60-second chunks through `getActiveStorageBackend()`, watermark composited, 200 MB / 4 h caps,
       storage failure degrades without ending the view, index on close, `recordingExpiresAt` from
       the Node's clamped retention; sets `recorded = true` (the first writer).
       **Test**: `__tests__/desktop-recording.service.spec.ts` — caps with reasons; outage →
       `recordingSkippedReason`; chunk `seq` monotonic; expiry stamped.
-- [ ] **T-39**. Recording API (`/recordings`, `/recordings/:viewId`, `/chunks/:seq`, `DELETE` with
+- [x] **T-39**. Recording API (`/recordings`, `/recordings/:viewId`, `/chunks/:seq`, `DELETE` with
       `confirm`) in `fleet-desktop.controller.ts`; audit `node.desktop.recording.start|stop|delete`.
       **Test**: `fleet-desktop-recordings.controller.spec.ts` — `nosniff` + `attachment`; delete
       without `confirm: true` (CONTRACTS §2.2) → `confirmation_required`.
-- [ ] **T-40**. GC task `packages/tasks/src/tasks/trigger/computer-recording-gc.task.ts` (cron
+- [x] **T-40**. GC task `packages/tasks/src/tasks/trigger/computer-recording-gc.task.ts` (cron
       `23 3 * * *`; object first, row second) with dispatcher symbol in
       `packages/agent/src/fleet/desktop/computer-recording-gc.dispatcher.ts`; register beside
       `terminal-transcript-gc.task.ts`.
       **Test**: `packages/tasks/src/__tests__/computer-recording-gc.task.spec.ts` — failed object
       delete leaves the row; nothing deleted on read.
-- [ ] **T-41**. Web: `DesktopRecordingsList.tsx`, `DesktopRecordingPlayer.tsx` (scrubber 1 s / 10 s
+- [x] **T-41**. Web: `DesktopRecordingsList.tsx`, `DesktopRecordingPlayer.tsx` (scrubber 1 s / 10 s
       steps, spans, display/quality, storage, expiry, Delete now), the AW-09 receipt `COMPUTER`
       block reading `recordingRef`, the FL-04 session detail block.
       **Test**: `DesktopRecordingPlayer.unit.spec.tsx`; `apps/web/e2e/flow-fleet-desktop-recording.spec.ts`.
-- [ ] **T-42**. Update `docs/specs/features/agent-workspace/TRACKER.md` and
+- [x] **T-42**. Update `docs/specs/features/agent-workspace/TRACKER.md` and
       `docs/specs/features/agent-workspace/AW-11-agent-computers/tasks.md` (T50–T53 marked
       "delivered by FL-07", with links) in the same PR as T-38.
       **Test**: n/a (docs); `pnpm --filter ever-works-docs build` has no broken links.
+
+> **P2.C status (2026-10-27, PR #2934):** T-38 is `packages/agent/src/computer/desktop-recording.service.ts` (beside the
+> arbiter it shares rows with) for the **Desktop source only** — the Agent's browser source is not recorded yet (FR-49,
+> lane log); pictures are tapped on FL-02's viewer gateway (an additive `nodeBinary` observer hook) and the watermark is
+> drawn by the player, not burned into stored pictures (lane log decision 30). T-39's specs are in
+> `fleet-desktop-control.service.spec.ts` (recordings block). T-40's dispatcher is the RPC proxy of
+> `DesktopRecordingService` (no separate symbol) plus an API fallback cron. T-41: the player and list are
+> `DesktopRecordings.tsx` in the Desktop tab; the AW-09 receipt block and the FL-04 session detail block are not built.
+> T-42 updated the AW-11 tracker and tasks (T50–T52 delivered, T53's receipt block open).
 
 ## P3 — Signed admission and virtual displays
 
