@@ -10,7 +10,11 @@ import { AddWorkAppSpecBlueprintUpgradeRun1796600000000 } from '../1796600000000
 describe('AddWorkAppSpecBlueprintUpgradeRun1796600000000', () => {
     let dataSource: DataSource;
     const migration = new AddWorkAppSpecBlueprintUpgradeRun1796600000000();
-    const RUN_COLUMNS = ['blueprintUpgradeStatus', 'blueprintUpgradeError', 'blueprintUpgradeRequestedAt'];
+    const RUN_COLUMNS = [
+        'blueprintUpgradeStatus',
+        'blueprintUpgradeError',
+        'blueprintUpgradeRequestedAt',
+    ];
 
     beforeEach(async () => {
         dataSource = new DataSource({
@@ -88,7 +92,9 @@ describe('AddWorkAppSpecBlueprintUpgradeRun1796600000000', () => {
         await run('up');
         await expect(run('up')).resolves.toBeUndefined();
         const states = await table();
-        expect(states?.columns.filter((column) => RUN_COLUMNS.includes(column.name))).toHaveLength(3);
+        expect(states?.columns.filter((column) => RUN_COLUMNS.includes(column.name))).toHaveLength(
+            3,
+        );
     });
 
     it('down() removes exactly the three columns and keeps the rest', async () => {

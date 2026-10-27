@@ -443,7 +443,13 @@ export class AppBlueprintResolverService {
                 refs.push({ ref: version, sha: null });
             }
             for (const candidate of refs) {
-                const read = await this.readBlueprintSpec(facade, token, repository, budget, candidate.ref);
+                const read = await this.readBlueprintSpec(
+                    facade,
+                    token,
+                    repository,
+                    budget,
+                    candidate.ref,
+                );
                 if (read && accept(read.spec)) {
                     return {
                         hit: this.toHit('explicit', repository, read.spec),
@@ -459,12 +465,19 @@ export class AppBlueprintResolverService {
                 return null;
             }
             budget.take();
-            const head = await facade.getLatestCommit(APP_BLUEPRINT_OWNER, repository.name, branch, {
-                token,
-                providerId: 'github',
-            });
+            const head = await facade.getLatestCommit(
+                APP_BLUEPRINT_OWNER,
+                repository.name,
+                branch,
+                {
+                    token,
+                    providerId: 'github',
+                },
+            );
             const headSha =
-                typeof head?.sha === 'string' && COMMIT_SHA_PATTERN.test(head.sha) ? head.sha : null;
+                typeof head?.sha === 'string' && COMMIT_SHA_PATTERN.test(head.sha)
+                    ? head.sha
+                    : null;
             const read = await this.readBlueprintSpec(
                 facade,
                 token,

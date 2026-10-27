@@ -239,11 +239,14 @@ export class AppBlueprintUpgradePrDto implements AppBlueprintUpgradePr {
     blueprintSha?: string | null;
 
     @ApiPropertyOptional({
-        description: '`false` when the applied version could not be read and the merge was two-way.',
+        description:
+            '`false` when the applied version could not be read and the merge was two-way.',
     })
     baseKnown?: boolean;
 
-    @ApiPropertyOptional({ description: 'Every conflict found; the member value was kept for each.' })
+    @ApiPropertyOptional({
+        description: 'Every conflict found; the member value was kept for each.',
+    })
     conflictCount?: number;
 
     @ApiPropertyOptional({

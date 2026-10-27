@@ -78,7 +78,10 @@ import {
     type AppBlueprintApplyDispatcher,
     type AppBlueprintApplyJobPayload,
 } from './app-blueprint-apply.job';
-import { APP_BLUEPRINT_ACTIVITY_ACTION_TYPE, adaptBlueprintForRelation } from './app-blueprint-apply.service';
+import {
+    APP_BLUEPRINT_ACTIVITY_ACTION_TYPE,
+    adaptBlueprintForRelation,
+} from './app-blueprint-apply.service';
 import {
     AppBlueprintResolverService,
     AppsCatalogCredentialUnavailableError,
@@ -160,7 +163,8 @@ export const APP_BLUEPRINT_RUN_CODES = {
     unexpected: 'unexpected',
 } as const;
 
-export type AppBlueprintRunCode = (typeof APP_BLUEPRINT_RUN_CODES)[keyof typeof APP_BLUEPRINT_RUN_CODES];
+export type AppBlueprintRunCode =
+    (typeof APP_BLUEPRINT_RUN_CODES)[keyof typeof APP_BLUEPRINT_RUN_CODES];
 
 /** The HTTP status each request refusal maps to (plan §4.2 where it names one). */
 export const APP_BLUEPRINT_REFUSAL_STATUS: Readonly<Record<string, number>> = {
@@ -198,7 +202,11 @@ export function isNewerBlueprintVersion(
 
 /** A semver string, `v` prefix tolerated, or `null`. */
 function cleanVersion(value: string | null | undefined): string | null {
-    return semver.valid(String(value ?? '').trim().replace(/^v/, ''));
+    return semver.valid(
+        String(value ?? '')
+            .trim()
+            .replace(/^v/, ''),
+    );
 }
 
 /** A `MAJOR` bump (FR-51's `Breaking:` label). `0.x → 0.y` is not one. */
@@ -286,9 +294,9 @@ function nonEmpty(value: unknown): string | null {
 
 function relationOfRecord(record: AppSourceRecord | null | undefined): AppRepositoryMode {
     const type = record?.type;
-    const entry = (Object.entries(APP_SOURCE_REPOSITORY_TYPE_BY_MODE) as Array<[AppRepositoryMode, string]>).find(
-        ([, value]) => value === type,
-    );
+    const entry = (
+        Object.entries(APP_SOURCE_REPOSITORY_TYPE_BY_MODE) as Array<[AppRepositoryMode, string]>
+    ).find(([, value]) => value === type);
     return entry ? entry[0] : 'link';
 }
 
@@ -321,7 +329,10 @@ export class AppBlueprintUpgradeService {
     private states(): WorkAppSpecStateRepository | undefined {
         if (!this.moduleRef) return undefined;
         try {
-            return getOptionalProvider<WorkAppSpecStateRepository>(this.moduleRef, WorkAppSpecStateRepository);
+            return getOptionalProvider<WorkAppSpecStateRepository>(
+                this.moduleRef,
+                WorkAppSpecStateRepository,
+            );
         } catch {
             return undefined;
         }
@@ -340,7 +351,10 @@ export class AppBlueprintUpgradeService {
     }): Promise<AppBlueprintRequestOutcome> {
         const states = this.states();
         if (!states || !this.works || !this.resolver) {
-            return this.refused('dependenciesUnavailable', 'Blueprint upgrades are not available in this installation.');
+            return this.refused(
+                'dependenciesUnavailable',
+                'Blueprint upgrades are not available in this installation.',
+            );
         }
         const state = await states.findByWorkId(input.workId);
         const work = state ? await this.works.findById(input.workId) : null;
@@ -357,11 +371,18 @@ export class AppBlueprintUpgradeService {
         let wanted: string | null;
         if (input.mode === 'upgrade') {
             if (!state.blueprintId) {
-                return this.refused('noBlueprint', 'This App Work follows no Blueprint, so there is nothing to upgrade.');
+                return this.refused(
+                    'noBlueprint',
+                    'This App Work follows no Blueprint, so there is nothing to upgrade.',
+                );
             }
             blueprintId = state.blueprintId;
             wanted = nonEmpty(input.version) ?? nonEmpty(state.blueprintLatestVersion);
-            if (!wanted || !VERSION_PATTERN.test(wanted) || !isNewerBlueprintVersion(wanted, state.blueprintVersion)) {
+            if (
+                !wanted ||
+                !VERSION_PATTERN.test(wanted) ||
+                !isNewerBlueprintVersion(wanted, state.blueprintVersion)
+            ) {
                 return this.refused(
                     'noUpgrade',
                     `Version ${wanted ?? '(none)'} is not newer than the applied ${state.blueprintVersion ?? 'version'}.`,
@@ -375,7 +396,10 @@ export class AppBlueprintUpgradeService {
             blueprintId = id;
             wanted = nonEmpty(input.version);
             if (wanted && !VERSION_PATTERN.test(wanted)) {
-                return this.refused('blueprintVersionNotFound', `The Blueprint has no version ${wanted}.`);
+                return this.refused(
+                    'blueprintVersionNotFound',
+                    `The Blueprint has no version ${wanted}.`,
+                );
             }
             const ownProposal = state.blueprintUpgradePr?.mode === 'apply';
             if (state.blueprintId && state.blueprintApplyStatus === 'applied') {
@@ -385,7 +409,10 @@ export class AppBlueprintUpgradeService {
                 );
             }
             if (state.blueprintApplyStatus === 'applying' && !ownProposal) {
-                return this.refused('applyInProgress', 'A Blueprint is already being applied to this App Work.');
+                return this.refused(
+                    'applyInProgress',
+                    'A Blueprint is already being applied to this App Work.',
+                );
             }
         }
 
@@ -400,26 +427,46 @@ export class AppBlueprintUpgradeService {
             context &&
             (await this.isPullRequestOpen(context, proposal.number))
         ) {
-            return { status: 'existing', mode: input.mode, blueprintId, version: proposal.version, pullRequest: proposal };
+            return {
+                status: 'existing',
+                mode: input.mode,
+                blueprintId,
+                version: proposal.version,
+                pullRequest: proposal,
+            };
         }
 
         let release: AppBlueprintRelease | null;
         try {
-            release = await this.resolver.readBlueprintRelease(blueprintId, { sourceOwner, version: wanted });
+            release = await this.resolver.readBlueprintRelease(blueprintId, {
+                sourceOwner,
+                version: wanted,
+            });
         } catch (error) {
             if (!(error instanceof AppsCatalogCredentialUnavailableError)) {
-                this.logger.warn(`Blueprint request for work ${input.workId}: reading ${blueprintId} failed (${errorText(error)}).`);
+                this.logger.warn(
+                    `Blueprint request for work ${input.workId}: reading ${blueprintId} failed (${errorText(error)}).`,
+                );
             }
-            return this.refused('catalogUnavailable', 'The Blueprint repositories cannot be read right now.');
+            return this.refused(
+                'catalogUnavailable',
+                'The Blueprint repositories cannot be read right now.',
+            );
         }
         if (!release) {
             return wanted
-                ? this.refused('blueprintVersionNotFound', `The ${blueprintId} Blueprint has no readable version ${wanted}.`)
+                ? this.refused(
+                      'blueprintVersionNotFound',
+                      `The ${blueprintId} Blueprint has no readable version ${wanted}.`,
+                  )
                 : this.refused('blueprintNotFound', `No readable Blueprint "${blueprintId}".`);
         }
         const version = release.hit.version;
         if (input.mode === 'upgrade' && !isNewerBlueprintVersion(version, state.blueprintVersion)) {
-            return this.refused('noUpgrade', `Version ${version} is not newer than the applied ${state.blueprintVersion}.`);
+            return this.refused(
+                'noUpgrade',
+                `Version ${version} is not newer than the applied ${state.blueprintVersion}.`,
+            );
         }
 
         const now = this.now();
@@ -429,7 +476,10 @@ export class AppBlueprintUpgradeService {
             new Date(now.getTime() - APP_BLUEPRINT_RUN_STALE_MS),
         );
         if (!claimed) {
-            return this.refused('applyInProgress', 'A Blueprint run for this App Work is already in progress.');
+            return this.refused(
+                'applyInProgress',
+                'A Blueprint run for this App Work is already in progress.',
+            );
         }
 
         if (input.mode === 'apply') {
@@ -467,7 +517,9 @@ export class AppBlueprintUpgradeService {
             try {
                 runId = await this.dispatcher.dispatch(payload);
             } catch (error) {
-                this.logger.warn(`Blueprint run for work ${input.workId}: dispatch failed (${errorText(error)}); running in-process.`);
+                this.logger.warn(
+                    `Blueprint run for work ${input.workId}: dispatch failed (${errorText(error)}); running in-process.`,
+                );
                 runId = null;
             }
         }
@@ -476,7 +528,9 @@ export class AppBlueprintUpgradeService {
             // No job runtime took it: run it here, after the answer. A user is waiting
             // for a pull request, and a dropped request would leave the claim to go stale.
             void this.run(payload).catch((error) =>
-                this.logger.warn(`Blueprint run for work ${input.workId} failed in-process (${errorText(error)}).`),
+                this.logger.warn(
+                    `Blueprint run for work ${input.workId} failed in-process (${errorText(error)}).`,
+                ),
             );
         }
         return { status: 'queued', mode: input.mode, blueprintId, version, runId, inProcess };
@@ -490,10 +544,16 @@ export class AppBlueprintUpgradeService {
         workId: string;
         userId?: string | null;
         version: string;
-    }): Promise<{ status: 'dismissed'; version: string } | { status: 'refused'; code: string; httpStatus: number; message: string }> {
+    }): Promise<
+        | { status: 'dismissed'; version: string }
+        | { status: 'refused'; code: string; httpStatus: number; message: string }
+    > {
         const states = this.states();
         if (!states) {
-            return this.refused('dependenciesUnavailable', 'Blueprint upgrades are not available in this installation.');
+            return this.refused(
+                'dependenciesUnavailable',
+                'Blueprint upgrades are not available in this installation.',
+            );
         }
         const state = await states.findByWorkId(input.workId);
         if (!state) {
@@ -503,15 +563,26 @@ export class AppBlueprintUpgradeService {
             return this.refused('noBlueprint', 'This App Work follows no Blueprint.');
         }
         const version = nonEmpty(input.version);
-        if (!version || !VERSION_PATTERN.test(version) || !isNewerBlueprintVersion(version, state.blueprintVersion)) {
-            return this.refused('noUpgrade', `Version ${version ?? '(none)'} is not an upgrade of this App Work.`);
+        if (
+            !version ||
+            !VERSION_PATTERN.test(version) ||
+            !isNewerBlueprintVersion(version, state.blueprintVersion)
+        ) {
+            return this.refused(
+                'noUpgrade',
+                `Version ${version ?? '(none)'} is not an upgrade of this App Work.`,
+            );
         }
         await states.patchBlueprintRun(input.workId, { blueprintUpgradeDismissedVersion: version });
         await this.logActivity(input.workId, input.userId ?? null, {
             action: APP_BLUEPRINT_RUN_EVENTS.upgradeDismissed,
             status: ActivityStatus.COMPLETED,
             summary: `The ${state.blueprintId} Blueprint ${version} upgrade notice was dismissed`,
-            details: { blueprintId: state.blueprintId, version, fromVersion: state.blueprintVersion ?? null },
+            details: {
+                blueprintId: state.blueprintId,
+                version,
+                fromVersion: state.blueprintVersion ?? null,
+            },
         });
         return { status: 'dismissed', version };
     }
@@ -531,15 +602,25 @@ export class AppBlueprintUpgradeService {
             !BLUEPRINT_ID_PATTERN.test(blueprintId) ||
             !VERSION_PATTERN.test(version)
         ) {
-            return this.result('failed', workId, mode, version || null, APP_BLUEPRINT_RUN_CODES.invalidPayload);
+            return this.result(
+                'failed',
+                workId,
+                mode,
+                version || null,
+                APP_BLUEPRINT_RUN_CODES.invalidPayload,
+            );
         }
         const job: AppBlueprintApplyJobPayload = { ...payload, workId, mode, blueprintId, version };
         if (!this.locks) {
             return this.execute(job);
         }
-        const locked = await this.locks.runExclusive(blueprintRunLockKey(workId), () => this.execute(job), {
-            ttlMs: APP_BLUEPRINT_RUN_LOCK_TTL_MS,
-        });
+        const locked = await this.locks.runExclusive(
+            blueprintRunLockKey(workId),
+            () => this.execute(job),
+            {
+                ttlMs: APP_BLUEPRINT_RUN_LOCK_TTL_MS,
+            },
+        );
         if (!locked.acquired) {
             return this.result('skipped', workId, mode, version, 'locked');
         }
@@ -549,20 +630,40 @@ export class AppBlueprintUpgradeService {
     private async execute(job: AppBlueprintApplyJobPayload): Promise<AppBlueprintRunResult> {
         const states = this.states();
         if (!states || !this.works || !this.git || !this.resolver) {
-            return this.result('failed', job.workId, job.mode, job.version, APP_BLUEPRINT_RUN_CODES.dependenciesUnavailable);
+            return this.result(
+                'failed',
+                job.workId,
+                job.mode,
+                job.version,
+                APP_BLUEPRINT_RUN_CODES.dependenciesUnavailable,
+            );
         }
         const state = await states.findByWorkId(job.workId);
         const work = state ? await this.works.findById(job.workId) : null;
         if (!state || !work) {
-            return this.result('failed', job.workId, job.mode, job.version, APP_BLUEPRINT_RUN_CODES.workNotFound);
+            return this.result(
+                'failed',
+                job.workId,
+                job.mode,
+                job.version,
+                APP_BLUEPRINT_RUN_CODES.workNotFound,
+            );
         }
-        await states.patchBlueprintRun(job.workId, { blueprintUpgradeStatus: 'running', blueprintUpgradeError: null });
+        await states.patchBlueprintRun(job.workId, {
+            blueprintUpgradeStatus: 'running',
+            blueprintUpgradeError: null,
+        });
 
         try {
             const context = this.repositoryContext(work, state);
             if (!context) throw new RunFailure(APP_BLUEPRINT_RUN_CODES.repositoryUnresolved);
 
-            const theirs = await this.readRelease(job.blueprintId, context.sourceOwner, job.version, null);
+            const theirs = await this.readRelease(
+                job.blueprintId,
+                context.sourceOwner,
+                job.version,
+                null,
+            );
             if (!theirs) throw new RunFailure(APP_BLUEPRINT_RUN_CODES.blueprintVersionNotFound);
             const theirsDoc = this.blueprintDocument(theirs, context.relation);
 
@@ -570,7 +671,12 @@ export class AppBlueprintUpgradeService {
             let baseDoc: Record<string, unknown> | null = {};
             if (job.mode === 'upgrade') {
                 const base = fromVersion
-                    ? await this.readRelease(job.blueprintId, context.sourceOwner, fromVersion, state.blueprintSha ?? null)
+                    ? await this.readRelease(
+                          job.blueprintId,
+                          context.sourceOwner,
+                          fromVersion,
+                          state.blueprintSha ?? null,
+                      )
                     : null;
                 baseDoc = base ? this.blueprintDocument(base, context.relation) : null;
             }
@@ -591,15 +697,27 @@ export class AppBlueprintUpgradeService {
             });
             this.assertValidatesNoWorse(ours.text, text);
 
-            const breaking = job.mode === 'upgrade' && isBreakingBlueprintUpgrade(fromVersion, job.version);
-            const landing = await this.propose(context, state, job, text, merge, theirs, fromVersion, breaking);
+            const breaking =
+                job.mode === 'upgrade' && isBreakingBlueprintUpgrade(fromVersion, job.version);
+            const landing = await this.propose(
+                context,
+                state,
+                job,
+                text,
+                merge,
+                theirs,
+                fromVersion,
+                breaking,
+            );
 
             const conflicts: AppBlueprintUpgradeConflictSummary[] = merge.conflicts
                 .slice(0, APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED)
                 .map((conflict) => ({
                     path: conflict.path,
                     kind: conflict.kind,
-                    ...(conflict.theirs !== undefined ? { proposed: previewMergeValue(conflict.theirs) } : {}),
+                    ...(conflict.theirs !== undefined
+                        ? { proposed: previewMergeValue(conflict.theirs) }
+                        : {}),
                 }));
             const proposal: AppBlueprintUpgradePr = {
                 number: landing.number,
@@ -653,11 +771,20 @@ export class AppBlueprintUpgradeService {
                 conflictCount: merge.conflictCount,
             };
         } catch (error) {
-            const code = error instanceof RunFailure ? error.code : APP_BLUEPRINT_RUN_CODES.unexpected;
+            const code =
+                error instanceof RunFailure ? error.code : APP_BLUEPRINT_RUN_CODES.unexpected;
             if (!(error instanceof RunFailure)) {
-                this.logger.warn(`Blueprint run for work ${job.workId} failed unexpectedly (${errorText(error)}).`);
+                this.logger.warn(
+                    `Blueprint run for work ${job.workId} failed unexpectedly (${errorText(error)}).`,
+                );
             }
-            await this.recordFailure(states, work, job, code, error instanceof RunFailure ? error.detail : undefined);
+            await this.recordFailure(
+                states,
+                work,
+                job,
+                code,
+                error instanceof RunFailure ? error.detail : undefined,
+            );
             return this.result('failed', job.workId, job.mode, job.version, code);
         }
     }
@@ -679,7 +806,11 @@ export class AppBlueprintUpgradeService {
         const proposal = state?.blueprintUpgradePr;
         if (!state || !proposal || state.blueprintUpgradeStatus !== 'proposed') return false;
         const effective = state.effectiveSpec?.blueprint;
-        if (!effective || effective.id !== state.blueprintId || effective.version !== proposal.version) {
+        if (
+            !effective ||
+            effective.id !== state.blueprintId ||
+            effective.version !== proposal.version
+        ) {
             return false;
         }
         await states.patchBlueprintRun(workId, {
@@ -693,9 +824,14 @@ export class AppBlueprintUpgradeService {
             blueprintUpgradeError: null,
         });
         const mode = proposal.mode ?? 'upgrade';
-        const owner = this.works ? ((await this.works.findById(workId).catch(() => null))?.userId ?? null) : null;
+        const owner = this.works
+            ? ((await this.works.findById(workId).catch(() => null))?.userId ?? null)
+            : null;
         await this.logActivity(workId, owner, {
-            action: mode === 'apply' ? APP_BLUEPRINT_RUN_EVENTS.applied : APP_BLUEPRINT_RUN_EVENTS.upgraded,
+            action:
+                mode === 'apply'
+                    ? APP_BLUEPRINT_RUN_EVENTS.applied
+                    : APP_BLUEPRINT_RUN_EVENTS.upgraded,
             status: ActivityStatus.COMPLETED,
             summary:
                 mode === 'apply'
@@ -725,7 +861,9 @@ export class AppBlueprintUpgradeService {
         const record = (work.sourceRepository ?? {}) as AppSourceRecord;
         const relation = relationOfRecord(record);
         const sourceOwner =
-            relation === 'link' ? (nonEmpty(record.owner) ?? owner) : (nonEmpty(record.upstream?.owner) ?? null);
+            relation === 'link'
+                ? (nonEmpty(record.owner) ?? owner)
+                : (nonEmpty(record.upstream?.owner) ?? null);
         return {
             work,
             owner,
@@ -744,7 +882,11 @@ export class AppBlueprintUpgradeService {
         sha: string | null,
     ): Promise<AppBlueprintRelease | null> {
         try {
-            return await this.resolver!.readBlueprintRelease(blueprintId, { sourceOwner, version, sha });
+            return await this.resolver!.readBlueprintRelease(blueprintId, {
+                sourceOwner,
+                version,
+                sha,
+            });
         } catch (error) {
             if (error instanceof AppsCatalogCredentialUnavailableError) {
                 throw new RunFailure(APP_BLUEPRINT_RUN_CODES.catalogUnavailable);
@@ -754,7 +896,10 @@ export class AppBlueprintUpgradeService {
     }
 
     /** The release's document, relation-adapted (GAP-02; its own `source` dropped). */
-    private blueprintDocument(release: AppBlueprintRelease, relation: AppRepositoryMode): Record<string, unknown> {
+    private blueprintDocument(
+        release: AppBlueprintRelease,
+        relation: AppRepositoryMode,
+    ): Record<string, unknown> {
         let parsed: unknown;
         try {
             parsed = yaml.parse(release.text);
@@ -765,7 +910,9 @@ export class AppBlueprintUpgradeService {
         return adaptBlueprintForRelation(parsed, relation).document;
     }
 
-    private async readOurs(context: RepositoryContext): Promise<{ text: string; doc: Record<string, unknown>; head: string }> {
+    private async readOurs(
+        context: RepositoryContext,
+    ): Promise<{ text: string; doc: Record<string, unknown>; head: string }> {
         let head: string | null;
         try {
             const commit = await this.git!.getLatestCommit(
@@ -791,7 +938,9 @@ export class AppBlueprintUpgradeService {
             );
             text = typeof file?.content === 'string' ? file.content : '';
         } catch (error) {
-            this.logger.warn(`Blueprint run: reading ${APP_BLUEPRINT_SPEC_FILE} of ${context.owner}/${context.repo} failed (${errorText(error)}).`);
+            this.logger.warn(
+                `Blueprint run: reading ${APP_BLUEPRINT_SPEC_FILE} of ${context.owner}/${context.repo} failed (${errorText(error)}).`,
+            );
             throw new RunFailure(APP_BLUEPRINT_RUN_CODES.worksYmlUnreadable);
         }
 
@@ -813,7 +962,10 @@ export class AppBlueprintUpgradeService {
     /** A merge may not validate WORSE than the member's own file did. */
     private assertValidatesNoWorse(oursText: string, mergedText: string): void {
         const merged = validateAppSpecDocument(mergedText, { mode: 'data-repository' });
-        const ours = oursText.trim() === '' ? null : validateAppSpecDocument(oursText, { mode: 'data-repository' });
+        const ours =
+            oursText.trim() === ''
+                ? null
+                : validateAppSpecDocument(oursText, { mode: 'data-repository' });
         if (merged.errorCount > (ours?.errorCount ?? 0)) {
             throw new RunFailure(APP_BLUEPRINT_RUN_CODES.mergedSpecInvalid, {
                 errorCount: merged.errorCount,
@@ -828,7 +980,12 @@ export class AppBlueprintUpgradeService {
     private async isPullRequestOpen(context: RepositoryContext, number: number): Promise<boolean> {
         if (!this.git || typeof number !== 'number' || number <= 0) return false;
         try {
-            const pr = await this.git.getPullRequest(context.owner, context.repo, number, context.gitOptions);
+            const pr = await this.git.getPullRequest(
+                context.owner,
+                context.repo,
+                number,
+                context.gitOptions,
+            );
             return pr?.state === 'open';
         } catch {
             return false;
@@ -865,7 +1022,12 @@ export class AppBlueprintUpgradeService {
 
     private async branchHead(context: RepositoryContext, branch: string): Promise<string | null> {
         try {
-            const commit = await this.git!.getLatestCommit(context.owner, context.repo, branch, context.gitOptions);
+            const commit = await this.git!.getLatestCommit(
+                context.owner,
+                context.repo,
+                branch,
+                context.gitOptions,
+            );
             return nonEmpty(commit?.sha);
         } catch {
             return null;
@@ -888,10 +1050,18 @@ export class AppBlueprintUpgradeService {
         breaking: boolean,
     ): Promise<Landing> {
         const git = this.git!;
-        const prefix = job.mode === 'apply' ? APP_BLUEPRINT_APPLY_BRANCH_PREFIX : APP_BLUEPRINT_UPGRADE_BRANCH_PREFIX;
+        const prefix =
+            job.mode === 'apply'
+                ? APP_BLUEPRINT_APPLY_BRANCH_PREFIX
+                : APP_BLUEPRINT_UPGRADE_BRANCH_PREFIX;
         const primary = `${prefix}${job.blueprintId}`;
         const remembered = nonEmpty(state.blueprintUpgradePr?.branch);
-        const candidates = [primary, ...(remembered && remembered !== primary && remembered.startsWith(prefix) ? [remembered] : [])];
+        const candidates = [
+            primary,
+            ...(remembered && remembered !== primary && remembered.startsWith(prefix)
+                ? [remembered]
+                : []),
+        ];
 
         const head = (await this.branchHead(context, context.trackedBranch)) ?? null;
         if (!head) throw new RunFailure(APP_BLUEPRINT_RUN_CODES.trackedBranchMissing);
@@ -904,11 +1074,21 @@ export class AppBlueprintUpgradeService {
             baseSha = (await this.branchHead(context, branch)) ?? head;
         } else {
             const versionSlug = job.version.replace(/[^0-9A-Za-z.-]+/g, '-');
-            const names = [primary, `${primary}-${versionSlug}`, `${primary}-${versionSlug}-${head.slice(0, 7)}`];
+            const names = [
+                primary,
+                `${primary}-${versionSlug}`,
+                `${primary}-${versionSlug}-${head.slice(0, 7)}`,
+            ];
             let created: { name: string; sha: string } | null = null;
             for (const name of names) {
                 try {
-                    const made = await git.createBranchFromSha(context.owner, context.repo, name, head, context.gitOptions);
+                    const made = await git.createBranchFromSha(
+                        context.owner,
+                        context.repo,
+                        name,
+                        head,
+                        context.gitOptions,
+                    );
                     created = { name, sha: nonEmpty(made?.commit) ?? head };
                     break;
                 } catch (error) {
@@ -929,16 +1109,31 @@ export class AppBlueprintUpgradeService {
         const body = this.pullRequestBody(context, job, merge, theirs, fromVersion, breaking);
         if (existing) {
             try {
-                await git.updatePullRequest(context.owner, context.repo, existing.number, { title, body }, context.gitOptions);
+                await git.updatePullRequest(
+                    context.owner,
+                    context.repo,
+                    existing.number,
+                    { title, body },
+                    context.gitOptions,
+                );
             } catch (error) {
                 // The new commit is on the branch either way; a stale description is not a failure.
-                this.logger.warn(`Blueprint run: refreshing pull request #${existing.number} failed (${errorText(error)}).`);
+                this.logger.warn(
+                    `Blueprint run: refreshing pull request #${existing.number} failed (${errorText(error)}).`,
+                );
             }
             return { number: existing.number, url: existing.url, branch };
         }
         try {
             const created = await git.createPullRequest(
-                { owner: context.owner, repo: context.repo, title, head: branch, base: context.trackedBranch, body },
+                {
+                    owner: context.owner,
+                    repo: context.repo,
+                    title,
+                    head: branch,
+                    base: context.trackedBranch,
+                    body,
+                },
                 context.gitOptions,
             );
             if (!created?.url || typeof created.number !== 'number') {
@@ -947,7 +1142,9 @@ export class AppBlueprintUpgradeService {
             return { number: created.number, url: created.url, branch };
         } catch (error) {
             if (error instanceof RunFailure) throw error;
-            this.logger.warn(`Blueprint run: opening the pull request for work ${job.workId} failed (${errorText(error)}).`);
+            this.logger.warn(
+                `Blueprint run: opening the pull request for work ${job.workId} failed (${errorText(error)}).`,
+            );
             throw new RunFailure(APP_BLUEPRINT_RUN_CODES.pullRequestFailed);
         }
     }
@@ -962,7 +1159,13 @@ export class AppBlueprintUpgradeService {
         const git = this.git!;
         let onBranch: string | null = null;
         try {
-            const file = await git.getFileContent(context.owner, context.repo, APP_BLUEPRINT_SPEC_FILE, context.gitOptions, baseSha);
+            const file = await git.getFileContent(
+                context.owner,
+                context.repo,
+                APP_BLUEPRINT_SPEC_FILE,
+                context.gitOptions,
+                baseSha,
+            );
             onBranch = typeof file?.content === 'string' ? file.content : null;
         } catch {
             onBranch = null;
@@ -983,7 +1186,9 @@ export class AppBlueprintUpgradeService {
                         branch,
                         baseSha: sha,
                         message,
-                        files: [{ path: APP_BLUEPRINT_SPEC_FILE, content: text, encoding: 'utf-8' }],
+                        files: [
+                            { path: APP_BLUEPRINT_SPEC_FILE, content: text, encoding: 'utf-8' },
+                        ],
                     },
                     context.gitOptions,
                 );
@@ -993,7 +1198,9 @@ export class AppBlueprintUpgradeService {
                     throw new RunFailure(APP_BLUEPRINT_RUN_CODES.providerUnsupported);
                 }
                 if (!isNonFastForward(error) || attempt === APP_BLUEPRINT_COMMIT_ATTEMPTS) {
-                    this.logger.warn(`Blueprint run: committing to ${branch} failed (${errorText(error)}).`);
+                    this.logger.warn(
+                        `Blueprint run: committing to ${branch} failed (${errorText(error)}).`,
+                    );
                     throw new RunFailure(APP_BLUEPRINT_RUN_CODES.commitRejected);
                 }
                 sha = (await this.branchHead(context, branch)) ?? sha;
@@ -1031,7 +1238,10 @@ export class AppBlueprintUpgradeService {
                 `This pull request upgrades the **${job.blueprintId}** Blueprint from ${fromVersion ?? 'an unknown version'} to **${job.version}** (\`${theirs.hit.repo}\`).`,
             );
             if (breaking) {
-                lines.push('', '> **Breaking:** this is a major version bump. Review the changes before merging.');
+                lines.push(
+                    '',
+                    '> **Breaking:** this is a major version bump. Review the changes before merging.',
+                );
             }
         }
         lines.push(
@@ -1061,34 +1271,62 @@ export class AppBlueprintUpgradeService {
                 'Each kept value carries a `# ever-works:` note in the file. Edit it to take the Blueprint value, or leave it as it is.',
                 '',
             );
-            for (const conflict of merge.conflicts.slice(0, APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED)) {
-                const proposed = conflict.theirs !== undefined ? `; the Blueprint proposes ${previewMergeValue(conflict.theirs)}` : '';
-                lines.push(`- \`${formatMergePath(conflict.segments)}\` — ${conflict.kind.replace(/_/g, ' ')}${proposed}`);
+            for (const conflict of merge.conflicts.slice(
+                0,
+                APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED,
+            )) {
+                const proposed =
+                    conflict.theirs !== undefined
+                        ? `; the Blueprint proposes ${previewMergeValue(conflict.theirs)}`
+                        : '';
+                lines.push(
+                    `- \`${formatMergePath(conflict.segments)}\` — ${conflict.kind.replace(/_/g, ' ')}${proposed}`,
+                );
             }
             if (merge.conflictCount > APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED) {
-                lines.push(`- … and ${merge.conflictCount - APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED} more`);
+                lines.push(
+                    `- … and ${merge.conflictCount - APP_BLUEPRINT_UPGRADE_CONFLICTS_LISTED} more`,
+                );
             }
         }
         lines.push('', '---', `Opened by Ever Works (job \`${APP_BLUEPRINT_APPLY_JOB_ID}\`).`);
         return lines.join('\n');
     }
 
-    private async recordApplyMatch(workId: string, release: AppBlueprintRelease, userId: string | null): Promise<void> {
+    private async recordApplyMatch(
+        workId: string,
+        release: AppBlueprintRelease,
+        userId: string | null,
+    ): Promise<void> {
         const states = this.states();
         if (!states) return;
         try {
-            const first = await states.markBlueprintMatched(workId, release.hit.id, release.hit.version, 'explicit');
-            await states.patchBlueprint(workId, { blueprintRepo: release.hit.repo, blueprintApplyError: null });
+            const first = await states.markBlueprintMatched(
+                workId,
+                release.hit.id,
+                release.hit.version,
+                'explicit',
+            );
+            await states.patchBlueprint(workId, {
+                blueprintRepo: release.hit.repo,
+                blueprintApplyError: null,
+            });
             if (first) {
                 await this.logActivity(workId, userId, {
                     action: APP_BLUEPRINT_RUN_EVENTS.matched,
                     status: ActivityStatus.COMPLETED,
                     summary: `The ${release.hit.id} Blueprint was chosen for this App Work`,
-                    details: { blueprintId: release.hit.id, version: release.hit.version, matchSource: 'explicit' },
+                    details: {
+                        blueprintId: release.hit.id,
+                        version: release.hit.version,
+                        matchSource: 'explicit',
+                    },
                 });
             }
         } catch (error) {
-            this.logger.warn(`Blueprint request: recording the match for work ${workId} failed (${errorText(error)}).`);
+            this.logger.warn(
+                `Blueprint request: recording the match for work ${workId} failed (${errorText(error)}).`,
+            );
         }
     }
 
@@ -1103,26 +1341,44 @@ export class AppBlueprintUpgradeService {
             await states.patchBlueprintRun(job.workId, {
                 blueprintUpgradeStatus: 'failed',
                 blueprintUpgradeError: code,
-                ...(job.mode === 'apply' ? { blueprintApplyStatus: 'failed' as const, blueprintApplyError: code } : {}),
+                ...(job.mode === 'apply'
+                    ? { blueprintApplyStatus: 'failed' as const, blueprintApplyError: code }
+                    : {}),
             });
         } catch (error) {
-            this.logger.warn(`Blueprint run: recording the failure for work ${job.workId} failed (${errorText(error)}).`);
+            this.logger.warn(
+                `Blueprint run: recording the failure for work ${job.workId} failed (${errorText(error)}).`,
+            );
         }
         await this.logActivity(job.workId, job.userId ?? work.userId ?? null, {
-            action: job.mode === 'apply' ? APP_BLUEPRINT_RUN_EVENTS.applyFailed : APP_BLUEPRINT_RUN_EVENTS.upgradeFailed,
+            action:
+                job.mode === 'apply'
+                    ? APP_BLUEPRINT_RUN_EVENTS.applyFailed
+                    : APP_BLUEPRINT_RUN_EVENTS.upgradeFailed,
             status: ActivityStatus.FAILED,
             summary:
                 job.mode === 'apply'
                     ? `The ${job.blueprintId} Blueprint could not be proposed (${code})`
                     : `The ${job.blueprintId} Blueprint upgrade to ${job.version} could not be proposed (${code})`,
-            details: { blueprintId: job.blueprintId, version: job.version, mode: job.mode, reason: code, ...(detail ?? {}) },
+            details: {
+                blueprintId: job.blueprintId,
+                version: job.version,
+                mode: job.mode,
+                reason: code,
+                ...(detail ?? {}),
+            },
         });
     }
 
     private async logActivity(
         workId: string,
         userId: string | null,
-        entry: { action: string; status: ActivityStatus; summary: string; details: Record<string, unknown> },
+        entry: {
+            action: string;
+            status: ActivityStatus;
+            summary: string;
+            details: Record<string, unknown>;
+        },
     ): Promise<void> {
         if (!this.activity) return;
         try {
@@ -1136,7 +1392,9 @@ export class AppBlueprintUpgradeService {
                 details: entry.details,
             } as never);
         } catch (error) {
-            this.logger.warn(`Blueprint: recording ${entry.action} for work ${workId} failed (${errorText(error)}).`);
+            this.logger.warn(
+                `Blueprint: recording ${entry.action} for work ${workId} failed (${errorText(error)}).`,
+            );
         }
     }
 

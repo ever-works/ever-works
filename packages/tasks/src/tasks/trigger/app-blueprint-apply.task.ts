@@ -84,7 +84,13 @@ export async function runAppBlueprintApplyTask(
         return { ...base, status: 'skipped', result: null, reason: 'invalidPayload', error: null };
     }
     if (!runner || typeof runner.run !== 'function') {
-        return { ...base, status: 'skipped', result: null, reason: 'runnerUnavailable', error: null };
+        return {
+            ...base,
+            status: 'skipped',
+            result: null,
+            reason: 'runnerUnavailable',
+            error: null,
+        };
     }
     try {
         const result = await runner.run(payload);
@@ -100,7 +106,10 @@ export async function runAppBlueprintApplyTask(
     }
 }
 
-export const appBlueprintApplyTask = task<typeof APP_BLUEPRINT_APPLY_TASK_ID, AppBlueprintApplyJobPayload>({
+export const appBlueprintApplyTask = task<
+    typeof APP_BLUEPRINT_APPLY_TASK_ID,
+    AppBlueprintApplyJobPayload
+>({
     id: APP_BLUEPRINT_APPLY_TASK_ID,
     // Plan §6.1 — 300 s, retries 1. A retry is safe: the run updates the one open pull
     // request on its branch and commits only when the file differs.
@@ -112,7 +121,9 @@ export const appBlueprintApplyTask = task<typeof APP_BLUEPRINT_APPLY_TASK_ID, Ap
             async (appContext): Promise<AppBlueprintApplyTaskResult> => {
                 let runner: AppBlueprintApplyRunnerSeam | null = null;
                 try {
-                    runner = appContext.get<AppBlueprintApplyRunnerSeam>(APP_BLUEPRINT_APPLY_RUNNER_SEAM);
+                    runner = appContext.get<AppBlueprintApplyRunnerSeam>(
+                        APP_BLUEPRINT_APPLY_RUNNER_SEAM,
+                    );
                 } catch {
                     runner = null;
                 }
@@ -124,10 +135,13 @@ export const appBlueprintApplyTask = task<typeof APP_BLUEPRINT_APPLY_TASK_ID, Ap
                         result: outcome.result,
                     });
                 } else {
-                    logger.error(`app-blueprint-apply: work ${outcome.workId ?? '?'} ${outcome.status}`, {
-                        reason: outcome.reason,
-                        error: outcome.error,
-                    });
+                    logger.error(
+                        `app-blueprint-apply: work ${outcome.workId ?? '?'} ${outcome.status}`,
+                        {
+                            reason: outcome.reason,
+                            error: outcome.error,
+                        },
+                    );
                 }
                 return outcome;
             },

@@ -11,26 +11,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * green result.
  */
 
-const { recorded, createRemoteProxyMock, loggerErrorMock, loggerInfoMock, contextHolder } = vi.hoisted(() => ({
-    recorded: [] as Array<Record<string, unknown>>,
-    createRemoteProxyMock: vi.fn(() => ({ run: vi.fn() })),
-    loggerErrorMock: vi.fn(),
-    loggerInfoMock: vi.fn(),
-    contextHolder: { current: undefined as unknown },
-}));
+const { recorded, createRemoteProxyMock, loggerErrorMock, loggerInfoMock, contextHolder } =
+    vi.hoisted(() => ({
+        recorded: [] as Array<Record<string, unknown>>,
+        createRemoteProxyMock: vi.fn(() => ({ run: vi.fn() })),
+        loggerErrorMock: vi.fn(),
+        loggerInfoMock: vi.fn(),
+        contextHolder: { current: undefined as unknown },
+    }));
 
 vi.mock('@trigger.dev/sdk', () => ({
     task: (params: Record<string, unknown>) => {
         recorded.push(params);
         return params;
     },
-    logger: { info: loggerInfoMock, warn: vi.fn(), error: loggerErrorMock, debug: vi.fn(), log: vi.fn() },
+    logger: {
+        info: loggerInfoMock,
+        warn: vi.fn(),
+        error: loggerErrorMock,
+        debug: vi.fn(),
+        log: vi.fn(),
+    },
 }));
 
 vi.mock('../trigger/worker/remote-proxy', () => ({ createRemoteProxy: createRemoteProxyMock }));
 
 vi.mock('../trigger/worker/utils/worker-context.utils', () => ({
-    withWorkerContext: async (_name: string, fn: (ctx: unknown) => Promise<unknown>) => fn(contextHolder.current),
+    withWorkerContext: async (_name: string, fn: (ctx: unknown) => Promise<unknown>) =>
+        fn(contextHolder.current),
 }));
 
 import {
@@ -43,7 +51,12 @@ import {
 } from '../tasks/trigger/app-blueprint-apply.task';
 
 const WORK_ID = '00000000-0000-4000-8000-0000000000c1';
-const PAYLOAD = { workId: WORK_ID, mode: 'upgrade' as const, blueprintId: 'umami', version: '0.2.0' };
+const PAYLOAD = {
+    workId: WORK_ID,
+    mode: 'upgrade' as const,
+    blueprintId: 'umami',
+    version: '0.2.0',
+};
 
 describe('app-blueprint-apply (APW-03 T28)', () => {
     beforeEach(() => {
@@ -51,7 +64,9 @@ describe('app-blueprint-apply (APW-03 T28)', () => {
     });
 
     it('registers plan §6.1’s id and budget, equal to the API-side job id', async () => {
-        const registered = recorded.find((entry) => entry.id === APP_BLUEPRINT_APPLY_TASK_ID) as Record<string, any>;
+        const registered = recorded.find(
+            (entry) => entry.id === APP_BLUEPRINT_APPLY_TASK_ID,
+        ) as Record<string, any>;
         expect(registered).toBeDefined();
         expect((appBlueprintApplyTask as unknown as { id: string }).id).toBe('app-blueprint-apply');
         expect(registered.maxDuration).toBe(300);
@@ -67,7 +82,9 @@ describe('app-blueprint-apply (APW-03 T28)', () => {
                 provide?: unknown;
                 useFactory?: (client: unknown) => unknown;
             }>) ?? [];
-        const seam = providers.find((provider) => provider.provide === APP_BLUEPRINT_APPLY_RUNNER_SEAM);
+        const seam = providers.find(
+            (provider) => provider.provide === APP_BLUEPRINT_APPLY_RUNNER_SEAM,
+        );
         expect(seam).toBeDefined();
         const client = { callRemote: vi.fn() };
         seam!.useFactory!(client);
@@ -92,7 +109,9 @@ describe('app-blueprint-apply (APW-03 T28)', () => {
             status: 'skipped',
             reason: 'runnerUnavailable',
         });
-        await expect(runAppBlueprintApplyTask({} as never, { run: vi.fn() })).resolves.toMatchObject({
+        await expect(
+            runAppBlueprintApplyTask({} as never, { run: vi.fn() }),
+        ).resolves.toMatchObject({
             status: 'skipped',
             reason: 'invalidPayload',
         });
@@ -108,17 +127,27 @@ describe('app-blueprint-apply (APW-03 T28)', () => {
 
     it('resolves the seam from the worker context in the task body', async () => {
         const run = vi.fn(async () => ({ status: 'unchanged' }));
-        contextHolder.current = { get: vi.fn((token: unknown) => (token === APP_BLUEPRINT_APPLY_RUNNER_SEAM ? { run } : undefined)) };
+        contextHolder.current = {
+            get: vi.fn((token: unknown) =>
+                token === APP_BLUEPRINT_APPLY_RUNNER_SEAM ? { run } : undefined,
+            ),
+        };
         const registered = recorded.find((entry) => entry.id === APP_BLUEPRINT_APPLY_TASK_ID) as {
             run: (payload: unknown) => Promise<unknown>;
         };
-        await expect(registered.run(PAYLOAD)).resolves.toMatchObject({ status: 'ran', result: { status: 'unchanged' } });
+        await expect(registered.run(PAYLOAD)).resolves.toMatchObject({
+            status: 'ran',
+            result: { status: 'unchanged' },
+        });
         contextHolder.current = {
             get: vi.fn(() => {
                 throw new Error('no provider');
             }),
         };
-        await expect(registered.run(PAYLOAD)).resolves.toMatchObject({ status: 'skipped', reason: 'runnerUnavailable' });
+        await expect(registered.run(PAYLOAD)).resolves.toMatchObject({
+            status: 'skipped',
+            reason: 'runnerUnavailable',
+        });
         expect(loggerErrorMock).toHaveBeenCalled();
     });
 });

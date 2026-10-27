@@ -101,7 +101,9 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const ours = doc({ build: { dockerfile: 'Dockerfile.custom', context: '.' } });
             const theirs = doc({ build: { dockerfile: 'Dockerfile', context: 'app' } });
             const result = mergeAppSpecDocuments(base, ours, theirs);
-            expect(result.merged).toEqual(doc({ build: { dockerfile: 'Dockerfile.custom', context: 'app' } }));
+            expect(result.merged).toEqual(
+                doc({ build: { dockerfile: 'Dockerfile.custom', context: 'app' } }),
+            );
             expect(result.conflicts).toEqual([]);
         });
     });
@@ -109,10 +111,15 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
     describe('additions and removals', () => {
         it('adds a key the Blueprint added', () => {
             const base = doc({ build: { dockerfile: 'Dockerfile' } });
-            const theirs = doc({ build: { dockerfile: 'Dockerfile' }, smoke: [{ name: 'home', path: '/' }] });
+            const theirs = doc({
+                build: { dockerfile: 'Dockerfile' },
+                smoke: [{ name: 'home', path: '/' }],
+            });
             const result = mergeAppSpecDocuments(base, base, theirs);
             expect(result.merged).toEqual(theirs);
-            expect(result.applied).toEqual([expect.objectContaining({ path: 'spec.smoke', kind: 'added' })]);
+            expect(result.applied).toEqual([
+                expect.objectContaining({ path: 'spec.smoke', kind: 'added' }),
+            ]);
         });
 
         it('keeps a key only the member added', () => {
@@ -163,7 +170,11 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const result = mergeAppSpecDocuments(base, ours, theirs);
             expect(result.merged).toEqual(ours);
             expect(result.conflicts).toEqual([
-                expect.objectContaining({ path: 'spec.build.context', kind: 'deleted_by_you', theirs: 'web' }),
+                expect.objectContaining({
+                    path: 'spec.build.context',
+                    kind: 'deleted_by_you',
+                    theirs: 'web',
+                }),
             ]);
         });
 
@@ -270,7 +281,12 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             for (const block of ['components', 'jobs', 'cron', 'smoke', 'checks']) {
                 const b = doc({ [block]: [{ name: 'one', x: 1 }] });
                 const o = doc({ [block]: [{ name: 'one', x: 1, mine: true }] });
-                const t = doc({ [block]: [{ name: 'one', x: 1 }, { name: 'two', x: 2 }] });
+                const t = doc({
+                    [block]: [
+                        { name: 'one', x: 1 },
+                        { name: 'two', x: 2 },
+                    ],
+                });
                 const result = mergeAppSpecDocuments(b, o, t);
                 expect(result.conflicts).toEqual([]);
                 expect(result.merged.spec).toEqual({
@@ -287,21 +303,35 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const o = doc({ env: [{ name: 'B' }, { name: 'A' }] });
             const t = doc({ env: [{ name: 'Z' }, { name: 'A' }, { name: 'Y' }, { name: 'B' }] });
             const result = mergeAppSpecDocuments(b, o, t);
-            expect((result.merged.spec as { env: Array<{ name: string }> }).env.map((e) => e.name)).toEqual([
-                'B',
-                'A',
-                'Z',
-                'Y',
-            ]);
+            expect(
+                (result.merged.spec as { env: Array<{ name: string }> }).env.map((e) => e.name),
+            ).toEqual(['B', 'A', 'Z', 'Y']);
         });
 
         it('treats an array with duplicate names as one value', () => {
-            const b = doc({ env: [{ name: 'A', value: '1' }, { name: 'A', value: '2' }] });
-            const o = doc({ env: [{ name: 'A', value: 'x' }, { name: 'A', value: '2' }] });
-            const t = doc({ env: [{ name: 'A', value: '1' }, { name: 'A', value: 'y' }] });
+            const b = doc({
+                env: [
+                    { name: 'A', value: '1' },
+                    { name: 'A', value: '2' },
+                ],
+            });
+            const o = doc({
+                env: [
+                    { name: 'A', value: 'x' },
+                    { name: 'A', value: '2' },
+                ],
+            });
+            const t = doc({
+                env: [
+                    { name: 'A', value: '1' },
+                    { name: 'A', value: 'y' },
+                ],
+            });
             const result = mergeAppSpecDocuments(b, o, t);
             expect(result.merged).toEqual(o);
-            expect(result.conflicts).toEqual([expect.objectContaining({ path: 'spec.env', kind: 'both_changed' })]);
+            expect(result.conflicts).toEqual([
+                expect.objectContaining({ path: 'spec.env', kind: 'both_changed' }),
+            ]);
         });
     });
 
@@ -313,13 +343,18 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const result = mergeAppSpecDocuments(b, o, t);
             expect(result.merged).toEqual(o);
             expect(result.conflicts).toEqual([
-                expect.objectContaining({ path: 'spec.components[name=web].command', kind: 'both_changed' }),
+                expect.objectContaining({
+                    path: 'spec.components[name=web].command',
+                    kind: 'both_changed',
+                }),
             ]);
         });
 
         it('takes a whole new command when only the Blueprint changed it', () => {
             const b = doc({ components: [{ name: 'web', command: ['node', 'b.js'] }] });
-            const t = doc({ components: [{ name: 'web', command: ['node', 'c.js', '--port', '3000'] }] });
+            const t = doc({
+                components: [{ name: 'web', command: ['node', 'c.js', '--port', '3000'] }],
+            });
             expect(mergeAppSpecDocuments(b, b, t).merged).toEqual(t);
         });
 
@@ -329,14 +364,22 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const t = doc({ domains: 'none' });
             const result = mergeAppSpecDocuments(b, o, t);
             expect(result.merged).toEqual(o);
-            expect(result.conflicts).toEqual([expect.objectContaining({ path: 'spec.domains', kind: 'both_changed' })]);
+            expect(result.conflicts).toEqual([
+                expect.objectContaining({ path: 'spec.domains', kind: 'both_changed' }),
+            ]);
         });
     });
 
     describe('the two owned paths', () => {
         it('takes spec.source from ours, never from theirs', () => {
             const b = doc({ source: { relation: 'fork', branch: 'main' } });
-            const o = doc({ source: { relation: 'fork', branch: 'main', upstream: { repo: 'umami-software/umami' } } });
+            const o = doc({
+                source: {
+                    relation: 'fork',
+                    branch: 'main',
+                    upstream: { repo: 'umami-software/umami' },
+                },
+            });
             const t = doc({ source: { relation: 'link', branch: 'develop' } });
             const result = mergeAppSpecDocuments(b, o, t);
             expect((result.merged.spec as Record<string, unknown>).source).toEqual(
@@ -346,14 +389,24 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
         });
 
         it('leaves spec.source absent when ours has none, even if theirs carries one', () => {
-            const result = mergeAppSpecDocuments(doc({}), doc({}), doc({ source: { relation: 'link' } }));
+            const result = mergeAppSpecDocuments(
+                doc({}),
+                doc({}),
+                doc({ source: { relation: 'link' } }),
+            );
             expect(result.merged.spec).toEqual({});
         });
 
         it('takes spec.blueprint from theirs, so the file names the new version', () => {
-            const b = doc({ blueprint: { id: 'umami', version: '0.1.0', repo: 'ever-works/umami-template' } });
-            const o = doc({ blueprint: { id: 'umami', version: '0.1.0', repo: 'ever-works/umami-template' } });
-            const t = doc({ blueprint: { id: 'umami', version: '0.2.0', repo: 'ever-works/umami-template' } });
+            const b = doc({
+                blueprint: { id: 'umami', version: '0.1.0', repo: 'ever-works/umami-template' },
+            });
+            const o = doc({
+                blueprint: { id: 'umami', version: '0.1.0', repo: 'ever-works/umami-template' },
+            });
+            const t = doc({
+                blueprint: { id: 'umami', version: '0.2.0', repo: 'ever-works/umami-template' },
+            });
             const result = mergeAppSpecDocuments(b, o, t);
             expect((result.merged.spec as Record<string, unknown>).blueprint).toEqual(
                 (t.spec as Record<string, unknown>).blueprint,
@@ -386,7 +439,10 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
         const theirs = doc({
             blueprint: { id: 'umami', version: '0.2.0' },
             build: { dockerfile: 'Dockerfile', target: 'prod' },
-            env: [{ name: 'MINE', value: 'blueprint' }, { name: 'NEW', value: 'y' }],
+            env: [
+                { name: 'MINE', value: 'blueprint' },
+                { name: 'NEW', value: 'y' },
+            ],
         });
 
         it('adds what only the Blueprint has, keeps what only the member has, removes nothing', () => {
@@ -413,12 +469,18 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const unknown = mergeAppSpecDocuments(undefined, ours, theirs);
             const empty = mergeAppSpecDocuments({}, ours, theirs);
             expect(empty.merged).toEqual(unknown.merged);
-            expect(empty.conflicts.map((c) => c.path)).toEqual(unknown.conflicts.map((c) => c.path));
+            expect(empty.conflicts.map((c) => c.path)).toEqual(
+                unknown.conflicts.map((c) => c.path),
+            );
             expect(empty.baseKnown).toBe(true);
         });
 
         it('applies the whole Blueprint onto a source-only file without a conflict', () => {
-            const sourceOnly = { version: 2, kind: 'app', spec: { source: { relation: 'fork', branch: 'main' } } };
+            const sourceOnly = {
+                version: 2,
+                kind: 'app',
+                spec: { source: { relation: 'fork', branch: 'main' } },
+            };
             const result = mergeAppSpecDocuments({}, sourceOnly, theirs);
             expect(result.conflicts).toEqual([]);
             expect(result.merged.spec).toEqual({
@@ -438,7 +500,12 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
         it('never mutates an input, and the same inputs give the same output', () => {
             const b = frozen(doc({ env: [{ name: 'A', value: '1' }], build: { dockerfile: 'D' } }));
             const o = frozen(doc({ env: [{ name: 'A', value: '2' }], build: { dockerfile: 'D' } }));
-            const t = frozen(doc({ env: [{ name: 'A', value: '1' }, { name: 'B' }], build: { dockerfile: 'E' } }));
+            const t = frozen(
+                doc({
+                    env: [{ name: 'A', value: '1' }, { name: 'B' }],
+                    build: { dockerfile: 'E' },
+                }),
+            );
             const first = mergeAppSpecDocuments(b, o, t);
             const second = mergeAppSpecDocuments(b, o, t);
             expect(JSON.stringify(first)).toBe(JSON.stringify(second));
@@ -448,15 +515,21 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
         });
 
         it('drops prototype-polluting keys from every side', () => {
-            const theirs = yaml.parse('spec:\n  __proto__:\n    polluted: true\n  constructor:\n    x: 1\n  build:\n    dockerfile: D\n');
+            const theirs = yaml.parse(
+                'spec:\n  __proto__:\n    polluted: true\n  constructor:\n    x: 1\n  build:\n    dockerfile: D\n',
+            );
             const result = mergeAppSpecDocuments({}, {}, theirs);
             expect(Object.keys(result.merged.spec as object)).toEqual(['build']);
             expect(({} as Record<string, unknown>).polluted).toBeUndefined();
         });
 
         it('reads a non-object ours or theirs as an empty document', () => {
-            expect(mergeAppSpecDocuments(null, 'garbage', { spec: { a: 1 } }).merged).toEqual({ spec: { a: 1 } });
-            expect(mergeAppSpecDocuments(null, { spec: { a: 1 } }, [1, 2]).merged).toEqual({ spec: { a: 1 } });
+            expect(mergeAppSpecDocuments(null, 'garbage', { spec: { a: 1 } }).merged).toEqual({
+                spec: { a: 1 },
+            });
+            expect(mergeAppSpecDocuments(null, { spec: { a: 1 } }, [1, 2]).merged).toEqual({
+                spec: { a: 1 },
+            });
         });
 
         it('caps the listed conflicts but counts all of them', () => {
@@ -476,7 +549,9 @@ describe('APW-03 T27 — mergeAppSpecDocuments', () => {
             const t = { version: 2, kind: 'app', name: 'Umami Analytics', spec: {} };
             const result = mergeAppSpecDocuments(b, o, t);
             expect(result.merged.name).toBe('My analytics');
-            expect(result.conflicts).toEqual([expect.objectContaining({ path: 'name', kind: 'both_changed' })]);
+            expect(result.conflicts).toEqual([
+                expect.objectContaining({ path: 'name', kind: 'both_changed' }),
+            ]);
         });
     });
 
@@ -588,7 +663,9 @@ spec:
 
 describe('APW-03 T27 — helpers', () => {
     it('formats paths with named segments and quotes odd keys', () => {
-        expect(formatMergePath(['spec', 'env', { name: 'A_B' }, 'value'])).toBe('spec.env[name=A_B].value');
+        expect(formatMergePath(['spec', 'env', { name: 'A_B' }, 'value'])).toBe(
+            'spec.env[name=A_B].value',
+        );
         expect(formatMergePath(['spec', 'a.b', 'c d'])).toBe('spec["a.b"]["c d"]');
         expect(formatMergePath([])).toBe('(document)');
     });
@@ -654,7 +731,9 @@ spec:
 
     it('patches the member file in place: comments, quoting and order survive', () => {
         const ours = yaml.parse(oursText);
-        const theirs = yaml.parse(oursText.replace('0.1.0', '0.2.0').replace('"2"', '"22"')) as Record<string, any>;
+        const theirs = yaml.parse(
+            oursText.replace('0.1.0', '0.2.0').replace('"2"', '"22"'),
+        ) as Record<string, any>;
         theirs.spec.env.push({ name: 'C', value: '3' });
         theirs.spec.build.target = 'prod';
         const base = yaml.parse(oursText);
@@ -683,7 +762,9 @@ spec:
             conflicts: result.conflicts,
             blueprintVersion: '0.2.0',
         });
-        expect(first).toContain('# ever-works: Blueprint 0.2.0 proposes "Dockerfile.prod"; your value was kept.');
+        expect(first).toContain(
+            '# ever-works: Blueprint 0.2.0 proposes "Dockerfile.prod"; your value was kept.',
+        );
         expect(yaml.parse(first)).toEqual(result.merged);
 
         // A second run (a newer version) replaces the note rather than stacking it.
@@ -706,13 +787,18 @@ spec:
             conflicts: result.conflicts,
             blueprintVersion: '0.2.0',
         });
-        expect(text).toMatch(/# ever-works: Blueprint 0\.2\.0 removes this; you changed it, so it was kept\.\n\s+- name: B/);
+        expect(text).toMatch(
+            /# ever-works: Blueprint 0\.2\.0 removes this; you changed it, so it was kept\.\n\s+- name: B/,
+        );
         expect(yaml.parse(text)).toEqual(result.merged);
     });
 
     it('removes a named entry and rewrites a reordered array, still reading back exactly', () => {
         const merged = yaml.parse(oursText) as Record<string, any>;
-        merged.spec.env = [{ name: 'B', value: '2' }, { name: 'A', value: '1' }];
+        merged.spec.env = [
+            { name: 'B', value: '2' },
+            { name: 'A', value: '1' },
+        ];
         const reordered = renderMergedAppSpecText(oursText, merged);
         expect(yaml.parse(reordered)).toEqual(merged);
 
@@ -728,6 +814,8 @@ spec:
         expect(yaml.parse(renderMergedAppSpecText(null, merged))).toEqual(merged);
         expect(yaml.parse(renderMergedAppSpecText('   ', merged))).toEqual(merged);
         expect(yaml.parse(renderMergedAppSpecText('spec: [unclosed', merged))).toEqual(merged);
-        expect(yaml.parse(renderMergedAppSpecText('- a list\n- not a map\n', merged))).toEqual(merged);
+        expect(yaml.parse(renderMergedAppSpecText('- a list\n- not a map\n', merged))).toEqual(
+            merged,
+        );
     });
 });

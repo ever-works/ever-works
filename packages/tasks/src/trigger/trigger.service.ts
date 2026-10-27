@@ -1634,11 +1634,7 @@ export class TriggerService
                 APP_BLUEPRINT_APPLY_TASK_ID,
                 payload,
                 this.stampTenantOptions({
-                    tags: [
-                        'app-blueprint-apply',
-                        `work:${payload.workId}`,
-                        `mode:${payload.mode}`,
-                    ],
+                    tags: ['app-blueprint-apply', `work:${payload.workId}`, `mode:${payload.mode}`],
                     idempotencyKey: `app-blueprint-apply:${payload.workId}:${payload.mode}:${payload.version}:${
                         payload.requestedAt ?? ''
                     }`,

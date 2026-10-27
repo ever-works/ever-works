@@ -70,7 +70,9 @@ export const BLUEPRINT_APPLY_DISPATCH_METHOD = 'dispatchAppBlueprintApply' as co
 export function buildAppBlueprintApplyDispatcherProvider(): FactoryProvider {
     return {
         provide: APP_BLUEPRINT_APPLY_DISPATCHER,
-        useFactory: (registry?: JobRuntimeProviderRegistry | null): AppBlueprintApplyDispatcher => ({
+        useFactory: (
+            registry?: JobRuntimeProviderRegistry | null,
+        ): AppBlueprintApplyDispatcher => ({
             dispatch: async (payload: AppBlueprintApplyJobPayload): Promise<string | null> => {
                 const dispatchers = registry?.getActive()?.dispatchers as
                     | Record<string, unknown>

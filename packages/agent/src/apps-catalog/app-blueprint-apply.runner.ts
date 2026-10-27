@@ -17,7 +17,10 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { AppSpecAppliedEvent } from '../events/app-spec-applied.event';
 import type { AppBlueprintApplyJobPayload } from './app-blueprint-apply.job';
-import { AppBlueprintUpgradeService, type AppBlueprintRunResult } from './app-blueprint-upgrade.service';
+import {
+    AppBlueprintUpgradeService,
+    type AppBlueprintRunResult,
+} from './app-blueprint-upgrade.service';
 
 @Injectable()
 export class AppBlueprintApplyRunner {

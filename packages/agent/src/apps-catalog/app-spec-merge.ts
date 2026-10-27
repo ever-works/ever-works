@@ -230,7 +230,10 @@ export function formatMergePath(segments: readonly AppSpecMergePathSegment[]): s
     return out === '' ? '(document)' : out;
 }
 
-function pathEquals(segments: readonly AppSpecMergePathSegment[], owned: readonly string[]): boolean {
+function pathEquals(
+    segments: readonly AppSpecMergePathSegment[],
+    owned: readonly string[],
+): boolean {
     return (
         segments.length === owned.length &&
         segments.every((segment, index) => segment === owned[index])
@@ -282,7 +285,10 @@ function applied(
 }
 
 /** `segments` is a strict ancestor of an owned path (the root and `spec`, by default). */
-function isOwnedAncestor(context: MergeContext, segments: readonly AppSpecMergePathSegment[]): boolean {
+function isOwnedAncestor(
+    context: MergeContext,
+    segments: readonly AppSpecMergePathSegment[],
+): boolean {
     return [...context.oursOwned, ...context.theirsOwned].some(
         (path) =>
             path.length > segments.length &&
@@ -351,7 +357,14 @@ function mergeValue(
 
     // Both moved, to different places (containers were merged above).
     if (ours !== ABSENT && theirs !== ABSENT) {
-        conflict(context, segments, base === ABSENT ? 'both_added' : 'both_changed', base, ours, theirs);
+        conflict(
+            context,
+            segments,
+            base === ABSENT ? 'both_added' : 'both_changed',
+            base,
+            ours,
+            theirs,
+        );
         return ours;
     }
     if (theirs === ABSENT) {
@@ -491,7 +504,10 @@ export function previewMergeValue(value: unknown): string {
     if (value === undefined) return '(absent)';
     let text: string;
     try {
-        text = typeof value === 'string' ? JSON.stringify(value) : (JSON.stringify(value) ?? String(value));
+        text =
+            typeof value === 'string'
+                ? JSON.stringify(value)
+                : (JSON.stringify(value) ?? String(value));
     } catch {
         text = String(value);
     }
@@ -637,7 +653,12 @@ function stripAllNotes(doc: yaml.Document): void {
     });
 }
 
-function annotate(doc: yaml.Document, merged: unknown, conflict: AppSpecMergeConflict, version?: string): void {
+function annotate(
+    doc: yaml.Document,
+    merged: unknown,
+    conflict: AppSpecMergeConflict,
+    version?: string,
+): void {
     if (conflict.kind === 'deleted_by_you') {
         return; // nothing in the file to hang a note on; the pull request lists it.
     }
@@ -655,13 +676,13 @@ function annotate(doc: yaml.Document, merged: unknown, conflict: AppSpecMergeCon
         return;
     }
     const parentPath = path.slice(0, -1);
-    const parent = (parentPath.length === 0 ? doc.contents : doc.getIn(parentPath, true)) as unknown;
+    const parent = (
+        parentPath.length === 0 ? doc.contents : doc.getIn(parentPath, true)
+    ) as unknown;
     if (!yaml.isMap(parent)) {
         return;
     }
-    const pair = parent.items.find(
-        (item) => yaml.isScalar(item.key) && item.key.value === last,
-    );
+    const pair = parent.items.find((item) => yaml.isScalar(item.key) && item.key.value === last);
     if (pair && yaml.isScalar(pair.key)) {
         pair.key.commentBefore = withNote(pair.key.commentBefore, note);
     }
