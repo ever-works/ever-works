@@ -324,11 +324,9 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
     // aw-safety): `TriggerAppRuntimeModule` binds it to `workerAppWorkDeletionCompletion`, a
     // one-member proxy of the API's `AppRuntimeDeletionService.finishDeletion`, so a finished
     // removal deletes the Work row (guarded in the API: the row must record a deletion).
-    {
-        key: 'AppUpstreamSyncWorkerModule :: ActivityLogService',
-        reason: 'The worker has no `ActivityLogService` and no database module; the sync outcome is settled on the row through the state-service proxy, but its `app.upstream.*` / `app.actions.*` Activity rows are not written from the worker.',
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-worker.module.ts:161-163 (no ActivityLogService in worker scope)',
-    },
+    // `AppUpstreamSyncWorkerModule :: ActivityLogService` left this list on 2026-10-27 (lane
+    // aw-loops): the worker binds it to `appUpstreamWorkerActivitySink`, which hands each entry
+    // to the API's `AppUpstreamStateService.recordWorkerActivity` (a closed set of actions).
     {
         key: 'TriggerAppRuntimeModule :: APP_DEPLOY_DISPATCHER_AVAILABILITY',
         reason: 'Deliberately unbound — decision B1 (2026-10-17): inside the isolated worker §5.1 step 1 is answered by the run itself (the lock-holding `deploymentId`, `AppDeployPreconditionsService.evaluate`), so the gate is not consulted for a dequeued Deployment and a lock-less one still meets `worker_not_isolated`.',

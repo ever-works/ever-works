@@ -46,6 +46,10 @@ vi.mock('@ever-works/agent/app-works', () => ({
     AppUpstreamPrivateCopyAdapter: class AppUpstreamPrivateCopyAdapter {},
     AppUpstreamStateService: class AppUpstreamStateService {},
     AppUpstreamSyncService: class AppUpstreamSyncService {},
+    appUpstreamWorkerActivitySink: (states: unknown) => ({ __sinkOver: states }),
+}));
+vi.mock('@ever-works/agent/activity-log', () => ({
+    ActivityLogService: class ActivityLogService {},
 }));
 vi.mock('@ever-works/agent/database', () => ({
     WorkUpstreamStateRepository: class WorkUpstreamStateRepository {},
@@ -100,6 +104,7 @@ import {
     AppUpstreamSyncService,
 } from '@ever-works/agent/app-works';
 import { WorkUpstreamStateRepository } from '@ever-works/agent/database';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { TenantRuntimeBindingResolverService } from '../../../trigger/worker/services/tenant-runtime-binding-resolver.service';
 import {
     APP_UPSTREAM_SYNC_TASK_ID,
@@ -273,6 +278,15 @@ describe('app-upstream-sync (APW-02 T33)', () => {
             expect(binding(APP_UPSTREAM_PRIVATE_COPY_PORT)?.useExisting).toBe(
                 AppUpstreamPrivateCopyAdapter,
             );
+        });
+
+        it('writes the run Activity rows through the state service (no worker ActivityLogService)', () => {
+            const provider = binding(ActivityLogService) as
+                | { useFactory?: (...args: unknown[]) => unknown; inject?: unknown[] }
+                | undefined;
+            expect(provider?.inject).toEqual([AppUpstreamStateService]);
+            const states = { recordWorkerActivity: vi.fn() };
+            expect(provider?.useFactory?.(states)).toEqual({ __sinkOver: states });
         });
     });
 });

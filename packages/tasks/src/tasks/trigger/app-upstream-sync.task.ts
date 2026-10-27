@@ -8,8 +8,10 @@ import {
     AppUpstreamPrivateCopyAdapter,
     AppUpstreamStateService,
     AppUpstreamSyncService,
+    appUpstreamWorkerActivitySink,
     type AppUpstreamSyncTrigger,
 } from '@ever-works/agent/app-works';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
 import { WorkUpstreamStateRepository } from '@ever-works/agent/database';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
 import { getOptionalProvider } from '@ever-works/agent/utils';
@@ -132,6 +134,14 @@ const TRIGGERS: readonly AppUpstreamSyncTrigger[] = ['schedule', 'manual', 'dive
             inject: [TriggerInternalApiClient],
         },
         TenantRuntimeBindingResolverService,
+        // The sync run's and Actions hygiene's Activity rows: written API-side through the
+        // state service's proxy (`recordWorkerActivity`, a closed set of actions) — the worker
+        // has no database module and no ActivityLogService of its own.
+        {
+            provide: ActivityLogService,
+            useFactory: (states: AppUpstreamStateService) => appUpstreamWorkerActivitySink(states),
+            inject: [AppUpstreamStateService],
+        },
         AppActionsHygieneService,
         // FR-63 (APW-02 T48) — the private copy's compare and sync-branch move, through the
         // worker's git facade (the provider plugin does the git work; the agent never does).
