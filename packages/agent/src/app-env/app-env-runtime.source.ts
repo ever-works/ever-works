@@ -214,6 +214,30 @@ export class AppEnvRuntimeSource implements AppRuntimeEnvSource {
     }
 
     /**
+     * APW-06 §9.3 (lane aw-builds-bindings, 2026-10-27) — the narrow read behind the isolated
+     * worker's `APP_HEALTH_EGRESS_SOURCE`: the App Work's dependency egress HOSTS, and nothing
+     * else, for the health poll's every-10th re-resolution. Delegates to
+     * {@link AppEnvResolver.resolveEgressHosts}; it never calls `ensureReadyForDeploy` (that
+     * dispatches provisioning) and never reads an env value. The worker reaches it through the
+     * internal channel, like {@link resolve}, because the outputs envelopes are decrypted here.
+     *
+     * `null` when it cannot be answered (no resolver, a failed read, a target it cannot judge).
+     */
+    async resolveEgressHosts(workId: string, target?: string | null): Promise<string[] | null> {
+        if (!this.resolver) return null;
+        try {
+            return await this.resolver.resolveEgressHosts(workId, target);
+        } catch (error) {
+            this.logger.warn(
+                `The dependency egress hosts of work ${workId} could not be read: ${
+                    error instanceof Error ? error.name : 'Error'
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
      * Ephemeral mode (R-10, plan §4.6.1:439-447).
      *
      * `cluster` → in-memory values for a verification namespace, with derived

@@ -382,6 +382,23 @@ describe('AccountExportService', () => {
             expect(mocks.scheduleRepository.findByWorkId).toHaveBeenCalledWith('work-1');
         });
 
+        // APW-11 FR-19 — the export half of the `appLauncherExposed` whitelist
+        // entry. All three real states travel; only a missing column is absent.
+        it.each([
+            [true, true],
+            [false, false],
+            [null, null],
+            [undefined, undefined],
+        ])('serializes appLauncherExposed %p as %p', async (stored, expected) => {
+            const { service, mocks } = setupOneWork();
+            mocks.workRepository.findByUser.mockResolvedValue([
+                makeWork({ appLauncherExposed: stored }),
+            ]);
+
+            const result = await service.exportAccountData('user-1');
+            expect(result.data.works[0].appLauncherExposed).toBe(expected);
+        });
+
         it('emits members[] in the documented {userId, role} shape', async () => {
             const { service } = setupOneWork({
                 members: [
