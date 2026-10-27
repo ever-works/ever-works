@@ -549,6 +549,90 @@ export class AppRuntimeNotificationProducersAdapter implements AppRuntimeNotific
         });
     }
 
+    // ── T29's three health producers (§9.4:1337-1339, lane aw-safety 2026-10-26) ─────────────
+    //
+    // `AppHealthService` (the every-minute `app-health-poll`) calls these through OPTIONAL members
+    // that nothing implemented, so an App could be down for hours and its owner was never told.
+    // The dedupe keys are §9.4's. The de-dup WINDOW (6 h between down notices) and "recovered only
+    // after a down notice of the same streak" are the health service's own rules
+    // (`appHealthStreaks`, `lastHealthNotifiedAt`, the shared streak handle) — these only write.
+
+    async notifyAppUnhealthy(args: {
+        userId: string;
+        workId: string;
+        failureStreakStartMs: number;
+    }): Promise<void> {
+        if (!this.writer?.create || !args?.userId || !args?.workId) return;
+        await this.writer.create({
+            userId: args.userId,
+            type: NotificationType.ERROR,
+            category: NotificationCategory.SYSTEM,
+            title: 'Your App is down',
+            message:
+                'Your App failed its health checks several times in a row. Open the Deploy tab to ' +
+                'see which component is failing.',
+            actionUrl: deployTabUrl(args.workId),
+            actionLabel: 'Open Deploy',
+            isPersistent: true,
+            deduplicationKey: `app-unhealthy:${args.workId}:${streakKey(args.failureStreakStartMs)}`,
+            metadata: {
+                eventKey: 'app_unhealthy',
+                urgent: true,
+                workId: args.workId,
+            },
+        });
+    }
+
+    async notifyAppRecovered(args: {
+        userId: string;
+        workId: string;
+        failureStreakStartMs: number;
+    }): Promise<void> {
+        if (!this.writer?.create || !args?.userId || !args?.workId) return;
+        await this.writer.create({
+            userId: args.userId,
+            type: NotificationType.SUCCESS,
+            category: NotificationCategory.SYSTEM,
+            title: 'Your App is back up',
+            message: 'Your App is passing its health checks again.',
+            actionUrl: deployTabUrl(args.workId),
+            actionLabel: 'Open Deploy',
+            deduplicationKey: `app-recovered:${args.workId}:${streakKey(args.failureStreakStartMs)}`,
+            metadata: {
+                eventKey: 'app_recovered',
+                workId: args.workId,
+            },
+        });
+    }
+
+    async notifyAppClusterUnreachable(args: {
+        userId: string;
+        workId: string;
+        unreachableStreakStartMs: number;
+    }): Promise<void> {
+        if (!this.writer?.create || !args?.userId || !args?.workId) return;
+        await this.writer.create({
+            userId: args.userId,
+            type: NotificationType.ERROR,
+            category: NotificationCategory.SYSTEM,
+            title: 'The cluster your App runs on cannot be reached',
+            message:
+                'The platform could not reach the cluster your App runs on, so its health is ' +
+                'unknown. Check the cluster connection on the Deploy tab.',
+            actionUrl: deployTabUrl(args.workId),
+            actionLabel: 'Open Deploy',
+            isPersistent: true,
+            deduplicationKey: `app-cluster-unreachable:${args.workId}:${streakKey(
+                args.unreachableStreakStartMs,
+            )}`,
+            metadata: {
+                eventKey: 'app_cluster_unreachable',
+                urgent: true,
+                workId: args.workId,
+            },
+        });
+    }
+
     async notifyAppRollbackFailed(args: {
         userId: string;
         workId: string;
@@ -578,6 +662,11 @@ export class AppRuntimeNotificationProducersAdapter implements AppRuntimeNotific
 
 function deployTabUrl(workId: string): string {
     return `/works/${encodeURIComponent(String(workId))}/deploy`;
+}
+
+/** §9.4's streak handle as a dedupe-key segment — an integer epoch ms, or `0` when unusable. */
+function streakKey(ms: number): string {
+    return Number.isFinite(ms) && ms > 0 ? String(Math.floor(ms)) : '0';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -678,6 +767,12 @@ export const APP_RUNTIME_RELAYED_EVENTS: ReadonlySet<string> = new Set([
     'app.smoke.passed',
     'app.smoke.failed',
     'app.health.changed',
+    // Lane aw-safety (2026-10-26) — the three names `AppHealthService.emitTransition` REALLY emits
+    // (`APP_HEALTH_EVENT_*`). Only `app.health.changed` was catalogued, so every health transition
+    // was refused here and no health Activity row was ever written.
+    'app.health.degraded',
+    'app.health.recovered',
+    'app.health.unreachable',
     'app.dependency.ready',
     'app.dependency.failed',
     'app.dependency.removed',
