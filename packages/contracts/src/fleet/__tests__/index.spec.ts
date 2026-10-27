@@ -1451,7 +1451,19 @@ const ACTIONS_RUNNERS_EXPORTS = [
 	'FLEET_ACTIONS_RUNNER_STATUS_VERB',
 	'mergeFleetActionsRunnerState',
 	'isFleetActionsRunnerStopped',
-	'fleetActionsRunnerLogSourceId'
+	'fleetActionsRunnerLogSourceId',
+	// P2 (Actions jobs).
+	'FLEET_ACTIONS_MAX_WATCHED_TARGETS',
+	'FLEET_ACTIONS_MAX_LISTED_JOBS',
+	'FLEET_ACTIONS_JOBS_CACHE_MS',
+	'FLEET_ACTIONS_JOB_DIAGNOSES',
+	'isFleetActionsJobDiagnosis',
+	'isFleetActionsJobProblem',
+	'fleetActionsRunnerCovers',
+	'diagnoseFleetActionsJob',
+	'isFleetActionsJobUnassignable',
+	'normalizeFleetActionsWatchedTargets',
+	'fleetActionsJobItemId'
 ] as const;
 
 /** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
@@ -2084,7 +2096,14 @@ const FUNCTION_EXPORTS = [
 	'isFleetActionsRunnerDownloadUrl',
 	'mergeFleetActionsRunnerState',
 	'isFleetActionsRunnerStopped',
-	'fleetActionsRunnerLogSourceId'
+	'fleetActionsRunnerLogSourceId',
+	'isFleetActionsJobDiagnosis',
+	'isFleetActionsJobProblem',
+	'fleetActionsRunnerCovers',
+	'diagnoseFleetActionsJob',
+	'isFleetActionsJobUnassignable',
+	'normalizeFleetActionsWatchedTargets',
+	'fleetActionsJobItemId'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -2199,7 +2218,8 @@ describe('fleet barrel', () => {
 		// → +52 with FL-18 (Actions runners on computers): the fifty-one symbols of
 		// `fleet-actions-runners.types.ts` — a NEW module, one row below — and
 		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 52);
+		// → +11 with FL-18 P2 (Actions jobs): same module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 52 + 11);
 	});
 
 	it.each([
