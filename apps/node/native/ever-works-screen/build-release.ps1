@@ -2,8 +2,8 @@
 #
 # Builds twice in clean target directories and compares the SHA-256 of both
 # binaries; a mismatch fails. Writes unsigned-release-metadata.json with
-# productionEligible: false. Uploads nothing. UNVERIFIED: written on a machine
-# without a Rust toolchain (see PACKAGING.md). The job launcher's
+# productionEligible: false. Uploads nothing. Verified on Windows (MSVC,
+# Rust 1.88.0): two clean builds are byte-identical. The job launcher's
 # build-release.ps1 attests the full toolchain identity; this script is the
 # smaller first step and gains that attestation with signed admission (P3).
 param(
@@ -19,14 +19,21 @@ if (-not (Test-Path -LiteralPath 'Cargo.lock')) {
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $env:CARGO_INCREMENTAL = '0'
 $cargoHome = if ($env:CARGO_HOME) { $env:CARGO_HOME } else { Join-Path $env:USERPROFILE '.cargo' }
-$env:RUSTFLAGS = "--remap-path-prefix=$((Get-Location).Path)=C:\build\ever-works-screen --remap-path-prefix=$cargoHome=C:\cargo"
+# /Brepro: the MSVC linker otherwise stamps the link time (PE header and debug directory)
+# into the binary, and two clean builds differ by those bytes alone.
+$env:RUSTFLAGS = "-C link-arg=/Brepro --remap-path-prefix=$((Get-Location).Path)=C:\build\ever-works-screen --remap-path-prefix=$cargoHome=C:\cargo"
 
 $hashes = @()
 foreach ($pass in 1, 2) {
     $targetDir = "target-repro-$pass"
     if (Test-Path -LiteralPath $targetDir) { Remove-Item -Recurse -Force -LiteralPath $targetDir }
+    # cargo reports progress on stderr. Windows PowerShell 5.1 turns a native command's
+    # stderr into error records, which 'Stop' would make fatal: judge cargo by its exit code.
+    $ErrorActionPreference = 'Continue'
     cargo build --release --locked --target x86_64-pc-windows-msvc --target-dir $targetDir
-    if ($LASTEXITCODE -ne 0) { throw "cargo build failed (pass $pass)" }
+    $cargoExit = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($cargoExit -ne 0) { throw "cargo build failed (pass $pass)" }
     $binary = Join-Path $targetDir 'x86_64-pc-windows-msvc\release\ever-works-screen.exe'
     $hashes += (Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash.ToLowerInvariant()
 }

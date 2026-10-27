@@ -64,11 +64,11 @@ pub fn to_rgb_scaled(image: &RawImage, max_w: u32) -> Result<RgbFrame, String> {
                 }
             }
             let o = (dy as usize * dst_w as usize + dx as usize) * 3;
-            if n > 0 {
-                out[o] = ((r + n / 2) / n) as u8;
-                out[o + 1] = ((g + n / 2) / n) as u8;
-                out[o + 2] = ((b + n / 2) / n) as u8;
-            }
+            // The rounded mean of each channel; a block with no source pixel stays black.
+            let mean = |sum: u64| (sum + n / 2).checked_div(n).unwrap_or(0) as u8;
+            out[o] = mean(r);
+            out[o + 1] = mean(g);
+            out[o + 2] = mean(b);
         }
     }
     Ok(RgbFrame {
@@ -107,7 +107,12 @@ mod tests {
             2,
             2,
             PixelLayout::Bgra,
-            &[[10, 20, 0, 255], [10, 20, 100, 255], [10, 20, 200, 255], [10, 20, 100, 255]],
+            &[
+                [10, 20, 0, 255],
+                [10, 20, 100, 255],
+                [10, 20, 200, 255],
+                [10, 20, 100, 255],
+            ],
         );
         let frame = to_rgb_scaled(&picture, 1).unwrap();
         assert_eq!((frame.width, frame.height), (1, 1));

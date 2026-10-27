@@ -4,11 +4,13 @@ The native screen helper behind the **Desktop** source of a computer's live view
 the machine and hands the node JPEG keyframes and changed 64 × 64 tiles over its stdin / stdout. This file states
 what is and is not shipped.
 
-> **Unverified build.** This crate was written on a workstation with no Rust toolchain. Nothing here has been
-> compiled, linted or run: `cargo test`, `cargo clippy` and both release scripts are unverified until the
-> `Screen Helper` workflow (`.github/workflows/screen-helper.yml`, `workflow_dispatch` only, not a required check)
-> runs them on each OS. `Cargo.lock` is not committed yet — the first successful run must generate and commit it
-> before any release build is called reproducible.
+> **Build status (2026-10-27).** First compiled with the pinned Rust 1.88.0. On Windows (MSVC) `cargo build`,
+> `cargo test`, `cargo clippy -- -D warnings` and `cargo fmt --check` pass, and `cargo clippy` is also clean for
+> Linux x64 and macOS x64 / arm64. `Cargo.lock` is committed and `build-release.ps1` produces byte-identical builds.
+> A Windows build streamed this machine's desktop end to end (hello, keyframe, tiles, exit on stdin close). The
+> `Screen Helper` workflow (`.github/workflows/screen-helper.yml`, not a required check) runs the same on Windows,
+> Linux and macOS for pull requests that touch this folder, and on demand. How to build and admit a build of your
+> own: [`README.md`](README.md).
 
 ## What it is
 
