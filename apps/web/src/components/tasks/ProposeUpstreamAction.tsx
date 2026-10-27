@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { GitPullRequestArrow } from 'lucide-react';
 import { UPSTREAM_REFUSAL_CODES } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
@@ -35,12 +35,21 @@ export interface ProposeUpstreamActionView {
 export function ProposeUpstreamAction({ view }: { view: ProposeUpstreamActionView }) {
     const t = useTranslations('dashboard.tasksPage.proposeUpstream');
     const refusals = useTranslations('dashboard.workDetail.upstream.refusals');
+    // Rendered on the server and hydrated in the browser: format in a fixed zone (UTC, named in
+    // the output) so both sides produce the same text.
+    const format = useFormatter();
 
     if (view.relation !== 'fork' && view.relation !== 'private-copy') return null;
 
     const upstream = view.target ? `${view.target.owner}/${view.target.repo}` : t('theUpstream');
     const fork = view.target ? `${view.target.forkOwner}/${view.target.forkRepo}` : t('yourFork');
-    const time = view.nextSlotAt ? new Date(view.nextSlotAt).toLocaleString() : '';
+    const time = view.nextSlotAt
+        ? format.dateTime(new Date(view.nextSlotAt), {
+              dateStyle: 'medium',
+              timeStyle: 'long',
+              timeZone: 'UTC',
+          })
+        : '';
     const count = view.limitValue ?? 1;
 
     let reason: string;

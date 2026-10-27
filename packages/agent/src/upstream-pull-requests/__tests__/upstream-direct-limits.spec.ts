@@ -25,10 +25,18 @@ function fakeRepository(initial: Row[] = []) {
     const active = ['preparing', 'needs_signature', 'awaiting_approval', 'opening', 'open'];
     return {
         rows,
-        findForWork: jest.fn(async (workId: string, id: string) => rows.find((r) => r.id === id && r.workId === workId) ?? null),
+        findForWork: jest.fn(
+            async (workId: string, id: string) =>
+                rows.find((r) => r.id === id && r.workId === workId) ?? null,
+        ),
         findActiveBySourceTask: jest.fn(
             async (workId: string, sourceTaskId: string) =>
-                rows.find((r) => r.workId === workId && r.sourceTaskId === sourceTaskId && active.includes(r.state)) ?? null,
+                rows.find(
+                    (r) =>
+                        r.workId === workId &&
+                        r.sourceTaskId === sourceTaskId &&
+                        active.includes(r.state),
+                ) ?? null,
         ),
         insertActive: jest.fn(async (input: Row) => {
             next += 1;
@@ -36,12 +44,14 @@ function fakeRepository(initial: Row[] = []) {
             rows.push(row);
             return { inserted: true, row, activeId: null };
         }),
-        updateStateIf: jest.fn(async (id: string, workId: string, from: string[], to: string, patch: Row = {}) => {
-            const row = rows.find((r) => r.id === id && r.workId === workId);
-            if (!row || !from.includes(row.state)) return false;
-            Object.assign(row, patch, { state: to });
-            return true;
-        }),
+        updateStateIf: jest.fn(
+            async (id: string, workId: string, from: string[], to: string, patch: Row = {}) => {
+                const row = rows.find((r) => r.id === id && r.workId === workId);
+                if (!row || !from.includes(row.state)) return false;
+                Object.assign(row, patch, { state: to });
+                return true;
+            },
+        ),
         patchIf: jest.fn(async (id: string, workId: string, from: string[], patch: Row) => {
             const row = rows.find((r) => r.id === id && r.workId === workId);
             if (!row || !from.includes(row.state)) return false;
@@ -68,11 +78,17 @@ function work() {
     };
 }
 
-function build(limits: Array<UpstreamRateLimitRefusal | null>) {
+function build(limits: Array<UpstreamRateLimitRefusal | null | Error>) {
     const repository = fakeRepository();
     const activity = { log: jest.fn(async () => ({})) };
     const records = new UpstreamPullRequestRecordService(repository as never, activity as never);
-    const eligibility = { limitsFor: jest.fn(async () => limits.shift() ?? null) };
+    const eligibility = {
+        limitsFor: jest.fn(async () => {
+            const next = limits.shift() ?? null;
+            if (next instanceof Error) throw next;
+            return next;
+        }),
+    };
     const credentials = {
         resolveForPublishingMember: jest.fn(async () => ({
             usable: true,
@@ -80,11 +96,22 @@ function build(limits: Array<UpstreamRateLimitRefusal | null>) {
         })),
     };
     const git = {
-        createPullRequest: jest.fn(async () => ({ number: 7, url: 'https://github.com/example-org/helpdesk/pull/7' })),
+        createPullRequest: jest.fn(async () => ({
+            number: 7,
+            url: 'https://github.com/example-org/helpdesk/pull/7',
+        })),
     };
     const service = new UpstreamPullRequestOpenService(
         { findById: jest.fn(async () => work()) } as never,
-        { findById: jest.fn(async () => ({ id: 't1', workId: 'w1', userId: 'owner', branchRef: 'b1', title: 'x' })) } as never,
+        {
+            findById: jest.fn(async () => ({
+                id: 't1',
+                workId: 'w1',
+                userId: 'owner',
+                branchRef: 'b1',
+                title: 'x',
+            })),
+        } as never,
         credentials as never,
         git as never,
         undefined,
@@ -128,10 +155,18 @@ describe('the direct route enforces FR-26 / FR-39 (APW-09 T8)', () => {
         ]);
         await expect(
             platform.service.open({ workId: 'w1', callerUserId: 'editor', taskId: 't1' }),
-        ).resolves.toMatchObject({ httpStatus: 429, code: 'platformCapReached', limit: 'platformOpenedPerUpstreamPer24h' });
+        ).resolves.toMatchObject({
+            httpStatus: 429,
+            code: 'platformCapReached',
+            limit: 'platformOpenedPerUpstreamPer24h',
+        });
 
         const open = build([{ code: 'rateLimited', limit: 'openPerUpstream', limitValue: 3 }]);
-        const result = await open.service.open({ workId: 'w1', callerUserId: 'editor', taskId: 't1' });
+        const result = await open.service.open({
+            workId: 'w1',
+            callerUserId: 'editor',
+            taskId: 't1',
+        });
         expect(result).toMatchObject({ httpStatus: 429, limit: 'openPerUpstream' });
         expect(result).not.toHaveProperty('nextSlotAt');
     });
@@ -139,17 +174,37 @@ describe('the direct route enforces FR-26 / FR-39 (APW-09 T8)', () => {
     it('refuses a request a concurrent one pushed over the limit, and releases its own claim', async () => {
         const { service, git, repository, eligibility, activity } = build([
             null,
-            { code: 'rateLimited', limit: 'openedPerUpstreamPer24h', limitValue: 1, nextSlotAt: '2026-10-28T10:00:00.000Z' },
+            {
+                code: 'rateLimited',
+                limit: 'openedPerUpstreamPer24h',
+                limitValue: 1,
+                nextSlotAt: '2026-10-28T10:00:00.000Z',
+            },
         ]);
         const result = await service.open({ workId: 'w1', callerUserId: 'editor', taskId: 't1' });
         expect(result).toMatchObject({ httpStatus: 429, code: 'rateLimited' });
         expect(git.createPullRequest).not.toHaveBeenCalled();
-        expect(eligibility.limitsFor).toHaveBeenLastCalledWith(expect.objectContaining({ includesSelf: true }));
-        expect(repository.rows[0]).toMatchObject({ state: 'refused', openedAt: null, refusalCode: 'rateLimited' });
+        expect(eligibility.limitsFor).toHaveBeenLastCalledWith(
+            expect.objectContaining({ includesSelf: true }),
+        );
+        expect(repository.rows[0]).toMatchObject({
+            state: 'refused',
+            openedAt: null,
+            refusalCode: 'rateLimited',
+        });
         expect((activity.log.mock.calls[0] as unknown[])[0]).toMatchObject({
             action: 'app.upstream_pr.refused',
             status: ActivityStatus.FAILED,
         });
+    });
+
+    it('releases its own claim when the second look throws, and calls no provider', async () => {
+        const { service, git, repository } = build([null, new Error('database went away')]);
+        await expect(
+            service.open({ workId: 'w1', callerUserId: 'editor', taskId: 't1' }),
+        ).rejects.toThrow('database went away');
+        expect(git.createPullRequest).not.toHaveBeenCalled();
+        expect(repository.rows[0]).toMatchObject({ state: 'failed', openedAt: null });
     });
 
     it('opens when both looks pass', async () => {
@@ -176,7 +231,11 @@ describe('member state changes on a record (APW-09 T19, no credential)', () => {
             },
         ]);
         const activity = { log: jest.fn(async () => ({})) };
-        return { repository, activity, records: new UpstreamPullRequestRecordService(repository as never, activity as never) };
+        return {
+            repository,
+            activity,
+            records: new UpstreamPullRequestRecordService(repository as never, activity as never),
+        };
     }
 
     it('lets the author withdraw before opening, writes the withdrawn Activity, and uses no credential', async () => {
@@ -194,11 +253,15 @@ describe('member state changes on a record (APW-09 T19, no credential)', () => {
 
     it('lets the Work owner withdraw, and refuses any other editor', async () => {
         const owner = recordWith({ state: 'preparing' });
-        await expect(owner.records.withdraw('w1', 'r1', { userId: 'owner', isWorkOwner: true })).resolves.toMatchObject({
+        await expect(
+            owner.records.withdraw('w1', 'r1', { userId: 'owner', isWorkOwner: true }),
+        ).resolves.toMatchObject({
             status: 'ok',
         });
         const other = recordWith({ state: 'preparing' });
-        await expect(other.records.withdraw('w1', 'r1', { userId: 'editor', isWorkOwner: false })).resolves.toMatchObject({
+        await expect(
+            other.records.withdraw('w1', 'r1', { userId: 'editor', isWorkOwner: false }),
+        ).resolves.toMatchObject({
             status: 'refused',
             httpStatus: 403,
             code: 'authorRequired',
@@ -206,22 +269,31 @@ describe('member state changes on a record (APW-09 T19, no credential)', () => {
         expect(other.repository.rows[0].state).toBe('preparing');
     });
 
-    it.each(['opening', 'open', 'merged', 'withdrawn'])('refuses to withdraw a %s record (409)', async (state) => {
-        const { records, repository } = recordWith({ state });
-        await expect(records.withdraw('w1', 'r1', { userId: 'author', isWorkOwner: false })).resolves.toMatchObject({
-            status: 'refused',
-            httpStatus: 409,
-            code: 'notWithdrawable',
-        });
-        expect(repository.rows[0].state).toBe(state);
-    });
+    it.each(['opening', 'open', 'merged', 'withdrawn'])(
+        'refuses to withdraw a %s record (409)',
+        async (state) => {
+            const { records, repository } = recordWith({ state });
+            await expect(
+                records.withdraw('w1', 'r1', { userId: 'author', isWorkOwner: false }),
+            ).resolves.toMatchObject({
+                status: 'refused',
+                httpStatus: 409,
+                code: 'notWithdrawable',
+            });
+            expect(repository.rows[0].state).toBe(state);
+        },
+    );
 
     it('answers 404 for another App Work’s record id', async () => {
         const { records } = recordWith({ state: 'preparing' });
-        await expect(records.withdraw('w2', 'r1', { userId: 'author', isWorkOwner: true })).resolves.toMatchObject({
+        await expect(
+            records.withdraw('w2', 'r1', { userId: 'author', isWorkOwner: true }),
+        ).resolves.toMatchObject({
             httpStatus: 404,
         });
-        await expect(records.acknowledgeExtraFiles('w2', 'r1', 'author')).resolves.toMatchObject({ httpStatus: 404 });
+        await expect(records.acknowledgeExtraFiles('w2', 'r1', 'author')).resolves.toMatchObject({
+            httpStatus: 404,
+        });
     });
 
     it('records the extra-files acknowledgement for the author while awaiting approval', async () => {
@@ -230,25 +302,36 @@ describe('member state changes on a record (APW-09 T19, no credential)', () => {
             diffStats: { files: 3, additions: 10, deletions: 1, extraFiles: ['CHANGELOG.md'] },
         });
         const now = new Date('2026-10-27T12:00:00.000Z');
-        await expect(records.acknowledgeExtraFiles('w1', 'r1', 'author', now)).resolves.toMatchObject({ status: 'ok' });
-        expect(repository.rows[0]).toMatchObject({ extraFilesAcknowledgedAt: now, extraFilesAcknowledgedById: 'author' });
+        await expect(
+            records.acknowledgeExtraFiles('w1', 'r1', 'author', now),
+        ).resolves.toMatchObject({ status: 'ok' });
+        expect(repository.rows[0]).toMatchObject({
+            extraFilesAcknowledgedAt: now,
+            extraFilesAcknowledgedById: 'author',
+        });
         expect(repository.rows[0].state).toBe('awaiting_approval');
     });
 
     it('refuses the acknowledgement for a non-author, with no extra files, or outside the approval window', async () => {
         const extra = { files: 3, additions: 10, deletions: 1, extraFiles: ['CHANGELOG.md'] };
         await expect(
-            recordWith({ state: 'awaiting_approval', diffStats: extra }).records.acknowledgeExtraFiles('w1', 'r1', 'editor'),
+            recordWith({
+                state: 'awaiting_approval',
+                diffStats: extra,
+            }).records.acknowledgeExtraFiles('w1', 'r1', 'editor'),
         ).resolves.toMatchObject({ httpStatus: 403, code: 'authorRequired' });
         await expect(
-            recordWith({ state: 'awaiting_approval', diffStats: { ...extra, extraFiles: [] } }).records.acknowledgeExtraFiles(
+            recordWith({
+                state: 'awaiting_approval',
+                diffStats: { ...extra, extraFiles: [] },
+            }).records.acknowledgeExtraFiles('w1', 'r1', 'author'),
+        ).resolves.toMatchObject({ httpStatus: 409, code: 'extraFilesNotPresent' });
+        await expect(
+            recordWith({ state: 'preparing', diffStats: extra }).records.acknowledgeExtraFiles(
                 'w1',
                 'r1',
                 'author',
             ),
-        ).resolves.toMatchObject({ httpStatus: 409, code: 'extraFilesNotPresent' });
-        await expect(
-            recordWith({ state: 'preparing', diffStats: extra }).records.acknowledgeExtraFiles('w1', 'r1', 'author'),
         ).resolves.toMatchObject({ httpStatus: 409, code: 'notAwaitingApproval' });
     });
 });

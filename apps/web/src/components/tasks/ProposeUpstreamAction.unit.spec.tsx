@@ -86,8 +86,28 @@ describe('ProposeUpstreamAction (APW-09 T11)', () => {
     it('names the limit that refused (FR-27)', () => {
         renderAction(view({ code: 'rateLimited', limit: 'openPerUpstream', limitValue: 3 }));
         expect(screen.getByTestId('propose-upstream-reason').textContent).toBe(
-            'You already have 3 open pull request on acme/bookings.',
+            'You already have 3 open pull requests on acme/bookings.',
         );
+        cleanup();
+        renderAction(view({ code: 'rateLimited', limit: 'openPerUpstream', limitValue: 1 }));
+        expect(screen.getByTestId('propose-upstream-reason').textContent).toBe(
+            'You already have 1 open pull request on acme/bookings.',
+        );
+    });
+
+    it('formats the next slot in a fixed zone, so the server and the browser agree', () => {
+        renderAction(
+            view({
+                code: 'rateLimited',
+                limit: 'openedPerUpstreamPer24h',
+                limitValue: 1,
+                nextSlotAt: '2026-10-28T10:00:00.000Z',
+            }),
+        );
+        const text = screen.getByTestId('propose-upstream-reason').textContent ?? '';
+        expect(text).toContain('You can open 1 pull request on acme/bookings per day.');
+        expect(text).toContain('UTC');
+        expect(text).toContain('10:00');
     });
 
     it('says the Task already has a proposal (FR-5)', () => {

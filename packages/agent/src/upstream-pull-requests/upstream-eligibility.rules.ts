@@ -8,6 +8,8 @@ import type { UpstreamRateLimitRefusal } from './upstream-rate-limits';
  * Every refusal has its own code (spec §6.5 has the copy). The order is the order a member
  * can act on, and every check that needs no provider comes before every one that does:
  *
+ *   0. `taskNotOnWork`   — the named Task is not one of this App Work's: the API answers `404`
+ *                          whatever the Work's policy state, so the answer never depends on it.
  *   1. `disabled`        — the operator kill switch (FR-46) is off.
  *   2. `notFork`         — a private copy or a link: no fork network to propose into (S10, S11).
  *   3. `deniedUpstream`  — the operator deny list (FR-41).
@@ -50,13 +52,16 @@ export type UpstreamEligibilityDecision =
           readonly activeId?: string | null;
       };
 
-export function decideUpstreamEligibility(facts: UpstreamEligibilityFacts): UpstreamEligibilityDecision {
+export function decideUpstreamEligibility(
+    facts: UpstreamEligibilityFacts,
+): UpstreamEligibilityDecision {
+    if (facts.task === null) return { allowed: false, code: 'taskNotOnWork' };
     if (!facts.killSwitchOn) return { allowed: false, code: 'disabled' };
     if (facts.relation !== 'fork' || !facts.hasUpstream) return { allowed: false, code: 'notFork' };
     if (facts.denied) return { allowed: false, code: 'deniedUpstream' };
     if (!facts.optedIn) return { allowed: false, code: 'disabled' };
-    if (facts.task === null) return { allowed: false, code: 'taskNotOnWork' };
-    if (facts.task && facts.task.prState !== 'merged') return { allowed: false, code: 'sourceNotMerged' };
+    if (facts.task && facts.task.prState !== 'merged')
+        return { allowed: false, code: 'sourceNotMerged' };
     if (facts.activeRecordId) {
         return { allowed: false, code: 'activeProposal', activeId: facts.activeRecordId };
     }

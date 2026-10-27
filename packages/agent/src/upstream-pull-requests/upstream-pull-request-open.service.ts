@@ -279,10 +279,17 @@ export class UpstreamPullRequestOpenService {
 
         // The second look, with this request's own claim counted (see the class docstring).
         if (row && this.eligibility && this.records) {
-            const postLimit = await this.eligibility.limitsFor({ ...limitScope, includesSelf: true });
+            let postLimit: UpstreamRateLimitRefusal | null;
+            try {
+                postLimit = await this.eligibility.limitsFor({ ...limitScope, includesSelf: true });
+            } catch (error) {
+                // Never leave the claim holding the Task's slot (and counting in every window).
+                await this.releaseClaim(row, 'The limit re-check failed.');
+                throw error;
+            }
             if (postLimit) {
-                await this.records
-                    .transition(
+                try {
+                    const moved = await this.records.transition(
                         row,
                         ['opening'],
                         'refused',
@@ -292,8 +299,18 @@ export class UpstreamPullRequestOpenService {
                             status: ActivityStatus.FAILED,
                             summary: `A pull request on ${upstream.owner}/${upstream.repo} was refused by a limit`,
                         },
-                    )
-                    .catch(() => undefined);
+                    );
+                    if (!moved) {
+                        this.logger.warn(
+                            `Upstream PR claim ${row.id} was no longer opening when its limit refusal was recorded.`,
+                        );
+                    }
+                } catch (error) {
+                    this.logger.warn(
+                        `Recording the limit refusal of claim ${row.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+                    );
+                    await this.releaseClaim(row, 'Refused by a limit.');
+                }
                 return limitRefusal(postLimit, `${upstream.owner}/${upstream.repo}`);
             }
         }
@@ -357,6 +374,21 @@ export class UpstreamPullRequestOpenService {
         }
     }
 
+    /** Move a claim that will not reach the provider to `failed` (best-effort, logged). */
+    private async releaseClaim(
+        row: Parameters<UpstreamPullRequestRecordService['markFailed']>[0],
+        detail: string,
+    ): Promise<void> {
+        if (!this.records) return;
+        await this.records
+            .markFailed(row, detail)
+            .catch((error: unknown) =>
+                this.logger.warn(
+                    `Releasing upstream PR claim ${row.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+                ),
+            );
+    }
+
     /** The record: one line on the Task the change came from, so its thread links the PR. */
     private async record(
         task: { id: string; userId: string },
@@ -381,7 +413,10 @@ export class UpstreamPullRequestOpenService {
 }
 
 /** The `429` an FR-26 / FR-39 limit answers, naming the limit (FR-27). */
-function limitRefusal(refusal: UpstreamRateLimitRefusal, upstream: string): UpstreamPullRequestOpenResult {
+function limitRefusal(
+    refusal: UpstreamRateLimitRefusal,
+    upstream: string,
+): UpstreamPullRequestOpenResult {
     const message =
         refusal.code === 'platformCapReached'
             ? `Ever Works has opened its daily limit of ${refusal.limitValue} pull requests on ${upstream}.`
@@ -394,7 +429,9 @@ function limitRefusal(refusal: UpstreamRateLimitRefusal, upstream: string): Upst
         status: 'refused',
         httpStatus: 429,
         code: refusal.code,
-        message: refusal.nextSlotAt ? `${message} Next one available at ${refusal.nextSlotAt}.` : message,
+        message: refusal.nextSlotAt
+            ? `${message} Next one available at ${refusal.nextSlotAt}.`
+            : message,
         limit: refusal.limit,
         ...(refusal.nextSlotAt ? { nextSlotAt: refusal.nextSlotAt } : {}),
     };

@@ -1,4 +1,7 @@
-import { decideUpstreamEligibility, type UpstreamEligibilityFacts } from '../upstream-eligibility.rules';
+import {
+    decideUpstreamEligibility,
+    type UpstreamEligibilityFacts,
+} from '../upstream-eligibility.rules';
 import { UpstreamEligibilityService } from '../upstream-eligibility.service';
 
 /**
@@ -64,16 +67,44 @@ describe('decideUpstreamEligibility', () => {
         });
     });
 
+    it('answers taskNotOnWork for a foreign Task whatever the Work’s policy state (one 404)', () => {
+        for (const change of [
+            { killSwitchOn: false },
+            { relation: 'link' },
+            { denied: true },
+            { optedIn: false },
+        ] as Partial<UpstreamEligibilityFacts>[]) {
+            expect(decideUpstreamEligibility({ ...allowed, ...change, task: null })).toMatchObject({
+                allowed: false,
+                code: 'taskNotOnWork',
+            });
+        }
+    });
+
     it('checks the operator switch before anything else, and the deny list before the opt-in', () => {
         expect(
-            decideUpstreamEligibility({ ...allowed, killSwitchOn: false, relation: 'link', denied: true })
-                .allowed === false &&
-                (decideUpstreamEligibility({ ...allowed, killSwitchOn: false, relation: 'link' }) as {
-                    code: string;
-                }).code,
+            decideUpstreamEligibility({
+                ...allowed,
+                killSwitchOn: false,
+                relation: 'link',
+                denied: true,
+            }).allowed === false &&
+                (
+                    decideUpstreamEligibility({
+                        ...allowed,
+                        killSwitchOn: false,
+                        relation: 'link',
+                    }) as {
+                        code: string;
+                    }
+                ).code,
         ).toBe('disabled');
         expect(
-            (decideUpstreamEligibility({ ...allowed, denied: true, optedIn: false }) as { code: string }).code,
+            (
+                decideUpstreamEligibility({ ...allowed, denied: true, optedIn: false }) as {
+                    code: string;
+                }
+            ).code,
         ).toBe('deniedUpstream');
     });
 });
@@ -115,7 +146,9 @@ describe('UpstreamEligibilityService', () => {
         const works = { findById: jest.fn(async () => options.work ?? work()) };
         const tasks = {
             findById: jest.fn(async (id: string) =>
-                id === 't1' ? { id: 't1', workId: 'w1', prState: options.prState ?? 'merged' } : null,
+                id === 't1'
+                    ? { id: 't1', workId: 'w1', prState: options.prState ?? 'merged' }
+                    : null,
             ),
         };
         const records = {
@@ -155,7 +188,13 @@ describe('UpstreamEligibilityService', () => {
             relation: 'fork',
             preparationAvailable: false,
             maintainerCanModifyDefault: true,
-            target: { owner: 'acme', repo: 'bookings', baseBranch: 'main', forkOwner: 'maya', forkRepo: 'bookings' },
+            target: {
+                owner: 'acme',
+                repo: 'bookings',
+                baseBranch: 'main',
+                forkOwner: 'maya',
+                forkRepo: 'bookings',
+            },
         });
         // FR-24: the caller's OWN connection is what is checked — never a Work-resolved token.
         expect(credentials.resolveForPublishingMember).toHaveBeenCalledWith('w1', 'maya-user');
@@ -179,25 +218,47 @@ describe('UpstreamEligibilityService', () => {
 
     it('refuses while the operator switch is off, and a denied upstream', async () => {
         process.env.APP_WORKS_UPSTREAM_PRS_ENABLED = 'false';
-        await expect(build().service.evaluate({ workId: 'w1', userId: 'u' })).resolves.toMatchObject({
+        await expect(
+            build().service.evaluate({ workId: 'w1', userId: 'u' }),
+        ).resolves.toMatchObject({
             code: 'disabled',
         });
         process.env.APP_WORKS_UPSTREAM_PRS_ENABLED = 'true';
         process.env.APP_WORKS_UPSTREAM_DENY_LIST = 'ACME/Bookings';
-        await expect(build().service.evaluate({ workId: 'w1', userId: 'u' })).resolves.toMatchObject({
+        await expect(
+            build().service.evaluate({ workId: 'w1', userId: 'u' }),
+        ).resolves.toMatchObject({
             code: 'deniedUpstream',
         });
     });
 
+    it('flags a foreign Task even on a Work that has not opted in', async () => {
+        await expect(
+            build({ spec: { enabled: false } }).service.evaluate({
+                workId: 'w1',
+                userId: 'u',
+                taskId: 't-other',
+            }),
+        ).resolves.toMatchObject({ allowed: false, taskNotOnWork: true });
+    });
+
     it('refuses an unmerged source Task, flags a foreign Task, and names the active record', async () => {
         await expect(
-            build({ prState: 'open' }).service.evaluate({ workId: 'w1', userId: 'u', taskId: 't1' }),
+            build({ prState: 'open' }).service.evaluate({
+                workId: 'w1',
+                userId: 'u',
+                taskId: 't1',
+            }),
         ).resolves.toMatchObject({ allowed: false, code: 'sourceNotMerged' });
         await expect(
             build().service.evaluate({ workId: 'w1', userId: 'u', taskId: 't-other' }),
         ).resolves.toMatchObject({ allowed: false, taskNotOnWork: true });
         await expect(
-            build({ active: { id: 'r9' } }).service.evaluate({ workId: 'w1', userId: 'u', taskId: 't1' }),
+            build({ active: { id: 'r9' } }).service.evaluate({
+                workId: 'w1',
+                userId: 'u',
+                taskId: 't1',
+            }),
         ).resolves.toMatchObject({ allowed: false, activeProposalId: 'r9' });
     });
 
@@ -209,10 +270,21 @@ describe('UpstreamEligibilityService', () => {
 
     it('honours the App spec maxOpen per App Work (G15)', async () => {
         await expect(
-            build({ spec: { enabled: true, maxOpen: 1 }, open: 1 }).service.evaluate({ workId: 'w1', userId: 'u' }),
-        ).resolves.toMatchObject({ allowed: false, code: 'rateLimited', limit: 'openPerUpstream', limitValue: 1 });
+            build({ spec: { enabled: true, maxOpen: 1 }, open: 1 }).service.evaluate({
+                workId: 'w1',
+                userId: 'u',
+            }),
+        ).resolves.toMatchObject({
+            allowed: false,
+            code: 'rateLimited',
+            limit: 'openPerUpstream',
+            limitValue: 1,
+        });
         await expect(
-            build({ spec: { enabled: true, maxOpen: 5 }, open: 4 }).service.evaluate({ workId: 'w1', userId: 'u' }),
+            build({ spec: { enabled: true, maxOpen: 5 }, open: 4 }).service.evaluate({
+                workId: 'w1',
+                userId: 'u',
+            }),
         ).resolves.toMatchObject({ allowed: true });
     });
 
@@ -230,7 +302,9 @@ describe('UpstreamEligibilityService', () => {
             limit: 'platformOpenedPerUpstreamPer24h',
             limitValue: 5,
         });
-        expect(view.nextSlotAt).toBe(new Date(now.getTime() - 5 * 3_600_000 + 86_400_000).toISOString());
+        expect(view.nextSlotAt).toBe(
+            new Date(now.getTime() - 5 * 3_600_000 + 86_400_000).toISOString(),
+        );
     });
 
     it('fails closed with no record store', async () => {
