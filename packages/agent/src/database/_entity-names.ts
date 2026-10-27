@@ -256,6 +256,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TermsAcceptance',
     // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
     'ToolGrant',
+    // APW-09 Upstream pull requests — one record per proposal / directly-opened
+    // upstream pull request, and FR-34's suggestion counters.
+    'UpstreamPrSuggestion',
+    'UpstreamPullRequest',
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',
@@ -309,6 +313,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkProposal',
     'WorkProposalAttachment',
     'WorkSchedule',
+    // APW-09 — the Upstream pull requests toggle's in-flight state (one per App Work).
+    'WorkUpstreamPrSetting',
     // APW-02 Fork lifecycle — one per App Work; readiness through sync.
     'WorkUpstreamState',
     'Workflow',
