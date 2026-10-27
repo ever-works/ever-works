@@ -24,6 +24,8 @@ import {
     type WorkAppRuntimeStateDeletionStore,
 } from '@ever-works/agent/app-runtime';
 import { AppDependenciesModule } from '@ever-works/agent/app-dependencies';
+import { APP_PUBLISHED_HOSTS, type AppPublishedHostsPort } from '@ever-works/agent/app-launcher';
+import { AppHostsService } from '@ever-works/agent/app-runtime';
 
 /**
  * APW-06 T33 / T58 / T73, plan §9.8 (lane aw-safety, 2026-10-26) — **the API's App runtime ports
@@ -135,7 +137,22 @@ import { AppDependenciesModule } from '@ever-works/agent/app-dependencies';
             ],
         },
         APP_WORK_DELETION_PORT_PROVIDER,
+        // Lane aw-safety (2026-10-26) — APW-11's `APP_PUBLISHED_HOSTS` (the App Launcher tile's
+        // address): APW-06's `AppHostsService.primary` — the owner's verified primary domain, else
+        // `<managedSubdomain>.<apps-domain>`, else `null` (then FR-16's order applies unchanged).
+        // Lazy: `AppHostsService` lives in `AppDeployRequestModule`, and a global export is what
+        // reaches the launcher in `AppLauncherModule` without an import edge.
+        {
+            provide: APP_PUBLISHED_HOSTS,
+            useFactory: (moduleRef: ModuleRef): AppPublishedHostsPort => ({
+                primary: async (workId: string) => {
+                    const hosts = getOptionalProvider<AppHostsService>(moduleRef, AppHostsService);
+                    return hosts ? hosts.primary(workId) : null;
+                },
+            }),
+            inject: [ModuleRef],
+        },
     ],
-    exports: [APP_WORK_DELETION_PORT, AppRuntimeDeletionService],
+    exports: [APP_WORK_DELETION_PORT, AppRuntimeDeletionService, APP_PUBLISHED_HOSTS],
 })
 export class AppRuntimePortsModule {}
