@@ -164,3 +164,20 @@ export function fleetActionsRunnerViewOf(
         logSource: fleetActionsRunnerLogSourceId(row.name),
     };
 }
+
+/**
+ * The Actions jobs panel's default watched list (FR-21): every repository and
+ * organisation the person has runners registered for, once each
+ * (case-insensitively), in name order.
+ */
+export function defaultWatchedTargets(
+    rows: ReadonlyArray<Pick<FleetActionsRunner, 'scope' | 'target' | 'state' | 'removedAt'>>,
+): Array<{ scope: 'org' | 'repo'; target: string }> {
+    const seen = new Map<string, { scope: 'org' | 'repo'; target: string }>();
+    for (const row of rows) {
+        if (row.removedAt || row.state === 'removed') continue;
+        const key = `${row.scope}:${row.target.toLowerCase()}`;
+        if (!seen.has(key)) seen.set(key, { scope: row.scope, target: row.target });
+    }
+    return [...seen.values()].sort((a, b) => a.target.localeCompare(b.target));
+}

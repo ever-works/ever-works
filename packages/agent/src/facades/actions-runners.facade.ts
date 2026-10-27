@@ -391,6 +391,49 @@ export class ActionsRunnersFacadeService extends BaseFacadeService {
         return rows.filter((row) => row.selected !== false).map((row) => ({ fullName: row.fullName, githubRepoId: row.githubRepoId }));
     }
 
+    // ─── Watched targets (P2, FR-21) — the person's own plugin setting ────
+
+    /**
+     * The repositories and organisations this person's Actions jobs panel
+     * watches, from the plugin's user-scope `watchedTargets` setting (plan §7:
+     * non-secret, the person's own). Null when nothing was saved (the panel
+     * then watches every target the person has runners for) or no provider is
+     * enabled. Entries are `repo:owner/name` or `org:login`.
+     */
+    async getWatchedTargets(userId: string): Promise<Array<{ scope: 'org' | 'repo'; target: string }> | null> {
+        if (!this.settingsService) return null;
+        let plugin: IActionsRunnersPlugin;
+        try {
+            plugin = await this.resolveTypedPlugin(userId);
+        } catch {
+            return null;
+        }
+        const settings = await this.settingsService.getSettings(plugin.id, { userId }).catch(() => null);
+        const raw = settings?.watchedTargets;
+        if (!Array.isArray(raw)) return null;
+        const out: Array<{ scope: 'org' | 'repo'; target: string }> = [];
+        for (const entry of raw) {
+            if (typeof entry !== 'string') continue;
+            const colon = entry.indexOf(':');
+            const scope = entry.slice(0, colon);
+            const target = entry.slice(colon + 1);
+            if ((scope === 'org' || scope === 'repo') && target) out.push({ scope, target });
+        }
+        // An empty saved list is "the default" (every target the person has runners for).
+        return out.length > 0 ? out : null;
+    }
+
+    /** Save (or, with `null`, clear back to the default) this person's watched targets. */
+    async setWatchedTargets(userId: string, targets: ReadonlyArray<{ scope: 'org' | 'repo'; target: string }> | null): Promise<void> {
+        if (!this.settingsService) {
+            throw new ActionsRunnersFacadeError('settings are not available on this deployment', 'setWatchedTargets', 'not-configured');
+        }
+        const plugin = await this.resolveTypedPlugin(userId);
+        await this.settingsService.updateUserSettings(plugin.id, userId, {
+            watchedTargets: targets ? targets.map((entry) => `${entry.scope}:${entry.target}`) : [],
+        });
+    }
+
     // ─── Shared ──────────────────────────────────────────────────────────
 
     private targetOf(

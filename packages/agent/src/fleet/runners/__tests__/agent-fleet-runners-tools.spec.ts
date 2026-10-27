@@ -119,4 +119,44 @@ describe('fleet_runners_* Agent tools (FL-18 P1)', () => {
             error: { code: 'invalid' },
         });
     });
+
+    it('P2: offers fleet_runners_jobs (read) and holds fleet_runners_cancel_run with the run and repository named', async () => {
+        const service = {
+            list: jest.fn(),
+            listAll: jest.fn(),
+            install: jest.fn(),
+            control: jest.fn(),
+            jobs: jest.fn(async () => ({ jobs: [], busyRunners: 0, totalRunners: 1 })),
+            cancelRun: jest.fn(async () => {
+                throw fleetMachineError('confirmation_required', 'send confirm: true to confirm', {
+                    class: 'confirm',
+                    summary: 'Cancel workflow run #17 of acme/api? Every job in it stops. This cannot be undone.',
+                });
+            }),
+        };
+        const proposals = { propose: jest.fn(async () => ({ id: 'proposal-2', status: 'pending' as const })) };
+        const built = buildFleetRunnersTools({
+            userId: OWNER,
+            agentId: AGENT,
+            runId: null,
+            service: service as never,
+            proposals: proposals as never,
+        });
+        const byName = new Map(built.map((tool) => [tool.name, tool]));
+        expect([...byName.keys()]).toContain('fleet_runners_jobs');
+        expect(await byName.get('fleet_runners_jobs')!.invoke({ targets: ['acme/api', 'acme'] })).toMatchObject({ totalRunners: 1 });
+        expect(service.jobs).toHaveBeenCalledWith(expect.anything(), [
+            { scope: 'repo', target: 'acme/api' },
+            { scope: 'org', target: 'acme' },
+        ]);
+        expect(
+            await byName.get('fleet_runners_cancel_run')!.invoke({ repository: 'acme/api', runId: 4822, runNumber: 17 }),
+        ).toMatchObject({ held: true, proposalId: 'proposal-2' });
+        const call = (proposals.propose.mock.calls[0] as unknown[])[1] as { title: string; payload: Record<string, unknown> };
+        expect(call.title).toBe('Cancel workflow run #17 of acme/api? Every job in it stops. This cannot be undone.');
+        expect(call.payload).toMatchObject({ verb: 'cancel-run', nodeId: '', args: { repository: 'acme/api', runId: 4822 } });
+        expect(await byName.get('fleet_runners_cancel_run')!.invoke({ repository: 'nope', runId: 1 })).toMatchObject({
+            error: { code: 'invalid' },
+        });
+    });
 });

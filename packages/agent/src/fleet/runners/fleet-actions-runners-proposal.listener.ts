@@ -32,13 +32,23 @@ export class FleetActionsRunnersProposalListener {
         if (event.decidedVia !== 'user' || !event.decidedById) return;
         const payload = (event.payload ?? {}) as Record<string, unknown>;
         if (payload.kind !== FLEET_RUNNERS_ACTION_PROPOSAL_KIND) return;
-        if (payload.agentId !== event.agentId || typeof payload.nodeId !== 'string' || !payload.nodeId) {
+        if (payload.agentId !== event.agentId || typeof payload.nodeId !== 'string' || (!payload.nodeId && payload.verb !== 'cancel-run')) {
             this.logger.warn(`Approved runner act ${event.proposalId} names another Agent or no computer; not run`);
             return;
         }
         const args = (payload.args ?? {}) as Record<string, unknown>;
         const caller = { kind: 'agent' as const, agentId: event.agentId, ownerUserId: event.userId };
         try {
+            if (payload.verb === 'cancel-run') {
+                // P2 (FR-23): a whole workflow run of a repository the owner's installation covers.
+                await this.runners.cancelRun(caller, {
+                    repository: args.repository,
+                    runId: args.runId,
+                    runNumber: args.runNumber,
+                    fields: { confirm: true },
+                });
+                return;
+            }
             if (payload.verb === 'install') {
                 const target = (args.target ?? {}) as { scope?: unknown; target?: unknown };
                 if (!isFleetActionsRunnerScope(target.scope) || !isFleetActionsRunnerTarget(target.scope, target.target)) {

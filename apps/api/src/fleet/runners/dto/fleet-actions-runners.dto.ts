@@ -22,6 +22,7 @@ import {
     FLEET_ACTIONS_RUNNER_SCOPES,
     FLEET_ACTIONS_RUNNER_STATES,
     FLEET_ACTIONS_RUNNERS_MAX_PER_NODE,
+    FLEET_ACTIONS_MAX_WATCHED_TARGETS,
     type FleetActionConfirmFields,
     type FleetActionsRunnerMode,
     type FleetActionsRunnerPhase,
@@ -173,4 +174,55 @@ export class FleetActionsRunnerProgressDto extends FleetActionsRunnerNodeJobDto 
     @IsOptional()
     @IsBoolean()
     deregistered?: boolean;
+}
+
+/** `PUT /api/fleet/runners/jobs/watched` (FR-21). Each entry is re-validated by the service. */
+export class FleetActionsWatchedTargetsDto {
+    @ApiProperty({
+        description: 'The repositories ({ scope: "repo", target: "owner/repo" }) and organisations ({ scope: "org", target: "acme" }) to watch; empty = every target you have runners for.',
+        type: 'array',
+        items: { type: 'object' },
+        maxItems: FLEET_ACTIONS_MAX_WATCHED_TARGETS,
+    })
+    @IsArray()
+    @ArrayMaxSize(FLEET_ACTIONS_MAX_WATCHED_TARGETS)
+    targets: unknown[];
+}
+
+/** `POST /api/fleet/runners/jobs/cancel` (FR-23). The confirmation fields are CONTRACTS §2.2's. */
+export class FleetActionsCancelRunDto {
+    @ApiProperty({ description: 'owner/repo of the workflow run.', maxLength: 200 })
+    @IsString()
+    @MaxLength(200)
+    repository: string;
+
+    @ApiProperty({ minimum: 1, description: 'The workflow run id (from the Actions jobs panel).' })
+    @IsInt()
+    @Min(1)
+    runId: number;
+
+    @ApiProperty({ required: false, minimum: 1, description: 'The run number, for the confirmation sentence.' })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    runNumber?: number;
+
+    @ApiProperty({ required: false, description: 'Cancel is `confirm`: send true.' })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
+/**
+ * `?targets=acme/api,acme` → watched-target entries (a `/` names a repository,
+ * else an organisation); validated by the service. Absent or empty → null.
+ */
+export function parseTargetsQuery(raw: string | undefined): Array<{ scope: 'org' | 'repo'; target: string }> | null {
+    if (typeof raw !== 'string' || !raw.trim()) return null;
+    return raw
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0)
+        .slice(0, FLEET_ACTIONS_MAX_WATCHED_TARGETS + 1)
+        .map((target) => ({ scope: target.includes('/') ? ('repo' as const) : ('org' as const), target }));
 }
