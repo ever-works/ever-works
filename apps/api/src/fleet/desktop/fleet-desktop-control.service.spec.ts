@@ -57,7 +57,14 @@ function node(helper: Record<string, unknown> = { control: 'allowed', inputReaso
 type Row = Record<string, unknown> & { id: string; status: string };
 
 function build(
-    options: { helper?: Record<string, unknown>; held?: boolean; refused?: string } = {},
+    options: {
+        helper?: Record<string, unknown>;
+        held?: boolean;
+        refused?: string;
+        /** P2.C: a recording service double, and the owner's opt-in for watching views. */
+        recording?: Record<string, jest.Mock>;
+        recordWatchSessions?: boolean;
+    } = {},
 ) {
     const row = node(options.helper);
     const rows = new Map<string, Row>();
@@ -196,6 +203,7 @@ function build(
         sessions as never,
         gateway as never,
         control as never,
+        options.recording as never,
     );
     return {
         service,
@@ -604,5 +612,166 @@ describe('availability', () => {
             reasons: ['permission-accessibility'],
         });
         expect(view.control?.blockedShortcuts).toContain('Alt+F4');
+    });
+});
+
+describe('recordings (P2.C, FR-48 … FR-55)', () => {
+    function recordingDouble() {
+        const live = new Set<string>();
+        return {
+            live,
+            start: jest.fn(async (input: { viewId: string }) => {
+                live.add(input.viewId);
+                return true;
+            }),
+            stop: jest.fn(async (viewId: string) => {
+                live.delete(viewId);
+            }),
+            push: jest.fn(),
+            isRecording: jest.fn((viewId: string) => live.has(viewId)),
+            failureOf: jest.fn(() => null),
+            list: jest.fn(async () => []),
+            read: jest.fn(async (viewId: string) => ({
+                viewId,
+                startedAt: '2026-10-27T09:00:00.000Z',
+                endedAt: viewId.endsWith('live') ? null : '2026-10-27T09:30:00.000Z',
+            })),
+            flushNow: jest.fn(),
+            chunk: jest.fn(async () => new Uint8Array([0x45, 0x57, 0x52, 0x31])),
+            remove: jest.fn(async () => true),
+        };
+    }
+
+    it('records a view from the moment it takes control (FR-48), and taps only its pictures', async () => {
+        const recording = recordingDouble();
+        const { service } = build({ recording: recording as never });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        // The tab watches (one socket here), takes control, then re-attaches as the driver.
+        const viewer = handle(opened.view.viewId, 'viewer');
+        await service.admit(viewer);
+        service.opened(viewer);
+        await service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true });
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(recording.start).toHaveBeenCalledWith(
+            expect.objectContaining({ viewId: opened.view.viewId, trigger: 'control' }),
+        );
+        service.closed(viewer);
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
+        await service.admit(driver);
+        service.opened(driver);
+        service.nodeBinary(driver, 20, new Uint8Array([1]));
+        service.nodeBinary(driver, 10, new Uint8Array([1]));
+        expect(recording.push).toHaveBeenCalledTimes(1);
+        expect(service.viewFor(OWNER, NODE_ID, opened.view.viewId).recording).toEqual({
+            state: 'recording',
+            reason: null,
+        });
+    });
+
+    it('never records a watching view unless the owner opted in', async () => {
+        const recording = recordingDouble();
+        const { service } = build({ recording: recording as never });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        const viewer = handle(opened.view.viewId, 'viewer');
+        await service.admit(viewer);
+        service.opened(viewer);
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(recording.start).not.toHaveBeenCalled();
+        expect(service.viewFor(OWNER, NODE_ID, opened.view.viewId).recording?.state).toBe('off');
+    });
+
+    it('stops a control recording when control ends, and every recording with its view', async () => {
+        const recording = recordingDouble();
+        const { service } = build({ recording: recording as never, held: true });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        const viewer = handle(opened.view.viewId, 'viewer');
+        await service.admit(viewer);
+        service.opened(viewer);
+        await service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true });
+        await new Promise((resolve) => setImmediate(resolve));
+        service.onControlChanged(
+            new ComputerControlChangedEvent({
+                nodeId: NODE_ID,
+                sessionId: opened.view.viewId,
+                ownerUserId: OWNER,
+                agentId: '',
+                actorUserId: OWNER,
+                held: false,
+                untilMs: null,
+                reason: 'given-back',
+                heldMs: 1_000,
+            }),
+        );
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(recording.stop).toHaveBeenCalledWith(opened.view.viewId, 'control-ended');
+        await service.takeControl(OWNER, NODE_ID, opened.view.viewId, { confirm: true });
+        await new Promise((resolve) => setImmediate(resolve));
+        await service.endView(OWNER, NODE_ID, opened.view.viewId);
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(recording.stop).toHaveBeenLastCalledWith(opened.view.viewId, 'view-ended');
+    });
+
+    it('never deletes the recording of a live view, and only its owner deletes one', async () => {
+        const recording = recordingDouble();
+        const { service } = build({ recording: recording as never });
+        expect(
+            await refusal(service.deleteRecording(OWNER, NODE_ID, 'view-still-live', true)),
+        ).toMatchObject({ code: 'busy', details: { reason: 'view-live' } });
+        expect(
+            await refusal(
+                service.deleteRecording(
+                    'member-1',
+                    NODE_ID,
+                    '00000000-0000-4000-8000-0000000000aa',
+                    true,
+                ),
+            ),
+        ).toMatchObject({ code: 'permission_denied' });
+        expect(recording.remove).not.toHaveBeenCalled();
+    });
+
+    it('takes the pictures of one socket only, and ends a control recording when the driver goes', async () => {
+        const recording = recordingDouble();
+        const { service } = build({ recording: recording as never, held: true });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
+        const other = { ...handle(opened.view.viewId, 'viewer'), id: 'h-other' };
+        await service.admit(driver);
+        service.opened(driver);
+        await service.admit(other);
+        service.opened(other);
+        await new Promise((resolve) => setImmediate(resolve));
+        service.nodeBinary(driver, 20, new Uint8Array([1]));
+        service.nodeBinary(other, 20, new Uint8Array([1]));
+        expect(recording.push).toHaveBeenCalledTimes(1);
+        service.closed(driver);
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(recording.stop).toHaveBeenCalledWith(opened.view.viewId, 'control-ended');
+    });
+
+    it('deletes a recording only with confirm, for people in the desktop audience', async () => {
+        const recording = recordingDouble();
+        const { service } = build({ recording: recording as never });
+        const viewId = '00000000-0000-4000-8000-0000000000aa';
+        expect(await refusal(service.deleteRecording(OWNER, NODE_ID, viewId, false))).toMatchObject(
+            {
+                code: 'confirmation_required',
+                details: { class: 'confirm' },
+            },
+        );
+        expect(recording.remove).not.toHaveBeenCalled();
+        await service.deleteRecording(OWNER, NODE_ID, viewId, true);
+        expect(recording.remove).toHaveBeenCalledWith(viewId, OWNER);
+        const access = (service as unknown as { access: { canAct: jest.Mock } }).access;
+        access.canAct.mockImplementationOnce(async () => false);
+        expect(await refusal(service.recordings(OWNER, NODE_ID))).toMatchObject({
+            code: 'permission_denied',
+        });
     });
 });

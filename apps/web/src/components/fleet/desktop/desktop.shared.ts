@@ -8,6 +8,8 @@ import {
     type FleetDesktopAvailabilityView,
     type FleetDesktopBlocker,
     type FleetDesktopOpenResult,
+    type FleetDesktopRecordingView,
+    type FleetDesktopViewView,
     type FleetDisplayView,
 } from '@ever-works/contracts';
 import { readSessionError, type SessionErrorRead } from '../sessions/sessions.shared';
@@ -168,6 +170,38 @@ export const desktopClient = {
     reattach(nodeId: string, viewId: string): Promise<DesktopResult<DesktopBrowserGrant>> {
         return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/attach-token`, {
             method: 'POST',
+        });
+    },
+    /** One of my views (P2.C: whether it is being recorded). */
+    view(nodeId: string, viewId: string): Promise<DesktopResult<FleetDesktopViewView>> {
+        return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}`);
+    },
+    // ─── Recordings (P2.C) ─────────────────────────────────────────────────
+    recordings(nodeId: string): Promise<DesktopResult<FleetDesktopRecordingView[]>> {
+        return call(`${base(nodeId)}/recordings`);
+    },
+    recording(nodeId: string, viewId: string): Promise<DesktopResult<FleetDesktopRecordingView>> {
+        return call(`${base(nodeId)}/recordings/${encodeURIComponent(viewId)}`);
+    },
+    /** One chunk's bytes, or null when it cannot be read. */
+    async recordingChunk(nodeId: string, viewId: string, seq: number): Promise<Uint8Array | null> {
+        try {
+            const response = await fetch(
+                `${base(nodeId)}/recordings/${encodeURIComponent(viewId)}/chunks/${encodeURIComponent(String(seq))}`,
+                { cache: 'no-store' },
+            );
+            if (!response.ok) return null;
+            return new Uint8Array(await response.arrayBuffer());
+        } catch {
+            return null;
+        }
+    },
+    /** "Delete now" — only after the person confirmed it. */
+    deleteRecording(nodeId: string, viewId: string): Promise<DesktopResult<null>> {
+        return call(`${base(nodeId)}/recordings/${encodeURIComponent(viewId)}`, {
+            method: 'DELETE',
+            headers: JSON_HEADERS,
+            body: JSON.stringify({ confirm: true }),
         });
     },
     // ─── Control (P2) ──────────────────────────────────────────────────────

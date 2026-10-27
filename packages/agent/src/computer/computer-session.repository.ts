@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Not, Repository, type FindOptionsWhere } from 'typeorm';
 import { COMPUTER_SESSION_OPEN_STATUSES } from '@ever-works/contracts';
 import { advisoryLockObjectId } from '../database/repositories/agent-run.repository';
 import { ComputerSession } from '../entities/computer-session.entity';
@@ -132,6 +132,73 @@ export class ComputerSessionRepository {
         return this.repository.findOne({
             where: { id, openedByUserId, source: 'desktop', agentId: IsNull() },
         });
+    }
+
+    // ── Desktop recordings (FL-07 P2.C) ──────────────────────────────────
+
+    /** Write a Desktop view's recording fields (the recording path only). */
+    async setRecording(id: string, patch: Partial<ComputerSession>): Promise<void> {
+        await this.repository.update({ id, source: 'desktop' }, patch);
+    }
+
+    /** One computer's Desktop views that still have a recording, newest first. */
+    async findDesktopRecordingsForNode(nodeId: string, take = 50): Promise<ComputerSession[]> {
+        return this.repository.find({
+            where: { nodeId, source: 'desktop', recordingRef: Not(IsNull()) },
+            order: { createdAt: 'DESC' },
+            take,
+        });
+    }
+
+    /**
+     * Desktop recordings the retention sweep deletes: past their expiry, or
+     * ended with no expiry at all and older than `orphanCutoff` (a recording
+     * whose writer never finished). `excludeIds`: rows that already failed in
+     * this sweep, so they never block the ones behind them.
+     */
+    async findExpiredDesktopRecordings(
+        now: Date,
+        take = 100,
+        orphanCutoff?: Date,
+        excludeIds: readonly string[] = [],
+    ): Promise<ComputerSession[]> {
+        const idFilter = excludeIds.length > 0 ? { id: Not(In([...excludeIds])) } : {};
+        const where: FindOptionsWhere<ComputerSession>[] = [
+            {
+                ...idFilter,
+                source: 'desktop',
+                recordingRef: Not(IsNull()),
+                recordingExpiresAt: LessThan(now),
+            },
+        ];
+        if (orphanCutoff) {
+            where.push({
+                ...idFilter,
+                source: 'desktop',
+                recordingRef: Not(IsNull()),
+                recordingExpiresAt: IsNull(),
+                status: 'ended',
+                endedAt: LessThan(orphanCutoff),
+            });
+        }
+        return this.repository.find({ where, order: { createdAt: 'ASC' }, take });
+    }
+
+    /**
+     * Move a Desktop view's recording fields only while its `recordingRef` is
+     * still `previous` (null: none yet) — the compare-and-set two API replicas
+     * writing one view's recording go through. True when this write won.
+     */
+    async swapRecordingRef(
+        id: string,
+        previous: string | null,
+        patch: Partial<ComputerSession>,
+    ): Promise<boolean> {
+        const result = await this.repository.update(
+            { id, source: 'desktop', recordingRef: previous === null ? IsNull() : previous },
+            patch,
+        );
+        return (result.affected ?? 0) === 1;
     }
 
     /** A Desktop view's driver attached or proved alive now (the cross-replica disconnect grace reads it). */
