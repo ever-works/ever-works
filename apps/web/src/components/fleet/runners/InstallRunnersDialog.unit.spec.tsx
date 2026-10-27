@@ -11,10 +11,13 @@ vi.mock('next-intl', async () => {
 
 const options = vi.fn();
 const install = vi.fn();
+const permission = vi.fn();
 vi.mock('@/app/actions/fleet/runners', () => ({
     listFleetActionsRunnersAction: vi.fn(),
     fleetActionsRunnerOptionsAction: (...args: unknown[]) => options(...args),
     installFleetActionsRunnersAction: (...args: unknown[]) => install(...args),
+    // P2 (FR-26): the organisation permission check; unknown unless a test says otherwise.
+    fleetActionsRunnersPermissionAction: (...args: unknown[]) => permission(...args),
     fleetActionsRunnerControlAction: vi.fn(),
     removeFleetActionsRunnerAction: vi.fn(),
 }));
@@ -94,6 +97,8 @@ function open(onInstalled = vi.fn(), onClose = vi.fn()) {
 beforeEach(() => {
     options.mockReset();
     install.mockReset();
+    permission.mockReset();
+    permission.mockResolvedValue({ ok: false, error: { code: 'not_found', hint: '' } });
     toast.success.mockReset();
     toast.error.mockReset();
 });
@@ -261,5 +266,105 @@ describe('InstallRunnersDialog', () => {
             'https://github.com/organizations/acme/settings/installations/1',
         );
         expect(screen.getByTestId('fleet-runners-install-submit')).toBeDisabled();
+    });
+
+    // ─── P2 (spec §5.6, FR-26): the organisation permission check ───────────
+
+    const orgOnly = () =>
+        opts({
+            targets: [
+                {
+                    scope: 'org',
+                    target: 'acme',
+                    accountLogin: 'acme',
+                    permission: 'unknown',
+                    grantUrl: null,
+                },
+                {
+                    scope: 'repo',
+                    target: 'acme/api',
+                    accountLogin: 'acme',
+                    permission: 'ok',
+                    grantUrl: null,
+                },
+            ],
+        });
+
+    it('asks the API about an organisation target and installs once the App may register there', async () => {
+        options.mockResolvedValue({ ok: true, data: orgOnly() });
+        permission.mockResolvedValue({
+            ok: true,
+            data: { scope: 'org', target: 'acme', ok: true, missing: null, grantUrl: null },
+        });
+        open();
+        const target = await screen.findByTestId('fleet-runners-install-target');
+        fireEvent.change(target, { target: { value: 'org:acme' } });
+        await waitFor(() => expect(permission).toHaveBeenCalledWith('org', 'acme'));
+        await waitFor(() =>
+            expect(screen.getByTestId('fleet-runners-install-submit')).toBeEnabled(),
+        );
+        expect(screen.queryByTestId('fleet-runners-install-permission')).toBeNull();
+    });
+
+    it('shows the Grant access card instead of enabling Install when the permission is missing', async () => {
+        options.mockResolvedValue({ ok: true, data: orgOnly() });
+        permission.mockResolvedValue({
+            ok: true,
+            data: {
+                scope: 'org',
+                target: 'acme',
+                ok: false,
+                missing: 'Self-hosted runners: Read and write',
+                grantUrl: 'https://github.com/organizations/acme/settings/installations/1',
+            },
+        });
+        open();
+        fireEvent.change(await screen.findByTestId('fleet-runners-install-target'), {
+            target: { value: 'org:acme' },
+        });
+        const card = await screen.findByTestId('fleet-runners-install-permission');
+        expect(card).toHaveTextContent('Organisation runners need one more permission');
+        expect(card).toHaveTextContent('needs “Self-hosted runners: Read and write”');
+        expect(screen.getByTestId('fleet-runners-install-permission-grant')).toHaveAttribute(
+            'href',
+            'https://github.com/organizations/acme/settings/installations/1',
+        );
+        expect(screen.getByTestId('fleet-runners-install-submit')).toBeDisabled();
+
+        // Check again re-asks; once granted, Install enables.
+        permission.mockResolvedValue({
+            ok: true,
+            data: { scope: 'org', target: 'acme', ok: true, missing: null, grantUrl: null },
+        });
+        fireEvent.click(screen.getByTestId('fleet-runners-install-permission-check'));
+        await waitFor(() => expect(permission).toHaveBeenCalledTimes(2));
+        await waitFor(() =>
+            expect(screen.queryByTestId('fleet-runners-install-permission')).toBeNull(),
+        );
+        expect(screen.getByTestId('fleet-runners-install-submit')).toBeEnabled();
+    });
+
+    it('switches to a repository on "Use a repository instead"', async () => {
+        options.mockResolvedValue({ ok: true, data: orgOnly() });
+        permission.mockResolvedValue({
+            ok: true,
+            data: { scope: 'org', target: 'acme', ok: false, missing: null, grantUrl: null },
+        });
+        open();
+        const target = await screen.findByTestId('fleet-runners-install-target');
+        fireEvent.change(target, { target: { value: 'org:acme' } });
+        fireEvent.click(
+            await screen.findByTestId('fleet-runners-install-permission-use-repository'),
+        );
+        await waitFor(() => expect(target).toHaveValue('repo:acme/api'));
+        expect(screen.queryByTestId('fleet-runners-install-permission')).toBeNull();
+        expect(screen.getByTestId('fleet-runners-install-submit')).toBeEnabled();
+    });
+
+    it('never asks about a repository target', async () => {
+        options.mockResolvedValue({ ok: true, data: opts() });
+        open();
+        await screen.findByTestId('fleet-runners-install-summary');
+        expect(permission).not.toHaveBeenCalled();
     });
 });

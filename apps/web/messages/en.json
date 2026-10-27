@@ -16019,10 +16019,85 @@
                 "cancel": "Cancel",
                 "submit": "{count, plural, one {Install # runner} other {Install # runners}}",
                 "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
-                "failed": "The runners could not be installed."
+                "failed": "The runners could not be installed.",
+                "choose": "Choose a repository or organisation",
+                "checkingPermission": "Checking the GitHub App’s permission on {target}…"
             },
             "palette": {
-                "install": "Install Actions runners on {name}"
+                "install": "Install Actions runners on {name}",
+                "jobs": "Actions jobs"
+            },
+            "jobs": {
+                "title": "Actions jobs",
+                "counts": "{queued} queued · {running} running",
+                "busy": "{busy} of {total, plural, one {# runner} other {# runners}} busy",
+                "listLabel": "Queued and running Actions jobs",
+                "loading": "Loading Actions jobs…",
+                "loadFailed": "The Actions jobs could not be read.",
+                "lastKnown": "Last known jobs — {reason}",
+                "checked": "checked {time}",
+                "notChecked": "not checked yet",
+                "rateLimited": "GitHub is rate-limiting; next check {time}",
+                "rateLimitedWait": "GitHub is rate-limiting; the next check waits until it allows one",
+                "killSwitch": "All computers are stopped — runners keep running; installing and cancelling are paused.",
+                "empty": "No queued or running jobs on your runners",
+                "watching": "watching {targets}",
+                "watchingNone": "not watching any repository or organisation yet",
+                "watchingDefault": "(the default: every repository and organisation your runners are registered for)",
+                "change": "Change",
+                "unreadable": "Could not read {target}: {reason}",
+                "grantAccess": "Grant access",
+                "highlightGone": "That workflow run is no longer queued or running.",
+                "run": "#{number}",
+                "queued": "queued {duration}",
+                "queuedNow": "queued",
+                "running": "running {duration}",
+                "runningNow": "running",
+                "noRunner": "no runner can take it",
+                "openJob": "Open job on GitHub",
+                "cancel": "Cancel workflow run…",
+                "cancelConfirm": "Cancel workflow run",
+                "cancelPaused": "Paused while all computers are stopped",
+                "cancelling": "Cancelling workflow run #{number} of {repository}…",
+                "cancellingNoNumber": "Cancelling the workflow run of {repository}…",
+                "cancelFailed": "The workflow run could not be cancelled.",
+                "watched": {
+                    "title": "Watched repositories and organisations",
+                    "description": "The Actions jobs panel lists the queued and running jobs of these that target your self-hosted runners.",
+                    "defaultNote": "Nothing saved yet: the panel watches every repository and organisation your runners are registered for.",
+                    "empty": "Nothing in the list.",
+                    "add": "Add",
+                    "addLabel": "Add a repository or organisation",
+                    "choose": "Choose…",
+                    "repository": "repository",
+                    "organisation": "organisation",
+                    "remove": "Stop watching {target}",
+                    "limit": "At most {max} repositories and organisations.",
+                    "noneAvailable": "Your GitHub App does not cover a repository or organisation yet.",
+                    "openAppSettings": "Open GitHub App settings",
+                    "save": "Save",
+                    "useDefault": "Use the default",
+                    "cancel": "Cancel",
+                    "saved": "Saved the watched list.",
+                    "failed": "The watched list could not be saved."
+                }
+            },
+            "diagnosis": {
+                "offline": "the only matching runner is offline",
+                "missingLabel": "no runner has the label {label}",
+                "missingLabelUnnamed": "no runner has every label it asks for",
+                "wrongScope": "no runner is registered to {target}",
+                "waitingFor": "waiting for {runner}",
+                "waitingForAny": "waiting for a busy runner"
+            },
+            "grantAccess": {
+                "title": "Organisation runners need one more permission",
+                "body": "The Ever Works GitHub App on {account} needs “{permission}”. Grant it on GitHub, then come back and press Check again.",
+                "bodyUnnamed": "The Ever Works GitHub App on {account} needs one more permission. Grant it on GitHub, then come back and press Check again.",
+                "grant": "Grant access",
+                "checkAgain": "Check again",
+                "checking": "Checking…",
+                "useRepository": "Use a repository instead"
             }
         }
     }
