@@ -42,17 +42,15 @@ export async function requestAccountDeletion(email: string): Promise<ActionResul
 
 /** Public: what a link would delete. Does not use the link. */
 export async function verifyAccountDeletion(token: string): Promise<ActionResult<AccountDeletionPreview>> {
-    const t = await getTranslations('auth.deleteAccount.confirm.errors');
     try {
         return { success: true, data: await accountDeletionAPI.verify(token) };
     } catch (error) {
-        return linkError(error, t);
+        return linkError(error, await linkErrorMessages());
     }
 }
 
 /** Public: use the link and delete the account. */
 export async function confirmAccountDeletion(token: string): Promise<ActionResult<AccountDeletionResult>> {
-    const t = await getTranslations('auth.deleteAccount.confirm.errors');
     try {
         const result = await accountDeletionAPI.confirm(token);
         // If this browser happened to be signed in to the deleted account,
@@ -60,7 +58,7 @@ export async function confirmAccountDeletion(token: string): Promise<ActionResul
         await removeAuthAccessCookies().catch(() => undefined);
         return { success: true, data: result };
     } catch (error) {
-        return linkError(error, t);
+        return linkError(error, await linkErrorMessages());
     }
 }
 
@@ -99,20 +97,34 @@ export async function deleteMyAccount(confirmEmail: string): Promise<ActionResul
     }
 }
 
-function linkError(
-    error: unknown,
-    t: Awaited<ReturnType<typeof getTranslations>>,
-): { success: false; error: string; gone?: boolean } {
+interface LinkErrorMessages {
+    linkInvalid: string;
+    tooManyRequests: string;
+    billingCancelFailed: string;
+    failed: string;
+}
+
+async function linkErrorMessages(): Promise<LinkErrorMessages> {
+    const t = await getTranslations('auth.deleteAccount.confirm.errors');
+    return {
+        linkInvalid: t('linkInvalid'),
+        tooManyRequests: t('tooManyRequests'),
+        billingCancelFailed: t('billingCancelFailed'),
+        failed: t('failed'),
+    };
+}
+
+function linkError(error: unknown, messages: LinkErrorMessages): { success: false; error: string; gone?: boolean } {
     if (error instanceof ApiResponseError) {
         if (error.statusCode === 410) {
-            return { success: false, error: t('linkInvalid'), gone: true };
+            return { success: false, error: messages.linkInvalid, gone: true };
         }
         if (error.statusCode === 429) {
-            return { success: false, error: t('tooManyRequests') };
+            return { success: false, error: messages.tooManyRequests };
         }
         if (error.code === 'billing_cancel_failed') {
-            return { success: false, error: t('billingCancelFailed') };
+            return { success: false, error: messages.billingCancelFailed };
         }
     }
-    return { success: false, error: t('failed') };
+    return { success: false, error: messages.failed };
 }
