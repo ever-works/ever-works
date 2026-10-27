@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import {
     UPSTREAM_POLLING,
+    UPSTREAM_WITHDRAWABLE_STATES,
     type UpstreamPrActivityEvent,
     type UpstreamPullRequestState,
     type UpstreamPullRequestView,
@@ -19,6 +20,22 @@ import {
  * the same source Task moves it to `failed` so the slot is not held forever.
  */
 export const UPSTREAM_DIRECT_OPENING_STALE_MS = 15 * 60_000;
+
+/** The answer of a member's state change on one record (`withdraw`, `acknowledgeExtraFiles`). */
+export type UpstreamRecordChangeResult =
+    | { readonly status: 'ok'; readonly row: UpstreamPullRequest }
+    | {
+          readonly status: 'refused';
+          readonly httpStatus: 403 | 404 | 409 | 503;
+          readonly code:
+              | 'not_found'
+              | 'authorRequired'
+              | 'notWithdrawable'
+              | 'extraFilesNotPresent'
+              | 'notAwaitingApproval'
+              | 'unavailable';
+          readonly message: string;
+      };
 
 /** What a direct pull request claims before the provider is called. */
 export interface UpstreamDirectClaimInput {
@@ -205,6 +222,115 @@ export class UpstreamPullRequestRecordService {
         return moved;
     }
 
+    /**
+     * FR-33 — **Withdraw**, before the pull request exists.
+     *
+     * Only the author (whose name the pull request would carry) or the App Work's owner may
+     * withdraw; any other editor is refused `403 authorRequired`. Only `preparing`,
+     * `needs_signature` and `awaiting_approval` are withdrawable (`409 notWithdrawable` after
+     * that: an opened pull request is closed on the provider by the member, never by Ever Works,
+     * FR-32). The compare-and-set is the fence against a concurrent open.
+     *
+     * The fork branch is NOT deleted here: `forkBranchDeletedAt` stays NULL, which is the status
+     * job's (T18) cue to delete it with the member's token within 10 minutes. No credential is
+     * used by this call.
+     */
+    async withdraw(
+        workId: string,
+        id: string,
+        actor: { userId: string; isWorkOwner: boolean },
+    ): Promise<UpstreamRecordChangeResult> {
+        if (!this.records) return unavailable();
+        const row = await this.records.findForWork(workId, id);
+        if (!row) return notFound(id);
+        if (row.userId !== actor.userId && !actor.isWorkOwner) {
+            return {
+                status: 'refused',
+                httpStatus: 403,
+                code: 'authorRequired',
+                message: 'Only the member who proposed this pull request, or the App Work owner, can withdraw it.',
+            };
+        }
+        const withdrawable = UPSTREAM_WITHDRAWABLE_STATES as readonly UpstreamPullRequestState[];
+        const moved = await this.transition(
+            row,
+            withdrawable,
+            'withdrawn',
+            { nextCheckAt: null, closedAt: new Date() },
+            {
+                event: 'app.upstream_pr.withdrawn',
+                status: ActivityStatus.CANCELLED,
+                summary: `Withdrew a pull request proposal for ${upstreamOf(row)}`,
+                actorUserId: actor.userId,
+            },
+        );
+        if (!moved) {
+            return {
+                status: 'refused',
+                httpStatus: 409,
+                code: 'notWithdrawable',
+                message:
+                    row.state === 'open' || row.state === 'opening'
+                        ? 'This pull request is already open upstream. Close it on GitHub if you no longer want it.'
+                        : `This proposal is ${row.state} and can no longer be withdrawn.`,
+            };
+        }
+        const fresh = await this.records.findForWork(workId, id);
+        return { status: 'ok', row: fresh ?? { ...row, state: 'withdrawn' } };
+    }
+
+    /**
+     * FR-49 / G06 — "I've reviewed the extra files", recorded for the AUTHOR, the only person
+     * whose approval counts (FR-21). `409 extraFilesNotPresent` when the prepared diff marks no
+     * file "Not in the original change"; `409 notAwaitingApproval` outside the approval window.
+     * Idempotent: a second acknowledgement keeps the first time.
+     */
+    async acknowledgeExtraFiles(
+        workId: string,
+        id: string,
+        actorUserId: string,
+        now: Date = new Date(),
+    ): Promise<UpstreamRecordChangeResult> {
+        if (!this.records) return unavailable();
+        const row = await this.records.findForWork(workId, id);
+        if (!row) return notFound(id);
+        if (row.userId !== actorUserId) {
+            return {
+                status: 'refused',
+                httpStatus: 403,
+                code: 'authorRequired',
+                message: 'Only the member who will publish this pull request can acknowledge its extra files.',
+            };
+        }
+        const extra = Array.isArray(row.diffStats?.extraFiles) ? row.diffStats.extraFiles : [];
+        if (extra.length === 0) {
+            return {
+                status: 'refused',
+                httpStatus: 409,
+                code: 'extraFilesNotPresent',
+                message: 'This proposal changes no file outside the original change.',
+            };
+        }
+        if (row.extraFilesAcknowledgedAt) return { status: 'ok', row };
+        const patched = await this.records.patchIf(row.id, workId, ['awaiting_approval'], {
+            extraFilesAcknowledgedAt: now,
+            extraFilesAcknowledgedById: actorUserId,
+        });
+        if (!patched) {
+            return {
+                status: 'refused',
+                httpStatus: 409,
+                code: 'notAwaitingApproval',
+                message: 'Extra files can only be acknowledged while the proposal is awaiting your approval.',
+            };
+        }
+        const fresh = await this.records.findForWork(workId, id);
+        return {
+            status: 'ok',
+            row: fresh ?? { ...row, extraFilesAcknowledgedAt: now, extraFilesAcknowledgedById: actorUserId },
+        };
+    }
+
     /** One `app_upstream_pr` Activity row (R-2). Best-effort: never fails the caller. */
     async recordActivity(
         row: Pick<
@@ -266,6 +392,24 @@ export class UpstreamPullRequestRecordService {
             );
         }
     }
+}
+
+function unavailable(): UpstreamRecordChangeResult {
+    return {
+        status: 'refused',
+        httpStatus: 503,
+        code: 'unavailable',
+        message: 'Upstream pull requests are not available in this process.',
+    };
+}
+
+function notFound(id: string): UpstreamRecordChangeResult {
+    return {
+        status: 'refused',
+        httpStatus: 404,
+        code: 'not_found',
+        message: `Upstream pull request ${id} not found.`,
+    };
 }
 
 function upstreamOf(row: { upstreamOwner: string; upstreamRepo: string }): string {
