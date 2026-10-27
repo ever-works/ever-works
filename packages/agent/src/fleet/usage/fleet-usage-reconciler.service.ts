@@ -54,9 +54,12 @@ interface KeyedRow {
     checkoutPath: string | null;
 }
 
-type Attribution = { fleetSessionId: string; agentRunId?: undefined } | { agentRunId: string; fleetSessionId?: undefined };
+type Attribution =
+    | { fleetSessionId: string; agentRunId?: undefined }
+    | { agentRunId: string; fleetSessionId?: undefined };
 
-const sessionKey = (provider: string, providerSessionId: string) => `${provider}\u0000${providerSessionId}`;
+const sessionKey = (provider: string, providerSessionId: string) =>
+    `${provider}\u0000${providerSessionId}`;
 
 /**
  * Usage & cost on the fleet (FL-20, plan §10, T-12, T-13, T-23) — turn a
@@ -144,7 +147,11 @@ export class FleetUsageReconcilerService {
     }
 
     /** Ingest one report for one node. Public for the specs and a manual replay. */
-    async ingest(nodeId: string, raw: unknown, jobId?: string | null): Promise<FleetUsageIngestSummary> {
+    async ingest(
+        nodeId: string,
+        raw: unknown,
+        jobId?: string | null,
+    ): Promise<FleetUsageIngestSummary> {
         const summary: FleetUsageIngestSummary = {
             accepted: false,
             rows: 0,
@@ -160,7 +167,9 @@ export class FleetUsageReconcilerService {
         if (!node) return summary;
         const reading = normalizeFleetUsageReport(raw);
         if (!reading) {
-            this.logger.warn(`usage-scan report from node ${nodeId} is not a report (or is over the row cap) — ignored`);
+            this.logger.warn(
+                `usage-scan report from node ${nodeId} is not a report (or is over the row cap) — ignored`,
+            );
             return summary;
         }
         summary.accepted = true;
@@ -174,11 +183,18 @@ export class FleetUsageReconcilerService {
 
         for (let i = 0; i < rows.length; i += CHUNK) {
             const chunk = rows.slice(i, i + CHUNK);
-            const existing = await this.samples.find({ where: { dedupeKey: In(chunk.map((r) => r.key)) } });
+            const existing = await this.samples.find({
+                where: { dedupeKey: In(chunk.map((r) => r.key)) },
+            });
             const byKey = new Map(existing.map((sample) => [sample.dedupeKey, sample]));
             for (const keyed of chunk) {
                 const owner = attribution.get(keyed.key) ?? null;
-                const outcome = await this.upsert(node.id, keyed, owner, byKey.get(keyed.key) ?? null);
+                const outcome = await this.upsert(
+                    node.id,
+                    keyed,
+                    owner,
+                    byKey.get(keyed.key) ?? null,
+                );
                 summary[outcome.result] += 1;
                 if (outcome.fleetSessionId) touchedSessions.add(outcome.fleetSessionId);
                 else if (outcome.agentRunId) touchedRuns.add(outcome.agentRunId);
@@ -252,14 +268,22 @@ export class FleetUsageReconcilerService {
         rows: readonly KeyedRow[],
     ): Promise<Map<string, Attribution>> {
         const out = new Map<string, Attribution>();
-        const ids = [...new Set(rows.map((r) => r.row.providerSessionId).filter((id): id is string => !!id))];
+        const ids = [
+            ...new Set(rows.map((r) => r.row.providerSessionId).filter((id): id is string => !!id)),
+        ];
         if (ids.length === 0) return out;
 
         const sessionsByKey = new Map<string, FleetSession[]>();
         for (let i = 0; i < ids.length; i += CHUNK) {
             const found = await this.sessions.find({
                 where: { nodeId, providerSessionId: In(ids.slice(i, i + CHUNK)) },
-                select: { id: true, provider: true, providerSessionId: true, createdAt: true, agentRunId: true },
+                select: {
+                    id: true,
+                    provider: true,
+                    providerSessionId: true,
+                    createdAt: true,
+                    agentRunId: true,
+                },
             });
             for (const session of found) {
                 if (!session.providerSessionId) continue;
@@ -270,7 +294,8 @@ export class FleetUsageReconcilerService {
 
         const unmatched = ids.filter(
             (id) =>
-                !sessionsByKey.has(sessionKey('claude-code', id)) && !sessionsByKey.has(sessionKey('codex', id)),
+                !sessionsByKey.has(sessionKey('claude-code', id)) &&
+                !sessionsByKey.has(sessionKey('codex', id)),
         );
         const runsByKey = new Map<string, AgentRun[]>();
         for (let i = 0; i < unmatched.length; i += CHUNK) {
@@ -280,7 +305,8 @@ export class FleetUsageReconcilerService {
             });
             for (const run of found) {
                 const session = run.fleetCliSession;
-                if (!session || session.nodeId !== nodeId || session.sessionId !== run.cliSessionId) continue;
+                if (!session || session.nodeId !== nodeId || session.sessionId !== run.cliSessionId)
+                    continue;
                 const key = sessionKey(session.provider, session.sessionId);
                 runsByKey.set(key, [...(runsByKey.get(key) ?? []), run]);
             }
@@ -305,7 +331,10 @@ export class FleetUsageReconcilerService {
     private claimable(
         rows: readonly KeyedRow[],
         attribution: Map<string, Attribution>,
-    ): Map<string, { provider: FleetUsageProvider; providerSessionId: string; attribution: Attribution }> {
+    ): Map<
+        string,
+        { provider: FleetUsageProvider; providerSessionId: string; attribution: Attribution }
+    > {
         const out = new Map<
             string,
             { provider: FleetUsageProvider; providerSessionId: string; attribution: Attribution }
@@ -315,7 +344,12 @@ export class FleetUsageReconcilerService {
             const id = keyed.row.providerSessionId;
             if (!owner || !id) continue;
             const key = sessionKey(keyed.row.provider, id);
-            if (!out.has(key)) out.set(key, { provider: keyed.row.provider, providerSessionId: id, attribution: owner });
+            if (!out.has(key))
+                out.set(key, {
+                    provider: keyed.row.provider,
+                    providerSessionId: id,
+                    attribution: owner,
+                });
         }
         return out;
     }
@@ -328,7 +362,9 @@ export class FleetUsageReconcilerService {
     ): Promise<void> {
         await this.samples.update(
             { nodeId, provider, providerSessionId, fleetSessionId: IsNull(), agentRunId: IsNull() },
-            owner.fleetSessionId ? { fleetSessionId: owner.fleetSessionId } : { agentRunId: owner.agentRunId },
+            owner.fleetSessionId
+                ? { fleetSessionId: owner.fleetSessionId }
+                : { agentRunId: owner.agentRunId },
         );
     }
 
@@ -339,7 +375,11 @@ export class FleetUsageReconcilerService {
         keyed: KeyedRow,
         owner: Attribution | null,
         stored: FleetUsageSample | null,
-    ): Promise<{ result: 'created' | 'updated' | 'unchanged'; fleetSessionId?: string; agentRunId?: string }> {
+    ): Promise<{
+        result: 'created' | 'updated' | 'unchanged';
+        fleetSessionId?: string;
+        agentRunId?: string;
+    }> {
         const { row } = keyed;
         if (!stored) {
             const priced = this.prices.price(row.tokens, row.model);
@@ -399,7 +439,11 @@ export class FleetUsageReconcilerService {
             patch.lastAt = merged.lastAt;
             // Re-priced at the version the sample already carries (U8); one
             // never priced is priced at the current version now.
-            const priced = this.prices.price(merged.tokens, stored.model, stored.priceListVersion ?? undefined);
+            const priced = this.prices.price(
+                merged.tokens,
+                stored.model,
+                stored.priceListVersion ?? undefined,
+            );
             patch.costCents = priced ? Math.round(priced.cents) : null;
             if (priced && stored.priceListVersion == null) patch.priceListVersion = priced.version;
         }
@@ -420,12 +464,18 @@ export class FleetUsageReconcilerService {
     // ─── 4. Sessions ─────────────────────────────────────────────────────
 
     /** The priced usage of every sample matching `where` (one Session's or one run's). */
-    async pricedFor(where: { fleetSessionId: string } | { agentRunId: string }): Promise<PricedUsage> {
+    async pricedFor(
+        where: { fleetSessionId: string } | { agentRunId: string },
+    ): Promise<PricedUsage> {
         const rows = await this.samples.find({ where });
         return priceUsageGroups(groupFleetUsageSamples(rows), this.prices);
     }
 
-    private async deriveSession(sessionId: string, nodeId: string, jobId: string | null): Promise<void> {
+    private async deriveSession(
+        sessionId: string,
+        nodeId: string,
+        jobId: string | null,
+    ): Promise<void> {
         const session = await this.sessions.findOne({ where: { id: sessionId } });
         if (!session) return;
         const priced = await this.pricedFor({ fleetSessionId: sessionId });
@@ -433,13 +483,23 @@ export class FleetUsageReconcilerService {
             tokens: toFleetSessionUsage(priced, new Date()),
             costCents: priced.costCents,
         });
-        if (session.agentRunId && (session.provider === 'claude-code' || session.provider === 'codex')) {
+        if (
+            session.agentRunId &&
+            (session.provider === 'claude-code' || session.provider === 'codex')
+        ) {
             await this.settleRun(session.agentRunId, session.provider, priced, nodeId, jobId);
         }
     }
 
-    private async deriveTaskRun(runId: string, nodeId: string, jobId: string | null): Promise<void> {
-        const run = await this.runRows.findOne({ where: { id: runId }, select: { id: true, fleetCliSession: true } });
+    private async deriveTaskRun(
+        runId: string,
+        nodeId: string,
+        jobId: string | null,
+    ): Promise<void> {
+        const run = await this.runRows.findOne({
+            where: { id: runId },
+            select: { id: true, fleetCliSession: true },
+        });
         const provider = run?.fleetCliSession?.provider;
         if (!run || (provider !== 'claude-code' && provider !== 'codex')) return;
         const priced = await this.pricedFor({ agentRunId: runId });
@@ -532,14 +592,21 @@ export class FleetUsageReconcilerService {
 
     private async acknowledge(jobId: string, raw: unknown): Promise<void> {
         const result = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
-        await this.jobRows.update(jobId, { result: { ...result, ingestedAt: new Date().toISOString() } });
+        await this.jobRows.update(jobId, {
+            result: { ...result, ingestedAt: new Date().toISOString() },
+        });
     }
 }
 
 /** The newest candidate created at or before `at` (else the oldest one). */
-function newestBefore<T extends { createdAt: Date }>(candidates: T[] | undefined, at: string): T | null {
+function newestBefore<T extends { createdAt: Date }>(
+    candidates: T[] | undefined,
+    at: string,
+): T | null {
     if (!candidates || candidates.length === 0) return null;
-    const sorted = [...candidates].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const sorted = [...candidates].sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    );
     const limit = Date.parse(at);
     let best: T | null = null;
     for (const candidate of sorted) {
@@ -574,7 +641,8 @@ export function groupFleetUsageSamples(rows: readonly FleetUsageSample[]): Usage
             cacheWrite: group.tokens.cacheWrite + tokens.cacheWrite,
         };
         group.requests += row.requests ?? 0;
-        if (row.firstAt && (!group.firstAt || row.firstAt < group.firstAt)) group.firstAt = row.firstAt;
+        if (row.firstAt && (!group.firstAt || row.firstAt < group.firstAt))
+            group.firstAt = row.firstAt;
         if (row.lastAt && (!group.lastAt || row.lastAt > group.lastAt)) group.lastAt = row.lastAt;
     }
     return [...groups.values()];

@@ -5,3 +5,4 @@ export * from './digest.module';
 export * from './digest.service';
 export * from './digest.types';
 export * from './agent-digest-tools';
+export * from './digest-fleet-usage-reader';

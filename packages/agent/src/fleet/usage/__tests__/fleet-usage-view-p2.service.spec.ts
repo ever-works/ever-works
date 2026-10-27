@@ -26,7 +26,10 @@ function matches(row: Row, where: Record<string, unknown>): boolean {
             const type = (expected as unknown as { type: string }).type;
             const value = (expected as unknown as { value: unknown }).value;
             if (type === 'in' && !(value as unknown[]).includes(actual)) return false;
-            if (type === 'moreThanOrEqual' && !(new Date(actual as Date).getTime() >= new Date(value as Date).getTime())) {
+            if (
+                type === 'moreThanOrEqual' &&
+                !(new Date(actual as Date).getTime() >= new Date(value as Date).getTime())
+            ) {
                 return false;
             }
             continue;
@@ -43,7 +46,11 @@ const repo = (rows: Row[]) => ({
     findOne: jest.fn(async (options: { where: Record<string, unknown> }) => {
         const found = rows
             .filter((row) => matches(row, options.where))
-            .sort((a, b) => new Date(b.createdAt as Date).getTime() - new Date(a.createdAt as Date).getTime());
+            .sort(
+                (a, b) =>
+                    new Date(b.createdAt as Date).getTime() -
+                    new Date(a.createdAt as Date).getTime(),
+            );
         return found[0] ?? null;
     }),
 });
@@ -67,7 +74,8 @@ const sample = (overrides: Row): Row => ({
 
 function harness(grouped: Row[] = []) {
     const qb: Record<string, jest.Mock> = {};
-    for (const name of ['select', 'addSelect', 'where', 'andWhere', 'groupBy', 'addGroupBy']) qb[name] = jest.fn(() => qb);
+    for (const name of ['select', 'addSelect', 'where', 'andWhere', 'groupBy', 'addGroupBy'])
+        qb[name] = jest.fn(() => qb);
     qb.getRawMany = jest.fn(async () => grouped);
     const storedSamples = [
         // RUN_NEW's Agent session: 1 M input ($3.00).
@@ -81,10 +89,28 @@ function harness(grouped: Row[] = []) {
         { id: 'session-x', agentRunId: null, agentId: OTHER_AGENT, kind: 'agent' },
     ]);
     const runs = repo([
-        { id: RUN_NEW, taskId: TASK, userId: OWNER, agentId: AGENT, createdAt: new Date('2026-10-20T08:00:00.000Z') },
-        { id: RUN_OLD, taskId: TASK, userId: OWNER, agentId: AGENT, createdAt: new Date('2026-10-10T08:00:00.000Z') },
+        {
+            id: RUN_NEW,
+            taskId: TASK,
+            userId: OWNER,
+            agentId: AGENT,
+            createdAt: new Date('2026-10-20T08:00:00.000Z'),
+        },
+        {
+            id: RUN_OLD,
+            taskId: TASK,
+            userId: OWNER,
+            agentId: AGENT,
+            createdAt: new Date('2026-10-10T08:00:00.000Z'),
+        },
         // Someone else's run of the same Task id is never counted.
-        { id: 'run-foreign', taskId: TASK, userId: 'someone-else', agentId: AGENT, createdAt: new Date('2026-10-20T09:00:00.000Z') },
+        {
+            id: 'run-foreign',
+            taskId: TASK,
+            userId: 'someone-else',
+            agentId: AGENT,
+            createdAt: new Date('2026-10-20T09:00:00.000Z'),
+        },
     ]);
     const agents = { find: jest.fn(async () => [{ id: AGENT, name: 'Nina' }]) };
     const checkouts = { find: jest.fn(async () => []) };
@@ -145,9 +171,18 @@ describe('FleetUsageViewService — P2', () => {
     });
 
     it('answers an empty line for a Task that never ran', async () => {
-        const result = await harness().taskCosts(OWNER, ['77777777-7777-4777-8777-777777777777'], NOW);
+        const result = await harness().taskCosts(
+            OWNER,
+            ['77777777-7777-4777-8777-777777777777'],
+            NOW,
+        );
         expect(result.tasks).toEqual([
-            { taskId: '77777777-7777-4777-8777-777777777777', lastRun: null, last30DaysCents: null, runs30Days: 0 },
+            {
+                taskId: '77777777-7777-4777-8777-777777777777',
+                lastRun: null,
+                last30DaysCents: null,
+                runs30Days: 0,
+            },
         ]);
     });
 });

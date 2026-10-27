@@ -215,6 +215,41 @@ describe('AppClusterOpRouter (APW-06 T70)', () => {
         expect(ops.handle).not.toHaveBeenCalled();
     });
 
+    it('runs `delete-app-work` WHILE the deletion is recorded — the real sequence (lane aw-safety)', async () => {
+        // §9.7: the op is dispatched only after the claim set `deletionRequestedAt`, so the R-15
+        // guard must not apply to the deletion itself — before 2026-10-26 it did, and every removal
+        // was refused `app_work_deleting`. The other ops are still refused (the case above).
+        const deletion = {
+            handleDeleteAppWork: jest.fn(async () => ({
+                state: 'done',
+                attempts: 1,
+                target: 'your-cluster',
+                deleted: [],
+                kept: [],
+                mayRemain: [],
+                namespaceDeleted: true,
+                completed: true,
+            })),
+        } as unknown as AppRuntimeDeletionService;
+        const ops = opsFake();
+        const router = new AppClusterOpRouter(
+            ops,
+            deletion,
+            {} as never,
+            stateFake({ deletionRequestedAt: '2026-10-26T21:00:00.000Z' }),
+            cacheFake() as never,
+        );
+
+        const removal = await router.handle({ op: 'delete-app-work', workId: WORK_ID });
+        const other = await router.handle({ op: 'pause', workId: WORK_ID });
+
+        expect(deletion.handleDeleteAppWork).toHaveBeenCalledTimes(1);
+        expect(removal.route).toBe('deletion');
+        expect(removal.state).toBe('done');
+        expect(other.code).toBe('app_work_deleting');
+        expect(ops.handle).not.toHaveBeenCalled();
+    });
+
     it('refuses when the runtime-state row cannot be read — the truth is unknown', async () => {
         const ops = opsFake();
         const exploding = {

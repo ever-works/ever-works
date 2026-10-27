@@ -28,7 +28,24 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 
 /** The ids and names a row may carry, copied field by field from the payload. */
-const METADATA_KEYS = ['deploymentId', 'buildId', 'target', 'phase', 'code', 'names'] as const;
+const METADATA_KEYS = [
+    'deploymentId',
+    'buildId',
+    'target',
+    'phase',
+    'code',
+    'names',
+    // Lane aw-safety (2026-10-26) — `app.deploy.removed`'s own fields (§9.4:1325-1326): the
+    // reason code, the count, and the `kept[]` / `mayRemain[]` refs as `Kind/name`. Before this
+    // the row of an App Work deletion said "Deployment removed" and nothing about what was left.
+    'reason',
+    'deletedCount',
+    'kept',
+    'mayRemain',
+] as const;
+
+/** The `details.reason` of an App Work's deletion (`app-runtime-deletion.service.ts`). */
+const APP_WORK_DELETED_REASON = 'app_work_deleted';
 
 @Injectable()
 export class AppRuntimeActivityListener {
@@ -116,11 +133,11 @@ export class AppRuntimeActivityListener {
                 const value = payload?.[key];
                 if (value === undefined || value === null || value === '') continue;
                 metadata[key] = Array.isArray(value)
-                    ? value.map((entry) => String(entry)).slice(0, 20)
+                    ? value.map((entry) => refText(entry)).slice(0, 20)
                     : String(value);
             }
 
-            await this.activityLog.log({
+            const row = {
                 userId,
                 workId,
                 actionType,
@@ -128,7 +145,23 @@ export class AppRuntimeActivityListener {
                 status: statusFor(action),
                 summary: summaryFor(actionType, action, metadata),
                 metadata,
-            });
+            };
+            try {
+                await this.activityLog.log(row);
+            } catch (error) {
+                // Lane aw-safety: an App Work deletion's row races the completion that deletes the
+                // Work (`activity_log.workId` is a foreign key to `works`). The record matters more
+                // than the link — it is the member's only lasting note of what was kept and what
+                // may remain — so it is written once more without the link, the Work id kept in
+                // `metadata` (the same shape `work.deleted` uses after a completed delete).
+                if (text(payload?.reason) !== APP_WORK_DELETED_REASON) throw error;
+                const { workId: _dropped, ...unlinked } = row;
+                void _dropped;
+                await this.activityLog.log({
+                    ...unlinked,
+                    metadata: { ...metadata, workId },
+                });
+            }
             return true;
         } catch (error) {
             this.logger.warn(
@@ -165,6 +198,15 @@ function summaryFor(
     const verb = action.split('.').pop() ?? '';
     switch (actionType) {
         case ActivityActionType.APP_DEPLOY:
+            if (action === 'app.deploy.removed' && metadata.reason === APP_WORK_DELETED_REASON) {
+                // Lane aw-safety — the deletion's own summary: what may still be running.
+                const mayRemain = Array.isArray(metadata.mayRemain)
+                    ? (metadata.mayRemain as string[])
+                    : [];
+                return mayRemain.length > 0
+                    ? `App removed with the Work deletion; may remain: ${mayRemain.join(', ')}`
+                    : 'App removed with the Work deletion';
+            }
             return `Deployment ${verb.replace('_', ' ')}${metadata.code ? ` (${String(metadata.code)})` : ''}`;
         case ActivityActionType.APP_JOB:
             return `Job ${Array.isArray(metadata.names) ? (metadata.names as string[]).join(', ') : ''} ${verb}`
@@ -173,6 +215,15 @@ function summaryFor(
         default:
             return `Smoke checks ${verb}`;
     }
+}
+
+/** One array entry as text: a `{ kind, name }` ref as `Kind/name`, anything else as itself. */
+function refText(entry: unknown): string {
+    if (entry && typeof entry === 'object') {
+        const { kind, name } = entry as { kind?: unknown; name?: unknown };
+        if (typeof kind === 'string' && typeof name === 'string') return `${kind}/${name}`;
+    }
+    return String(entry);
 }
 
 function text(value: unknown): string {
