@@ -126,7 +126,7 @@ this phase._
 
 ## P1.2 — Record and shared types
 
-- [ ] **T6. Contracts and Activity family.**
+- [x] **T6. Contracts and Activity family.** _(Done 2026-10-27, #2963. `GitPullRequestReview` is not redeclared in contracts: T2 already landed it in the plugin SDK; the detail view's `diff` is a structural subset.)_
       **Create** `packages/contracts/src/apps/upstream-pull-request.types.ts` (new) exactly as plan §3.3 (Resolution
       R-1 — the one shared types folder), including the seven appended refusal codes, `UPSTREAM_ERROR_CODES`,
       `UpstreamPreparationReport`, `UpstreamEligibilityView`, `UpstreamPullRequestView`,
@@ -155,7 +155,7 @@ this phase._
       `pnpm --filter @ever-works/contracts test` and `pnpm --filter @ever-works/agent test activity-log.types feed-kind publishable-activity`.
       **Done when**: all three specs are green and `pnpm --filter @ever-works/contracts build` emits the declarations.
 
-- [ ] **T7. Entity + migrations.**
+- [ ] **T7. Entity + migrations.** _(Mostly done 2026-10-27, #2963: three entities, migrations re-stamped to slots `01`/`02`/`03` (R-39, slot `00` is T43's), the repository with scoped finders, CAS, limit windows. Left: `findByPreparationTaskId` / `findByFollowUpTaskId`, the due-row and due-`preparing` selections, `stopTrackingForUser` / `stopTrackingForOrganization` — they land with T15/T18.)_
       **Create** `packages/agent/src/entities/upstream-pull-request.entity.ts` (new) per plan §3.1 (dates via
       `PortableDateColumn`, scope columns without relations, `@ManyToOne` to `User` and `Work` with
       `onDelete: 'CASCADE'`), including the 2026-09-17 additions: `upstreamBaseSha` (G01),
@@ -191,7 +191,7 @@ this phase._
 
 ## P1.3 — Eligibility
 
-- [ ] **T8. Pure rules and limits.**
+- [ ] **T8. Pure rules and limits.** _(Partly done 2026-10-27, #2966: `upstream-rate-limits.ts` and `upstream-eligibility.rules.ts` with specs. Left: `summarize-upstream-checks.ts`, `upstream-fingerprint.ts`.)_
       **Create** `packages/agent/src/upstream-pull-requests/upstream-eligibility.rules.ts`,
       `packages/agent/src/upstream-pull-requests/upstream-rate-limits.ts`,
       `packages/agent/src/upstream-pull-requests/summarize-upstream-checks.ts`,
@@ -213,7 +213,7 @@ this phase._
       `pnpm --filter @ever-works/agent test upstream-pull-requests`.
       **Done when**: the four specs are green.
 
-- [ ] **T9. `UpstreamEligibilityService`.**
+- [ ] **T9. `UpstreamEligibilityService`.** _(Platform half done 2026-10-27, #2966: kill switch, deny list, relation, App spec `enabled`/`maxOpen`, merged source Task, active record, member connection, limits. Left: the provider reads — `getRepository` archived/source/pull-requests-disabled, `getInteractionLimit`, push permission, maintainer opt-out.)_
       **Create** `packages/agent/src/upstream-pull-requests/upstream-eligibility.service.ts` and
       `packages/agent/src/upstream-pull-requests/upstream-pull-requests.module.ts` (new) — reads APW-01
       `sourceRepository.type/upstream`, APW-03 App spec `upstreamPullRequests.enabled` **and `.maxOpen`** through
@@ -230,7 +230,7 @@ WorkUpstreamPrSetting, UpstreamPrSuggestion])` and provides `UpstreamPullRequest
       `pnpm --filter @ever-works/agent test upstream-eligibility`.
       **Done when**: the spec is green.
 
-- [ ] **T10. Read-only API.**
+- [x] **T10. Read-only API.** _(Done 2026-10-27, #2966, plus `GET …/:prId` and the no-credential writes `withdraw` / `acknowledge-extra-files` of T19.)_
       **Create** `apps/api/src/works/upstream-pull-requests.controller.ts` (new) with
       `GET /api/works/:id/upstream-pull-requests` and `GET …/eligibility`; **create**
       `apps/api/src/works/dto/upstream-pull-request.dto.ts` (new) — the field lists are plan §3.3's
@@ -243,7 +243,7 @@ WorkUpstreamPrSetting, UpstreamPrSuggestion])` and provides `UpstreamPullRequest
       `cd apps/api && pnpm test upstream-pull-requests.controller`.
       **Done when**: the spec is green.
 
-- [ ] **T11. P1 web: eligibility on the Task.**
+- [x] **T11. P1 web: eligibility on the Task.** _(Done 2026-10-27, #2966: server-decided `ProposeUpstreamSlot` → `ProposeUpstreamAction`; locale keys appended with English placeholders.)_
       **Create** `apps/web/src/lib/api/upstream-pull-requests.ts` (new) and
       `apps/web/src/components/tasks/ProposeUpstreamAction.tsx` (new) — a disabled **Propose upstream** button with the
       reason for fork App Works, hidden for link, since nothing can be prepared yet.

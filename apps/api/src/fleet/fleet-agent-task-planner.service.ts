@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PromptAssemblerService } from '@ever-works/agent/agents';
 import {
+    APP_RUN_BRIEF_SOURCE,
     APP_WORK_TOOL_POLICY_REFUSAL_CODE,
     appWorkTaskToolPolicyApplies,
     describeAppChangesPaused,
     readAppWorkSwitches,
+    type AppRunBriefSource,
 } from '@ever-works/agent/app-works';
 import { config } from '@ever-works/agent/config';
 import {
@@ -492,6 +494,12 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // fails closed at the publish (which is the guarantee that
         // matters — this only moves the failure twenty minutes earlier).
         @Optional() private readonly pushCredentials?: FleetPushCredentialService,
+        // APW-08 T18 — the App Work run brief (the App rules at the base commit and the
+        // fenced instruction files). Bound + exported by the api @Global() AgentsModule.
+        // Appended LAST + @Optional(): absent, an App Work run is briefed as before.
+        @Optional()
+        @Inject(APP_RUN_BRIEF_SOURCE)
+        private readonly appRunBriefs?: AppRunBriefSource,
     ) {}
 
     /**
@@ -866,10 +874,19 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 `Task ${task.slug ?? task.id}: App Work run — the platform-MCP bridge is withheld (${APP_WORK_TOOL_POLICY_REFUSAL_CODE}).`,
             );
         }
+        // APW-08 T18 — an App Work run's brief: the App rules at the workspace's base, and the
+        // repository's instruction files fenced as untrusted content. Best-effort (`null` when
+        // the Task is not on an App Work or the brief could not be composed).
+        const appBrief = this.appRunBriefs
+            ? await this.appRunBriefs
+                  .forTask({ taskId: task.id, baseRef: workspace.baseRef })
+                  .catch(() => null)
+            : null;
         const { instructions, continuation } = await this.composeInstructions({
             agent,
             task,
             workspace,
+            appBrief,
             acceptanceChecks,
             setup,
             ownerMessages,
@@ -1273,6 +1290,12 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         settings: FleetAgentExecutionSettings;
         /** Slice Z — present only when the run actually gets platform tools. */
         mcp?: FleetAgentTaskMcpBridge | null;
+        /**
+         * APW-08 T18 — an App Work run's rules (platform text, never truncated: it sits in
+         * the tail) and its fenced instruction files (optional, left out with a warning when
+         * the payload would not fit, like the answer trail).
+         */
+        appBrief?: { rules: string; instructions: string | null } | null;
     }): Promise<{
         /** The complete fresh-session prompt — what runs unless a node resumes. */
         instructions: string;
@@ -1385,11 +1408,29 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // BEFORE the newest answer so the whole history reads in order.
         const trailSection =
             answerTrail.length > 0 ? composeAnswerTrailSection(answerTrail, fenceNonce) : null;
+        const appRules = input.appBrief?.rules ?? null;
+        let appInstructions = input.appBrief?.instructions ?? null;
         const tailOf = (trail: string | null): string =>
-            [composeTaskSection(userMessage, fenceNonce), trail, ownerSection, fleetSections]
+            [
+                appRules,
+                composeTaskSection(userMessage, fenceNonce),
+                trail,
+                ownerSection,
+                fleetSections,
+                appInstructions,
+            ]
                 .filter(Boolean)
                 .join('\n\n');
         let tail = tailOf(trailSection);
+        // APW-08 T18 — the instruction files are the first thing left out when the payload
+        // would not fit: the rules and the brief are what the run cannot do without.
+        if (appInstructions && byteLength(tail) > FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES) {
+            this.logger.warn(
+                `Fleet instructions for task ${task.id}: the App Work's instruction files were left out — they would not fit the job payload`,
+            );
+            appInstructions = null;
+            tail = tailOf(trailSection);
+        }
         // The trail is the one optional part of the tail: a run without its
         // history can still go ahead honestly, a run without its brief
         // cannot. Left out — and said so — rather than failing the plan.

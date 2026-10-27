@@ -696,7 +696,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/works/:id/upstream-pull-requests',
         wrapper: 'listUpstreamPullRequests',
-        shipped: false,
+        // APW-09 T10/T19 (lane aw-upstream-prs, 2026-10-27).
+        shipped: true,
     },
     {
         id: '09-3',
@@ -704,7 +705,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/works/:id/upstream-pull-requests/eligibility',
         wrapper: 'getUpstreamPrEligibility',
-        shipped: false,
+        // APW-09 T10/T19 (lane aw-upstream-prs, 2026-10-27).
+        shipped: true,
         note: '`?taskId=` is required by the route',
     },
     {
@@ -713,7 +715,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/works/:id/upstream-pull-requests/:prId',
         wrapper: 'getUpstreamPullRequest',
-        shipped: false,
+        // APW-09 T10/T19 (lane aw-upstream-prs, 2026-10-27).
+        shipped: true,
     },
     {
         id: '09-5',
@@ -729,7 +732,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'POST',
         path: '/api/works/:id/upstream-pull-requests/:prId/withdraw',
         wrapper: 'withdrawUpstreamPr',
-        shipped: false,
+        // APW-09 T10/T19 (lane aw-upstream-prs, 2026-10-27).
+        shipped: true,
     },
     {
         id: '09-7',
