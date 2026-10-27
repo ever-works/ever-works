@@ -654,7 +654,7 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/tasks/:taskId/cost',
         wrapper: 'getTaskCost',
-        shipped: false,
+        shipped: true,
     },
     {
         id: '08-6',
@@ -670,7 +670,7 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/works/:id/cost',
         wrapper: 'getWorkCost',
-        shipped: false,
+        shipped: true,
     },
     {
         id: '08-8',
@@ -1519,7 +1519,7 @@ export function followUpTaskDelivery(
     return rawApi(request, 'POST', `/api/tasks/${seg(input.taskId)}/delivery/follow-up`, input);
 }
 
-/** **Unshipped / contract-only** (APW-08): `GET /api/tasks/:id/cost`. */
+/** **Shipped** (APW-08 T24, lane B2): `GET /api/tasks/:id/cost` (`TaskCostView`). */
 export function getTaskCost(
     request: APIRequestContext,
     input: WrapperOptions & { taskId: string },
@@ -1544,8 +1544,8 @@ export function allowAppRunContainment(
 }
 
 /**
- * **Unshipped / contract-only** (APW-08): `GET /api/works/:id/cost`
- * (`WorkCostRollup`).
+ * **Shipped** (APW-08 T56, lane B2): `GET /api/works/:id/cost`
+ * (`WorkCostRollup`; `?month=YYYY-MM`).
  */
 export function getWorkCost(
     request: APIRequestContext,
