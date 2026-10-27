@@ -125,6 +125,7 @@ export function TaskDetailClient({
     initialActivityError = null,
     fleetAction = null,
     fleetSection = null,
+    upstreamAction = null,
 }: {
     task: Task;
     /**
@@ -135,6 +136,11 @@ export function TaskDetailClient({
      */
     fleetAction?: ReactNode;
     fleetSection?: ReactNode;
+    /**
+     * APW-09 T11 — **Propose upstream** for a Task on a fork App Work. Server-rendered by the
+     * page from the eligibility read (`ProposeUpstreamSlot`); null renders nothing.
+     */
+    upstreamAction?: ReactNode;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
@@ -405,6 +411,7 @@ export function TaskDetailClient({
                                     than leave a stale list behind. */}
                                 <RunWithAgentMenu key={agentId ?? 'no-agent'} taskId={task.id} />
                                 {fleetAction}
+                                {upstreamAction}
                                 <TaskDeleteButton taskId={task.id} taskSlug={task.slug} />
                             </div>
                         </div>

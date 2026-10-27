@@ -1868,6 +1868,19 @@
                 "loadError": "Could not load your repositories.",
                 "empty": "No repositories in your registry yet.",
                 "emptyLink": "Add one in Settings → Repositories"
+            },
+            "proposeUpstream": {
+                "action": "Propose upstream",
+                "theUpstream": "the upstream project",
+                "yourFork": "your fork",
+                "notAvailableYet": "This change can be proposed upstream, but preparing an upstream pull request isn't available yet.",
+                "unavailable": "This Task can't be proposed upstream right now.",
+                "privateCopy": "A private copy isn't connected to {upstream} on GitHub, so it can't propose pull requests there. Use a fork to contribute.",
+                "activeProposal": "This Task already has a proposal. Open it instead of starting another.",
+                "limits": {
+                    "openPerUpstream": "You already have {count} open pull request on {upstream}.",
+                    "window": "You've reached this limit for now (limit: {count} per 24 hours). Next one available at {time}."
+                }
             }
         },
         "skillsPage": {
@@ -5524,7 +5537,39 @@
                 "stopFailed": "Stornierung der Generierung fehlgeschlagen"
             },
             "upstream": {
-                "tabName": "Upstream"
+                "tabName": "Upstream",
+                "refusals": {
+                    "archived": "{upstream} is archived and no longer accepts pull requests.",
+                    "collaboratorsOnly": "{upstream} only accepts pull requests from collaborators right now.",
+                    "blocked": "GitHub refused: your account can't open pull requests on {upstream}.",
+                    "networkMismatch": "This fork is no longer connected to {upstream} on GitHub.",
+                    "aiNotAccepted": "{upstream} asks contributors not to submit AI-generated changes.",
+                    "dcoRequired": "{upstream} requires you to sign off each commit yourself. Ever Works never adds a sign-off for you.",
+                    "tooLarge": "This change is too large to propose upstream ({lines} changed lines; limit {limit}). Split it into smaller Tasks first.",
+                    "rateLimited": "You can open {count} pull request on {upstream} per day. Next one available at {time}.",
+                    "doesNotPort": "This change depends on customisations in your fork that {upstream} doesn't have.",
+                    "checksRed": "A check {upstream} documents failed: {command}.",
+                    "tooManyExtraFiles": "The prepared change touches more files than the original change.",
+                    "connectionScope": "Your GitHub connection needs permission to open pull requests. Reconnect GitHub.",
+                    "notForkPusher": "Only someone whose GitHub account can push to {fork} can propose upstream.",
+                    "notFork": "Only a fork can propose changes upstream. This App Work links to {upstream} instead of forking it.",
+                    "disabled": "Upstream pull requests are turned off for this workspace. An administrator can enable them.",
+                    "sourceNotMerged": "This change has to be merged into your fork before it can be proposed upstream.",
+                    "excludedPath": "This change touches {path}, which {upstream} asks contributors not to change.",
+                    "secretDetected": "Something in this change looks like a secret. Remove it before proposing it upstream.",
+                    "notSingleCommit": "Proposing upstream needs a single commit; this change has {count}.",
+                    "fingerprintMismatch": "The change is no longer the one that was approved. Review it and approve it again.",
+                    "approvalExpired": "The approval expired before the pull request was opened. Approve it again.",
+                    "timedOut": "Preparation took too long.",
+                    "providerUnsupported": "{upstream}'s host does not support opening pull requests from Ever Works yet.",
+                    "publishingOff": "Publishing is switched off in your autonomy settings, so Ever Works didn't open this pull request. Turn publishing on, then propose it again.",
+                    "pullRequestsDisabled": "{upstream} has switched pull requests off, so nothing can be opened there right now.",
+                    "outsideContributorCap": "{upstream} limits how many pull requests people outside the project can have open at once, and you've reached it. Close or merge one of yours there, then try again.",
+                    "platformCapReached": "Ever Works has opened its daily limit of {count} pull requests on {upstream}. Next one available at {time}.",
+                    "maintainerOptOut": "{upstream} asks not to receive automated contributions, so Ever Works won't open a pull request there.",
+                    "deniedUpstream": "Ever Works has been asked not to open pull requests on {upstream}.",
+                    "reportInvalid": "The preparation run didn't report what it found, so nothing was proposed. Try again."
+                }
             },
             "appUpstream": {
                 "title": "Upstream",

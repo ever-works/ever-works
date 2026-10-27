@@ -265,7 +265,7 @@ test.describe('ACC-NEG-06 — no create-pull-request call, against a lane that r
         ).toBe(0);
     });
 
-    test('the proposal routes ACC-NEG-06 drives are not mounted — 404 for the owner, another account and nobody', async ({
+    test('the proposal route is not mounted; the read routes answer only their owner — and nothing is published', async ({
         request,
     }) => {
         const run = stamp();
@@ -285,37 +285,51 @@ test.describe('ACC-NEG-06 — no create-pull-request call, against a lane that r
         const workId = created.body.work?.id ?? '';
         expect(workId).toBeTruthy();
 
-        const attempts: Array<{
+        // The proposal itself (prepare → approve → open) is APW-09 Wave 2 and still unmounted.
+        for (const [who, token] of [
+            ['owner', owner.access_token],
+            ['another account', other.access_token],
+            ['no session', ''],
+        ] as const) {
+            const result = await proposeUpstreamPr(request, { token, workId, body: {} });
+            expect(
+                result.status,
+                `POST upstream-pull-requests (${who}) body=${result.text.slice(0, 200)} — the ` +
+                    'proposal route does not exist on this API yet',
+            ).toBe(404);
+        }
+
+        // APW-09 T10 (lane aw-upstream-prs): the read routes are mounted. The owner reads them;
+        // another account gets the one `404` a missing Work gets; no session is `401`. The
+        // eligibility read for a Task that is not this Work's is a `404` as well.
+        const reads: Array<{
             label: string;
             run: (token: string) => Promise<{ status: number; text: string }>;
+            owner: number;
         }> = [
-            {
-                label: 'POST upstream-pull-requests (the proposal)',
-                run: (token) => proposeUpstreamPr(request, { token, workId, body: {} }),
-            },
             {
                 label: 'GET upstream-pull-requests (the list)',
                 run: (token) => listUpstreamPullRequests(request, { token, workId }),
+                owner: 200,
             },
             {
-                label: 'GET upstream-pull-requests/eligibility (the pre-flight)',
+                label: 'GET upstream-pull-requests/eligibility (a Task of no Work)',
                 run: (token) =>
                     getUpstreamPrEligibility(request, { token, workId, taskId: VALID_UUID }),
+                owner: 404,
             },
         ];
-
-        for (const attempt of attempts) {
-            for (const [who, token] of [
-                ['owner', owner.access_token],
-                ['another account', other.access_token],
-                ['no session', ''],
+        for (const read of reads) {
+            for (const [who, token, expected] of [
+                ['owner', owner.access_token, read.owner],
+                ['another account', other.access_token, 404],
+                ['no session', '', 401],
             ] as const) {
-                const result = await attempt.run(token);
+                const result = await read.run(token);
                 expect(
                     result.status,
-                    `${attempt.label} (${who}) body=${result.text.slice(0, 200)} — APW-09 owns these ` +
-                        'routes and none of them exists on this API yet',
-                ).toBe(404);
+                    `${read.label} (${who}) body=${result.text.slice(0, 200)}`,
+                ).toBe(expected);
             }
         }
 
