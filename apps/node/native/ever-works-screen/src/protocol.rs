@@ -17,6 +17,8 @@
 //! | 0x04 | node → helper  | `refresh`      | —                                                |
 //! | 0x05 | node → helper  | `quality`      | JSON `{ width, quality, maxFps, keyframeMs }`    |
 //! | 0x06 | node → helper  | `listDisplays` | —                                                |
+//! | 0x07 | node → helper  | `addDisplay`   | JSON `{ name, width, height }` — a virtual display (P3, Linux X11) |
+//! | 0x08 | node → helper  | `removeDisplay`| JSON `{ display }` — only one the helper added    |
 //! | 0x10 | node → helper  | `input`        | JSON input frame + `pictureWidth`, `pictureHeight` |
 //! | 0x11 | node → helper  | `releaseAll`   | — (let go of every pressed key and button)       |
 //! | 0x13 | node → helper  | `controlMarker`| JSON `{ visible }` — show the border while the stream is controlled |
@@ -27,6 +29,7 @@
 //! | 0x84 | helper → node  | `displays`     | JSON `{ displays, fallback? }`                   |
 //! | 0x85 | helper → node  | `error`        | JSON `{ code, message }`                         |
 //! | 0x86 | helper → node  | `started`      | JSON `{ display, displays, fellBack }`           |
+//! | 0x88 | helper → node  | `displayChange`| JSON `{ action, ok, code?, display?, displays }` — the answer to add / remove |
 //! | 0x87 | helper → node  | `inputResult`  | JSON `{ outcome, code }` — only for an input that was not injected |
 //!
 //! Decoding never panics: every malformed message is an `Err`.
@@ -50,6 +53,8 @@ pub const MSG_SET_DISPLAY: u8 = 0x03;
 pub const MSG_REFRESH: u8 = 0x04;
 pub const MSG_QUALITY: u8 = 0x05;
 pub const MSG_LIST_DISPLAYS: u8 = 0x06;
+pub const MSG_ADD_DISPLAY: u8 = 0x07;
+pub const MSG_REMOVE_DISPLAY: u8 = 0x08;
 pub const MSG_INPUT: u8 = 0x10;
 pub const MSG_RELEASE_ALL: u8 = 0x11;
 pub const MSG_RELEASE_HELD: u8 = 0x12;
@@ -62,6 +67,7 @@ pub const MSG_DISPLAYS: u8 = 0x84;
 pub const MSG_ERROR: u8 = 0x85;
 pub const MSG_STARTED: u8 = 0x86;
 pub const MSG_INPUT_RESULT: u8 = 0x87;
+pub const MSG_DISPLAY_CHANGE: u8 = 0x88;
 
 /// Bounds a stream setting must respect (the platform's presets live well inside them).
 pub const MIN_WIDTH: u32 = 16;
@@ -100,6 +106,18 @@ pub enum Command {
     ReleaseHeld,
     /// Owner question 10: show (true) or hide the controlled-machine marker.
     ControlMarker(bool),
+    /// T-45: add a virtual display (the name and size are checked by `virtual_display`).
+    AddDisplay(AddDisplayRequest),
+    /// T-45: remove a virtual display the helper added.
+    RemoveDisplay(String),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AddDisplayRequest {
+    pub name: String,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -221,6 +239,22 @@ pub fn decode_command(kind: u8, payload: &[u8]) -> Result<Command, DecodeError> 
             )?))
         }
         MSG_LIST_DISPLAYS => empty(payload, Command::ListDisplays),
+        MSG_ADD_DISPLAY => {
+            let request: AddDisplayRequest = serde_json::from_slice(payload)
+                .map_err(|_| DecodeError::BadPayload("addDisplay"))?;
+            if request.name.len() > 256 {
+                return Err(DecodeError::BadPayload("name"));
+            }
+            Ok(Command::AddDisplay(request))
+        }
+        MSG_REMOVE_DISPLAY => {
+            let json: DisplayJson = serde_json::from_slice(payload)
+                .map_err(|_| DecodeError::BadPayload("removeDisplay"))?;
+            if !is_display_id(&json.display) {
+                return Err(DecodeError::BadPayload("display"));
+            }
+            Ok(Command::RemoveDisplay(json.display))
+        }
         MSG_INPUT => {
             if payload.is_empty() || payload.len() > 16 * 1024 {
                 return Err(DecodeError::BadPayload("input"));
@@ -409,6 +443,40 @@ mod tests {
         assert!(decode_command(MSG_CONTROL_MARKER, br#"{"visible":1}"#).is_err());
         assert!(decode_command(MSG_CONTROL_MARKER, br#"{"visible":true,"text":"x"}"#).is_err());
         assert!(decode_command(MSG_CONTROL_MARKER, &[]).is_err());
+    }
+
+    #[test]
+    fn decodes_virtual_display_requests_and_bounds_them() {
+        assert_eq!(
+            decode_command(
+                MSG_ADD_DISPLAY,
+                br#"{"name":"Desk","width":1920,"height":1080}"#
+            )
+            .unwrap(),
+            Command::AddDisplay(AddDisplayRequest {
+                name: "Desk".into(),
+                width: 1920,
+                height: 1080
+            })
+        );
+        assert!(decode_command(MSG_ADD_DISPLAY, br#"{"name":"Desk","width":1920}"#).is_err());
+        assert!(
+            decode_command(
+                MSG_ADD_DISPLAY,
+                br#"{"name":"Desk","width":1920,"height":1080,"x":0}"#
+            )
+            .is_err()
+        );
+        let long = format!(
+            r#"{{"name":"{}","width":1920,"height":1080}}"#,
+            "x".repeat(257)
+        );
+        assert!(decode_command(MSG_ADD_DISPLAY, long.as_bytes()).is_err());
+        assert_eq!(
+            decode_command(MSG_REMOVE_DISPLAY, br#"{"display":"VIRTUAL1"}"#).unwrap(),
+            Command::RemoveDisplay("VIRTUAL1".into())
+        );
+        assert!(decode_command(MSG_REMOVE_DISPLAY, br#"{"display":"../x"}"#).is_err());
     }
 
     #[test]

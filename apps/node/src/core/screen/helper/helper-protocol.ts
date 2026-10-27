@@ -39,6 +39,10 @@ export const HELPER_MESSAGES = {
 	refresh: 0x04,
 	quality: 0x05,
 	listDisplays: 0x06,
+	/** P3 (T-45, Linux X11): `{ name, width, height }` — add a virtual display; answered `displayChange`. */
+	addDisplay: 0x07,
+	/** P3 (T-45): `{ display }` — remove a virtual display the helper added; answered `displayChange`. */
+	removeDisplay: 0x08,
 	input: 0x10,
 	releaseAll: 0x11,
 	/**
@@ -58,7 +62,9 @@ export const HELPER_MESSAGES = {
 	error: 0x85,
 	started: 0x86,
 	/** P2: an input the helper did not inject (`{ outcome, code }`; injected inputs are not answered). */
-	inputResult: 0x87
+	inputResult: 0x87,
+	/** P3 (T-45): `{ action, ok, code?, display?, displays }` — the answer to `addDisplay` / `removeDisplay`. */
+	displayChange: 0x88
 } as const;
 
 export type HelperMessageKind = (typeof HELPER_MESSAGES)[keyof typeof HELPER_MESSAGES];

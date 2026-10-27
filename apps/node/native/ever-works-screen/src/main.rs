@@ -43,6 +43,7 @@ mod marker;
 mod protocol;
 mod scale;
 mod tiles;
+mod virtual_display;
 
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
@@ -56,8 +57,8 @@ use capture::{Capturer, Display, DisplayRect};
 use input::{Injector, InputFrame, InputOutcome, InputState};
 use marker::Marker;
 use protocol::{
-    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED,
-    MSG_TILES, PROTOCOL_VERSION, StartRequest, StreamSettings,
+    AddDisplayRequest, Command, MSG_DISPLAY_CHANGE, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO,
+    MSG_INPUT_RESULT, MSG_STARTED, MSG_TILES, PROTOCOL_VERSION, StartRequest, StreamSettings,
 };
 use tiles::RgbFrame;
 
@@ -334,7 +335,44 @@ impl<W: Write> Helper<W> {
                 self.marker_wanted = visible;
                 Ok(())
             }
+            Command::AddDisplay(request) => self.add_display(&request),
+            Command::RemoveDisplay(id) => self.remove_display(&id),
         }
+    }
+
+    /// T-45: add a virtual display; answered `displayChange` either way.
+    fn add_display(&mut self, request: &AddDisplayRequest) -> io::Result<()> {
+        let result = virtual_display::add(&request.name, request.width, request.height);
+        self.refresh_displays();
+        let answer = match result {
+            Ok(id) => {
+                let display = self
+                    .displays
+                    .iter()
+                    .find(|display| display.id == id)
+                    .cloned();
+                json!({ "action": "add", "ok": true, "display": display, "displays": self.displays })
+            }
+            Err(code) => {
+                json!({ "action": "add", "ok": false, "code": code, "displays": self.displays })
+            }
+        };
+        self.out.json(MSG_DISPLAY_CHANGE, &answer)
+    }
+
+    /// T-45: remove a virtual display the helper added (a streamed one falls back to the primary).
+    fn remove_display(&mut self, id: &str) -> io::Result<()> {
+        let mut answer = match virtual_display::remove(id) {
+            Ok(()) => json!({ "action": "remove", "ok": true, "display": id }),
+            Err(code) => json!({ "action": "remove", "ok": false, "code": code, "display": id }),
+        };
+        if self.session.is_some() {
+            self.check_displays()?;
+        } else {
+            self.refresh_displays();
+        }
+        answer["displays"] = json!(self.displays);
+        self.out.json(MSG_DISPLAY_CHANGE, &answer)
     }
 
     /// Show the marker around the streamed display while it is wanted and a stream runs;
