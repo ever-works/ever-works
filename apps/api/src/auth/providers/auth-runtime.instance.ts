@@ -141,9 +141,13 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                 // `verification` or `terms_acceptance` must keep two rules:
                 // every column Better Auth writes (the core fields plus the
                 // `additionalFields` below) exists, and every column it does
-                // not write is nullable or has a default. The check stays on
-                // so drift fails loudly at boot instead of as a 422 on the next
-                // signup; set this to `false` only as an emergency switch.
+                // not write is nullable or has a default. On a mismatch the
+                // API still starts and readiness stays green (it does not run
+                // this check): Better Auth logs the findings as an error when
+                // the instance is created at boot, then rejects the affected
+                // calls. Keep it on so drift names its columns instead of
+                // surfacing as a 422 on the next signup; set it to `false` only
+                // as an emergency switch.
                 validateSchema: true,
             },
         },
