@@ -47,6 +47,7 @@ import {
 	verifyHelper,
 	type HelperFs,
 	type HelperPaths,
+	type HelperSignatureChecker,
 	type HelperVerification
 } from './helper/helper-trust';
 
@@ -157,6 +158,10 @@ export interface DesktopHelperHostOptions {
 	now?: () => number;
 	/** Most streams at once (default: the per-computer view cap). */
 	maxStreams?: number;
+	/** P3: verifies a `signed` admission by its OS signature (absent: a signed record is untrusted). */
+	checkSignature?: HelperSignatureChecker;
+	/** P3: this node version publishes a signed build for this machine (the helper note offers it). */
+	signedAvailable?: boolean;
 }
 
 interface Waiter<T> {
@@ -185,7 +190,7 @@ export class DesktopHelperHost {
 	/** Re-verify the helper and, when admitted and stale, re-probe its facts. Never throws. */
 	async refresh(): Promise<void> {
 		try {
-			const verification = await verifyHelper(this.options.fs, this.options.paths, this.now);
+			const verification = await verifyHelper(this.options.fs, this.options.paths, this.now, this.options.checkSignature);
 			await this.noteVerification(verification);
 			await this.readControl(verification.ok ? verification.record : null);
 			if (!verification.ok) {
@@ -260,6 +265,7 @@ export class DesktopHelperHost {
 				verifiedAt: verification?.ok ? verification.verifiedAt : null,
 				published: record ? record.published : null,
 				control: verification?.ok && this.controlAllowed ? 'allowed' : 'not-allowed',
+				...(this.options.signedAvailable === true && trust !== 'signed' ? { signedAvailable: true } : {}),
 				inputReasons: [...(this.hello?.inputReasons ?? [])]
 			},
 			displays: this.hello?.displays ?? [],
@@ -284,7 +290,7 @@ export class DesktopHelperHost {
 		this.crashes = this.crashes.filter((at) => nowMs - at < HELPER_CRASH_WINDOW_MS);
 		if (this.crashes.length >= HELPER_CRASH_LIMIT) return { ok: false, refusal: { kind: 'crashing' } };
 		// FR-14: verified immediately before this start, every time.
-		const verification = await verifyHelper(this.options.fs, this.options.paths, this.now);
+		const verification = await verifyHelper(this.options.fs, this.options.paths, this.now, this.options.checkSignature);
 		await this.noteVerification(verification);
 		if (!verification.ok) return { ok: false, refusal: { kind: 'reason', reason: verification.reason } };
 		if (request.controlling) {

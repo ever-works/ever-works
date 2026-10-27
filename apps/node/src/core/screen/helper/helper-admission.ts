@@ -15,7 +15,8 @@ import {
 	readHelperPolicy,
 	verifyHelper,
 	type HelperFs,
-	type HelperPaths
+	type HelperPaths,
+	type HelperSignatureChecker
 } from './helper-trust';
 
 /**
@@ -60,6 +61,8 @@ export interface HelperAdmissionDeps {
 	readLine?: (prompt: string) => Promise<string | null>;
 	fetchFn?: typeof fetch;
 	now?: () => number;
+	/** P3: the OS signature check (macOS `codesign`, Windows Authenticode); absent on Linux. */
+	checkSignature?: HelperSignatureChecker;
 }
 
 /** Most bytes `helper install` downloads. */
@@ -176,6 +179,68 @@ export async function helperAdmit(
 	return record;
 }
 
+/** `helper admit --signed` — the OS-verified signature of the publisher this node version names (P3, FR-57). */
+export async function helperAdmitSigned(
+	deps: HelperAdmissionDeps,
+	options: { path?: string } = {}
+): Promise<FleetHelperPolicyRecord> {
+	const path = options.path?.trim() || deps.paths.installPath;
+	if (!(await deps.fs.isFile(path))) {
+		throw new HelperAdmissionError(
+			`There is no screen helper at ${path}. Run: ever-works-node helper install (or pass --path <file>).`
+		);
+	}
+	const target = fleetHelperTarget(deps.platform, deps.arch);
+	const expected = target ? deps.manifest.targets[target]?.signer : undefined;
+	if (!expected) {
+		throw new HelperAdmissionError(
+			`This node version publishes no signed screen helper for ${target ?? `${deps.platform}-${deps.arch}`}. Approve it hash-pinned instead: ever-works-node helper admit`
+		);
+	}
+	if (!deps.checkSignature) {
+		throw new HelperAdmissionError('Signed approval is not available on this platform; approve it hash-pinned: ever-works-node helper admit');
+	}
+	const signature = await deps.checkSignature(path, expected);
+	if (!signature.ok) {
+		throw new HelperAdmissionError(
+			signature.reason === 'wrong-signer'
+				? `The helper is signed, but not by ${expected}, the publisher this node version names. Nothing was approved.`
+				: signature.reason === 'unsigned'
+					? 'The helper is not signed. Approve it hash-pinned instead: ever-works-node helper admit'
+					: `The helper's signature could not be verified (${signature.reason}). Nothing was approved.`
+		);
+	}
+	const sha256 = await deps.fs.sha256(path);
+	if (!isFleetSha256Hex(sha256)) throw new HelperAdmissionError('The helper could not be fingerprinted.');
+	deps.out(`Screen helper   ${path}`);
+	deps.out(`Signed by       ${signature.signer} (the publisher this node version names)`);
+	deps.out(`Its SHA-256     ${formatFleetHelperFingerprint(sha256)}`);
+	deps.out(
+		"Approving lets Ever Works show this computer's whole screen to the people you allow. A signed approval keeps working when the helper is updated by the same publisher."
+	);
+	if (!deps.readLine) {
+		throw new HelperAdmissionError('helper admit needs you at this machine’s keyboard (no terminal input).');
+	}
+	const typed = await deps.readLine(`Type ${FLEET_HELPER_ADMIT_WORD} to approve it on ${deps.hostName}: `);
+	if ((typed ?? '').trim() !== FLEET_HELPER_ADMIT_WORD) {
+		throw new HelperAdmissionError('Not approved: the word was not typed. Nothing changed.');
+	}
+	const record: FleetHelperPolicyRecord = {
+		schemaVersion: 1,
+		path,
+		sha256,
+		level: 'signed',
+		version: deps.manifest.version,
+		published: true,
+		acknowledgedAt: new Date((deps.now ?? Date.now)()).toISOString(),
+		signer: signature.signer
+	};
+	await deps.fs.writePrivate(deps.paths.policyPath, `${JSON.stringify(record, null, '\t')}\n`);
+	await appendHelperEvent(deps.fs, deps.paths.eventsPath, admitEventFor(record), deps.now);
+	deps.out(`Approved (signed by ${signature.signer}).`);
+	return record;
+}
+
 /** `helper revoke` — remove the record (and say what that does). */
 export async function helperRevoke(deps: HelperAdmissionDeps): Promise<boolean> {
 	const record = await readHelperPolicy(deps.fs, deps.paths.policyPath);
@@ -220,7 +285,7 @@ export async function helperStatus(
 	options: { json?: boolean } = {}
 ): Promise<HelperStatusReport> {
 	const target = fleetHelperTarget(deps.platform, deps.arch);
-	const verification = await verifyHelper(deps.fs, deps.paths, deps.now);
+	const verification = await verifyHelper(deps.fs, deps.paths, deps.now, deps.checkSignature);
 	const record = verification.record;
 	const report: HelperStatusReport = {
 		target,
