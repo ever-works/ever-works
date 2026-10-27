@@ -1527,7 +1527,7 @@ export class AppBuildsService {
                 buildId: row.id,
                 reason: source === 'poll' ? 'sweep' : 'event',
             });
-            this.noteDeliveredRun(source);
+            this.noteDeliveredRun(source, false);
             return { accepted: true, build: row, created: false };
         }
 
@@ -1554,20 +1554,22 @@ export class AppBuildsService {
             buildId: build.id,
             reason: source === 'poll' ? 'sweep' : 'event',
         });
-        this.noteDeliveredRun(source);
+        this.noteDeliveredRun(source, created);
 
         return { accepted: true, build, created };
     }
 
     /**
      * APW-05 T38 — the `event` half of plan §9.1's `app_build_runs_discovered`: one accepted run
-     * a webhook delivery reported. The `poll` half is one event per discovery pass, emitted by
-     * `AppBuildRunDiscoveryService`, so a polled run is not counted twice here.
+     * a webhook delivery reported. `recorded` is `1` only when the delivery created the Build —
+     * a run's later status deliveries update the same row and count `0`. The `poll` half is one
+     * event per discovery pass, emitted by `AppBuildRunDiscoveryService`, so a polled run is not
+     * counted here.
      */
-    private noteDeliveredRun(source: AppBuildRunSource): void {
+    private noteDeliveredRun(source: AppBuildRunSource, created: boolean): void {
         if (source !== 'event') return;
         this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.runsDiscovered, {
-            recorded: 1,
+            recorded: created ? 1 : 0,
             notModified: false,
             source: 'event',
         });

@@ -170,11 +170,13 @@ export class AppBuildRunDiscoveryService {
                 );
             }
         }
-        // APW-05 T38 — one `app_build_runs_discovered` per pass that checked anything:
-        // `notModified` when every page checked answered "not modified" (the ETag path).
+        // APW-05 T38 — one `app_build_runs_discovered` per pass that checked anything. `recorded`
+        // counts the Builds this pass CREATED (a known run's update is not a discovery), the same
+        // rule as the event path in `AppBuildsService`; `notModified` when every page checked
+        // answered "not modified" (the ETag path).
         if (summary.worksChecked > 0) {
             this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.runsDiscovered, {
-                recorded: summary.runsRecorded,
+                recorded: summary.buildsCreated,
                 notModified:
                     summary.worksNotModified > 0 &&
                     summary.worksNotModified === summary.worksChecked,

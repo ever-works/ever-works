@@ -112,16 +112,19 @@ export type AppBuildSettingsError = 'labelInvalid' | 'memoryRequired' | 'memoryR
  *   vCPU is optional and informational.
  * - `attestations` is sent only for a public repository: on a private one the plugin ignores it,
  *   and the dialog does not show it, so a stored value is left as it was.
+ * - `verificationPromptedValuesRequireApproval` is never sent (see the body).
  */
 export function appBuildSettingsPatch(
     values: AppBuildSettings,
     options: { readonly publicRepository: boolean },
 ): { ok: true; settings: Record<string, unknown> } | { ok: false; error: AppBuildSettingsError } {
     const label = values.largerRunnerLabel.trim();
+    // `verificationPromptedValuesRequireApproval` is read but NOT written: the approval gate it
+    // switches (T46's `startVerification` half) is not built yet, so offering the switch would
+    // promise a protection that does not exist. A stored value is left exactly as it was.
     const settings: Record<string, unknown> = {
         reclaimDisk: values.reclaimDisk,
         allowBuildValuesOnPullRequests: values.allowBuildValuesOnPullRequests,
-        verificationPromptedValuesRequireApproval: values.verificationPromptedValuesRequireApproval,
     };
     if (options.publicRepository) {
         settings.attestations = values.attestations;

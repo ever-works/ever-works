@@ -31,9 +31,13 @@ import {
  * header button, plan §6.2's `BuildSettingsDialog`).
  *
  * Larger runner (label, memory, vCPU; private repositories), reclaim disk, provenance
- * attestations (public repositories only), and XC-01's two switches: whether stored build values
- * reach pull requests (off by default, with the warning plan §4.7b asks for) and whether a
- * verification needs approval before it uses prompted values (on by default).
+ * attestations (public repositories only), and XC-01's pull-request switch: whether stored build
+ * values reach pull requests (off by default, with the warning plan §4.7b asks for; the generator
+ * already renders the restricted literal when it is off).
+ *
+ * XC-01's second switch, `verificationPromptedValuesRequireApproval`, is deliberately NOT shown:
+ * the approval gate it controls (T46's `startVerification` half) is not built, so the switch
+ * would promise a protection that does not exist. Its i18n leaves are in place for that task.
  *
  * The plugin id is the Builds list's `provider.pluginId`, passed in — this component never names
  * a plugin. The values are read when the dialog opens and written once on Save; a viewer sees the
@@ -260,17 +264,6 @@ export function AppBuildSettingsDialog({
                                 </p>
                             )}
                         </div>
-
-                        <Switch
-                            checked={values.verificationPromptedValuesRequireApproval}
-                            onChange={(checked) =>
-                                set('verificationPromptedValuesRequireApproval', checked)
-                            }
-                            disabled={disabled}
-                            label={t('verificationPromptedValuesRequireApproval')}
-                            helperText={t('verificationPromptedValuesRequireApprovalHelp')}
-                            data-testid="app-build-settings-verification-approval"
-                        />
                     </form>
                 )}
 

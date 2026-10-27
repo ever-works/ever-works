@@ -49,7 +49,6 @@ describe('appBuildSettingsPatch', () => {
             settings: {
                 reclaimDisk: true,
                 allowBuildValuesOnPullRequests: false,
-                verificationPromptedValuesRequireApproval: true,
                 largerRunnerLabel: null,
                 largerRunnerMemoryGiB: null,
                 largerRunnerVcpu: null,
@@ -114,7 +113,7 @@ describe('appBuildSettingsPatch', () => {
         });
     });
 
-    it('never carries the pull token or any key outside the seven', () => {
+    it('never carries the pull token, any key outside the seven, or the unbuilt approval switch', () => {
         const patch = appBuildSettingsPatch({ ...base, pullToken: 'ghp_x' } as never, {
             publicRepository: true,
         });
@@ -126,7 +125,6 @@ describe('appBuildSettingsPatch', () => {
                 'largerRunnerMemoryGiB',
                 'largerRunnerVcpu',
                 'reclaimDisk',
-                'verificationPromptedValuesRequireApproval',
             ].sort(),
         );
     });

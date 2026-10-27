@@ -7,6 +7,8 @@ import {
 } from '../app-builds.telemetry';
 import { AppBuildPrepareRunner } from '../app-build-prepare.runner';
 import { pullTokenTelemetryResultFor } from '../app-build-pull-token.service';
+import { AppBuildSweepService } from '../app-build-sweep.service';
+import { AppBuildRunDiscoveryService } from '../app-build-run-discovery.service';
 
 /**
  * APW-05 T38 (C-17, lane aw-builds-bindings, 2026-10-27) — plan §9.1's Builds telemetry.
@@ -220,6 +222,89 @@ describe('Builds telemetry (APW-05 T38)', () => {
             listener.onQueued({} as never);
             await listener.onSucceeded(null as never);
             expect(target.sent).toEqual([]);
+        });
+    });
+
+    describe('the sweep tick and run discovery', () => {
+        it('emits one sweep tick with three counters, even when every pass found nothing', async () => {
+            const target = sink();
+            // Every repository read answers "nothing to do".
+            const builds = new Proxy({}, { get: () => async () => [] });
+            const sweep = new AppBuildSweepService(
+                builds as never,
+                {} as never,
+                undefined,
+                undefined,
+                undefined,
+                new AppBuildsTelemetry(target),
+            );
+
+            await sweep.sweep(Date.parse('2026-10-27T12:00:00Z'));
+
+            expect(target.sent).toEqual([
+                {
+                    distinctId: 'app-works',
+                    event: 'app_build_sweep_tick',
+                    properties: { observed: 0, lost: 0, verifySecretsRemoved: 0 },
+                },
+            ]);
+        });
+
+        it('counts the Builds a discovery pass CREATED, and names no repository', async () => {
+            const target = sink();
+            const run = {
+                providerRunId: '1',
+                runAttempt: 1,
+                event: 'push',
+                status: 'completed',
+                headSha: 'a'.repeat(40),
+                headBranch: 'feature/login',
+                headRepositoryFullName: 'acme/secret-widgets',
+                displayTitle: 'fix the login page',
+                createdAt: '2026-10-27T11:59:00Z',
+            };
+            const discovery = new AppBuildRunDiscoveryService(
+                {
+                    findDiscoveryCandidates: async () => [
+                        {
+                            workId: 'w1',
+                            runsEtag: null,
+                            workflowWrittenAt: null,
+                            runsCheckedAt: null,
+                        },
+                        {
+                            workId: 'w2',
+                            runsEtag: 'W/"e"',
+                            workflowWrittenAt: null,
+                            runsCheckedAt: null,
+                        },
+                    ],
+                    upsertAfterPrepare: async () => undefined,
+                } as never,
+                {
+                    recordProviderRun: async () => ({ accepted: true, created: true }),
+                } as never,
+                { read: async () => ({ userId: 'u1' }) } as never,
+                {
+                    resolve: async (workId: string) => ({
+                        listRecentRuns: async () =>
+                            workId === 'w1'
+                                ? {
+                                      notModified: false,
+                                      runs: [run, { ...run, providerRunId: '2' }],
+                                  }
+                                : { notModified: true, runs: [] },
+                    }),
+                } as never,
+                new AppBuildsTelemetry(target),
+            );
+
+            await discovery.discover(Date.parse('2026-10-27T12:00:00Z'));
+
+            expect(target.sent.map((entry) => [entry.event, entry.properties])).toEqual([
+                ['app_build_runs_discovered', { recorded: 2, notModified: false, source: 'poll' }],
+            ]);
+            expectClean(target.sent);
         });
     });
 

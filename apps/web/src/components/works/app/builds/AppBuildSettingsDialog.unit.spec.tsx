@@ -80,6 +80,8 @@ describe('AppBuildSettingsDialog', () => {
         expect(getMock).toHaveBeenCalledWith('w1', 'build-plugin');
         // Attestations are for public repositories only.
         expect(screen.queryByTestId('app-build-settings-attestations')).toBeNull();
+        // The verification approval switch waits on its gate (T46's service half).
+        expect(screen.queryByTestId('app-build-settings-verification-approval')).toBeNull();
     });
 
     it('shows the attestations switch for a public repository', async () => {
@@ -126,7 +128,6 @@ describe('AppBuildSettingsDialog', () => {
         expect(saveMock).toHaveBeenCalledWith('w1', 'build-plugin', {
             reclaimDisk: true,
             allowBuildValuesOnPullRequests: false,
-            verificationPromptedValuesRequireApproval: true,
             largerRunnerLabel: null,
             largerRunnerMemoryGiB: null,
             largerRunnerVcpu: null,

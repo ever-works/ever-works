@@ -208,7 +208,9 @@ const buildSettingsPatchSchema = z
         reclaimDisk: z.boolean().optional(),
         attestations: z.boolean().optional(),
         allowBuildValuesOnPullRequests: z.boolean().optional(),
-        verificationPromptedValuesRequireApproval: z.boolean().optional(),
+        // `verificationPromptedValuesRequireApproval` is deliberately absent, so `strict()`
+        // refuses it: the approval gate it switches (T46's `startVerification` half) is not
+        // built, and no path here may change a setting whose protection does not exist yet.
     })
     .strict();
 
@@ -239,8 +241,9 @@ export async function getAppBuildSettingsAction(
 
 /**
  * Save the Build settings through `PATCH /api/works/:workId/plugins/:pluginId/settings`. Only
- * the seven keys are accepted (`strict`), so this action cannot write the pull token or any
- * other plugin setting; the API checks edit access and validates against the plugin schema.
+ * the six keys the dialog edits are accepted (`strict`), so this action cannot write the pull
+ * token or any other plugin setting; the API checks edit access and validates against the
+ * plugin schema.
  */
 export async function saveAppBuildSettingsAction(
     workId: string,
