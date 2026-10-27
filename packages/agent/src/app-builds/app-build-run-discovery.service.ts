@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { APP_BUILD_TELEMETRY_EVENTS, AppBuildsTelemetry } from './app-builds.telemetry';
 import {
     APP_BUILD_RUN_DISCOVERY_BATCH,
     APP_BUILD_RUN_DISCOVERY_PER_PAGE,
@@ -82,6 +83,10 @@ export class AppBuildRunDiscoveryService {
         @Optional()
         @Inject(APP_BUILD_PLUGIN_RESOLVER)
         private readonly plugins?: AppBuildPluginResolver,
+        // APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — `app_build_runs_discovered`.
+        @Optional()
+        @Inject(AppBuildsTelemetry)
+        private readonly telemetry?: AppBuildsTelemetry,
     ) {}
 
     async discover(nowMs: number = Date.now()): Promise<AppBuildRunDiscoverySummary> {
@@ -164,6 +169,16 @@ export class AppBuildRunDiscoveryService {
                     }).`,
                 );
             }
+        }
+        // APW-05 T38 — one `app_build_runs_discovered` per pass that checked anything:
+        // `notModified` when every page checked answered "not modified" (the ETag path).
+        if (summary.worksChecked > 0) {
+            this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.runsDiscovered, {
+                recorded: summary.runsRecorded,
+                notModified:
+                    summary.worksNotModified > 0 && summary.worksNotModified === summary.worksChecked,
+                source: 'poll',
+            });
         }
         return summary;
     }

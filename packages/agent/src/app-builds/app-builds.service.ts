@@ -66,6 +66,7 @@ import { UsageOutcome, UsagePayer } from '../entities/_types';
 import { WorkBuild } from '../entities/work-build.entity';
 import type { WorkBuildPreparation } from '../entities/work-build-preparation.entity';
 import { APP_BUILD_EVENT_CLASSES, type AppBuildEventClass } from '../events/app-build.events';
+import { APP_BUILD_TELEMETRY_EVENTS, AppBuildsTelemetry } from './app-builds.telemetry';
 import { PluginUsageService } from '../usage/plugin-usage.service';
 // APW-05 T18 — the two dispatcher ports and their DI tokens, IMPORTED from the files
 // that own them. This import is the swap: while this module declared its own
@@ -1234,6 +1235,12 @@ export class AppBuildsService {
         @Optional()
         @Inject(DistributedTaskLockService)
         private readonly locks?: DistributedTaskLockService,
+        // APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — plan §9.1's Builds telemetry.
+        // Appended last and `@Optional()`: unbound, nothing is emitted. `@Inject` by class for
+        // the SWC reason the line above gives.
+        @Optional()
+        @Inject(AppBuildsTelemetry)
+        private readonly telemetry?: AppBuildsTelemetry,
     ) {}
 
     /* ---------------------------------------------------------------------- *
@@ -1406,6 +1413,9 @@ export class AppBuildsService {
         }
         const state = { rerun: false };
         this.inProcessRuns.set(marker, state);
+        // APW-05 T38 — §9.1's `app_build_dispatch_fallback`: the job runtime did not take the
+        // job, so it runs here (one event per in-process run started, not per coalesced ask).
+        this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.dispatchFallback, { job });
         void (async () => {
             try {
                 await this.settleInProcess(job, key, call);
@@ -1517,6 +1527,7 @@ export class AppBuildsService {
                 buildId: row.id,
                 reason: source === 'poll' ? 'sweep' : 'event',
             });
+            this.noteDeliveredRun(source);
             return { accepted: true, build: row, created: false };
         }
 
@@ -1543,8 +1554,23 @@ export class AppBuildsService {
             buildId: build.id,
             reason: source === 'poll' ? 'sweep' : 'event',
         });
+        this.noteDeliveredRun(source);
 
         return { accepted: true, build, created };
+    }
+
+    /**
+     * APW-05 T38 — the `event` half of plan §9.1's `app_build_runs_discovered`: one accepted run
+     * a webhook delivery reported. The `poll` half is one event per discovery pass, emitted by
+     * `AppBuildRunDiscoveryService`, so a polled run is not counted twice here.
+     */
+    private noteDeliveredRun(source: AppBuildRunSource): void {
+        if (source !== 'event') return;
+        this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.runsDiscovered, {
+            recorded: 1,
+            notModified: false,
+            source: 'event',
+        });
     }
 
     /**
@@ -1735,6 +1761,11 @@ export class AppBuildsService {
             now - APP_BUILD_REBUILD_DEDUPE_MS,
         );
         if (recent) {
+            this.telemetry?.track(
+                APP_BUILD_TELEMETRY_EVENTS.rebuildRequested,
+                { deduped: true },
+                userId,
+            );
             return { ok: true, build: recent, deduped: true };
         }
 
@@ -1774,6 +1805,11 @@ export class AppBuildsService {
             ),
         );
 
+        this.telemetry?.track(
+            APP_BUILD_TELEMETRY_EVENTS.rebuildRequested,
+            { deduped: false },
+            userId,
+        );
         return { ok: true, build, deduped: false };
     }
 
@@ -2047,6 +2083,7 @@ export class AppBuildsService {
             blockedDetail: detail,
         });
         await this.notifyProvisioner(blocked);
+        this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.blocked, { reason });
         return { buildId: blocked.id, blocked: true, blockedReason: reason };
     }
 
