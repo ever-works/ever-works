@@ -103,9 +103,13 @@ describe('channel families', () => {
 			'health.now': 'link',
 			'checkouts.list': 'work-or-manage',
 			'checkouts.create': 'work-or-manage',
-			'checkouts.changes': 'work-or-manage'
+			'checkouts.changes': 'work-or-manage',
+			// FL-18: runner jobs are work, so a --work node lists its runners.
+			'runner.list': 'work',
+			'runner.status': 'work'
 		});
 		expect(fleetLinkVerbConsent('health.now')).toBe('link');
+		expect(fleetLinkVerbConsent('runner.list')).toBe('work');
 		expect(fleetLinkVerbConsent('services.list')).toBe('manage');
 		expect(fleetLinkVerbConsent('constructor')).toBe('manage');
 		expect(fleetLinkVerbConsent('__proto__')).toBe('manage');

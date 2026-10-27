@@ -9,24 +9,29 @@ import { FLEET_NO_CONSENTS } from '../fleet-link.types.js';
 
 /** Fleet node link (FL-02, T-27, CONTRACTS R-34) — the management lane's kind list and its consents. */
 describe('the management lane', () => {
-	it('carries exactly the kinds epics registered: FL-16 vm-create / vm-control under --manage, FL-20 usage-scan under --usage-scan', () => {
+	it('carries exactly the kinds epics registered: FL-16 vm-* (--manage), FL-20 usage-scan (--usage-scan), FL-18 runner-* (--work)', () => {
 		// FL-02 shipped the list empty ("no node starts the lane until an epic
-		// registers a kind"); FL-16 registered its kinds first, FL-20 appended its own.
-		expect(FLEET_MANAGEMENT_LANE_KINDS).toEqual(['vm-create', 'vm-control', 'usage-scan']);
+		// registers a kind"); FL-16 registered its kinds first, FL-20 and FL-18 appended theirs.
+		expect(FLEET_MANAGEMENT_LANE_KINDS).toEqual(['vm-create', 'vm-control', 'usage-scan', 'runner-install', 'runner-control']);
 		expect(FLEET_MANAGEMENT_LANE_CONSENT).toEqual({
 			'vm-create': 'manage',
 			'vm-control': 'manage',
-			'usage-scan': 'usageScan'
+			'usage-scan': 'usageScan',
+			'runner-install': 'work',
+			'runner-control': 'work'
 		});
 		expect(
 			fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true, manage: true, usageScan: true })
-		).toEqual(['vm-create', 'vm-control', 'usage-scan']);
-		// --work alone never leases a management job; --usage-scan alone leases only the scan.
-		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true })).toEqual([]);
+		).toEqual(['vm-create', 'vm-control', 'usage-scan', 'runner-install', 'runner-control']);
+		// --work alone leases the runner jobs only; --usage-scan alone leases only the scan.
+		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true })).toEqual(['runner-install', 'runner-control']);
+		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, usageScan: true })).toEqual(['usage-scan']);
 		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true, usageScan: true })).toEqual([
-			'usage-scan'
+			'usage-scan',
+			'runner-install',
+			'runner-control'
 		]);
-		// --manage never leases the scan: the transcript scan is its own consent (CONTRACTS §1.1).
+		// --manage never leases the scan (its own consent) nor a runner job (runner jobs are work, CONTRACTS §1.1).
 		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, manage: true })).toEqual(['vm-create', 'vm-control']);
 	});
 

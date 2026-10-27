@@ -33,13 +33,13 @@
 
 ## P1.A — Contracts
 
-- [ ] **T-01**. Add `packages/plugin/src/contracts/capabilities/actions-runners.interface.ts` (types +
+- [x] **T-01**. Add `packages/plugin/src/contracts/capabilities/actions-runners.interface.ts` (types +
       `IActionsRunnersPlugin` + guard per plan §4.3); export from `capabilities/index.ts` (after
       L137); append `ACTIONS_RUNNERS: 'actions-runners'` **last** in
       `packages/plugin/src/contracts/facade-capabilities.ts` (after L150). No category change.
       **Test**: `packages/plugin/src/contracts/__tests__/actions-runners.interface.spec.ts`; extend
       the append-only pin specs; `isValidPluginCapability('actions-runners')`.
-- [ ] **T-02**. Add `packages/contracts/src/fleet/fleet-runners.types.ts` (plan §4.3) and export from
+- [x] **T-02**. Add `packages/contracts/src/fleet/fleet-runners.types.ts` (plan §4.3) and export from
       `packages/contracts/src/fleet/index.ts`; extend `fleet-jobs.types.ts` with `'runner-install' | 'runner-control'` (L117, L120) and max-age entries (L239: 3600 / 600) and
       `FLEET_ACTIONS_RUNNER_CAPABILITY`; extend `fleet-panic.types.ts` with
       `node.runner.install|start|stop|restart|remove` and `node.runner.job.cancel` (CONTRACTS §7).
@@ -48,28 +48,28 @@
 
 ## P1.B — Schema
 
-- [ ] **T-03**. Add `packages/agent/src/entities/fleet-actions-runner.entity.ts` (columns per plan
+- [x] **T-03**. Add `packages/agent/src/entities/fleet-actions-runner.entity.ts` (columns per plan
       §4.1 — the CONTRACTS §4.11 columns with their exact names and `state` values, plus the
       epic-local ones; raw uuid columns, `PortableDateColumn`, varchar unions, `simple-json` text for
       `labels`); register in
       `packages/agent/src/entities/index.ts` and the fleet TypeORM feature array.
       **Test**: `pnpm --filter @ever-works/agent build`; entities inventory spec updated.
-- [ ] **T-04**. Author `apps/api/src/migrations/1796180000000-CreateFleetActionsRunners.ts` from
+- [x] **T-04**. Author `apps/api/src/migrations/1796180000000-CreateFleetActionsRunners.ts` from
       `apps/api/`: one table, three indexes, one unique `(nodeId, name)`; `down` drops the table.
       **Test**: applies twice cleanly; re-generate yields an empty diff.
 
 ## P1.C — Plugin and facade
 
-- [ ] **T-05**. Scaffold `packages/plugins/github-actions-runners/` (`package.json` manifest per plan
+- [x] **T-05**. Scaffold `packages/plugins/github-actions-runners/` (`package.json` manifest per plan
       §7, `tsup.config.ts`, `vitest.config.ts`, `src/index.ts`, `README.md`).
       **Test**: build + empty test green; manifest validator accepts the block.
-- [ ] **T-06**. Implement `src/github-actions-runners.plugin.ts`, `src/github-runners-api.ts`
+- [x] **T-06**. Implement `src/github-actions-runners.plugin.ts`, `src/github-runners-api.ts`
       (downloads list with sha256; registration/remove tokens per scope; list/delete runners;
       conditional requests; rate-limit headers; 403 → permission check), `src/diagnose.ts` (pure),
       `src/testing/fake-github-runners-api.ts`.
       **Test**: `src/__tests__/github-actions-runners.plugin.spec.ts`, `diagnose.spec.ts` per plan §14;
       every method takes the token as a parameter and never logs it.
-- [ ] **T-07**. Add `packages/agent/src/facades/actions-runners.facade.ts` (`mintToken` with the
+- [x] **T-07**. Add `packages/agent/src/facades/actions-runners.facade.ts` (`mintToken` with the
       narrowest permission per operation via `requestGitHubAppInstallationAccessTokenDetails`
       (`packages/agent/src/utils/github-app.utils.ts:91`), `listTargets` from
       `GitHubAppInstallationRepository` + `GitHubAppInstallationRepoRepository` with the ownership
@@ -78,13 +78,13 @@
       per operation; `repositoryIds` only from the snapshot; suspended/deleted installations
       excluded; `grep -rn "github-actions-runners" packages/agent apps --include=*.ts` returns only
       the listed user-copy exceptions.
-- [ ] **T-08**. Add the plugin to `docs/plugin-system/built-in-plugins.md` (count 105 → 106 at L9;
+- [x] **T-08**. Add the plugin to `docs/plugin-system/built-in-plugins.md` (count 105 → 106 at L9;
       `integration` row; a short section) — canonical doc only.
       **Test**: docs build clean; no other doc's count edited.
 
 ## P1.D — Domain and API
 
-- [ ] **T-09**. Add `packages/agent/src/fleet/runners/fleet-runners.service.ts`: `options` (targets,
+- [x] **T-09**. Add `packages/agent/src/fleet/runners/fleet-runners.service.ts`: `options` (targets,
       canHost + reason, modes per OS), `install` (limit 16; rows first `installing`; fetch downloads
       via facade; enqueue `runner-install` pinned to the node with `requiredCapabilities ['actions-runner']` through the node job-runtime plugin as `fleet-agent-task.dispatcher.ts`
       does; audit per runner), `control` (`runner-control`; `stoppedByOwner`; remove busy guard),
@@ -94,13 +94,13 @@
       `apps/api/src/fleet/fleet.module.ts`.
       **Test**: `packages/agent/src/fleet/runners/__tests__/fleet-runners.service.spec.ts` — token
       never in the job payload; limit; busy guard; kill switch; audit `extra` has no token.
-- [ ] **T-10**. Add `apps/api/src/fleet/dto/fleet-runners.dto.ts` and
+- [x] **T-10**. Add `apps/api/src/fleet/dto/fleet-runners.dto.ts` and
       `apps/api/src/fleet/fleet-runners.controller.ts` (P1 routes: list, options, install, control),
       `FleetEnabledGuard` + `FLEET_ACTIONS_RUNNERS_ENABLED` (add to `apps/api/src/config/constants.ts`
       and `apps/web/src/lib/fleet-flags.ts`), `@Throttle` tiers, CONTRACTS §8 envelope.
       **Test**: `apps/api/src/fleet/fleet-runners.controller.spec.ts` — one case per status in
       plan §5; 404 when the flag is off.
-- [ ] **T-11**. Register the `runner.token` / `runner.list` / `runner.status` vocabulary on the
+- [x] **T-11**. Register the `runner.token` / `runner.list` / `runner.status` vocabulary on the
       `machine` channel (platform side `apps/api/src/fleet/link/machine-channel.handlers.ts`, node side
       `apps/node/src/core/link/modules/runners/index.ts`, registered once in
       `apps/node/src/core/link/modules/index.ts` — CONTRACTS R-40) and the `awaiting-token` progress
@@ -110,17 +110,17 @@
 
 ## P1.E — Node
 
-- [ ] **T-12**. Add `apps/node/src/core/link/modules/runners/runner-download.ts`, `runner-state.ts`,
+- [x] **T-12**. Add `apps/node/src/core/link/modules/runners/runner-download.ts`, `runner-state.ts`,
       `runner-logs.ts` (FL-08 source `runner:<name>`).
       **Test**: `runner-download.spec.ts` — mismatch deletes and extracts nothing; foreign host
       refused; `runner-logs.spec.ts` — newest `_diag` file chosen.
-- [ ] **T-13**. Add `runner-config.ts` (env-input token, `--unattended`, `--replace` only when GitHub
+- [x] **T-13**. Add `runner-config.ts` (env-input token, `--unattended`, `--replace` only when GitHub
       lists the name for this node, `--runasservice` on win32; refuse if the build rejects env input)
       and `runner-service.ts` (FL-09 adapters per OS; `sudo -n true` probe; elevation probe; exact
       refusal commands).
       **Test**: `runner-config.spec.ts` — argv never contains the token under any input;
       `runner-service.spec.ts` — refusal text per OS.
-- [ ] **T-14**. Add `apps/node/src/core/executors/runner-install.ts` and `runner-control.ts`; register
+- [x] **T-14**. Add `apps/node/src/core/executors/runner-install.ts` and `runner-control.ts`; register
       them on the management lane in `apps/node/src/core/runtime.ts` (CONTRACTS R-34 — append to FL-02's
       `createManagementLane`; runner kinds only with `--work`; never on the
       work lane) only when `actions-runner` is advertised; advertise `actions-runner` in `apps/node/src/core/capabilities.ts` (`--work` + FL-09
@@ -131,28 +131,28 @@
 
 ## P1.F — Web, tools, poll, e2e
 
-- [ ] **T-15**. Add `apps/web/src/components/fleet/runners/runners.shared.ts` and register the
+- [x] **T-15**. Add `apps/web/src/components/fleet/runners/runners.shared.ts` and register the
       computer Overview **Actions runners** block with `registerOverviewBlock` in
       `apps/web/src/components/fleet/registry.ts` (its **Install runners** button lives in the block;
       FL-01's registry has no header-action entry point).
       **Test**: `runners.shared.unit.spec.ts` — Windows offers Service only; default names
       `<computer>-<n>`.
-- [ ] **T-16**. Add `InstallRunnersDialog.tsx`, `RunnersBlock.tsx`, `RunnerRow.tsx`,
+- [x] **T-16**. Add `InstallRunnersDialog.tsx`, `RunnersBlock.tsx`, `RunnerRow.tsx`,
       `RunnerActionsMenu.tsx`, `RemoveRunnerDialog.tsx` under `apps/web/src/components/fleet/runners/`;
       BFF routes under `apps/web/src/app/api/fleet/nodes/[id]/runners/**`; **Logs** opens FL-08's tab
       with source `runner:<name>`.
       **Test**: `InstallRunnersDialog.unit.spec.tsx` (count clamp; sudo/elevation state renders the
       command; cost sentence), `RunnersBlock.unit.spec.tsx` (every state glyph).
-- [ ] **T-17**. Palette entries (`screens.ts:212` area) and `fleet.runners.*` keys in
+- [x] **T-17**. Palette entries (`screens.ts:212` area) and `fleet.runners.*` keys in
       `apps/web/messages/en.json` (spec §5.7).
       **Test**: dotted-key grep unchanged; no literal user strings under `components/fleet/runners/`.
-- [ ] **T-18**. Add `packages/tasks/src/tasks/trigger/fleet-runners-poll.task.ts` (every 5 min; P1
+- [x] **T-18**. Add `packages/tasks/src/tasks/trigger/fleet-runners-poll.task.ts` (every 5 min; P1
       scope: runner states + `runner-stopped` producer with `stoppedByOwner` suppression) and
       `FLEET_RUNNERS_POLL_DISPATCHER`; register in `packages/tasks/src/tasks/trigger/index.ts` (beside
       L25); register the producer with FL-03's registry.
       **Test**: `packages/tasks/src/__tests__/fleet-runners-poll.task.spec.ts` — GitHub wins when
       fresh; item after 5 min; cleared on recovery; owner stop raises nothing.
-- [ ] **T-19**. Add `packages/agent/src/fleet/agent-fleet-runners-tools.ts` (P1 tools: list, install,
+- [x] **T-19**. Add `packages/agent/src/fleet/agent-fleet-runners-tools.ts` (P1 tools: list, install,
       action, remove; annotations per plan §9) and MCP whitelist entries
       (`apps/mcp/src/openapi-tools/whitelist.ts` after L530).
       **Test**: `agent-fleet-runners-tools.spec.ts` — install's confirmation text names target,
@@ -161,7 +161,7 @@
       fixture): install 2 → rows → idle; stop → `stopped (by you)`; remove with typed name; sudo
       refusal shows the command.
       **Test**: green locally and in CI.
-- [ ] **T-21**. Docs `docs/features/fleet-actions-runners.md` (P1), sidebar entry in
+- [x] **T-21**. Docs `docs/features/fleet-actions-runners.md` (P1), sidebar entry in
       `apps/docs/sidebarsPlatform.ts` after `features/fleet` (L183); tracker row.
       **Test**: docs build clean.
 
