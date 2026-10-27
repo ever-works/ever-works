@@ -3,7 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import type { UpstreamPullRequestView } from '@ever-works/contracts';
 import messages from '../../../../../messages/en.json';
-import { UpstreamPullRequestsSection } from './UpstreamPullRequestsSection';
+import { UpstreamPullRequestsSection, safeUpstreamUrl } from './UpstreamPullRequestsSection';
 
 /**
  * APW-09 — the Upstream tab's **Upstream pull requests** section, rendered with the REAL
@@ -83,6 +83,21 @@ describe('UpstreamPullRequestsSection (APW-09)', () => {
         expect(screen.getByTestId('upstream-pull-request-refusal').textContent).toContain(
             'You can open 1 pull request on acme/bookings per day.',
         );
+        expect(screen.queryByRole('link')).toBeNull();
+    });
+
+    it('renders only an https URL as a link', () => {
+        expect(safeUpstreamUrl('https://github.com/acme/bookings/pull/12')).toBe(
+            'https://github.com/acme/bookings/pull/12',
+        );
+        expect(safeUpstreamUrl('javascript:alert(1)')).toBeNull();
+        expect(safeUpstreamUrl('/relative')).toBeNull();
+        expect(safeUpstreamUrl(null)).toBeNull();
+        renderSection({
+            rows: [row({ url: 'javascript:alert(1)' })],
+            relation: 'fork',
+            upstream: 'acme/bookings',
+        });
         expect(screen.queryByRole('link')).toBeNull();
     });
 

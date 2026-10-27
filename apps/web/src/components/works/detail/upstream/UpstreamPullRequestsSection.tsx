@@ -9,6 +9,20 @@ import {
 } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
 
+/**
+ * Only an `https:` link is rendered as a link. The URL is the provider's own answer, stored by
+ * the platform, but it is rendered into an `href`, so anything else (`javascript:`, a relative
+ * path) is shown as plain text.
+ */
+export function safeUpstreamUrl(url: string | null): string | null {
+    if (!url) return null;
+    try {
+        return new URL(url).protocol === 'https:' ? url : null;
+    } catch {
+        return null;
+    }
+}
+
 /** The tone of each state chip: final-good, in flight, final-problem. */
 const STATE_TONE: Record<string, string> = {
     preparing: 'bg-info/10 text-info',
@@ -136,9 +150,9 @@ export function UpstreamPullRequestsSection({
                                             ? t(`states.${state}` as Parameters<typeof t>[0])
                                             : row.state}
                                     </span>
-                                    {row.url && row.number !== null ? (
+                                    {safeUpstreamUrl(row.url) && row.number !== null ? (
                                         <a
-                                            href={row.url}
+                                            href={safeUpstreamUrl(row.url) ?? undefined}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
