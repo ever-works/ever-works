@@ -381,7 +381,7 @@
         "typescript-eslint": "8.53.1"
     },
     "dependencies": {
-        "@ai-sdk/openai-compatible": "^2.0.41",
+        "@ai-sdk/openai-compatible": "^2.0.87",
         "@ever-co/connect-sdk": "1.0.0-rc.7",
         "@ever-works/agent-plugins": "workspace:*",
         "@ever-works/contracts": "workspace:*",
@@ -392,7 +392,7 @@
         "@nestjs/config": "^4.0.4",
         "@nestjs/swagger": "^11.4.7",
         "@nestjs/typeorm": "^11.0.3",
-        "ai": "^6.0.154",
+        "ai": "^6.0.316",
         "ajv": "^8.18.0",
         "ajv-formats": "^3.0.1",
         "archiver": "^5.3.2",

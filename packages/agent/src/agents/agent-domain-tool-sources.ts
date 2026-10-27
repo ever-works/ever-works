@@ -14,6 +14,7 @@ import type { FleetMachineActionsService } from '../fleet/machine/fleet-machine-
 import type { FleetVirtualService } from '../fleet/virtual/fleet-virtual.service';
 import type { FleetCloudService } from '../fleet/cloud/fleet-cloud.service';
 import type { FleetUsageViewService } from '../fleet/usage/fleet-usage-view.service';
+import type { FleetActionsRunnersService } from '../fleet/runners/fleet-actions-runners.service';
 import type { FleetSessionsToolService } from '../fleet/agent-fleet-session-tools';
 import type { FleetCommandService } from '../fleet/commands/fleet-command.service';
 import type { FleetScheduleService } from '../fleet/schedules/fleet-schedule.service';
@@ -144,6 +145,11 @@ export interface AgentFleetToolSource {
      * Optional: unbound (or `FLEET_USAGE_SCAN_ENABLED` off), it is not offered.
      */
     usage?: Pick<FleetUsageViewService, 'view'>;
+    /**
+     * Actions runners on computers (FL-18) — backs `fleet_runners_*`. Optional:
+     * unbound (or `FLEET_ACTIONS_RUNNERS_ENABLED` off), those tools are simply not offered.
+     */
+    runners?: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'

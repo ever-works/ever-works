@@ -327,10 +327,39 @@ export class FleetJobService {
         if (kind === 'usage-scan') {
             return this.resolveUsageScanTarget(payload?.nodeId);
         }
+        // Actions runners (FL-18, spec FR-5): a runner job is for ONE machine — the
+        // one its runners live on — so it is pinned to `payload.nodeId` and never
+        // written unpinned (another computer advertising `actions-runner` must never
+        // lease it). The service has already checked the caller's audience.
+        if (kind === 'runner-install' || kind === 'runner-control') {
+            return this.resolvePinnedMachineTarget(kind, payload?.nodeId);
+        }
+        // Virtual computers (FL-16): a create / control is for the host named in the
+        // payload. Pinned for the same reason; the token mint already refused any
+        // other host, this keeps another host from building the machine at all.
+        if (kind === 'vm-create' || kind === 'vm-control') {
+            return this.resolvePinnedMachineTarget(kind, payload?.hostNodeId);
+        }
         if (kind !== 'agent-task') {
             return null;
         }
         return this.resolveAgentTaskTarget(userId, payload?.agentId);
+    }
+
+    /**
+     * Machine jobs (FL-16 `vm-*`, FL-18 `runner-*`) — pinned to the node their
+     * payload names. Refused when it names no node or one that does not exist,
+     * rather than written unpinned.
+     */
+    private async resolvePinnedMachineTarget(kind: FleetJobKind, nodeId: unknown): Promise<string> {
+        if (typeof nodeId !== 'string' || !isUUID(nodeId)) {
+            throw new BadRequestException(`A ${kind} job must name the computer it is for`);
+        }
+        const node = await this.nodes.findById(nodeId);
+        if (!node) {
+            throw new BadRequestException(`A ${kind} job must name a computer that exists`);
+        }
+        return node.id;
     }
 
     /**

@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 106 plugins under `packages/plugins/`, spanning **22 of the 28 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, utility, build, identity, and machine provider. (`form`, `integration`, `theme`, `memory`, `rag`, and `app-dependency` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
+The platform ships with 107 plugins under `packages/plugins/`, spanning **23 of the 28 categories** declared by `PLUGIN_CATEGORIES` in `packages/plugin/src/contracts/plugin-manifest.types.ts`: AI provider, search, content extractor, screenshot, git provider, deployment, data source, pipeline, storage, database, vector store, DNS, secret store resolver, job runtime, email provider, notification channel, connector, metrics, utility, build, identity, integration, and machine provider. (`form`, `theme`, `memory`, `rag`, and `app-dependency` are declared as contracts but have no shipped plugin yet.) This page documents the most widely used ones, with configuration and environment variables for each.
 
 ## Plugin count by category
 
@@ -37,6 +37,7 @@ Counted from each package's `everworks.plugin.category` field.
 | `build`                 | 1     | `github-actions-build`                                                                                                                                                                                                                  |
 | `identity`              | 1     | `oidc-identity`                                                                                                                                                                                                                         |
 | `machine-provider`      | 1     | `digitalocean-machines`                                                                                                                                                                                                                 |
+| `integration`           | 1     | `github-actions-runners`                                                                                                                                                                                                                |
 
 A plugin's **capabilities** are independent of its category: `scrapfly` sits in `content-extractor` but also advertises `screenshot`, and every `search` plugin except `brave`, `perplexity` and `serpapi` also advertises `content-extractor`.
 
@@ -1993,3 +1994,7 @@ Create. Switched on per deployment by `FLEET_CLOUD_ENABLED`.
 
 Writing a second provider: [Creating a Machine-Provider Plugin](./creating-machine-provider-plugin.md) — the contract,
 the tags reconciliation reads, and what `billsWhileOff` and `usage` mean.
+
+## GitHub Actions runners (`github-actions-runners`)
+
+Category `integration`, capability `actions-runners` (Fleet epic FL-18). Turns computers of your Fleet into GitHub Actions self-hosted runners for repositories and organisations the Ever Works GitHub App is installed on: it lists the runner builds GitHub publishes with their SHA-256, mints the one-time registration and remove tokens, reads runner status and the queued and running jobs, and cancels a workflow run. It talks to GitHub only with a short-lived installation token the platform mints for each call, narrowed to the one permission that call needs; it has no settings and never asks for a personal token. Switched on with `FLEET_ACTIONS_RUNNERS_ENABLED`. See [Actions runners on computers](../features/fleet-actions-runners.md).

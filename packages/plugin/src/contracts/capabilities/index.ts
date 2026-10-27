@@ -143,3 +143,6 @@ export * from './domain-event-subscriber.interface.js';
 // are appended last in the same change; a plugin that never declares it
 // compiles and behaves exactly as before.
 export * from './machine-provider.interface.js';
+// Actions runners on computers (FL-18, CONTRACTS R-14) — the `actions-runners` capability:
+// GitHub's self-hosted runner API through the Ever Works GitHub App, a token per call.
+export * from './actions-runners.interface.js';

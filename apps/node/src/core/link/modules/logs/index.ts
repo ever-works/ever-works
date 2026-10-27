@@ -3,6 +3,7 @@ import {
 	FLEET_LOGS_SOURCES_VERB,
 	fleetLogSystemSourcesFor,
 	parseFleetLogSourceId,
+	type FleetLogSource,
 	type FleetLogSourceList
 } from '@ever-works/contracts';
 import { resolveUnderRoots, type AllowedRoot } from '../../allowed-roots';
@@ -43,6 +44,16 @@ export interface LogsLinkModuleOptions {
 	/** The allowed roots (`resolveCanonicalAllowedRoots`, purpose `logs`), read per call. */
 	roots(): Promise<readonly AllowedRoot[]>;
 	nodeName: string;
+	/**
+	 * Actions runners on computers (FL-18, FR-18): the `runner:<name>` sources —
+	 * each runner's newest diagnostic log, resolved by the machine from a
+	 * validated runner name (a caller never names a path). Absent: no runner
+	 * sources are listed and `runner:` ids are refused.
+	 */
+	runners?: {
+		sources(): Promise<FleetLogSource[]>;
+		logPath(name: string): Promise<string | null>;
+	};
 }
 
 const OUTSIDE_ROOTS = "Only files under this computer's shared folders and standard log directories can be read";
@@ -107,6 +118,12 @@ export function createLogsLinkModule(options: LogsLinkModuleOptions): NodeModule
 				return createContainerReader(io, ref.key, nodeName);
 			case 'service':
 				return createServiceReader(io, ref.key);
+			case 'runner': {
+				if (!options.runners) throw new LogReadError('unsupported_on_node', 'no Actions runners on this computer');
+				const path = await options.runners.logPath(ref.key);
+				if (!path) throw new LogReadError('not_found', `${ref.key} has not written a diagnostic log yet`);
+				return createFileReader(io, path);
+			}
 			default:
 				throw new LogReadError('invalid', 'source');
 		}
@@ -121,8 +138,18 @@ export function createLogsLinkModule(options: LogsLinkModuleOptions): NodeModule
 
 	const sourcesVerb: MachineVerb = {
 		stateChanging: false,
-		run: async (context): Promise<FleetLogSourceList> =>
-			listLogSources({ io, roots: await options.roots(), nodeName: context.nodeName, signal: context.signal })
+		run: async (context): Promise<FleetLogSourceList> => {
+			const listed = await listLogSources({
+				io,
+				roots: await options.roots(),
+				nodeName: context.nodeName,
+				signal: context.signal
+			});
+			if (!options.runners) return listed;
+			// FL-18 (FR-18): the runners' diagnostic logs, after the four FL-08 groups.
+			const runners = await options.runners.sources().catch(() => []);
+			return runners.length > 0 ? { ...listed, sources: [...listed.sources, ...runners] } : listed;
+		}
 	};
 
 	return {

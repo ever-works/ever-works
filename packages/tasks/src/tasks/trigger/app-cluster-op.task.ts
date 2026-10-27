@@ -84,6 +84,9 @@ export const APP_CLUSTER_OPS = [
     'verification-deploy',
     'verification-status',
     'verification-destroy',
+    // Lane aw-ops (2026-10-27) — the on-demand smoke run of `POST :id/app-smoke`, routed by the
+    // router to `AppSmokeService.run` (the `app-smoke` task has no API dispatcher).
+    'smoke',
 ] as const;
 
 export type AppClusterOp = (typeof APP_CLUSTER_OPS)[number];

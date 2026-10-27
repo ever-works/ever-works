@@ -857,6 +857,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
 			'checkouts.json'
 		),
+		// Actions runners on computers (FL-18): the runners this machine hosts keep
+		// their folders (GitHub's runner build, its config, its logs) beside the config.
+		runnersDataDir: (deps.platform === 'win32' ? win32 : posix).join(
+			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
+			'actions-runners'
+		),
 		// Virtual computers (FL-16): the children this host builds keep their
 		// folders (bootstrap, meta, the catalogue lock) beside the config. A
 		// Windows host never hosts virtual computers (spec U4).

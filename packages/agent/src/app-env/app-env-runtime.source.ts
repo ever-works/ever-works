@@ -272,6 +272,39 @@ export class AppEnvRuntimeSource implements AppRuntimeEnvSource {
         };
     }
 
+    /**
+     * Lane aw-ops (APW-06 FR-48, 2026-10-27) — the secret values a log tail must not show, as
+     * `{ NAME: value }`, so the API can replace each one by its name before a tail leaves it.
+     *
+     * Read-only on purpose, unlike {@link resolve}: it never calls `ensureReadyForDeploy` (whose
+     * `reconcile` pass dispatches provisioning for `pending` kinds, GAP-05), because reading logs
+     * must not provision anything. Only `secret` entries are returned. A resolver that is unbound
+     * or throws answers `null` — "unknown", never "no secrets" — so the caller can fail closed
+     * rather than show an unredacted tail. The values stay in this process's memory and are never
+     * logged, stored or returned to a client.
+     */
+    async secretValuesForRedaction(
+        workId: string,
+        target: AppRuntimeEnvContext['target'] = 'your-cluster',
+    ): Promise<Record<string, string> | null> {
+        if (!this.resolver) return null;
+        try {
+            const resolution = await this.resolver.resolveRuntime(workId, { target }, null);
+            const out: Record<string, string> = {};
+            for (const entry of resolution.values ?? []) {
+                if (entry?.secret && typeof entry.value === 'string' && entry.value.length > 0) {
+                    out[entry.name] = entry.value;
+                }
+            }
+            return out;
+        } catch (error) {
+            this.logger.warn(
+                `App env: the redaction values of work ${workId} could not be read (${describeError(error)}).`,
+            );
+            return null;
+        }
+    }
+
     /* ---------------------------------------------------------------------- *
      * internals
      * ---------------------------------------------------------------------- */
