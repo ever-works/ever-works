@@ -638,4 +638,33 @@ describe('AppEnvRuntimeSource (T14, plan §4.6.1:424-449)', () => {
         expect(typeof APP_ENV_DEPLOY_READINESS).toBe('symbol');
         expect(typeof APP_ENV_SPEC_SOURCE).toBe('symbol');
     });
+
+    // Lane aw-builds-bindings (2026-10-27) — the read behind the worker's APP_HEALTH_EGRESS_SOURCE.
+    describe('resolveEgressHosts (APW-06 §9.3)', () => {
+        it('answers the external hosts and never dispatches provisioning', async () => {
+            await seedReadyWorld();
+            ensureReadyForDeploy.mockClear();
+
+            const hosts = await makeSource().resolveEgressHosts(WORK, 'your-cluster');
+
+            expect(hosts).toContain('smtp.mail.test');
+            expect(hosts?.every((host) => typeof host === 'string')).toBe(true);
+            // `ensureReadyForDeploy` dispatches pending kinds; a health poll must never.
+            expect(ensureReadyForDeploy).not.toHaveBeenCalled();
+        });
+
+        it('answers null with no resolver, and null — not a throw — when the resolver fails', async () => {
+            expect(
+                await makeSource({ resolver: null }).resolveEgressHosts(WORK, 'your-cluster'),
+            ).toBeNull();
+            const failing = {
+                resolveEgressHosts: async () => {
+                    throw new Error('boom');
+                },
+            } as unknown as AppEnvResolver;
+            expect(
+                await makeSource({ resolver: failing }).resolveEgressHosts(WORK, 'your-cluster'),
+            ).toBeNull();
+        });
+    });
 });

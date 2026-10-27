@@ -319,6 +319,7 @@ export default function FilesTab({ node }: FleetComputerTabProps) {
         if (isUploadRefusal(stream)) return;
         const label = picks.length === 1 ? picks[0].path : `${picks.length} items`;
         const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        // eslint-disable-next-line no-restricted-syntax -- XHR for upload progress; the selector is set below via applyBrowserWorkspaceScope + setRequestHeader (EW-788)
         const xhr = new XMLHttpRequest();
         const patch = (change: Partial<LocalUpload>) =>
             setUploads((current) =>

@@ -394,6 +394,13 @@ export class AccountExportService {
             // deliberate `false` must round-trip; see ExportedWork).
             memoryRecallEnabled:
                 typeof dir.memoryRecallEnabled === 'boolean' ? dir.memoryRecallEnabled : undefined,
+            // App Launcher exposure (APW-11) — serialize the explicit boolean
+            // AND an explicit `null` (= kind default): omitting the null would
+            // make an overwrite import silently RETAIN an explicit choice.
+            appLauncherExposed:
+                typeof dir.appLauncherExposed === 'boolean' || dir.appLauncherExposed === null
+                    ? dir.appLauncherExposed
+                    : undefined,
             // Ingest routing claims (chat channels / teams / databases /
             // meetings). Serialize the object as-is when present; an
             // absent column exports as undefined so old importers and

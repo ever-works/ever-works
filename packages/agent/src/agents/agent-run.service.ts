@@ -74,6 +74,25 @@ import {
     isAgentReviewRunScope,
     SUBMIT_TASK_REVIEW_TOOL,
 } from '../tasks-domain/task-agent-review';
+// APW-08 T47 (FR-69) — leaf files (contracts, the action classifier, the Nest logger).
+import {
+    APP_WORK_RUN_CLASSIFIER,
+    type AppWorkRunClassifier,
+} from '../app-works/app-work-run-classifier';
+import {
+    APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+    describeAppWorkTaskToolPolicyRefusal,
+    findAppWorkTaskToolPolicyViolations,
+    type AppWorkTaskToolDenial,
+    type AppWorkTaskToolPolicyCounts,
+} from '../app-works/app-work-task-tool-policy';
+// APW-08 T49 — a leaf (the Nest logger only).
+import {
+    APP_WORK_SWITCH_ENV,
+    APP_WORK_SWITCH_OFF_CODE,
+    describeAppChangesPaused,
+    readAppWorkSwitches,
+} from '../app-works/app-work-switches';
 
 export interface AgentRunContext {
     runId: string;
@@ -315,6 +334,13 @@ export class AgentRunService {
         @Optional()
         @Inject(FLEET_HELD_CALL_FILER)
         private readonly fleetHeldCalls?: FleetHeldCallFiler,
+        // APW-08 T47 (FR-69) — "is this an App Work run?", from the Task and Work rows.
+        // Trailing + `@Optional()` so every positional constructor call keeps working;
+        // the API binds it in its @Global() AgentsModule. Unbound, no run is classified
+        // and every run resolves its tools exactly as before.
+        @Optional()
+        @Inject(APP_WORK_RUN_CLASSIFIER)
+        private readonly appWorkRuns?: AppWorkRunClassifier,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -344,6 +370,32 @@ export class AgentRunService {
                 `AgentRunService.execute: ownership mismatch for run ${context.runId} — agent ${context.agentId} is not owned by the requesting user; refusing cross-tenant run.`,
             );
             return { runId: context.runId, status: 'agent-not-found' };
+        }
+
+        // 0. APW-08 T49 (R-30) — the operator's change switch, read again at execution. The
+        // dispatch path already refuses a NEW run while it is off; this catches every run that
+        // reaches a worker another way (a resumed or drained run, an assign-task enqueue, a job
+        // queued before the switch was flipped), before any model call or workspace change.
+        if (await this.appChangesPausedForRun(context)) {
+            const message = describeAppChangesPaused();
+            await this.runs.markFailed(context.runId, message);
+            await this.runLogs
+                .append({
+                    runId: context.runId,
+                    level: 'ERROR',
+                    step: 'switch',
+                    message,
+                    metadata: {
+                        code: APP_WORK_SWITCH_OFF_CODE,
+                        switch: APP_WORK_SWITCH_ENV.changes,
+                    },
+                })
+                .catch(() => undefined);
+            return {
+                runId: context.runId,
+                status: 'dispatch-failed',
+                outcome: { errored: true, errorMessage: message },
+            };
         }
 
         // 1. Pre-flight budget check.
@@ -852,6 +904,18 @@ export class AgentRunService {
             readStatus: (id) => this.runs.findById(id).then((r) => r?.status ?? null),
         });
         const editsThisRunByFile = new Set<string>();
+        // Works-security (2026-10-18) — a reply to a Conversation message the
+        // Agent's OWNER sent. Every other run (Task, heartbeat, Task chat,
+        // delegated) is the agent acting on its own.
+        const ownerChatTurn =
+            context.kind === 'chat' &&
+            typeof context.conversationMessageId === 'string' &&
+            context.conversationMessageId.length > 0 &&
+            context.userId === agent.userId;
+        // APW-08 T47 (FR-69) — classified BEFORE the tools are resolved, from platform rows.
+        const appWorkTask = this.toolService
+            ? await this.classifyAppWorkRun(context, agent, ownerChatTurn)
+            : false;
         const baseDescriptors: AgentToolDescriptor[] = this.toolService
             ? await this.resolveToolsForRun(
                   agent,
@@ -860,13 +924,8 @@ export class AgentRunService {
                   context.delegationScope,
                   context.missionId,
                   context.taskId,
-                  // Works-security (2026-10-18) — a reply to a Conversation message the
-                  // Agent's OWNER sent. Every other run (Task, heartbeat, Task chat,
-                  // delegated) is the agent acting on its own.
-                  context.kind === 'chat' &&
-                      typeof context.conversationMessageId === 'string' &&
-                      context.conversationMessageId.length > 0 &&
-                      context.userId === agent.userId,
+                  ownerChatTurn,
+                  appWorkTask,
               )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
@@ -900,6 +959,27 @@ export class AgentRunService {
         const scopedBaseDescriptors = reviewRun
             ? baseDescriptors
             : baseDescriptors.filter((descriptor) => descriptor.name !== SUBMIT_TASK_REVIEW_TOOL);
+        // APW-08 T47 (FR-69) — the dispatch re-check. `AgentToolService` already filtered an
+        // App Work run's list; this is the last look before the model sees it, so a path that
+        // widened the list after the policy ran (a tool service without the policy, a future
+        // descriptor appended above) refuses the run instead of starting it. The virtual
+        // `transitionTask` below is added after this check on purpose: it only records the
+        // run's intent for its OWN Task and is applied by `finalize`.
+        if (appWorkTask) {
+            const violations = findAppWorkTaskToolPolicyViolations(
+                scopedBaseDescriptors.map((descriptor) => descriptor.name),
+            );
+            if (violations.length > 0) {
+                const errorMessage = describeAppWorkTaskToolPolicyRefusal(violations);
+                await this.recordAppWorkToolPolicyRefusal(context, agent, violations, errorMessage);
+                return {
+                    errored: true,
+                    errorMessage,
+                    outcome: { errored: true, errorMessage },
+                    iterations: 0,
+                };
+            }
+        }
         const offerVirtualTransition = context.kind === 'task' && !reviewRun;
         const toolDescriptors: AgentToolDescriptor[] = offerVirtualTransition
             ? [
@@ -2201,6 +2281,118 @@ export class AgentRunService {
     }
 
     /**
+     * APW-08 T49 — `EVER_WORKS_APP_CHANGES_ENABLED` is off and this run works on a Task on an
+     * App Work. Switch first (no query while it is on); a run with no Task, and a code-review
+     * run (it changes nothing), are never paused. Uses the T47 classifier with the Task only, so
+     * the answer is "the Task's Work is an App Work" (fail closed on unreadable rows). Unbound
+     * classifier = not paused (a runtime without the Task tables, a unit test).
+     */
+    private async appChangesPausedForRun(context: AgentRunContext): Promise<boolean> {
+        if (readAppWorkSwitches().changesEnabled) return false;
+        if (!context.taskId) return false;
+        if (isAgentReviewRunScope(context.delegationScope)) return false;
+        if (!this.appWorkRuns) return false;
+        try {
+            return await this.appWorkRuns.appliesTo({ taskId: context.taskId });
+        } catch {
+            return true;
+        }
+    }
+
+    /**
+     * APW-08 T47 (FR-69) — is this run an App Work run? Asked once per run, before its tools
+     * are resolved. Unbound classifier = not classified (every run as before). The classifier
+     * fails closed on its own reads; a classifier that throws is treated the same way.
+     */
+    private async classifyAppWorkRun(
+        context: AgentRunContext,
+        agent: Agent,
+        ownerChatTurn: boolean,
+    ): Promise<boolean> {
+        if (!this.appWorkRuns) return false;
+        try {
+            return await this.appWorkRuns.appliesTo({
+                taskId: context.taskId ?? null,
+                agentWorkId: agent.workId ?? null,
+                ownerConversationTurn: ownerChatTurn,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Run ${context.runId}: App Work run classification failed — applying the App Work Task tool policy (fail closed): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return true;
+        }
+    }
+
+    /**
+     * APW-08 T47 — one WARN run-log row naming what the policy withheld, with the per-group
+     * counter (ACC-08-33). Tool names and groups only; no tool argument exists at this point.
+     */
+    private recordAppWorkToolPolicyWithheld(
+        runId: string,
+        denied: readonly AppWorkTaskToolDenial[],
+        counts: AppWorkTaskToolPolicyCounts,
+    ): void {
+        const summary = Object.entries(counts)
+            .map(([group, count]) => `${group} ${count}`)
+            .join(', ');
+        this.logger.log(
+            `Run ${runId}: App Work Task tool policy withheld ${denied.length} tool(s) (${summary}).`,
+        );
+        void this.runLogs
+            ?.append({
+                runId,
+                level: 'WARN',
+                step: 'tools',
+                message: `This run works on an App Work, so the App Work Task tool policy withheld ${denied.length} tool(s): ${summary}.`,
+                metadata: {
+                    code: APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+                    counts,
+                    toolNames: denied.map((denial) => denial.toolName),
+                },
+            })
+            .catch(() => undefined);
+    }
+
+    /** APW-08 T47 — the dispatch re-check refused the run: an ERROR row and an Activity row. */
+    private async recordAppWorkToolPolicyRefusal(
+        context: AgentRunContext,
+        agent: Agent,
+        violations: readonly AppWorkTaskToolDenial[],
+        errorMessage: string,
+    ): Promise<void> {
+        const groups = [...new Set(violations.map((violation) => violation.group))];
+        this.logger.warn(`Run ${context.runId}: ${errorMessage}`);
+        await this.runLogs
+            .append({
+                runId: context.runId,
+                level: 'ERROR',
+                step: 'tools',
+                message: errorMessage,
+                metadata: {
+                    code: APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+                    groups,
+                    toolNames: violations.map((violation) => violation.toolName),
+                },
+            })
+            .catch(() => undefined);
+        await this.logActivity({
+            userId: agent.userId,
+            agentId: agent.id,
+            actionType: ActivityActionType.AGENT_RUN_FAILED,
+            status: ActivityStatus.FAILED,
+            details: {
+                runId: context.runId,
+                ...(context.taskId ? { taskId: context.taskId } : {}),
+                code: APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+                groups,
+            },
+        });
+    }
+
+    /**
      * Tool-grant matrix (audit item G4) — resolve the run's tool set
      * through the grant-aware path when the tool service offers it.
      *
@@ -2219,6 +2411,7 @@ export class AgentRunService {
         missionId?: string | null,
         taskId?: string | null,
         ownerChatTurn = false,
+        appWorkTask = false,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
@@ -2229,6 +2422,8 @@ export class AgentRunService {
             // AW-17 — the run's Task, so MCP tool calls are attributed to it.
             taskId: taskId ?? undefined,
             ...(ownerChatTurn ? { ownerChatTurn: true } : {}),
+            // APW-08 T47 — platform state, never model input.
+            ...(appWorkTask ? { appWorkTask: true } : {}),
         };
         if (typeof service.resolveGrantedTools !== 'function') {
             return this.applyDelegationScope(
@@ -2238,7 +2433,13 @@ export class AgentRunService {
             );
         }
 
-        const { tools, refused } = await service.resolveGrantedTools(agent, runContext);
+        const { tools, refused, appWorkPolicy } = await service.resolveGrantedTools(
+            agent,
+            runContext,
+        );
+        if (appWorkPolicy && appWorkPolicy.denied.length > 0) {
+            this.recordAppWorkToolPolicyWithheld(runId, appWorkPolicy.denied, appWorkPolicy.counts);
+        }
         for (const decision of refused) {
             void this.runLogs
                 ?.append({

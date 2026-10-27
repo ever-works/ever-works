@@ -518,6 +518,12 @@ export enum ActivityActionType {
     // carries the kind, the provider id and counts only — never a config value or an output (FR-5).
     // Additive member — `actionType` is a plain varchar, so no migration is needed.
     APP_DEPENDENCY = 'app_dependency',
+    // APW-09 T6 (lane aw-upstream-prs, 2026-10-27) — the upstream pull request family (R-2): one row
+    // per lifecycle event of an `upstream_pull_requests` record (`app.upstream_pr.opened`, `.refused`,
+    // `.withdrawn`, … — CONTRACTS §6, plan §3.4). `details` carry the upstream `owner/repo`, the number,
+    // the URL, the state and a refusal code — never a title, a body or a diff (FR-37). Additive member —
+    // `actionType` is a plain varchar, so no migration is needed. Never publishable (R-34).
+    APP_UPSTREAM_PR = 'app_upstream_pr',
     // EW-P1-2 — integration keys (`ew_int_…`) and the integration principal.
     //   - INTEGRATION_WRITE: one row per successful write an integration key
     //     makes, with `actorKind = 'external'`, `actorLabel = 'Ever Gauzy
