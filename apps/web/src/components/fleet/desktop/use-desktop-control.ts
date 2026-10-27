@@ -113,7 +113,8 @@ export function useDesktopControl(input: {
         busy,
         serverOffsetMs,
         take: () => act((id) => desktopClient.takeControl(nodeId, id, { confirm: true })),
-        request: () => act((id) => desktopClient.takeControl(nodeId, id, { request: true })),
+        request: () =>
+            act((id) => desktopClient.takeControl(nodeId, id, { confirm: true, request: true })),
         giveBack: () => act((id) => desktopClient.giveBack(nodeId, id)),
         answer: (decision) =>
             act((id) => {

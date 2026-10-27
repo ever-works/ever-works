@@ -1500,7 +1500,10 @@ const DESKTOP_CONTROL_EXPORTS = [
 	'isFleetDesktopInputRefusedCode',
 	'normalizeFleetDesktopInputRefusedCode',
 	'fleetDesktopBlockedShortcutLabels',
-	'fleetDesktopControlAvailabilityOf'
+	'fleetDesktopControlAvailabilityOf',
+	'fleetDesktopModifierOfCode',
+	'FleetDesktopModifierTracker',
+	'fleetDesktopInputBlocked'
 ] as const;
 
 /** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
@@ -2276,7 +2279,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1382 runtime symbols', () => {
+	it('exposes exactly these 1385 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2382,8 +2385,8 @@ describe('fleet barrel', () => {
 		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
 		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
 		// → +5 with FL-18 P3 (Docker-isolated runners, versions): same module.
-		// → +20 with desktop control (FL-07 P2): `fleet-desktop-control.types.ts`, a NEW module.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 5 + 20);
+		// → +23 with desktop control (FL-07 P2): `fleet-desktop-control.types.ts`, a NEW module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 5 + 23);
 	});
 
 	it.each([

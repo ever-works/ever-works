@@ -150,6 +150,10 @@ function build(
             return true;
         }),
         recordFrames: jest.fn(async () => ({ becameLive: false })),
+        markDesktopDriver: jest.fn(async (id: string, at: Date) => {
+            const found = rows.get(id);
+            if (found) found.controlDriverAt = at;
+        }),
     };
     const gateway = {
         registerObserver: jest.fn(),
@@ -391,11 +395,18 @@ describe('taking control of a desktop view', () => {
         });
     });
 
-    it('asks for control without a confirmation', async () => {
+    it('asks for control only after a confirmation too (a hand-over gives it)', async () => {
         const { service, control } = build();
         const opened = await service.openView(OWNER, NODE_ID, {});
+        expect(
+            await refusal(
+                service.takeControl(OWNER, NODE_ID, opened.view.viewId, { request: true }),
+            ),
+        ).toMatchObject({ code: 'confirmation_required' });
+        expect(control.request).not.toHaveBeenCalled();
         const asked = await service.takeControl(OWNER, NODE_ID, opened.view.viewId, {
             request: true,
+            confirm: true,
         });
         expect(control.request).toHaveBeenCalled();
         expect(asked.attach).toBeNull();
@@ -460,9 +471,48 @@ describe('driver sockets', () => {
         });
         await service.admit(driver);
         service.opened(driver);
-        service.inbound(driver, 40);
-        service.inbound(driver, 40);
+        // A view control (refresh, quality: JSON 10) never counts as input.
+        service.inbound(driver, 40, 10);
+        expect(control.recordInput).not.toHaveBeenCalled();
+        service.inbound(driver, 40, 21);
+        service.inbound(driver, 40, 21);
         expect(control.recordInput).toHaveBeenCalledTimes(1);
+    });
+
+    it('close at once when input shows the hold ended on another replica', async () => {
+        const { service, gateway, setHeld } = build({ held: true });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
+        await service.admit(driver);
+        service.opened(driver);
+        await Promise.resolve();
+        gateway.closeViewers.mockClear();
+        setHeld(false);
+        service.inbound(driver, 40, 21);
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(gateway.closeViewers).toHaveBeenCalled();
+    });
+
+    it('fail closed when the hold cannot be read, and give the hold back when access is lost', async () => {
+        const { service, control } = build({ held: true });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
+        await service.admit(driver);
+        service.opened(driver);
+        control.holdOf.mockImplementationOnce(async () => {
+            throw new Error('database away');
+        });
+        expect(await service.stillAllowed(driver)).toBe(false);
+        const access = (service as unknown as { access: { canAct: jest.Mock } }).access;
+        access.canAct.mockImplementationOnce(async () => false);
+        expect(await service.stillAllowed(driver)).toBe(false);
+        expect(control.releaseForSession).toHaveBeenCalledWith(opened.view.viewId, 'revoked');
     });
 
     it('close at once on this replica when the hold ends', async () => {
@@ -496,7 +546,6 @@ describe('driver sockets', () => {
             await service.admit(driver);
             service.opened(driver);
             service.closed(driver);
-            control.getState.mockImplementationOnce(async () => null as never);
             await jest.advanceTimersByTimeAsync(30_000);
             expect(control.releaseForSession).toHaveBeenCalledWith(
                 opened.view.viewId,
@@ -505,6 +554,42 @@ describe('driver sockets', () => {
         } finally {
             jest.useRealTimers();
         }
+    });
+
+    it('keep control when a driver came back on another replica within the grace', async () => {
+        jest.useFakeTimers();
+        try {
+            const { service, control, rows } = build({ held: true });
+            const opened = await service.openView(OWNER, NODE_ID, {});
+            const driver = handle(opened.view.viewId, 'driver', {
+                source: 'desktop',
+                mode: 'controlling',
+            });
+            await service.admit(driver);
+            service.opened(driver);
+            service.closed(driver);
+            // Another replica's driver attached a moment later.
+            rows.get(opened.view.viewId)!.controlDriverAt = new Date(Date.now() + 1_000);
+            await jest.advanceTimersByTimeAsync(30_000);
+            expect(control.releaseForSession).not.toHaveBeenCalled();
+        } finally {
+            jest.useRealTimers();
+        }
+    });
+
+    it('give back the hold of a person who lost the right, before refusing their keep', async () => {
+        const { service, control } = build({ held: true });
+        const opened = await service.openView(OWNER, NODE_ID, {});
+        const killSwitch = (service as unknown as { killSwitch: { isStopped: jest.Mock } })
+            .killSwitch;
+        killSwitch.isStopped.mockImplementation(async () => true);
+        expect(
+            await refusal(service.keepControl(OWNER, NODE_ID, opened.view.viewId)),
+        ).toMatchObject({
+            code: 'kill_switch',
+        });
+        expect(control.releaseForSession).toHaveBeenCalledWith(opened.view.viewId, 'revoked');
+        expect(control.keep).not.toHaveBeenCalled();
     });
 });
 

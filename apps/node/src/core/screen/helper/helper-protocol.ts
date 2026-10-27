@@ -166,7 +166,10 @@ export function parseHelperHello(payload: Uint8Array): HelperHello | null {
 		platform,
 		reasons: normalizeFleetDesktopReasons(json.reasons),
 		displays: normalizeFleetDisplays(json.displays),
-		inputReasons: normalizeFleetDesktopControlReasons(json.inputReasons)
+		// A helper that says nothing about input (one built before control) cannot inject.
+		inputReasons: Array.isArray(json.inputReasons)
+			? normalizeFleetDesktopControlReasons(json.inputReasons)
+			: ['input-unavailable']
 	};
 }
 

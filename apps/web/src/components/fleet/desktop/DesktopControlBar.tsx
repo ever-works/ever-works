@@ -58,7 +58,8 @@ export function DesktopControlBar({
     onAnswer: (decision: 'hand-over' | 'keep') => void;
 }) {
     const t = useTranslations('fleet.desktop.control');
-    const [confirming, setConfirming] = useState(false);
+    // What the confirmation will do once accepted: take control, or ask for it (a hand-over gives it).
+    const [confirming, setConfirming] = useState<'take' | 'request' | null>(null);
     const status = desktopControlStatus(state);
     const controlling = status === 'controlling';
     const canTake = Boolean(availability?.available && state?.canControl);
@@ -125,8 +126,8 @@ export function DesktopControlBar({
                             type="button"
                             size="sm"
                             variant="secondary"
-                            disabled={busy || Boolean(waiting)}
-                            onClick={onRequest}
+                            disabled={busy || Boolean(waiting) || !availability?.available}
+                            onClick={() => setConfirming('request')}
                         >
                             {waiting
                                 ? t('requestWaiting', {
@@ -139,7 +140,7 @@ export function DesktopControlBar({
                             type="button"
                             size="sm"
                             disabled={busy || !canTake}
-                            onClick={() => setConfirming(true)}
+                            onClick={() => setConfirming('take')}
                             data-testid="desktop-control-take"
                         >
                             {t('take')}
@@ -183,8 +184,10 @@ export function DesktopControlBar({
                             size="sm"
                             disabled={busy}
                             onClick={() => {
-                                setConfirming(false);
-                                onTake();
+                                const act = confirming;
+                                setConfirming(null);
+                                if (act === 'request') onRequest();
+                                else onTake();
                             }}
                             data-testid="desktop-control-confirm"
                         >
@@ -194,7 +197,7 @@ export function DesktopControlBar({
                             type="button"
                             size="sm"
                             variant="ghost"
-                            onClick={() => setConfirming(false)}
+                            onClick={() => setConfirming(null)}
                         >
                             {t('confirm.no')}
                         </Button>

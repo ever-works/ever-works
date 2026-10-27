@@ -270,6 +270,18 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
     const driving =
         grantRole === 'driver' && control.state?.mode === 'controlling' && phase === 'live';
 
+    // Control handed over to this view (someone said Hand over): re-attach with the driver grant
+    // the reconnect now answers, once per hold.
+    const handedSinceRef = useRef<string | null>(null);
+    const holdSince =
+        control.state?.mode === 'controlling' ? (control.state.holder?.since ?? 'held') : null;
+    useEffect(() => {
+        if (!holdSince || grantRole === 'driver' || phase !== 'live') return;
+        if (handedSinceRef.current === holdSince) return;
+        handedSinceRef.current = holdSince;
+        reconnectRef.current();
+    }, [grantRole, holdSince, phase]);
+
     // Taking control moves the keyboard onto the stage at once.
     useEffect(() => {
         if (driving) stageRef.current?.focus();

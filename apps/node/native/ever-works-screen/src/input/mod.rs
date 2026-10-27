@@ -123,6 +123,19 @@ pub const MOD_ALT: u32 = 1;
 pub const MOD_CTRL: u32 = 2;
 pub const MOD_META: u32 = 4;
 
+pub const MOD_SHIFT: u32 = 8;
+
+/// The modifier bit a physical key holds while it is pressed (the contracts' `fleetDesktopModifierOfCode`).
+pub fn modifier_of(code: &str) -> u32 {
+    match code {
+        "ControlLeft" | "ControlRight" => MOD_CTRL,
+        "AltLeft" | "AltRight" => MOD_ALT,
+        "MetaLeft" | "MetaRight" | "OSLeft" | "OSRight" => MOD_META,
+        "ShiftLeft" | "ShiftRight" => MOD_SHIFT,
+        _ => 0,
+    }
+}
+
 /// The contracts' `COMPUTER_BLOCKED_SHORTCUTS`, refused here a second time.
 pub fn is_blocked(code: &str, modifiers: u32) -> bool {
     let ctrl_or_meta = modifiers & MOD_CTRL != 0 || modifiers & MOD_META != 0;
@@ -199,7 +212,9 @@ impl InputState {
                 injector.move_to(px, py).and_then(|_| injector.scroll(clamp(*dx), clamp(*dy)))
             }
             InputFrame::Key { action, code, modifiers, .. } => {
-                if is_blocked(code, *modifiers) {
+                // FR-37: the declared bits are never trusted alone — a shortcut split across
+                // presses (Ctrl down, then V with no declared modifier) is refused too.
+                if is_blocked(code, *modifiers | self.held_modifiers()) {
                     return InputOutcome::Blocked;
                 }
                 match action.as_str() {
@@ -217,6 +232,10 @@ impl InputState {
                 if text.chars().count() > 4096 {
                     return InputOutcome::Refused("text too long".into());
                 }
+                // Text typed while Ctrl, Alt or the system key is held would be a shortcut.
+                if self.held_modifiers() & (MOD_CTRL | MOD_ALT | MOD_META) != 0 {
+                    return InputOutcome::Blocked;
+                }
                 injector.text(text)
             }
         };
@@ -224,6 +243,11 @@ impl InputState {
             Ok(()) => InputOutcome::Injected,
             Err(message) => InputOutcome::Refused(message),
         }
+    }
+
+    /// The modifier bits of the keys this helper is holding down for the controller.
+    fn held_modifiers(&self) -> u32 {
+        self.keys.iter().map(|code| modifier_of(code)).fold(0, |bits, bit| bits | bit)
     }
 
     /// Release every key and button pressed on the controller's behalf (FR-39). Never fails half-way.
@@ -301,6 +325,22 @@ mod tests {
         assert!(recorder.events.is_empty());
         let plain = frame(r#"{"kind":"key","action":"down","code":"KeyC","key":"c","modifiers":0}"#);
         assert_eq!(state.apply(&mut recorder, RETINA, &plain), InputOutcome::Injected);
+    }
+
+    #[test]
+    fn refuses_a_shortcut_split_across_presses_and_text_under_a_modifier() {
+        let mut state = InputState::default();
+        let mut recorder = Recorder::default();
+        let ctrl = frame(r#"{"kind":"key","action":"down","code":"ControlLeft","modifiers":0}"#);
+        assert_eq!(state.apply(&mut recorder, RETINA, &ctrl), InputOutcome::Injected);
+        let paste = frame(r#"{"kind":"key","action":"down","code":"KeyV","modifiers":0}"#);
+        assert_eq!(state.apply(&mut recorder, RETINA, &paste), InputOutcome::Blocked);
+        let tab = frame(r#"{"kind":"text","text":"\t"}"#);
+        assert_eq!(state.apply(&mut recorder, RETINA, &tab), InputOutcome::Blocked);
+        let up = frame(r#"{"kind":"key","action":"up","code":"ControlLeft","modifiers":0}"#);
+        assert_eq!(state.apply(&mut recorder, RETINA, &up), InputOutcome::Injected);
+        assert_eq!(state.apply(&mut recorder, RETINA, &paste), InputOutcome::Injected);
+        assert_eq!(modifier_of("ShiftRight"), MOD_SHIFT);
     }
 
     #[test]

@@ -1,4 +1,12 @@
-import { COMPUTER_BLOCKED_SHORTCUTS } from '../computer/computer-control.types.js';
+import {
+	COMPUTER_BLOCKED_SHORTCUTS,
+	COMPUTER_KEY_MODIFIER_ALT,
+	COMPUTER_KEY_MODIFIER_CTRL,
+	COMPUTER_KEY_MODIFIER_META,
+	COMPUTER_KEY_MODIFIER_SHIFT,
+	isComputerShortcutBlocked
+} from '../computer/computer-control.types.js';
+import type { ComputerInputFrame } from '../computer/computer-frame.types.js';
 import type { ComputerControlStateView } from '../computer/computer-control.types.js';
 import type { FleetDesktopAttachGrant } from './fleet-desktop.types.js';
 
@@ -186,6 +194,74 @@ export function isFleetDesktopInputRefusedCode(value: unknown): value is FleetDe
 /** Map anything the helper answered to a known code (an unknown one is `inject-failed`). */
 export function normalizeFleetDesktopInputRefusedCode(value: unknown): FleetDesktopInputRefusedCode {
 	return isFleetDesktopInputRefusedCode(value) ? value : 'inject-failed';
+}
+
+/** The modifier bit a physical key holds while it is pressed (0 for any other key). */
+export function fleetDesktopModifierOfCode(code: unknown): number {
+	switch (code) {
+		case 'ControlLeft':
+		case 'ControlRight':
+			return COMPUTER_KEY_MODIFIER_CTRL;
+		case 'AltLeft':
+		case 'AltRight':
+			return COMPUTER_KEY_MODIFIER_ALT;
+		case 'MetaLeft':
+		case 'MetaRight':
+		case 'OSLeft':
+		case 'OSRight':
+			return COMPUTER_KEY_MODIFIER_META;
+		case 'ShiftLeft':
+		case 'ShiftRight':
+			return COMPUTER_KEY_MODIFIER_SHIFT;
+		default:
+			return 0;
+	}
+}
+
+/**
+ * The modifier keys a controller holds on one channel, from the key frames it
+ * sent — so a blocked shortcut split across presses (Ctrl down with
+ * `modifiers: 0`, then V with `modifiers: 0`) is still refused (FR-37). The
+ * declared `modifiers` of a frame are never trusted alone.
+ */
+export class FleetDesktopModifierTracker {
+	private readonly held = new Map<string, number>();
+
+	/** Note a key frame (call for every key frame, forwarded or not). */
+	apply(frame: { kind: string; action?: unknown; code?: unknown }): void {
+		if (frame.kind !== 'key' || typeof frame.code !== 'string') return;
+		const bit = fleetDesktopModifierOfCode(frame.code);
+		if (bit === 0) return;
+		if (frame.action === 'down') this.held.set(frame.code, bit);
+		else if (frame.action === 'up') this.held.delete(frame.code);
+	}
+
+	/** The modifier bits held right now. */
+	bits(): number {
+		let bits = 0;
+		for (const bit of this.held.values()) bits |= bit;
+		return bits;
+	}
+
+	reset(): void {
+		this.held.clear();
+	}
+}
+
+/**
+ * Is this input refused before it reaches the machine? A key that is a blocked
+ * shortcut with the declared OR the held modifiers; text typed while Ctrl, Alt
+ * or ⌘ / Win is held (it would become a shortcut on the machine).
+ */
+export function fleetDesktopInputBlocked(frame: ComputerInputFrame, heldBits: number): boolean {
+	if (frame.kind === 'key') {
+		const declared = typeof frame.modifiers === 'number' && Number.isFinite(frame.modifiers) ? frame.modifiers : 0;
+		return isComputerShortcutBlocked({ code: frame.code, modifiers: declared | heldBits });
+	}
+	if (frame.kind === 'text') {
+		return (heldBits & (COMPUTER_KEY_MODIFIER_CTRL | COMPUTER_KEY_MODIFIER_ALT | COMPUTER_KEY_MODIFIER_META)) !== 0;
+	}
+	return false;
 }
 
 /** The shortcuts a controller's keyboard never forwards (AW-11's list, named on the surface, FR-37). */

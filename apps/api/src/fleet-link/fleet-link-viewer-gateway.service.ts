@@ -65,7 +65,7 @@ export interface FleetLinkViewerObserver {
     /** The channel is open and bridged. */
     opened?(viewer: FleetLinkViewerHandle): void;
     /** The viewer sent one binary message of `bytes` bytes (forwarded, or refused by its role). */
-    inbound?(viewer: FleetLinkViewerHandle, bytes: number): void;
+    inbound?(viewer: FleetLinkViewerHandle, bytes: number, kind?: number): void;
     /** Asked on every ping tick while open: false closes the viewer (it lost the right to watch). */
     stillAllowed?(viewer: FleetLinkViewerHandle): Promise<boolean>;
     /**
@@ -201,7 +201,13 @@ export class FleetLinkViewerGatewayService
                     state.bridge.fromViewer(bytes);
                     if (state.opened && state.handle) {
                         try {
-                            state.observer?.inbound?.(state.handle, bytes.byteLength);
+                            // FL-07 P2: the frame kind too (byte 4 of the frame header), so a
+                            // family can tell input from view controls — never the payload.
+                            state.observer?.inbound?.(
+                                state.handle,
+                                bytes.byteLength,
+                                bytes.byteLength > 4 ? bytes[4] : undefined,
+                            );
                         } catch {
                             // an observer never breaks the stream
                         }

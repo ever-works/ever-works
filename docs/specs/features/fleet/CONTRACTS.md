@@ -201,16 +201,20 @@ already audited (§4.1); the eight desktop reasons are their own union (`FLEET_D
 
 **Revision 24 (2026-10-27)** — FL-07 P2 control (lane log decisions 18–26): a Desktop view is a `computer_sessions`
 row (`source: 'desktop'`, `agentId` null, `userId` = the computer's owner, `openedByUserId` = the viewer; slot
-`1796070100000` adds R-9's columns and relaxes `agentId`, forward-only on `down`), so AW-11's caps and its ONE control
+`1796070100000` adds R-9's columns plus `controlDriverAt` — when a driver socket of the view last attached or proved alive,
+on any replica, which the disconnect grace reads — and relaxes `agentId`, forward-only on `down`), so AW-11's caps and its ONE control
 lock per computer cover both sources; control on a view is `GET|POST|DELETE …/desktop/views/:viewId/control` and
-`POST …/control/{handover,keep,extend}` answering `FleetDesktopControlResult { state, attach }` (a take needs `confirm:
-true`, class `confirm`; a `driver` grant only to the view holding the lock, with channel params `mode: 'controlling'` and
+`POST …/control/{handover,keep,extend}` answering `FleetDesktopControlResult { state, attach }` (a take and a request
+need `confirm: true`, class `confirm`; a `driver` grant only to the view holding the lock, with channel params `mode: 'controlling'` and
 `controlledBy`); the machine half is the owner's on-machine permission (`ever-works-node helper control allow|deny`,
 `helper-control.json`, bound to one admission) reported inside the heartbeat's `helper` as `control: allowed |
 not-allowed` and `inputReasons[]` (`FLEET_DESKTOP_CONTROL_REASONS`; absent reads as not allowed), audited
 `node.helper.control-allow|deny` from `helperEvents`; node → controlling viewer `desktop.inputRefused { code }`
 (`FLEET_DESKTOP_INPUT_REFUSED_CODES`, a code only); a controlling channel refuses `desktop.setDisplay` (a display switch
-is the audited `PATCH`); the helper wire gains `inputResult` (0x87) and `hello.inputReasons`. Shapes in
+is the audited `PATCH`); the helper wire gains `inputResult` (0x87) and `hello.inputReasons` (absent: `input-unavailable`);
+the blocked shortcuts are refused with the modifiers a channel HOLDS, not only the ones a frame declares
+(`FleetDesktopModifierTracker`), and text is refused while Ctrl, Alt or the system key is held; FL-02's viewer
+observer `inbound` hook also receives the frame kind (byte 4), never the payload. Shapes in
 `packages/contracts/src/fleet/fleet-desktop-control.types.ts`.
 
 ## 0. Resolutions (R-1 … R-41)

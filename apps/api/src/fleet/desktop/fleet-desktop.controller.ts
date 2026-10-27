@@ -299,7 +299,7 @@ export class FleetDesktopController {
     }
 }
 
-/** The name the machine's console prints while this person controls it (never an email when a username exists). */
+/** The name the machine's console prints while this person controls it — the username, never an email. */
 function controllerNameOf(auth: AuthenticatedUser): string | null {
-    return auth.username || auth.email || null;
+    return auth.username || null;
 }

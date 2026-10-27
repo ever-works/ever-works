@@ -6,6 +6,7 @@ import {
     ComputerControlArbiter,
     ComputerControlChangedEvent,
     ComputerSessionRepository,
+    computerSessionScopeKey,
     resolveComputerSessionLimits,
     resolveSessionExpiry,
     type ComputerControlActor,
@@ -121,6 +122,12 @@ export const DESKTOP_SCREENSHOT_TIMEOUT_MS = 10_000;
 export const DESKTOP_ROW_STAMP_EVERY_MS = 15_000;
 /** A controller's input pushes the idle deadline at most this often. */
 export const DESKTOP_INPUT_WRITE_EVERY_MS = 5_000;
+/** While a controller types, the hold is re-read at most this often (a hold ended elsewhere closes the driver). */
+export const DESKTOP_HOLD_CHECK_EVERY_MS = 1_000;
+/** A view this replica holds in memory is re-read from its row at most this long after the last read. */
+export const DESKTOP_VIEW_RECHECK_MS = 10_000;
+/** The node-link frame kind of a controller's input (`INPUT`). */
+const INPUT_FRAME_KIND = FLEET_LINK_FRAME_KINDS.INPUT;
 
 interface DesktopViewRecord {
     viewId: string;
@@ -145,10 +152,14 @@ interface DesktopViewRecord {
     /** P2: who is controlling, as the machine's console prints it. */
     controllerName: string | null;
     inputAt: number;
+    /** When the hold was last re-read because input arrived. */
+    holdCheckedAt: number;
     stampAt: number;
     statsFrames: number;
     statsBytes: number;
     releaseTimer: ReturnType<typeof setTimeout> | null;
+    /** When this replica last read the view's row (a cached view is re-read every few seconds). */
+    checkedAt: number;
 }
 
 @Injectable()
@@ -257,7 +268,6 @@ export class FleetDesktopService
                 },
             );
         }
-        await this.assertWithinCaps(node);
         const facts = fleetNodeDesktopViewOf(node);
         const { display, fellBack } = pickFleetDisplay(
             facts?.displays ?? [],
@@ -282,12 +292,18 @@ export class FleetDesktopService
             drivers: 0,
             controllerName: normalizeFleetDesktopControllerName(controllerName),
             inputAt: 0,
+            holdCheckedAt: 0,
             stampAt: now,
             statsFrames: 0,
             statsBytes: 0,
             releaseTimer: null,
+            checkedAt: now,
         };
-        await this.persist(record);
+        // AW-11's admission lock: the caps and the row that counts against them, together.
+        await this.withAdmissionLock(node, async () => {
+            await this.assertWithinCaps(node);
+            await this.persist(record);
+        });
         let attach: FleetDesktopAttachGrant;
         try {
             attach = await this.mintFor(record, 'viewer');
@@ -363,7 +379,7 @@ export class FleetDesktopService
         }
         if (update.quality) record.quality = update.quality;
         await this.updateRow(record, { displayId: record.displayId, quality: record.quality });
-        const attach = await this.mintFor(record, await this.roleNow(record));
+        const attach = await this.mintFor(record, await this.roleNow(record, node));
         return { view: this.viewOf(record), attach, display, fellBack };
     }
 
@@ -385,7 +401,7 @@ export class FleetDesktopService
                 },
             );
         }
-        return this.mintFor(record, await this.roleNow(record));
+        return this.mintFor(record, await this.roleNow(record, node));
     }
 
     /**
@@ -408,9 +424,31 @@ export class FleetDesktopService
     ): Promise<ComputerControlStateView> {
         const record = await this.loadView(userId, nodeId, viewId);
         const control = this.requireControl(record);
+        const { node } = await this.access.resolveVisible(nodeId, { userId });
+        await this.assertStillMayControl(record, node, userId);
         const state = await control.getState(this.actorOf(record));
         if (!state) throw this.viewGone();
         return state;
+    }
+
+    /**
+     * The person behind a view that holds (or wants) control must still be
+     * allowed to: the kill switch, the flag, the `desktop` audience, `--attend`
+     * … A view that no longer may gives back what it holds (`revoked`) before
+     * the refusal — a person removed from the audience never keeps the lock.
+     */
+    private async assertStillMayControl(
+        record: DesktopViewRecord,
+        node: FleetNode,
+        userId: string,
+    ): Promise<void> {
+        const blocker = await this.blockerFor(node, userId);
+        if (!blocker) return;
+        await this.control?.releaseForSession(record.viewId, 'revoked').catch(() => false);
+        this.closeDrivers(record.viewId, 'access changed');
+        throw fleetLinkError(FLEET_DESKTOP_BLOCKER_CODES[blocker], this.hintFor(blocker, node), {
+            reason: blocker,
+        });
     }
 
     /**
@@ -464,10 +502,7 @@ export class FleetDesktopService
                 },
             );
         }
-        if (request.request) {
-            const state = this.controlOutcome(await control.request(this.actorOf(record)), node);
-            return { state, attach: null };
-        }
+        // CONTRACTS §2.2 class `confirm` — for a request too: a hand-over gives control to whoever asked.
         if (request.confirm !== true) {
             throw fleetLinkError(
                 'confirmation_required',
@@ -480,6 +515,10 @@ export class FleetDesktopService
         }
         const name = normalizeFleetDesktopControllerName(controllerName);
         if (name) record.controllerName = name;
+        if (request.request) {
+            const state = this.controlOutcome(await control.request(this.actorOf(record)), node);
+            return { state, attach: null };
+        }
         const state = this.controlOutcome(await control.take(this.actorOf(record)), node);
         const attach = state.mode === 'controlling' ? await this.mintFor(record, 'driver') : null;
         return { state, attach };
@@ -510,6 +549,7 @@ export class FleetDesktopService
         const record = await this.loadView(userId, nodeId, viewId);
         const control = this.requireControl(record);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
+        await this.assertStillMayControl(record, node, userId);
         const state = this.controlOutcome(
             await control.answer(this.actorOf(record), requestId, decision),
             node,
@@ -527,6 +567,7 @@ export class FleetDesktopService
     ): Promise<FleetDesktopControlResult> {
         const record = await this.loadView(userId, nodeId, viewId);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
+        await this.assertStillMayControl(record, node, userId);
         const state = this.controlOutcome(
             await this.requireControl(record).keep(this.actorOf(record)),
             node,
@@ -542,6 +583,7 @@ export class FleetDesktopService
     ): Promise<FleetDesktopControlResult> {
         const record = await this.loadView(userId, nodeId, viewId);
         const { node } = await this.access.resolveVisible(nodeId, { userId });
+        await this.assertStillMayControl(record, node, userId);
         const state = this.controlOutcome(
             await this.requireControl(record).extend(this.actorOf(record)),
             node,
@@ -692,6 +734,24 @@ export class FleetDesktopService
                 clearTimeout(record.releaseTimer);
                 record.releaseTimer = null;
             }
+            // The hold could have ended while the channel was opening (admit checked it before):
+            // look again now, and mark the driver as back for the other replicas' grace timers.
+            void this.recheckDriver(record);
+        }
+    }
+
+    private async recheckDriver(record: DesktopViewRecord): Promise<void> {
+        try {
+            if (!this.control || !(await this.control.holdOf(record.viewId)).held) {
+                this.closeDrivers(record.viewId, 'control ended');
+                return;
+            }
+            // Only while a driver is still here: a socket that already left proves nothing.
+            if (record.drivers > 0) {
+                await this.sessions?.markDesktopDriver?.(record.viewId, new Date(this.now()));
+            }
+        } catch {
+            // Unreadable right now: the next ping decides.
         }
     }
 
@@ -724,22 +784,39 @@ export class FleetDesktopService
     private async releaseIfStillGone(record: DesktopViewRecord, closedAt: number): Promise<void> {
         const control = this.control;
         if (!control) return;
-        const state = await control.getState(this.actorOf(record));
-        const since =
-            state?.holder?.thisView && state.holder.since ? Date.parse(state.holder.since) : NaN;
-        if (Number.isFinite(since) && since > closedAt) return;
+        // Nothing held by this view: nothing to give back (and a request it made stays).
+        if (!(await control.holdOf(record.viewId)).held) return;
+        // A driver of this view attached or answered a ping since — on any replica.
+        const row = await this.sessions?.findById(record.viewId);
+        const back = row?.controlDriverAt ? new Date(row.controlDriverAt).getTime() : NaN;
+        if (Number.isFinite(back) && back > closedAt) return;
         await control.releaseForSession(record.viewId, 'disconnected');
     }
 
     /** A controller's input keeps the hold from idling out (at most every few seconds). */
-    inbound(viewer: FleetLinkViewerHandle, bytes: number): void {
-        if (viewer.claims.role !== 'driver' || bytes <= 0 || !this.control) return;
+    inbound(viewer: FleetLinkViewerHandle, bytes: number, kind?: number): void {
+        // Only input keeps the hold from idling out — not the view's own refresh / quality requests.
+        if (
+            viewer.claims.role !== 'driver' ||
+            bytes <= 0 ||
+            !this.control ||
+            kind !== INPUT_FRAME_KIND
+        )
+            return;
         const record = this.desktopRecordOf(viewer);
         if (!record) return;
         const now = this.now();
-        if (now - record.inputAt < DESKTOP_INPUT_WRITE_EVERY_MS) return;
-        record.inputAt = now;
-        void this.control.recordInput(record.viewId).catch(() => undefined);
+        if (now - record.holdCheckedAt < DESKTOP_HOLD_CHECK_EVERY_MS) return;
+        record.holdCheckedAt = now;
+        const write = now - record.inputAt >= DESKTOP_INPUT_WRITE_EVERY_MS;
+        if (write) record.inputAt = now;
+        const control = this.control;
+        void (write ? control.recordInput(record.viewId) : control.holdOf(record.viewId))
+            .then((hold) => {
+                // The hold ended on another replica: this driver stops now, not at the next ping.
+                if (!hold.held) this.closeDrivers(record.viewId, 'control ended');
+            })
+            .catch(() => undefined);
     }
 
     /** `desktop.stats` (once a second): the view's row is stamped so AW-11's stall rule sees it alive. */
@@ -782,27 +859,41 @@ export class FleetDesktopService
             if (record.persisted) void this.closeRow(record.viewId, 'session-ceiling');
             return false;
         }
+        let lost = false;
         try {
-            if (await this.killSwitch.isStopped()) return false;
-            if (record.persisted && this.sessions) {
+            if (await this.killSwitch.isStopped()) lost = true;
+            if (!lost && record.persisted && this.sessions) {
                 const row = await this.sessions.findById(record.viewId);
                 if (!row || row.status === 'ended') {
                     this.forget(record);
                     return false;
                 }
             }
-            const node = await this.nodes.findById(record.nodeId);
-            if (!node) return false;
-            if (!(await this.access.canAct(node, { userId: record.userId }, 'desktop')))
-                return false;
-            if (viewer.claims.role === 'driver') {
-                if (!this.control || !(await this.control.holdOf(record.viewId)).held) return false;
-                await this.control.acknowledge(record.viewId);
+            if (!lost) {
+                const node = await this.nodes.findById(record.nodeId);
+                lost =
+                    !node ||
+                    !(await this.access.canAct(node, { userId: record.userId }, 'desktop'));
             }
+        } catch {
+            // Unreadable right now: a watcher keeps the view; a driver is decided below.
+            if (viewer.claims.role !== 'driver') return true;
+        }
+        if (lost) {
+            // The person lost the right (or the fleet is stopped): what the view holds goes back too.
+            if (record.persisted)
+                await this.control?.releaseForSession(record.viewId, 'revoked').catch(() => false);
+            return false;
+        }
+        if (viewer.claims.role !== 'driver') return true;
+        // A driver fails closed: no hold read, no input.
+        try {
+            if (!this.control || !(await this.control.holdOf(record.viewId)).held) return false;
+            await this.control.acknowledge(record.viewId);
+            await this.sessions?.markDesktopDriver?.(record.viewId, new Date(this.now()));
             return true;
         } catch {
-            // Unreadable right now: keep the view; the next ping asks again.
-            return true;
+            return false;
         }
     }
 
@@ -847,6 +938,9 @@ export class FleetDesktopService
                 'this view does not have control any more — take it again',
             );
         }
+        await this.sessions
+            ?.markDesktopDriver?.(record.viewId, new Date(this.now()))
+            .catch(() => undefined);
     }
 
     private desktopRecordOf(viewer: FleetLinkViewerHandle): DesktopViewRecord | null {
@@ -911,13 +1005,39 @@ export class FleetDesktopService
         }
     }
 
-    private async roleNow(record: DesktopViewRecord): Promise<'viewer' | 'driver'> {
+    private async roleNow(
+        record: DesktopViewRecord,
+        node?: FleetNode,
+    ): Promise<'viewer' | 'driver'> {
         if (!this.control || !record.persisted) return 'viewer';
+        // The machine half again: a driver grant never outlives the owner's permission on the machine.
+        if (
+            node &&
+            resolveFleetDesktopControlReasons(fleetNodeDesktopViewOf(node)?.helper ?? null).length >
+                0
+        ) {
+            return 'viewer';
+        }
         try {
             return (await this.control.holdOf(record.viewId)).held ? 'driver' : 'viewer';
         } catch {
             return 'viewer';
         }
+    }
+
+    /** AW-11's admission lock (Postgres advisory locks) around a cap check and its row; plain without it. */
+    private withAdmissionLock(node: FleetNode, fn: () => Promise<void>): Promise<void> {
+        if (typeof this.sessions?.withAdmissionLock !== 'function') return fn();
+        return this.sessions.withAdmissionLock(
+            {
+                nodeId: node.id,
+                scopeKey: computerSessionScopeKey({
+                    userId: node.userId,
+                    organizationId: node.organizationId ?? null,
+                }),
+            },
+            fn,
+        );
     }
 
     private closeDrivers(viewId: string, reason: string): void {
@@ -1018,6 +1138,19 @@ export class FleetDesktopService
         const cached = this.views.get(viewId);
         if (cached) {
             if (cached.userId !== userId || cached.nodeId !== nodeId) throw this.viewGone();
+            // Ended on another replica? Look again every few seconds before trusting memory.
+            if (
+                cached.persisted &&
+                this.sessions &&
+                this.now() - cached.checkedAt >= DESKTOP_VIEW_RECHECK_MS
+            ) {
+                const row = await this.sessions.findById(viewId);
+                if (!row || row.status === 'ended') {
+                    this.forget(cached);
+                    throw this.viewGone();
+                }
+                cached.checkedAt = this.now();
+            }
             return cached;
         }
         if (typeof this.sessions?.findDesktopViewFor !== 'function') throw this.viewGone();
@@ -1043,10 +1176,12 @@ export class FleetDesktopService
             drivers: 0,
             controllerName: null,
             inputAt: 0,
+            holdCheckedAt: 0,
             stampAt: this.now(),
             statsFrames: 0,
             statsBytes: 0,
             releaseTimer: null,
+            checkedAt: this.now(),
         };
         this.views.set(record.viewId, record);
         return record;

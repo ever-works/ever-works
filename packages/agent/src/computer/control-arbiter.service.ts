@@ -261,7 +261,7 @@ export class ComputerControlArbiter {
 
         if (session.status === 'ended') return refuse('session-ended');
         if (!canControl(this.desktopPolicy(lock), await this.roleOf(lock, actor))) {
-            await this.recordRefusal(session, actor.userId, lock);
+            await this.recordRefusal(session, actor.userId, lock, 'node.desktop.control.request');
             return refuse('policy');
         }
         if (!LIVE_STATUSES.has(session.status)) return refuse('not-live');
@@ -702,19 +702,14 @@ export class ComputerControlArbiter {
         session: ComputerSession,
         actorUserId: string,
         lock: ComputerControlLockRow,
+        desktopAction: DesktopControlAuditAction = 'node.desktop.control.take',
     ): Promise<void> {
         if (ControlArbiterDesktop.is(session)) {
-            await this.auditDesktop(
-                session,
-                'node.desktop.control.take',
-                actorUserId,
-                lock.userId,
-                {
-                    outcome: 'refused',
-                    policy: this.desktopPolicy(lock),
-                    holderPresent: Boolean(lock.controlHolderSessionId),
-                },
-            );
+            await this.auditDesktop(session, desktopAction, actorUserId, lock.userId, {
+                outcome: 'refused',
+                policy: this.desktopPolicy(lock),
+                holderPresent: Boolean(lock.controlHolderSessionId),
+            });
             return;
         }
         await this.audit?.tryRecord({

@@ -167,4 +167,12 @@ export class ComputerSession {
     /** Why recording stopped early (`size-cap` · `time-cap` · `storage-failed` · `view-ended` · `deleted`). */
     @Column({ type: 'varchar', length: 24, nullable: true })
     recordingStoppedReason?: string | null;
+
+    /**
+     * When a controlling socket of this Desktop view last attached or proved
+     * alive (any API replica) — the disconnect grace gives control back only
+     * when no driver came back since it started.
+     */
+    @PortableDateColumn({ nullable: true })
+    controlDriverAt?: Date | null;
 }

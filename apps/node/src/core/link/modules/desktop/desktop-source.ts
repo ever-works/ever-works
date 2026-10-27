@@ -6,7 +6,8 @@ import {
 	FLEET_DESKTOP_MESSAGES,
 	FLEET_LINK_FRAME_KINDS,
 	isComputerInputFrame,
-	isComputerShortcutBlocked,
+	FleetDesktopModifierTracker,
+	fleetDesktopInputBlocked,
 	isFleetDesktopQuality,
 	isFleetDisplayId,
 	makeFleetLinkError,
@@ -155,6 +156,8 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 		let controlLive = controlling;
 		let picture: { width: number; height: number } | null = null;
 		let lastRefusedAt = -Infinity;
+		// The modifier keys the controller holds, from the key frames it sent (FR-37: never the declared bits alone).
+		const held = new FleetDesktopModifierTracker();
 		let ready = false;
 		let closed = false;
 		let seq = 0;
@@ -178,6 +181,7 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 			controlLive = false;
 			// FR-39: every key and button let go before anything else.
 			stream?.releaseAll();
+			held.reset();
 			say(`Desktop control of this computer ended (${why}).`);
 		};
 		const finish = (): void => {
@@ -230,7 +234,12 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 						type: FLEET_DESKTOP_MESSAGES.displayChanged,
 						displays: displays.displays
 					};
-					if (displays.fallback) message.fallback = displays.fallback;
+					if (displays.fallback) {
+						message.fallback = displays.fallback;
+						// The controller aims at a picture of the display that went away: no input lands
+						// until the fallback display's first keyframe is on their screen.
+						picture = null;
+					}
 					context.sendJson(message);
 				},
 				onError: (error) => {
@@ -400,7 +409,8 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 					if (context.control.paused) return;
 					const frame = decodeComputerFrame(payload);
 					if (!frame || !isComputerInputFrame(frame)) return;
-					if (frame.kind === 'key' && isComputerShortcutBlocked(frame)) {
+					if (frame.kind === 'key') held.apply(frame);
+					if (fleetDesktopInputBlocked(frame, held.bits())) {
 						refuseInput('blocked-shortcut');
 						return;
 					}

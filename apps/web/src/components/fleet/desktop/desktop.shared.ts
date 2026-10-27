@@ -178,7 +178,8 @@ export const desktopClient = {
     takeControl(
         nodeId: string,
         viewId: string,
-        body: { confirm: true } | { request: true },
+        /** `confirm` always (CONTRACTS §2.2 class `confirm`); `request` to ask instead of taking. */
+        body: { confirm: true; request?: true },
     ): Promise<DesktopResult<DesktopBrowserControlResult>> {
         return call(`${base(nodeId)}/views/${encodeURIComponent(viewId)}/control`, {
             method: 'POST',

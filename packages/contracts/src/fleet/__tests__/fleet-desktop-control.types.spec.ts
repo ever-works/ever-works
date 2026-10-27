@@ -5,6 +5,9 @@ import {
 	fleetDesktopControlReasonHint,
 	FLEET_DESKTOP_CONTROL_REASONS,
 	FLEET_DESKTOP_CONTROL_REASON_FIXES,
+	FleetDesktopModifierTracker,
+	fleetDesktopInputBlocked,
+	fleetDesktopModifierOfCode,
 	isFleetDesktopMode,
 	isFleetHelperControlAllowed,
 	normalizeFleetDesktopControllerName,
@@ -135,5 +138,37 @@ describe('the machine half on the wire', () => {
 				at: '2026-10-27T03:00:00Z'
 			})
 		).toMatchObject({ kind: 'control-allow' });
+	});
+});
+
+describe('blocked shortcuts split across presses (FR-37)', () => {
+	it('refuses Ctrl then V sent with no declared modifiers, and text while Alt is held', () => {
+		const held = new FleetDesktopModifierTracker();
+		held.apply({ kind: 'key', action: 'down', code: 'ControlLeft' });
+		expect(held.bits()).toBe(2);
+		expect(
+			fleetDesktopInputBlocked({ kind: 'key', action: 'down', key: 'v', code: 'KeyV', modifiers: 0 }, held.bits())
+		).toBe(true);
+		expect(
+			fleetDesktopInputBlocked({ kind: 'key', action: 'down', key: 'a', code: 'KeyA', modifiers: 0 }, held.bits())
+		).toBe(false);
+		held.apply({ kind: 'key', action: 'up', code: 'ControlLeft' });
+		expect(
+			fleetDesktopInputBlocked({ kind: 'key', action: 'down', key: 'v', code: 'KeyV', modifiers: 0 }, held.bits())
+		).toBe(false);
+		held.apply({ kind: 'key', action: 'down', code: 'AltRight' });
+		expect(fleetDesktopInputBlocked({ kind: 'text', text: '\t' }, held.bits())).toBe(true);
+		expect(
+			fleetDesktopInputBlocked({ kind: 'key', action: 'down', key: 'F4', code: 'F4', modifiers: 0 }, held.bits())
+		).toBe(true);
+		held.reset();
+		expect(fleetDesktopInputBlocked({ kind: 'text', text: 'hello' }, held.bits())).toBe(false);
+	});
+
+	it('knows the modifier keys by their physical code only', () => {
+		expect(fleetDesktopModifierOfCode('ShiftRight')).toBe(8);
+		expect(fleetDesktopModifierOfCode('OSLeft')).toBe(4);
+		expect(fleetDesktopModifierOfCode('KeyC')).toBe(0);
+		expect(fleetDesktopModifierOfCode(undefined)).toBe(0);
 	});
 });

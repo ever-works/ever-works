@@ -19,6 +19,9 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  *  - `recordingExpiresAt` (timestamp, nullable) — when the GC sweep deletes it.
  *  - `recordingStoppedReason` (varchar 24, nullable) — `size-cap` · `time-cap` ·
  *    `storage-failed` · `view-ended` · `deleted`.
+ *  - `controlDriverAt` (timestamp, nullable) — when a controlling (driver) socket
+ *    of a Desktop view last attached or proved alive, on any API replica: the
+ *    disconnect grace gives control back only when no driver came back since.
  *  - `agentId` relaxed to nullable: a Desktop view opened from the computer page
  *    has no Agent. (TypeORM rebuilds the table on SQLite; Postgres drops NOT NULL.)
  *
@@ -56,6 +59,7 @@ export class AddComputerSessionRecordingColumns1796070100000 implements Migratio
             length: '24',
             isNullable: true,
         }),
+        new TableColumn({ name: 'controlDriverAt', type: 'timestamp', isNullable: true }),
     ];
 
     private static readonly INDEXES: TableIndex[] = [

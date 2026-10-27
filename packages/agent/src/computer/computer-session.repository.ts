@@ -127,9 +127,19 @@ export class ComputerSessionRepository {
      * than its owner. A foreign id resolves to null, exactly like an unknown one.
      */
     async findDesktopViewFor(id: string, openedByUserId: string): Promise<ComputerSession | null> {
+        // TypeORM drops an undefined `where` key: never let a missing person widen this to an id lookup.
+        if (!id || !openedByUserId) return null;
         return this.repository.findOne({
             where: { id, openedByUserId, source: 'desktop', agentId: IsNull() },
         });
+    }
+
+    /** A Desktop view's driver attached or proved alive now (the cross-replica disconnect grace reads it). */
+    async markDesktopDriver(id: string, at: Date): Promise<void> {
+        await this.repository.update(
+            { id, source: 'desktop', status: Not('ended') },
+            { controlDriverAt: at },
+        );
     }
 
     /** Node-scoped: the only read a node credential buys. */

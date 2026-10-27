@@ -60,6 +60,7 @@ describe('AddComputerSessionRecordingColumns1796070100000', () => {
             'recordingDurationMs',
             'recordingExpiresAt',
             'recordingStoppedReason',
+            'controlDriverAt',
         ]) {
             expect(sessions?.findColumnByName(name)).toBeDefined();
         }

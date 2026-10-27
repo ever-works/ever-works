@@ -184,6 +184,23 @@ describe('a controlling desktop channel', () => {
 		]);
 	});
 
+	it('refuses a shortcut split across presses, and text typed while Alt is held (FR-37)', async () => {
+		const { result, fake } = await open(FILES);
+		const handler = (result as { ok: true; handler: NodeChannelHandler }).handler;
+		const send = (frame: ComputerInputFrame) => handler.onBinary!(FLEET_LINK_FRAME_KINDS.INPUT, inputBytes(frame));
+		send({ kind: 'key', action: 'down', key: 'Control', code: 'ControlLeft', modifiers: 0 });
+		send({ kind: 'key', action: 'down', key: 'v', code: 'KeyV', modifiers: 0 });
+		send({ kind: 'key', action: 'up', key: 'Control', code: 'ControlLeft', modifiers: 0 });
+		send({ kind: 'key', action: 'down', key: 'Alt', code: 'AltLeft', modifiers: 0 });
+		send({ kind: 'text', text: '\t' });
+		await flush();
+		expect(fake.children[0].inputs.map((input) => input.code ?? input.kind)).toEqual([
+			'ControlLeft',
+			'ControlLeft',
+			'AltLeft'
+		]);
+	});
+
 	it('drops input while the kill switch pauses the link, then ends the view and releases everything', async () => {
 		const { result, fake, ctl, closes, said } = await open(FILES);
 		const handler = (result as { ok: true; handler: NodeChannelHandler }).handler;

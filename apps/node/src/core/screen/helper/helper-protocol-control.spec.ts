@@ -65,6 +65,6 @@ describe('helper input', () => {
 		const [message] = new HelperMessageDecoder().push(hello);
 		expect(parseHelperHello(message.payload)?.inputReasons).toEqual(['permission-accessibility']);
 		const older = new HelperMessageDecoder().push(encodeHelperJson(HELPER_MESSAGES.hello, { protocol: 1 }))[0];
-		expect(parseHelperHello(older.payload)?.inputReasons).toEqual([]);
+		expect(parseHelperHello(older.payload)?.inputReasons).toEqual(['input-unavailable']);
 	});
 });
