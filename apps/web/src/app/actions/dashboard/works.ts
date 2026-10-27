@@ -585,14 +585,17 @@ export async function createWorkWithAI(request: AIWorkOptions) {
 
     try {
         // Validate input
-        const validation = aiPromptSchema.safeParse({
-            prompt: request.prompt,
-            name: request.name,
-            slug: request.slug,
-            gitProvider: request.gitProvider,
-            proposalId: request.proposalId,
-            workKind: request.workKind,
-        }, ZOD3_ERROR_MESSAGES);
+        const validation = aiPromptSchema.safeParse(
+            {
+                prompt: request.prompt,
+                name: request.name,
+                slug: request.slug,
+                gitProvider: request.gitProvider,
+                proposalId: request.proposalId,
+                workKind: request.workKind,
+            },
+            ZOD3_ERROR_MESSAGES,
+        );
         if (!validation.success) {
             return {
                 success: false,
@@ -2135,7 +2138,10 @@ export async function setWorkAppLauncherExposureAction(
     });
 
     try {
-        const validation = schema.safeParse({ workId, appLauncherExposed: value }, ZOD3_ERROR_MESSAGES);
+        const validation = schema.safeParse(
+            { workId, appLauncherExposed: value },
+            ZOD3_ERROR_MESSAGES,
+        );
         if (!validation.success) {
             return {
                 success: false,

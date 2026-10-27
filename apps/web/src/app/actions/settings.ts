@@ -170,7 +170,10 @@ export async function updateNotificationPreferences(preferences: {
         }
 
         // Validate input
-        const validation = notificationPreferencesSchema.safeParse(preferences, ZOD3_ERROR_MESSAGES);
+        const validation = notificationPreferencesSchema.safeParse(
+            preferences,
+            ZOD3_ERROR_MESSAGES,
+        );
         if (!validation.success) {
             return {
                 success: false,

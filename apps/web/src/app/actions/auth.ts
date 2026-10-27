@@ -260,7 +260,10 @@ export async function register(
     });
 
     // Validate input
-    const validation = registerSchema.safeParse({ username, email, password, terms }, ZOD3_ERROR_MESSAGES);
+    const validation = registerSchema.safeParse(
+        { username, email, password, terms },
+        ZOD3_ERROR_MESSAGES,
+    );
     if (!validation.success) {
         return {
             success: false,

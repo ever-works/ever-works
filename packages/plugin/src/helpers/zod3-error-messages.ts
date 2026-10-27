@@ -106,7 +106,9 @@ function invalidType(issue: Zod3MessageIssue): string {
 	const received = zod3ParsedType(issue.input);
 	if (issue.expected === 'int') {
 		// zod 3's `.int()` reported a non-integer number as a float.
-		return typeof issue.input === 'number' ? 'Expected integer, received float' : `Expected number, received ${received}`;
+		return typeof issue.input === 'number'
+			? 'Expected integer, received float'
+			: `Expected number, received ${received}`;
 	}
 	const expected = ZOD3_EXPECTED[issue.expected ?? ''] ?? issue.expected;
 	return `Expected ${expected}, received ${received}`;

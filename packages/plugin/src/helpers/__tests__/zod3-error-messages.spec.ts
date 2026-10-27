@@ -42,7 +42,12 @@ describe('zod3ErrorMessage — zod 3 default messages under zod 4', () => {
 		['enum type', z.enum(['a', 'b']), 5, ":Expected 'a' | 'b', received number"],
 		['enum missing', z.object({ e: z.enum(['a', 'b']) }), {}, 'e:Required'],
 		['literal', z.literal('works.ever.works/v1'), 'v2', ':Invalid literal value, expected "works.ever.works/v1"'],
-		['strict', z.object({ a: z.string() }).strict(), { a: 'x', b: 1, c: 2 }, ":Unrecognized key(s) in object: 'b', 'c'"],
+		[
+			'strict',
+			z.object({ a: z.string() }).strict(),
+			{ a: 'x', b: 1, c: 2 },
+			":Unrecognized key(s) in object: 'b', 'c'"
+		],
 		['union', z.union([z.string(), z.number()]), true, ':Invalid input'],
 		[
 			'discriminator',
@@ -61,7 +66,12 @@ describe('zod3ErrorMessage — zod 3 default messages under zod 4', () => {
 
 	it('leaves a message set on the schema alone', () => {
 		expect(firstMessage(z.string().min(3, 'too short!'), 'a')).toBe(':too short!');
-		expect(firstMessage(z.string().refine(() => false, { message: 'custom!' }), 'x')).toBe(':custom!');
+		expect(
+			firstMessage(
+				z.string().refine(() => false, { message: 'custom!' }),
+				'x'
+			)
+		).toBe(':custom!');
 		expect(firstMessage(z.string().email('Enter a valid email'), 'x')).toBe(':Enter a valid email');
 	});
 

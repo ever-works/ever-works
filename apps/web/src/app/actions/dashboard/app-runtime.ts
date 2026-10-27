@@ -114,7 +114,10 @@ export async function saveAppTargetAction(
             target: z.enum(APP_DEPLOY_TARGET_CHOICES),
             settings: settingsSchema.optional(),
         })
-        .safeParse({ workId, target: input?.target, settings: input?.settings }, ZOD3_ERROR_MESSAGES);
+        .safeParse(
+            { workId, target: input?.target, settings: input?.settings },
+            ZOD3_ERROR_MESSAGES,
+        );
     if (!parsed.success) {
         return { success: false, error: parsed.error.issues[0]?.message, code: 'invalid_input' };
     }
