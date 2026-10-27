@@ -15,6 +15,7 @@ import {
     ArrowUpRight,
     Webhook,
     Monitor,
+    GitMerge,
     type LucideProps,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -34,7 +35,8 @@ export type SourceLabelKey =
     | 'sourceValidation'
     | 'dataSync'
     | 'inboundTrigger'
-    | 'nodeSchedule';
+    | 'nodeSchedule'
+    | 'appUpstreamSync';
 
 export const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey: SourceLabelKey }> =
     {
@@ -47,6 +49,8 @@ export const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey:
         inbound_trigger: { icon: Webhook, labelKey: 'inboundTrigger' },
         // Schedules on computers (FL-13).
         node_schedule: { icon: Monitor, labelKey: 'nodeSchedule' },
+        // APW-02 T53 — an App Work's upstream sync.
+        app_upstream_sync: { icon: GitMerge, labelKey: 'appUpstreamSync' },
     };
 
 export const SOURCE_ORDER: ScheduleSourceType[] = [
@@ -58,6 +62,7 @@ export const SOURCE_ORDER: ScheduleSourceType[] = [
     'data_sync',
     'inbound_trigger',
     'node_schedule',
+    'app_upstream_sync',
 ];
 
 export const STATUS_STYLES: Record<ScheduleStatus, string> = {

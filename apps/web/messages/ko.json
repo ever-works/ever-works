@@ -4327,7 +4327,8 @@
             "more": "외 {n}개",
             "source": {
                 "work": "워크",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9772,7 +9773,8 @@
                 "missionTick": "Mission 틱",
                 "sourceValidation": "소스 검증",
                 "dataSync": "데이터 동기화",
-                "inboundTrigger": "수신 트리거"
+                "inboundTrigger": "수신 트리거",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "활성",

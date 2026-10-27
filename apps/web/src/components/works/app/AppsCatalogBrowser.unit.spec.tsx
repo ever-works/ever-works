@@ -130,6 +130,29 @@ describe('AppsCatalogBrowser — curated catalog (APW-03)', () => {
         expect(onPick).toHaveBeenCalledTimes(1);
     });
 
+    it('offers Ever Works Apps only when the API judged managed hosting available (APW-10 T31)', async () => {
+        const allowed = { ...CAL, managedHosting: { allowed: true, reason: null } };
+        curatedMock.mockResolvedValue(
+            curated([
+                { ...allowed, id: 'open', name: 'Open', managed: 'available' },
+                { ...allowed, id: 'closed', name: 'Closed', managed: 'managedTierDisabled' },
+                { ...allowed, id: 'older', name: 'Older API' },
+            ]),
+        );
+        renderBrowser();
+        await flush();
+        const cards = new Map(
+            screen
+                .getAllByTestId('apps-catalog-card')
+                .map((card) => [card.getAttribute('data-blueprint-id'), card]),
+        );
+        expect(cards.get('open')?.textContent).toContain('Ever Works Apps');
+        // A closed tier hides the managed target even for an entry that allows it.
+        expect(cards.get('closed')?.textContent).not.toContain('Ever Works Apps');
+        // An API without `managed` keeps the row's own `allowed`.
+        expect(cards.get('older')?.textContent).toContain('Ever Works Apps');
+    });
+
     it('searches only from two characters, after the debounce', async () => {
         curatedMock.mockResolvedValue(curated([]));
         renderBrowser();

@@ -2517,7 +2517,8 @@
                 "missionTick": "פעימת Mission",
                 "sourceValidation": "אימות מקור",
                 "dataSync": "סנכרון נתונים",
-                "inboundTrigger": "טריגר נכנס"
+                "inboundTrigger": "טריגר נכנס",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "פעיל",
@@ -4395,7 +4396,8 @@
             "more": "+{n} נוספים",
             "source": {
                 "work": "עבודה",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {

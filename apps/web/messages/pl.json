@@ -4327,7 +4327,8 @@
             "more": "+{n} więcej",
             "source": {
                 "work": "Praca",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9772,7 +9773,8 @@
                 "missionTick": "Takt Mission",
                 "sourceValidation": "Walidacja źródła",
                 "dataSync": "Synchronizacja danych",
-                "inboundTrigger": "Wyzwalacz przychodzący"
+                "inboundTrigger": "Wyzwalacz przychodzący",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Aktywny",

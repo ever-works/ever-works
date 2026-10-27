@@ -2517,7 +2517,8 @@
                 "missionTick": "Такт на Mission",
                 "sourceValidation": "Валидиране на източник",
                 "dataSync": "Синхронизиране на данни",
-                "inboundTrigger": "Входящ тригер"
+                "inboundTrigger": "Входящ тригер",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Активен",
@@ -4395,7 +4396,8 @@
             "more": "+{n} още",
             "source": {
                 "work": "Работа",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {

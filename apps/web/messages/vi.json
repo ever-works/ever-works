@@ -4327,7 +4327,8 @@
             "more": "+{n} khác",
             "source": {
                 "work": "Công việc",
-                "mission": "Mission"
+                "mission": "Mission",
+                "appUpstreamSync": "upstream sync"
             }
         },
         "adminUsage": {
@@ -9772,7 +9773,8 @@
                 "missionTick": "Tick Mission",
                 "sourceValidation": "Xác thực nguồn",
                 "dataSync": "Đồng bộ dữ liệu",
-                "inboundTrigger": "Trình kích hoạt đến"
+                "inboundTrigger": "Trình kích hoạt đến",
+                "appUpstreamSync": "Upstream sync"
             },
             "statuses": {
                 "active": "Hoạt động",

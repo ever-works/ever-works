@@ -3959,6 +3959,7 @@
             "sourceTypes": {
                 "inboundTrigger": "Inbound trigger",
                 "nodeSchedule": "Computer",
+                "appUpstreamSync": "Upstream sync",
                 "recurringTask": "Recurring task",
                 "agentHeartbeat": "Agent heartbeat",
                 "workSchedule": "Work schedule",
@@ -6353,7 +6354,8 @@
                 "sourceValidation": "source check",
                 "dataSync": "data sync",
                 "inboundTrigger": "trigger",
-                "nodeSchedule": "computer schedule"
+                "nodeSchedule": "computer schedule",
+                "appUpstreamSync": "upstream sync"
             },
             "todayTitle": "Today",
             "ranAt": "ran at {time}",

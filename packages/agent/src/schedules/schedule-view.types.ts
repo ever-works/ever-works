@@ -27,14 +27,28 @@ export type ScheduleSourceType =
     | 'data_sync'
     | 'inbound_trigger'
     /** Schedules on computers (FL-13, R-2): a Command with a cadence, run on the computer's own clock. */
-    | 'node_schedule';
+    | 'node_schedule'
+    /**
+     * APW-02 T53 (FR-32, ACC-E2E-05): an App Work's upstream sync, on the App spec's cron. Read
+     * only — the spec owns the schedule and the dispatcher is its only writer; **Sync now** lives
+     * on the Work's Upstream tab.
+     */
+    | 'app_upstream_sync';
 
 /**
  * The kind of entity that owns the schedule. `trigger` is used by
  * inbound-trigger rows with no target Agent; when a target Agent is
  * set the row reuses `agent` (and links to that Agent).
  */
-export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger' | 'node';
+export type ScheduleOwnerType =
+    | 'task'
+    | 'agent'
+    | 'work'
+    | 'mission'
+    | 'trigger'
+    | 'node'
+    /** APW-02 T53: the App Work an upstream sync row belongs to. */
+    | 'app_work';
 
 /**
  * Normalized status label so the UI renders one pill vocabulary across
