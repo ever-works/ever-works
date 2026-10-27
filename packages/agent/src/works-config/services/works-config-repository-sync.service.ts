@@ -1,6 +1,7 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WorkRepository } from '@src/database/repositories/work.repository';
+import { isAppWork } from '@src/works/app-work-guard';
 import { GitFacadeService } from '@src/facades/git.facade';
 import { DataRepository } from '@src/generators/data-generator/data-repository';
 import type { User } from '@src/entities/user.entity';
@@ -53,6 +54,12 @@ export class WorksConfigRepositorySyncService {
             this.logger.warn(
                 `Skipping .works/works.yml sync for ${options.workId}: work or owner was not found`,
             );
+            return;
+        }
+        // APW-01 T10 (lane aw-safety) — an App Work's `.works/works.yml` is the member's App spec,
+        // in the member's own repository; this writer must never commit a generated one over it.
+        if (isAppWork(work)) {
+            this.logger.debug(`Skipping .works/works.yml sync for App Work ${options.workId}`);
             return;
         }
 

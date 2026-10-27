@@ -1,4 +1,13 @@
-import { Controller, Get, HttpCode, HttpException, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    HttpCode,
+    HttpException,
+    HttpStatus,
+    Param,
+    Post,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { AppUpstreamStateResponse } from '@ever-works/contracts';
@@ -11,6 +20,9 @@ import {
 } from '@ever-works/agent/app-works';
 import { CurrentUser } from '@src/auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '@src/auth/types/auth.types';
+import { requireHumanSession } from '../auth/machine-principal';
+import { APP_OWNER_REQUIRED_CODE } from '../works/app-owner-gate';
+import { AppUpstreamSyncDto } from './dto/app-upstream-sync.dto';
 
 /**
  * APW-02 T27 — the three Upstream routes (plan §4.1, `plan.md:487-516`).
@@ -101,6 +113,9 @@ export class AppUpstreamController {
         // `setupCheckedAt` is the gate. Same posture as the divergence refresh above: it can
         // never turn a rendered card into an error.
         await this.refreshSetupPullRequest(id);
+        // APW-02 T47 (FR-62): an open sync pull request is checked for a merge when the card is
+        // opened and the last check is older than 60 s — same posture, same swallow.
+        await this.refreshSyncPullRequest(id);
 
         return state;
     }
@@ -132,7 +147,8 @@ export class AppUpstreamController {
     @ApiResponse({ status: 404, description: '`not_found`.' })
     @ApiResponse({
         status: 409,
-        description: '`not_ready` · `sync_paused` (+ `details.reason`) · `sync_in_progress`.',
+        description:
+            '`not_ready` · `sync_paused` (+ `details.reason`) · `sync_in_progress` · `workflow_confirmation_required` / `workflow_hold_changed` (+ `details.headSha`, `details.paths`) · `no_workflow_hold`.',
     })
     @ApiResponse({ status: 422, description: '`no_upstream` — the App Work is a link.' })
     @ApiResponse({
@@ -142,8 +158,47 @@ export class AppUpstreamController {
     async syncUpstream(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id') id: string,
+        @Body() body: AppUpstreamSyncDto = {},
     ): Promise<AppUpstreamDispatchResult> {
-        return this.translate(() => this.upstream.requestSync(id, auth.userId));
+        const confirmWorkflowChanges = body?.confirmWorkflowChanges === true;
+        if (confirmWorkflowChanges) {
+            // APW-02 T46 — the security rule of #2802/#2806 stands: only the Work OWNER, in a
+            // signed-in session, may accept upstream workflow changes. A member (editor,
+            // manager), the owner's own API key, an integration key, a fleet-run token or an
+            // Agent is refused here, before the service is even asked.
+            await this.requireOwnerSession(id, auth);
+        }
+        return this.translate(() =>
+            this.upstream.requestSync(id, auth.userId, {
+                ...(confirmWorkflowChanges ? { confirmWorkflowChanges: true } : {}),
+                ...(typeof body?.workflowHeadSha === 'string'
+                    ? { workflowHeadSha: body.workflowHeadSha }
+                    : {}),
+            }),
+        );
+    }
+
+    /**
+     * T46 — the owner-and-session gate, in the order and with the answers of the shared App
+     * Works owner gate (`app-owner-gate.ts`, #2802): visibility first (the service's own check
+     * answers the same `404` a stranger always gets), then **the owner** — the Work's creator,
+     * whose repository and secrets a released workflow runs with — `403 ownerRequired`, then
+     * **a person** (`requireHumanSession`): the owner's own API key, an integration key, a
+     * fleet-run token or an Agent cannot take this decision.
+     */
+    private async requireOwnerSession(id: string, auth: AuthenticatedUser): Promise<void> {
+        const isOwner = await this.translate(() => this.upstream.isWorkOwner(id, auth.userId));
+        if (!isOwner) {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: APP_OWNER_REQUIRED_CODE,
+                    message: 'Only the Work owner can accept upstream workflow changes.',
+                },
+                HttpStatus.FORBIDDEN,
+            );
+        }
+        requireHumanSession(auth, 'accept upstream workflow changes');
     }
 
     /**
@@ -226,6 +281,17 @@ export class AppUpstreamController {
             await this.dispatcher.requestSetupPullRequestCheck(workId);
         } catch {
             // Deliberately swallowed: see the docstring.
+        }
+    }
+
+    /** T47 — the on-view sync pull request check; best-effort exactly like the two above. */
+    private async refreshSyncPullRequest(workId: string): Promise<void> {
+        try {
+            if (typeof this.dispatcher.requestSyncPullRequestCheck === 'function') {
+                await this.dispatcher.requestSyncPullRequestCheck(workId);
+            }
+        } catch {
+            // Deliberately swallowed: see `refreshDivergence`.
         }
     }
 }

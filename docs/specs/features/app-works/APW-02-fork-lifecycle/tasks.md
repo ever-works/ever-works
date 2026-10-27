@@ -675,7 +675,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
 
 ## P1.10 — Audit-pass additions (2026-09-17): automation, completion and closed sets
 
-- [ ] **T46. The workflow-change hold on the sync path (FR-60, FR-61 — ACC-02-24).**
+- [x] **T46. The workflow-change hold on the sync path (FR-60, FR-61 — ACC-02-24).** _(Release built 2026-10-27, #2912: owner-only, signed-in session, bound to the exact held head.)_
       **Create** `packages/agent/src/app-works/upstream-workflow-diff.ts` — a pure
       `workflowChanges(compareFiles): { paths: string[]; truncated: boolean }` over the compare result, matching
       `.github/workflows/**` at any depth (case-insensitive) and capping the reported paths at 100.
@@ -703,7 +703,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       **Done when**: the four specs are green and no test path can push a workflow-carrying range without the
       confirmation.
 
-- [ ] **T47. Merged sync pull request finishes the sync (FR-62 — ACC-02-26).**
+- [x] **T47. Merged sync pull request finishes the sync (FR-62 — ACC-02-26).** _(2026-10-27, #2912; the check lives on `AppUpstreamStateService.checkSyncPullRequest`.)_
       **Modify** `packages/agent/src/entities/work-upstream-state.entity.ts` (T12), the migration (T13) and
       `packages/agent/src/database/repositories/work-upstream-state.repository.ts` (T14) — one new nullable
       `syncPullRequestCheckedAt: Date` column and `claimSyncPullRequestChecks(nowMs, minIntervalMs, limit)`
@@ -754,7 +754,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       **Done when**: `git grep -n "isomorphic-git" packages/agent/src/app-works` returns nothing and the three
       specs are green.
 
-- [ ] **T49. Sync settings come from the App spec (FR-64 — ACC-02-28).**
+- [x] **T49. Sync settings come from the App spec (FR-64 — ACC-02-28).** _(Listener 2026-10-27, #2912.)_
       **Modify** `packages/agent/src/app-works/upstream-schedule.ts` (T26) — read every field from APW-03's
       effective spec through `AppSpecService.getEffectiveSpec(workId, branch)`; `enabled: false` ⇒ `nextSyncAt`
       stays `null` and the dispatcher never selects the row (manual **Sync now** still works), with
