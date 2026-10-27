@@ -37,6 +37,22 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { getOptionalProvider } from '../utils/optional-provider.util';
 import type { AppEnvActivity, AppEnvActivityEvent } from './app-env.service';
+import {
+    APP_WORKS_TELEMETRY_SINK,
+    AppWorksTelemetryService,
+    type AppWorksTelemetrySink,
+} from '../app-works/app-works-telemetry.service';
+
+/**
+ * APW-07 T39 (lane aw-builds-bindings, 2026-10-27) — the env half of plan §9.1's events, emitted
+ * where the env change is already recorded: one `app_env_values_changed` per `apply` that
+ * changed anything (`count` of names, the action VERBS), one `app_env_rotated` per rotation.
+ * Never an env name or value (plan §9.1, ACC-07-05) — the names stay in the Activity row.
+ */
+export const APP_ENV_TELEMETRY_EVENTS = {
+    valuesChanged: 'app_env_values_changed',
+    rotated: 'app_env_rotated',
+} as const;
 
 /** The metadata keys a row may carry — the event's `details`, nothing else. */
 const DETAIL_KEYS = ['names', 'actions', 'name'] as const;
@@ -78,5 +94,40 @@ export class AppEnvActivityService implements AppEnvActivity {
             summary: String(event.summary ?? ''),
             metadata,
         });
+
+        this.emitTelemetry(event, userId);
+    }
+
+    /**
+     * The telemetry service over the API's global sink, looked up lazily like the Activity
+     * writer above (no constructor edge, so this module still compiles standalone; unbound ⇒
+     * every event is counted and dropped). Built once.
+     */
+    private telemetry?: AppWorksTelemetryService;
+
+    private emitTelemetry(event: AppEnvActivityEvent, userId: string): void {
+        try {
+            if (!this.telemetry) {
+                const sink = this.ref
+                    ? getOptionalProvider<AppWorksTelemetrySink>(this.ref, APP_WORKS_TELEMETRY_SINK)
+                    : undefined;
+                this.telemetry = new AppWorksTelemetryService(sink);
+            }
+            if (event.action === 'app.env.rotated') {
+                this.telemetry.trackEvent(APP_ENV_TELEMETRY_EVENTS.rotated, {}, userId);
+                return;
+            }
+            const names = Array.isArray(event.details?.names) ? event.details.names : [];
+            const actions = Array.isArray(event.details?.actions)
+                ? [...new Set(event.details.actions.map((action) => String(action)))].sort()
+                : [];
+            this.telemetry.trackEvent(
+                APP_ENV_TELEMETRY_EVENTS.valuesChanged,
+                { count: names.length, actions },
+                userId,
+            );
+        } catch {
+            // Telemetry never fails the change it observes (APW-01 T36 rule 2).
+        }
     }
 }
