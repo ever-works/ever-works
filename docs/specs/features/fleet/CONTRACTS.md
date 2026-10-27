@@ -217,6 +217,16 @@ the blocked shortcuts are refused with the modifiers a channel HOLDS, not only t
 observer `inbound` hook also receives the frame kind (byte 4), never the payload. Shapes in
 `packages/contracts/src/fleet/fleet-desktop-control.types.ts`.
 
+**Revision 25 (2026-10-27)** — FL-07 P2.C recordings (lane log decisions 29–32): a Desktop view's recording rides its
+`computer_sessions` row (`recordingRef` = the storage key of the recording's index object, never shown; `recorded`,
+`recordingBytes`, `recordingDurationMs`, `recordingExpiresAt`, `recordingStoppedReason`, `recordingSkippedReason`);
+chunks are `EWR1` containers of the view's `FRAME` / `TILES` frames (`FleetDesktopRecordingEntry`, ≤ 1 keyframe a
+second); routes `GET …/desktop/recordings`, `GET …/recordings/:viewId`, `GET …/recordings/:viewId/chunks/:seq`
+(`application/octet-stream`, `attachment`, `nosniff`), `DELETE …/recordings/:viewId { confirm }` (class `confirm`);
+`FleetDesktopViewView.recording { state: recording | off | failed, reason }`; the `computer-recording-gc` cron
+(`FLEET_DESKTOP_RECORDING_GC_CRON`); FL-02's viewer observer gains `nodeBinary(viewer, kind, payload)`. Shapes in
+`packages/contracts/src/fleet/fleet-desktop-recording.types.ts`.
+
 ## 0. Resolutions (R-1 … R-41)
 
 Rulings that settle questions more than one epic would otherwise answer differently.
