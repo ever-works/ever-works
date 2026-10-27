@@ -33,7 +33,8 @@ import { type INestApplication, Logger } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { Test, TestingModule } from '@nestjs/testing';
 import * as request from 'supertest';
-import { EmailController } from './email.controller';
+import { createHmac } from 'node:crypto';
+import { EmailController, inboundAckCounts } from './email.controller';
 import { EmailService } from './email.service';
 import { EmailFacadeService } from '@ever-works/agent/facades';
 import { EmailDraftService } from '@ever-works/agent/email';
@@ -226,6 +227,94 @@ describe('EmailController', () => {
             facade.parseInbound.mockRejectedValueOnce(refusal);
 
             await expect(controller.inboundWebhook('postmark', req, headers)).rejects.toBe(refusal);
+            expect(inboundDispatcher.dispatch).not.toHaveBeenCalled();
+        });
+    });
+
+    // Ever Email Router — a plugin that opts into `inboundAck: 'counts'` is
+    // told what became of the message; every other plugin keeps the bare ack.
+    describe('inboundWebhook — opt-in counts ack', () => {
+        const req = { body: { foo: 'bar' } } as any;
+        const headers = { 'x-ever-email-signature': 'sig' } as any;
+        const parsed = (inboundAck?: 'counts' | 'received') => ({
+            providerMessageId: 'pmid-r',
+            from: 'sender@x.com',
+            to: ['agent@ever.email'],
+            subject: 'hi',
+            bodyText: 'body',
+            receivedAt: new Date('2026-10-27T00:00:00Z'),
+            authenticatedRecipient: { emailAddressId: 'addr-r', userId: 'owner-r' },
+            ...(inboundAck ? { inboundAck } : {}),
+        });
+
+        it.each([
+            [
+                'a delivered message',
+                { handled: true, agentId: 'agent-secret-42', mode: 'task-spawn' },
+                { accepted: 1, duplicates: 0, dropped: 0 },
+            ],
+            [
+                'a duplicate',
+                { handled: true, agentId: 'agent-secret-42', reason: 'duplicate' },
+                { accepted: 0, duplicates: 1, dropped: 0 },
+            ],
+            [
+                'an unknown recipient',
+                { handled: false, reason: 'no matching inbound address' },
+                { accepted: 0, duplicates: 0, dropped: 1 },
+            ],
+            [
+                'an address with no inbound assignment',
+                { handled: false, reason: 'address has no inbound agent assignment' },
+                { accepted: 0, duplicates: 0, dropped: 1 },
+            ],
+        ])('answers counts for %s', async (_case, dispatched, expected) => {
+            facade.parseInbound.mockResolvedValueOnce(parsed('counts'));
+            inboundDispatcher.dispatch.mockResolvedValueOnce(dispatched);
+
+            const res = await controller.inboundWebhook('ever-email-router', req, headers);
+
+            expect(res).toEqual(expected);
+            // Only the three counts: no id, agent, mode or reason.
+            const serialized = JSON.stringify(res);
+            expect(serialized).not.toContain('pmid-r');
+            expect(serialized).not.toContain('agent-secret-42');
+            expect(serialized).not.toContain('reason');
+        });
+
+        it('counts a delivery as dropped when no dispatcher handled it', () => {
+            expect(inboundAckCounts(undefined)).toEqual({ accepted: 0, duplicates: 0, dropped: 1 });
+        });
+
+        it.each([
+            ['no inboundAck', undefined],
+            ["inboundAck 'received'", 'received' as const],
+        ])(
+            'keeps {received:true} for a plugin with %s, whatever the dispatch outcome',
+            async (_case, inboundAck) => {
+                for (const dispatched of [
+                    { handled: true },
+                    { handled: true, reason: 'duplicate' },
+                    { handled: false, reason: 'no matching inbound address' },
+                ]) {
+                    facade.parseInbound.mockResolvedValueOnce(parsed(inboundAck));
+                    inboundDispatcher.dispatch.mockResolvedValueOnce(dispatched);
+                    await expect(
+                        controller.inboundWebhook('postmark', req, headers),
+                    ).resolves.toEqual({
+                        received: true,
+                    });
+                }
+            },
+        );
+
+        it('still refuses (and answers nothing) when the signature check fails', async () => {
+            const refusal = new Error('Ever Email Router inbound: signature mismatch.');
+            facade.parseInbound.mockRejectedValueOnce(refusal);
+
+            await expect(controller.inboundWebhook('ever-email-router', req, headers)).rejects.toBe(
+                refusal,
+            );
             expect(inboundDispatcher.dispatch).not.toHaveBeenCalled();
         });
     });
@@ -532,5 +621,166 @@ describe('EmailController — refused webhooks over HTTP', () => {
         expect(parsed).not.toHaveBeenCalled();
         expect(events).not.toHaveBeenCalled();
         expect(dispatcher.dispatch).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * Ever Email Router — the whole inbound path over HTTP: the REAL plugin (its
+ * HMAC over the raw body), the REAL facade (binding, admin-scope secret,
+ * `inboundAck` read from the loaded instance) and the route's counts answer.
+ */
+describe('EmailController — Ever Email Router over HTTP', () => {
+    const PLUGIN_ID = 'ever-email-router';
+    const SECRET = 'router-secret-0123456789-abcdef';
+    const MIME =
+        'From: ada@example.com\r\nTo: agent@ever.email\r\nSubject: hi\r\nMessage-ID: <m-1@example.com>\r\n\r\nhello\r\n';
+
+    const { EverEmailRouterPlugin } = jest.requireActual<{
+        EverEmailRouterPlugin: new () => Record<string, unknown>;
+    }>('../../../../packages/plugins/ever-email-router/src/ever-email-router-plugin');
+
+    let app: INestApplication | undefined;
+    let dispatcher: { dispatch: jest.Mock };
+    let addresses: { findByAddress: jest.Mock };
+    let settings: { getSettings: jest.Mock };
+
+    async function serve(): Promise<INestApplication> {
+        const registry = {
+            getByCapability: jest.fn(() => [
+                { plugin: new EverEmailRouterPlugin(), state: 'loaded' },
+            ]),
+        };
+        settings = { getSettings: jest.fn(async () => ({ inboundWebhookSecret: SECRET })) };
+        addresses = { findByAddress: jest.fn(async () => null) };
+        dispatcher = { dispatch: jest.fn() };
+        const RealFacade = RealEmailFacadeService as unknown as new (
+            ...args: unknown[]
+        ) => EmailFacadeService;
+        const moduleRef = await Test.createTestingModule({
+            controllers: [EmailController],
+            providers: [
+                { provide: EmailService, useValue: {} },
+                {
+                    provide: EmailFacadeService,
+                    useValue: new RealFacade(registry, settings, undefined, addresses),
+                },
+                { provide: AGENT_INBOUND_EMAIL_DISPATCHER, useValue: dispatcher },
+                { provide: APP_FILTER, useClass: FacadeExceptionFilter },
+            ],
+        })
+            .overrideGuard(AuthSessionGuard)
+            .useValue({ canActivate: () => true })
+            .compile();
+        app = moduleRef.createNestApplication({ logger: false });
+        await app.init();
+        return app;
+    }
+
+    /** Compact JSON: the route re-serializes a parsed body to the same bytes. */
+    function delivery(to = 'agent@ever.email'): string {
+        return JSON.stringify({
+            raw: Buffer.from(MIME).toString('base64'),
+            envelope: { from: 'ada@example.com', to: [to] },
+        });
+    }
+
+    function signature(body: string, secret = SECRET): string {
+        const t = Math.floor(Date.now() / 1000);
+        const v1 = createHmac('sha256', secret).update(`${t}.${body}`).digest('hex');
+        return `t=${t},v1=${v1}`;
+    }
+
+    beforeEach(() => {
+        jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(async () => {
+        await app?.close();
+        app = undefined;
+        jest.restoreAllMocks();
+    });
+
+    it('answers 202 with counts for a signed delivery to a registered address', async () => {
+        const server = await serve();
+        addresses.findByAddress.mockResolvedValue({
+            id: 'addr-1',
+            userId: 'owner-1',
+            pluginId: PLUGIN_ID,
+        });
+        dispatcher.dispatch.mockResolvedValue({ handled: true, agentId: 'agent-1' });
+        const body = delivery();
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Content-Type', 'application/json')
+            .set('x-ever-email-signature', signature(body))
+            .send(body);
+
+        expect(res.status).toBe(202);
+        expect(res.body).toEqual({ accepted: 1, duplicates: 0, dropped: 0 });
+        expect(addresses.findByAddress).toHaveBeenCalledWith('agent@ever.email');
+        expect(dispatcher.dispatch).toHaveBeenCalledWith(
+            expect.objectContaining({
+                pluginId: PLUGIN_ID,
+                recipient: { emailAddressId: 'addr-1', userId: 'owner-1' },
+            }),
+        );
+    });
+
+    it('verifies an unknown recipient with the admin/env secret, then answers dropped', async () => {
+        const server = await serve();
+        dispatcher.dispatch.mockResolvedValue({
+            handled: false,
+            reason: 'no matching inbound address',
+        });
+        const body = delivery('nobody@ever.email');
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Content-Type', 'application/json')
+            .set('x-ever-email-signature', signature(body))
+            .send(body);
+
+        expect(res.status).toBe(202);
+        expect(res.body).toEqual({ accepted: 0, duplicates: 0, dropped: 1 });
+        // Bound to no owner: the secret was resolved at admin/env scope (no userId).
+        expect(settings.getSettings).toHaveBeenCalled();
+        for (const call of settings.getSettings.mock.calls) {
+            expect(call[1]?.userId).toBeUndefined();
+        }
+        expect(dispatcher.dispatch).toHaveBeenCalledWith(
+            expect.objectContaining({ recipient: null }),
+        );
+    });
+
+    it('answers 401 (no counts) to an unknown recipient with a bad signature', async () => {
+        const server = await serve();
+        const body = delivery('nobody@ever.email');
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Content-Type', 'application/json')
+            .set('x-ever-email-signature', signature(body, 'wrong-secret-0123456789-abcdef'))
+            .send(body);
+
+        expect(res.status).toBe(401);
+        expect(res.body).toEqual({ statusCode: 401, message: 'Invalid webhook signature' });
+        expect(dispatcher.dispatch).not.toHaveBeenCalled();
+    });
+
+    it('answers duplicates for a retried delivery', async () => {
+        const server = await serve();
+        dispatcher.dispatch.mockResolvedValue({ handled: true, reason: 'duplicate' });
+        const body = delivery();
+
+        const res = await request(server.getHttpServer())
+            .post(`/api/email/inbound/${PLUGIN_ID}`)
+            .set('Content-Type', 'application/json')
+            .set('x-ever-email-signature', signature(body))
+            .send(body);
+
+        expect(res.status).toBe(202);
+        expect(res.body).toEqual({ accepted: 0, duplicates: 1, dropped: 0 });
     });
 });

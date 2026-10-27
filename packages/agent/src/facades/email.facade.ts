@@ -18,6 +18,7 @@ import {
     type EmailInboundMessage,
     type EmailDeliveryEvent,
     type EmailOptions,
+    type EmailInboundAckMode,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
@@ -134,6 +135,13 @@ export interface AuthenticatedInboundEmail extends EmailInboundMessage {
      * is then authenticated at that scope only, and bound to no address.
      */
     readonly authenticatedRecipient: AgentInboundEmailRecipient | null;
+    /**
+     * How the webhook acknowledges this delivery: the loaded plugin's own
+     * `inboundAck` (read from the real instance, never the lazy proxy), or
+     * `received` when it declares none — so every plugin that did not opt in
+     * keeps the `{received:true}` answer.
+     */
+    readonly inboundAck: EmailInboundAckMode;
 }
 
 export interface EmailFacadeSendOptions extends FacadeOptions {
@@ -548,6 +556,9 @@ export class EmailFacadeService extends BaseFacadeService {
             authenticatedRecipient: recipient?.id
                 ? { emailAddressId: recipient.id, userId: recipient.userId }
                 : null,
+            // After the spread: only the plugin's declared member decides it,
+            // never a field its parsed message happens to carry.
+            inboundAck: plugin.inboundAck === 'counts' ? 'counts' : 'received',
         };
     }
 
