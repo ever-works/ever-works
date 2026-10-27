@@ -105,7 +105,12 @@ describe('fleetMissingConfirmation (CONTRACTS §2.2)', () => {
 
 	it('raises confirm to blast-radius when the node warned, and needs both fields', () => {
 		expect(
-			fleetMissingConfirmation({ class: 'confirm', target: 'NetworkManager', blastRadius: warning, fields: { confirm: true } })
+			fleetMissingConfirmation({
+				class: 'confirm',
+				target: 'NetworkManager',
+				blastRadius: warning,
+				fields: { confirm: true }
+			})
 		).toBe('blast-radius');
 		expect(
 			fleetMissingConfirmation({
@@ -122,10 +127,18 @@ describe('fleetMissingConfirmation (CONTRACTS §2.2)', () => {
 			fleetMissingConfirmation({ class: 'confirm-destructive', target: 'acme-api', fields: { confirm: true } })
 		).toBe('confirm-destructive');
 		expect(
-			fleetMissingConfirmation({ class: 'confirm-destructive', target: 'acme-api', fields: { confirmName: 'acme-ap' } })
+			fleetMissingConfirmation({
+				class: 'confirm-destructive',
+				target: 'acme-api',
+				fields: { confirmName: 'acme-ap' }
+			})
 		).toBe('confirm-destructive');
 		expect(
-			fleetMissingConfirmation({ class: 'confirm-destructive', target: 'acme-api', fields: { confirmName: 'acme-api' } })
+			fleetMissingConfirmation({
+				class: 'confirm-destructive',
+				target: 'acme-api',
+				fields: { confirmName: 'acme-api' }
+			})
 		).toBeNull();
 	});
 
@@ -142,7 +155,11 @@ describe('fleetMissingConfirmation (CONTRACTS §2.2)', () => {
 
 	it('treats a truthy non-boolean as not confirmed', () => {
 		expect(
-			fleetMissingConfirmation({ class: 'confirm', target: 'nginx', fields: { confirm: 'yes' as unknown as boolean } })
+			fleetMissingConfirmation({
+				class: 'confirm',
+				target: 'nginx',
+				fields: { confirm: 'yes' as unknown as boolean }
+			})
 		).toBe('confirm');
 	});
 
@@ -164,7 +181,10 @@ describe('blast radius', () => {
 	});
 
 	it('reads one off the wire and refuses anything else', () => {
-		expect(asFleetBlastRadius({ kind: 'ssh', sentence: ' Stops ssh. ' })).toEqual({ kind: 'ssh', sentence: 'Stops ssh.' });
+		expect(asFleetBlastRadius({ kind: 'ssh', sentence: ' Stops ssh. ' })).toEqual({
+			kind: 'ssh',
+			sentence: 'Stops ssh.'
+		});
 		expect(asFleetBlastRadius({ kind: 'printer', sentence: 'x' })).toBeNull();
 		expect(asFleetBlastRadius({ kind: 'ssh', sentence: '' })).toBeNull();
 		expect(asFleetBlastRadius('ssh')).toBeNull();
@@ -179,11 +199,18 @@ describe('services ordering and find (FR-2)', () => {
 			{ name: 'postgresql', state: 'failed' as const, scope: 'system' as const },
 			{ name: 'docker', state: 'running' as const, scope: 'system' as const }
 		];
-		expect([...rows].sort(compareFleetServices).map((row) => row.name)).toEqual(['postgresql', 'docker', 'nginx', 'ssh']);
+		expect([...rows].sort(compareFleetServices).map((row) => row.name)).toEqual([
+			'postgresql',
+			'docker',
+			'nginx',
+			'ssh'
+		]);
 	});
 
 	it('finds by name or description', () => {
-		expect(fleetServiceMatchesFind({ name: 'nginx', description: 'A high performance web server' }, 'WEB')).toBe(true);
+		expect(fleetServiceMatchesFind({ name: 'nginx', description: 'A high performance web server' }, 'WEB')).toBe(
+			true
+		);
 		expect(fleetServiceMatchesFind({ name: 'nginx', description: null }, 'postgres')).toBe(false);
 		expect(fleetServiceMatchesFind({ name: 'nginx', description: null }, '  ')).toBe(true);
 	});

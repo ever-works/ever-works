@@ -135,7 +135,9 @@ describe('normalizeFleetPortsList', () => {
 describe('tunnel helpers', () => {
 	it('expires idle after 10 min and hard after 60 min', () => {
 		const opened = new Date('2026-10-21T09:00:00Z');
-		expect(fleetPortTunnelExpiry({ openedAt: opened, lastRequestAt: null }, new Date('2026-10-21T09:09:59Z'))).toBeNull();
+		expect(
+			fleetPortTunnelExpiry({ openedAt: opened, lastRequestAt: null }, new Date('2026-10-21T09:09:59Z'))
+		).toBeNull();
 		expect(fleetPortTunnelExpiry({ openedAt: opened, lastRequestAt: null }, new Date('2026-10-21T09:10:00Z'))).toBe(
 			'idle'
 		);

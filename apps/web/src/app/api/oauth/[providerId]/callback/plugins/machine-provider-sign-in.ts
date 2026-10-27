@@ -17,7 +17,9 @@ export async function isSignInMachineProvider(providerId: string): Promise<boole
     if (!PLUGIN_ID_PATTERN.test(providerId)) return false;
     try {
         const { providers } = await fleetCloudAPI.providers();
-        return providers.some((provider) => provider.pluginId === providerId && provider.oauthAvailable);
+        return providers.some(
+            (provider) => provider.pluginId === providerId && provider.oauthAvailable,
+        );
     } catch {
         return false;
     }

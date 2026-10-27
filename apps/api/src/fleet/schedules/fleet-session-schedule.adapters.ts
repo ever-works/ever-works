@@ -46,7 +46,9 @@ export class FleetSessionScheduleDispatcher implements TaskSessionScheduleDispat
     async dispatch(task: Task, agentId: string): Promise<TaskSessionScheduleDispatchResult> {
         const organizationId = task.organizationId ?? null;
         const affinity = organizationId
-            ? await this.affinities.findForAgent(task.userId, organizationId, agentId).catch(() => null)
+            ? await this.affinities
+                  .findForAgent(task.userId, organizationId, agentId)
+                  .catch(() => null)
             : null;
         if (!affinity) {
             return { runId: null, dispatched: false, parked: false, error: 'session-not-pinned' };
@@ -71,7 +73,9 @@ export class FleetSessionScheduleDispatcher implements TaskSessionScheduleDispat
             return { runId: view.agentRunId ?? null, dispatched: true, parked: false };
         } catch (error) {
             const code = readFleetCommandError(error)?.code ?? 'internal';
-            this.logger.warn(`Agent-session schedule fire for task ${task.id} did not start: ${code}`);
+            this.logger.warn(
+                `Agent-session schedule fire for task ${task.id} did not start: ${code}`,
+            );
             return { runId: null, dispatched: false, parked: false, error: `session-${code}` };
         }
     }

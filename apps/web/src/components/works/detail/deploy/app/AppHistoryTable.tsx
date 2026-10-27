@@ -86,7 +86,10 @@ export function AppHistoryTable({ workId, refreshKey }: AppHistoryTableProps) {
         >
             <div className="flex items-center gap-2">
                 <History className="h-4 w-4 text-text-secondary" aria-hidden="true" />
-                <h3 id="app-history-title" className="text-sm font-semibold text-text dark:text-text-dark">
+                <h3
+                    id="app-history-title"
+                    className="text-sm font-semibold text-text dark:text-text-dark"
+                >
                     {t('title')}
                 </h3>
             </div>
@@ -102,11 +105,21 @@ export function AppHistoryTable({ workId, refreshKey }: AppHistoryTableProps) {
                         <caption className="sr-only">{t('caption')}</caption>
                         <thead className="text-xs text-text-secondary">
                             <tr>
-                                <th scope="col" className="py-1 pr-3 font-medium">{t('state')}</th>
-                                <th scope="col" className="py-1 pr-3 font-medium">{t('trigger')}</th>
-                                <th scope="col" className="py-1 pr-3 font-medium">{t('version')}</th>
-                                <th scope="col" className="py-1 pr-3 font-medium">{t('when')}</th>
-                                <th scope="col" className="py-1 font-medium">{t('smoke')}</th>
+                                <th scope="col" className="py-1 pr-3 font-medium">
+                                    {t('state')}
+                                </th>
+                                <th scope="col" className="py-1 pr-3 font-medium">
+                                    {t('trigger')}
+                                </th>
+                                <th scope="col" className="py-1 pr-3 font-medium">
+                                    {t('version')}
+                                </th>
+                                <th scope="col" className="py-1 pr-3 font-medium">
+                                    {t('when')}
+                                </th>
+                                <th scope="col" className="py-1 font-medium">
+                                    {t('smoke')}
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-card-border dark:divide-white/9">
@@ -115,7 +128,12 @@ export function AppHistoryTable({ workId, refreshKey }: AppHistoryTableProps) {
                                 const trigger = triggerLeafOf(row.trigger);
                                 const at = row.createdAt ? new Date(row.createdAt) : null;
                                 return (
-                                    <tr key={row.id} data-testid="app-history-row" data-state={row.state} data-current={row.current}>
+                                    <tr
+                                        key={row.id}
+                                        data-testid="app-history-row"
+                                        data-state={row.state}
+                                        data-current={row.current}
+                                    >
                                         <td className="py-1.5 pr-3">
                                             <span
                                                 className={cn(
@@ -141,7 +159,9 @@ export function AppHistoryTable({ workId, refreshKey }: AppHistoryTableProps) {
                                             )}
                                         </td>
                                         <td className="py-1.5 pr-3 text-xs text-text-secondary">
-                                            {trigger ? t(`triggers.${trigger}`) : (row.trigger ?? '—')}
+                                            {trigger
+                                                ? t(`triggers.${trigger}`)
+                                                : (row.trigger ?? '—')}
                                         </td>
                                         <td className="py-1.5 pr-3 text-xs">
                                             {row.buildId ? (
@@ -152,17 +172,25 @@ export function AppHistoryTable({ workId, refreshKey }: AppHistoryTableProps) {
                                                     {t('build')}
                                                 </Link>
                                             ) : row.imageDigest ? (
-                                                <code title={row.imageDigest}>{shortSha(row.imageDigest)}</code>
+                                                <code title={row.imageDigest}>
+                                                    {shortSha(row.imageDigest)}
+                                                </code>
                                             ) : null}
                                             {row.commitSha && (
-                                                <code className="ml-1.5 text-text-muted" title={row.commitSha}>
+                                                <code
+                                                    className="ml-1.5 text-text-muted"
+                                                    title={row.commitSha}
+                                                >
                                                     {shortSha(row.commitSha)}
                                                 </code>
                                             )}
                                         </td>
                                         <td className="py-1.5 pr-3 text-xs text-text-secondary">
                                             {at && !Number.isNaN(at.getTime())
-                                                ? format.dateTime(at, { dateStyle: 'medium', timeStyle: 'short' })
+                                                ? format.dateTime(at, {
+                                                      dateStyle: 'medium',
+                                                      timeStyle: 'short',
+                                                  })
                                                 : '—'}
                                         </td>
                                         <td className="py-1.5 text-xs text-text-secondary">

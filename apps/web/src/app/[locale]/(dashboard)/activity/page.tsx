@@ -64,7 +64,8 @@ export default async function ActivityPage({
     const schedulesRequested = view === 'schedules';
     // FL-05: the Sessions view exists only while FLEET_SESSIONS_ENABLED is on (else the page
     // falls back to the Log, spec T-36); opened on it, its first board / list is read here.
-    const sessionsEnabled = readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED'] as const).FLEET_SESSIONS_ENABLED === true;
+    const sessionsEnabled =
+        readFleetFeatureFlags(['FLEET_SESSIONS_ENABLED'] as const).FLEET_SESSIONS_ENABLED === true;
     const sessionsRequested = sessionsEnabled && view === 'sessions';
     const sessionsView = parseSessionsViewState(source);
 
@@ -117,52 +118,60 @@ export default async function ActivityPage({
           ])
         : Promise.resolve(null);
 
-    const [response, feedPage, feedActors, resolvedTimeZone, agentRoster, ledger, schedules, sessionsPayload] =
-        await Promise.all([
-            getActivityLog({ limit: 25 }).catch(() => ({
-                success: false,
-                activities: [],
-                total: 0,
-            })),
-            feedFilters
-                ? getFeedPage({
-                      agentIds: feedFilters.agentIds,
-                      kinds: feedFilters.kinds,
-                      failedOnly: feedFilters.failedOnly,
-                  }).catch(() => null)
-                : Promise.resolve(null),
-            feedFilters ? getFeedActors().catch(() => null) : Promise.resolve(null),
-            timeZone,
-            agentsAPI
-                .list({ limit: 200 })
-                .then((r) =>
-                    r.data.map<RunsAgentOption>((agent) => ({
-                        id: agent.id,
-                        name: agent.name,
-                        archived: agent.status === 'archived',
-                    })),
-                )
-                .catch(() => [] as RunsAgentOption[]),
-            loadLedgerWindow(runsView, runsRequested, timeZone),
-            // The Schedules view is the former `/schedules` page, so it is
-            // server-rendered for the filters in the link exactly as that page
-            // was. Each half fails on its own: a failing list must not blank
-            // the health banner and vice versa.
-            scheduleFilters
-                ? Promise.all([
-                      getSchedulePage(pageParamsFor(scheduleFilters)).catch(() => ({
-                          ok: false as const,
-                      })),
-                      getScheduleHealth().catch(() => ({ ok: false as const })),
-                  ]).then(([pageResponse, healthResponse]) => ({
-                      page: pageResponse.ok ? pageResponse.page : null,
-                      failed: !pageResponse.ok,
-                      health: healthResponse.ok ? healthResponse.summary : null,
-                      healthFailed: !healthResponse.ok,
-                  }))
-                : Promise.resolve(null),
-            sessionsFirstPaint,
-        ]);
+    const [
+        response,
+        feedPage,
+        feedActors,
+        resolvedTimeZone,
+        agentRoster,
+        ledger,
+        schedules,
+        sessionsPayload,
+    ] = await Promise.all([
+        getActivityLog({ limit: 25 }).catch(() => ({
+            success: false,
+            activities: [],
+            total: 0,
+        })),
+        feedFilters
+            ? getFeedPage({
+                  agentIds: feedFilters.agentIds,
+                  kinds: feedFilters.kinds,
+                  failedOnly: feedFilters.failedOnly,
+              }).catch(() => null)
+            : Promise.resolve(null),
+        feedFilters ? getFeedActors().catch(() => null) : Promise.resolve(null),
+        timeZone,
+        agentsAPI
+            .list({ limit: 200 })
+            .then((r) =>
+                r.data.map<RunsAgentOption>((agent) => ({
+                    id: agent.id,
+                    name: agent.name,
+                    archived: agent.status === 'archived',
+                })),
+            )
+            .catch(() => [] as RunsAgentOption[]),
+        loadLedgerWindow(runsView, runsRequested, timeZone),
+        // The Schedules view is the former `/schedules` page, so it is
+        // server-rendered for the filters in the link exactly as that page
+        // was. Each half fails on its own: a failing list must not blank
+        // the health banner and vice versa.
+        scheduleFilters
+            ? Promise.all([
+                  getSchedulePage(pageParamsFor(scheduleFilters)).catch(() => ({
+                      ok: false as const,
+                  })),
+                  getScheduleHealth().catch(() => ({ ok: false as const })),
+              ]).then(([pageResponse, healthResponse]) => ({
+                  page: pageResponse.ok ? pageResponse.page : null,
+                  failed: !pageResponse.ok,
+                  health: healthResponse.ok ? healthResponse.summary : null,
+                  healthFailed: !healthResponse.ok,
+              }))
+            : Promise.resolve(null),
+        sessionsFirstPaint,
+    ]);
 
     return (
         <Suspense fallback={null}>

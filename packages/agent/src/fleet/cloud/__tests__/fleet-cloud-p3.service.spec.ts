@@ -63,12 +63,18 @@ function harness(opts: { existing?: Row[]; tagged?: unknown[]; audit?: unknown[]
     const rows = new Map<string, Row>((opts.existing ?? []).map((row) => [row.id, row]));
     let seq = 0;
     const nodes = {
-        findByUser: jest.fn(async (userId: string) => [...rows.values()].filter((row) => row.userId === userId)),
+        findByUser: jest.fn(async (userId: string) =>
+            [...rows.values()].filter((row) => row.userId === userId),
+        ),
         findById: jest.fn(async (id: string) => rows.get(id) ?? null),
-        findCloudNodes: jest.fn(async () => [...rows.values()].filter((row) => row.origin === 'cloud')),
+        findCloudNodes: jest.fn(async () =>
+            [...rows.values()].filter((row) => row.origin === 'cloud'),
+        ),
         findByProviderMachine: jest.fn(
             async (pluginId: string, ref: string) =>
-                [...rows.values()].find((row) => row.providerPluginId === pluginId && row.providerMachineRef === ref) ?? null,
+                [...rows.values()].find(
+                    (row) => row.providerPluginId === pluginId && row.providerMachineRef === ref,
+                ) ?? null,
         ),
         create: jest.fn(async (data: Partial<Row>) => {
             seq += 1;
@@ -92,7 +98,10 @@ function harness(opts: { existing?: Row[]; tagged?: unknown[]; audit?: unknown[]
         create: jest.fn(async () => ({ machineRef: '4242', state: 'provisioning' as const })),
         power: jest.fn(async () => undefined),
         destroy: jest.fn(async () => undefined),
-        getMachine: jest.fn(async (_p: string, _u: string, ref: string) => ({ machineRef: ref, state: 'running' as const })),
+        getMachine: jest.fn(async (_p: string, _u: string, ref: string) => ({
+            machineRef: ref,
+            state: 'running' as const,
+        })),
         listTagged: jest.fn(async () => opts.tagged ?? []),
     };
     const audit = {
@@ -100,7 +109,14 @@ function harness(opts: { existing?: Row[]; tagged?: unknown[]; audit?: unknown[]
         forActionSince: jest.fn(async () => opts.audit ?? []),
     };
     const fleet = { viewForRole: jest.fn((node: Row) => ({ id: node.id, name: node.name })) };
-    const service = new FleetCloudService(nodes as never, fleet as never, machines as never, undefined, undefined, audit as never);
+    const service = new FleetCloudService(
+        nodes as never,
+        fleet as never,
+        machines as never,
+        undefined,
+        undefined,
+        audit as never,
+    );
     return { service, rows, nodes, machines, audit };
 }
 
@@ -182,7 +198,8 @@ describe('FleetCloudService P3 (FL-17)', () => {
     describe('the overlay-VPN key (T-29, FR-32)', () => {
         beforeEach(() => {
             process.env.FLEET_CLOUD_OVERLAY_VPN_INSTALL_URL = 'https://vpn.example.com/install.sh';
-            process.env.FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND = '/usr/bin/vpn up --auth-key-file={keyFile}';
+            process.env.FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND =
+                '/usr/bin/vpn up --auth-key-file={keyFile}';
         });
 
         it('goes into the first-boot script once, through the 0600 file, and nowhere else', async () => {
@@ -194,9 +211,13 @@ describe('FleetCloudService P3 (FL-17)', () => {
                 fields: { confirm: true },
             });
             await settle();
-            const input = (machines.create.mock.calls[0] as unknown[])[2] as { bootstrapScript: string };
+            const input = (machines.create.mock.calls[0] as unknown[])[2] as {
+                bootstrapScript: string;
+            };
             expect(input.bootstrapScript.split(VPN_KEY)).toHaveLength(2);
-            expect(input.bootstrapScript).toContain('/usr/bin/vpn up --auth-key-file=/run/ever-works/overlay-vpn-key');
+            expect(input.bootstrapScript).toContain(
+                '/usr/bin/vpn up --auth-key-file=/run/ever-works/overlay-vpn-key',
+            );
             expect(JSON.stringify(rows.get(created.nodeId))).not.toContain(VPN_KEY);
             expect(JSON.stringify(audit.tryRecord.mock.calls)).not.toContain(VPN_KEY);
             expect(JSON.stringify(created)).not.toContain(VPN_KEY);
@@ -204,9 +225,15 @@ describe('FleetCloudService P3 (FL-17)', () => {
 
         it('installs the client without a key when none is given', async () => {
             const { service, machines } = harness();
-            await service.create(caller, { ...request, software: ['overlay-vpn'], fields: { confirm: true } });
+            await service.create(caller, {
+                ...request,
+                software: ['overlay-vpn'],
+                fields: { confirm: true },
+            });
             await settle();
-            const input = (machines.create.mock.calls[0] as unknown[])[2] as { bootstrapScript: string };
+            const input = (machines.create.mock.calls[0] as unknown[])[2] as {
+                bootstrapScript: string;
+            };
             expect(input.bootstrapScript).toContain('https://vpn.example.com/install.sh');
             expect(input.bootstrapScript).not.toContain('overlay-vpn-key\n    permissions');
         });
@@ -214,7 +241,12 @@ describe('FleetCloudService P3 (FL-17)', () => {
         it('refuses a key without the preset, without a join command, or of the wrong shape — never quoting it', async () => {
             const { service, machines } = harness();
             const noPreset = await refusal(
-                service.create(caller, { ...request, software: ['docker'], vpnAuthKey: VPN_KEY, fields: { confirm: true } }),
+                service.create(caller, {
+                    ...request,
+                    software: ['docker'],
+                    vpnAuthKey: VPN_KEY,
+                    fields: { confirm: true },
+                }),
             );
             expect(noPreset?.code).toBe('invalid');
             expect(noPreset?.details).toMatchObject({ field: 'vpnAuthKey' });
@@ -230,7 +262,12 @@ describe('FleetCloudService P3 (FL-17)', () => {
             expect(JSON.stringify(badShape)).not.toContain('rm -rf');
             delete process.env.FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND;
             const noJoin = await refusal(
-                service.create(caller, { ...request, software: ['overlay-vpn'], vpnAuthKey: VPN_KEY, fields: { confirm: true } }),
+                service.create(caller, {
+                    ...request,
+                    software: ['overlay-vpn'],
+                    vpnAuthKey: VPN_KEY,
+                    fields: { confirm: true },
+                }),
             );
             expect(noJoin?.code).toBe('invalid');
             expect(machines.create).not.toHaveBeenCalled();
@@ -242,7 +279,11 @@ describe('FleetCloudService P3 (FL-17)', () => {
         const created = await service.create(caller, { ...request, fields: { confirm: true } });
         await settle();
         const input = (machines.create.mock.calls[0] as unknown[])[2] as { tags: string[] };
-        expect(input.tags).toEqual(['ever-works', `ever-works-node:${created.nodeId}`, `ever-works-site:${SITE}`]);
+        expect(input.tags).toEqual([
+            'ever-works',
+            `ever-works-node:${created.nodeId}`,
+            `ever-works-site:${SITE}`,
+        ]);
     });
 
     describe('reconciliation P3 (T-30, FR-30, U7)', () => {
@@ -254,7 +295,11 @@ describe('FleetCloudService P3 (FL-17)', () => {
                     {
                         machineRef: '9001',
                         state: 'running',
-                        tags: ['ever-works', `ever-works-node:${row.id}`, `ever-works-site:${SITE}`],
+                        tags: [
+                            'ever-works',
+                            `ever-works-node:${row.id}`,
+                            `ever-works-site:${SITE}`,
+                        ],
                         createdAt: '2026-10-26T00:02:00.000Z',
                     },
                 ],
@@ -271,7 +316,10 @@ describe('FleetCloudService P3 (FL-17)', () => {
             const entry = (audit.tryRecord.mock.calls as unknown[][])
                 .map(([call]) => call as { action: string; details: Record<string, unknown> })
                 .find((call) => call.details.act === 'repaired');
-            expect(entry).toMatchObject({ action: 'node.cloud.create', details: { requestedBy: 'system:cloud-reconcile' } });
+            expect(entry).toMatchObject({
+                action: 'node.cloud.create',
+                details: { requestedBy: 'system:cloud-reconcile' },
+            });
         });
 
         it('adopts an unclaimed machine of this deployment, priced from the options, with the unclaimed item', async () => {
@@ -284,7 +332,11 @@ describe('FleetCloudService P3 (FL-17)', () => {
                         name: 'old-box',
                         regionId: 'nyc3',
                         sizeId: 's-2',
-                        tags: ['ever-works', 'ever-works-node:5d1c0a52-3a8e-4c55-9b7d-2f8c0b1a9e09', `ever-works-site:${SITE}`],
+                        tags: [
+                            'ever-works',
+                            'ever-works-node:5d1c0a52-3a8e-4c55-9b7d-2f8c0b1a9e09',
+                            `ever-works-site:${SITE}`,
+                        ],
                         createdAt: '2026-10-20T00:00:00.000Z',
                     },
                 ],
@@ -306,12 +358,17 @@ describe('FleetCloudService P3 (FL-17)', () => {
                 monthlyPriceCents: 2400,
                 idlePolicy: { mode: 'nothing' },
             });
-            expect(typeof (adopted.providerMeta as { unclaimedAt?: unknown }).unclaimedAt).toBe('string');
+            expect(typeof (adopted.providerMeta as { unclaimedAt?: unknown }).unclaimedAt).toBe(
+                'string',
+            );
 
             const view = fleetCloudViewOf(adopted as never)!;
-            const items = cloudIdleItems([{ id: adopted.id, name: adopted.name, status: 'offline', cloud: view } as never], {
-                now: new Date(),
-            });
+            const items = cloudIdleItems(
+                [{ id: adopted.id, name: adopted.name, status: 'offline', cloud: view } as never],
+                {
+                    now: new Date(),
+                },
+            );
             expect(items).toHaveLength(1);
             expect(items[0]).toMatchObject({
                 kind: 'cloud-idle',
@@ -328,9 +385,17 @@ describe('FleetCloudService P3 (FL-17)', () => {
             const { service, rows, audit } = harness({
                 audit: [{ ownerUserId: OWNER, details: { providerPluginId: PLUGIN } }],
                 tagged: [
-                    { machineRef: '1', state: 'running', tags: ['ever-works', 'ever-works-site:0123456789abcdef'] },
+                    {
+                        machineRef: '1',
+                        state: 'running',
+                        tags: ['ever-works', 'ever-works-site:0123456789abcdef'],
+                    },
                     { machineRef: '2', state: 'running', tags: ['ever-works'] },
-                    { machineRef: '3', state: 'gone', tags: ['ever-works', `ever-works-site:${SITE}`] },
+                    {
+                        machineRef: '3',
+                        state: 'gone',
+                        tags: ['ever-works', `ever-works-site:${SITE}`],
+                    },
                 ],
             });
             await expect(service.reconcile()).resolves.toMatchObject({ changed: 0 });
@@ -349,24 +414,38 @@ describe('FleetCloudService P3 (FL-17)', () => {
     describe('sign in with the provider (T-28, FR-31)', () => {
         function facade(account: { accessToken: string } | null) {
             const authAccounts = { findConnectedProviderAccount: jest.fn(async () => account) };
-            const service = new MachineProviderFacadeService({} as never, {} as never, authAccounts as never);
+            const service = new MachineProviderFacadeService(
+                {} as never,
+                {} as never,
+                authAccounts as never,
+            );
             const plugin = {
                 id: PLUGIN,
                 providerName: 'Provider',
                 capabilities: ['machine-provider', 'oauth'],
-                isConfigured: (settings: Record<string, unknown>) => Boolean(settings.apiToken || settings.oauthAccessToken),
+                isConfigured: (settings: Record<string, unknown>) =>
+                    Boolean(settings.apiToken || settings.oauthAccessToken),
                 listOptions: jest.fn(async () => OPTIONS),
             };
-            jest.spyOn(service as never, 'resolveProvider' as never).mockResolvedValue(plugin as never);
-            jest.spyOn(service as never, 'getResolvedSettings' as never).mockResolvedValue({ defaultRegion: 'nyc3' } as never);
+            jest.spyOn(service as never, 'resolveProvider' as never).mockResolvedValue(
+                plugin as never,
+            );
+            jest.spyOn(service as never, 'getResolvedSettings' as never).mockResolvedValue({
+                defaultRegion: 'nyc3',
+            } as never);
             return { service, plugin, authAccounts };
         }
 
         it('hands the stored sign-in token to the plugin as oauthAccessToken', async () => {
             const { service, plugin, authAccounts } = facade({ accessToken: 'signed-in-token' });
             await service.listOptions(PLUGIN, OWNER);
-            expect(authAccounts.findConnectedProviderAccount).toHaveBeenCalledWith(OWNER, PLUGIN, { usePluginProviderId: true });
-            expect(plugin.listOptions).toHaveBeenCalledWith({ defaultRegion: 'nyc3', oauthAccessToken: 'signed-in-token' });
+            expect(authAccounts.findConnectedProviderAccount).toHaveBeenCalledWith(OWNER, PLUGIN, {
+                usePluginProviderId: true,
+            });
+            expect(plugin.listOptions).toHaveBeenCalledWith({
+                defaultRegion: 'nyc3',
+                oauthAccessToken: 'signed-in-token',
+            });
         });
 
         it('passes the plain settings when there is no sign-in', async () => {
@@ -377,14 +456,27 @@ describe('FleetCloudService P3 (FL-17)', () => {
 
         it('reads "Sign in" and "configured" off the live plugin', async () => {
             const { service } = facade({ accessToken: 'signed-in-token' });
-            const live = { id: PLUGIN, providerName: 'Provider', capabilities: ['machine-provider'], isConfigured: () => true };
-            const lazy = { ...live, capabilities: ['machine-provider', 'oauth'], __materialize: async () => live };
-            jest
-                .spyOn(service as never, 'getEnabledPlugins' as never)
-                .mockResolvedValue([{ plugin: lazy, manifest: { name: 'Machines' } }] as never);
+            const live = {
+                id: PLUGIN,
+                providerName: 'Provider',
+                capabilities: ['machine-provider'],
+                isConfigured: () => true,
+            };
+            const lazy = {
+                ...live,
+                capabilities: ['machine-provider', 'oauth'],
+                __materialize: async () => live,
+            };
+            jest.spyOn(service as never, 'getEnabledPlugins' as never).mockResolvedValue([
+                { plugin: lazy, manifest: { name: 'Machines' } },
+            ] as never);
             const [summary] = await service.listProviders(OWNER);
             // The cold manifest lists oauth; the live instance (no operator application) does not.
-            expect(summary).toMatchObject({ pluginId: PLUGIN, configured: true, oauthAvailable: false });
+            expect(summary).toMatchObject({
+                pluginId: PLUGIN,
+                configured: true,
+                oauthAvailable: false,
+            });
         });
     });
 });

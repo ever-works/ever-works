@@ -79,6 +79,8 @@ export async function openOnDesktop(input: OpenOnDesktopInput): Promise<void> {
 		await input.opener.openUrl(input.url);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
-		throw new MachineVerbError(makeFleetLinkError('operation_failed', message.slice(0, 300), { target: 'desktop' }));
+		throw new MachineVerbError(
+			makeFleetLinkError('operation_failed', message.slice(0, 300), { target: 'desktop' })
+		);
 	}
 }

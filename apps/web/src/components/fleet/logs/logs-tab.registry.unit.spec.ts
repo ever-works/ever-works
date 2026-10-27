@@ -25,29 +25,40 @@ describe('openLogsForSource / openMergedLogs', () => {
     });
 
     it('carries a failure time for P3 and drops a malformed one', () => {
-        expect(openLogsForSource(NODE, 'service:postgresql.service', { at: '2026-10-21T09:41:02Z' })).toContain(
-            'at=2026-10-21T09%3A41%3A02.000Z',
+        expect(
+            openLogsForSource(NODE, 'service:postgresql.service', { at: '2026-10-21T09:41:02Z' }),
+        ).toContain('at=2026-10-21T09%3A41%3A02.000Z');
+        expect(openLogsForSource(NODE, 'service:postgresql.service', { at: 'soon' })).not.toContain(
+            'at=',
         );
-        expect(openLogsForSource(NODE, 'service:postgresql.service', { at: 'soon' })).not.toContain('at=');
     });
 
     it('opens a merged view of a Compose project, bounded at twelve, de-duplicated', () => {
         const ids = composeLogSourceIds(['acme-api', 'acme-db', 'acme-cache', 'acme-api', '-bad']);
-        expect(ids).toEqual(['container:acme-api', 'container:acme-db', 'container:acme-cache', 'container:acme-api']);
+        expect(ids).toEqual([
+            'container:acme-api',
+            'container:acme-db',
+            'container:acme-cache',
+            'container:acme-api',
+        ]);
         const href = openMergedLogs(NODE, ids, { title: 'acme' });
-        expect(read(href)).toEqual(['container:acme-api', 'container:acme-db', 'container:acme-cache']);
+        expect(read(href)).toEqual([
+            'container:acme-api',
+            'container:acme-db',
+            'container:acme-cache',
+        ]);
         expect(new URL(href, 'http://x').searchParams.get('title')).toBe('acme');
         const many = Array.from({ length: 20 }, (_, i) => `container:c${i}`);
         expect(read(openMergedLogs(NODE, many))).toHaveLength(12);
     });
 
     it('still reads FL-09’s kind-and-name links', () => {
-        expect(read(`/fleet/computers/${NODE}?tab=logs&source=service&unit=nginx.service`)).toEqual([
-            'service:nginx.service',
-        ]);
-        expect(read(`/fleet/computers/${NODE}?tab=logs&source=container&container=acme-api`)).toEqual([
-            'container:acme-api',
-        ]);
+        expect(read(`/fleet/computers/${NODE}?tab=logs&source=service&unit=nginx.service`)).toEqual(
+            ['service:nginx.service'],
+        );
+        expect(
+            read(`/fleet/computers/${NODE}?tab=logs&source=container&container=acme-api`),
+        ).toEqual(['container:acme-api']);
         expect(read(`/fleet/computers/${NODE}?tab=logs&source=container&container=-x`)).toEqual([]);
     });
 });

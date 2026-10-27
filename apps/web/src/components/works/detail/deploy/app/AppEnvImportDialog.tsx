@@ -62,7 +62,9 @@ export function AppEnvImportDialog({ workId, onOpenChange, onImported }: AppEnvI
     const tooLarge = new TextEncoder().encode(text).length > APP_ENV_IMPORT_MAX_BYTES;
 
     const refusal = (code: string | undefined, error: string | undefined) => {
-        const leaf = code ? (IMPORT_REFUSALS as Readonly<Record<string, ImportRefusalLeaf>>)[code] : undefined;
+        const leaf = code
+            ? (IMPORT_REFUSALS as Readonly<Record<string, ImportRefusalLeaf>>)[code]
+            : undefined;
         return leaf ? t(`refusals.${leaf}`) : t('failed', { reason: error ?? code ?? '' });
     };
 
@@ -109,7 +111,9 @@ export function AppEnvImportDialog({ workId, onOpenChange, onImported }: AppEnvI
     };
 
     const changeCount = preview
-        ? preview.changes.add.length + preview.changes.replace.length + preview.changes.remove.length
+        ? preview.changes.add.length +
+          preview.changes.replace.length +
+          preview.changes.remove.length
         : 0;
 
     return (
@@ -140,7 +144,10 @@ export function AppEnvImportDialog({ workId, onOpenChange, onImported }: AppEnvI
                             data-testid="app-env-import-text"
                         />
                     </label>
-                    <label htmlFor={fileId} className="flex items-center gap-2 text-xs text-text-secondary">
+                    <label
+                        htmlFor={fileId}
+                        className="flex items-center gap-2 text-xs text-text-secondary"
+                    >
                         <span>{t('fileLabel')}</span>
                         <input
                             id={fileId}
@@ -160,12 +167,20 @@ export function AppEnvImportDialog({ workId, onOpenChange, onImported }: AppEnvI
                             data-testid="app-env-import-file"
                         />
                     </label>
-                    {tooLarge && <p className="text-xs text-red-600 dark:text-red-400">{t('refusals.tooLarge')}</p>}
+                    {tooLarge && (
+                        <p className="text-xs text-red-600 dark:text-red-400">
+                            {t('refusals.tooLarge')}
+                        </p>
+                    )}
 
                     {preview && <PreviewTable preview={preview} />}
 
                     {message && (
-                        <p className="text-sm text-red-600 dark:text-red-400" role="alert" data-testid="app-env-import-error">
+                        <p
+                            className="text-sm text-red-600 dark:text-red-400"
+                            role="alert"
+                            data-testid="app-env-import-error"
+                        >
                             {message}
                         </p>
                     )}
@@ -210,7 +225,10 @@ function PreviewTable({ preview }: { preview: AppEnvImportPreviewView }) {
     const t = useTranslations('dashboard.workDetail.appDeploy.environment.import');
     if (preview.limits) {
         return (
-            <p className="text-sm text-red-600 dark:text-red-400" data-testid="app-env-import-limits">
+            <p
+                className="text-sm text-red-600 dark:text-red-400"
+                data-testid="app-env-import-limits"
+            >
                 {preview.limits.message}
             </p>
         );
@@ -226,7 +244,10 @@ function PreviewTable({ preview }: { preview: AppEnvImportPreviewView }) {
                 })}
             </p>
             {preview.undeclared.length > 0 && (
-                <p className="text-xs font-medium text-red-700 dark:text-red-400" data-testid="app-env-import-undeclared">
+                <p
+                    className="text-xs font-medium text-red-700 dark:text-red-400"
+                    data-testid="app-env-import-undeclared"
+                >
                     {t('undeclared', { names: preview.undeclared.join(', ') })}
                 </p>
             )}
@@ -238,7 +259,9 @@ function PreviewTable({ preview }: { preview: AppEnvImportPreviewView }) {
                         data-testid="app-env-import-line"
                         data-action={line.action}
                     >
-                        <span className="w-10 shrink-0 tabular-nums text-text-muted">{t('line', { line: line.line })}</span>
+                        <span className="w-10 shrink-0 tabular-nums text-text-muted">
+                            {t('line', { line: line.line })}
+                        </span>
                         <code className="font-semibold">{line.name ?? '—'}</code>
                         <span
                             className={cn(

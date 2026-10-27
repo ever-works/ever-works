@@ -594,9 +594,7 @@ export const fleetAPI = {
 
     /** Computer health, second phase (FL-03) — has the computer answered its last wake? */
     wakeStatus: async (nodeId: string) => {
-        return serverFetch<FleetNodeWakeStatus>(
-            `${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`,
-        );
+        return serverFetch<FleetNodeWakeStatus>(`${BASE}/nodes/${encodeURIComponent(nodeId)}/wake`);
     },
 
     /** FL-19 — "how is my fleet?" in one read (`GET /api/fleet/status`). */

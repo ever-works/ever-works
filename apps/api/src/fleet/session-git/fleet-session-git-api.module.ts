@@ -59,6 +59,11 @@ import { FleetSessionGitCronService } from './fleet-session-git-cron.service';
         FleetSessionsEnabledGuard,
         FleetCheckoutsEnabledGuard,
     ],
-    exports: [FleetSessionGitModule, FleetPrEnrichmentService, FLEET_SESSION_PR_FACTS, FleetPullRequestService],
+    exports: [
+        FleetSessionGitModule,
+        FleetPrEnrichmentService,
+        FLEET_SESSION_PR_FACTS,
+        FleetPullRequestService,
+    ],
 })
 export class FleetSessionGitApiModule {}

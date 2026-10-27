@@ -102,7 +102,10 @@ export function commandPickRows(nodes: readonly FleetNodeView[]): CommandPickRow
  * computer page asked for one (`?node=<id>`, P2), only that one when it is
  * selectable.
  */
-export function commandPreselection(rows: readonly CommandPickRow[], only?: string | null): string[] {
+export function commandPreselection(
+    rows: readonly CommandPickRow[],
+    only?: string | null,
+): string[] {
     if (only) {
         const row = rows.find((entry) => entry.nodeId === only);
         return row?.selectable ? [row.nodeId] : [];
@@ -156,7 +159,11 @@ export function commandCardEnd(run: FleetCommandRunView): CommandCardEnd {
     }
     if (run.status === 'done') return { key: 'done', tone: 'success', values: { duration } };
     if (run.status === 'timeout') {
-        return { key: 'timedOut', tone: 'danger', values: { clock: formatCommandClock(run.durationMs ?? 0) } };
+        return {
+            key: 'timedOut',
+            tone: 'danger',
+            values: { clock: formatCommandClock(run.durationMs ?? 0) },
+        };
     }
     switch (run.failedReason) {
         case 'kill-switch':
@@ -175,7 +182,11 @@ export function commandCardEnd(run: FleetCommandRunView): CommandCardEnd {
             break;
     }
     if (run.error) {
-        return { key: 'refused', tone: 'danger', values: { code: run.error.code, hint: run.error.hint } };
+        return {
+            key: 'refused',
+            tone: 'danger',
+            values: { code: run.error.code, hint: run.error.hint },
+        };
     }
     if (typeof run.exitCode === 'number') {
         return { key: 'exit', tone: 'danger', values: { code: run.exitCode, duration } };
@@ -200,12 +211,18 @@ export function commandSummaryLine(summary: FleetCommandSummary): {
 }
 
 /** A card's text: the head, the truncation marker when bytes were dropped, the tail. */
-export function commandCardText(run: Pick<FleetCommandRunView, 'outputHead' | 'outputTail' | 'truncated'>): {
+export function commandCardText(
+    run: Pick<FleetCommandRunView, 'outputHead' | 'outputTail' | 'truncated'>,
+): {
     head: string;
     tail: string;
     truncated: boolean;
 } {
-    return { head: run.outputHead, tail: run.truncated ? run.outputTail : '', truncated: run.truncated };
+    return {
+        head: run.outputHead,
+        tail: run.truncated ? run.outputTail : '',
+        truncated: run.truncated,
+    };
 }
 
 /** True while any run of the Command may still change (the poll keeps going). */
@@ -214,7 +231,9 @@ export function commandIsLive(runs: readonly Pick<FleetCommandRunView, 'status'>
 }
 
 /** Read the 409 `confirmation_required` details of a run request, or null. */
-export function readCommandConfirmation(details: Record<string, unknown>): FleetCommandConfirmationDetails | null {
+export function readCommandConfirmation(
+    details: Record<string, unknown>,
+): FleetCommandConfirmationDetails | null {
     if (details.class !== 'confirm' || !Array.isArray(details.summary)) return null;
     return details as unknown as FleetCommandConfirmationDetails;
 }
@@ -229,7 +248,8 @@ export interface CommandErrorRead {
 
 /** Read the CONTRACTS §8 envelope off a BFF answer. */
 export function readCommandError(status: number, body: unknown): CommandErrorRead {
-    const error = typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
+    const error =
+        typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
     if (typeof error === 'object' && error !== null) {
         const record = error as Record<string, unknown>;
         if (isFleetLinkErrorCode(record.code)) {

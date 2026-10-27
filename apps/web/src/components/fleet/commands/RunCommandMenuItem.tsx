@@ -20,7 +20,10 @@ export default function RunCommandMenuItem({ node, allowed = true }: FleetComput
     if (!allowed) {
         return (
             <DropdownMenuItem disabled>
-                <span className="flex flex-col items-start text-left" data-testid="fleet-computer-menu-run-command">
+                <span
+                    className="flex flex-col items-start text-left"
+                    data-testid="fleet-computer-menu-run-command"
+                >
                     <span className="flex items-center gap-2">
                         <TerminalSquare className="h-4 w-4" aria-hidden="true" />
                         {t('runCommand')}
@@ -34,7 +37,11 @@ export default function RunCommandMenuItem({ node, allowed = true }: FleetComput
     }
     return (
         <DropdownMenuItem asChild>
-            <Link href={href} className="flex items-center gap-2" data-testid="fleet-computer-menu-run-command">
+            <Link
+                href={href}
+                className="flex items-center gap-2"
+                data-testid="fleet-computer-menu-run-command"
+            >
                 <TerminalSquare className="h-4 w-4" aria-hidden="true" />
                 {t('runCommand')}
             </Link>

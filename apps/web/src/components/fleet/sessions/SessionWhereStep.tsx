@@ -28,7 +28,10 @@ export type SessionWhereMode = 'existing' | 'worktree' | 'clone';
  * owner session in the checkout itself. A worktree needs a ready, host-
  * isolated checkout with a remote; a Task-pool worktree is used as it is.
  */
-export function defaultWhereMode(kind: FleetSessionKind, checkout: Pick<FleetCheckoutView, 'createdBy' | 'remoteUrl'>): SessionWhereMode {
+export function defaultWhereMode(
+    kind: FleetSessionKind,
+    checkout: Pick<FleetCheckoutView, 'createdBy' | 'remoteUrl'>,
+): SessionWhereMode {
     if (kind === 'agent' && checkout.createdBy !== 'task' && checkout.remoteUrl) return 'worktree';
     return 'existing';
 }
@@ -90,7 +93,9 @@ export function SessionWhereStep({
         let cancelled = false;
         void listNodeCheckoutsAction(nodeId, { state: 'ready' }).then((result) => {
             if (cancelled || !result.success) return;
-            setCheckouts(result.data.data.filter((row) => row.state === 'ready' && row.isolation === 'host'));
+            setCheckouts(
+                result.data.data.filter((row) => row.state === 'ready' && row.isolation === 'host'),
+            );
         });
         return () => {
             cancelled = true;
@@ -106,10 +111,18 @@ export function SessionWhereStep({
         }
     }, [cwd, checkouts, checkoutId, kind]);
 
-    const checkout = useMemo(() => checkouts.find((row) => row.id === checkoutId) ?? null, [checkouts, checkoutId]);
+    const checkout = useMemo(
+        () => checkouts.find((row) => row.id === checkoutId) ?? null,
+        [checkouts, checkoutId],
+    );
 
     useEffect(() => {
-        if (checkout) setMode((current) => (current === 'existing' && kind === 'agent' ? defaultWhereMode(kind, checkout) : current));
+        if (checkout)
+            setMode((current) =>
+                current === 'existing' && kind === 'agent'
+                    ? defaultWhereMode(kind, checkout)
+                    : current,
+            );
     }, [kind, checkout]);
 
     // The branch proposal, asked again (debounced) while the first message or the title changes.
@@ -134,7 +147,8 @@ export function SessionWhereStep({
                 setProposalError(null);
                 setProposal(result.data);
                 // A branch the person typed is theirs; a Task's branch is never theirs to change (FR-4).
-                if (!editedRef.current || result.data.source === 'task') setBranch(result.data.branch);
+                if (!editedRef.current || result.data.source === 'task')
+                    setBranch(result.data.branch);
                 if (result.data.source === 'task') setEdited(false);
             });
         }, PROPOSAL_DEBOUNCE_MS);
@@ -146,8 +160,10 @@ export function SessionWhereStep({
     const branchValid = isFleetCheckoutBranchName(branch);
     useEffect(() => {
         if (!checkout) onChange({ mode: 'folder' });
-        else if (mode === 'existing') onChange({ mode: 'existing', checkoutId: checkout.id, path: checkout.path });
-        else if (mode === 'worktree' && branchValid) onChange({ mode: 'worktree', parentCheckoutId: checkout.id, branch });
+        else if (mode === 'existing')
+            onChange({ mode: 'existing', checkoutId: checkout.id, path: checkout.path });
+        else if (mode === 'worktree' && branchValid)
+            onChange({ mode: 'worktree', parentCheckoutId: checkout.id, branch });
         else if (mode === 'clone' && branchValid && checkout.remoteUrl)
             onChange({ mode: 'clone', repoUrl: checkout.remoteUrl, branch });
         else onChange({ mode: 'folder' });
@@ -164,12 +180,15 @@ export function SessionWhereStep({
             disabled && 'opacity-50 cursor-not-allowed',
         );
     const taskBranch = proposal?.source === 'task';
-    const canBranch = checkout !== null && checkout.remoteUrl !== null && checkout.createdBy !== 'task';
+    const canBranch =
+        checkout !== null && checkout.remoteUrl !== null && checkout.createdBy !== 'task';
 
     return (
         <div className="space-y-2" data-testid="fleet-session-where">
             <label className="block space-y-1 text-sm">
-                <span className="text-text-muted dark:text-text-muted-dark">{t('checkoutLabel', { node: nodeName })}</span>
+                <span className="text-text-muted dark:text-text-muted-dark">
+                    {t('checkoutLabel', { node: nodeName })}
+                </span>
                 <select
                     value={checkoutId}
                     onChange={(event) => {
@@ -198,7 +217,11 @@ export function SessionWhereStep({
 
             {checkout ? (
                 <>
-                    <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t('modeLabel')}>
+                    <div
+                        className="grid gap-2 sm:grid-cols-3"
+                        role="radiogroup"
+                        aria-label={t('modeLabel')}
+                    >
                         <button
                             type="button"
                             role="radio"
@@ -243,7 +266,9 @@ export function SessionWhereStep({
                     </p>
                     {mode !== 'existing' ? (
                         <label className="block space-y-1 text-sm">
-                            <span className="text-text-muted dark:text-text-muted-dark">{tBranch('label')}</span>
+                            <span className="text-text-muted dark:text-text-muted-dark">
+                                {tBranch('label')}
+                            </span>
                             <input
                                 value={branch}
                                 onChange={(event) => {
@@ -255,11 +280,16 @@ export function SessionWhereStep({
                                 aria-invalid={branch.length > 0 && !branchValid}
                                 className={cn(
                                     'w-full rounded-md border bg-transparent px-3 py-2 font-mono text-sm',
-                                    branch.length > 0 && !branchValid ? 'border-danger' : 'border-border dark:border-border-dark',
+                                    branch.length > 0 && !branchValid
+                                        ? 'border-danger'
+                                        : 'border-border dark:border-border-dark',
                                 )}
                                 data-testid="fleet-session-where-branch"
                             />
-                            <span className="block text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-session-where-branch-reason">
+                            <span
+                                className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                data-testid="fleet-session-where-branch-reason"
+                            >
                                 {proposing
                                     ? tBranch('checking')
                                     : proposalError
@@ -272,9 +302,15 @@ export function SessionWhereStep({
                                             ? taskBranch
                                                 ? tBranch('taskBranch')
                                                 : proposal.suffixed
-                                                  ? tBranch('suffixed', { base: proposal.base, branch: proposal.branch })
+                                                  ? tBranch('suffixed', {
+                                                        base: proposal.base,
+                                                        branch: proposal.branch,
+                                                    })
                                                   : tBranch('neverUsed', {
-                                                        repository: proposal.repository ?? checkout.repository ?? '—',
+                                                        repository:
+                                                            proposal.repository ??
+                                                            checkout.repository ??
+                                                            '—',
                                                     })
                                             : ''}
                                 {proposal && proposal.remoteChecked === false && !taskBranch ? (

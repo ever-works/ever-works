@@ -860,8 +860,7 @@ export const config = {
          */
         isCloudEnabled(): boolean {
             return (
-                process.env.FLEET_ENABLED !== 'false' &&
-                process.env.FLEET_CLOUD_ENABLED === 'true'
+                process.env.FLEET_ENABLED !== 'false' && process.env.FLEET_CLOUD_ENABLED === 'true'
             );
         },
         /**

@@ -23,7 +23,12 @@ export class AddFleetNodeTimeZone1796130100000 implements MigrationInterface {
         if (nodes && !nodes.findColumnByName('timeZone')) {
             await queryRunner.addColumn(
                 'fleet_nodes',
-                new TableColumn({ name: 'timeZone', type: 'varchar', length: '64', isNullable: true }),
+                new TableColumn({
+                    name: 'timeZone',
+                    type: 'varchar',
+                    length: '64',
+                    isNullable: true,
+                }),
             );
         }
     }

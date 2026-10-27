@@ -100,7 +100,7 @@ export async function readGitIdentity(runner: CommandRunner): Promise<GitIdentit
 		helper:
 			helper !== 'missing' && helper.set
 				? { present: true, ...(helper.value ? { value: helper.value } : {}) }
-				: { present: false },
+				: { present: false }
 	};
 }
 
@@ -112,7 +112,7 @@ export async function readGitIdentity(runner: CommandRunner): Promise<GitIdentit
  */
 export async function setGitIdentity(
 	runner: CommandRunner,
-	input: { name: unknown; email: unknown },
+	input: { name: unknown; email: unknown }
 ): Promise<{ fields: Array<'user.name' | 'user.email'> }> {
 	const name = validGitIdentityValue(input.name);
 	if (!name) throw new GitIdentityError('invalid', 'the name must be 1–200 characters with no control characters');
@@ -123,9 +123,14 @@ export async function setGitIdentity(
 		['user.name', name],
 		['user.email', email]
 	] as const) {
-		const result = await runner.run('git', ['config', '--global', key, value], { timeoutMs: GIT_CONFIG_TIMEOUT_MS });
+		const result = await runner.run('git', ['config', '--global', key, value], {
+			timeoutMs: GIT_CONFIG_TIMEOUT_MS
+		});
 		if (result.code !== 0) {
-			throw new GitIdentityError('failed', firstLine(result.stderr || result.stdout, `git config exited ${result.code ?? 1}`));
+			throw new GitIdentityError(
+				'failed',
+				firstLine(result.stderr || result.stdout, `git config exited ${result.code ?? 1}`)
+			);
 		}
 		fields.push(key);
 	}

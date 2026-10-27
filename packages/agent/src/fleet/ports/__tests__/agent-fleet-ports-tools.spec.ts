@@ -21,7 +21,10 @@ describe('buildFleetPortsTools', () => {
     });
 
     it('offers exactly the two P1 tools, neither taking an address', () => {
-        expect(tools.map((candidate) => candidate.name)).toEqual(['fleet_ports_list', 'fleet_ports_open']);
+        expect(tools.map((candidate) => candidate.name)).toEqual([
+            'fleet_ports_list',
+            'fleet_ports_open',
+        ]);
         expect(Object.keys(tool('fleet_ports_open').parameters.properties)).not.toContain('url');
     });
 
@@ -43,13 +46,18 @@ describe('buildFleetPortsTools', () => {
             canOpen: true,
             defaultTarget: 'preview-profile',
         });
-        const result = (await tool('fleet_ports_list').invoke({ nodeId: 'n1' })) as Record<string, unknown>;
+        const result = (await tool('fleet_ports_list').invoke({ nodeId: 'n1' })) as Record<
+            string,
+            unknown
+        >;
         expect(list).toHaveBeenCalledWith(
             'n1',
             { kind: 'agent', agentId: 'agent-1', ownerUserId: 'owner-1', agentName: 'Nina' },
             { watch: undefined },
         );
-        expect((result.webServers as Array<{ port: number }>).map((port) => port.port)).toEqual([3000]);
+        expect((result.webServers as Array<{ port: number }>).map((port) => port.port)).toEqual([
+            3000,
+        ]);
     });
 
     it('opens by port number only and never hands back a viewer token', async () => {

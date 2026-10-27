@@ -1,5 +1,8 @@
 import { Logger } from '@nestjs/common';
-import { FLEET_JOB_PURGE_BATCH_SIZE, FleetJobRetentionService } from '../fleet-job-retention.service';
+import {
+    FLEET_JOB_PURGE_BATCH_SIZE,
+    FleetJobRetentionService,
+} from '../fleet-job-retention.service';
 
 /**
  * Commands on computers (FL-12 P3, T-27) — the nightly pass that clears the
@@ -36,7 +39,11 @@ describe('FleetJobRetentionService — command outputs', () => {
     });
 
     const service = (withCommands = true) =>
-        new FleetJobRetentionService(jobs as never, taskLock as never, withCommands ? (commandRuns as never) : undefined);
+        new FleetJobRetentionService(
+            jobs as never,
+            taskLock as never,
+            withCommands ? (commandRuns as never) : undefined,
+        );
 
     it('clears outputs ended before the 30-day cut-off, in batches until one comes back short', async () => {
         commandRuns.purgeEndedOutputs

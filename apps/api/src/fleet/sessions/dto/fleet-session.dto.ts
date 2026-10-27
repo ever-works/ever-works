@@ -39,7 +39,11 @@ import {
 
 /** The terminal size a start, restart or attach may name (clamped again by the service). */
 class FleetSessionSizeDto {
-    @ApiProperty({ required: false, minimum: FLEET_SESSION_MIN_COLS, maximum: FLEET_SESSION_MAX_COLS })
+    @ApiProperty({
+        required: false,
+        minimum: FLEET_SESSION_MIN_COLS,
+        maximum: FLEET_SESSION_MAX_COLS,
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -47,7 +51,11 @@ class FleetSessionSizeDto {
     @Max(FLEET_SESSION_MAX_COLS)
     cols?: number;
 
-    @ApiProperty({ required: false, minimum: FLEET_SESSION_MIN_ROWS, maximum: FLEET_SESSION_MAX_ROWS })
+    @ApiProperty({
+        required: false,
+        minimum: FLEET_SESSION_MIN_ROWS,
+        maximum: FLEET_SESSION_MAX_ROWS,
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -114,7 +122,8 @@ export class StartFleetSessionDto extends FleetSessionSizeDto {
     @ApiProperty({
         required: false,
         format: 'uuid',
-        description: 'Start this ended session again (the same act as `POST /api/fleet/sessions/:id/restart`).',
+        description:
+            'Start this ended session again (the same act as `POST /api/fleet/sessions/:id/restart`).',
     })
     @IsOptional()
     @IsUUID()
@@ -156,7 +165,8 @@ export class PatchFleetSessionDto {
     @ApiProperty({
         required: false,
         maxLength: 200,
-        description: 'The attention key the reader saw (fleet-session:<id>:<reason>:<prompt>): clears unread, never the prompt.',
+        description:
+            'The attention key the reader saw (fleet-session:<id>:<reason>:<prompt>): clears unread, never the prompt.',
     })
     @IsOptional()
     @IsString()
@@ -166,12 +176,19 @@ export class PatchFleetSessionDto {
 
 /** Body for `POST /api/fleet/sessions/:id/answer` (FL-05, plan §5, spec FR-28 … FR-31). */
 export class AnswerFleetSessionDto {
-    @ApiProperty({ maxLength: 200, description: 'The attention key being answered (it must still be current).' })
+    @ApiProperty({
+        maxLength: 200,
+        description: 'The attention key being answered (it must still be current).',
+    })
     @IsString()
     @MaxLength(200)
     key!: string;
 
-    @ApiProperty({ required: false, maxLength: 64, description: 'One of the options the CLI showed.' })
+    @ApiProperty({
+        required: false,
+        maxLength: 64,
+        description: 'One of the options the CLI showed.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(64)
@@ -180,7 +197,8 @@ export class AnswerFleetSessionDto {
     @ApiProperty({
         required: false,
         maxLength: FLEET_SESSION_ANSWER_TEXT_MAX_CHARS,
-        description: 'A free-text answer, for a question that takes one. Typed into the session; never stored.',
+        description:
+            'A free-text answer, for a question that takes one. Typed into the session; never stored.',
     })
     @IsOptional()
     @IsString()
@@ -248,7 +266,8 @@ export class ListFleetSessionsQueryDto {
     @ApiProperty({
         required: false,
         format: 'uuid',
-        description: 'FL-15: only sessions whose Run works on this Task (the Task page’s Computer block).',
+        description:
+            'FL-15: only sessions whose Run works on this Task (the Task page’s Computer block).',
     })
     @IsOptional()
     @IsUUID()
@@ -294,7 +313,11 @@ export class FleetSessionRecordingDto {
 
 /** Query for `GET /api/fleet/sessions/:id/recording` (FL-04 P3): `from` asks for a page of chunks. */
 export class FleetSessionRecordingQueryDto {
-    @ApiProperty({ required: false, minimum: 0, description: 'The first sequence number of the page.' })
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        description: 'The first sequence number of the page.',
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()

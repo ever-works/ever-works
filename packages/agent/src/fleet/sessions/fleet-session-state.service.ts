@@ -60,7 +60,11 @@ export class FleetSessionStateService {
     ) {}
 
     /** One `session.status` from a node (CONTRACTS §3.3). */
-    async applyStatus(nodeId: string, message: FleetSessionStatusMessage, attempt = 0): Promise<void> {
+    async applyStatus(
+        nodeId: string,
+        message: FleetSessionStatusMessage,
+        attempt = 0,
+    ): Promise<void> {
         try {
             const row = await this.sessions.findByDaemonId(nodeId, message.sessionId);
             if (!row) {
@@ -68,10 +72,17 @@ export class FleetSessionStateService {
                 return;
             }
             if (!isFleetSessionLive(row.state)) return;
-            const stored = row.lastEvidence ? parseFleetSessionLastEvidence(row.lastEvidence) : null;
+            const stored = row.lastEvidence
+                ? parseFleetSessionLastEvidence(row.lastEvidence)
+                : null;
             if (stored && message.seq <= stored.detail.seq) return;
-            if (row.provider === 'shell' && (message.state === 'needs_you' || message.state === 'done')) {
-                this.logger.debug(`node ${nodeId} reported a shell as ${message.state}; ignored (FR-19)`);
+            if (
+                row.provider === 'shell' &&
+                (message.state === 'needs_you' || message.state === 'done')
+            ) {
+                this.logger.debug(
+                    `node ${nodeId} reported a shell as ${message.state}; ignored (FR-19)`,
+                );
                 return;
             }
             const now = new Date(this.now());
@@ -87,7 +98,8 @@ export class FleetSessionStateService {
                 patch.stateChangedAt = now;
                 if (row.state === 'starting' && !row.startedAt) patch.startedAt = now;
             }
-            if ((message.outcome ?? null) !== (row.outcome ?? null)) patch.outcome = message.outcome ?? null;
+            if ((message.outcome ?? null) !== (row.outcome ?? null))
+                patch.outcome = message.outcome ?? null;
             await this.sessions.updateIfLive(row.id, patch);
         } catch (error) {
             this.logger.warn(
@@ -158,7 +170,12 @@ export class FleetSessionStateService {
     async sessionEnded(before: FleetSession, after: FleetSession): Promise<void> {
         try {
             const previous = before.attention ? parseFleetSessionAttention(before.attention) : null;
-            if (previous && previous.reason !== 'finished' && previous.reason !== 'failed' && this.sink) {
+            if (
+                previous &&
+                previous.reason !== 'finished' &&
+                previous.reason !== 'failed' &&
+                this.sink
+            ) {
                 await this.sink.attentionCleared({ ...after, attention: null }, previous, null);
             }
             if (after.provider === 'shell' || after.outcome !== 'failure') return;
@@ -172,7 +189,10 @@ export class FleetSessionStateService {
                 acknowledgedAt: null,
             };
             await this.sessions.update(after.id, { attention: failed });
-            if (this.sink) await this.sink.attentionRaised({ ...after, attention: failed }, failed, { finished: false });
+            if (this.sink)
+                await this.sink.attentionRaised({ ...after, attention: failed }, failed, {
+                    finished: false,
+                });
         } catch (error) {
             this.logger.warn(
                 `session ${after.id}: end not delivered: ${error instanceof Error ? error.message : String(error)}`,
@@ -191,7 +211,11 @@ export class FleetSessionStateService {
     ): FleetSessionAttention | null {
         if (!reported) return null;
         if (current && current.key === reported.key) {
-            return { ...reported, raisedAt: current.raisedAt, acknowledgedAt: current.acknowledgedAt };
+            return {
+                ...reported,
+                raisedAt: current.raisedAt,
+                acknowledgedAt: current.acknowledgedAt,
+            };
         }
         return { ...reported, acknowledgedAt: null };
     }

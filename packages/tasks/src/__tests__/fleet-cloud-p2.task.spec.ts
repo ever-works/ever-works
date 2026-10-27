@@ -57,7 +57,11 @@ vi.mock('../trigger/worker/trigger-logger', () => ({
 }));
 
 vi.mock('../trigger/worker/utils/worker-context.utils', () => ({
-    withWorkerContext: async (loggerName: string, fn: (ctx: unknown) => Promise<unknown>, module: unknown) => {
+    withWorkerContext: async (
+        loggerName: string,
+        fn: (ctx: unknown) => Promise<unknown>,
+        module: unknown,
+    ) => {
         const ctx = await createApplicationContextMock(module);
         ctx.useLogger(createTriggerLoggerMock(loggerName));
         try {
@@ -77,13 +81,23 @@ const importTask = async (file: 'fleet-cloud-usage' | 'fleet-cloud-idle') => {
         file === 'fleet-cloud-usage'
             ? await import('../tasks/trigger/fleet-cloud-usage.task')
             : await import('../tasks/trigger/fleet-cloud-idle.task');
-    const cfg = schedulesTaskMock.mock.calls[schedulesTaskMock.mock.calls.length - 1][0] as ScheduleConfig;
+    const cfg = schedulesTaskMock.mock.calls[
+        schedulesTaskMock.mock.calls.length - 1
+    ][0] as ScheduleConfig;
     return { cfg, mod: mod as Record<string, unknown> };
 };
 
 describe('FL-17 P2 cloud crons', () => {
-    let sweeps: { refreshUsage: ReturnType<typeof vi.fn>; evaluateIdle: ReturnType<typeof vi.fn>; reconcile: ReturnType<typeof vi.fn> };
-    let appContext: { useLogger: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> };
+    let sweeps: {
+        refreshUsage: ReturnType<typeof vi.fn>;
+        evaluateIdle: ReturnType<typeof vi.fn>;
+        reconcile: ReturnType<typeof vi.fn>;
+    };
+    let appContext: {
+        useLogger: ReturnType<typeof vi.fn>;
+        get: ReturnType<typeof vi.fn>;
+        close: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -94,7 +108,9 @@ describe('FL-17 P2 cloud crons', () => {
         };
         appContext = {
             useLogger: vi.fn(),
-            get: vi.fn((token: unknown) => (token === StubFleetCloudSweepService ? sweeps : undefined)),
+            get: vi.fn((token: unknown) =>
+                token === StubFleetCloudSweepService ? sweeps : undefined,
+            ),
             close: vi.fn().mockResolvedValue(undefined),
         };
         createApplicationContextMock.mockResolvedValue(appContext);
@@ -122,7 +138,10 @@ describe('FL-17 P2 cloud crons', () => {
         expect(sweeps.refreshUsage).toHaveBeenCalledTimes(1);
         expect(sweeps.evaluateIdle).not.toHaveBeenCalled();
         expect(result).toEqual({ status: 'completed', machines: 3, changed: 2 });
-        expect(loggerInfoMock).toHaveBeenCalledWith('fleet.cloud.usage.completed', { machines: 3, changed: 2 });
+        expect(loggerInfoMock).toHaveBeenCalledWith('fleet.cloud.usage.completed', {
+            machines: 3,
+            changed: 2,
+        });
         expect(appContext.close).toHaveBeenCalled();
     });
 
@@ -131,7 +150,10 @@ describe('FL-17 P2 cloud crons', () => {
         await expect(cfg.run()).resolves.toEqual({ status: 'completed', machines: 3, acted: 1 });
         expect(sweeps.evaluateIdle).toHaveBeenCalledTimes(1);
         expect(sweeps.refreshUsage).not.toHaveBeenCalled();
-        expect(loggerInfoMock).toHaveBeenCalledWith('fleet.cloud.idle.completed', { machines: 3, acted: 1 });
+        expect(loggerInfoMock).toHaveBeenCalledWith('fleet.cloud.idle.completed', {
+            machines: 3,
+            acted: 1,
+        });
 
         loggerInfoMock.mockClear();
         sweeps.evaluateIdle.mockResolvedValueOnce({ machines: 0, acted: 0 });

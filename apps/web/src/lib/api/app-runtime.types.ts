@@ -307,9 +307,7 @@ export const APP_RUNTIME_ROUTE_UNAVAILABLE = 'route_unavailable';
 export const APP_OWNER_REQUIRED_CODE = 'ownerRequired';
 
 /** Whether an action's answer is the owner-only refusal ({@link APP_OWNER_REQUIRED_CODE}). */
-export function isAppOwnerRequired(
-    result: { code?: string | null } | null | undefined,
-): boolean {
+export function isAppOwnerRequired(result: { code?: string | null } | null | undefined): boolean {
     return result?.code === APP_OWNER_REQUIRED_CODE;
 }
 

@@ -50,7 +50,12 @@ export class FleetLogsAttachDto {
     @MaxLength(FLEET_LOG_SOURCE_ID_MAX_LENGTH, { each: true })
     sources?: string[];
 
-    @ApiProperty({ required: false, minimum: 1, maximum: FLEET_LOGS_INITIAL_LINES, default: FLEET_LOGS_INITIAL_LINES })
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        maximum: FLEET_LOGS_INITIAL_LINES,
+        default: FLEET_LOGS_INITIAL_LINES,
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -58,7 +63,11 @@ export class FleetLogsAttachDto {
     @Max(FLEET_LOGS_INITIAL_LINES)
     lines?: number;
 
-    @ApiProperty({ required: false, default: true, description: 'Follow the source live after the first lines.' })
+    @ApiProperty({
+        required: false,
+        default: true,
+        description: 'Follow the source live after the first lines.',
+    })
     @IsOptional()
     @IsBoolean()
     follow?: boolean;
@@ -66,13 +75,21 @@ export class FleetLogsAttachDto {
 
 /** Body for `POST /api/fleet/nodes/:id/logs/read` — one batch, never a follow. */
 export class FleetLogsReadDto {
-    @ApiProperty({ description: 'The source id from the sources list.', maxLength: FLEET_LOG_SOURCE_ID_MAX_LENGTH })
+    @ApiProperty({
+        description: 'The source id from the sources list.',
+        maxLength: FLEET_LOG_SOURCE_ID_MAX_LENGTH,
+    })
     @IsString()
     @MinLength(3)
     @MaxLength(FLEET_LOG_SOURCE_ID_MAX_LENGTH)
     source!: string;
 
-    @ApiProperty({ required: false, minimum: 1, maximum: FLEET_LOGS_INITIAL_LINES, default: FLEET_LOGS_INITIAL_LINES })
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        maximum: FLEET_LOGS_INITIAL_LINES,
+        default: FLEET_LOGS_INITIAL_LINES,
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()

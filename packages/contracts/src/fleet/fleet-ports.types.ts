@@ -347,7 +347,9 @@ export const FLEET_WELL_KNOWN_PORTS: Readonly<Record<number, string>> = Object.f
 
 /** The well-known name of a port, or undefined. */
 export function fleetWellKnownPortName(port: number): string | undefined {
-	return Object.prototype.hasOwnProperty.call(FLEET_WELL_KNOWN_PORTS, port) ? FLEET_WELL_KNOWN_PORTS[port] : undefined;
+	return Object.prototype.hasOwnProperty.call(FLEET_WELL_KNOWN_PORTS, port)
+		? FLEET_WELL_KNOWN_PORTS[port]
+		: undefined;
 }
 
 /**
@@ -413,7 +415,9 @@ export function groupFleetPorts(ports: readonly FleetListeningPort[]): FleetPort
 
 /** `:22 ssh · :5432 postgres · :6379 redis` — the folded line's names. */
 export function describeFleetOtherPorts(ports: readonly FleetListeningPort[], max = 6): string {
-	const parts = ports.slice(0, max).map((port) => (port.wellKnown ? `:${port.port} ${port.wellKnown}` : `:${port.port}`));
+	const parts = ports
+		.slice(0, max)
+		.map((port) => (port.wellKnown ? `:${port.port} ${port.wellKnown}` : `:${port.port}`));
 	if (ports.length > max) parts.push(`+${ports.length - max}`);
 	return parts.join(' · ');
 }
@@ -444,7 +448,9 @@ function normalizePort(value: unknown): FleetListeningPort | null {
 		const name = boundedText(program.name, FLEET_PORT_TEXT_MAX);
 		if (name) {
 			const pid =
-				typeof program.pid === 'number' && Number.isInteger(program.pid) && program.pid > 0 ? program.pid : null;
+				typeof program.pid === 'number' && Number.isInteger(program.pid) && program.pid > 0
+					? program.pid
+					: null;
 			const cwd = boundedText(program.cwd, FLEET_PORT_TEXT_MAX);
 			port.program = cwd ? { name, pid, cwd } : { name, pid };
 		}

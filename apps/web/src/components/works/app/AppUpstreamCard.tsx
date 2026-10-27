@@ -636,14 +636,14 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
                         {isUpstreamWorkflowRefusal(failure.code)
                             ? t(UPSTREAM_WORKFLOW_REFUSAL_KEYS[failure.code])
                             : failure.code === 'sync_in_progress'
-                            ? t('alreadyRunning')
-                            : failure.code === 'sync_limit_reached'
-                              ? t('syncLimitReached', {
-                                    time: retryAt ? formatNextSync(retryAt) : 'later',
-                                })
-                              : failure.code === 'edit_access_required'
-                                ? t('editAccessRequired')
-                                : t('resultFailed', { reason: failure.code ?? 'failed' })}
+                              ? t('alreadyRunning')
+                              : failure.code === 'sync_limit_reached'
+                                ? t('syncLimitReached', {
+                                      time: retryAt ? formatNextSync(retryAt) : 'later',
+                                  })
+                                : failure.code === 'edit_access_required'
+                                  ? t('editAccessRequired')
+                                  : t('resultFailed', { reason: failure.code ?? 'failed' })}
                     </p>
                 )}
 

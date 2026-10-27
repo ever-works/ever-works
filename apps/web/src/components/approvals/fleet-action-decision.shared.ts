@@ -39,7 +39,9 @@ export interface FleetActionDecisionView {
     expiresInMs: number | null;
 }
 
-export function isFleetActionDecisionPayload(payload: Record<string, unknown> | null | undefined): boolean {
+export function isFleetActionDecisionPayload(
+    payload: Record<string, unknown> | null | undefined,
+): boolean {
     const kind = payload?.kind;
     return kind === FLEET_TOOL_CALL_KIND || kind === FLEET_MACHINE_ACTION_KIND;
 }
@@ -52,7 +54,13 @@ function argPairs(value: unknown): Array<[string, string]> {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
     return Object.entries(value as Record<string, unknown>)
         .slice(0, 12)
-        .map(([key, item]) => [key, typeof item === 'string' ? item : JSON.stringify(item) ?? ''] as [string, string]);
+        .map(
+            ([key, item]) =>
+                [key, typeof item === 'string' ? item : (JSON.stringify(item) ?? '')] as [
+                    string,
+                    string,
+                ],
+        );
 }
 
 /** What the card shows, or null when the proposal is not a held fleet action. */

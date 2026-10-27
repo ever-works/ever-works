@@ -19,18 +19,30 @@ function base(nodeId: string): string {
 }
 
 /** The Logs tab with one source open. Unknown ids still link to the tab (it shows its list). */
-export function openLogsForSource(nodeId: string, sourceId: string, options: { at?: string | null } = {}): string {
+export function openLogsForSource(
+    nodeId: string,
+    sourceId: string,
+    options: { at?: string | null } = {},
+): string {
     const params = new URLSearchParams();
     if (isFleetLogSourceId(sourceId)) params.append('source', sourceId);
-    if (options.at && !Number.isNaN(Date.parse(options.at))) params.set('at', new Date(Date.parse(options.at)).toISOString());
+    if (options.at && !Number.isNaN(Date.parse(options.at)))
+        params.set('at', new Date(Date.parse(options.at)).toISOString());
     const query = params.toString();
     return query ? `${base(nodeId)}&${query}` : base(nodeId);
 }
 
 /** The Logs tab with several sources merged by time (a Compose project's containers). */
-export function openMergedLogs(nodeId: string, sourceIds: readonly string[], options: { title?: string } = {}): string {
+export function openMergedLogs(
+    nodeId: string,
+    sourceIds: readonly string[],
+    options: { title?: string } = {},
+): string {
     const params = new URLSearchParams();
-    const ids = [...new Set(sourceIds.filter((id) => isFleetLogSourceId(id)))].slice(0, FLEET_LOGS_MAX_MERGED_SOURCES);
+    const ids = [...new Set(sourceIds.filter((id) => isFleetLogSourceId(id)))].slice(
+        0,
+        FLEET_LOGS_MAX_MERGED_SOURCES,
+    );
     for (const id of ids) params.append('source', id);
     const title = options.title?.trim();
     if (title && ids.length > 1) params.set('title', title.slice(0, 80));

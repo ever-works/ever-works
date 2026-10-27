@@ -12,7 +12,13 @@ import { destroyFleetCloudAction, fleetCloudPowerAction } from '@/app/actions/fl
 import { ConfirmActionDialog } from '../machine/ConfirmActionDialog';
 import type { ConfirmDialogModel } from '../machine/machine-actions.shared';
 import type { FleetComputerActionProps } from '../registry';
-import { cloudActFromQuery, cloudDisplayState, cloudPowerChoice, hourly, money } from './cloud.shared';
+import {
+    cloudActFromQuery,
+    cloudDisplayState,
+    cloudPowerChoice,
+    hourly,
+    money,
+} from './cloud.shared';
 
 /**
  * Cloud computers (FL-17, spec §5.3 – §5.5, FR-16 – FR-20, S10) — a cloud
@@ -27,7 +33,10 @@ import { cloudActFromQuery, cloudDisplayState, cloudPowerChoice, hourly, money }
 export default function CloudComputerActions({ node, allowed = true }: FleetComputerActionProps) {
     const t = useTranslations('fleet.cloud');
     const router = useRouter();
-    const [dialog, setDialog] = useState<{ act: 'off' | 'on' | 'destroy'; model: ConfirmDialogModel } | null>(null);
+    const [dialog, setDialog] = useState<{
+        act: 'off' | 'on' | 'destroy';
+        model: ConfirmDialogModel;
+    } | null>(null);
     const [pending, startTransition] = useTransition();
     const params = useSearchParams();
     const opened = useRef(false);
@@ -50,7 +59,8 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
     if (!cloud) return null;
     const state = cloudDisplayState(node, cloud);
     const power = cloudPowerChoice(state);
-    const busy = pending || state === 'destroying' || state === 'poweringOff' || state === 'starting';
+    const busy =
+        pending || state === 'destroying' || state === 'poweringOff' || state === 'starting';
     const notAllowed = allowed ? undefined : t('power.notAllowed', { name: node.name });
 
     const fail = (error: FleetLinkError, fallback: string) => toast.error(error.hint || fallback);
@@ -64,7 +74,10 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
                 setDialog(null);
                 if (result.ok) {
                     toast.success(
-                        t('destroy.done', { name: node.name, cost: money(result.data.costSoFarCents ?? 0, cloud.currency) }),
+                        t('destroy.done', {
+                            name: node.name,
+                            cost: money(result.data.costSoFarCents ?? 0, cloud.currency),
+                        }),
                     );
                     router.push(ROUTES.DASHBOARD_FLEET_COMPUTERS);
                 } else fail(result.error, t('destroy.failed'));
@@ -73,7 +86,11 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
             const result = await fleetCloudPowerAction(node.id, current.act, true);
             setDialog(null);
             if (result.ok) {
-                toast.success(current.act === 'off' ? t('power.poweringOff', { name: node.name }) : t('power.starting', { name: node.name }));
+                toast.success(
+                    current.act === 'off'
+                        ? t('power.poweringOff', { name: node.name })
+                        : t('power.starting', { name: node.name }),
+                );
                 router.refresh();
             } else fail(result.error, t('power.failed'));
         });
@@ -84,13 +101,18 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
             act,
             model: {
                 class: 'confirm',
-                title: act === 'off' ? t('power.offTitle', { name: node.name }) : t('power.onTitle', { name: node.name }),
+                title:
+                    act === 'off'
+                        ? t('power.offTitle', { name: node.name })
+                        : t('power.onTitle', { name: node.name }),
                 body:
                     act === 'off'
                         ? cloud.billsWhileOff
                             ? t('power.offBody', { provider: cloud.providerName })
                             : t('power.offBodyFree')
-                        : t('power.onBody', { rate: hourly(cloud.hourlyRateCents, cloud.currency) }),
+                        : t('power.onBody', {
+                              rate: hourly(cloud.hourlyRateCents, cloud.currency),
+                          }),
             },
         });
 
@@ -147,7 +169,11 @@ export default function CloudComputerActions({ node, allowed = true }: FleetComp
             <ConfirmActionDialog
                 model={dialog?.model ?? null}
                 actionLabel={
-                    dialog?.act === 'destroy' ? t('destroy.confirm') : dialog?.act === 'on' ? t('power.on') : t('power.off')
+                    dialog?.act === 'destroy'
+                        ? t('destroy.confirm')
+                        : dialog?.act === 'on'
+                          ? t('power.on')
+                          : t('power.off')
                 }
                 pending={pending}
                 onConfirm={confirm}

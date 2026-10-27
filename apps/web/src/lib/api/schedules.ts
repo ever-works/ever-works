@@ -244,12 +244,18 @@ export const schedulesAPI = {
     getHealth: async (): Promise<ScheduleHealthSummary> =>
         serverFetch<ScheduleHealthSummary>('/schedules/health'),
 
-    runNow: async (id: string, options: { confirm?: boolean } = {}): Promise<ScheduleRunNowResult> =>
+    runNow: async (
+        id: string,
+        options: { confirm?: boolean } = {},
+    ): Promise<ScheduleRunNowResult> =>
         serverFetch<ScheduleRunNowResult>(`/schedules/${encodeURIComponent(id)}/run-now`, {
             method: 'POST',
             // FL-13: a Command schedule on a computer runs only with `confirm` (FR-25).
             ...(options.confirm
-                ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) }
+                ? {
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ confirm: true }),
+                  }
                 : {}),
         }),
 

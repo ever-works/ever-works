@@ -72,25 +72,32 @@ export class FleetSessionGitService {
         }
         let used: Awaited<ReturnType<FleetCheckoutService['takenBranchNames']>>;
         try {
-            used = await this.checkouts.takenBranchNames(query.checkoutId, { userId: actor.userId });
+            used = await this.checkouts.takenBranchNames(query.checkoutId, {
+                userId: actor.userId,
+            });
         } catch (error) {
             const typed = readFleetSessionError(error);
             if (typed) throw fleetSessionError(typed.code, typed.hint, typed.details);
             throw error;
         }
         if (used.checkout.nodeId !== node.id) {
-            throw fleetSessionError('invalid', `that checkout is not on ${node.name}`, { field: 'checkoutId' });
+            throw fleetSessionError('invalid', `that checkout is not on ${node.name}`, {
+                field: 'checkoutId',
+            });
         }
 
         let prefix = 'session';
         let organizationId: string | null = null;
         const agentId = actor.agentId ?? query.agentId;
         if (agentId) {
-            const agent = this.agents && UUID.test(agentId) ? await this.agents.findById(agentId) : null;
-            if (!agent || agent.userId !== actor.userId) throw fleetSessionError('not_found', 'no such Agent');
+            const agent =
+                this.agents && UUID.test(agentId) ? await this.agents.findById(agentId) : null;
+            if (!agent || agent.userId !== actor.userId)
+                throw fleetSessionError('not_found', 'no such Agent');
             // FL-06 P3 (FR-27): the Agent's own `fleet.branchPrefix`, else its slug.
             prefix = fleetSessionBranchPrefix(
-                readAgentFleetBlock(agent.agentYml ?? null).block.branchPrefix ?? (agent.slug || agent.name),
+                readAgentFleetBlock(agent.agentYml ?? null).block.branchPrefix ??
+                    (agent.slug || agent.name),
             );
             organizationId = agent.organizationId ?? null;
         } else {
@@ -128,7 +135,10 @@ export class FleetSessionGitService {
     private async handleOf(userId: string): Promise<string> {
         if (!this.users) return 'session';
         try {
-            const user = await this.users.findOne({ where: { id: userId }, select: ['id', 'username'] });
+            const user = await this.users.findOne({
+                where: { id: userId },
+                select: ['id', 'username'],
+            });
             return user?.username || 'session';
         } catch (error) {
             this.logger.debug(

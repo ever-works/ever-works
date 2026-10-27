@@ -116,7 +116,12 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
         return this.link.isConnected(nodeId);
     }
 
-    async open(input: { tunnelId: string; nodeId: string; port: number; caller: FleetPortsCaller }): Promise<void> {
+    async open(input: {
+        tunnelId: string;
+        nodeId: string;
+        port: number;
+        caller: FleetPortsCaller;
+    }): Promise<void> {
         await this.ensure(input.tunnelId, input.nodeId, input.port, input.caller);
     }
 
@@ -139,10 +144,15 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
     async forward(request: TunnelForwardRequest, callbacks: TunnelForwardCallbacks): Promise<void> {
         let open: OpenTunnel;
         try {
-            open = await this.ensure(request.tunnel.id, request.tunnel.nodeId, request.tunnel.port, {
-                kind: 'user',
-                userId: request.tunnel.ownerUserId,
-            });
+            open = await this.ensure(
+                request.tunnel.id,
+                request.tunnel.nodeId,
+                request.tunnel.port,
+                {
+                    kind: 'user',
+                    userId: request.tunnel.ownerUserId,
+                },
+            );
         } catch (error) {
             const hint =
                 error instanceof FleetPortsException
@@ -154,7 +164,10 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
             return;
         }
         if (open.pending.size >= FLEET_PORT_TUNNEL_MAX_INFLIGHT) {
-            callbacks.onError('busy', 'too many requests are in flight on this preview — try again');
+            callbacks.onError(
+                'busy',
+                'too many requests are in flight on this preview — try again',
+            );
             return;
         }
         const requestId = open.nextRequest;
@@ -167,7 +180,8 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
                 const entry = open.pending.get(requestId);
                 if (!entry) return;
                 open.pending.delete(requestId);
-                if (!entry.responded) entry.onError('timeout', 'the computer did not answer within 60 s');
+                if (!entry.responded)
+                    entry.onError('timeout', 'the computer did not answer within 60 s');
                 else entry.onEnd();
             }, FLEET_PORT_TUNNEL_REQUEST_TIMEOUT_MS),
         };
@@ -181,13 +195,19 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
             headers: request.headers,
         });
         if (!sent) {
-            this.settle(open, requestId, () => callbacks.onError('unreachable', 'the request could not be sent'));
+            this.settle(open, requestId, () =>
+                callbacks.onError('unreachable', 'the request could not be sent'),
+            );
             return;
         }
         try {
             for await (const raw of request.body) {
                 const chunk = typeof raw === 'string' ? Buffer.from(raw) : Buffer.from(raw);
-                for (let offset = 0; offset < chunk.length; offset += FLEET_PORT_TUNNEL_CHUNK_BYTES) {
+                for (
+                    let offset = 0;
+                    offset < chunk.length;
+                    offset += FLEET_PORT_TUNNEL_CHUNK_BYTES
+                ) {
                     const piece = chunk.subarray(offset, offset + FLEET_PORT_TUNNEL_CHUNK_BYTES);
                     if (
                         !open.channel.sendBinary(
@@ -199,10 +219,16 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
                     }
                 }
             }
-            open.channel.sendBinary(FLEET_LINK_FRAME_KINDS.END, encodeFleetPortTunnelChunk(requestId));
+            open.channel.sendBinary(
+                FLEET_LINK_FRAME_KINDS.END,
+                encodeFleetPortTunnelChunk(requestId),
+            );
         } catch (error) {
             this.settle(open, requestId, () =>
-                callbacks.onError('unreachable', error instanceof Error ? error.message : 'the body could not be sent'),
+                callbacks.onError(
+                    'unreachable',
+                    error instanceof Error ? error.message : 'the body could not be sent',
+                ),
             );
         }
     }
@@ -221,10 +247,15 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
     ): Promise<TunnelUpgradeHandle | null> {
         let open: OpenTunnel;
         try {
-            open = await this.ensure(request.tunnel.id, request.tunnel.nodeId, request.tunnel.port, {
-                kind: 'user',
-                userId: request.tunnel.ownerUserId,
-            });
+            open = await this.ensure(
+                request.tunnel.id,
+                request.tunnel.nodeId,
+                request.tunnel.port,
+                {
+                    kind: 'user',
+                    userId: request.tunnel.ownerUserId,
+                },
+            );
         } catch (error) {
             callbacks.onError(
                 'unreachable',
@@ -237,7 +268,10 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
             return null;
         }
         if (open.pending.size >= FLEET_PORT_TUNNEL_MAX_INFLIGHT) {
-            callbacks.onError('busy', 'too many requests are in flight on this preview — try again');
+            callbacks.onError(
+                'busy',
+                'too many requests are in flight on this preview — try again',
+            );
             return null;
         }
         const requestId = open.nextRequest;
@@ -264,18 +298,26 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
                 headers: request.headers,
             })
         ) {
-            this.settle(open, requestId, () => callbacks.onError('unreachable', 'the request could not be sent'));
+            this.settle(open, requestId, () =>
+                callbacks.onError('unreachable', 'the request could not be sent'),
+            );
             return null;
         }
         return {
             send: (bytes) => {
                 if (!open.pending.has(requestId)) return false;
                 open.lastUsed = Date.now();
-                return open.channel.sendBinary(FLEET_LINK_FRAME_KINDS.DATA, encodeFleetPortTunnelChunk(requestId, bytes));
+                return open.channel.sendBinary(
+                    FLEET_LINK_FRAME_KINDS.DATA,
+                    encodeFleetPortTunnelChunk(requestId, bytes),
+                );
             },
             end: () => {
                 if (!open.pending.has(requestId)) return;
-                open.channel.sendBinary(FLEET_LINK_FRAME_KINDS.END, encodeFleetPortTunnelChunk(requestId));
+                open.channel.sendBinary(
+                    FLEET_LINK_FRAME_KINDS.END,
+                    encodeFleetPortTunnelChunk(requestId),
+                );
                 this.settle(open, requestId, () => undefined);
             },
         };
@@ -283,7 +325,12 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
 
     // ─── Internals ─────────────────────────────────────────────────────────
 
-    private async ensure(tunnelId: string, nodeId: string, port: number, caller: FleetPortsCaller): Promise<OpenTunnel> {
+    private async ensure(
+        tunnelId: string,
+        nodeId: string,
+        port: number,
+        caller: FleetPortsCaller,
+    ): Promise<OpenTunnel> {
         const existing = this.tunnels.get(tunnelId);
         if (existing && !existing.channel.isClosed) return existing;
         const inFlight = this.opening.get(tunnelId);
@@ -296,10 +343,15 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
                     family: 'tunnel',
                     params: { tunnelId, port },
                     caller,
-                    requirement: { actionFamily: 'ports', stateChanging: false, target: `:${port}` },
+                    requirement: {
+                        actionFamily: 'ports',
+                        stateChanging: false,
+                        target: `:${port}`,
+                    },
                 });
             } catch (error) {
-                if (error instanceof FleetLinkException) throw new FleetPortsException(error.linkError);
+                if (error instanceof FleetLinkException)
+                    throw new FleetPortsException(error.linkError);
                 throw error;
             }
             const open: OpenTunnel = {
@@ -345,14 +397,23 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
                     : {};
             entry.responded = true;
             clearTimeout(entry.timer);
-            entry.upgrade.onAccept(typeof message.status === 'number' ? message.status : 101, headers);
+            entry.upgrade.onAccept(
+                typeof message.status === 'number' ? message.status : 101,
+                headers,
+            );
         } else if (message.type === 'tunnel.ws-refused' && entry.upgrade) {
             const upgrade = entry.upgrade;
             const status = typeof message.status === 'number' ? message.status : 502;
             this.settle(open, requestId, () => upgrade.onRefused(status));
         } else if (message.type === 'tunnel.error') {
-            const code = message.code === 'timeout' || message.code === 'invalid' ? message.code : 'unreachable';
-            const hint = typeof message.hint === 'string' ? message.hint.slice(0, 300) : 'the request failed';
+            const code =
+                message.code === 'timeout' || message.code === 'invalid'
+                    ? message.code
+                    : 'unreachable';
+            const hint =
+                typeof message.hint === 'string'
+                    ? message.hint.slice(0, 300)
+                    : 'the request failed';
             this.settle(open, requestId, () => entry.onError(code, hint));
         }
     }
@@ -393,14 +454,17 @@ export class FleetPortTunnelBridge implements FleetPortTunnelLinkPort, OnModuleD
     private failAll(open: OpenTunnel, code: 'unreachable', hint: string): void {
         for (const requestId of [...open.pending.keys()]) {
             const entry = open.pending.get(requestId)!;
-            this.settle(open, requestId, () => (entry.responded ? entry.onEnd() : entry.onError(code, hint)));
+            this.settle(open, requestId, () =>
+                entry.responded ? entry.onEnd() : entry.onError(code, hint),
+            );
         }
     }
 
     private closeIdle(): void {
         const cutoff = Date.now() - FLEET_PORT_TUNNEL_CHANNEL_IDLE_MS;
         for (const open of [...this.tunnels.values()]) {
-            if (open.pending.size === 0 && open.lastUsed < cutoff) this.close(open.tunnelId, 'idle');
+            if (open.pending.size === 0 && open.lastUsed < cutoff)
+                this.close(open.tunnelId, 'idle');
         }
     }
 }

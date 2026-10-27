@@ -35,12 +35,18 @@ export function AppSmokeResults({ smoke, isolationEnforced }: AppSmokeResultsPro
         );
     }
 
-    const failing = [...smoke.inCluster, ...smoke.public, ...(smoke.hairpin ? [smoke.hairpin] : [])].filter(
-        (check) => check.status === 'failed',
-    );
+    const failing = [
+        ...smoke.inCluster,
+        ...smoke.public,
+        ...(smoke.hairpin ? [smoke.hairpin] : []),
+    ].filter((check) => check.status === 'failed');
 
     return (
-        <div className="space-y-1.5 text-sm" data-testid="app-smoke-results" data-failing={failing.length}>
+        <div
+            className="space-y-1.5 text-sm"
+            data-testid="app-smoke-results"
+            data-failing={failing.length}
+        >
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Half label={t('inCluster')} checks={smoke.inCluster} />
                 <Half label={t('public')} checks={smoke.public} />
@@ -55,7 +61,10 @@ export function AppSmokeResults({ smoke, isolationEnforced }: AppSmokeResultsPro
             {failing.length > 0 && (
                 <ul className="space-y-0.5 text-xs" data-testid="app-smoke-failing">
                     {failing.map((check, index) => (
-                        <li key={`${check.name}-${index}`} className="text-red-700 dark:text-red-400">
+                        <li
+                            key={`${check.name}-${index}`}
+                            className="text-red-700 dark:text-red-400"
+                        >
                             <code>{check.name}</code>
                             {' — '}
                             {describe(check, t)}

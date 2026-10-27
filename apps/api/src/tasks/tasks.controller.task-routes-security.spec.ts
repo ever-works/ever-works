@@ -101,7 +101,11 @@ describe('1 · reserved Task labels', () => {
     it('refuses a fleet run that adds app-provision on create or update', async () => {
         const { controller, service } = build({ labels: [] });
         await expect(
-            controller.create(session, { title: 'x', labels: ['app-provision'] } as never, runToken),
+            controller.create(
+                session,
+                { title: 'x', labels: ['app-provision'] } as never,
+                runToken,
+            ),
         ).rejects.toBeInstanceOf(ForbiddenException);
         await expect(
             controller.update(session, TASK_ID, { labels: ['app-provision'] } as never, runToken),
@@ -118,7 +122,10 @@ describe('1 · reserved Task labels', () => {
         expect(error).toBeInstanceOf(IntegrationHttpException);
         expect((error as IntegrationHttpException).getStatus()).toBe(422);
         expect((error as IntegrationHttpException).getResponse()).toMatchObject({
-            error: { code: 'domain_rule', details: { reason: 'reserved_label', added: ['release:revert'] } },
+            error: {
+                code: 'domain_rule',
+                details: { reason: 'reserved_label', added: ['release:revert'] },
+            },
         });
     });
 
@@ -138,7 +145,12 @@ describe('1 · reserved Task labels', () => {
 
     it('passes the restriction to the service for a fleet run, and none for a person', async () => {
         const { controller, service } = build({ labels: ['awaiting-owner'] });
-        await controller.update(session, TASK_ID, { labels: ['awaiting-owner', 'p1'] } as never, runToken);
+        await controller.update(
+            session,
+            TASK_ID,
+            { labels: ['awaiting-owner', 'p1'] } as never,
+            runToken,
+        );
         expect(service.update.mock.calls[0][4]).toEqual({
             restrictReservedLabels: { who: 'A fleet-run credential' },
         });
@@ -182,13 +194,21 @@ describe('6 · autonomous Task text', () => {
             .catch((e: unknown) => e);
         expect(error).toBeInstanceOf(IntegrationHttpException);
         expect((error as IntegrationHttpException).getResponse()).toMatchObject({
-            error: { code: 'domain_rule', details: { reason: 'scheduled_task', fields: ['description'] } },
+            error: {
+                code: 'domain_rule',
+                details: { reason: 'scheduled_task', fields: ['description'] },
+            },
         });
     });
 
     it('lets a fleet run edit an ordinary Task, or other fields of a template', async () => {
         const { controller, service } = build({ isRecurring: true, title: 'Weekly' });
-        await controller.update(session, TASK_ID, { priority: 'p1', title: 'Weekly' } as never, runToken);
+        await controller.update(
+            session,
+            TASK_ID,
+            { priority: 'p1', title: 'Weekly' } as never,
+            runToken,
+        );
         const ordinary = build({ isRecurring: false, scheduledAt: null });
         await ordinary.controller.update(session, TASK_ID, { title: 'Renamed' } as never, runToken);
         expect(service.update).toHaveBeenCalledTimes(1);
@@ -208,13 +228,20 @@ describe('7 · re-filing a branched Task', () => {
     it.each([
         ['workId', { workId: OTHER_WORK }],
         ['agentId', { agentId: OWN_AGENT }],
-    ])('refuses a fleet run that changes %s on a Task with a pull request', async (_field, body) => {
-        const { controller, service } = build({ workId: 'w1', agentId: OTHER_AGENT, prNumber: 7 });
-        await expect(
-            controller.update(session, TASK_ID, body as never, runToken),
-        ).rejects.toBeInstanceOf(ForbiddenException);
-        expect(service.update).not.toHaveBeenCalled();
-    });
+    ])(
+        'refuses a fleet run that changes %s on a Task with a pull request',
+        async (_field, body) => {
+            const { controller, service } = build({
+                workId: 'w1',
+                agentId: OTHER_AGENT,
+                prNumber: 7,
+            });
+            await expect(
+                controller.update(session, TASK_ID, body as never, runToken),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(service.update).not.toHaveBeenCalled();
+        },
+    );
 
     it('refuses the same on a Task with only a branch', async () => {
         const { controller } = build({ workId: 'w1', branchRef: 'ever-works/task/t-1' });

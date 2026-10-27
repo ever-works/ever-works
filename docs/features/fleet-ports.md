@@ -26,11 +26,11 @@ and the command palette offers **Ports on &lt;computer&gt;** for every computer 
 
 ## How the list is read
 
-| Machine | Listeners                                       | Program folder                 |
-| ------- | ----------------------------------------------- | ------------------------------ |
-| Linux   | `ss -tlnp` (without `-p` when not permitted)    | `/proc/<pid>/cwd`              |
-| macOS   | `lsof -nP -iTCP -sTCP:LISTEN`                    | `lsof -d cwd`                  |
-| Windows | `Get-NetTCPConnection -State Listen` (PowerShell) | the program's own folder       |
+| Machine | Listeners                                         | Program folder           |
+| ------- | ------------------------------------------------- | ------------------------ |
+| Linux   | `ss -tlnp` (without `-p` when not permitted)      | `/proc/<pid>/cwd`        |
+| macOS   | `lsof -nP -iTCP -sTCP:LISTEN`                     | `lsof -d cwd`            |
+| Windows | `Get-NetTCPConnection -State Listen` (PowerShell) | the program's own folder |
 
 Each candidate port is asked `GET /` over HTTP (then HTTPS for a TLS server, certificate checks off — a dev server's
 self-signed certificate is still a web server) **from the machine to its own loopback, `127.0.0.1`**, with a
@@ -83,11 +83,11 @@ address, which opens in a browser you already opened it in).
 
 ### Setting up the preview host
 
-| Variable                     | Meaning                                                                                          |
-| ---------------------------- | ------------------------------------------------------------------------------------------------ |
-| `FLEET_PORT_TUNNEL_ENABLED`  | `true` turns **Preview in my browser** on (with `FLEET_MACHINE_FACTS_ENABLED`); off, the preview host answers 404 |
-| `FLEET_PREVIEW_HOST`         | The dedicated hostname tunnels are served on, e.g. `preview.example.com` — a host of its own, so a tunnelled page can never read Ever Works' cookies or storage |
-| `FLEET_PREVIEW_SECRET`       | Optional signing secret for the hand-off and the tunnel cookie (falls back to the attach-token secret) |
+| Variable                    | Meaning                                                                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLEET_PORT_TUNNEL_ENABLED` | `true` turns **Preview in my browser** on (with `FLEET_MACHINE_FACTS_ENABLED`); off, the preview host answers 404                                               |
+| `FLEET_PREVIEW_HOST`        | The dedicated hostname tunnels are served on, e.g. `preview.example.com` — a host of its own, so a tunnelled page can never read Ever Works' cookies or storage |
+| `FLEET_PREVIEW_SECRET`      | Optional signing secret for the hand-off and the tunnel cookie (falls back to the attach-token secret)                                                          |
 
 Point the preview hostname at the API (the same service, its own TLS certificate). Requests whose `Host` is the
 preview host are served by the tunnel and never reach the platform's own routes.

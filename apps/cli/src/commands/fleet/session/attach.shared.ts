@@ -17,7 +17,10 @@ export const SESSION_CLI_EXIT = { ok: 0, refused: 1, usage: 2 } as const;
  * reaches the session); `Ctrl-]` twice sends one `Ctrl-]`; `Ctrl-]` then any
  * other key sends both. Everything else passes through untouched.
  */
-export function createDetachChord(): (chunk: Uint8Array) => { forward: Uint8Array; detach: boolean } {
+export function createDetachChord(): (chunk: Uint8Array) => {
+    forward: Uint8Array;
+    detach: boolean;
+} {
     let armed = false;
     return (chunk) => {
         const out: number[] = [];

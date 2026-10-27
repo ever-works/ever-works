@@ -104,7 +104,11 @@ describe('the "about me" audience (FL-15 P3, spec FR-18, ACC-FL15-11)', () => {
         payload,
     });
     const matcher = (me: string[]) =>
-        ({ source: 'github', kind: 'github.*', audience: { me } }) as unknown as InboundTriggerEventMatcher;
+        ({
+            source: 'github',
+            kind: 'github.*',
+            audience: { me },
+        }) as unknown as InboundTriggerEventMatcher;
 
     it('keeps a valid audience and drops unknown kinds', () => {
         expect(normalizeEventMatcher(matcher(['assigned', 'bogus', 'assigned']))).toEqual({
@@ -112,35 +116,52 @@ describe('the "about me" audience (FL-15 P3, spec FR-18, ACC-FL15-11)', () => {
             kind: 'github.*',
             audience: { me: ['assigned'] },
         });
-        expect(normalizeEventMatcher(matcher(['bogus']))).toEqual({ source: 'github', kind: 'github.*' });
+        expect(normalizeEventMatcher(matcher(['bogus']))).toEqual({
+            source: 'github',
+            kind: 'github.*',
+        });
     });
 
     it('fires on a review requested from the owner only, case-insensitively', () => {
         const event = PR({ action: 'review_requested', requestedReviewer: 'Nina-Dev' });
-        expect(matchesEvent(matcher(['review-requested']), event, { githubLogin: 'nina-dev' })).toBe(true);
-        expect(matchesEvent(matcher(['review-requested']), event, { githubLogin: 'someone-else' })).toBe(false);
+        expect(
+            matchesEvent(matcher(['review-requested']), event, { githubLogin: 'nina-dev' }),
+        ).toBe(true);
+        expect(
+            matchesEvent(matcher(['review-requested']), event, { githubLogin: 'someone-else' }),
+        ).toBe(false);
     });
 
     it('matches nothing without a linked login (fail closed)', () => {
         const event = PR({ action: 'review_requested', requestedReviewer: 'nina' });
         expect(matchesEvent(matcher(['review-requested']), event)).toBe(false);
-        expect(matchesEvent(matcher(['review-requested']), event, { githubLogin: null })).toBe(false);
+        expect(matchesEvent(matcher(['review-requested']), event, { githubLogin: null })).toBe(
+            false,
+        );
     });
 
     it('fires on an assignment to the owner and on their own pull requests', () => {
         expect(
-            matchesEvent(matcher(['assigned']), PR({ action: 'assigned', assignee: 'nina' }), { githubLogin: 'nina' }),
+            matchesEvent(matcher(['assigned']), PR({ action: 'assigned', assignee: 'nina' }), {
+                githubLogin: 'nina',
+            }),
         ).toBe(true);
         expect(
-            matchesEvent(matcher(['authored']), PR({ action: 'opened' }, 'Nina'), { githubLogin: 'nina' }),
+            matchesEvent(matcher(['authored']), PR({ action: 'opened' }, 'Nina'), {
+                githubLogin: 'nina',
+            }),
         ).toBe(true);
         expect(
-            matchesEvent(matcher(['authored']), PR({ action: 'synchronize', author: 'nina' }), { githubLogin: 'nina' }),
+            matchesEvent(matcher(['authored']), PR({ action: 'synchronize', author: 'nina' }), {
+                githubLogin: 'nina',
+            }),
         ).toBe(false);
     });
 
     it('leaves a matcher without an audience exactly as before', () => {
         const plain = { source: 'github', kind: 'github.*' } as InboundTriggerEventMatcher;
-        expect(matchesEvent(plain, PR({ action: 'review_requested', requestedReviewer: 'x' }))).toBe(true);
+        expect(
+            matchesEvent(plain, PR({ action: 'review_requested', requestedReviewer: 'x' })),
+        ).toBe(true);
     });
 });

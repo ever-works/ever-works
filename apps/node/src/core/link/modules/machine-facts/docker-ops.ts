@@ -39,7 +39,12 @@ export function dockerRunArgv(request: FleetRunRequest): { args: string[]; env: 
  */
 export function mountSpec(source: string, target: string, readOnly: boolean): string {
 	const bind = source.startsWith('/') || /^[A-Za-z]:[\\/]/.test(source) || source.startsWith('\\\\');
-	return [`type=${bind ? 'bind' : 'volume'}`, `source=${source}`, `target=${target}`, ...(readOnly ? ['readonly'] : [])].join(',');
+	return [
+		`type=${bind ? 'bind' : 'volume'}`,
+		`source=${source}`,
+		`target=${target}`,
+		...(readOnly ? ['readonly'] : [])
+	].join(',');
 }
 
 /** A line of operation output as it may leave the machine: secrets scanned, run values masked, cut. */
@@ -51,7 +56,17 @@ export function safeOutputLine(line: string, maskedValues: readonly string[] = [
 	return redactSecrets(out).cleaned.slice(0, 500);
 }
 
-const SIZE_UNITS: Record<string, number> = { B: 1, kB: 1e3, KB: 1e3, MB: 1e6, GB: 1e9, TB: 1e12, KiB: 1024, MiB: 1024 ** 2, GiB: 1024 ** 3 };
+const SIZE_UNITS: Record<string, number> = {
+	B: 1,
+	kB: 1e3,
+	KB: 1e3,
+	MB: 1e6,
+	GB: 1e9,
+	TB: 1e12,
+	KiB: 1024,
+	MiB: 1024 ** 2,
+	GiB: 1024 ** 3
+};
 
 function size(value: string, unit: string): number | null {
 	const factor = SIZE_UNITS[unit];

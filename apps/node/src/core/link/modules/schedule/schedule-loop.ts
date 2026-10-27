@@ -111,7 +111,8 @@ export class ScheduleLoop {
 		this.paused = state.paused;
 		this.notifyHeld();
 		const settled = await this.options.history.settleInterrupted(this.now()).catch(() => 0);
-		if (settled > 0) this.options.logger?.info(`Schedules: ${settled} run(s) interrupted by a restart were recorded.`);
+		if (settled > 0)
+			this.options.logger?.info(`Schedules: ${settled} run(s) interrupted by a restart were recorded.`);
 		this.options.logger?.info(
 			`Schedules: ${this.schedules.size} held${this.paused ? ' (paused by the fleet kill switch)' : ''}.`
 		);
@@ -303,7 +304,9 @@ export class ScheduleLoop {
 				kept: false,
 				trigger
 			})
-			.catch((error: unknown) => this.options.logger?.warn(`Schedules: a skipped fire was not recorded: ${describe(error)}`));
+			.catch((error: unknown) =>
+				this.options.logger?.warn(`Schedules: a skipped fire was not recorded: ${describe(error)}`)
+			);
 	}
 
 	/** One run, start to end, written to the history as it goes. Never throws. */
@@ -434,7 +437,9 @@ export class ScheduleLoop {
 					bytes: snapshot.bytes,
 					kept: writer !== null
 				})
-				.catch((error: unknown) => this.options.logger?.warn(`Schedules: a run was not recorded: ${describe(error)}`));
+				.catch((error: unknown) =>
+					this.options.logger?.warn(`Schedules: a run was not recorded: ${describe(error)}`)
+				);
 		} catch (error) {
 			this.options.logger?.warn(`Schedules: a run failed unexpectedly: ${describe(error)}`);
 		} finally {

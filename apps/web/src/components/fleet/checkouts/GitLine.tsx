@@ -27,7 +27,10 @@ export function GitLine({
     const Icon = line?.isWorktree ? GitFork : GitBranch;
     return (
         <span
-            className={cn('inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs', className)}
+            className={cn(
+                'inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs',
+                className,
+            )}
             data-testid="fleet-checkout-git-line"
         >
             <span className="inline-flex items-center gap-1 font-mono">
@@ -47,7 +50,9 @@ export function GitLine({
                         </span>
                     ) : null}
                     {line.ahead !== null && line.ahead > 0 ? (
-                        <span title={t('aheadTitle', { count: line.ahead })}>{t('ahead', { count: line.ahead })}</span>
+                        <span title={t('aheadTitle', { count: line.ahead })}>
+                            {t('ahead', { count: line.ahead })}
+                        </span>
                     ) : null}
                     {line.behind !== null && line.behind > 0 ? (
                         <span title={t('behindTitle', { count: line.behind })}>

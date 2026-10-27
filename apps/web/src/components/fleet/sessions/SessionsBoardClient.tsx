@@ -80,10 +80,15 @@ export function SessionsBoardClient({
     const [list, setList] = useState<FleetSessionView[] | null>(initialList);
     const [failed, setFailed] = useState(false);
     const [announcement, setAnnouncement] = useState('');
-    const previousColumns = useRef(initialBoard ? columnIndex(initialBoard) : new Map<string, FleetSessionBoardColumn>());
+    const previousColumns = useRef(
+        initialBoard ? columnIndex(initialBoard) : new Map<string, FleetSessionBoardColumn>(),
+    );
 
     const nodeNames = useMemo(() => new Map(nodes.map((node) => [node.id, node.name])), [nodes]);
-    const agentNames = useMemo(() => new Map(agents.map((agent) => [agent.id, agent.name])), [agents]);
+    const agentNames = useMemo(
+        () => new Map(agents.map((agent) => [agent.id, agent.name])),
+        [agents],
+    );
 
     const filters = useMemo(
         () => ({
@@ -108,14 +113,20 @@ export function SessionsBoardClient({
             previousColumns.current = nextColumns;
             if (moves.length > 0) {
                 const titles = new Map(
-                    FLEET_SESSION_BOARD_COLUMNS.flatMap((column) => next.columns[column]).map((s) => [s.id, s.title]),
+                    FLEET_SESSION_BOARD_COLUMNS.flatMap((column) => next.columns[column]).map(
+                        (s) => [s.id, s.title],
+                    ),
                 );
                 setAnnouncement(
                     moves
                         .map((move) =>
                             t('board.moved', {
                                 title: titles.get(move.id) ?? '',
-                                column: t(`board.${COLUMN_KEYS[move.to].title}` as Parameters<typeof t>[0]),
+                                column: t(
+                                    `board.${COLUMN_KEYS[move.to].title}` as Parameters<
+                                        typeof t
+                                    >[0],
+                                ),
                             }),
                         )
                         .join(' '),
@@ -123,8 +134,11 @@ export function SessionsBoardClient({
             }
             // FR-43: a card that changed column moves (view transition where the browser has it).
             const apply = () => setBoard(next);
-            const doc = document as Document & { startViewTransition?: (callback: () => void) => unknown };
-            if (moves.length > 0 && typeof doc.startViewTransition === 'function') doc.startViewTransition(apply);
+            const doc = document as Document & {
+                startViewTransition?: (callback: () => void) => unknown;
+            };
+            if (moves.length > 0 && typeof doc.startViewTransition === 'function')
+                doc.startViewTransition(apply);
             else apply();
             return;
         }
@@ -157,7 +171,10 @@ export function SessionsBoardClient({
     const shownList = list ? filterList(list, view) : null;
 
     const card = (session: FleetSessionView) => (
-        <div key={session.id} style={{ viewTransitionName: `fleet-session-${session.id}` } as CSSProperties}>
+        <div
+            key={session.id}
+            style={{ viewTransitionName: `fleet-session-${session.id}` } as CSSProperties}
+        >
             <SessionCard
                 session={session}
                 nodeName={nodeNames.get(session.nodeId) ?? '…'}
@@ -170,7 +187,12 @@ export function SessionsBoardClient({
     );
 
     return (
-        <section className="space-y-4" data-testid="fleet-sessions-board" data-mode={view.mode} aria-labelledby="fleet-sessions-heading">
+        <section
+            className="space-y-4"
+            data-testid="fleet-sessions-board"
+            data-mode={view.mode}
+            aria-labelledby="fleet-sessions-heading"
+        >
             <h2 id="fleet-sessions-heading" className="sr-only">
                 {t('board.heading')}
             </h2>
@@ -226,7 +248,12 @@ export function SessionsBoardClient({
                     aria-label={t('board.filterKind')}
                     value={view.kind ?? ''}
                     onChange={(event) =>
-                        update({ kind: event.target.value === 'owner' || event.target.value === 'agent' ? event.target.value : null })
+                        update({
+                            kind:
+                                event.target.value === 'owner' || event.target.value === 'agent'
+                                    ? event.target.value
+                                    : null,
+                        })
                     }
                     className="rounded-md border border-border dark:border-border-dark bg-background dark:bg-background-dark px-2 py-1 text-xs"
                     data-testid="fleet-sessions-filter-kind"
@@ -242,7 +269,11 @@ export function SessionsBoardClient({
                         const value = event.target.value;
                         update({
                             state:
-                                value === 'needs_you' || value === 'working' || value === 'done' || value === 'idle' || value === 'ended'
+                                value === 'needs_you' ||
+                                value === 'working' ||
+                                value === 'done' ||
+                                value === 'idle' ||
+                                value === 'ended'
                                     ? value
                                     : null,
                         });
@@ -290,9 +321,17 @@ export function SessionsBoardClient({
             </p>
 
             {view.mode === 'board' && shownBoard && total === 0 && !view.state && (
-                <div className="rounded-lg border border-dashed border-border dark:border-border-dark p-6 text-center space-y-3" data-testid="fleet-sessions-empty">
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('board.empty')}</p>
-                    <Link href={ROUTES.DASHBOARD_FLEET_COMPUTERS} className="text-sm text-primary hover:underline">
+                <div
+                    className="rounded-lg border border-dashed border-border dark:border-border-dark p-6 text-center space-y-3"
+                    data-testid="fleet-sessions-empty"
+                >
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('board.empty')}
+                    </p>
+                    <Link
+                        href={ROUTES.DASHBOARD_FLEET_COMPUTERS}
+                        className="text-sm text-primary hover:underline"
+                    >
                         {t('board.newSession')}
                     </Link>
                 </div>
@@ -311,12 +350,21 @@ export function SessionsBoardClient({
                                 id={`fleet-sessions-column-${column}`}
                                 className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark"
                             >
-                                {t(`board.${COLUMN_KEYS[column].title}` as Parameters<typeof t>[0])} ({counts?.[column] ?? 0})
+                                {t(`board.${COLUMN_KEYS[column].title}` as Parameters<typeof t>[0])}{' '}
+                                ({counts?.[column] ?? 0})
                             </h3>
                             {shownBoard.columns[column].length === 0 ? (
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t(`board.${COLUMN_KEYS[column].empty}` as Parameters<typeof t>[0])}</p>
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t(
+                                        `board.${COLUMN_KEYS[column].empty}` as Parameters<
+                                            typeof t
+                                        >[0],
+                                    )}
+                                </p>
                             ) : (
-                                <div className="space-y-2">{shownBoard.columns[column].map(card)}</div>
+                                <div className="space-y-2">
+                                    {shownBoard.columns[column].map(card)}
+                                </div>
                             )}
                         </section>
                     ))}
@@ -326,7 +374,9 @@ export function SessionsBoardClient({
             {view.mode === 'list' && shownList && (
                 <div className="space-y-4" data-testid="fleet-sessions-list">
                     {shownList.length === 0 && (
-                        <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('board.empty')}</p>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('board.empty')}
+                        </p>
                     )}
                     {groupSessionsList(shownList, view.grouping).map((group) => {
                         const who =
@@ -338,11 +388,16 @@ export function SessionsBoardClient({
                         return (
                             <section key={`${group.period}|${group.whoKey}`} className="space-y-1">
                                 <h3 className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                    {t(view.grouping === 'day' ? 'list.dayHeading' : 'list.weekHeading', {
-                                        period: group.period,
-                                        who,
-                                        count: group.sessions.length,
-                                    })}
+                                    {t(
+                                        view.grouping === 'day'
+                                            ? 'list.dayHeading'
+                                            : 'list.weekHeading',
+                                        {
+                                            period: group.period,
+                                            who,
+                                            count: group.sessions.length,
+                                        },
+                                    )}
                                 </h3>
                                 <ul className="divide-y divide-border dark:divide-border-dark">
                                     {group.sessions.map((session) => {
@@ -350,10 +405,15 @@ export function SessionsBoardClient({
                                         const reason = endedReasonKey(session);
                                         const elapsed = sessionElapsedSlot(session, now);
                                         return (
-                                            <li key={session.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
+                                            <li
+                                                key={session.id}
+                                                className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm"
+                                            >
                                                 <SessionStateGlyph glyph={sessionGlyph(session)} />
                                                 <Link
-                                                    href={ROUTES.DASHBOARD_FLEET_SESSION(session.id)}
+                                                    href={ROUTES.DASHBOARD_FLEET_SESSION(
+                                                        session.id,
+                                                    )}
                                                     className="min-w-0 truncate font-medium text-text dark:text-text-dark hover:underline"
                                                 >
                                                     {session.title}
@@ -362,22 +422,30 @@ export function SessionsBoardClient({
                                                     {words.qualifier
                                                         ? t('states.withQualifier', {
                                                               state: t(`states.${words.key}`),
-                                                              qualifier: t(`states.${words.qualifier}`),
+                                                              qualifier: t(
+                                                                  `states.${words.qualifier}`,
+                                                              ),
                                                           })
                                                         : t(`states.${words.key}`)}
-                                                    {reason ? ` · ${t(`list.reasons.${reason}`, { code: session.exitCode ?? 0 })}` : ''}
+                                                    {reason
+                                                        ? ` · ${t(`list.reasons.${reason}`, { code: session.exitCode ?? 0 })}`
+                                                        : ''}
                                                 </span>
                                                 <span className="text-xs text-text-muted dark:text-text-muted-dark">
                                                     {nodeNames.get(session.nodeId) ?? '…'}
                                                 </span>
                                                 {elapsed && (
                                                     <span className="text-xs tabular-nums text-text-muted dark:text-text-muted-dark">
-                                                        {t(`card.${elapsed.key}`, { span: elapsed.span })}
+                                                        {t(`card.${elapsed.key}`, {
+                                                            span: elapsed.span,
+                                                        })}
                                                     </span>
                                                 )}
                                                 {session.state === 'needs_you' && (
                                                     <Link
-                                                        href={ROUTES.DASHBOARD_FLEET_SESSION(session.id)}
+                                                        href={ROUTES.DASHBOARD_FLEET_SESSION(
+                                                            session.id,
+                                                        )}
                                                         className="ml-auto text-xs font-medium text-primary hover:underline"
                                                     >
                                                         {t('list.answer')}

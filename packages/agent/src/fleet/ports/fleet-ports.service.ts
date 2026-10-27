@@ -110,16 +110,23 @@ export class FleetPortsService {
      * see the computer, files at most one item per port per five minutes, and
      * never says more than the sentence.
      */
-    async watchStopped(nodeId: string, portNumber: number, actor: FleetPortsActor): Promise<{ filed: boolean }> {
+    async watchStopped(
+        nodeId: string,
+        portNumber: number,
+        actor: FleetPortsActor,
+    ): Promise<{ filed: boolean }> {
         if (!isFleetPortNumber(portNumber)) {
-            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', { field: 'port' });
+            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', {
+                field: 'port',
+            });
         }
         const userId = actorUserId(actor);
         const { node } = await this.access.resolveForFamily(nodeId, userId, 'view');
         if (!this.inbox) return { filed: false };
         const key = `${userId}:${node.id}:${portNumber}`;
         const now = Date.now();
-        for (const [entry, at] of this.watchNotices) if (now - at > WATCH_NOTICE_EVERY_MS) this.watchNotices.delete(entry);
+        for (const [entry, at] of this.watchNotices)
+            if (now - at > WATCH_NOTICE_EVERY_MS) this.watchNotices.delete(entry);
         if (this.watchNotices.has(key)) return { filed: false };
         this.watchNotices.set(key, now);
         try {
@@ -190,10 +197,14 @@ export class FleetPortsService {
         input: FleetPortsOpenInput = {},
     ): Promise<FleetPortOpenResult> {
         if (!isFleetPortNumber(portNumber)) {
-            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', { field: 'port' });
+            throw fleetPortsError('invalid', 'a port is a number from 1 to 65535', {
+                field: 'port',
+            });
         }
         if (input.target !== undefined && !isFleetPortOpenTarget(input.target)) {
-            throw fleetPortsError('invalid', 'target is desktop or preview-profile', { field: 'target' });
+            throw fleetPortsError('invalid', 'target is desktop or preview-profile', {
+                field: 'target',
+            });
         }
         const userId = actorUserId(actor);
         const { node } = await this.access.resolveForFamily(nodeId, userId, 'ports');
@@ -231,7 +242,15 @@ export class FleetPortsService {
             })) as FleetPortOpenNodeResult;
         } catch (error) {
             const refused = readFleetPortsError(error);
-            await this.auditOpen(node, actor, portNumber, target, null, 'refused', refused?.code ?? 'internal');
+            await this.auditOpen(
+                node,
+                actor,
+                portNumber,
+                target,
+                null,
+                'refused',
+                refused?.code ?? 'internal',
+            );
             throw error;
         }
 
@@ -249,7 +268,11 @@ export class FleetPortsService {
             // The picture is for the person who opened it — an Agent cannot
             // watch; its owner sees the open in the Activity log.
             if (actor.kind === 'user') {
-                result.attach = await link.mintPreviewAttach({ nodeId: node.id, viewId, userId: actor.userId });
+                result.attach = await link.mintPreviewAttach({
+                    nodeId: node.id,
+                    viewId,
+                    userId: actor.userId,
+                });
             }
         }
         return result;

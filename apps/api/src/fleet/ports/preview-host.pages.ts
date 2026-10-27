@@ -5,7 +5,14 @@
  * server's own answer.
  */
 
-export type PreviewHostPage = 'notFound' | 'ended' | 'notYours' | 'signIn' | 'nodeDidNotAnswer' | 'timeout' | 'redirect';
+export type PreviewHostPage =
+    | 'notFound'
+    | 'ended'
+    | 'notYours'
+    | 'signIn'
+    | 'nodeDidNotAnswer'
+    | 'timeout'
+    | 'redirect';
 
 function escapeHtml(value: string): string {
     return value

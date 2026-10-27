@@ -63,25 +63,45 @@ describe('App runtime BFF routes (lane aw-ops)', () => {
         vi.unstubAllGlobals();
     });
 
-    const all = () => [
-        ['status', () => GET(request('GET'), ctx({ id: WORK_ID })), 'GET', '/app-status'],
-        ['refresh', () => REFRESH(request('POST'), ctx({ id: WORK_ID })), 'POST', '/app-status/refresh'],
-        ['logs', () => LOGS(request('POST', { component: 'web' }), ctx({ id: WORK_ID })), 'POST', '/app-logs'],
+    const all = () =>
         [
-            'read logs',
-            () => READ_LOGS(request('GET'), ctx({ id: WORK_ID, requestId: REQUEST_ID })),
-            'GET',
-            `/app-logs/${REQUEST_ID}`,
-        ],
-        [
-            'run job',
-            () => RUN_JOB(request('POST', { confirmFirstDeploy: true }), ctx({ id: WORK_ID, name: 'migrate' })),
-            'POST',
-            '/app-jobs/migrate/run',
-        ],
-        ['smoke', () => SMOKE(request('POST'), ctx({ id: WORK_ID })), 'POST', '/app-smoke'],
-        ['history', () => HISTORY(request('GET'), ctx({ id: WORK_ID })), 'GET', '/app-deployments'],
-    ] as const;
+            ['status', () => GET(request('GET'), ctx({ id: WORK_ID })), 'GET', '/app-status'],
+            [
+                'refresh',
+                () => REFRESH(request('POST'), ctx({ id: WORK_ID })),
+                'POST',
+                '/app-status/refresh',
+            ],
+            [
+                'logs',
+                () => LOGS(request('POST', { component: 'web' }), ctx({ id: WORK_ID })),
+                'POST',
+                '/app-logs',
+            ],
+            [
+                'read logs',
+                () => READ_LOGS(request('GET'), ctx({ id: WORK_ID, requestId: REQUEST_ID })),
+                'GET',
+                `/app-logs/${REQUEST_ID}`,
+            ],
+            [
+                'run job',
+                () =>
+                    RUN_JOB(
+                        request('POST', { confirmFirstDeploy: true }),
+                        ctx({ id: WORK_ID, name: 'migrate' }),
+                    ),
+                'POST',
+                '/app-jobs/migrate/run',
+            ],
+            ['smoke', () => SMOKE(request('POST'), ctx({ id: WORK_ID })), 'POST', '/app-smoke'],
+            [
+                'history',
+                () => HISTORY(request('GET'), ctx({ id: WORK_ID })),
+                'GET',
+                '/app-deployments',
+            ],
+        ] as const;
 
     it('forwards each call with the session and the Organization scope, to its platform route', async () => {
         for (const [name, run, method, path] of all()) {
@@ -89,7 +109,11 @@ describe('App runtime BFF routes (lane aw-ops)', () => {
             const response = await run();
             expect([name, response.status]).toEqual([name, 200]);
             const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-            expect([name, url, init.method]).toEqual([name, `http://api.example/api/works/${WORK_ID}${path}`, method]);
+            expect([name, url, init.method]).toEqual([
+                name,
+                `http://api.example/api/works/${WORK_ID}${path}`,
+                method,
+            ]);
             const headers = new Headers(init.headers);
             expect(headers.get('authorization')).toBe('Bearer fake-jwt');
             expect(headers.get('x-scope-slug')).toBe('ever');
@@ -115,17 +139,24 @@ describe('App runtime BFF routes (lane aw-ops)', () => {
 
     it('refuses malformed ids and job names before anything leaves the web tier', async () => {
         expect((await GET(request('GET'), ctx({ id: 'not-a-uuid' }))).status).toBe(400);
-        expect((await READ_LOGS(request('GET'), ctx({ id: WORK_ID, requestId: '../x' }))).status).toBe(400);
-        expect((await RUN_JOB(request('POST', {}), ctx({ id: WORK_ID, name: '../../admin' }))).status).toBe(400);
+        expect(
+            (await READ_LOGS(request('GET'), ctx({ id: WORK_ID, requestId: '../x' }))).status,
+        ).toBe(400);
+        expect(
+            (await RUN_JOB(request('POST', {}), ctx({ id: WORK_ID, name: '../../admin' }))).status,
+        ).toBe(400);
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('passes the platform’s refusal through, with a 429’s Retry-After', async () => {
         fetchMock.mockResolvedValueOnce(
-            new Response(JSON.stringify({ status: 'error', code: 'refresh_too_soon', retryAfterSeconds: 9 }), {
-                status: 429,
-                headers: { 'content-type': 'application/json', 'retry-after': '9' },
-            }),
+            new Response(
+                JSON.stringify({ status: 'error', code: 'refresh_too_soon', retryAfterSeconds: 9 }),
+                {
+                    status: 429,
+                    headers: { 'content-type': 'application/json', 'retry-after': '9' },
+                },
+            ),
         );
         const response = await REFRESH(request('POST'), ctx({ id: WORK_ID }));
         expect(response.status).toBe(429);
@@ -145,10 +176,17 @@ describe('App runtime BFF routes (lane aw-ops)', () => {
             ctx({ id: WORK_ID }),
         );
         const [, logsInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-        expect(JSON.parse(String(logsInit.body))).toEqual({ component: 'web', lines: 500, previous: true });
+        expect(JSON.parse(String(logsInit.body))).toEqual({
+            component: 'web',
+            lines: 500,
+            previous: true,
+        });
 
         fetchMock.mockClear();
-        await RUN_JOB(request('POST', { confirmFirstDeploy: 'yes', image: 'evil' }), ctx({ id: WORK_ID, name: 'seed' }));
+        await RUN_JOB(
+            request('POST', { confirmFirstDeploy: 'yes', image: 'evil' }),
+            ctx({ id: WORK_ID, name: 'seed' }),
+        );
         const [, jobInit] = fetchMock.mock.calls[0] as [string, RequestInit];
         expect(JSON.parse(String(jobInit.body))).toEqual({});
     });

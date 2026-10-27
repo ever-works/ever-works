@@ -170,7 +170,10 @@ export function parseSystemdShow(stdout: string, now: Date = new Date()): ShownU
 		out.push({
 			id,
 			mainPid: Number.isInteger(pid) && pid > 0 ? pid : null,
-			since: parseSystemdTimestamp(values.get('ActiveEnterTimestamp') ?? values.get('InactiveEnterTimestamp'), now),
+			since: parseSystemdTimestamp(
+				values.get('ActiveEnterTimestamp') ?? values.get('InactiveEnterTimestamp'),
+				now
+			),
 			exitStatus: status !== undefined && /^\d+$/.test(status) ? Number(status) : null,
 			activeState: values.get('ActiveState'),
 			subState: values.get('SubState'),
@@ -202,7 +205,11 @@ export function parseSystemdTimestamp(value: string | undefined, now: Date = new
 
 export interface SystemdManager {
 	list(scope: FleetServiceScope): Promise<SystemdListOutcome>;
-	act(input: { name: string; scope: FleetServiceScope; action: FleetServiceAction }): Promise<
+	act(input: {
+		name: string;
+		scope: FleetServiceScope;
+		action: FleetServiceAction;
+	}): Promise<
 		| { ok: true; row: Pick<SystemdUnitRow, 'state' | 'since' | 'exitCode' | 'atBoot'> }
 		| { ok: false; refusal: 'root'; command: string }
 		| { ok: false; refusal: 'not-found' }
@@ -253,7 +260,8 @@ export function createSystemdManager(deps: { runner: CommandRunner; root: RootRu
 			[...scopeArgs(scope), 'list-units', '--type=service', '--all', '--no-legend', '--no-pager', '--plain'],
 			{ timeoutMs: LIST_TIMEOUT_MS }
 		);
-		if (text.code !== 0) return { error: firstLine(text.stderr || json.stderr, `systemctl exited ${text.code ?? 1}`) };
+		if (text.code !== 0)
+			return { error: firstLine(text.stderr || json.stderr, `systemctl exited ${text.code ?? 1}`) };
 		return { units: parseSystemdTextUnits(text.stdout) };
 	};
 
@@ -300,7 +308,12 @@ export function createSystemdManager(deps: { runner: CommandRunner; root: RootRu
 			const unit = systemdUnitName(name);
 			const argv = ['systemctl', ...scopeArgs(scope), '--no-ask-password', action, '--', unit];
 			const display = ['systemctl', ...scopeArgs(scope), action, name];
-			const outcome = await root.run({ argv, display, needsRoot: scope === 'system', timeoutMs: ACTION_TIMEOUT_MS });
+			const outcome = await root.run({
+				argv,
+				display,
+				needsRoot: scope === 'system',
+				timeoutMs: ACTION_TIMEOUT_MS
+			});
 			if (!outcome.ok) return { ok: false, refusal: 'root', command: outcome.command };
 			if (outcome.code !== 0) {
 				const message = firstLine(outcome.stderr || outcome.stdout, `systemctl exited ${outcome.code ?? 1}`);

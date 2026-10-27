@@ -426,7 +426,9 @@ export function ComputerActionsMenu({
                             // FL-17 (R-36): a cloud computer is destroyed, not removed, while its
                             // machine may still bill — the server refuses it too.
                             lifecycleDenied ??
-                                (node.cloud && !node.cloud.removable ? tCloud('removeUnavailable.line') : null),
+                                (node.cloud && !node.cloud.removable
+                                    ? tCloud('removeUnavailable.line')
+                                    : null),
                         )}
                     </DropdownMenuContent>
                 </DropdownMenu>

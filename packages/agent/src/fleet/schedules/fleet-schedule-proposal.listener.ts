@@ -34,7 +34,9 @@ export class FleetScheduleProposalListener {
         const payload = (event.payload ?? {}) as Record<string, unknown>;
         if (payload.kind !== FLEET_SCHEDULE_PROPOSAL_KIND) return;
         if (payload.agentId !== event.agentId) {
-            this.logger.warn(`Approved schedule write ${event.proposalId} names another Agent; not applied`);
+            this.logger.warn(
+                `Approved schedule write ${event.proposalId} names another Agent; not applied`,
+            );
             return;
         }
         const actor = { userId: event.userId, agentId: event.agentId };
@@ -50,14 +52,18 @@ export class FleetScheduleProposalListener {
                         cadence: payload.cadence,
                         confirm: true,
                     });
-                    this.logger.log(`Approved schedule write ${event.proposalId} created schedule ${view.id}`);
+                    this.logger.log(
+                        `Approved schedule write ${event.proposalId} created schedule ${view.id}`,
+                    );
                     return;
                 }
                 case 'update':
                     await this.schedules.update(scheduleId, actor, {
                         ...(typeof payload.name === 'string' ? { name: payload.name } : {}),
                         ...(typeof payload.nodeId === 'string' ? { nodeId: payload.nodeId } : {}),
-                        ...(typeof payload.command === 'string' ? { command: payload.command } : {}),
+                        ...(typeof payload.command === 'string'
+                            ? { command: payload.command }
+                            : {}),
                         ...(typeof payload.cwd === 'string' ? { cwd: payload.cwd } : {}),
                         ...(payload.cadence !== undefined ? { cadence: payload.cadence } : {}),
                         confirm: true,
@@ -70,10 +76,14 @@ export class FleetScheduleProposalListener {
                     await this.schedules.runNow(scheduleId, actor, true);
                     break;
                 default:
-                    this.logger.warn(`Approved schedule write ${event.proposalId} names no known operation; not applied`);
+                    this.logger.warn(
+                        `Approved schedule write ${event.proposalId} names no known operation; not applied`,
+                    );
                     return;
             }
-            this.logger.log(`Approved schedule write ${event.proposalId} applied (${String(payload.op)})`);
+            this.logger.log(
+                `Approved schedule write ${event.proposalId} applied (${String(payload.op)})`,
+            );
         } catch (error) {
             this.logger.warn(
                 `Approved schedule write ${event.proposalId} was not applied: ${

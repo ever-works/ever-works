@@ -83,7 +83,10 @@ function grantAllows(matrix: ToolGrantMatrix | null, toolName: string): boolean 
 }
 
 /** The rung in force for a category: an unenforced shipped default behaves as Auto (AW-24 P1). */
-function rungFor(ladder: ResolvedLadder | null, category: ActionCategory | undefined): TrustRung | null {
+function rungFor(
+    ladder: ResolvedLadder | null,
+    category: ActionCategory | undefined,
+): TrustRung | null {
     if (!ladder || !category || !isLadderedCategory(category)) return null;
     const entry = ladderEntry(ladder, category);
     if (!entry || !entry.enforced) return 'auto';
@@ -128,7 +131,8 @@ export class FleetToolsGateService {
 
     async gateFor(userId: string, agentId: string): Promise<FleetToolsGateView> {
         const agent = await this.agents.findByIdAndUser(agentId, userId);
-        if (!agent) throw new NotFoundException({ error: { code: 'not_found', hint: 'no such Agent' } });
+        if (!agent)
+            throw new NotFoundException({ error: { code: 'not_found', hint: 'no such Agent' } });
 
         const tenantId = (agent as { tenantId?: string | null }).tenantId ?? null;
         const organizationId = (agent as { organizationId?: string | null }).organizationId ?? null;
@@ -147,7 +151,10 @@ export class FleetToolsGateService {
                 : Promise.resolve(false),
             this.autonomy
                 ? this.autonomy
-                      .resolve(userId, { workspaceScopeId: organizationId ?? tenantId ?? userId, agentId })
+                      .resolve(userId, {
+                          workspaceScopeId: organizationId ?? tenantId ?? userId,
+                          agentId,
+                      })
                       .catch(() => null)
                 : Promise.resolve(null),
             this.grants
@@ -155,11 +162,15 @@ export class FleetToolsGateService {
                       .resolve({ userId, agentId, workId, organizationId, tenantId })
                       .then((resolved) => resolved.matrix)
                       .catch((error) => {
-                          this.logger.warn(`fleet tools gate: grants unreadable (${String(error)})`);
+                          this.logger.warn(
+                              `fleet tools gate: grants unreadable (${String(error)})`,
+                          );
                           return null;
                       })
                 : Promise.resolve(null),
-            this.fleet.listVisibleForUser(userId, { includeClusters: false }).catch(() => [] as FleetNodeView[]),
+            this.fleet
+                .listVisibleForUser(userId, { includeClusters: false })
+                .catch(() => [] as FleetNodeView[]),
         ]);
 
         const agentName = agent.name ?? 'This Agent';
@@ -201,17 +212,23 @@ export class FleetToolsGateService {
     ): FleetToolsGateFamilyRow {
         const rows = FLEET_TOOL_CATALOGUE.filter((entry) => entry.family === family);
         const live = rows.filter((entry) => entry.status === 'live' && fleetToolFlagOn(entry.flag));
-        const planned = rows.filter((entry) => entry.status === 'planned').map((entry) => entry.name);
+        const planned = rows
+            .filter((entry) => entry.status === 'planned')
+            .map((entry) => entry.name);
         const reads = live.filter((entry) => entry.readOnly);
         const acts = live.filter((entry) => !entry.readOnly);
 
         const read = reads.some((entry) => grantAllows(facts.matrix, entry.name));
         // The family's acts are checked for the strictest permission family among them
         // (`services` for services, `machines` for wake) and its strictest category.
-        const representative = acts.find((entry) => grantAllows(facts.matrix, entry.name)) ?? acts[0];
+        const representative =
+            acts.find((entry) => grantAllows(facts.matrix, entry.name)) ?? acts[0];
         const category = strictestCategory(acts);
         const permissionFamily: FleetActionFamily =
-            representative?.permissionFamily ?? reads[0]?.permissionFamily ?? rows[0]?.permissionFamily ?? 'view';
+            representative?.permissionFamily ??
+            reads[0]?.permissionFamily ??
+            rows[0]?.permissionFamily ??
+            'view';
 
         let act: FleetToolsGateActRung | null = null;
         let refusedBy: FleetToolGateName | null = null;
@@ -281,7 +298,11 @@ export class FleetToolsGateService {
             consents: node.consents ?? null,
         };
         const decision: FleetToolGateDecision = decideFleetToolCall({
-            tool: { name: facts.representative?.name ?? 'fleet_status', readOnly: true, permissionFamily: family },
+            tool: {
+                name: facts.representative?.name ?? 'fleet_status',
+                readOnly: true,
+                permissionFamily: family,
+            },
             agentName: facts.agentName,
             killSwitch: false,
             workspacePaused: false,
@@ -296,7 +317,8 @@ export class FleetToolsGateService {
             name: node.name,
             read: facts.read && allowed,
             act: facts.act && allowed,
-            refusedBy: decision.gate === 'audience' || decision.gate === 'consent' ? decision.gate : null,
+            refusedBy:
+                decision.gate === 'audience' || decision.gate === 'consent' ? decision.gate : null,
             hint: decision.error?.hint ?? null,
         };
     }

@@ -35,15 +35,21 @@ class FakeSocket {
         this.onopen?.();
     }
     serve(frame: Uint8Array | null) {
-        this.onmessage?.({ data: frame!.buffer.slice(frame!.byteOffset, frame!.byteOffset + frame!.byteLength) });
+        this.onmessage?.({
+            data: frame!.buffer.slice(frame!.byteOffset, frame!.byteOffset + frame!.byteLength),
+        });
     }
 }
 
 function mintOk(role = 'driver') {
-    return vi.fn(async () =>
-        new Response(JSON.stringify({ token: 'tok', wsUrl: 'wss://api.test/ws/fleet/session/s1', role }), {
-            status: 200,
-        }),
+    return vi.fn(
+        async () =>
+            new Response(
+                JSON.stringify({ token: 'tok', wsUrl: 'wss://api.test/ws/fleet/session/s1', role }),
+                {
+                    status: 200,
+                },
+            ),
     );
 }
 
@@ -61,14 +67,30 @@ async function attached(role: 'viewer' | 'driver' = 'driver') {
         's1',
         role,
         events,
-        { fetchImpl: mintOk(role) as unknown as typeof fetch, webSocketImpl: FakeSocket as unknown as typeof WebSocket },
+        {
+            fetchImpl: mintOk(role) as unknown as typeof fetch,
+            webSocketImpl: FakeSocket as unknown as typeof WebSocket,
+        },
         () => ({ cols: 100, rows: 30 }),
     );
     await socket.open();
     const ws = FakeSocket.last!;
     ws.open();
-    ws.serve(encodeFleetLinkControl({ type: 'viewer.ready', family: 'session', target: 's1', role, linkGeneration: 1 }));
-    ws.serve(encodeFleetLinkJson(1, { requestId: 'browser-attach-1', result: { alive: true, cols: 100, rows: 30, exitCode: null } }));
+    ws.serve(
+        encodeFleetLinkControl({
+            type: 'viewer.ready',
+            family: 'session',
+            target: 's1',
+            role,
+            linkGeneration: 1,
+        }),
+    );
+    ws.serve(
+        encodeFleetLinkJson(1, {
+            requestId: 'browser-attach-1',
+            result: { alive: true, cols: 100, rows: 30, exitCode: null },
+        }),
+    );
     return { socket, ws, events };
 }
 
@@ -84,16 +106,33 @@ describe('FleetSessionSocket (FL-04 P1b)', () => {
             type: 'session.attach',
             params: { cols: 100, rows: 30 },
         });
-        expect(events.onAttached).toHaveBeenCalledWith({ alive: true, cols: 100, rows: 30, exitCode: null });
+        expect(events.onAttached).toHaveBeenCalledWith({
+            alive: true,
+            cols: 100,
+            rows: 30,
+            exitCode: null,
+        });
     });
 
     it('renders DATA, reports EXIT and notices', async () => {
         const { ws, events, socket } = await attached();
-        ws.serve(encodeFleetLinkFrame(1, FLEET_LINK_FRAME_KINDS.DATA, new TextEncoder().encode('hi')));
+        ws.serve(
+            encodeFleetLinkFrame(1, FLEET_LINK_FRAME_KINDS.DATA, new TextEncoder().encode('hi')),
+        );
         expect(events.onBytes).toHaveBeenCalledTimes(1);
         expect(socket.bytesIn).toBe(2);
-        ws.serve(encodeFleetLinkJson(1, { type: 'session.notice', notice: 'paused', reason: 'fleet stop' }));
-        expect(events.onNotice).toHaveBeenCalledWith({ type: 'session.notice', notice: 'paused', reason: 'fleet stop' });
+        ws.serve(
+            encodeFleetLinkJson(1, {
+                type: 'session.notice',
+                notice: 'paused',
+                reason: 'fleet stop',
+            }),
+        );
+        expect(events.onNotice).toHaveBeenCalledWith({
+            type: 'session.notice',
+            notice: 'paused',
+            reason: 'fleet stop',
+        });
         ws.serve(encodeFleetLinkFrame(1, FLEET_LINK_FRAME_KINDS.EXIT, encodeFleetLinkExit(3)!));
         expect(events.onExit).toHaveBeenCalledWith(3);
     });
@@ -105,7 +144,9 @@ describe('FleetSessionSocket (FL-04 P1b)', () => {
         expect(keys.kind).toBe(FLEET_LINK_FRAME_KINDS.DATA);
         expect(new TextDecoder().decode(keys.payload)).toBe('ls\r');
         socket.sendResize(90, 20);
-        expect(decodeFleetLinkFrame(ws.sent[3] as Uint8Array)!.kind).toBe(FLEET_LINK_FRAME_KINDS.RESIZE);
+        expect(decodeFleetLinkFrame(ws.sent[3] as Uint8Array)!.kind).toBe(
+            FLEET_LINK_FRAME_KINDS.RESIZE,
+        );
     });
 
     it('never sends a watcher’s keys', async () => {
@@ -117,10 +158,22 @@ describe('FleetSessionSocket (FL-04 P1b)', () => {
 
     it('reads the close and the reason that preceded it', async () => {
         const { ws, events } = await attached();
-        ws.serve(encodeFleetLinkControl({ type: 'channel.close', channel: 1, reason: 'kill_switch', hint: 'stopped' }));
+        ws.serve(
+            encodeFleetLinkControl({
+                type: 'channel.close',
+                channel: 1,
+                reason: 'kill_switch',
+                hint: 'stopped',
+            }),
+        );
         ws.close(4013);
         const close = events.onClosed.mock.calls[0][0] as SessionSocketClose;
-        expect(close).toMatchObject({ code: 4013, linkReason: 'kill_switch', hint: 'stopped', wasAttached: true });
+        expect(close).toMatchObject({
+            code: 4013,
+            linkReason: 'kill_switch',
+            hint: 'stopped',
+            wasAttached: true,
+        });
         expect(sessionCloseVerdict(close, false)).toBe('refused');
     });
 
@@ -132,11 +185,17 @@ describe('FleetSessionSocket (FL-04 P1b)', () => {
             'viewer',
             { onBytes: vi.fn(), onClosed },
             {
-                fetchImpl: vi.fn(async () =>
-                    new Response(
-                        JSON.stringify({ error: { code: 'limit_exceeded', hint: 'This session already has 5 watchers.' } }),
-                        { status: 429 },
-                    ),
+                fetchImpl: vi.fn(
+                    async () =>
+                        new Response(
+                            JSON.stringify({
+                                error: {
+                                    code: 'limit_exceeded',
+                                    hint: 'This session already has 5 watchers.',
+                                },
+                            }),
+                            { status: 429 },
+                        ),
                 ) as unknown as typeof fetch,
                 webSocketImpl: FakeSocket as unknown as typeof WebSocket,
             },
@@ -171,7 +230,15 @@ describe('sessionCloseVerdict', () => {
     it('reads an ended session from the mint refusal', () => {
         expect(
             sessionCloseVerdict(
-                { ...base, mintError: { code: 'invalid', hint: 'ended', details: { state: 'ended' }, status: 422 } },
+                {
+                    ...base,
+                    mintError: {
+                        code: 'invalid',
+                        hint: 'ended',
+                        details: { state: 'ended' },
+                        status: 422,
+                    },
+                },
                 false,
             ),
         ).toBe('ended');

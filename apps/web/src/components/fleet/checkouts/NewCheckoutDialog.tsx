@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { FleetCheckoutCreateRequest, FleetCheckoutView, FleetNodeView } from '@ever-works/contracts';
+import type {
+    FleetCheckoutCreateRequest,
+    FleetCheckoutView,
+    FleetNodeView,
+} from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { createCheckoutAction } from '@/app/actions/fleet-checkouts';
 import { formatCheckoutSize, homeRelativePath, isComputerOnline } from './checkouts.shared';
@@ -40,7 +44,11 @@ export function NewCheckoutDialog({
 
     const node = nodes.find((candidate) => candidate.id === nodeId) ?? null;
     const parents = rows.filter(
-        (row) => row.nodeId === nodeId && row.state === 'ready' && row.createdBy !== 'task' && row.remoteUrl,
+        (row) =>
+            row.nodeId === nodeId &&
+            row.state === 'ready' &&
+            row.createdBy !== 'task' &&
+            row.remoteUrl,
     );
     const parent = parents.find((row) => row.id === parentId) ?? null;
     const size = formatCheckoutSize(parent?.sizeBytes ?? null);
@@ -59,7 +67,10 @@ export function NewCheckoutDialog({
         setError(null);
         const request: FleetCheckoutCreateRequest = {
             nodeId: node.id,
-            source: how === 'clone' ? { kind: 'clone', repoUrl: repoUrl.trim() } : { kind: 'worktree', parentCheckoutId: parentId },
+            source:
+                how === 'clone'
+                    ? { kind: 'clone', repoUrl: repoUrl.trim() }
+                    : { kind: 'worktree', parentCheckoutId: parentId },
         };
         if (branch.trim()) request.branch = branch.trim();
         if (container && !containerReason) request.isolation = 'container';
@@ -101,9 +112,17 @@ export function NewCheckoutDialog({
                         const online = isComputerOnline(candidate);
                         const managed = candidate.consents?.manage === true;
                         return (
-                            <option key={candidate.id} value={candidate.id} disabled={!online || !managed}>
+                            <option
+                                key={candidate.id}
+                                value={candidate.id}
+                                disabled={!online || !managed}
+                            >
                                 {candidate.name}
-                                {!online ? ` — ${t('offline')}` : !managed ? ` — ${t('needsManage')}` : ''}
+                                {!online
+                                    ? ` — ${t('offline')}`
+                                    : !managed
+                                      ? ` — ${t('needsManage')}`
+                                      : ''}
                             </option>
                         );
                     })}
@@ -112,7 +131,12 @@ export function NewCheckoutDialog({
             <fieldset className="flex flex-wrap gap-4">
                 <legend className="mb-1 text-xs">{t('how')}</legend>
                 <label className="inline-flex items-center gap-1">
-                    <input type="radio" name="how" checked={how === 'clone'} onChange={() => setHow('clone')} />
+                    <input
+                        type="radio"
+                        name="how"
+                        checked={how === 'clone'}
+                        onChange={() => setHow('clone')}
+                    />
                     {t('clone')}
                 </label>
                 <label className="inline-flex items-center gap-1">
@@ -136,7 +160,9 @@ export function NewCheckoutDialog({
                         placeholder="https://github.com/acme/api.git"
                         data-testid="fleet-new-checkout-repo"
                     />
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('credentialNote')}</span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('credentialNote')}
+                    </span>
                 </label>
             ) : (
                 <label className="flex flex-col gap-1">
@@ -165,7 +191,9 @@ export function NewCheckoutDialog({
                     placeholder={t('branchPlaceholder')}
                     data-testid="fleet-new-checkout-branch"
                 />
-                <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('branchNote')}</span>
+                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('branchNote')}
+                </span>
             </label>
             {how === 'worktree' ? (
                 <label className="flex flex-col gap-1">
@@ -177,7 +205,9 @@ export function NewCheckoutDialog({
                         placeholder="node_modules, .env.local"
                         data-testid="fleet-new-checkout-shared"
                     />
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('sharedFoldersNote')}</span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('sharedFoldersNote')}
+                    </span>
                 </label>
             ) : null}
             <label className="inline-flex items-center gap-2" title={containerReason ?? undefined}>
@@ -190,7 +220,9 @@ export function NewCheckoutDialog({
                 />
                 <span>{t('container')}</span>
                 {containerReason ? (
-                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{containerReason}</span>
+                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {containerReason}
+                    </span>
                 ) : null}
             </label>
             {error ? (
@@ -198,7 +230,10 @@ export function NewCheckoutDialog({
                     {error}
                 </p>
             ) : null}
-            <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-new-checkout-cost">
+            <p
+                className="text-xs text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-new-checkout-cost"
+            >
                 {size
                     ? t('costWithSize', { name: node?.name ?? '', size })
                     : t('cost', { name: node?.name ?? '' })}

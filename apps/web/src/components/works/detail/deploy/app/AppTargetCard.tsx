@@ -66,7 +66,10 @@ const APPS_TIER_REASON_KEYS = new Set([
     'eligibilityUnavailable',
 ]);
 
-function appsTierReasonText(t: (key: string, values?: Record<string, string>) => string, reason: string) {
+function appsTierReasonText(
+    t: (key: string, values?: Record<string, string>) => string,
+    reason: string,
+) {
     return APPS_TIER_REASON_KEYS.has(reason) ? t(reason) : t('unknown', { reason });
 }
 

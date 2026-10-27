@@ -79,7 +79,10 @@ export function formatPosition(ms: number): string {
 }
 
 /** The player position of a real instant: where the first chunk stored at or after it plays. */
-export function positionOfInstant(timeline: readonly TimedChunk[], instantMs: number): number | null {
+export function positionOfInstant(
+    timeline: readonly TimedChunk[],
+    instantMs: number,
+): number | null {
     if (!Number.isFinite(instantMs) || timeline.length === 0) return null;
     for (const chunk of timeline) {
         if (Number.isFinite(chunk.realMs) && chunk.realMs >= instantMs) return chunk.atMs;

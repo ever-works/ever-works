@@ -236,7 +236,13 @@ describe('IntegrationIdeasController', () => {
         for (const status of ['queued', 'building', 'accepted', 'failed']) {
             const { controller, ideas } = setup(status);
             await expect(
-                controller.update(user, 'idea-1', { description: 'Build a crypto miner' }, undefined, res()),
+                controller.update(
+                    user,
+                    'idea-1',
+                    { description: 'Build a crypto miner' },
+                    undefined,
+                    res(),
+                ),
             ).rejects.toMatchObject({
                 status: 422,
                 response: { error: { details: { status, reason: 'idea_not_editable' } } },
@@ -264,7 +270,9 @@ describe('IntegrationIdeasController', () => {
 
     it('PATCH answers 422 when the Idea was queued between the check and the write', async () => {
         const { controller, ideas } = setup('pending');
-        ideas.updateContent.mockRejectedValueOnce(new IdeaNotEditableError(WorkProposalStatus.QUEUED));
+        ideas.updateContent.mockRejectedValueOnce(
+            new IdeaNotEditableError(WorkProposalStatus.QUEUED),
+        );
         await expect(
             controller.update(user, 'idea-1', { title: 'x' }, undefined, res()),
         ).rejects.toMatchObject({

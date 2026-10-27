@@ -56,7 +56,10 @@ import { FleetCheckoutsEnabledGuard } from './fleet-checkouts-enabled.guard';
         // FL-14 P2: the scoped git credential — "does an installation cover it"
         // for create, and the node-authenticated mint.
         FleetCheckoutCredentialScopeAdapter,
-        { provide: FLEET_CHECKOUT_CREDENTIAL_SCOPE, useExisting: FleetCheckoutCredentialScopeAdapter },
+        {
+            provide: FLEET_CHECKOUT_CREDENTIAL_SCOPE,
+            useExisting: FleetCheckoutCredentialScopeAdapter,
+        },
         FleetCheckoutCredentialService,
         FleetNodeAuthGuard,
         DistributedTaskLockService,

@@ -76,7 +76,10 @@ const MODEL_EDGE_CHARS = 2_000;
 function toolError(error: unknown): ToolError {
     const known = readFleetCommandError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -106,8 +109,14 @@ function compact(view: FleetScheduleView) {
 }
 
 function compactRun(run: FleetCommandRunView) {
-    const head = run.outputHead.length > MODEL_EDGE_CHARS ? `${run.outputHead.slice(0, MODEL_EDGE_CHARS)}…` : run.outputHead;
-    const tail = run.outputTail.length > MODEL_EDGE_CHARS ? `…${run.outputTail.slice(-MODEL_EDGE_CHARS)}` : run.outputTail;
+    const head =
+        run.outputHead.length > MODEL_EDGE_CHARS
+            ? `${run.outputHead.slice(0, MODEL_EDGE_CHARS)}…`
+            : run.outputHead;
+    const tail =
+        run.outputTail.length > MODEL_EDGE_CHARS
+            ? `…${run.outputTail.slice(-MODEL_EDGE_CHARS)}`
+            : run.outputTail;
     return {
         id: run.id,
         scheduledFor: run.scheduledFor ?? null,
@@ -145,7 +154,8 @@ export function buildFleetScheduleTools(args: {
     /** An Agent-requested schedule of this owner, else as unknown as a missing one. */
     const agentSchedule = async (scheduleId: unknown): Promise<FleetScheduleView> => {
         const view = await args.service.get(String(scheduleId ?? ''), actor);
-        if (view.requestedBy !== 'agent' || view.deletedAt) throw fleetCommandError('not_found', 'no such schedule');
+        if (view.requestedBy !== 'agent' || view.deletedAt)
+            throw fleetCommandError('not_found', 'no such schedule');
         return view;
     };
     const hold = async (payload: FleetScheduleProposalPayload, title: string) => {
@@ -183,14 +193,21 @@ export function buildFleetScheduleTools(args: {
             "Read-only. The schedules Agents asked for on the owner's computers: name, computer, command, when it runs (on the computer's clock), next fire, last run, failure streak.",
         parameters: {
             type: 'object',
-            properties: { nodeId: { type: 'string', description: 'Only this computer (Fleet node id).' } },
+            properties: {
+                nodeId: { type: 'string', description: 'Only this computer (Fleet node id).' },
+            },
             required: [],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
             try {
-                const rows = await args.service.listForUser(actor, typeof a.nodeId === 'string' && a.nodeId ? { nodeId: a.nodeId } : {});
-                return { schedules: rows.filter((row) => row.requestedBy === 'agent').map(compact) };
+                const rows = await args.service.listForUser(
+                    actor,
+                    typeof a.nodeId === 'string' && a.nodeId ? { nodeId: a.nodeId } : {},
+                );
+                return {
+                    schedules: rows.filter((row) => row.requestedBy === 'agent').map(compact),
+                };
             } catch (error) {
                 return toolError(error);
             }
@@ -207,7 +224,8 @@ export function buildFleetScheduleTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { scheduleId?: unknown };
-            if (typeof a.scheduleId !== 'string' || !a.scheduleId) return invalid('scheduleId', 'scheduleId is required');
+            if (typeof a.scheduleId !== 'string' || !a.scheduleId)
+                return invalid('scheduleId', 'scheduleId is required');
             try {
                 return { schedule: compact(await agentSchedule(a.scheduleId)) };
             } catch (error) {
@@ -227,7 +245,8 @@ export function buildFleetScheduleTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as { scheduleId?: unknown };
-            if (typeof a.scheduleId !== 'string' || !a.scheduleId) return invalid('scheduleId', 'scheduleId is required');
+            if (typeof a.scheduleId !== 'string' || !a.scheduleId)
+                return invalid('scheduleId', 'scheduleId is required');
             try {
                 const view = await agentSchedule(a.scheduleId);
                 return { runs: (await args.service.runs(view.id, actor)).map(compactRun) };
@@ -247,17 +266,31 @@ export function buildFleetScheduleTools(args: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 name: { type: 'string', description: 'A short name (1–120 characters).' },
                 command: { type: 'string', description: 'The command line (at most 8 KiB).' },
-                cwd: { type: 'string', description: "Optional folder (default the owner's home, ~)." },
+                cwd: {
+                    type: 'string',
+                    description: "Optional folder (default the owner's home, ~).",
+                },
                 cadence: CADENCE_SCHEMA,
             },
             required: ['nodeId', 'name', 'command', 'cadence'],
         },
         invoke: async (raw) => {
-            const a = (raw ?? {}) as { nodeId?: unknown; name?: unknown; command?: unknown; cwd?: unknown; cadence?: unknown };
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId names one computer');
-            if (typeof a.name !== 'string' || !a.name.trim()) return invalid('name', 'name the schedule');
-            if (!isFleetCommandLine(a.command)) return invalid('command', 'command is 1 … 8 KiB of text');
-            if (!isValidFleetScheduleCadence({ ...((a.cadence ?? {}) as object), timezone: 'node' })) {
+            const a = (raw ?? {}) as {
+                nodeId?: unknown;
+                name?: unknown;
+                command?: unknown;
+                cwd?: unknown;
+                cadence?: unknown;
+            };
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId names one computer');
+            if (typeof a.name !== 'string' || !a.name.trim())
+                return invalid('name', 'name the schedule');
+            if (!isFleetCommandLine(a.command))
+                return invalid('command', 'command is 1 … 8 KiB of text');
+            if (
+                !isValidFleetScheduleCadence({ ...((a.cadence ?? {}) as object), timezone: 'node' })
+            ) {
                 return invalid('cadence', 'cadence is one of the four kinds (see the schema)');
             }
             return hold(
@@ -287,7 +320,10 @@ export function buildFleetScheduleTools(args: {
                 nodeId: { type: 'string', description: 'Move it to this computer.' },
                 name: { type: 'string', description: 'A short name (1–120 characters).' },
                 command: { type: 'string', description: 'The command line (at most 8 KiB).' },
-                cwd: { type: 'string', description: 'New folder; omit it to keep the current one.' },
+                cwd: {
+                    type: 'string',
+                    description: 'New folder; omit it to keep the current one.',
+                },
                 cadence: CADENCE_SCHEMA,
             },
             required: ['scheduleId'],
@@ -309,7 +345,9 @@ export function buildFleetScheduleTools(args: {
                         ...(typeof a.nodeId === 'string' ? { nodeId: a.nodeId } : {}),
                         ...(typeof a.command === 'string' ? { command: a.command } : {}),
                         ...(typeof a.cwd === 'string' ? { cwd: a.cwd } : {}),
-                        ...(a.cadence && typeof a.cadence === 'object' ? { cadence: a.cadence as Record<string, unknown> } : {}),
+                        ...(a.cadence && typeof a.cadence === 'object'
+                            ? { cadence: a.cadence as Record<string, unknown> }
+                            : {}),
                     },
                     `Change the schedule ${view.name}`,
                 );
@@ -319,7 +357,11 @@ export function buildFleetScheduleTools(args: {
         },
     } satisfies TaskToolDescriptor<Record<string, unknown>, unknown>);
 
-    const heldOp = (name: 'fleet_schedules_delete' | 'fleet_schedules_run', op: 'delete' | 'run', description: string) =>
+    const heldOp = (
+        name: 'fleet_schedules_delete' | 'fleet_schedules_run',
+        op: 'delete' | 'run',
+        description: string,
+    ) =>
         ({
             name,
             description,
@@ -333,8 +375,15 @@ export function buildFleetScheduleTools(args: {
                 try {
                     const view = await agentSchedule(a.scheduleId);
                     return hold(
-                        { kind: FLEET_SCHEDULE_PROPOSAL_KIND, agentId: args.agentId, op, scheduleId: view.id },
-                        op === 'delete' ? `Delete the schedule ${view.name}` : `Run the schedule ${view.name} now`,
+                        {
+                            kind: FLEET_SCHEDULE_PROPOSAL_KIND,
+                            agentId: args.agentId,
+                            op,
+                            scheduleId: view.id,
+                        },
+                        op === 'delete'
+                            ? `Delete the schedule ${view.name}`
+                            : `Run the schedule ${view.name} now`,
                     );
                 } catch (error) {
                     return toolError(error);
@@ -355,7 +404,10 @@ export function buildFleetScheduleTools(args: {
         ),
     );
 
-    const plainOp = (name: 'fleet_schedules_pause' | 'fleet_schedules_resume', description: string) =>
+    const plainOp = (
+        name: 'fleet_schedules_pause' | 'fleet_schedules_resume',
+        description: string,
+    ) =>
         ({
             name,
             description,
@@ -380,7 +432,10 @@ export function buildFleetScheduleTools(args: {
         }) satisfies TaskToolDescriptor<{ scheduleId?: unknown }, unknown>;
 
     out.push(
-        plainOp('fleet_schedules_pause', 'Pause a schedule an Agent asked for (its cadence is kept). Applied at once.'),
+        plainOp(
+            'fleet_schedules_pause',
+            'Pause a schedule an Agent asked for (its cadence is kept). Applied at once.',
+        ),
         plainOp(
             'fleet_schedules_resume',
             'Resume a paused schedule an Agent asked for. Applied at once; fires missed while paused are not replayed.',

@@ -25,7 +25,12 @@ import { computerActionAllowed, type FleetComputerTabProps } from '../registry';
 import { ConfirmActionDialog } from '../machine/ConfirmActionDialog';
 import { MachineTabNotice } from '../machine/MachineTabNotice';
 import { RootRequiredDialog } from '../machine/RootRequiredDialog';
-import { dialogForRow, formatBytes, formatPercent, formatSince } from '../machine/machine-actions.shared';
+import {
+    dialogForRow,
+    formatBytes,
+    formatPercent,
+    formatSince,
+} from '../machine/machine-actions.shared';
 import { useMachineAction } from '../machine/use-machine-action';
 import { useMachineList } from '../machine/use-machine-list';
 import {
@@ -74,17 +79,29 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                 ? t('dialog.enableTitle', { name: service.name, machine: node.name })
                 : action === 'disable'
                   ? t('dialog.disableTitle', { name: service.name, machine: node.name })
-                  : t('dialog.title', { action: actionLabel(action), name: service.name, machine: node.name });
+                  : t('dialog.title', {
+                        action: actionLabel(action),
+                        name: service.name,
+                        machine: node.name,
+                    });
         const body =
             action === 'restart'
                 ? t('dialog.restartBody', { name: service.name })
                 : action === 'stop'
                   ? t('dialog.stopBody', { name: service.name })
                   : undefined;
-        const warned = action === 'stop' || action === 'restart' || action === 'disable' ? service.blastRadius : null;
+        const warned =
+            action === 'stop' || action === 'restart' || action === 'disable'
+                ? service.blastRadius
+                : null;
         machineAction.request({
             key: `${service.id}:${action}`,
-            dialog: dialogForRow({ class: service.confirmation[action], title, body, blastRadius: warned }),
+            dialog: dialogForRow({
+                class: service.confirmation[action],
+                title,
+                body,
+                blastRadius: warned,
+            }),
             actionLabel: actionLabel(action),
             run: (fields) =>
                 fleetServiceAction(node.id, {
@@ -95,8 +112,16 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                     fields,
                 }),
             onDone: (result) => {
-                if ('operationId' in result) toast.message(t('stillWorking', { name: service.name }));
-                else toast.success(t('done', { action: actionLabel(action), name: service.name, state: t(`states.${result.state}`) }));
+                if ('operationId' in result)
+                    toast.message(t('stillWorking', { name: service.name }));
+                else
+                    toast.success(
+                        t('done', {
+                            action: actionLabel(action),
+                            name: service.name,
+                            state: t(`states.${result.state}`),
+                        }),
+                    );
                 void list.refresh();
             },
             onError,
@@ -114,8 +139,14 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
 
     if (!list.data && list.loading) {
         return (
-            <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-services-loading">
-                {list.slow ? tActions('states.slow', { name: node.name }) : tActions('states.asking', { name: node.name })}
+            <p
+                role="status"
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-services-loading"
+            >
+                {list.slow
+                    ? tActions('states.slow', { name: node.name })
+                    : tActions('states.asking', { name: node.name })}
             </p>
         );
     }
@@ -134,7 +165,11 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
     if (!data) return null;
     if (data.managers.length === 0) {
         return (
-            <p role="status" className="rounded-xl border border-dashed border-border dark:border-border-dark p-8 text-center text-sm" data-testid="fleet-services-no-manager">
+            <p
+                role="status"
+                className="rounded-xl border border-dashed border-border dark:border-border-dark p-8 text-center text-sm"
+                data-testid="fleet-services-no-manager"
+            >
                 {t('noManager', { name: node.name })}
             </p>
         );
@@ -143,13 +178,27 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
     return (
         <section className="space-y-3" data-testid="fleet-services-tab" aria-label={t('title')}>
             {list.error ? (
-                <p role="status" className="rounded-md border border-warning/40 bg-warning/5 p-2 text-sm" data-testid="fleet-services-stale">
-                    {list.error.code === 'kill_switch' ? tActions('states.killSwitchLastKnown') : tActions('states.lastKnown', { name: node.name })}
+                <p
+                    role="status"
+                    className="rounded-md border border-warning/40 bg-warning/5 p-2 text-sm"
+                    data-testid="fleet-services-stale"
+                >
+                    {list.error.code === 'kill_switch'
+                        ? tActions('states.killSwitchLastKnown')
+                        : tActions('states.lastKnown', { name: node.name })}
                 </p>
             ) : null}
             {data.errors?.map((error) => (
-                <p key={`${error.manager}:${error.scope}`} role="status" className="text-sm text-danger">
-                    {t('listError', { manager: error.manager, name: node.name, message: error.message })}
+                <p
+                    key={`${error.manager}:${error.scope}`}
+                    role="status"
+                    className="text-sm text-danger"
+                >
+                    {t('listError', {
+                        manager: error.manager,
+                        name: node.name,
+                        message: error.message,
+                    })}
                 </p>
             ))}
             <div className="flex flex-wrap items-center gap-3">
@@ -165,7 +214,9 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                     className="h-8 w-56 rounded-md border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 text-sm"
                     data-testid="fleet-services-find"
                 />
-                <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('order')}</span>
+                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('order')}
+                </span>
                 <Button
                     type="button"
                     variant="ghost"
@@ -179,7 +230,10 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                 </Button>
             </div>
             {!allowed ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-services-read-only">
+                <p
+                    className="text-sm text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-services-read-only"
+                >
                     {t('ownerOnly', { name: node.name })}
                 </p>
             ) : null}
@@ -206,7 +260,8 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                             {rows.map((service) => {
                                 const marker = riskMarker(service);
                                 const boot = atBootAction(service);
-                                const busy = machineAction.busyKey?.startsWith(`${service.id}:`) ?? false;
+                                const busy =
+                                    machineAction.busyKey?.startsWith(`${service.id}:`) ?? false;
                                 const since = formatSince(service.since);
                                 return (
                                     <tr
@@ -219,41 +274,73 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                                         <td className="px-3 py-2">
                                             <span
                                                 aria-hidden
-                                                className={service.state === 'failed' ? 'text-danger' : service.state === 'running' ? 'text-success' : 'text-text-muted dark:text-text-muted-dark'}
+                                                className={
+                                                    service.state === 'failed'
+                                                        ? 'text-danger'
+                                                        : service.state === 'running'
+                                                          ? 'text-success'
+                                                          : 'text-text-muted dark:text-text-muted-dark'
+                                                }
                                             >
                                                 {stateGlyph(service)}
                                             </span>{' '}
                                             <span className="font-medium">{service.name}</span>
                                             {service.scope === 'user' ? (
-                                                <span className="ml-1 text-xs text-text-muted dark:text-text-muted-dark">{t('userScope')}</span>
+                                                <span className="ml-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                                    {t('userScope')}
+                                                </span>
                                             ) : null}
                                             {service.description ? (
-                                                <span className="block truncate text-xs text-text-muted dark:text-text-muted-dark">{service.description}</span>
+                                                <span className="block truncate text-xs text-text-muted dark:text-text-muted-dark">
+                                                    {service.description}
+                                                </span>
                                             ) : null}
                                         </td>
                                         <td className="px-3 py-2">
                                             {busy ? t('working') : t(`states.${service.state}`)}
-                                            {service.state === 'failed' && service.exitCode !== null ? (
-                                                <span className="ml-1 text-xs text-text-muted dark:text-text-muted-dark">{t('exited', { code: service.exitCode })}</span>
+                                            {service.state === 'failed' &&
+                                            service.exitCode !== null ? (
+                                                <span className="ml-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                                    {t('exited', { code: service.exitCode })}
+                                                </span>
                                             ) : null}
                                         </td>
                                         <td className="px-3 py-2 text-xs">
                                             {since ?? '—'}
                                             {' · '}
-                                            {service.atBoot === null ? '—' : service.atBoot ? (service.scope === 'user' ? t('atLogin') : t('atBoot')) : t('manual')}
+                                            {service.atBoot === null
+                                                ? '—'
+                                                : service.atBoot
+                                                  ? service.scope === 'user'
+                                                      ? t('atLogin')
+                                                      : t('atBoot')
+                                                  : t('manual')}
                                         </td>
-                                        <td className="px-3 py-2 text-right tabular-nums">{formatPercent(service.cpuPercent)}</td>
-                                        <td className="px-3 py-2 text-right tabular-nums">{formatBytes(service.memBytes)}</td>
+                                        <td className="px-3 py-2 text-right tabular-nums">
+                                            {formatPercent(service.cpuPercent)}
+                                        </td>
+                                        <td className="px-3 py-2 text-right tabular-nums">
+                                            {formatBytes(service.memBytes)}
+                                        </td>
                                         <td className="px-3 py-2">
                                             <div className="flex items-center justify-end gap-1">
                                                 {marker ? (
                                                     <span
                                                         className="inline-flex items-center gap-1 text-xs text-warning"
-                                                        title={marker === 'node' ? t('thisNodeTooltip') : t('riskTooltip', { name: node.name })}
+                                                        title={
+                                                            marker === 'node'
+                                                                ? t('thisNodeTooltip')
+                                                                : t('riskTooltip', {
+                                                                      name: node.name,
+                                                                  })
+                                                        }
                                                         data-testid="fleet-service-risk"
                                                         data-kind={marker}
                                                     >
-                                                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+                                                        <AlertTriangle
+                                                            className="h-3.5 w-3.5"
+                                                            aria-hidden
+                                                        />
                                                         {t(`risk.${marker}`)}
                                                     </span>
                                                 ) : null}
@@ -262,9 +349,19 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                                                         key={action}
                                                         type="button"
                                                         size="sm"
-                                                        variant={action === 'start' ? 'primary' : 'secondary'}
+                                                        variant={
+                                                            action === 'start'
+                                                                ? 'primary'
+                                                                : 'secondary'
+                                                        }
                                                         disabled={!allowed || busy}
-                                                        title={!allowed ? t('ownerOnly', { name: node.name }) : undefined}
+                                                        title={
+                                                            !allowed
+                                                                ? t('ownerOnly', {
+                                                                      name: node.name,
+                                                                  })
+                                                                : undefined
+                                                        }
                                                         onClick={() => act(service, action)}
                                                         data-testid={`fleet-service-${action}`}
                                                     >
@@ -273,14 +370,29 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                                                 ))}
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button type="button" variant="ghost" size="sm" aria-label={t('more', { name: service.name })}>
-                                                            <MoreHorizontal className="h-4 w-4" aria-hidden />
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            aria-label={t('more', {
+                                                                name: service.name,
+                                                            })}
+                                                        >
+                                                            <MoreHorizontal
+                                                                className="h-4 w-4"
+                                                                aria-hidden
+                                                            />
                                                         </Button>
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         {boot ? (
-                                                            <DropdownMenuItem disabled={!allowed || busy} onClick={() => act(service, boot)}>
-                                                                {boot === 'enable' ? t('enableAtBoot') : t('disableAtBoot')}
+                                                            <DropdownMenuItem
+                                                                disabled={!allowed || busy}
+                                                                onClick={() => act(service, boot)}
+                                                            >
+                                                                {boot === 'enable'
+                                                                    ? t('enableAtBoot')
+                                                                    : t('disableAtBoot')}
                                                             </DropdownMenuItem>
                                                         ) : null}
                                                         <DropdownMenuItem asChild>
@@ -288,14 +400,24 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                                                                 href={
                                                                     // FL-08 P3 (FR-39): a failed service opens its log at the failure time.
                                                                     service.state === 'failed'
-                                                                        ? openLogsForSource(node.id, `service:${service.name}`, { at: service.since })
+                                                                        ? openLogsForSource(
+                                                                              node.id,
+                                                                              `service:${service.name}`,
+                                                                              { at: service.since },
+                                                                          )
                                                                         : `${ROUTES.DASHBOARD_FLEET_COMPUTER(node.id, 'logs')}&source=service&unit=${encodeURIComponent(service.name)}`
                                                                 }
                                                             >
                                                                 {t('log')}
                                                             </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => void copyName(service.name)}>{t('copyName')}</DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                void copyName(service.name)
+                                                            }
+                                                        >
+                                                            {t('copyName')}
+                                                        </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </div>
@@ -314,7 +436,11 @@ export default function ServicesTab({ node }: FleetComputerTabProps) {
                 onConfirm={machineAction.confirm}
                 onCancel={machineAction.cancel}
             />
-            <RootRequiredDialog model={machineAction.root} machine={node.name} onClose={machineAction.closeRoot} />
+            <RootRequiredDialog
+                model={machineAction.root}
+                machine={node.name}
+                onClose={machineAction.closeRoot}
+            />
         </section>
     );
 }

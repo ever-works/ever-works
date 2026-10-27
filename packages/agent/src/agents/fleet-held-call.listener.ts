@@ -61,12 +61,17 @@ export class FleetHeldCallListener {
             await this.run(event, payload);
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error);
-            this.logger.warn(`Approved fleet call ${event.proposalId} (${payload.tool}) did not run: ${reason}`);
+            this.logger.warn(
+                `Approved fleet call ${event.proposalId} (${payload.tool}) did not run: ${reason}`,
+            );
             await this.notice(event, payload, reason);
         }
     }
 
-    private async run(event: AgentActionProposalDecidedEvent, payload: FleetHeldToolCallPayload): Promise<void> {
+    private async run(
+        event: AgentActionProposalDecidedEvent,
+        payload: FleetHeldToolCallPayload,
+    ): Promise<void> {
         if (payload.agentId !== event.agentId) throw new Error('the Decision names another Agent.');
         const entry = heldFleetToolEntry(payload.tool);
         if (!entry) throw new Error(`${payload.tool} is not a fleet act this platform runs.`);
@@ -76,7 +81,9 @@ export class FleetHeldCallListener {
             );
         }
         if (this.killSwitch && (await this.killSwitch.shouldHaltDispatch().catch(() => true))) {
-            throw new Error('all computers are stopped; clear it under Settings → Fleet and ask the Agent again.');
+            throw new Error(
+                'all computers are stopped; clear it under Settings → Fleet and ask the Agent again.',
+            );
         }
         const agent = await this.agents.findById(event.agentId);
         if (!agent || agent.userId !== event.userId) throw new Error('the Agent no longer exists.');
@@ -90,14 +97,23 @@ export class FleetHeldCallListener {
                 `${entry.name} is not available to this Agent any more (its tool grant, or the family switched off).`,
             );
         }
-        const result = await tool.invoke({ ...payload.args, ...fleetHeldCallConfirmFields(payload) });
+        const result = await tool.invoke({
+            ...payload.args,
+            ...fleetHeldCallConfirmFields(payload),
+        });
         if (isFleetToolError(result)) {
             throw new Error(`${result.error.code}: ${result.error.hint}`);
         }
-        if (result && typeof result === 'object' && typeof (result as { error?: unknown }).error === 'string') {
+        if (
+            result &&
+            typeof result === 'object' &&
+            typeof (result as { error?: unknown }).error === 'string'
+        ) {
             throw new Error(String((result as { error: string }).error));
         }
-        this.logger.log(`Approved fleet call ${event.proposalId} (${entry.name}) ran for Agent ${event.agentId}`);
+        this.logger.log(
+            `Approved fleet call ${event.proposalId} (${entry.name}) ran for Agent ${event.agentId}`,
+        );
     }
 
     private async notice(

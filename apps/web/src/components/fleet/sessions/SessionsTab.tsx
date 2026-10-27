@@ -11,7 +11,12 @@ import { SessionRowMenu } from './SessionRowMenu';
 import { SessionStartDialog } from './SessionStartDialog';
 import { SessionStateCard } from './SessionStateCard';
 import { sessionsClient } from './sessions.client';
-import { atOwnerLimit, groupSessions, sessionsTabCard, type SessionErrorRead } from './sessions.shared';
+import {
+    atOwnerLimit,
+    groupSessions,
+    sessionsTabCard,
+    type SessionErrorRead,
+} from './sessions.shared';
 import { hookHealthLines } from './sessions-status.shared';
 
 /** How often the tab re-reads the computer's sessions while it is open. */
@@ -85,7 +90,13 @@ export function SessionsTab({
                         nodeName={node.name}
                         viewerUserId={viewerUserId}
                         now={now}
-                        menu={<SessionRowMenu session={session} nodeName={node.name} onChanged={onChanged} />}
+                        menu={
+                            <SessionRowMenu
+                                session={session}
+                                nodeName={node.name}
+                                onChanged={onChanged}
+                            />
+                        }
                     />
                 </li>
             ))}
@@ -93,10 +104,20 @@ export function SessionsTab({
     );
 
     return (
-        <section className="space-y-4" data-testid="fleet-sessions-tab" aria-labelledby="fleet-sessions-live">
+        <section
+            className="space-y-4"
+            data-testid="fleet-sessions-tab"
+            aria-labelledby="fleet-sessions-live"
+        >
             <div className="flex items-center justify-between gap-3">
-                <h2 id="fleet-sessions-live" className="text-sm font-semibold text-text dark:text-text-dark">
-                    {t('tab.live')} <span className="text-text-muted dark:text-text-muted-dark">({live.length})</span>
+                <h2
+                    id="fleet-sessions-live"
+                    className="text-sm font-semibold text-text dark:text-text-dark"
+                >
+                    {t('tab.live')}{' '}
+                    <span className="text-text-muted dark:text-text-muted-dark">
+                        ({live.length})
+                    </span>
                 </h2>
                 <Button
                     size="sm"
@@ -110,7 +131,11 @@ export function SessionsTab({
             </div>
 
             <SessionStateCard
-                card={limited ? { kind: 'limit', count: live.filter((s) => s.kind === 'owner').length } : card}
+                card={
+                    limited
+                        ? { kind: 'limit', count: live.filter((s) => s.kind === 'owner').length }
+                        : card
+                }
                 nodeName={node.name}
                 onRetry={() => void reload()}
             />
@@ -141,11 +166,16 @@ export function SessionsTab({
                     className="rounded-xl border border-dashed border-border dark:border-border-dark p-8 flex flex-col items-center text-center gap-2"
                     data-testid="fleet-sessions-empty"
                 >
-                    <TerminalSquare className="w-5 h-5 text-text-muted dark:text-text-muted-dark" aria-hidden="true" />
+                    <TerminalSquare
+                        className="w-5 h-5 text-text-muted dark:text-text-muted-dark"
+                        aria-hidden="true"
+                    />
                     <p className="text-sm font-medium text-text dark:text-text-dark">
                         {t('tab.empty', { node: node.name })}
                     </p>
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark max-w-md">{t('tab.emptyBody')}</p>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark max-w-md">
+                        {t('tab.emptyBody')}
+                    </p>
                 </div>
             ) : (
                 <>
@@ -160,7 +190,9 @@ export function SessionsTab({
                         <div className="space-y-2">
                             <h2 className="text-sm font-semibold text-text dark:text-text-dark">
                                 {t('tab.ended')}{' '}
-                                <span className="text-text-muted dark:text-text-muted-dark">({ended.length})</span>
+                                <span className="text-text-muted dark:text-text-muted-dark">
+                                    ({ended.length})
+                                </span>
                             </h2>
                             {list(ended)}
                         </div>
@@ -168,7 +200,12 @@ export function SessionsTab({
                 </>
             )}
 
-            <SessionStartDialog open={starting} onOpenChange={setStarting} node={node} onStarted={onChanged} />
+            <SessionStartDialog
+                open={starting}
+                onOpenChange={setStarting}
+                node={node}
+                onStarted={onChanged}
+            />
         </section>
     );
 }

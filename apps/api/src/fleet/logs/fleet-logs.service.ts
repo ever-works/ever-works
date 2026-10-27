@@ -194,9 +194,13 @@ export class FleetLogsService
             timeoutMs: 15_000,
         });
         if (outcome.operationId !== undefined) {
-            throw fleetLinkError('unreachable', 'the computer did not list its logs in time; try again', {
-                nodeId,
-            });
+            throw fleetLinkError(
+                'unreachable',
+                'the computer did not list its logs in time; try again',
+                {
+                    nodeId,
+                },
+            );
         }
         return { nodeId, ...sanitizeFleetLogSourceList(outcome.result) };
     }
@@ -216,9 +220,13 @@ export class FleetLogsService
             follow: input.follow === true,
         });
         if (!parsed) {
-            throw fleetLinkError('invalid', 'source — pick one from the list, or a path under a shared folder', {
-                field: 'source',
-            });
+            throw fleetLinkError(
+                'invalid',
+                'source — pick one from the list, or a path under a shared folder',
+                {
+                    field: 'source',
+                },
+            );
         }
         this.assertUnderChannelCap(userId, nodeId, view.name);
         const params: Record<string, unknown> = {
@@ -286,7 +294,13 @@ export class FleetLogsService
         const slot = this.viewers.get(viewer.id);
         if (!slot || slot.audited) return;
         slot.audited = true;
-        void this.recordRead(slot.nodeId, { kind: 'user', userId: slot.userId }, slot.sources, parsed, 'viewer');
+        void this.recordRead(
+            slot.nodeId,
+            { kind: 'user', userId: slot.userId },
+            slot.sources,
+            parsed,
+            'viewer',
+        );
     }
 
     // ─── One-shot read (REST, MCP, Agents) ─────────────────────────────────
@@ -366,7 +380,8 @@ export class FleetLogsService
                         const cut = carry.lastIndexOf('\n');
                         if (cut >= 0) {
                             for (const line of parseFleetLogLines(carry.slice(0, cut + 1))) {
-                                if (collected.length < FLEET_LOGS_INITIAL_LINES) collected.push(line);
+                                if (collected.length < FLEET_LOGS_INITIAL_LINES)
+                                    collected.push(line);
                             }
                             carry = carry.slice(cut + 1);
                         }
@@ -418,7 +433,9 @@ export class FleetLogsService
             throw error;
         }
         if (batch.error && collected.length === 0) {
-            const code = isFleetLinkErrorCode(batch.error.code) ? batch.error.code : 'operation_failed';
+            const code = isFleetLinkErrorCode(batch.error.code)
+                ? batch.error.code
+                : 'operation_failed';
             await this.recordRefusal(nodeId, caller, input.source, code);
             throw fleetLinkError(code, batch.error.hint || `${nodeName} could not read that log`);
         }
@@ -510,4 +527,3 @@ export class FleetLogsService
         });
     }
 }
-

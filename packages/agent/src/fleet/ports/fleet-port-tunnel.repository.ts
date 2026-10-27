@@ -58,14 +58,24 @@ export class FleetPortTunnelRepository {
     }
 
     listOpenForOwner(ownerUserId: string): Promise<FleetPortTunnel[]> {
-        return this.repository.find({ where: { ownerUserId, state: 'open' }, order: { openedAt: 'ASC' } });
+        return this.repository.find({
+            where: { ownerUserId, state: 'open' },
+            order: { openedAt: 'ASC' },
+        });
     }
 
     listOpenForNode(nodeId: string): Promise<FleetPortTunnel[]> {
-        return this.repository.find({ where: { nodeId, state: 'open' }, order: { openedAt: 'ASC' } });
+        return this.repository.find({
+            where: { nodeId, state: 'open' },
+            order: { openedAt: 'ASC' },
+        });
     }
 
-    findOpenForPort(ownerUserId: string, nodeId: string, port: number): Promise<FleetPortTunnel | null> {
+    findOpenForPort(
+        ownerUserId: string,
+        nodeId: string,
+        port: number,
+    ): Promise<FleetPortTunnel | null> {
         return this.repository.findOne({
             where: { ownerUserId, nodeId, port, state: 'open' },
             order: { openedAt: 'DESC' },
@@ -74,7 +84,11 @@ export class FleetPortTunnelRepository {
 
     /** Every open tunnel, oldest first (the sweeper decides in code which must close). */
     listOpen(limit = 500): Promise<FleetPortTunnel[]> {
-        return this.repository.find({ where: { state: 'open' }, order: { openedAt: 'ASC' }, take: limit });
+        return this.repository.find({
+            where: { state: 'open' },
+            order: { openedAt: 'ASC' },
+            take: limit,
+        });
     }
 
     /** Close an OPEN row. False when it was already closed (someone else won the race). */
@@ -111,7 +125,10 @@ export class FleetPortTunnelRepository {
             .execute();
     }
 
-    async stampAudit(id: string, stamp: { auditOpenId?: string; auditCloseId?: string }): Promise<void> {
+    async stampAudit(
+        id: string,
+        stamp: { auditOpenId?: string; auditCloseId?: string },
+    ): Promise<void> {
         const patch: Partial<FleetPortTunnel> = {};
         if (stamp.auditOpenId) patch.auditOpenId = stamp.auditOpenId;
         if (stamp.auditCloseId) patch.auditCloseId = stamp.auditCloseId;

@@ -13,7 +13,11 @@ import { AgentRepository } from '../../database/repositories/agent.repository';
 import { AgentFileService } from '../../agents/agent-file.service';
 import { getOptionalProvider } from '../../utils/optional-provider.util';
 import { fleetSessionError } from '../sessions/fleet-session.errors';
-import { readAgentFleetBlock, writeAgentFleetBlock, type AgentFleetBlock } from './agent-fleet-block';
+import {
+    readAgentFleetBlock,
+    writeAgentFleetBlock,
+    type AgentFleetBlock,
+} from './agent-fleet-block';
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -48,27 +52,41 @@ export class FleetAgentActionTemplatesService {
     ): Promise<FleetAgentActionTemplates> {
         const agent = await this.owned(agentId, userId);
         const current = readAgentFleetBlock(agent.agentYml ?? null).block;
-        const next: AgentFleetBlock = { branchPrefix: current.branchPrefix, actions: { ...current.actions } };
-        if (update.branchPrefix !== undefined) next.branchPrefix = update.branchPrefix?.trim() || null;
+        const next: AgentFleetBlock = {
+            branchPrefix: current.branchPrefix,
+            actions: { ...current.actions },
+        };
+        if (update.branchPrefix !== undefined)
+            next.branchPrefix = update.branchPrefix?.trim() || null;
         if (update.actions && typeof update.actions === 'object') {
             for (const [id, value] of Object.entries(update.actions)) {
                 if (!isFleetSessionActionId(id)) {
-                    throw fleetSessionError('invalid', `"${id}" is not an action`, { field: `actions.${id}` });
+                    throw fleetSessionError('invalid', `"${id}" is not an action`, {
+                        field: `actions.${id}`,
+                    });
                 }
                 const text = typeof value === 'string' ? value : '';
                 // The default text itself is not an override (the file stays clean).
-                if (!text.trim() || text.trim() === FLEET_SESSION_ACTION_DEFAULTS[id].trim()) delete next.actions[id];
+                if (!text.trim() || text.trim() === FLEET_SESSION_ACTION_DEFAULTS[id].trim())
+                    delete next.actions[id];
                 else next.actions[id] = text;
             }
         }
         const body = writeAgentFleetBlock(agent.agentYml ?? null, next);
         if (body === null) {
-            throw fleetSessionError('invalid', 'agent.yml is not valid YAML; fix it in the editor first', {
-                field: 'agent.yml',
-            });
+            throw fleetSessionError(
+                'invalid',
+                'agent.yml is not valid YAML; fix it in the editor first',
+                {
+                    field: 'agent.yml',
+                },
+            );
         }
-        const files = this.moduleRef ? getOptionalProvider<AgentFileService>(this.moduleRef, AgentFileService) : undefined;
-        if (!files) throw fleetSessionError('internal', 'Agent files cannot be saved in this deployment');
+        const files = this.moduleRef
+            ? getOptionalProvider<AgentFileService>(this.moduleRef, AgentFileService)
+            : undefined;
+        if (!files)
+            throw fleetSessionError('internal', 'Agent files cannot be saved in this deployment');
         const { newHash } = await files.write({
             userId,
             agentId: agent.id,
@@ -76,11 +94,21 @@ export class FleetAgentActionTemplatesService {
             body,
             ...(update.expectedHash !== undefined ? { expectedHash: update.expectedHash } : {}),
         });
-        return { ...this.view({ ...agent, agentYml: body }, next, null), agentYml: body, hash: newHash };
+        return {
+            ...this.view({ ...agent, agentYml: body }, next, null),
+            agentYml: body,
+            hash: newHash,
+        };
     }
 
     private view(
-        agent: { id: string; name: string; slug: string; agentYml?: string | null; contentHash?: string | null },
+        agent: {
+            id: string;
+            name: string;
+            slug: string;
+            agentYml?: string | null;
+            contentHash?: string | null;
+        },
         block: AgentFleetBlock,
         error: string | null,
     ): FleetAgentActionTemplates {
@@ -94,7 +122,10 @@ export class FleetAgentActionTemplatesService {
         return {
             agentId: agent.id,
             agentName: agent.name,
-            branchPrefix: { value: block.branchPrefix, default: fleetSessionBranchPrefix(agent.slug || agent.name) },
+            branchPrefix: {
+                value: block.branchPrefix,
+                default: fleetSessionBranchPrefix(agent.slug || agent.name),
+            },
             actions,
             error,
             agentYml: agent.agentYml ?? '',
@@ -103,8 +134,12 @@ export class FleetAgentActionTemplatesService {
     }
 
     private async owned(agentId: string, userId: string) {
-        const agent = typeof agentId === 'string' && UUID.test(agentId) ? await this.agents.findById(agentId) : null;
-        if (!agent || agent.userId !== userId) throw fleetSessionError('not_found', 'no such Agent');
+        const agent =
+            typeof agentId === 'string' && UUID.test(agentId)
+                ? await this.agents.findById(agentId)
+                : null;
+        if (!agent || agent.userId !== userId)
+            throw fleetSessionError('not_found', 'no such Agent');
         return agent;
     }
 }

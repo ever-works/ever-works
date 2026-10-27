@@ -31,7 +31,9 @@ const { client, toastSuccess, toastError } = vi.hoisted(() => ({
 vi.mock('@/lib/api/app-runtime-ops.client', () => ({ appRuntimeOpsClient: client }));
 vi.mock('sonner', () => ({ toast: { success: toastSuccess, error: toastError } }));
 vi.mock('@/i18n/navigation', () => ({
-    Link: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a>,
+    Link: ({ href, children }: { href: string; children: ReactNode }) => (
+        <a href={href}>{children}</a>
+    ),
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
@@ -142,7 +144,9 @@ describe('AppLiveCard', () => {
         await waitFor(() => expect(screen.getAllByTestId('app-component-oom')).toHaveLength(1));
         cleanup();
         const old = status();
-        old.snapshot!.components[1].oomKilledAt = new Date(Date.now() - 48 * 3_600_000).toISOString();
+        old.snapshot!.components[1].oomKilledAt = new Date(
+            Date.now() - 48 * 3_600_000,
+        ).toISOString();
         renderCard(old);
         await waitFor(() => expect(screen.queryByTestId('app-component-oom')).toBeNull());
     });
@@ -151,14 +155,24 @@ describe('AppLiveCard', () => {
         client.refreshStatus.mockResolvedValueOnce({
             ok: true,
             status: 202,
-            data: { status: 'accepted', op: 'status-refresh', requestId: REQUEST_ID, dispatched: true },
+            data: {
+                status: 'accepted',
+                op: 'status-refresh',
+                requestId: REQUEST_ID,
+                dispatched: true,
+            },
         });
         const { onReload } = renderCard(status());
         fireEvent.click(screen.getByTestId('app-live-refresh'));
         await waitFor(() => expect(onReload).toHaveBeenCalledTimes(1));
         expect(client.refreshStatus).toHaveBeenCalledWith(WORK_ID);
 
-        client.refreshStatus.mockResolvedValueOnce({ ok: false, status: 429, code: 'refresh_too_soon', retryAfterSeconds: 12 });
+        client.refreshStatus.mockResolvedValueOnce({
+            ok: false,
+            status: 429,
+            code: 'refresh_too_soon',
+            retryAfterSeconds: 12,
+        });
         fireEvent.click(screen.getByTestId('app-live-refresh'));
         await waitFor(() => expect(screen.getByTestId('app-live-refresh')).toBeDisabled());
         expect(screen.getByTestId('app-live-refresh')).toHaveTextContent('Refresh in 12s');
@@ -171,7 +185,9 @@ describe('AppLiveCard', () => {
             data: { status: 'accepted', op: 'job-run', requestId: REQUEST_ID, dispatched: true },
         });
         const { onReload } = renderCard(status());
-        const row = screen.getAllByTestId('app-job-row').find((el) => el.dataset.name === 'create-admin')!;
+        const row = screen
+            .getAllByTestId('app-job-row')
+            .find((el) => el.dataset.name === 'create-admin')!;
         fireEvent.click(within(row).getByTestId('app-job-run-open'));
 
         const dialog = await screen.findByTestId('app-job-run-dialog');
@@ -190,20 +206,30 @@ describe('AppLiveCard', () => {
     it('keeps a refused run in the dialog with its reason', async () => {
         client.runJob.mockResolvedValueOnce({ ok: false, status: 409, code: 'job_active' });
         renderCard(status());
-        const row = screen.getAllByTestId('app-job-row').find((el) => el.dataset.name === 'migrate')!;
+        const row = screen
+            .getAllByTestId('app-job-row')
+            .find((el) => el.dataset.name === 'migrate')!;
         fireEvent.click(within(row).getByTestId('app-job-run-open'));
         const dialog = await screen.findByTestId('app-job-run-dialog');
         expect(within(dialog).queryByTestId('app-job-first-deploy-warning')).toBeNull();
         fireEvent.click(within(dialog).getByTestId('app-job-run-confirm'));
         fireEvent.click(within(dialog).getByTestId('app-job-run-submit'));
-        expect(await within(dialog).findByTestId('app-job-run-error')).toHaveTextContent(/still going/);
+        expect(await within(dialog).findByTestId('app-job-run-error')).toHaveTextContent(
+            /still going/,
+        );
     });
 
     it('disables Run now for a job with a queued run, and every run during a Deployment', () => {
         renderCard(
             status({
                 requests: [
-                    { requestId: REQUEST_ID, op: 'job-run', state: 'queued', at: '2026-10-27T00:00:00Z', jobName: 'migrate' },
+                    {
+                        requestId: REQUEST_ID,
+                        op: 'job-run',
+                        state: 'queued',
+                        at: '2026-10-27T00:00:00Z',
+                        jobName: 'migrate',
+                    },
                 ],
             }),
         );
@@ -212,11 +238,14 @@ describe('AppLiveCard', () => {
         const admin = rows.find((el) => el.dataset.name === 'create-admin')!;
         expect(within(migrate).getByTestId('app-job-run-open')).toBeDisabled();
         expect(within(admin).getByTestId('app-job-run-open')).not.toBeDisabled();
-        expect(screen.getByTestId('app-live-requests')).toHaveTextContent('Run of migrate — in progress');
+        expect(screen.getByTestId('app-live-requests')).toHaveTextContent(
+            'Run of migrate — in progress',
+        );
 
         cleanup();
         renderCard(status({ currentDeployment: { id: 'd-2', state: 'DEPLOYING' } }));
-        for (const button of screen.getAllByTestId('app-job-run-open')) expect(button).toBeDisabled();
+        for (const button of screen.getAllByTestId('app-job-run-open'))
+            expect(button).toBeDisabled();
         expect(screen.getByTestId('app-live-smoke')).toBeDisabled();
     });
 });

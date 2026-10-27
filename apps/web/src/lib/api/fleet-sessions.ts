@@ -1,5 +1,9 @@
 import 'server-only';
-import type { FleetSessionBoardResponse, FleetSessionListResponse, FleetSessionView } from '@ever-works/contracts';
+import type {
+    FleetSessionBoardResponse,
+    FleetSessionListResponse,
+    FleetSessionView,
+} from '@ever-works/contracts';
 import { serverFetch } from './server-api';
 
 /**
@@ -35,21 +39,29 @@ export const fleetSessionsAPI = {
     },
 
     /** FL-05 P3: the Sessions board's first paint (four columns of live sessions). */
-    board: async (query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent' } = {}): Promise<FleetSessionBoardResponse> => {
+    board: async (
+        query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent' } = {},
+    ): Promise<FleetSessionBoardResponse> => {
         const params = new URLSearchParams({ view: 'board' });
         if (query.nodeId) params.set('nodeId', query.nodeId);
         if (query.agentId) params.set('agentId', query.agentId);
         if (query.kind) params.set('kind', query.kind);
-        return serverFetch<FleetSessionBoardResponse>(`/fleet/sessions?${params.toString()}`, { method: 'GET' });
+        return serverFetch<FleetSessionBoardResponse>(`/fleet/sessions?${params.toString()}`, {
+            method: 'GET',
+        });
     },
 
     /** FL-05 P3: the Sessions list's first paint (live and ended, most recently active first). */
-    list: async (query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent'; limit?: number } = {}): Promise<FleetSessionListResponse> => {
+    list: async (
+        query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent'; limit?: number } = {},
+    ): Promise<FleetSessionListResponse> => {
         const params = new URLSearchParams({ limit: String(query.limit ?? 200) });
         if (query.nodeId) params.set('nodeId', query.nodeId);
         if (query.agentId) params.set('agentId', query.agentId);
         if (query.kind) params.set('kind', query.kind);
-        return serverFetch<FleetSessionListResponse>(`/fleet/sessions?${params.toString()}`, { method: 'GET' });
+        return serverFetch<FleetSessionListResponse>(`/fleet/sessions?${params.toString()}`, {
+            method: 'GET',
+        });
     },
 
     /** Sessions of one Agent across every computer the person may see (the Agent page block, P2). */

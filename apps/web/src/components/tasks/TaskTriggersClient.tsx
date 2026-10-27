@@ -723,15 +723,22 @@ export function TaskTriggersClient({
                                         {tGithub('aboutMe.title')}
                                     </legend>
                                     <div className="flex flex-wrap gap-3">
-                                        {(['review-requested', 'assigned', 'authored'] as const).map((kind) => (
-                                            <label key={kind} className="inline-flex items-center gap-1.5 text-xs">
+                                        {(
+                                            ['review-requested', 'assigned', 'authored'] as const
+                                        ).map((kind) => (
+                                            <label
+                                                key={kind}
+                                                className="inline-flex items-center gap-1.5 text-xs"
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={form.aboutMe.includes(kind)}
                                                     onChange={() => toggleAboutMe(kind)}
                                                     data-testid={`task-trigger-form-about-me-${kind}`}
                                                 />
-                                                {tGithub(`aboutMe.${kind === 'review-requested' ? 'reviewRequested' : kind}`)}
+                                                {tGithub(
+                                                    `aboutMe.${kind === 'review-requested' ? 'reviewRequested' : kind}`,
+                                                )}
                                             </label>
                                         ))}
                                     </div>

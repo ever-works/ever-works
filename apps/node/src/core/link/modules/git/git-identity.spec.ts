@@ -55,7 +55,10 @@ describe('readGitIdentity', () => {
 describe('setGitIdentity', () => {
 	it('writes exactly user.name and user.email, each value one argv element', async () => {
 		const { runner, calls } = fakeRunner({});
-		const result = await setGitIdentity(runner, { name: 'Nina; rm -rf ~', email: '12345+nina@users.noreply.github.com' });
+		const result = await setGitIdentity(runner, {
+			name: 'Nina; rm -rf ~',
+			email: '12345+nina@users.noreply.github.com'
+		});
 		expect(result.fields).toEqual(['user.name', 'user.email']);
 		expect(calls).toEqual([
 			{ command: 'git', args: ['config', '--global', 'user.name', 'Nina; rm -rf ~'] },

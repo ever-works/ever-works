@@ -4,10 +4,14 @@ import { completionScript, completionTable, completionTree } from '../completion
 
 /** FL-19 T-21 — completion scripts are generated from the registered command tree. */
 function program(): Command {
-    const services = new Command('services').alias('service').addCommand(
-        new Command('action').option('--on <computer>', 'computer').option('--yes', 'confirm'),
-    );
-    const fleet = new Command('fleet').addCommand(new Command('status').option('--json', 'json')).addCommand(services);
+    const services = new Command('services')
+        .alias('service')
+        .addCommand(
+            new Command('action').option('--on <computer>', 'computer').option('--yes', 'confirm'),
+        );
+    const fleet = new Command('fleet')
+        .addCommand(new Command('status').option('--json', 'json'))
+        .addCommand(services);
     return new Command('ever-works').addCommand(fleet);
 }
 
@@ -15,8 +19,12 @@ describe('completion', () => {
     it('lists what may follow every command path, aliases included', () => {
         const table = completionTable(completionTree(program()));
         expect(table.get('')).toEqual(expect.arrayContaining(['fleet', '--help']));
-        expect(table.get('fleet')).toEqual(expect.arrayContaining(['status', 'services', 'service']));
-        expect(table.get('fleet service action')).toEqual(expect.arrayContaining(['--on', '--yes']));
+        expect(table.get('fleet')).toEqual(
+            expect.arrayContaining(['status', 'services', 'service']),
+        );
+        expect(table.get('fleet service action')).toEqual(
+            expect.arrayContaining(['--on', '--yes']),
+        );
         expect(table.get('fleet services action')).toEqual(table.get('fleet service action'));
     });
 
@@ -35,7 +43,11 @@ describe('completion', () => {
     it('prints fish completions per level', () => {
         const script = completionScript('fish', completionTree(program()));
         expect(script).toContain("complete -c ever-works -f -n '__fish_use_subcommand' -a 'fleet'");
-        expect(script).toContain("complete -c ever-works -f -n '__fish_seen_subcommand_from fleet' -a 'services'");
-        expect(script).toContain("complete -c ever-works -n '__fish_seen_subcommand_from action' -l 'yes'");
+        expect(script).toContain(
+            "complete -c ever-works -f -n '__fish_seen_subcommand_from fleet' -a 'services'",
+        );
+        expect(script).toContain(
+            "complete -c ever-works -n '__fish_seen_subcommand_from action' -l 'yes'",
+        );
     });
 });

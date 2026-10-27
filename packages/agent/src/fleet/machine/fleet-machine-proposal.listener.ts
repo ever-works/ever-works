@@ -48,16 +48,28 @@ export class FleetMachineProposalListener {
         if (event.decidedVia !== 'user' || !event.decidedById) return;
         const payload = (event.payload ?? {}) as Record<string, unknown>;
         if (payload.kind !== FLEET_MACHINE_ACTION_PROPOSAL_KIND) return;
-        if (payload.agentId !== event.agentId || typeof payload.nodeId !== 'string' || !payload.nodeId) {
-            this.logger.warn(`Approved machine act ${event.proposalId} names another Agent or no computer; not run`);
+        if (
+            payload.agentId !== event.agentId ||
+            typeof payload.nodeId !== 'string' ||
+            !payload.nodeId
+        ) {
+            this.logger.warn(
+                `Approved machine act ${event.proposalId} names another Agent or no computer; not run`,
+            );
             return;
         }
         const args = (payload.args ?? {}) as Record<string, unknown>;
-        const caller = { kind: 'agent' as const, agentId: event.agentId, ownerUserId: event.userId };
+        const caller = {
+            kind: 'agent' as const,
+            agentId: event.agentId,
+            ownerUserId: event.userId,
+        };
         try {
             if (payload.verb === 'services.action') {
                 if (!isFleetServiceName(args.name) || !isFleetServiceAction(args.action)) {
-                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid service; not run`);
+                    this.logger.warn(
+                        `Approved machine act ${event.proposalId} has an invalid service; not run`,
+                    );
                     return;
                 }
                 await this.machine.serviceAction(payload.nodeId, caller, {
@@ -71,8 +83,14 @@ export class FleetMachineProposalListener {
             }
             if (payload.verb === 'docker.container.action') {
                 // Only `remove` is ever held; its typed name is the one the Agent's call resolved.
-                if (args.action !== 'remove' || !isFleetContainerRef(args.container) || !isFleetDockerName(args.name)) {
-                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid container; not run`);
+                if (
+                    args.action !== 'remove' ||
+                    !isFleetContainerRef(args.container) ||
+                    !isFleetDockerName(args.name)
+                ) {
+                    this.logger.warn(
+                        `Approved machine act ${event.proposalId} has an invalid container; not run`,
+                    );
                     return;
                 }
                 await this.machine.containerAction(payload.nodeId, caller, {
@@ -85,7 +103,9 @@ export class FleetMachineProposalListener {
             if (payload.verb === 'docker.run') {
                 const validated = validateFleetRunRequest(args.request);
                 if (!validated.ok) {
-                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid run request; not run`);
+                    this.logger.warn(
+                        `Approved machine act ${event.proposalId} has an invalid run request; not run`,
+                    );
                     return;
                 }
                 await this.machine.runContainer(payload.nodeId, caller, {
@@ -96,16 +116,23 @@ export class FleetMachineProposalListener {
             }
             if (payload.verb === 'docker.image.remove') {
                 if (!isFleetDockerId(args.id)) {
-                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid image; not run`);
+                    this.logger.warn(
+                        `Approved machine act ${event.proposalId} has an invalid image; not run`,
+                    );
                     return;
                 }
-                await this.machine.removeImage(payload.nodeId, caller, { id: args.id, fields: { confirm: true } });
+                await this.machine.removeImage(payload.nodeId, caller, {
+                    id: args.id,
+                    fields: { confirm: true },
+                });
                 return;
             }
             if (payload.verb === 'compose.action') {
                 // Only `down` is ever held.
                 if (args.action !== 'down' || !isFleetComposeProject(args.project)) {
-                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid project; not run`);
+                    this.logger.warn(
+                        `Approved machine act ${event.proposalId} has an invalid project; not run`,
+                    );
                     return;
                 }
                 await this.machine.composeAction(payload.nodeId, caller, {
@@ -116,12 +143,16 @@ export class FleetMachineProposalListener {
                 return;
             }
             if (payload.verb === 'docker.image.prune') {
-                await this.machine.pruneImages(payload.nodeId, caller, { fields: { confirm: true } });
+                await this.machine.pruneImages(payload.nodeId, caller, {
+                    fields: { confirm: true },
+                });
                 return;
             }
             if (payload.verb === 'processes.signal') {
                 if (!isFleetProcessPid(args.pid) || !isFleetProcessSignal(args.signal)) {
-                    this.logger.warn(`Approved machine act ${event.proposalId} has an invalid process; not run`);
+                    this.logger.warn(
+                        `Approved machine act ${event.proposalId} has an invalid process; not run`,
+                    );
                     return;
                 }
                 await this.machine.signalProcess(payload.nodeId, caller, {

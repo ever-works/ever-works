@@ -197,7 +197,8 @@ export async function resolveCanonicalAllowedRoots(
 	const refused: ResolvedAllowedRoots['refused'] = [];
 	const seen = new Set<string>();
 	for (const candidate of candidates) {
-		if (typeof candidate.path !== 'string' || candidate.path.length === 0 || candidate.path.includes('\0')) continue;
+		if (typeof candidate.path !== 'string' || candidate.path.length === 0 || candidate.path.includes('\0'))
+			continue;
 		if (!api.isAbsolute(candidate.path)) {
 			refused.push({ ...candidate, reason: 'relative' });
 			continue;

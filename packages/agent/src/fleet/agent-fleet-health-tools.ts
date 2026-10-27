@@ -49,9 +49,21 @@ export const FLEET_NODES_NEEDS_A_LOOK_TOOL_NAME = 'fleet_nodes_needs_a_look';
 export const FLEET_NODES_WAKE_TOOL_NAME = 'fleet_nodes_wake';
 
 export const FLEET_HEALTH_TOOL_ANNOTATIONS: Readonly<Record<string, FleetToolAnnotations>> = {
-    [FLEET_NODES_HEALTH_TOOL_NAME]: { readOnly: true, destructive: false, confirmationClass: 'plain' },
-    [FLEET_NODES_NEEDS_A_LOOK_TOOL_NAME]: { readOnly: true, destructive: false, confirmationClass: 'plain' },
-    [FLEET_NODES_WAKE_TOOL_NAME]: { readOnly: false, destructive: false, confirmationClass: 'plain' },
+    [FLEET_NODES_HEALTH_TOOL_NAME]: {
+        readOnly: true,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
+    [FLEET_NODES_NEEDS_A_LOOK_TOOL_NAME]: {
+        readOnly: true,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
+    [FLEET_NODES_WAKE_TOOL_NAME]: {
+        readOnly: false,
+        destructive: false,
+        confirmationClass: 'plain',
+    },
 };
 
 /**
@@ -101,7 +113,8 @@ function toolError(code: string, hint: string): ToolError {
 function refusal(err: unknown): ToolError {
     const status = (err as { status?: unknown; getStatus?: () => number } | null)?.getStatus?.();
     if (status === 404) return toolError('not_found', 'no such computer');
-    if (status === 403) return toolError('permission_denied', err instanceof Error ? err.message : 'not allowed');
+    if (status === 403)
+        return toolError('permission_denied', err instanceof Error ? err.message : 'not allowed');
     return toolError('internal', err instanceof Error ? err.message : String(err));
 }
 
@@ -121,14 +134,18 @@ export function buildFleetHealthTools(args: {
         parameters: {
             type: 'object',
             properties: {
-                nodeId: { type: 'string', description: 'The computer (its id, from list_fleet_nodes).' },
+                nodeId: {
+                    type: 'string',
+                    description: 'The computer (its id, from list_fleet_nodes).',
+                },
                 range: {
                     type: 'string',
                     description: 'Optional history range: 1h, 24h, 7d or 90d.',
                 },
                 fresh: {
                     type: 'boolean',
-                    description: 'Ask the computer for a fresh reading now instead of its last check-in.',
+                    description:
+                        'Ask the computer for a fresh reading now instead of its last check-in.',
                 },
             },
             required: ['nodeId'],
@@ -145,7 +162,9 @@ export function buildFleetHealthTools(args: {
                 const { view } = await args.service.getVisibleForUser(args.userId, a.nodeId);
                 const now = Date.now();
                 const offlineAfterMs = config.fleet.getNodeOfflineAfterMs();
-                const snapshot = hasFleetNodeHealthReading(view.health) ? (view.health ?? null) : null;
+                const snapshot = hasFleetNodeHealthReading(view.health)
+                    ? (view.health ?? null)
+                    : null;
                 const result: FleetNodesHealthResult = {
                     nodeId: view.id,
                     snapshot,
@@ -182,7 +201,10 @@ export function buildFleetHealthTools(args: {
             parameters: {
                 type: 'object',
                 properties: {
-                    nodeId: { type: 'string', description: "Optional: only this computer's items." },
+                    nodeId: {
+                        type: 'string',
+                        description: "Optional: only this computer's items.",
+                    },
                 },
                 required: [],
             },

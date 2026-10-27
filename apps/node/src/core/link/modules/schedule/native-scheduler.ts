@@ -158,7 +158,10 @@ function escapeCronPercent(line: string): string {
 }
 
 /** Why `cronLine` gives no line for this entry, or null when it gives one. Pure. */
-export function cronLineSkipReason(entry: NativeScheduleEntry, command: NativeSchedulerOptions['command']): string | null {
+export function cronLineSkipReason(
+	entry: NativeScheduleEntry,
+	command: NativeSchedulerOptions['command']
+): string | null {
 	if (!isFleetCommandId(entry.id)) return 'not a schedule id';
 	if (!fleetScheduleCadenceToCron(entry.cadence)) return 'not expressible as cron';
 	for (const word of [command.file, ...command.args]) {
@@ -308,7 +311,9 @@ export function schtasksTiming(cadence: FleetScheduleCadence): { args: string[] 
 		case 'weekdays':
 			return { args: ['/SC', 'WEEKLY', '/D', 'MON,TUE,WED,THU,FRI', '/ST', form.at] };
 		case 'days':
-			return { args: ['/SC', 'WEEKLY', '/D', form.days.map((day) => WINDOWS_DAYS[day]).join(','), '/ST', form.at] };
+			return {
+				args: ['/SC', 'WEEKLY', '/D', form.days.map((day) => WINDOWS_DAYS[day]).join(','), '/ST', form.at]
+			};
 		case 'cron':
 		default:
 			return { reason: 'Task Scheduler cannot express this cron expression; it runs while the node runs' };
@@ -364,7 +369,9 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 		const domain = `gui/${options.uid ?? process.getuid?.() ?? 501}`;
 		const ours = async (): Promise<string[]> => {
 			try {
-				return (await fsp.readdir(dir)).filter((name) => name.startsWith(NATIVE_LAUNCHD_PREFIX) && name.endsWith('.plist'));
+				return (await fsp.readdir(dir)).filter(
+					(name) => name.startsWith(NATIVE_LAUNCHD_PREFIX) && name.endsWith('.plist')
+				);
 			} catch {
 				return [];
 			}
@@ -383,7 +390,10 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 					const plist = launchdPlist(entry, options.command);
 					if (!plist) {
 						const timing = launchdTiming(entry.cadence);
-						result.skipped.push({ id: entry.id, reason: 'reason' in timing ? timing.reason : 'not a schedule id' });
+						result.skipped.push({
+							id: entry.id,
+							reason: 'reason' in timing ? timing.reason : 'not a schedule id'
+						});
 						continue;
 					}
 					const file = `${NATIVE_LAUNCHD_PREFIX}${entry.id}.plist`;
@@ -399,7 +409,10 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 						await exec('launchctl', ['bootout', domain, target]).catch(() => undefined);
 						await fsp.writeFile(target, plist, { mode: 0o644 });
 						const loaded = await exec('launchctl', ['bootstrap', domain, target]);
-						if (loaded.code !== 0) options.logger?.warn(`Schedules: launchd did not load ${file}: ${loaded.stderr.split('\n', 1)[0]}`);
+						if (loaded.code !== 0)
+							options.logger?.warn(
+								`Schedules: launchd did not load ${file}: ${loaded.stderr.split('\n', 1)[0]}`
+							);
 					}
 					result.installed.push(entry.id);
 				}
@@ -431,7 +444,10 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 				for (const entry of entries) {
 					const timing = schtasksTiming(entry.cadence);
 					if ('reason' in timing || !isFleetCommandId(entry.id)) {
-						result.skipped.push({ id: entry.id, reason: 'reason' in timing ? timing.reason : 'not a schedule id' });
+						result.skipped.push({
+							id: entry.id,
+							reason: 'reason' in timing ? timing.reason : 'not a schedule id'
+						});
 						continue;
 					}
 					const run = schtasksRunLine(entry, options.command);
@@ -441,9 +457,21 @@ export function createNativeScheduler(options: NativeSchedulerOptions): NativeSc
 					}
 					const name = `${NATIVE_TASK_FOLDER}${entry.id}`;
 					wanted.add(name);
-					const created = await exec('schtasks', ['/Create', '/F', '/TN', name, '/TR', run.line, ...timing.args]);
+					const created = await exec('schtasks', [
+						'/Create',
+						'/F',
+						'/TN',
+						name,
+						'/TR',
+						run.line,
+						...timing.args
+					]);
 					if (created.code === 0) result.installed.push(entry.id);
-					else result.skipped.push({ id: entry.id, reason: created.stderr.split('\n', 1)[0] || 'schtasks refused it' });
+					else
+						result.skipped.push({
+							id: entry.id,
+							reason: created.stderr.split('\n', 1)[0] || 'schtasks refused it'
+						});
 				}
 				for (const name of await ours()) if (!wanted.has(name)) await remove(name);
 				return result;

@@ -24,12 +24,12 @@ Built with [NestJS](https://nestjs.com/) and [@rekog/mcp-nest](https://github.co
 
 ## Environment Variables
 
-| Variable                | Required | Default                 | Description                                                                           |
-| ----------------------- | -------- | ----------------------- | ------------------------------------------------------------------------------------- |
-| `EVER_WORKS_API_KEY`    | Yes      | --                      | API key for authentication                                                            |
-| `EVER_WORKS_API_URL`    | No       | `http://localhost:3100` | Base URL of the Ever Works API                                                        |
-| `EVER_WORKS_MCP_PORT`   | No       | `3200`                  | Port for HTTP transport                                                               |
-| `EVER_WORKS_SCOPE_SLUG` | No       | -- (personal scope)     | Organization slug every tool call runs under, sent as `x-scope-slug` (or `@personal`) |
+| Variable                | Required | Default                 | Description                                                                                        |
+| ----------------------- | -------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `EVER_WORKS_API_KEY`    | Yes      | --                      | API key for authentication                                                                         |
+| `EVER_WORKS_API_URL`    | No       | `http://localhost:3100` | Base URL of the Ever Works API                                                                     |
+| `EVER_WORKS_MCP_PORT`   | No       | `3200`                  | Port for HTTP transport                                                                            |
+| `EVER_WORKS_SCOPE_SLUG` | No       | -- (personal scope)     | Organization slug every tool call runs under, sent as `x-scope-slug` (or `@personal`)              |
 | `MCP_PRIVILEGED_TOOLS`  | No       | off                     | `true` registers the privileged tools (deploy, plugin settings, run starters, deletes) — see below |
 
 ### Organization scope
@@ -87,12 +87,12 @@ EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp
 
 The API cannot tell an MCP client holding the owner's personal key (or a session JWT this server forwards) from the owner, and every client is a model that may be reading hostile content — a scraped page, an email, community-PR text. So the tools that publish, re-point model traffic, start paid or autonomous work, or destroy data are **not registered** unless the operator sets `MCP_PRIVILEGED_TOOLS=true` on the server. With the switch on they register exactly as before; with it off the server logs, at startup, which tools it held back.
 
-| Group | Tools held back while the switch is off |
-| ----- | --------------------------------------- |
-| Deploy | `deploy_work` |
-| Plugin secrets / model routing | `enable_plugin`, `update_plugin_settings` |
+| Group                          | Tools held back while the switch is off                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deploy                         | `deploy_work`                                                                                                                                                                                                                                                                                                                |
+| Plugin secrets / model routing | `enable_plugin`, `update_plugin_settings`                                                                                                                                                                                                                                                                                    |
 | Starts paid or autonomous work | `generate_items`, `update_items`, `update_schedule`, `run_scheduled_update`, `run_mission_now`, `resume_mission`, `clone_mission`, `build_idea`, `retry_idea`, `rebuild_idea`, `accept_idea`, `run_tasks_batch`, `run_task`, `activate_goal`, `update_goal_limits`, `run_agent_now`, `resume_agent`, `process_community_prs` |
-| Destroys or hides data | `delete_work`, `delete_mission`, `delete_task`, `discard_task_branch`, `delete_inbox_item`, `delete_comparison`, `remove_item` |
+| Destroys or hides data         | `delete_work`, `delete_mission`, `delete_task`, `discard_task_branch`, `delete_inbox_item`, `delete_comparison`, `remove_item`                                                                                                                                                                                               |
 
 The switch also governs two arguments: `create_task` / `update_task` do not offer or forward `agentId` and `scheduledAt` (who runs a Task and when) while it is off. And `kb.create` / `kb.update` file their documents as proposals (`reviewState: 'proposed'`, `source: 'agent'` on create; a content edit re-enters review) — the document feeds agent context once a person accepts it in the app; the API applies the same rule to every non-session credential (`KB_NON_SESSION_WRITES_PROPOSED`). The list lives in `src/openapi-tools/privileged-tools.ts`.
 

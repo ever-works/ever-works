@@ -35,9 +35,21 @@ async function enrolledNode(request: APIRequestContext, ownerToken: string) {
     return (await enrolled.json()) as { nodeId: string; secret: string };
 }
 
-async function beat(request: APIRequestContext, nodeId: string, secret: string, extra: Record<string, unknown>) {
+async function beat(
+    request: APIRequestContext,
+    nodeId: string,
+    secret: string,
+    extra: Record<string, unknown>,
+) {
     const res = await request.post(`${API_BASE}/api/fleet/heartbeat`, {
-        data: { nodeId, secret, platform: 'linux/x64', version: '0.4.0', capabilities: ['terminal'], ...extra },
+        data: {
+            nodeId,
+            secret,
+            platform: 'linux/x64',
+            version: '0.4.0',
+            capabilities: ['terminal'],
+            ...extra,
+        },
     });
     expect(res.status(), `heartbeat body=${await res.text().catch(() => '')}`).toBe(200);
 }
@@ -72,7 +84,10 @@ test.describe('computer health — wake and Refresh now (FR-23 … FR-28)', () =
     test('an online computer is not woken, and its health read says why', async ({ request }) => {
         const owner = await registerUserViaAPI(request);
         const { nodeId, secret } = await enrolledNode(request, owner.access_token);
-        await beat(request, nodeId, secret, { macAddress: 'aa:bb:cc:dd:3f:9a', lanId: 'a1b2c3d4e5f60718' });
+        await beat(request, nodeId, secret, {
+            macAddress: 'aa:bb:cc:dd:3f:9a',
+            lanId: 'a1b2c3d4e5f60718',
+        });
 
         const wake = await request.post(`${API_BASE}/api/fleet/nodes/${nodeId}/wake`, {
             headers: authedHeaders(owner.access_token),
@@ -86,16 +101,23 @@ test.describe('computer health — wake and Refresh now (FR-23 … FR-28)', () =
                 headers: authedHeaders(owner.access_token),
             })
         ).json();
-        if (health.wake) expect(health.wake).toMatchObject({ available: false, reason: 'not-offline' });
+        if (health.wake)
+            expect(health.wake).toMatchObject({ available: false, reason: 'not-offline' });
 
         const status = await request.get(`${API_BASE}/api/fleet/nodes/${nodeId}/wake`, {
             headers: authedHeaders(owner.access_token),
         });
         expect(status.status()).toBe(200);
-        expect(await status.json()).toMatchObject({ nodeId, lastWakeAttemptAt: null, answered: false });
+        expect(await status.json()).toMatchObject({
+            nodeId,
+            lastWakeAttemptAt: null,
+            answered: false,
+        });
     });
 
-    test('Refresh now on a computer with no open link is refused with its reason', async ({ request }) => {
+    test('Refresh now on a computer with no open link is refused with its reason', async ({
+        request,
+    }) => {
         const owner = await registerUserViaAPI(request);
         const { nodeId, secret } = await enrolledNode(request, owner.access_token);
         // Enrol-only: no consent able to open a link.
@@ -121,7 +143,9 @@ test.describe('computer health — wake and Refresh now (FR-23 … FR-28)', () =
         }
     });
 
-    test('a stranger can neither refresh nor wake, nor read the wake status', async ({ request }) => {
+    test('a stranger can neither refresh nor wake, nor read the wake status', async ({
+        request,
+    }) => {
         const owner = await registerUserViaAPI(request);
         const stranger = await registerUserViaAPI(request);
         const { nodeId } = await enrolledNode(request, owner.access_token);
@@ -132,8 +156,13 @@ test.describe('computer health — wake and Refresh now (FR-23 … FR-28)', () =
         ] as const) {
             const res =
                 method === 'post'
-                    ? await request.post(`${API_BASE}${path}`, { headers: authedHeaders(stranger.access_token), data: {} })
-                    : await request.get(`${API_BASE}${path}`, { headers: authedHeaders(stranger.access_token) });
+                    ? await request.post(`${API_BASE}${path}`, {
+                          headers: authedHeaders(stranger.access_token),
+                          data: {},
+                      })
+                    : await request.get(`${API_BASE}${path}`, {
+                          headers: authedHeaders(stranger.access_token),
+                      });
             expect(res.status(), `${method} ${path}`).toBe(404);
         }
     });

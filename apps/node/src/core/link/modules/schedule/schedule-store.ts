@@ -1,10 +1,6 @@
 import { promises as fsp } from 'fs';
 import * as path from 'path';
-import {
-	isFleetCommandId,
-	parseFleetScheduleDefinition,
-	type FleetScheduleDefinition
-} from '@ever-works/contracts';
+import { isFleetCommandId, parseFleetScheduleDefinition, type FleetScheduleDefinition } from '@ever-works/contracts';
 
 /**
  * Schedules on computers (FL-13, CONTRACTS §6, plan §6) — the machine's copy
@@ -101,7 +97,8 @@ export class ScheduleStore {
 		const held: StoredSchedule[] = [];
 		for (const definition of definitions) {
 			const before = previous.get(definition.id);
-			const sameClock = before && JSON.stringify(before.definition.cadence) === JSON.stringify(definition.cadence);
+			const sameClock =
+				before && JSON.stringify(before.definition.cadence) === JSON.stringify(definition.cadence);
 			const stored: StoredSchedule = {
 				definition,
 				armedAt: sameClock ? before.armedAt : now,
@@ -185,7 +182,8 @@ export class ScheduleStore {
 			const definition = parseFleetScheduleDefinition(raw.definition);
 			if (!definition) return null;
 			const armedAt = typeof raw.armedAt === 'number' && Number.isFinite(raw.armedAt) ? raw.armedAt : Date.now();
-			const lastFireAt = typeof raw.lastFireAt === 'number' && Number.isFinite(raw.lastFireAt) ? raw.lastFireAt : null;
+			const lastFireAt =
+				typeof raw.lastFireAt === 'number' && Number.isFinite(raw.lastFireAt) ? raw.lastFireAt : null;
 			return { definition, armedAt, lastFireAt };
 		} catch {
 			return null;

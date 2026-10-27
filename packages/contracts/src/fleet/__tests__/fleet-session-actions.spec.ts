@@ -148,7 +148,9 @@ describe('FL-06 — relevance rules (spec FR-15)', () => {
 		expect(isFleetSessionOnDefaultBranch({ branch: 'main', baseRef: 'origin/main' })).toBe(true);
 		expect(isFleetSessionOnDefaultBranch({ branch: 'nina/x', baseRef: 'main' })).toBe(false);
 		expect(isFleetSessionOnDefaultBranch({ branch: 'master', baseRef: null })).toBe(true);
-		expect(isFleetSessionOnDefaultBranch({ branch: 'develop', baseRef: null, defaultBranch: 'develop' })).toBe(true);
+		expect(isFleetSessionOnDefaultBranch({ branch: 'develop', baseRef: null, defaultBranch: 'develop' })).toBe(
+			true
+		);
 	});
 });
 
@@ -160,9 +162,9 @@ describe('FL-06 — the branch rule (spec FR-3 … FR-5, U9)', () => {
 	});
 
 	it('slugs the first message, then the title, then a generated name', () => {
-		expect(proposeFleetSessionBranch({ prefix: 'Nina', firstMessage: 'Fix the login bug!', taken: [] }).branch).toBe(
-			'nina/fix-the-login-bug'
-		);
+		expect(
+			proposeFleetSessionBranch({ prefix: 'Nina', firstMessage: 'Fix the login bug!', taken: [] }).branch
+		).toBe('nina/fix-the-login-bug');
 		expect(proposeFleetSessionBranch({ prefix: 'nina', title: 'Café menu', taken: [] })).toMatchObject({
 			branch: 'nina/cafe-menu',
 			source: 'title'

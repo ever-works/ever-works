@@ -48,7 +48,8 @@ export function useMachineList<T>(load: () => Promise<MachineCallResult<T>>, int
     useEffect(() => {
         void refresh();
         const tick = () => {
-            if (typeof document === 'undefined' || document.visibilityState === 'visible') void refresh();
+            if (typeof document === 'undefined' || document.visibilityState === 'visible')
+                void refresh();
         };
         const timer = setInterval(tick, intervalMs);
         const onVisible = () => {

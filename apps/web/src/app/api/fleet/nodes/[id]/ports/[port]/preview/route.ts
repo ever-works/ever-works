@@ -30,5 +30,9 @@ async function forward(
 }
 
 export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => forward('GET', headers, ctx));
-export const POST = bffProxy<RouteContext>(async ({ headers }, ctx) => forward('POST', headers, ctx));
-export const DELETE = bffProxy<RouteContext>(async ({ headers }, ctx) => forward('DELETE', headers, ctx));
+export const POST = bffProxy<RouteContext>(async ({ headers }, ctx) =>
+    forward('POST', headers, ctx),
+);
+export const DELETE = bffProxy<RouteContext>(async ({ headers }, ctx) =>
+    forward('DELETE', headers, ctx),
+);

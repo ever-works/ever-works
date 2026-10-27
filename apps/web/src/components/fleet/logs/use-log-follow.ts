@@ -111,7 +111,13 @@ export function useLogFollow(input: UseLogFollowInput) {
         setState((previous) => ({
             ...INITIAL,
             // A reconnect keeps what is on screen (U8): only a new source starts empty.
-            ...(attempt.current > 0 ? { window: previous.window, bytes: previous.bytes, redactions: previous.redactions } : {}),
+            ...(attempt.current > 0
+                ? {
+                      window: previous.window,
+                      bytes: previous.bytes,
+                      redactions: previous.redactions,
+                  }
+                : {}),
         }));
         heldWhilePaused.current = [];
         pausedRef.current = false;
@@ -144,11 +150,27 @@ export function useLogFollow(input: UseLogFollowInput) {
                         // In a merged view one source ending leaves the others following (P2).
                         return sources.length > 1
                             ? { ...s, stopHint: notice.hint ?? null }
-                            : { ...s, following: false, stopReason: notice.kind, stopHint: notice.hint ?? null };
+                            : {
+                                  ...s,
+                                  following: false,
+                                  stopReason: notice.kind,
+                                  stopHint: notice.hint ?? null,
+                              };
                     case 'kill-switch':
-                        return { ...s, following: false, phase: 'stopped', stopReason: 'kill-switch', stopHint: notice.hint ?? null };
+                        return {
+                            ...s,
+                            following: false,
+                            phase: 'stopped',
+                            stopReason: 'kill-switch',
+                            stopHint: notice.hint ?? null,
+                        };
                     case 'error':
-                        return { ...s, following: false, stopReason: 'not-following', stopHint: notice.hint ?? null };
+                        return {
+                            ...s,
+                            following: false,
+                            stopReason: 'not-following',
+                            stopHint: notice.hint ?? null,
+                        };
                     default:
                         return s;
                 }
@@ -168,9 +190,13 @@ export function useLogFollow(input: UseLogFollowInput) {
                 onLines: (incoming, bytes) => {
                     if (disposed) return;
                     const earlier = incoming.filter((line) => line.earlier === true);
-                    const fresh = earlier.length > 0 ? incoming.filter((line) => line.earlier !== true) : incoming;
+                    const fresh =
+                        earlier.length > 0
+                            ? incoming.filter((line) => line.earlier !== true)
+                            : incoming;
                     const redactions = incoming.reduce((sum, line) => sum + line.redactions, 0);
-                    if (pausedRef.current && fresh.length > 0) heldWhilePaused.current.push(...fresh);
+                    if (pausedRef.current && fresh.length > 0)
+                        heldWhilePaused.current.push(...fresh);
                     setState((s) => {
                         let window = s.window;
                         let prepended = s.prepended;
@@ -188,7 +214,9 @@ export function useLogFollow(input: UseLogFollowInput) {
                             appended: appending ? s.appended + fresh.length : s.appended,
                             bytes: s.bytes + bytes,
                             redactions: s.redactions + redactions,
-                            pausedCount: pausedRef.current ? s.pausedCount + fresh.length : s.pausedCount,
+                            pausedCount: pausedRef.current
+                                ? s.pausedCount + fresh.length
+                                : s.pausedCount,
                         };
                     });
                 },
@@ -205,7 +233,12 @@ export function useLogFollow(input: UseLogFollowInput) {
                         ...(done.error && done.count === 0
                             ? {
                                   phase: 'error' as const,
-                                  error: { code: done.error.code as LogsError['code'], hint: done.error.hint, details: {}, status: 0 },
+                                  error: {
+                                      code: done.error.code as LogsError['code'],
+                                      hint: done.error.hint,
+                                      details: {},
+                                      status: 0,
+                                  },
                               }
                             : {}),
                     }));
@@ -248,7 +281,12 @@ export function useLogFollow(input: UseLogFollowInput) {
                         return;
                     }
                     if (verdict === 'lost' || attempt.current >= RETRY_LIMIT) {
-                        setState((s) => ({ ...s, following: false, phase: 'stopped', stopReason: 'lost' }));
+                        setState((s) => ({
+                            ...s,
+                            following: false,
+                            phase: 'stopped',
+                            stopReason: 'lost',
+                        }));
                         return;
                     }
                     // A transient drop: reconnect with backoff, keeping the lines (U8).

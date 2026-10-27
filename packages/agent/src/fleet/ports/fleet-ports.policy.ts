@@ -72,7 +72,11 @@ export function fleetPortTargetRefusal(
     target: FleetPortOpenTarget,
     state: FleetPortOpenTargetState,
     nodeName: string,
-): { code: 'consent_missing' | 'permission_denied' | 'unsupported_on_node'; hint: string; details: Record<string, unknown> } {
+): {
+    code: 'consent_missing' | 'permission_denied' | 'unsupported_on_node';
+    hint: string;
+    details: Record<string, unknown>;
+} {
     const details = { target, reason: state.reason ?? null };
     switch (state.reason) {
         case 'attend-missing':

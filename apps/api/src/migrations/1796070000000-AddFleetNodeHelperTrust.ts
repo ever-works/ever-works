@@ -44,10 +44,16 @@ export class AddFleetNodeHelperTrust1796070000000 implements MigrationInterface 
             }
         }
         const nodes = await queryRunner.getTable('fleet_nodes');
-        if (nodes && !nodes.indices.some((index) => index.name === 'idx_fleet_nodes_helper_trust')) {
+        if (
+            nodes &&
+            !nodes.indices.some((index) => index.name === 'idx_fleet_nodes_helper_trust')
+        ) {
             await queryRunner.createIndex(
                 'fleet_nodes',
-                new TableIndex({ name: 'idx_fleet_nodes_helper_trust', columnNames: ['helperTrust'] }),
+                new TableIndex({
+                    name: 'idx_fleet_nodes_helper_trust',
+                    columnNames: ['helperTrust'],
+                }),
             );
         }
     }

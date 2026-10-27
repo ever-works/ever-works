@@ -68,8 +68,19 @@ export function createProcessesModule(deps: ProcessesModuleDeps = {}): NodeModul
 		daemonPid: deps.daemonPid?.() ?? null
 	});
 	const readText =
-		deps.readText ?? ((path: string) => fsp.readFile(path, 'utf8').then((text) => text, () => null));
-	const listDir = deps.listDir ?? ((path: string) => fsp.readdir(path).then((entries) => entries.map(String), () => []));
+		deps.readText ??
+		((path: string) =>
+			fsp.readFile(path, 'utf8').then(
+				(text) => text,
+				() => null
+			));
+	const listDir =
+		deps.listDir ??
+		((path: string) =>
+			fsp.readdir(path).then(
+				(entries) => entries.map(String),
+				() => []
+			));
 
 	const readAll = async (): Promise<ParsedProcess[]> => {
 		const read = await readProcesses(runner, platform);
@@ -115,7 +126,9 @@ export function createProcessesModule(deps: ProcessesModuleDeps = {}): NodeModul
 		}
 		if (/access is denied/i.test(message)) {
 			const command = signal === 'KILL' ? `Stop-Process -Id ${pid} -Force` : `taskkill /PID ${pid}`;
-			throw new MachineVerbError(makeFleetLinkError('root_required', command, { command, shell: 'powershell', machine }));
+			throw new MachineVerbError(
+				makeFleetLinkError('root_required', command, { command, shell: 'powershell', machine })
+			);
 		}
 		// A graceful close of a process with no window is refused by Windows: say what would work.
 		if (signal === 'TERM' && /forcefully|\/F/i.test(message)) {
@@ -134,11 +147,17 @@ export function createProcessesModule(deps: ProcessesModuleDeps = {}): NodeModul
 		} catch (error) {
 			const code = errorCode(error);
 			if (code === 'ESRCH') {
-				throw new MachineVerbError(makeFleetLinkError('not_found', `process ${pid} is not running on ${machine}`));
+				throw new MachineVerbError(
+					makeFleetLinkError('not_found', `process ${pid} is not running on ${machine}`)
+				);
 			}
 			if (code !== 'EPERM') throw error;
 		}
-		const outcome = await root.run({ argv: ['kill', `-${signal}`, String(pid)], needsRoot: true, timeoutMs: 10_000 });
+		const outcome = await root.run({
+			argv: ['kill', `-${signal}`, String(pid)],
+			needsRoot: true,
+			timeoutMs: 10_000
+		});
 		if (!outcome.ok) {
 			throw new MachineVerbError(
 				makeFleetLinkError('root_required', outcome.command, { command: outcome.command, shell: 'sh', machine })
@@ -168,7 +187,9 @@ export function createProcessesModule(deps: ProcessesModuleDeps = {}): NodeModul
 			);
 		}
 		if (!all.some((row) => row.pid === pid) && !isAlive(pid)) {
-			throw new MachineVerbError(makeFleetLinkError('not_found', `process ${pid} is not running on ${context.nodeName}`));
+			throw new MachineVerbError(
+				makeFleetLinkError('not_found', `process ${pid} is not running on ${context.nodeName}`)
+			);
 		}
 		if (platform === 'win32') await signalWindows(pid, which, context.nodeName);
 		else await signalUnix(pid, which, context.nodeName);

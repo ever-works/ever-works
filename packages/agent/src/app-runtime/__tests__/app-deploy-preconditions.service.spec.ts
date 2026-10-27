@@ -873,7 +873,12 @@ describe('AppDeployPreconditionsService — the managed tier (§5.1)', () => {
         const asked: unknown[][] = [];
         harness.tier.eligibility = (async (...args: unknown[]) => {
             asked.push(args);
-            return { eligible: false, reasons: ['capReached'], counted: ['cal', 'umami', 'ghost'], max: 3 };
+            return {
+                eligible: false,
+                reasons: ['capReached'],
+                counted: ['cal', 'umami', 'ghost'],
+                max: 3,
+            };
         }) as never;
 
         const result = await harness.service.evaluate(request({ userId: null }));
@@ -913,7 +918,9 @@ describe('AppDeployPreconditionsService — the managed tier (§5.1)', () => {
 
         const result = await harness.service.evaluate(request());
 
-        expect(entryFor(result, 'managed_ineligible').message).toContain('Verify the email address');
+        expect(entryFor(result, 'managed_ineligible').message).toContain(
+            'Verify the email address',
+        );
     });
 
     it('fails CLOSED when the eligibility read throws (it used to warn and deploy)', async () => {

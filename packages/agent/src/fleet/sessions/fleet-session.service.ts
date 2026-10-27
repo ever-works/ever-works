@@ -58,7 +58,10 @@ import { FleetKillSwitchService } from '../fleet-kill-switch.service';
 import { FleetNodeRepository } from '../fleet-node.repository';
 import { FleetCheckoutRepository } from '../checkouts/fleet-checkout.repository';
 import { fleetSessionError, readFleetSessionError } from './fleet-session.errors';
-import { FleetSessionTaskService, type FleetSessionTaskAdmission } from './fleet-session-task.service';
+import {
+    FleetSessionTaskService,
+    type FleetSessionTaskAdmission,
+} from './fleet-session-task.service';
 import {
     FLEET_SESSION_NODE_PORT,
     type FleetSessionNodePort,
@@ -83,7 +86,10 @@ import {
 } from './fleet-session.repository';
 import { toFleetSessionGitRef, toFleetSessionView } from './fleet-session.view';
 import { AGENT_SESSION_DISPATCHER, type AgentSessionDispatcher } from './agent-session.dispatcher';
-import { FLEET_SESSION_RECORDER, type FleetSessionRecorderPort } from './fleet-session-recorder.port';
+import {
+    FLEET_SESSION_RECORDER,
+    type FleetSessionRecorderPort,
+} from './fleet-session-recorder.port';
 import { FleetSessionStateService } from './fleet-session-state.service';
 
 /**
@@ -402,7 +408,12 @@ export class FleetSessionService {
             FLEET_SESSION_BOARD_MAX,
         );
         const now = this.now();
-        const columns: FleetSessionBoardResponse['columns'] = { needs_you: [], working: [], done: [], idle: [] };
+        const columns: FleetSessionBoardResponse['columns'] = {
+            needs_you: [],
+            working: [],
+            done: [],
+            idle: [],
+        };
         const movedAt = (view: FleetSessionView) =>
             Date.parse(view.stateChangedAt ?? view.lastActivityAt ?? view.createdAt) || 0;
         // FL-06: board cards carry the git line through the shared card (spec §5.8).
@@ -510,11 +521,17 @@ export class FleetSessionService {
         }
         // Shell inside a container (FL-09 P3): an owner shell session only, its target validated.
         const container =
-            request.container !== undefined ? parseFleetSessionContainerShell(request.container) : null;
+            request.container !== undefined
+                ? parseFleetSessionContainerShell(request.container)
+                : null;
         if (request.container !== undefined && (!container || request.provider !== 'shell')) {
-            throw fleetSessionError('invalid', 'a shell inside a container needs a container and bash or sh', {
-                field: 'container',
-            });
+            throw fleetSessionError(
+                'invalid',
+                'a shell inside a container needs a container and bash or sh',
+                {
+                    field: 'container',
+                },
+            );
         }
         const firstMessage =
             isFleetSessionAgentProvider(request.provider) &&
@@ -685,7 +702,8 @@ export class FleetSessionService {
             ...(options.restartOf ? { restartOf: options.restartOf.id } : {}),
         });
         const applied = await this.drainEarly(node.id, row.row);
-        if (applied.recordingState === 'recording' && isFleetSessionLive(applied.state)) this.ensureRecording(applied);
+        if (applied.recordingState === 'recording' && isFleetSessionLive(applied.state))
+            this.ensureRecording(applied);
         return toFleetSessionView(applied);
     }
 
@@ -718,7 +736,9 @@ export class FleetSessionService {
         // FL-15 P1: an Agent session that worked a Task starts again on the same Task.
         let restartTaskId: string | undefined;
         if (session.kind === 'agent' && session.agentRunId && this.taskRules) {
-            restartTaskId = (await this.taskRules.refsForRuns([session.agentRunId])).get(session.agentRunId)?.id;
+            restartTaskId = (await this.taskRules.refsForRuns([session.agentRunId])).get(
+                session.agentRunId,
+            )?.id;
         }
         return this.start(
             node.id,
@@ -730,7 +750,9 @@ export class FleetSessionService {
                 title: session.title,
                 // An Agent session starts again as the same Agent, with the
                 // first message it kept (redacted when it was stored).
-                ...(session.kind === 'agent' && session.agentId ? { agentId: session.agentId } : {}),
+                ...(session.kind === 'agent' && session.agentId
+                    ? { agentId: session.agentId }
+                    : {}),
                 ...(session.kind === 'agent' && session.firstMessage
                     ? { firstMessage: session.firstMessage }
                     : {}),
@@ -863,11 +885,17 @@ export class FleetSessionService {
         // FL-05 (FR-30): an Agent never answers a permission prompt — not through
         // `fleet_sessions_answer`, and not by typing into the session either.
         if (actor.agentId && session.state === 'needs_you') {
-            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            const attention = session.attention
+                ? parseFleetSessionAttention(session.attention)
+                : null;
             if (attention?.reason === 'permission') {
-                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
-                    reason: 'permission',
-                });
+                throw fleetSessionError(
+                    'permission_denied',
+                    'permission prompts are answered by people',
+                    {
+                        reason: 'permission',
+                    },
+                );
             }
         }
         if (await this.isStopped())
@@ -918,21 +946,32 @@ export class FleetSessionService {
             throw fleetSessionError('invalid', 'the prompt is 1–64 KiB', { field: 'prompt' });
         }
         if (!isFleetSessionLive(session.state)) {
-            throw fleetSessionError('invalid', 'the session has ended; restart it first', { state: session.state });
+            throw fleetSessionError('invalid', 'the session has ended; restart it first', {
+                state: session.state,
+            });
         }
         // FL-05 (FR-30): an Agent never answers a permission prompt — and an action typed while
         // one is open WOULD be read as the answer (spec U7), so an Agent's action waits for a person.
         if (actor.agentId && session.state === 'needs_you') {
-            const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
+            const attention = session.attention
+                ? parseFleetSessionAttention(session.attention)
+                : null;
             if (attention?.reason === 'permission') {
-                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
-                    reason: 'permission',
-                });
+                throw fleetSessionError(
+                    'permission_denied',
+                    'permission prompts are answered by people',
+                    {
+                        reason: 'permission',
+                    },
+                );
             }
         }
-        if (await this.isStopped()) throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
+        if (await this.isStopped())
+            throw fleetSessionError('kill_switch', 'clear it under Settings → Fleet');
         if (!this.node?.isConnected(session.nodeId)) {
-            throw fleetSessionError('unreachable', 'the computer is not connected', { nodeId: session.nodeId });
+            throw fleetSessionError('unreachable', 'the computer is not connected', {
+                nodeId: session.nodeId,
+            });
         }
         await this.requireNode().request({
             nodeId: session.nodeId,
@@ -957,7 +996,8 @@ export class FleetSessionService {
     async question(id: string, actor: FleetSessionActor): Promise<FleetSessionQuestionView> {
         const { session } = await this.resolve(id, actor);
         const view = toFleetSessionView(session);
-        const attention = view.attention && view.attention.reason !== 'finished' ? view.attention : null;
+        const attention =
+            view.attention && view.attention.reason !== 'finished' ? view.attention : null;
         return {
             sessionId: session.id,
             state: session.state,
@@ -972,11 +1012,17 @@ export class FleetSessionService {
      * re-flags (the node keeps its key). A key that is no longer the current
      * one answers `invalid`. Not audited (a read).
      */
-    async acknowledge(id: string, actor: FleetSessionActor, key: string): Promise<FleetSessionView> {
+    async acknowledge(
+        id: string,
+        actor: FleetSessionActor,
+        key: string,
+    ): Promise<FleetSessionView> {
         const { session } = await this.resolve(id, actor);
         const attention = session.attention ? parseFleetSessionAttention(session.attention) : null;
         if (!attention || attention.key !== key) {
-            throw fleetSessionError('invalid', 'that prompt is no longer current', { field: 'acknowledge' });
+            throw fleetSessionError('invalid', 'that prompt is no longer current', {
+                field: 'acknowledge',
+            });
         }
         if (!isFleetSessionAttentionUnread(attention)) return toFleetSessionView(session);
         const next = { ...attention, acknowledgedAt: new Date(this.now()).toISOString() };
@@ -1018,11 +1064,18 @@ export class FleetSessionService {
         }
         if (actor.agentId) {
             if (attention.reason === 'permission') {
-                throw fleetSessionError('permission_denied', 'permission prompts are answered by people', {
-                    reason: 'permission',
-                });
+                throw fleetSessionError(
+                    'permission_denied',
+                    'permission prompts are answered by people',
+                    {
+                        reason: 'permission',
+                    },
+                );
             }
-            if (session.agentId !== actor.agentId && !(await this.agentMayAnswerOthers(actor.agentId))) {
+            if (
+                session.agentId !== actor.agentId &&
+                !(await this.agentMayAnswerOthers(actor.agentId))
+            ) {
                 throw fleetSessionError(
                     'permission_denied',
                     'ask the Agent\u2019s owner to switch on "may answer other sessions" for this Agent',
@@ -1030,19 +1083,36 @@ export class FleetSessionService {
                 );
             }
         }
-        const optionId = typeof request.optionId === 'string' && request.optionId.length > 0 ? request.optionId : null;
-        const text = typeof request.text === 'string' && request.text.trim().length > 0 ? request.text : null;
+        const optionId =
+            typeof request.optionId === 'string' && request.optionId.length > 0
+                ? request.optionId
+                : null;
+        const text =
+            typeof request.text === 'string' && request.text.trim().length > 0
+                ? request.text
+                : null;
         if ((optionId === null) === (text === null)) {
-            throw fleetSessionError('invalid', 'an answer is one of the options or a text', { field: 'optionId' });
+            throw fleetSessionError('invalid', 'an answer is one of the options or a text', {
+                field: 'optionId',
+            });
         }
         if (optionId !== null && !attention.options.some((option) => option.id === optionId)) {
-            throw fleetSessionError('invalid', `"${optionId}" is not one of the options`, { field: 'optionId' });
+            throw fleetSessionError('invalid', `"${optionId}" is not one of the options`, {
+                field: 'optionId',
+            });
         }
         if (text !== null && !(attention.reason === 'question' && attention.allowsText)) {
-            throw fleetSessionError('invalid', 'this prompt takes one of its options, not a text', { field: 'text' });
+            throw fleetSessionError('invalid', 'this prompt takes one of its options, not a text', {
+                field: 'text',
+            });
         }
-        if (text !== null && (text.length > FLEET_SESSION_ANSWER_TEXT_MAX_CHARS || text.includes('\u0000'))) {
-            throw fleetSessionError('invalid', 'an answer is at most 4 000 characters', { field: 'text' });
+        if (
+            text !== null &&
+            (text.length > FLEET_SESSION_ANSWER_TEXT_MAX_CHARS || text.includes('\u0000'))
+        ) {
+            throw fleetSessionError('invalid', 'an answer is at most 4 000 characters', {
+                field: 'text',
+            });
         }
         const requestedBy = actor.agentId ? `agent:${actor.agentId}` : `user:${actor.userId}`;
         const auditBase = {
@@ -1060,10 +1130,16 @@ export class FleetSessionService {
                 outcome: 'refused',
                 code: 'kill_switch',
             });
-            throw fleetSessionError('kill_switch', 'Paused by the fleet stop \u2014 answers are not sent');
+            throw fleetSessionError(
+                'kill_switch',
+                'Paused by the fleet stop \u2014 answers are not sent',
+            );
         }
         if (!this.node?.isConnected(node.id)) {
-            throw fleetSessionError('unreachable', `${node.name} is unreachable \u2014 the answer will not be sent`);
+            throw fleetSessionError(
+                'unreachable',
+                `${node.name} is unreachable \u2014 the answer will not be sent`,
+            );
         }
         try {
             await this.requireNode().request({
@@ -1084,7 +1160,11 @@ export class FleetSessionService {
                 code: typed?.code ?? 'operation_failed',
             });
             if (typed?.code === 'invalid') {
-                throw fleetSessionError('invalid', 'Already answered in the terminal', typed.details);
+                throw fleetSessionError(
+                    'invalid',
+                    'Already answered in the terminal',
+                    typed.details,
+                );
             }
             if (typed) throw fleetSessionError(typed.code, typed.hint, typed.details);
             throw error;
@@ -1120,7 +1200,9 @@ export class FleetSessionService {
         if (!this.agents) return false;
         try {
             const agent = await this.agents.findById(agentId);
-            const permissions = agent?.permissions as unknown as Record<string, unknown> | undefined;
+            const permissions = agent?.permissions as unknown as
+                | Record<string, unknown>
+                | undefined;
             return permissions?.canAnswerOtherSessions === true;
         } catch {
             return false;
@@ -1136,12 +1218,20 @@ export class FleetSessionService {
      * on the machine (the recorder only watches), so the kill switch does not
      * refuse it. An ended session's recording is what it is.
      */
-    async setRecording(id: string, actor: FleetSessionActor, on: boolean): Promise<FleetSessionView> {
+    async setRecording(
+        id: string,
+        actor: FleetSessionActor,
+        on: boolean,
+    ): Promise<FleetSessionView> {
         const { session, node } = await this.resolve(id, actor);
         if (!isFleetSessionLive(session.state)) {
-            throw fleetSessionError('invalid', 'the session has ended; its recording is what it is', {
-                state: session.state,
-            });
+            throw fleetSessionError(
+                'invalid',
+                'the session has ended; its recording is what it is',
+                {
+                    state: session.state,
+                },
+            );
         }
         const next = on ? 'recording' : 'off';
         if (session.recordingState === next) return toFleetSessionView(session);
@@ -1317,7 +1407,8 @@ export class FleetSessionService {
             if (message.daemon.state === 'running') {
                 for (const row of await this.sessions.findLiveForNode(nodeId)) {
                     const entry = held.get(row.daemonSessionId);
-                    if (entry && entry.alive && row.recordingState === 'recording') this.ensureRecording(row);
+                    if (entry && entry.alive && row.recordingState === 'recording')
+                        this.ensureRecording(row);
                     if (entry) {
                         if (row.state === 'starting' && entry.alive) {
                             await this.applyToRow(nodeId, row, {
@@ -1377,7 +1468,11 @@ export class FleetSessionService {
             if (next.state === 'ended' && next.endedReason === 'timeout') {
                 ended += 1;
                 await this.withdrawAgentJob(row.id);
-                await this.settleAgentRun(next, 'unconfirmed', 'no computer slot became free within ten minutes');
+                await this.settleAgentRun(
+                    next,
+                    'unconfirmed',
+                    'no computer slot became free within ten minutes',
+                );
             }
         }
         await this.decayIdle();
@@ -1403,7 +1498,9 @@ export class FleetSessionService {
                 if (await this.sessions.updateIfState(row.id, [row.state], patch)) decayed += 1;
             }
         } catch (error) {
-            this.logger.warn(`idle decay failed: ${error instanceof Error ? error.message : String(error)}`);
+            this.logger.warn(
+                `idle decay failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
         }
         return decayed;
     }
@@ -1433,9 +1530,13 @@ export class FleetSessionService {
     ): Promise<FleetSessionView> {
         const provider = request.provider;
         if (!isFleetAgentSessionProvider(provider)) {
-            throw fleetSessionError('invalid', 'an Agent drives Claude Code or Codex in a session', {
-                field: 'provider',
-            });
+            throw fleetSessionError(
+                'invalid',
+                'an Agent drives Claude Code or Codex in a session',
+                {
+                    field: 'provider',
+                },
+            );
         }
         const agentId = typeof request.agentId === 'string' ? request.agentId : '';
         if (!/^[0-9a-f-]{36}$/i.test(agentId)) {
@@ -1467,7 +1568,10 @@ export class FleetSessionService {
             throw fleetSessionError('invalid', 'choose a folder on the computer', { field: 'cwd' });
         }
         if (!this.agents || !this.runs || !this.agentDispatcher) {
-            throw fleetSessionError('unreachable', 'this deployment does not run Agent sessions yet');
+            throw fleetSessionError(
+                'unreachable',
+                'this deployment does not run Agent sessions yet',
+            );
         }
         const agent = await this.agents.findByIdAndUser(agentId, actor.userId);
         if (!agent) throw fleetSessionError('not_found', 'no such Agent', { field: 'agentId' });
@@ -1532,14 +1636,22 @@ export class FleetSessionService {
         let handoff: FleetSessionTaskAdmission | null = null;
         if (requestedTaskId) {
             if (!this.taskRules) {
-                throw fleetSessionError('invalid', 'this deployment does not hand Tasks to sessions yet', {
-                    field: 'taskId',
-                });
+                throw fleetSessionError(
+                    'invalid',
+                    'this deployment does not hand Tasks to sessions yet',
+                    {
+                        field: 'taskId',
+                    },
+                );
             }
             try {
                 handoff = await this.taskRules.admit({
                     userId: actor.userId,
-                    agent: { id: agent.id, name: agent.name, organizationId: agent.organizationId ?? null },
+                    agent: {
+                        id: agent.id,
+                        name: agent.name,
+                        organizationId: agent.organizationId ?? null,
+                    },
                     node,
                     taskId: requestedTaskId,
                 });
@@ -1646,7 +1758,10 @@ export class FleetSessionService {
                 code: 'unreachable',
                 ...(handoff ? { taskId: handoff.taskId } : {}),
             });
-            throw fleetSessionError('unreachable', `${node.name} could not be asked to start the session`);
+            throw fleetSessionError(
+                'unreachable',
+                `${node.name} could not be asked to start the session`,
+            );
         }
         await this.record(action, actor.userId, node, id, {
             kind: 'agent',
@@ -1703,7 +1818,9 @@ export class FleetSessionService {
                 const reason = settlement.result?.endedReason ?? 'exit';
                 current = await this.endRow(row, reason);
                 const exitCode =
-                    typeof settlement.result?.exitCode === 'number' ? settlement.result.exitCode : null;
+                    typeof settlement.result?.exitCode === 'number'
+                        ? settlement.result.exitCode
+                        : null;
                 if (exitCode !== null && current.exitCode === null) {
                     await this.sessions.update(row.id, { exitCode });
                     current = { ...current, exitCode } as FleetSession;
@@ -1716,7 +1833,8 @@ export class FleetSessionService {
             await this.settleAgentRun(
                 current,
                 outcome,
-                settlement.error ?? (settlement.succeeded ? 'the session ended' : 'the session failed'),
+                settlement.error ??
+                    (settlement.succeeded ? 'the session ended' : 'the session failed'),
             );
         } catch (error) {
             this.logger.warn(
@@ -1798,13 +1916,16 @@ export class FleetSessionService {
                 await this.settleAgentRun(
                     { ...row, ...written } as FleetSession,
                     patch.outcome ?? 'unconfirmed',
-                    patch.endedReason ? `the session ended (${patch.endedReason})` : 'the session ended',
+                    patch.endedReason
+                        ? `the session ended (${patch.endedReason})`
+                        : 'the session ended',
                 );
             }
         } else {
             await this.sessions.update(row.id, written);
             // P3: the process runs — a session to be recorded gets its recorder now.
-            if (message.event === 'started' && row.recordingState === 'recording') this.ensureRecording(row);
+            if (message.event === 'started' && row.recordingState === 'recording')
+                this.ensureRecording(row);
         }
         if (
             (message.event === 'exited' || message.event === 'lost') &&
@@ -1836,10 +1957,14 @@ export class FleetSessionService {
      * and, on `ended`, an open prompt closed (its Decision expires with the
      * session, R-12; a `finished` / `failed` marker stays for unread).
      */
-    private withStatusColumns(row: FleetSession, written: Partial<FleetSession>): Partial<FleetSession> {
+    private withStatusColumns(
+        row: FleetSession,
+        written: Partial<FleetSession>,
+    ): Partial<FleetSession> {
         if (written.state === undefined || written.state === row.state) return written;
         const out: Partial<FleetSession> = { ...written, stateChangedAt: new Date(this.now()) };
-        if (written.state === 'working' && row.state === 'idle' && written.outcome === undefined) out.outcome = null;
+        if (written.state === 'working' && row.state === 'idle' && written.outcome === undefined)
+            out.outcome = null;
         if (
             written.state === 'ended' &&
             row.attention &&
@@ -1889,7 +2014,9 @@ export class FleetSessionService {
     }
 
     /** Ask the recorder (API) to record a live session; best effort. */
-    private ensureRecording(row: Pick<FleetSession, 'id' | 'nodeId' | 'daemonSessionId' | 'kind'>): void {
+    private ensureRecording(
+        row: Pick<FleetSession, 'id' | 'nodeId' | 'daemonSessionId' | 'kind'>,
+    ): void {
         try {
             this.recorder?.ensure({
                 id: row.id,

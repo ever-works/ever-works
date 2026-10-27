@@ -10,9 +10,13 @@ import type {
 
 /** The one read this completion makes of the Work. */
 export interface AppWorkDeletionCompletionWorks {
-    findById(
-        workId: string,
-    ): Promise<{ id: string; kind?: string | null; userId?: string | null; name?: string | null; slug?: string | null } | null>;
+    findById(workId: string): Promise<{
+        id: string;
+        kind?: string | null;
+        userId?: string | null;
+        name?: string | null;
+        slug?: string | null;
+    } | null>;
 }
 
 /** The one read this completion makes of the runtime-state row (`WORK_APP_RUNTIME_STATES`). */
@@ -122,7 +126,9 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
             // Read through a cast: this package compiles without `strictNullChecks`, which turns
             // off discriminated-union narrowing on `claim.claimed`.
             const code = (claim as { code: 'not_deleting' | 'runtime_state_unreadable' }).code;
-            this.logger.warn(`Refused to complete the deletion of work ${id}: ${code}. The row is kept.`);
+            this.logger.warn(
+                `Refused to complete the deletion of work ${id}: ${code}. The row is kept.`,
+            );
             throw new AppWorkDeletionCompletionRefusedError(code);
         }
 
@@ -132,7 +138,9 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
         }
 
         await this.tellOwner({
-            userId: (claim as { requestedByUserId: string | null }).requestedByUserId || String(work.userId ?? ''),
+            userId:
+                (claim as { requestedByUserId: string | null }).requestedByUserId ||
+                String(work.userId ?? ''),
             workId: id,
             workName: String(work.name || work.slug || 'Your App'),
             report,
@@ -158,7 +166,9 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
     }
 
     /** The claim, or the reason there is none. A read that fails is never taken as a claim. */
-    private async readClaim(workId: string): Promise<
+    private async readClaim(
+        workId: string,
+    ): Promise<
         | { claimed: true; requestedByUserId: string | null }
         | { claimed: false; code: 'not_deleting' | 'runtime_state_unreadable' }
     > {
@@ -171,7 +181,9 @@ export class AppWorkDeletionCompletionService implements AppWorkDeletionCompleti
                 return { claimed: false, code: 'not_deleting' };
             }
             const by =
-                typeof row.deletionRequestedByUserId === 'string' ? row.deletionRequestedByUserId : '';
+                typeof row.deletionRequestedByUserId === 'string'
+                    ? row.deletionRequestedByUserId
+                    : '';
             return { claimed: true, requestedByUserId: by || null };
         } catch (error) {
             this.logger.warn(

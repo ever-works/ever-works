@@ -26,7 +26,12 @@ import { fleetTaskHandoffAPI } from '@/lib/api/fleet-task-handoff';
 
 export type HandoffActionResult<T> =
     | { success: true; data: T }
-    | { success: false; code: string | null; hint: string | null; details: Record<string, unknown> | null };
+    | {
+          success: false;
+          code: string | null;
+          hint: string | null;
+          details: Record<string, unknown> | null;
+      };
 
 async function ensureAuth() {
     const user = await getAuthFromCookie();
@@ -38,8 +43,9 @@ async function ensureAuth() {
 
 function refusal(error: unknown): HandoffActionResult<never> {
     if (error instanceof ApiResponseError) {
-        const envelope = (error.details as { error?: { hint?: unknown; details?: unknown } } | undefined)
-            ?.error;
+        const envelope = (
+            error.details as { error?: { hint?: unknown; details?: unknown } } | undefined
+        )?.error;
         return {
             success: false,
             code: error.code ?? null,
@@ -67,7 +73,9 @@ export async function getTaskHandoffOptionsAction(
 }
 
 /** One checkout, re-read while the dialog waits for it to become ready. */
-export async function getHandoffCheckoutAction(id: string): Promise<HandoffActionResult<FleetCheckoutView>> {
+export async function getHandoffCheckoutAction(
+    id: string,
+): Promise<HandoffActionResult<FleetCheckoutView>> {
     await ensureAuth();
     try {
         return { success: true, data: await fleetCheckoutsAPI.get(id) };

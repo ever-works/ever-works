@@ -46,13 +46,18 @@ describe('app-work-guard', () => {
             try {
                 fn();
             } catch (error) {
-                return String((error as Error).message).replace(/ is an? [A-Z][a-z]+ Work — .*$/, '');
+                return String((error as Error).message).replace(
+                    / is an? [A-Z][a-z]+ Work — .*$/,
+                    '',
+                );
             }
             return '';
         };
 
         expect(shape(() => assertNotAppWork({ kind: 'app', slug: 'w' }, 'x'))).toBe('Work "w"');
-        expect(shape(() => assertNotRepositoryWork({ kind: 'repo', slug: 'w' }, 'x'))).toBe('Work "w"');
+        expect(shape(() => assertNotRepositoryWork({ kind: 'repo', slug: 'w' }, 'x'))).toBe(
+            'Work "w"',
+        );
         expect(REPOSITORY_WORK_REFUSAL).toBe('is a Repository Work');
     });
 });

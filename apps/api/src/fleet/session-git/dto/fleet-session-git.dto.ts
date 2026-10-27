@@ -1,6 +1,17 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import {
+    IsBoolean,
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    IsUUID,
+    Max,
+    MaxLength,
+    Min,
+    MinLength,
+} from 'class-validator';
 import {
     FLEET_PULL_REQUEST_BODY_MAX_LENGTH,
     FLEET_PULL_REQUEST_TITLE_MAX_LENGTH,
@@ -22,7 +33,11 @@ export class FleetSessionBranchProposalQueryDto {
     @IsUUID()
     checkoutId!: string;
 
-    @ApiProperty({ required: false, format: 'uuid', description: 'An Agent session: the prefix is the Agent’s slug.' })
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'An Agent session: the prefix is the Agent’s slug.',
+    })
     @IsOptional()
     @IsUUID()
     agentId?: string;
@@ -33,13 +48,20 @@ export class FleetSessionBranchProposalQueryDto {
     @MaxLength(FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH)
     firstMessage?: string;
 
-    @ApiProperty({ required: false, description: 'The session title (the slug when there is no first message).' })
+    @ApiProperty({
+        required: false,
+        description: 'The session title (the slug when there is no first message).',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(FLEET_SESSION_TITLE_MAX_LENGTH)
     title?: string;
 
-    @ApiProperty({ required: false, format: 'uuid', description: 'A session from a Task keeps the Task’s branch.' })
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'A session from a Task keeps the Task’s branch.',
+    })
     @IsOptional()
     @IsUUID()
     taskId?: string;
@@ -47,7 +69,10 @@ export class FleetSessionBranchProposalQueryDto {
 
 /** `GET /api/fleet/checkouts/:id/changes` (FL-06 spec FR-9). */
 export class FleetCheckoutChangesQueryDto {
-    @ApiProperty({ required: false, description: 'At most this many bytes of patch text (4 KiB … 1 MiB).' })
+    @ApiProperty({
+        required: false,
+        description: 'At most this many bytes of patch text (4 KiB … 1 MiB).',
+    })
     @IsOptional()
     @Type(() => Number)
     @IsInt()
@@ -62,7 +87,9 @@ export class SendFleetSessionActionDto {
     @IsIn(FLEET_SESSION_ACTION_IDS as unknown as string[])
     actionId!: FleetSessionActionId;
 
-    @ApiProperty({ description: 'The prompt as shown and edited (the rendered template when unchanged).' })
+    @ApiProperty({
+        description: 'The prompt as shown and edited (the rendered template when unchanged).',
+    })
     @IsString()
     @MinLength(1)
     @MaxLength(FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH)
@@ -71,7 +98,10 @@ export class SendFleetSessionActionDto {
 
 /** `POST /api/fleet/sessions/:id/actions/:ledgerId/resend` (FL-06 spec FR-24). */
 export class ResendFleetSessionActionDto {
-    @ApiProperty({ required: false, description: 'The prompt the sheet still holds; the template rendered afresh when absent.' })
+    @ApiProperty({
+        required: false,
+        description: 'The prompt the sheet still holds; the template rendered afresh when absent.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(FLEET_SESSION_ACTION_TEMPLATE_MAX_LENGTH)
@@ -97,7 +127,11 @@ export class OpenFleetPullRequestDto {
     @IsBoolean()
     draft?: boolean;
 
-    @ApiProperty({ required: false, format: 'uuid', description: 'The session asking (its ledger is credited).' })
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'The session asking (its ledger is credited).',
+    })
     @IsOptional()
     @IsUUID()
     sessionId?: string;
@@ -105,7 +139,11 @@ export class OpenFleetPullRequestDto {
 
 /** `PUT /api/fleet/agents/:agentId/action-templates` (FL-06 spec FR-27). */
 export class UpdateFleetAgentActionTemplatesDto {
-    @ApiProperty({ required: false, nullable: true, description: 'The branch prefix; empty or null for the default (the Agent’s slug).' })
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description: 'The branch prefix; empty or null for the default (the Agent’s slug).',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(30)

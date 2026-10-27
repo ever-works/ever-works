@@ -396,7 +396,9 @@ describe('AppUpstreamStateService — T46 release and T47 sync pull request chec
         it('never claims a row without a sync pull request', async () => {
             await seedState();
 
-            expect(await states.claimSyncPullRequestChecks(Date.now(), 600_000, 50)).toHaveLength(0);
+            expect(await states.claimSyncPullRequestChecks(Date.now(), 600_000, 50)).toHaveLength(
+                0,
+            );
         });
     });
 
@@ -446,9 +448,9 @@ describe('AppUpstreamStateService — T46 release and T47 sync pull request chec
         it('refuses any action outside the closed set, and a malformed Work id', async () => {
             await seedState();
 
-            expect(
-                await service().recordWorkerActivity(WORK_ID, { action: 'auth.login' }),
-            ).toBe(false);
+            expect(await service().recordWorkerActivity(WORK_ID, { action: 'auth.login' })).toBe(
+                false,
+            );
             expect(
                 await service().recordWorkerActivity('not-a-uuid', { action: 'app.upstream.held' }),
             ).toBe(false);

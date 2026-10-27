@@ -38,13 +38,19 @@ import {
  */
 
 export class FleetCloudCreateDto {
-    @ApiProperty({ description: 'The machine-provider plugin id (from GET /api/fleet/providers).', maxLength: 64 })
+    @ApiProperty({
+        description: 'The machine-provider plugin id (from GET /api/fleet/providers).',
+        maxLength: 64,
+    })
     @IsString()
     @MinLength(1)
     @MaxLength(64)
     providerPluginId: string;
 
-    @ApiProperty({ pattern: FLEET_CLOUD_NAME_PATTERN.source, description: '2–39 lower-case letters, digits and hyphens.' })
+    @ApiProperty({
+        pattern: FLEET_CLOUD_NAME_PATTERN.source,
+        description: '2–39 lower-case letters, digits and hyphens.',
+    })
     @IsString()
     @MinLength(2)
     @MaxLength(39)
@@ -70,7 +76,10 @@ export class FleetCloudCreateDto {
     @IsIn([...FLEET_CLOUD_SOFTWARE_IDS], { each: true })
     software?: FleetCloudSoftwareId[];
 
-    @ApiProperty({ description: 'The monthly price in cents the caller was shown (refused `invalid` when it changed).' })
+    @ApiProperty({
+        description:
+            'The monthly price in cents the caller was shown (refused `invalid` when it changed).',
+    })
     @IsNumber()
     @Min(0)
     acknowledgedPriceCents: number;
@@ -80,7 +89,10 @@ export class FleetCloudCreateDto {
     @IsBoolean()
     confirm?: boolean;
 
-    @ApiProperty({ required: false, description: 'The Organization the owner is acting in (spec FR-14).' })
+    @ApiProperty({
+        required: false,
+        description: 'The Organization the owner is acting in (spec FR-14).',
+    })
     @IsOptional()
     @IsUUID()
     organizationId?: string;
@@ -88,7 +100,8 @@ export class FleetCloudCreateDto {
     @ApiProperty({
         required: false,
         maxLength: 200,
-        description: 'P3: the overlay-VPN client’s one-time auth key — used once in the first-boot script, never stored.',
+        description:
+            'P3: the overlay-VPN client’s one-time auth key — used once in the first-boot script, never stored.',
     })
     @IsOptional()
     @IsString()
@@ -108,7 +121,10 @@ export class FleetCloudPowerDto {
 }
 
 export class FleetCloudDestroyDto {
-    @ApiProperty({ required: false, description: 'CONTRACTS §2.2 `confirm-destructive` — the machine’s exact name.' })
+    @ApiProperty({
+        required: false,
+        description: 'CONTRACTS §2.2 `confirm-destructive` — the machine’s exact name.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(39)
@@ -121,14 +137,20 @@ export class FleetCloudIdlePolicyDto {
     @IsIn([...FLEET_CLOUD_IDLE_POLICY_MODES])
     mode: FleetCloudIdlePolicyMode;
 
-    @ApiProperty({ minimum: FLEET_CLOUD_IDLE_MIN_HOURS, maximum: FLEET_CLOUD_IDLE_MAX_HOURS, default: 3 })
+    @ApiProperty({
+        minimum: FLEET_CLOUD_IDLE_MIN_HOURS,
+        maximum: FLEET_CLOUD_IDLE_MAX_HOURS,
+        default: 3,
+    })
     @IsInt()
     @Min(FLEET_CLOUD_IDLE_MIN_HOURS)
     @Max(FLEET_CLOUD_IDLE_MAX_HOURS)
     afterHours: number;
 }
 
-export function cloudConfirmFields(body: { confirm?: boolean; confirmName?: string } | null | undefined): FleetActionConfirmFields {
+export function cloudConfirmFields(
+    body: { confirm?: boolean; confirmName?: string } | null | undefined,
+): FleetActionConfirmFields {
     const out: FleetActionConfirmFields = {};
     if (body?.confirm === true) out.confirm = true;
     if (typeof body?.confirmName === 'string') out.confirmName = body.confirmName;

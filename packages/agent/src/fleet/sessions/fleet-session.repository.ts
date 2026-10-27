@@ -188,10 +188,9 @@ export class FleetSessionRepository {
         if (query.since) builder.andWhere('session.createdAt >= :since', { since: query.since });
         if (query.taskId) {
             // A session knows its Run, a Run knows its Task (spec §7): no column of its own.
-            builder.innerJoin(AgentRun, 'run', 'run.id = session.agentRunId').andWhere(
-                'run.taskId = :taskId',
-                { taskId: query.taskId },
-            );
+            builder
+                .innerJoin(AgentRun, 'run', 'run.id = session.agentRunId')
+                .andWhere('run.taskId = :taskId', { taskId: query.taskId });
         }
         const cursor = parseCursor(query.cursor);
         if (cursor) {
@@ -272,7 +271,8 @@ export class FleetSessionRepository {
             .where({ nodeId: In([...nodeIds]) })
             .andWhere('session.state <> :ended', { ended: 'ended' });
         if (query.kind) builder.andWhere('session.kind = :kind', { kind: query.kind });
-        if (query.agentId) builder.andWhere('session.agentId = :agentId', { agentId: query.agentId });
+        if (query.agentId)
+            builder.andWhere('session.agentId = :agentId', { agentId: query.agentId });
         return builder
             .orderBy('session.stateChangedAt', 'DESC')
             .addOrderBy('session.lastActivityAt', 'DESC')

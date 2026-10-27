@@ -308,7 +308,9 @@ describe('the identity-provider capability (APW-12 T4)', () => {
 
 		// The append-only guarantee, asserted rather than assumed: every pre-existing
 		// member is still there, in the same relative order, exactly once.
-		const remaining = PLUGIN_CATEGORIES.filter((entry) => entry !== 'identity' && !LATER_CATEGORIES.includes(entry));
+		const remaining = PLUGIN_CATEGORIES.filter(
+			(entry) => entry !== 'identity' && !LATER_CATEGORIES.includes(entry)
+		);
 		expect(remaining).toEqual([...PRE_IDENTITY_CATEGORIES]);
 		expect(new Set(PLUGIN_CATEGORIES).size).toBe(PLUGIN_CATEGORIES.length);
 

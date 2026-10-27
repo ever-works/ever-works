@@ -31,7 +31,9 @@ function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloud
         case 'running':
             return t('block.running', { duration: since });
         case 'off':
-            return cloud.billsWhileOff ? t('block.offBills', { duration: since }) : t('block.off', { duration: since });
+            return cloud.billsWhileOff
+                ? t('block.offBills', { duration: since })
+                : t('block.off', { duration: since });
         case 'poweringOff':
             return t('block.pending.poweringOff');
         case 'starting':
@@ -39,7 +41,10 @@ function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloud
         case 'destroying':
             return t('block.pending.destroying');
         case 'gone':
-            return t('block.gone', { provider: cloud.providerName, duration: formatSince(cloud.goneAt) ?? since });
+            return t('block.gone', {
+                provider: cloud.providerName,
+                duration: formatSince(cloud.goneAt) ?? since,
+            });
         case 'failed':
             return t('block.failed', { error: cloud.error ?? t('create.failed') });
         case 'unenrolled':
@@ -50,7 +55,9 @@ function stateLine(t: Translate, state: CloudDisplayState, cloud: FleetNodeCloud
         case 'creating':
         default:
             return t('block.creating', {
-                phase: t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as Parameters<typeof t>[0], { provider: cloud.providerName }),
+                phase: t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as Parameters<typeof t>[0], {
+                    provider: cloud.providerName,
+                }),
             });
     }
 }
@@ -124,14 +131,24 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
             {state === 'creating' ? (
                 <ol className="mt-2 flex flex-wrap gap-3 text-xs" aria-label={t('progress.label')}>
                     {CLOUD_PROGRESS.map((phase) => {
-                        const reached = CLOUD_PROGRESS.indexOf(phase) <= CLOUD_PROGRESS.indexOf(cloud.phase);
+                        const reached =
+                            CLOUD_PROGRESS.indexOf(phase) <= CLOUD_PROGRESS.indexOf(cloud.phase);
                         return (
                             <li
                                 key={phase}
-                                className={reached ? 'font-medium' : 'text-text-muted dark:text-text-muted-dark'}
+                                className={
+                                    reached
+                                        ? 'font-medium'
+                                        : 'text-text-muted dark:text-text-muted-dark'
+                                }
                                 aria-current={phase === cloud.phase ? 'step' : undefined}
                             >
-                                {t(`progress.${CLOUD_PHASE_KEYS[phase]}` as Parameters<typeof t>[0], { provider: cloud.providerName })}
+                                {t(
+                                    `progress.${CLOUD_PHASE_KEYS[phase]}` as Parameters<
+                                        typeof t
+                                    >[0],
+                                    { provider: cloud.providerName },
+                                )}
                             </li>
                         );
                     })}
@@ -167,8 +184,13 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
                 </p>
             ) : null}
             {live && idle === 'idle' ? (
-                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-cloud-block-idle-for">
-                    <span>{t('block.idleFor', { duration: formatSince(cloud.idleSince) ?? '' })}</span>
+                <p
+                    className="mt-1 flex flex-wrap items-center gap-2 text-xs"
+                    data-testid="fleet-cloud-block-idle-for"
+                >
+                    <span>
+                        {t('block.idleFor', { duration: formatSince(cloud.idleSince) ?? '' })}
+                    </span>
                     {canEdit ? (
                         <Button
                             size="sm"
@@ -191,7 +213,10 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
                 </p>
             ) : null}
             {live ? (
-                <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-cloud-block-idle">
+                <p
+                    className="mt-1 flex flex-wrap items-center gap-2 text-xs"
+                    data-testid="fleet-cloud-block-idle"
+                >
                     <span>{t('block.idlePolicy', { policy })}</span>
                     {canEdit && !editing ? (
                         <button

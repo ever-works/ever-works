@@ -120,7 +120,11 @@ import { deriveVirtualState, fleetVirtualViewOf, normalizeVirtualMeta } from './
 const MANAGED_CAPABILITY = 'managed';
 
 /** Host features the jobs require (CONTRACTS §1.2) beside the kind's own. */
-const BASE_JOB_CAPABILITIES = [MANAGED_CAPABILITY, FLEET_DOCKER_CAPABILITY, FLEET_VIRTUAL_HOST_CAPABILITY];
+const BASE_JOB_CAPABILITIES = [
+    MANAGED_CAPABILITY,
+    FLEET_DOCKER_CAPABILITY,
+    FLEET_VIRTUAL_HOST_CAPABILITY,
+];
 
 /** A create is retried once if its claim lapses (the executor is idempotent per child). */
 const CREATE_MAX_ATTEMPTS = 2;
@@ -166,7 +170,10 @@ export class FleetVirtualService {
      * — whether it may host it and, if not, why. `autoPickNodeId` is "Choose for
      * me" (the eligible host with the most free memory).
      */
-    async options(caller: FleetMachineCaller, systemId?: unknown): Promise<FleetVirtualOptionsView> {
+    async options(
+        caller: FleetMachineCaller,
+        systemId?: unknown,
+    ): Promise<FleetVirtualOptionsView> {
         const system = this.resolveSystemForOptions(systemId);
         const userId = fleetMachineCallerUserId(caller);
         const visible = await this.visibleNodes(userId);
@@ -191,10 +198,13 @@ export class FleetVirtualService {
                 status: node.status,
                 os: capabilityValue(node.capabilities, 'os'),
                 arch: capabilityValue(node.capabilities, 'arch'),
-                lastHeartbeatAt: node.lastHeartbeatAt ? new Date(node.lastHeartbeatAt).toISOString() : null,
+                lastHeartbeatAt: node.lastHeartbeatAt
+                    ? new Date(node.lastHeartbeatAt).toISOString()
+                    : null,
                 freeMemoryMiB: netFreeMemoryMiB(node.health ?? null, own.map(metaOf)),
                 reservedMemoryMiB: reservedMemoryMiB(own.map(metaOf)),
-                freeDiskMiB: typeof node.health?.diskFreeMiB === 'number' ? node.health.diskFreeMiB : null,
+                freeDiskMiB:
+                    typeof node.health?.diskFreeMiB === 'number' ? node.health.diskFreeMiB : null,
                 kvm: (node.capabilities ?? []).includes(FLEET_KVM_CAPABILITY),
                 childCount: own.length,
                 eligible: reason === null,
@@ -223,13 +233,17 @@ export class FleetVirtualService {
     }
 
     /** The children of one host, for anyone in its `view` audience (FR-31, FR-32). */
-    async listChildren(caller: FleetMachineCaller, hostNodeId: string): Promise<FleetVirtualChildrenView> {
+    async listChildren(
+        caller: FleetMachineCaller,
+        hostNodeId: string,
+    ): Promise<FleetVirtualChildrenView> {
         const userId = fleetMachineCallerUserId(caller);
         const { node: host } = await this.resolve(hostNodeId, userId, 'view');
         const children = await this.nodes.findByHostNodeIds([host.id]);
         const views: FleetNodeView[] = [];
         for (const child of children) {
-            const role: FleetViewerRole = child.userId === userId ? 'owner' : await this.roleOf(child, userId);
+            const role: FleetViewerRole =
+                child.userId === userId ? 'owner' : await this.roleOf(child, userId);
             if (role === 'stranger') continue;
             const view = this.fleet.viewForRole(child, role);
             views.push({ ...view, virtual: fleetVirtualViewOf(child, host.name) });
@@ -270,12 +284,20 @@ export class FleetVirtualService {
         const system = this.resolveSystemForCreate(input.systemId);
 
         // 1–3: existence, the kill switch, the host.
-        const host = await this.resolveHostForCreate(caller, hostNodeIdOrAuto ?? input.hostNodeId ?? null, system);
+        const host = await this.resolveHostForCreate(
+            caller,
+            hostNodeIdOrAuto ?? input.hostNodeId ?? null,
+            system,
+        );
 
         // Windows (P2, FR-18, U7): refused before any download when the host says it lacks the disk.
         if (system.kind === 'vm') {
             const shortfall = windowsDiskShortfall(host.health ?? null, host.name);
-            if (shortfall) throw fleetMachineError('unsupported_on_node', shortfall, { reason: 'disk', hostNodeId: host.id });
+            if (shortfall)
+                throw fleetMachineError('unsupported_on_node', shortfall, {
+                    reason: 'disk',
+                    hostNodeId: host.id,
+                });
         }
 
         // 4: the request.
@@ -293,32 +315,54 @@ export class FleetVirtualService {
         }
         const memoryGiB = input.memoryGiB ?? FLEET_VIRTUAL_DEFAULT_MEMORY_GIB;
         if (!isFleetVirtualMemoryGiB(memoryGiB)) {
-            throw fleetMachineError('invalid', 'memory must be 4, 8 or 16 GB', { field: 'memoryGiB' });
+            throw fleetMachineError('invalid', 'memory must be 4, 8 or 16 GB', {
+                field: 'memoryGiB',
+            });
         }
         let diskGiB: number | null = null;
         if (system.kind === 'vm') {
             const disk = input.diskGiB ?? FLEET_VIRTUAL_DEFAULT_DISK_GIB;
             if (!isFleetVirtualDiskGiB(disk)) {
-                throw fleetMachineError('invalid', 'disk must be 64, 128 or 256 GB', { field: 'diskGiB' });
+                throw fleetMachineError('invalid', 'disk must be 64, 128 or 256 GB', {
+                    field: 'diskGiB',
+                });
             }
             diskGiB = disk;
         } else if (input.diskGiB !== undefined && input.diskGiB !== null) {
             // A Container has no disk field (FR-2): saying one is a mistake, not a hint.
-            throw fleetMachineError('invalid', 'a Container takes no disk size', { field: 'diskGiB' });
+            throw fleetMachineError('invalid', 'a Container takes no disk size', {
+                field: 'diskGiB',
+            });
         }
         const ownerNodes = await this.nodes.findByUser(host.userId);
         if (ownerNodes.some((node) => node.name.toLowerCase() === name)) {
-            throw fleetMachineError('invalid', `the name ${name} is already used by another computer`, {
-                field: 'name',
-            });
+            throw fleetMachineError(
+                'invalid',
+                `the name ${name} is already used by another computer`,
+                {
+                    field: 'name',
+                },
+            );
         }
 
         // 5: the confirmation.
-        const summary = fleetVirtualCreateSummary({ system, hostName: host.name, cpus, memoryGiB, diskGiB });
-        this.requireConfirmation('create', name, summary, input.fields ?? { confirm: input.confirm }, {
-            // "Choose for me" is resolved by now: a held Agent act runs on THIS host.
-            hostNodeId: host.id,
+        const summary = fleetVirtualCreateSummary({
+            system,
+            hostName: host.name,
+            cpus,
+            memoryGiB,
+            diskGiB,
         });
+        this.requireConfirmation(
+            'create',
+            name,
+            summary,
+            input.fields ?? { confirm: input.confirm },
+            {
+                // "Choose for me" is resolved by now: a held Agent act runs on THIS host.
+                hostNodeId: host.id,
+            },
+        );
 
         // The registration first (FR-7), then the durable job.
         const now = new Date();
@@ -412,7 +456,12 @@ export class FleetVirtualService {
         if (!isFleetVirtualPowerAction(action)) {
             throw fleetMachineError('invalid', 'action must be start or stop', { field: 'action' });
         }
-        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, `node.vm.${action}`);
+        const { host, child } = await this.resolveChildForAct(
+            caller,
+            hostNodeId,
+            childNodeId,
+            `node.vm.${action}`,
+        );
         const kind = child.virtualKind === 'vm' ? 'vm' : 'container';
         const state = deriveVirtualState(child);
         if (action === 'start' && (state === 'running' || state === 'starting')) {
@@ -421,15 +470,32 @@ export class FleetVirtualService {
         if (action === 'stop' && (state === 'stopped' || state === 'stopping')) {
             throw fleetMachineError('busy', `${child.name} is already stopped`, { state });
         }
-        if (state === 'creating' || state === 'installing' || state === 'enrolling' || state === 'destroying') {
-            throw fleetMachineError('busy', `${child.name} is still being ${state === 'destroying' ? 'destroyed' : 'created'}`, {
-                state,
-            });
+        if (
+            state === 'creating' ||
+            state === 'installing' ||
+            state === 'enrolling' ||
+            state === 'destroying'
+        ) {
+            throw fleetMachineError(
+                'busy',
+                `${child.name} is still being ${state === 'destroying' ? 'destroyed' : 'created'}`,
+                {
+                    state,
+                },
+            );
         }
         const baseClass = FLEET_VIRTUAL_ACTION_CLASS[action];
-        this.requireConfirmation(action, child.name, action === 'stop' ? stopSummary(kind, child.name) : `Start ${child.name}?`, fields);
+        this.requireConfirmation(
+            action,
+            child.name,
+            action === 'stop' ? stopSummary(kind, child.name) : `Start ${child.name}?`,
+            fields,
+        );
         const job = await this.enqueueControl(host, child, action);
-        await this.patchMeta(child, { state: action === 'start' ? 'starting' : 'stopping', lastControlJobId: job.id });
+        await this.patchMeta(child, {
+            state: action === 'start' ? 'starting' : 'stopping',
+            lastControlJobId: job.id,
+        });
         await this.record(`node.vm.${action}` as FleetAuditAction, caller, host, child.id, {
             targetName: child.name,
             requestedBy: describeFleetMachineCaller(caller),
@@ -448,7 +514,12 @@ export class FleetVirtualService {
         fields?: FleetActionConfirmFields | null,
     ): Promise<FleetVirtualOperationResponse> {
         this.requireEnabled();
-        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.destroy');
+        const { host, child } = await this.resolveChildForAct(
+            caller,
+            hostNodeId,
+            childNodeId,
+            'node.vm.destroy',
+        );
         const kind = child.virtualKind === 'vm' ? 'vm' : 'container';
         const state = deriveVirtualState(child);
         if (state === 'destroying') {
@@ -456,7 +527,12 @@ export class FleetVirtualService {
         }
         // Busy first (U13): a person never types the name only to be told to wait.
         await this.assertNotWorking(child, caller, host);
-        this.requireConfirmation('destroy', child.name, destroySummary(kind, child.name, host.name), fields);
+        this.requireConfirmation(
+            'destroy',
+            child.name,
+            destroySummary(kind, child.name, host.name),
+            fields,
+        );
         // A create still queued or running for it is cancelled first: the destroy wins.
         const meta = normalizeVirtualMeta(child.virtualMeta);
         if (meta?.createJobId) await this.jobs.cancel(meta.createJobId).catch(() => undefined);
@@ -486,15 +562,24 @@ export class FleetVirtualService {
         input: { cpus?: unknown; memoryGiB?: unknown; fields?: FleetActionConfirmFields | null },
     ): Promise<FleetVirtualOperationResponse> {
         this.requireEnabled();
-        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.resize');
+        const { host, child } = await this.resolveChildForAct(
+            caller,
+            hostNodeId,
+            childNodeId,
+            'node.vm.resize',
+        );
         const meta = normalizeVirtualMeta(child.virtualMeta);
         if (input.cpus !== undefined && !isFleetVirtualCpus(input.cpus)) {
             throw fleetMachineError('invalid', 'CPUs must be 2, 4 or 8', { field: 'cpus' });
         }
         if (input.memoryGiB !== undefined && !isFleetVirtualMemoryGiB(input.memoryGiB)) {
-            throw fleetMachineError('invalid', 'memory must be 4, 8 or 16 GB', { field: 'memoryGiB' });
+            throw fleetMachineError('invalid', 'memory must be 4, 8 or 16 GB', {
+                field: 'memoryGiB',
+            });
         }
-        const cpus = isFleetVirtualCpus(input.cpus) ? input.cpus : (meta?.cpus ?? FLEET_VIRTUAL_DEFAULT_CPUS);
+        const cpus = isFleetVirtualCpus(input.cpus)
+            ? input.cpus
+            : (meta?.cpus ?? FLEET_VIRTUAL_DEFAULT_CPUS);
         const memoryGiB = isFleetVirtualMemoryGiB(input.memoryGiB)
             ? input.memoryGiB
             : (meta?.memoryGiB ?? FLEET_VIRTUAL_DEFAULT_MEMORY_GIB);
@@ -536,13 +621,23 @@ export class FleetVirtualService {
         fields?: FleetActionConfirmFields | null,
     ): Promise<FleetVirtualOperationResponse> {
         this.requireEnabled();
-        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.rebuild');
+        const { host, child } = await this.resolveChildForAct(
+            caller,
+            hostNodeId,
+            childNodeId,
+            'node.vm.rebuild',
+        );
         if (child.virtualKind !== 'container') {
-            throw fleetMachineError('unsupported_on_node', 'only a Container is rebuilt from an image');
+            throw fleetMachineError(
+                'unsupported_on_node',
+                'only a Container is rebuilt from an image',
+            );
         }
         const state = deriveVirtualState(child);
         if (state !== 'running' && state !== 'stopped') {
-            throw fleetMachineError('busy', `${child.name} is ${state}; wait for it to finish`, { state });
+            throw fleetMachineError('busy', `${child.name} is ${state}; wait for it to finish`, {
+                state,
+            });
         }
         await this.assertNotWorking(child, caller, host);
         this.requireConfirmation(
@@ -575,12 +670,24 @@ export class FleetVirtualService {
         childNodeId: string,
     ): Promise<FleetVirtualOperationResponse> {
         this.requireEnabled();
-        const { host, child } = await this.resolveChildForAct(caller, hostNodeId, childNodeId, 'node.vm.start');
+        const { host, child } = await this.resolveChildForAct(
+            caller,
+            hostNodeId,
+            childNodeId,
+            'node.vm.start',
+        );
         if (child.status !== 'enrolling') {
-            throw fleetMachineError('busy', `${child.name} is already enrolled`, { status: child.status });
+            throw fleetMachineError('busy', `${child.name} is already enrolled`, {
+                status: child.status,
+            });
         }
         const job = await this.enqueueControl(host, child, 'retry-enrollment');
-        await this.patchMeta(child, { state: 'creating', phase: 'enrolling', lastControlJobId: job.id, enrollRequestedAt: null });
+        await this.patchMeta(child, {
+            state: 'creating',
+            phase: 'enrolling',
+            lastControlJobId: job.id,
+            enrollRequestedAt: null,
+        });
         await this.record('node.vm.start', caller, host, child.id, {
             targetName: child.name,
             requestedBy: describeFleetMachineCaller(caller),
@@ -625,19 +732,25 @@ export class FleetVirtualService {
                 code: 'permission_denied',
                 hostNodeId: host.id,
             });
-            throw fleetMachineError('permission_denied', `only ${host.name}'s owner can reveal it`, { ownerOnly: true });
+            throw fleetMachineError(
+                'permission_denied',
+                `only ${host.name}'s owner can reveal it`,
+                { ownerOnly: true },
+            );
         }
         if (child.virtualKind !== 'vm') {
             throw fleetMachineError('unsupported_on_node', 'a Container has no generated password');
         }
-        if (await this.isStopped()) throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
+        if (await this.isStopped())
+            throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
         this.requireConfirmation(
             'reveal',
             child.name,
             `Reveal the password of ${child.name}? It was generated on ${host.name} and is kept only there; revealing it is recorded in the audit log.`,
             fields,
         );
-        if (!this.link) throw fleetMachineError('unreachable', 'this deployment cannot reach computers');
+        if (!this.link)
+            throw fleetMachineError('unreachable', 'this deployment cannot reach computers');
         let password: string | null = null;
         try {
             const reply = await this.link.request({
@@ -653,7 +766,12 @@ export class FleetVirtualService {
                 awaitOperationMs: 0,
             });
             const result = reply.result as { password?: unknown } | undefined;
-            if (reply.operationId === undefined && result && typeof result.password === 'string' && result.password) {
+            if (
+                reply.operationId === undefined &&
+                result &&
+                typeof result.password === 'string' &&
+                result.password
+            ) {
                 password = result.password;
             }
         } catch (error) {
@@ -669,7 +787,10 @@ export class FleetVirtualService {
             throw error;
         }
         if (!password) {
-            throw fleetMachineError('operation_failed', `${host.name} did not hand the password over`);
+            throw fleetMachineError(
+                'operation_failed',
+                `${host.name} did not hand the password over`,
+            );
         }
         await this.record('node.vm.password.reveal', caller, host, child.id, {
             targetName: child.name,
@@ -732,7 +853,10 @@ export class FleetVirtualService {
      * the machine and its disk are already gone — and keeps the job history
      * (FR-28). Same authorisation as {@link mintEnrollToken}.
      */
-    async reportProgress(childNodeId: string, report: Partial<FleetVirtualProgressReport>): Promise<boolean> {
+    async reportProgress(
+        childNodeId: string,
+        report: Partial<FleetVirtualProgressReport>,
+    ): Promise<boolean> {
         if (!config.fleet.isVirtualEnabled()) return false;
         const held = await this.authorizeHostJob(childNodeId, report);
         if (!held) return false;
@@ -754,21 +878,34 @@ export class FleetVirtualService {
         } else if (report.error === null) {
             next.error = null;
         }
-        if (report.image && typeof report.image === 'object' && typeof report.image.ref === 'string') {
+        if (
+            report.image &&
+            typeof report.image === 'object' &&
+            typeof report.image.ref === 'string'
+        ) {
             next.image = {
                 ref: report.image.ref.slice(0, 300),
-                digest: typeof report.image.digest === 'string' ? report.image.digest.slice(0, 100) : null,
+                digest:
+                    typeof report.image.digest === 'string'
+                        ? report.image.digest.slice(0, 100)
+                        : null,
             };
         }
         if (typeof report.activated === 'boolean') next.activated = report.activated;
         // Resize (P3): the size the host applied.
-        if (typeof report.cpus === 'number' && isFleetVirtualCpus(report.cpus)) next.cpus = report.cpus;
-        if (typeof report.memoryGiB === 'number' && isFleetVirtualMemoryGiB(report.memoryGiB)) next.memoryGiB = report.memoryGiB;
+        if (typeof report.cpus === 'number' && isFleetVirtualCpus(report.cpus))
+            next.cpus = report.cpus;
+        if (typeof report.memoryGiB === 'number' && isFleetVirtualMemoryGiB(report.memoryGiB))
+            next.memoryGiB = report.memoryGiB;
         if (report.viewerPort === null) next.viewerPort = null;
         else if (typeof report.viewerPort === 'number' && Number.isInteger(report.viewerPort)) {
-            if (report.viewerPort > 0 && report.viewerPort < 65536) next.viewerPort = report.viewerPort;
+            if (report.viewerPort > 0 && report.viewerPort < 65536)
+                next.viewerPort = report.viewerPort;
         }
-        const controlAction = job.kind === 'vm-control' ? (job.payload?.action as FleetVmControlAction | undefined) : undefined;
+        const controlAction =
+            job.kind === 'vm-control'
+                ? (job.payload?.action as FleetVmControlAction | undefined)
+                : undefined;
         if (controlAction === 'destroy' && next.state === 'gone') {
             await this.nodes.delete(child.id);
             return true;
@@ -796,7 +933,10 @@ export class FleetVirtualService {
         for (const [hostId, own] of byHost) {
             const host = await this.nodes.findById(hostId);
             for (const child of own) {
-                if (deriveVirtualState(child) === 'not-enrolled' && normalizeVirtualMeta(child.virtualMeta)?.state !== 'not-enrolled') {
+                if (
+                    deriveVirtualState(child) === 'not-enrolled' &&
+                    normalizeVirtualMeta(child.virtualMeta)?.state !== 'not-enrolled'
+                ) {
                     if (await this.patchMeta(child, { state: 'not-enrolled' })) changed += 1;
                 }
             }
@@ -840,7 +980,11 @@ export class FleetVirtualService {
                         : fact.state === 'gone'
                           ? 'gone'
                           : null;
-                if (next && next !== meta.state && !(next === 'running' && meta.state === 'stopping')) {
+                if (
+                    next &&
+                    next !== meta.state &&
+                    !(next === 'running' && meta.state === 'stopping')
+                ) {
                     if (await this.patchMeta(child, { state: next })) changed += 1;
                 }
             }
@@ -852,7 +996,10 @@ export class FleetVirtualService {
 
     private requireEnabled(): void {
         if (!config.fleet.isVirtualEnabled()) {
-            throw fleetMachineError('not_found', 'virtual computers are not switched on in this deployment');
+            throw fleetMachineError(
+                'not_found',
+                'virtual computers are not switched on in this deployment',
+            );
         }
     }
 
@@ -864,7 +1011,9 @@ export class FleetVirtualService {
     private resolveSystemForCreate(systemId: unknown): FleetVirtualSystem {
         const system = fleetVirtualSystem(systemId);
         if (!system) {
-            throw fleetMachineError('invalid', 'choose one of the listed systems', { field: 'systemId' });
+            throw fleetMachineError('invalid', 'choose one of the listed systems', {
+                field: 'systemId',
+            });
         }
         if (system.kind === 'vm' && !FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED) {
             throw fleetMachineError(
@@ -890,11 +1039,17 @@ export class FleetVirtualService {
             if (!picked) {
                 const reasons = options.hosts.map((host) => host.reason);
                 throw fleetMachineError(
-                    reasons.includes('permission-denied') && reasons.every((r) => r === 'permission-denied')
+                    reasons.includes('permission-denied') &&
+                        reasons.every((r) => r === 'permission-denied')
                         ? 'permission_denied'
                         : 'unsupported_on_node',
                     'No computer in your fleet can host this yet — a Linux or macOS computer with Docker, started with --manage',
-                    { hosts: options.hosts.map((host) => ({ name: host.name, reason: host.reason })) },
+                    {
+                        hosts: options.hosts.map((host) => ({
+                            name: host.name,
+                            reason: host.reason,
+                        })),
+                    },
                 );
             }
             requested = picked;
@@ -910,9 +1065,14 @@ export class FleetVirtualService {
             allowed: await this.allows(host, role, userId),
         });
         if (reason) {
-            const hostOfHost = host.hostNodeId ? (await this.nodes.findById(host.hostNodeId))?.name ?? null : null;
+            const hostOfHost = host.hostNodeId
+                ? ((await this.nodes.findById(host.hostNodeId))?.name ?? null)
+                : null;
             const code = hostReasonErrorCode(reason);
-            const hint = hostReasonHint(reason, host, { hostOfHost, lastSeen: describeAgo(host.lastHeartbeatAt) });
+            const hint = hostReasonHint(reason, host, {
+                hostOfHost,
+                lastSeen: describeAgo(host.lastHeartbeatAt),
+            });
             await this.record('node.vm.create', caller, host, null, {
                 requestedBy: describeFleetMachineCaller(caller),
                 confirmationClass: FLEET_VIRTUAL_ACTION_CLASS.create,
@@ -940,7 +1100,11 @@ export class FleetVirtualService {
         if (!child || child.hostNodeId !== host.id) {
             throw fleetMachineError('not_found', 'no such virtual computer on this computer');
         }
-        const refuse = async (code: FleetLinkErrorCode, hint: string, details?: Record<string, unknown>) => {
+        const refuse = async (
+            code: FleetLinkErrorCode,
+            hint: string,
+            details?: Record<string, unknown>,
+        ) => {
             await this.record(auditAction as FleetAuditAction, caller, host, child.id, {
                 targetName: child.name,
                 requestedBy: describeFleetMachineCaller(caller),
@@ -950,15 +1114,23 @@ export class FleetVirtualService {
             });
             return fleetMachineError(code, hint, details);
         };
-        if (await this.isStopped()) throw await refuse('kill_switch', 'clear it under Settings → Fleet');
+        if (await this.isStopped())
+            throw await refuse('kill_switch', 'clear it under Settings → Fleet');
         if (!(await this.allows(host, role, userId))) {
-            throw await refuse('permission_denied', `Only the owner of ${host.name} can change computers on it`, {
-                family: 'machines',
-            });
+            throw await refuse(
+                'permission_denied',
+                `Only the owner of ${host.name} can change computers on it`,
+                {
+                    family: 'machines',
+                },
+            );
         }
         const reason = hostEligibility({
             host,
-            system: { kind: child.virtualKind === 'vm' ? 'vm' : 'container', arch: ['x64', 'arm64'] },
+            system: {
+                kind: child.virtualKind === 'vm' ? 'vm' : 'container',
+                arch: ['x64', 'arm64'],
+            },
             // The limit does not apply to acting on an existing child.
             childCount: 0,
             offlineCutoffMs: Date.now() - config.fleet.getNodeOfflineAfterMs(),
@@ -975,9 +1147,15 @@ export class FleetVirtualService {
     }
 
     /** Destroy is refused `busy` while a Run or an owner Session is live on the child (U13, FR-28). */
-    private async assertNotWorking(child: FleetNode, caller: FleetMachineCaller, host: FleetNode): Promise<void> {
+    private async assertNotWorking(
+        child: FleetNode,
+        caller: FleetMachineCaller,
+        host: FleetNode,
+    ): Promise<void> {
         const load = (await this.jobs.loadByNodeForUser(child.userId).catch(() => ({})))[child.id];
-        const live = this.sessions ? await this.sessions.findLiveForNode(child.id).catch(() => []) : [];
+        const live = this.sessions
+            ? await this.sessions.findLiveForNode(child.id).catch(() => [])
+            : [];
         if ((load && load.activeJobCount > 0) || live.length > 0) {
             const hint = `Something is working on ${child.name} right now; end the session or wait`;
             await this.record('node.vm.destroy', caller, host, child.id, {
@@ -1006,7 +1184,9 @@ export class FleetVirtualService {
         if (!missing) return;
         throw fleetMachineError(
             'confirmation_required',
-            missing === 'confirm-destructive' ? `type ${target} to confirm` : 'send confirm: true to confirm',
+            missing === 'confirm-destructive'
+                ? `type ${target} to confirm`
+                : 'send confirm: true to confirm',
             {
                 ...extra,
                 class: missing,
@@ -1096,7 +1276,8 @@ export class FleetVirtualService {
             }
         }
         const node = nodeId ? await this.nodes.findById(nodeId) : null;
-        if (!node || node.userId !== userId) throw fleetMachineError('not_found', 'no such computer');
+        if (!node || node.userId !== userId)
+            throw fleetMachineError('not_found', 'no such computer');
         return { node, role: 'owner' };
     }
 
@@ -1114,16 +1295,23 @@ export class FleetVirtualService {
     }
 
     /** Every Node the caller may see, with their role (own + shared through an Organization). */
-    private async visibleNodes(userId: string): Promise<Array<{ node: FleetNode; role: FleetViewerRole }>> {
-        const own = (await this.nodes.findByUser(userId)).map((node) => ({ node, role: 'owner' as FleetViewerRole }));
+    private async visibleNodes(
+        userId: string,
+    ): Promise<Array<{ node: FleetNode; role: FleetViewerRole }>> {
+        const own = (await this.nodes.findByUser(userId)).map((node) => ({
+            node,
+            role: 'owner' as FleetViewerRole,
+        }));
         const shared = this.access ? await this.access.listSharedWith(userId).catch(() => []) : [];
-        return [...own, ...shared.map((entry) => ({ node: entry.node as FleetNode, role: entry.role }))].filter(
-            (entry) => entry.node.status !== 'enrolling',
-        );
+        return [
+            ...own,
+            ...shared.map((entry) => ({ node: entry.node as FleetNode, role: entry.role })),
+        ].filter((entry) => entry.node.status !== 'enrolling');
     }
 
     private async requireNotStopped(): Promise<void> {
-        if (await this.isStopped()) throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
+        if (await this.isStopped())
+            throw fleetMachineError('kill_switch', 'clear it under Settings → Fleet');
     }
 
     private async isStopped(): Promise<boolean> {

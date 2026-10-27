@@ -310,17 +310,26 @@ export function DeleteComponent({ work }: { work: Work }) {
                                 {appPreview && appPreview.stateUnreadable && (
                                     <p>{t('deleteAppPreviewUnavailable')}</p>
                                 )}
-                                {appPreview && !appPreview.stateUnreadable && !appPreview.deployed && (
-                                    <p>{t('deleteAppPreviewNothingDeployed')}</p>
-                                )}
+                                {appPreview &&
+                                    !appPreview.stateUnreadable &&
+                                    !appPreview.deployed && (
+                                        <p>{t('deleteAppPreviewNothingDeployed')}</p>
+                                    )}
                                 {appPreview && appPreview.removes.length > 0 && (
                                     <div>
                                         <p className="font-medium text-text dark:text-text-dark">
-                                            {t('deleteAppPreviewRemoves', { target: appTargetLabel })}
+                                            {t('deleteAppPreviewRemoves', {
+                                                target: appTargetLabel,
+                                            })}
                                         </p>
-                                        <ul className="list-disc pl-5" data-testid="app-delete-preview-removes">
+                                        <ul
+                                            className="list-disc pl-5"
+                                            data-testid="app-delete-preview-removes"
+                                        >
                                             {appPreview.removes.map((entry, index) => (
-                                                <li key={`r-${entry.kind}-${entry.name ?? entry.label ?? index}`}>
+                                                <li
+                                                    key={`r-${entry.kind}-${entry.name ?? entry.label ?? index}`}
+                                                >
                                                     {entryLabel(entry)}
                                                 </li>
                                             ))}
@@ -334,12 +343,17 @@ export function DeleteComponent({ work }: { work: Work }) {
                                                 ? t('deleteAppPreviewDestroysWithData')
                                                 : t('deleteAppPreviewKeeps')}
                                         </p>
-                                        <ul className="list-disc pl-5" data-testid="app-delete-preview-keeps">
+                                        <ul
+                                            className="list-disc pl-5"
+                                            data-testid="app-delete-preview-keeps"
+                                        >
                                             {(appStoredDataSatisfied
                                                 ? appPreview.destroysWithData
                                                 : appPreview.keeps
                                             ).map((entry, index) => (
-                                                <li key={`k-${entry.kind}-${entry.name ?? entry.label ?? index}`}>
+                                                <li
+                                                    key={`k-${entry.kind}-${entry.name ?? entry.label ?? index}`}
+                                                >
                                                     {entryLabel(entry)}
                                                 </li>
                                             ))}

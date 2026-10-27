@@ -114,7 +114,14 @@ describe('tunnel channel', () => {
 		const port = await listen((_req, res) => res.end('x'));
 		const { context, json } = fakeContext(port);
 		const opened = (await openTunnelChannel(context)) as { ok: true; handler: NodeChannelHandler };
-		opened.handler.onJson!({ type: 'tunnel.request', requestId: '2', method: 'GET', path: '//evil.test/', query: '', headers: {} });
+		opened.handler.onJson!({
+			type: 'tunnel.request',
+			requestId: '2',
+			method: 'GET',
+			path: '//evil.test/',
+			query: '',
+			headers: {}
+		});
 		expect(json[0]).toMatchObject({ type: 'tunnel.error', requestId: '2', code: 'invalid' });
 		opened.handler.onClose!('normal');
 	});

@@ -60,15 +60,19 @@ export class FleetPortTunnelTokens {
 
     private read(token: unknown, kind: 'h' | 'c'): TokenClaims | null {
         const key = this.secret();
-        if (!key || typeof token !== 'string' || token.length === 0 || token.length > 1024) return null;
+        if (!key || typeof token !== 'string' || token.length === 0 || token.length > 1024)
+            return null;
         const dot = token.indexOf('.');
         if (dot <= 0 || dot === token.length - 1) return null;
         const body = token.slice(0, dot);
         try {
             const expected = createHmac('sha256', key).update(`${LABEL}${body}`).digest();
             const provided = Buffer.from(token.slice(dot + 1), 'base64url');
-            if (provided.length !== expected.length || !timingSafeEqual(expected, provided)) return null;
-            const claims = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as TokenClaims;
+            if (provided.length !== expected.length || !timingSafeEqual(expected, provided))
+                return null;
+            const claims = JSON.parse(
+                Buffer.from(body, 'base64url').toString('utf8'),
+            ) as TokenClaims;
             if (
                 typeof claims !== 'object' ||
                 claims === null ||

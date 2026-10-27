@@ -37,13 +37,19 @@ function envValue(env: Env, key: string): string {
 
 /** True when the operator registered an application (both halves present). */
 export function isDigitalOceanOAuthConfigured(env: Env = process.env): boolean {
-	return envValue(env, ENV_DIGITALOCEAN_OAUTH_CLIENT_ID).length > 0 && envValue(env, ENV_DIGITALOCEAN_OAUTH_CLIENT_SECRET).length > 0;
+	return (
+		envValue(env, ENV_DIGITALOCEAN_OAUTH_CLIENT_ID).length > 0 &&
+		envValue(env, ENV_DIGITALOCEAN_OAUTH_CLIENT_SECRET).length > 0
+	);
 }
 
 function clientIdOf(config: Partial<OAuthConfig> | undefined, env: Env): string {
 	const id = (config?.clientId ?? '').trim() || envValue(env, ENV_DIGITALOCEAN_OAUTH_CLIENT_ID);
 	if (!id) {
-		throw new MachineProviderError('unauthorized', `DigitalOcean sign-in is not configured: set ${ENV_DIGITALOCEAN_OAUTH_CLIENT_ID}`);
+		throw new MachineProviderError(
+			'unauthorized',
+			`DigitalOcean sign-in is not configured: set ${ENV_DIGITALOCEAN_OAUTH_CLIENT_ID}`
+		);
 	}
 	return id;
 }
@@ -85,11 +91,7 @@ interface TokenAnswer {
 	refresh_token?: unknown;
 }
 
-async function tokenRequest(
-	form: Record<string, string>,
-	fetchImpl: typeof fetch,
-	base: string
-): Promise<OAuthToken> {
+async function tokenRequest(form: Record<string, string>, fetchImpl: typeof fetch, base: string): Promise<OAuthToken> {
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 	let response: Response;
@@ -113,7 +115,11 @@ async function tokenRequest(
 	}
 	if (!response.ok || !body || typeof body.access_token !== 'string' || !body.access_token) {
 		// Never the body: it may echo the code or the client id.
-		throw new MachineProviderError('unauthorized', `DigitalOcean refused the sign-in (HTTP ${response.status})`, response.status);
+		throw new MachineProviderError(
+			'unauthorized',
+			`DigitalOcean refused the sign-in (HTTP ${response.status})`,
+			response.status
+		);
 	}
 	const token: { -readonly [K in keyof OAuthToken]: OAuthToken[K] } = {
 		accessToken: body.access_token,

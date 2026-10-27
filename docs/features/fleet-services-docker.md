@@ -35,12 +35,12 @@ Without it each tab shows that command. The node advertises `services` (when it 
 
 Every act asks first, in words that name the target and the machine:
 
-| Act                                                                         | Confirmation                                                    |
-| --------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Start, enable at boot, restart, pull, run a container, Compose up / restart | one dialog ("Restart nginx on build-01?")                       |
+| Act                                                                         | Confirmation                                                      |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Start, enable at boot, restart, pull, run a container, Compose up / restart | one dialog ("Restart nginx on build-01?")                         |
 | Stop, disable at boot, Compose down, remove an image, remove unused, signal | one dialog — raised to a **blast-radius** warning when it applies |
-| Remove a container                                                          | type the container's name                                       |
-| Shell inside                                                                | none                                                            |
+| Remove a container                                                          | type the container's name                                         |
+| Shell inside                                                                | none                                                              |
 
 **Blast radius.** Before stopping, restarting or disabling a service, the computer itself works out whether it could cut the machine off from Ever Works — its network service, ssh or remote desktop, an overlay VPN, or the Ever Works node itself. If so, the dialog says it in red ("This stops the network service build-01 connects to Ever Works through. You would need to be at the machine to bring it back.") and the button reads **Stop anyway**. The node's own service and process tree, its session daemon and PID 1 have no buttons at all.
 
@@ -89,21 +89,21 @@ Agents get the same acts as tools — `fleet_services_list`, `fleet_services_act
 
 All under `/api/fleet`, behind the flag:
 
-| Method | Path                                         | What                                         |
-| ------ | -------------------------------------------- | -------------------------------------------- |
-| GET    | `/nodes/:id/services`                        | services (`?scope=system\|user\|all&find=`)  |
-| POST   | `/nodes/:id/services/:name/:action`          | start · stop · restart · enable · disable    |
+| Method | Path                                         | What                                          |
+| ------ | -------------------------------------------- | --------------------------------------------- |
+| GET    | `/nodes/:id/services`                        | services (`?scope=system\|user\|all&find=`)   |
+| POST   | `/nodes/:id/services/:name/:action`          | start · stop · restart · enable · disable     |
 | GET    | `/nodes/:id/processes`                       | busiest processes and GPUs (`?sort=cpu\|mem`) |
-| POST   | `/nodes/:id/processes/:pid/signal`           | `{ signal: 'TERM' \| 'KILL' }`               |
-| GET    | `/nodes/:id/docker/containers`               | containers                                   |
-| POST   | `/nodes/:id/docker/containers`               | run a container (`{ request }`)              |
-| POST   | `/nodes/:id/docker/containers/:cid/:action`  | start · stop · restart · remove · exec       |
-| GET    | `/nodes/:id/docker/containers/:cid/shells`   | the shells a container has                   |
-| GET    | `/nodes/:id/docker/images`                   | images                                       |
-| POST   | `/nodes/:id/docker/images`                   | pull (`{ ref }`)                             |
-| POST   | `/nodes/:id/docker/images/:iid/remove`       | remove an image                              |
-| DELETE | `/nodes/:id/docker/images?unused=true`       | remove unused images                         |
-| GET    | `/nodes/:id/docker/compose[?project=]`       | projects, or one project's description       |
-| POST   | `/nodes/:id/docker/compose/:project/:action` | up · down · restart · pull                   |
+| POST   | `/nodes/:id/processes/:pid/signal`           | `{ signal: 'TERM' \| 'KILL' }`                |
+| GET    | `/nodes/:id/docker/containers`               | containers                                    |
+| POST   | `/nodes/:id/docker/containers`               | run a container (`{ request }`)               |
+| POST   | `/nodes/:id/docker/containers/:cid/:action`  | start · stop · restart · remove · exec        |
+| GET    | `/nodes/:id/docker/containers/:cid/shells`   | the shells a container has                    |
+| GET    | `/nodes/:id/docker/images`                   | images                                        |
+| POST   | `/nodes/:id/docker/images`                   | pull (`{ ref }`)                              |
+| POST   | `/nodes/:id/docker/images/:iid/remove`       | remove an image                               |
+| DELETE | `/nodes/:id/docker/images?unused=true`       | remove unused images                          |
+| GET    | `/nodes/:id/docker/compose[?project=]`       | projects, or one project's description        |
+| POST   | `/nodes/:id/docker/compose/:project/:action` | up · down · restart · pull                    |
 
 Every act accepts the confirmation fields `confirm: true`, `confirmName` (for a typed name) and `acknowledgeBlastRadius: true`; without them it answers `409 confirmation_required` with the class, the dialog's summary and, for a blast radius, the sentence. An act that became an operation answers `202 { operationId }`; follow it at `GET /api/fleet/operations/:id`.

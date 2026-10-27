@@ -98,8 +98,7 @@ export class CreateFleetCommandRuns1796120100000 implements MigrationInterface {
             table &&
             (await queryRunner.hasTable('fleet_commands')) &&
             !table.foreignKeys.some(
-                (existing) =>
-                    existing.name === CreateFleetCommandRuns1796120100000.COMMAND_FK.name,
+                (existing) => existing.name === CreateFleetCommandRuns1796120100000.COMMAND_FK.name,
             )
         ) {
             await queryRunner.createForeignKey(

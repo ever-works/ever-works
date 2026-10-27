@@ -24,7 +24,8 @@ export function FleetActionDecisionCard({ proposal }: { proposal: AgentActionPro
     if (!view) return null;
 
     const category = view.category ? t(`categories.${categoryKey(view.category)}` as never) : null;
-    const rung = view.rung === 'ask' || view.rung === 'draft' ? t(`rungs.${view.rung}` as never) : null;
+    const rung =
+        view.rung === 'ask' || view.rung === 'draft' ? t(`rungs.${view.rung}` as never) : null;
     const expiry = view.expiresInMs === null ? null : formatFleetDecisionExpiry(view.expiresInMs);
 
     return (
@@ -39,15 +40,23 @@ export function FleetActionDecisionCard({ proposal }: { proposal: AgentActionPro
                 </p>
             )}
             {view.sentence && (
-                <p className="flex items-start gap-1.5 text-warning" data-testid={`approval-fleet-sentence-${proposal.id}`}>
+                <p
+                    className="flex items-start gap-1.5 text-warning"
+                    data-testid={`approval-fleet-sentence-${proposal.id}`}
+                >
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                     <span>{view.sentence}</span>
                 </p>
             )}
-            {view.reason && !view.sentence && <p>{t(`reasons.${reasonKey(view.reason)}` as never)}</p>}
+            {view.reason && !view.sentence && (
+                <p>{t(`reasons.${reasonKey(view.reason)}` as never)}</p>
+            )}
             {expiry &&
                 (view.expiresInMs !== null && view.expiresInMs <= 0 ? (
-                    <p className="text-danger" data-testid={`approval-fleet-expired-${proposal.id}`}>
+                    <p
+                        className="text-danger"
+                        data-testid={`approval-fleet-expired-${proposal.id}`}
+                    >
                         {t('expired')}
                     </p>
                 ) : (
@@ -55,7 +64,9 @@ export function FleetActionDecisionCard({ proposal }: { proposal: AgentActionPro
                 ))}
             {view.args.length > 0 && (
                 <details>
-                    <summary className="cursor-pointer">{t('details', { tool: view.tool ?? '' })}</summary>
+                    <summary className="cursor-pointer">
+                        {t('details', { tool: view.tool ?? '' })}
+                    </summary>
                     <dl className="mt-1 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 font-mono">
                         {view.args.map(([key, value]) => (
                             <div key={key} className="contents">
@@ -72,7 +83,15 @@ export function FleetActionDecisionCard({ proposal }: { proposal: AgentActionPro
 
 /** `machine.admin` → `machineAdmin` (i18n leaves are camelCase). */
 function categoryKey(category: string): string {
-    const known = ['machine.admin', 'machine.run', 'write.destructive', 'write.internal', 'agent.fanout', 'publish.external', 'spend.metered'];
+    const known = [
+        'machine.admin',
+        'machine.run',
+        'write.destructive',
+        'write.internal',
+        'agent.fanout',
+        'publish.external',
+        'spend.metered',
+    ];
     if (!known.includes(category)) return 'other';
     return category.replace(/\.([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }

@@ -84,12 +84,23 @@ function cloudRow(overrides: Partial<Row> = {}, metaOverrides: Record<string, un
     };
 }
 
-function harness(opts: { existing?: Row[]; liveSessions?: Array<{ state: string }>; cpu?: number[]; destroyed?: unknown[] } = {}) {
+function harness(
+    opts: {
+        existing?: Row[];
+        liveSessions?: Array<{ state: string }>;
+        cpu?: number[];
+        destroyed?: unknown[];
+    } = {},
+) {
     const rows = new Map<string, Row>((opts.existing ?? []).map((row) => [row.id, row]));
     const nodes = {
-        findByUser: jest.fn(async (userId: string) => [...rows.values()].filter((row) => row.userId === userId)),
+        findByUser: jest.fn(async (userId: string) =>
+            [...rows.values()].filter((row) => row.userId === userId),
+        ),
         findById: jest.fn(async (id: string) => rows.get(id) ?? null),
-        findCloudNodes: jest.fn(async () => [...rows.values()].filter((row) => row.origin === 'cloud')),
+        findCloudNodes: jest.fn(async () =>
+            [...rows.values()].filter((row) => row.origin === 'cloud'),
+        ),
         update: jest.fn(async (id: string, patch: Partial<Row>) => {
             const row = rows.get(id);
             if (row) rows.set(id, { ...row, ...patch });
@@ -104,7 +115,10 @@ function harness(opts: { existing?: Row[]; liveSessions?: Array<{ state: string 
         power: jest.fn(async () => undefined),
         destroy: jest.fn(async () => undefined),
         usage: jest.fn(async () => ({ providerMonthToDateCents: 1234, source: 'provider' })),
-        getMachine: jest.fn(async (_p: string, _u: string, ref: string) => ({ machineRef: ref, state: 'running' as const })),
+        getMachine: jest.fn(async (_p: string, _u: string, ref: string) => ({
+            machineRef: ref,
+            state: 'running' as const,
+        })),
     };
     const audit = {
         tryRecord: jest.fn(async () => true),
@@ -145,7 +159,12 @@ async function refusal(promise: Promise<unknown>) {
 
 function auditCalls(audit: { tryRecord: jest.Mock }) {
     return (audit.tryRecord.mock.calls as unknown[][]).map(
-        ([entry]) => entry as { action: string; actorUserId: string | null; details: Record<string, unknown> },
+        ([entry]) =>
+            entry as {
+                action: string;
+                actorUserId: string | null;
+                details: Record<string, unknown>;
+            },
     );
 }
 
@@ -165,7 +184,11 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
 
     describe('the cost job (T-23, FR-21, FR-23)', () => {
         it('writes the snapshot with the provider’s own month-to-date, once per provider and owner', async () => {
-            const second = cloudRow({ id: '1a2b3c4d-0000-4000-8000-000000000002', name: 'nyc-ops', providerMachineRef: '4343' });
+            const second = cloudRow({
+                id: '1a2b3c4d-0000-4000-8000-000000000002',
+                name: 'nyc-ops',
+                providerMachineRef: '4343',
+            });
             const { service, rows, machines } = harness({ existing: [cloudRow(), second] });
             await expect(service.refreshUsage(T0)).resolves.toEqual({ machines: 2, changed: 2 });
             expect(machines.usage).toHaveBeenCalledTimes(1);
@@ -180,9 +203,15 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             const { service, nodes } = harness({ existing: [cloudRow()] });
             await service.refreshUsage(T0);
             const writes = nodes.update.mock.calls.length;
-            await expect(service.refreshUsage(T0 + 60_000)).resolves.toEqual({ machines: 1, changed: 0 });
+            await expect(service.refreshUsage(T0 + 60_000)).resolves.toEqual({
+                machines: 1,
+                changed: 0,
+            });
             expect(nodes.update.mock.calls.length).toBe(writes);
-            await expect(service.refreshUsage(T0 + 10 * 60_000)).resolves.toEqual({ machines: 1, changed: 1 });
+            await expect(service.refreshUsage(T0 + 10 * 60_000)).resolves.toEqual({
+                machines: 1,
+                changed: 1,
+            });
         });
 
         it('does not write over a snapshot another pass wrote after this one read the row', async () => {
@@ -193,7 +222,10 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
                 const row = rows.get(id)!;
                 rows.set(id, {
                     ...row,
-                    providerMeta: { ...(row.providerMeta as object), cost: { computedAt: new Date(T0 - 1000).toISOString() } },
+                    providerMeta: {
+                        ...(row.providerMeta as object),
+                        cost: { computedAt: new Date(T0 - 1000).toISOString() },
+                    },
                 });
                 return original(id);
             });
@@ -225,25 +257,54 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
                         finalCostCents: 312,
                     },
                 },
-                { nodeId: 'refused', occurredAt: '2026-10-12T09:00:00.000Z', details: { outcome: 'refused' } },
+                {
+                    nodeId: 'refused',
+                    occurredAt: '2026-10-12T09:00:00.000Z',
+                    details: { outcome: 'refused' },
+                },
             ];
-            const row = cloudRow({}, { cost: { providerMonthToDateCents: 5000, computedAt: new Date(T0).toISOString() } });
+            const row = cloudRow(
+                {},
+                {
+                    cost: {
+                        providerMonthToDateCents: 5000,
+                        computedAt: new Date(T0).toISOString(),
+                    },
+                },
+            );
             const { service } = harness({ existing: [row], destroyed });
             const usage = await service.usageSummary(OWNER, T0);
             expect(usage.estimate).toBe(true);
-            expect(usage.machines.map((machine) => machine.name)).toEqual(['fra-nina', 'build-tmp']);
+            expect(usage.machines.map((machine) => machine.name)).toEqual([
+                'fra-nina',
+                'build-tmp',
+            ]);
             const live = usage.machines[0].monthToDateCents;
             expect(usage.monthToDateCents).toBeCloseTo(live + 312, 2);
-            expect(usage.machines[1]).toMatchObject({ state: 'gone', destroyedAt: '2026-10-12T09:00:00.000Z', hourlyCents: 0 });
+            expect(usage.machines[1]).toMatchObject({
+                state: 'gone',
+                destroyedAt: '2026-10-12T09:00:00.000Z',
+                hourlyCents: 0,
+            });
             expect(usage.providerMonthToDate).toEqual([
-                { providerPluginId: PLUGIN, providerName: 'Provider', monthToDateCents: 5000, computedAt: new Date(T0).toISOString() },
+                {
+                    providerPluginId: PLUGIN,
+                    providerName: 'Provider',
+                    monthToDateCents: 5000,
+                    computedAt: new Date(T0).toISOString(),
+                },
             ]);
         });
 
         it('never shows another owner’s account-wide figure on a shared machine', () => {
             const shared = cloudRow(
                 { userId: OTHER },
-                { cost: { providerMonthToDateCents: 9999, computedAt: new Date(T0).toISOString() } },
+                {
+                    cost: {
+                        providerMonthToDateCents: 9999,
+                        computedAt: new Date(T0).toISOString(),
+                    },
+                },
             );
             expect(usageOf([shared as never], T0, [], OWNER).providerMonthToDate).toEqual([]);
             expect(usageOf([shared as never], T0, [], OTHER).providerMonthToDate).toHaveLength(1);
@@ -256,16 +317,27 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             await expect(service.evaluateIdle(T0)).resolves.toEqual({ machines: 1, acted: 0 });
             expect(storedMeta(rows).idleSince).toBe(new Date(T0).toISOString());
 
-            await expect(service.evaluateIdle(T0 + 3 * HOUR)).resolves.toEqual({ machines: 1, acted: 1 });
+            await expect(service.evaluateIdle(T0 + 3 * HOUR)).resolves.toEqual({
+                machines: 1,
+                acted: 1,
+            });
             expect(inbox.notice).toHaveBeenCalledTimes(1);
             expect(inbox.notice).toHaveBeenCalledWith(
                 OWNER,
-                expect.objectContaining({ title: 'fra-nina has been idle for 3 h', organizationId: null }),
+                expect.objectContaining({
+                    title: 'fra-nina has been idle for 3 h',
+                    organizationId: null,
+                }),
             );
-            expect(storedMeta(rows).idleNotifiedKey).toBe(`fleet-node:${NODE}:cloud-idle:${new Date(T0).toISOString()}`);
+            expect(storedMeta(rows).idleNotifiedKey).toBe(
+                `fleet-node:${NODE}:cloud-idle:${new Date(T0).toISOString()}`,
+            );
 
             // The same window never notifies twice (FR-27).
-            await expect(service.evaluateIdle(T0 + 3 * HOUR + 10 * 60_000)).resolves.toEqual({ machines: 1, acted: 0 });
+            await expect(service.evaluateIdle(T0 + 3 * HOUR + 10 * 60_000)).resolves.toEqual({
+                machines: 1,
+                acted: 0,
+            });
             expect(inbox.notice).toHaveBeenCalledTimes(1);
             expect(machines.power).not.toHaveBeenCalled();
             expect(machines.destroy).not.toHaveBeenCalled();
@@ -275,9 +347,12 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             const { service, rows } = harness({ existing: [cloudRow()] });
             await service.evaluateIdle(T0);
             const view = fleetCloudViewOf(rows.get(NODE) as never, T0 + 4 * HOUR)!;
-            const items = cloudIdleItems([{ id: NODE, name: 'fra-nina', status: 'online', cloud: view } as never], {
-                now: new Date(T0 + 4 * HOUR),
-            });
+            const items = cloudIdleItems(
+                [{ id: NODE, name: 'fra-nina', status: 'online', cloud: view } as never],
+                {
+                    now: new Date(T0 + 4 * HOUR),
+                },
+            );
             expect(items).toHaveLength(1);
             expect(items[0]).toMatchObject({
                 id: `cloud-idle:${NODE}:idle:${new Date(T0).toISOString()}`,
@@ -289,7 +364,10 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
 
         it('powers off when told, audits with the policy as requester, and never destroys (S7, FR-28)', async () => {
             const since = new Date(T0 - 2 * HOUR).toISOString();
-            const row = cloudRow({}, { idlePolicy: { mode: 'power-off', afterHours: 2 }, idleSince: since });
+            const row = cloudRow(
+                {},
+                { idlePolicy: { mode: 'power-off', afterHours: 2 }, idleSince: since },
+            );
             const { service, rows, machines, audit, inbox } = harness({ existing: [row] });
             await expect(service.evaluateIdle(T0)).resolves.toEqual({ machines: 1, acted: 1 });
             expect(machines.power).toHaveBeenCalledWith(PLUGIN, OWNER, '4242', 'off');
@@ -299,7 +377,12 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             expect(stored.poweredOffByPolicyAt).toBe(new Date(T0).toISOString());
             const entry = auditCalls(audit).find((call) => call.action === 'node.cloud.power');
             expect(entry).toMatchObject({ actorUserId: null });
-            expect(entry?.details).toMatchObject({ requestedBy: 'system:idle-policy', outcome: 'ok', action: 'off', family: 'machines' });
+            expect(entry?.details).toMatchObject({
+                requestedBy: 'system:idle-policy',
+                outcome: 'ok',
+                action: 'off',
+                family: 'machines',
+            });
             expect(inbox.notice).toHaveBeenCalledWith(
                 OWNER,
                 expect.objectContaining({ title: 'fra-nina was powered off after 2 h idle' }),
@@ -310,12 +393,20 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             expect(machines.power).toHaveBeenCalledTimes(1);
 
             // Once off, the item reads "powered off after 2 h idle — it still bills while off".
-            rows.set(NODE, { ...rows.get(NODE)!, providerMeta: { ...storedMeta(rows), pending: null, powerState: 'off' } });
-            const view = fleetCloudViewOf(rows.get(NODE) as never, T0 + HOUR)!;
-            const items = cloudIdleItems([{ id: NODE, name: 'fra-nina', status: 'online', cloud: view } as never], {
-                now: new Date(T0 + HOUR),
+            rows.set(NODE, {
+                ...rows.get(NODE)!,
+                providerMeta: { ...storedMeta(rows), pending: null, powerState: 'off' },
             });
-            expect(items.map((item) => item.title)).toEqual(['fra-nina was powered off after 2 h idle — it still bills while off']);
+            const view = fleetCloudViewOf(rows.get(NODE) as never, T0 + HOUR)!;
+            const items = cloudIdleItems(
+                [{ id: NODE, name: 'fra-nina', status: 'online', cloud: view } as never],
+                {
+                    now: new Date(T0 + HOUR),
+                },
+            );
+            expect(items.map((item) => item.title)).toEqual([
+                'fra-nina was powered off after 2 h idle — it still bills while off',
+            ]);
             expect(items[0].action?.route).toContain('cloud=power-on');
         });
 
@@ -326,31 +417,50 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
                 { liveSessions: [{ state: 'needs_you' }] },
                 { cpu: [1, 7.5] },
             ]) {
-                const { service, rows, inbox } = harness({ existing: [cloudRow({}, { idleSince: since })], ...evidence });
+                const { service, rows, inbox } = harness({
+                    existing: [cloudRow({}, { idleSince: since })],
+                    ...evidence,
+                });
                 await expect(service.evaluateIdle(T0)).resolves.toEqual({ machines: 1, acted: 0 });
                 expect(storedMeta(rows).idleSince).toBeNull();
                 expect(inbox.notice).not.toHaveBeenCalled();
             }
             // An idle session does not keep the machine busy.
-            const quiet = harness({ existing: [cloudRow({}, { idleSince: since })], liveSessions: [{ state: 'idle' }] });
-            await expect(quiet.service.evaluateIdle(T0)).resolves.toEqual({ machines: 1, acted: 1 });
+            const quiet = harness({
+                existing: [cloudRow({}, { idleSince: since })],
+                liveSessions: [{ state: 'idle' }],
+            });
+            await expect(quiet.service.evaluateIdle(T0)).resolves.toEqual({
+                machines: 1,
+                acted: 1,
+            });
         });
 
         it('never counts a powered-off or still-enrolling machine as idle (FR-26, U11)', async () => {
             const since = new Date(T0 - 5 * HOUR).toISOString();
-            const off = harness({ existing: [cloudRow({}, { idleSince: since, powerState: 'off' })] });
+            const off = harness({
+                existing: [cloudRow({}, { idleSince: since, powerState: 'off' })],
+            });
             await off.service.evaluateIdle(T0);
             expect(off.inbox.notice).not.toHaveBeenCalled();
-            const enrolling = harness({ existing: [cloudRow({ status: 'enrolling' }, { idleSince: since })] });
+            const enrolling = harness({
+                existing: [cloudRow({ status: 'enrolling' }, { idleSince: since })],
+            });
             await enrolling.service.evaluateIdle(T0);
             expect(enrolling.inbox.notice).not.toHaveBeenCalled();
         });
 
         it('reads only the samples since the last pass, never before the window opened', async () => {
             const since = new Date(T0 - 5 * HOUR).toISOString();
-            const { service, healthSamples } = harness({ existing: [cloudRow({}, { idleSince: since })] });
+            const { service, healthSamples } = harness({
+                existing: [cloudRow({}, { idleSince: since })],
+            });
             await service.evaluateIdle(T0);
-            const [, resolution, from] = healthSamples.series.mock.calls[0] as unknown as [string, string, Date];
+            const [, resolution, from] = healthSamples.series.mock.calls[0] as unknown as [
+                string,
+                string,
+                Date,
+            ];
             expect(resolution).toBe('raw');
             expect(from.toISOString()).toBe(new Date(T0 - 20 * 60_000).toISOString());
         });
@@ -359,18 +469,46 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
     describe('the policy change (T-25, FR-25)', () => {
         it('refuses hours outside 1–72 and an unknown mode, naming the field', async () => {
             const { service } = harness({ existing: [cloudRow()] });
-            expect((await refusal(service.setIdlePolicy(caller, NODE, { mode: 'tell-me', afterHours: 0 })))?.details).toMatchObject({
+            expect(
+                (
+                    await refusal(
+                        service.setIdlePolicy(caller, NODE, { mode: 'tell-me', afterHours: 0 }),
+                    )
+                )?.details,
+            ).toMatchObject({
                 field: 'afterHours',
             });
-            expect((await refusal(service.setIdlePolicy(caller, NODE, { mode: 'tell-me', afterHours: 73 })))?.code).toBe('invalid');
-            expect((await refusal(service.setIdlePolicy(caller, NODE, { mode: 'tell-me', afterHours: 2.5 })))?.code).toBe('invalid');
             expect(
-                (await refusal(service.setIdlePolicy(caller, NODE, { mode: 'destroy' as never, afterHours: 2 })))?.details,
+                (
+                    await refusal(
+                        service.setIdlePolicy(caller, NODE, { mode: 'tell-me', afterHours: 73 }),
+                    )
+                )?.code,
+            ).toBe('invalid');
+            expect(
+                (
+                    await refusal(
+                        service.setIdlePolicy(caller, NODE, { mode: 'tell-me', afterHours: 2.5 }),
+                    )
+                )?.code,
+            ).toBe('invalid');
+            expect(
+                (
+                    await refusal(
+                        service.setIdlePolicy(caller, NODE, {
+                            mode: 'destroy' as never,
+                            afterHours: 2,
+                        }),
+                    )
+                )?.details,
             ).toMatchObject({ field: 'mode' });
         });
 
         it('saves, audits node.policy.change with from and to, and restarts the window', async () => {
-            const row = cloudRow({}, { idleSince: new Date(T0 - 5 * HOUR).toISOString(), idleNotifiedKey: 'k' });
+            const row = cloudRow(
+                {},
+                { idleSince: new Date(T0 - 5 * HOUR).toISOString(), idleNotifiedKey: 'k' },
+            );
             const { service, rows, audit } = harness({ existing: [row] });
             await service.setIdlePolicy(caller, NODE, { mode: 'power-off', afterHours: 1 });
             expect(storedMeta(rows)).toMatchObject({
@@ -390,7 +528,13 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
 
         it('refuses a caller outside the machine’s audience as not found', async () => {
             const { service } = harness({ existing: [cloudRow({ userId: OTHER })] });
-            expect((await refusal(service.setIdlePolicy(caller, NODE, { mode: 'nothing', afterHours: 3 })))?.code).toBe('not_found');
+            expect(
+                (
+                    await refusal(
+                        service.setIdlePolicy(caller, NODE, { mode: 'nothing', afterHours: 3 }),
+                    )
+                )?.code,
+            ).toBe('not_found');
         });
 
         it('"Keep running" starts the window again now', async () => {
@@ -399,7 +543,9 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             await service.keepRunning(caller, NODE);
             const restarted = Date.parse(String(storedMeta(rows).idleSince));
             expect(restarted).toBeGreaterThan(T0 - HOUR);
-            expect(auditCalls(audit).some((call) => call.details.act === 'keep-running')).toBe(true);
+            expect(auditCalls(audit).some((call) => call.details.act === 'keep-running')).toBe(
+                true,
+            );
         });
     });
 
@@ -416,17 +562,32 @@ describe('FleetCloudService P2 — cost and idle (FL-17)', () => {
             });
             const tool = tools.find((entry) => entry.name === 'fleet_cloud_idle_policy')!;
             expect(tool).toBeDefined();
-            const out = (await tool.invoke({ nodeId: NODE, mode: 'power-off', afterHours: 2 })) as Record<string, unknown>;
+            const out = (await tool.invoke({
+                nodeId: NODE,
+                mode: 'power-off',
+                afterHours: 2,
+            })) as Record<string, unknown>;
             expect(out).toMatchObject({ held: true, decisionId: 'p-1' });
-            const [, proposal] = proposals.propose.mock.calls[0] as unknown as [string, { title: string; payload: Record<string, unknown> }];
+            const [, proposal] = proposals.propose.mock.calls[0] as unknown as [
+                string,
+                { title: string; payload: Record<string, unknown> },
+            ];
             expect(proposal.title).toBe(
                 "Change fra-nina's idle policy from Tell me after 3 h to Power off after 2 h. Ever Works never destroys a cloud computer on its own.",
             );
-            expect(proposal.payload).toMatchObject({ verb: 'idle-policy', nodeId: NODE, args: { mode: 'power-off', afterHours: 2 } });
+            expect(proposal.payload).toMatchObject({
+                verb: 'idle-policy',
+                nodeId: NODE,
+                args: { mode: 'power-off', afterHours: 2 },
+            });
             // Nothing was written by the Agent itself.
             expect(storedMeta(rows).idlePolicy).toEqual({ mode: 'tell-me', afterHours: 3 });
 
-            const bad = (await tool.invoke({ nodeId: NODE, mode: 'tell-me', afterHours: 99 })) as Record<string, unknown>;
+            const bad = (await tool.invoke({
+                nodeId: NODE,
+                mode: 'tell-me',
+                afterHours: 99,
+            })) as Record<string, unknown>;
             expect((bad.error as { code: string }).code).toBe('invalid');
         });
     });

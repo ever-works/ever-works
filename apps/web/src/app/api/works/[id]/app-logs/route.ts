@@ -21,5 +21,9 @@ export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => 
     const { id } = await ctx.params;
     if (!isUuid(id)) return invalidIdResponse();
     const body = sanitizeLogsBody(await readJsonBody(request));
-    return forwardAppRuntimeCall(appRuntimeApiUrl(id, '/app-logs'), { method: 'POST', headers, body });
+    return forwardAppRuntimeCall(appRuntimeApiUrl(id, '/app-logs'), {
+        method: 'POST',
+        headers,
+        body,
+    });
 });

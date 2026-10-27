@@ -54,9 +54,13 @@ function harness(opts: { stopped?: boolean; liveSessions?: number; existing?: Ro
     let seq = 0;
     const order: string[] = [];
     const nodes = {
-        findByUser: jest.fn(async (userId: string) => [...rows.values()].filter((row) => row.userId === userId)),
+        findByUser: jest.fn(async (userId: string) =>
+            [...rows.values()].filter((row) => row.userId === userId),
+        ),
         findById: jest.fn(async (id: string) => rows.get(id) ?? null),
-        findCloudNodes: jest.fn(async () => [...rows.values()].filter((row) => row.origin === 'cloud')),
+        findCloudNodes: jest.fn(async () =>
+            [...rows.values()].filter((row) => row.origin === 'cloud'),
+        ),
         create: jest.fn(async (data: Partial<Row>) => {
             seq += 1;
             const id = `00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`;
@@ -83,11 +87,18 @@ function harness(opts: { stopped?: boolean; liveSessions?: number; existing?: Ro
         }),
         power: jest.fn(async () => undefined),
         destroy: jest.fn(async () => undefined),
-        getMachine: jest.fn(async (_p: string, _u: string, ref: string) => ({ machineRef: ref, state: 'running' as const })),
+        getMachine: jest.fn(async (_p: string, _u: string, ref: string) => ({
+            machineRef: ref,
+            state: 'running' as const,
+        })),
     };
     const audit = { tryRecord: jest.fn(async () => true) };
     const killSwitch = { isStopped: jest.fn(async () => Boolean(opts.stopped)) };
-    const sessions = { findLiveForNode: jest.fn(async () => Array.from({ length: opts.liveSessions ?? 0 }, () => ({}))) };
+    const sessions = {
+        findLiveForNode: jest.fn(async () =>
+            Array.from({ length: opts.liveSessions ?? 0 }, () => ({})),
+        ),
+    };
     const jobs = { loadByNodeForUser: jest.fn(async () => ({})) };
     const fleet = { viewForRole: jest.fn((node: Row) => ({ id: node.id, name: node.name })) };
     const service = new FleetCloudService(
@@ -181,7 +192,9 @@ describe('FleetCloudService (FL-17)', () => {
         const error = await refusal(service.create(caller, { ...request, fields: {} }));
         expect(error?.code).toBe('confirmation_required');
         expect(String(error?.details?.summary)).toContain('$24/month');
-        expect(String(error?.details?.decision)).toContain('2 CPU · 4 GB cloud computer at Provider (nyc3)');
+        expect(String(error?.details?.decision)).toContain(
+            '2 CPU · 4 GB cloud computer at Provider (nyc3)',
+        );
         expect(nodes.create).not.toHaveBeenCalled();
         expect(machines.create).not.toHaveBeenCalled();
     });
@@ -196,7 +209,11 @@ describe('FleetCloudService (FL-17)', () => {
         expect(row.status).toBe('enrolling');
         expect(row.providerMachineRef).toBe('4242');
         expect((row.providerMeta as { phase: string }).phase).toBe('booting');
-        const input = (machines.create.mock.calls[0] as unknown[])[2] as { bootstrapScript: string; tags: string[]; publicKey: string };
+        const input = (machines.create.mock.calls[0] as unknown[])[2] as {
+            bootstrapScript: string;
+            tags: string[];
+            publicKey: string;
+        };
         // The two P1 tags, then (P3, FR-30) this deployment's site tag.
         expect(input.tags.slice(0, 2)).toEqual(['ever-works', `ever-works-node:${created.nodeId}`]);
         expect(input.tags[2]).toMatch(/^ever-works-site:[0-9a-f]{16}$/);
@@ -222,7 +239,9 @@ describe('FleetCloudService (FL-17)', () => {
 
     it('marks the row failed with the provider’s first line when it refuses (U2)', async () => {
         const { service, rows, machines } = harness();
-        machines.create.mockRejectedValueOnce(new MachineProviderError('quota', 'droplet limit reached for this account'));
+        machines.create.mockRejectedValueOnce(
+            new MachineProviderError('quota', 'droplet limit reached for this account'),
+        );
         const created = await service.create(caller, { ...request, fields: { confirm: true } });
         await settle();
         const meta = rows.get(created.nodeId)!.providerMeta as { phase: string; error: string };
@@ -234,28 +253,52 @@ describe('FleetCloudService (FL-17)', () => {
 
     it('refuses a stale price with the current one (FR-4, U9)', async () => {
         const { service } = harness();
-        const error = await refusal(service.create(caller, { ...request, acknowledgedPriceCents: 2200, fields: { confirm: true } }));
+        const error = await refusal(
+            service.create(caller, {
+                ...request,
+                acknowledgedPriceCents: 2200,
+                fields: { confirm: true },
+            }),
+        );
         expect(error?.code).toBe('invalid');
-        expect(error?.details).toMatchObject({ field: 'acknowledgedPriceCents', currentPriceCents: 2400 });
+        expect(error?.details).toMatchObject({
+            field: 'acknowledgedPriceCents',
+            currentPriceCents: 2400,
+        });
     });
 
     it('refuses the eleventh cloud computer (FR-12)', async () => {
         const existing = Array.from({ length: 10 }, (_, i) =>
-            cloudRow({ id: `00000000-0000-4000-9000-${String(i).padStart(12, '0')}`, name: `box-${i}` }),
+            cloudRow({
+                id: `00000000-0000-4000-9000-${String(i).padStart(12, '0')}`,
+                name: `box-${i}`,
+            }),
         );
         const { service } = harness({ existing });
-        expect((await refusal(service.create(caller, { ...request, fields: { confirm: true } })))?.code).toBe('limit_exceeded');
+        expect(
+            (await refusal(service.create(caller, { ...request, fields: { confirm: true } })))
+                ?.code,
+        ).toBe('limit_exceeded');
     });
 
     it('applies the kill-switch matrix: create and power-on refused, power-off and destroy allowed (R-36)', async () => {
-        const offRow = cloudRow({ providerMeta: { ...cloudRow().providerMeta!, powerState: 'off' } });
+        const offRow = cloudRow({
+            providerMeta: { ...cloudRow().providerMeta!, powerState: 'off' },
+        });
         const { service, machines } = harness({ stopped: true, existing: [offRow] });
-        expect((await refusal(service.create(caller, { ...request, fields: { confirm: true } })))?.code).toBe('kill_switch');
-        expect((await refusal(service.power(caller, offRow.id, 'on', { confirm: true })))?.code).toBe('kill_switch');
+        expect(
+            (await refusal(service.create(caller, { ...request, fields: { confirm: true } })))
+                ?.code,
+        ).toBe('kill_switch');
+        expect(
+            (await refusal(service.power(caller, offRow.id, 'on', { confirm: true })))?.code,
+        ).toBe('kill_switch');
 
         const running = cloudRow();
         const second = harness({ stopped: true, existing: [running] });
-        await expect(second.service.power(caller, running.id, 'off', { confirm: true })).resolves.toEqual({ operationId: running.id });
+        await expect(
+            second.service.power(caller, running.id, 'off', { confirm: true }),
+        ).resolves.toEqual({ operationId: running.id });
         expect(second.machines.power).toHaveBeenCalledWith(PLUGIN, OWNER, '4242', 'off');
         await second.service.destroy(caller, running.id, { confirmName: 'nyc-ops' });
         expect(second.machines.destroy).toHaveBeenCalled();
@@ -282,7 +325,9 @@ describe('FleetCloudService (FL-17)', () => {
         const { service, rows, machines, audit } = harness({ existing: [row] });
         const ask = await refusal(service.destroy(caller, row.id, {}));
         expect(ask?.code).toBe('confirmation_required');
-        expect(String(ask?.details?.summary)).toMatch(/^Destroy nyc-ops\? It has cost \$[0-9.]+ since 2026-10-21\./);
+        expect(String(ask?.details?.summary)).toMatch(
+            /^Destroy nyc-ops\? It has cost \$[0-9.]+ since 2026-10-21\./,
+        );
         const done = await service.destroy(caller, row.id, { confirmName: 'nyc-ops' });
         expect(machines.destroy).toHaveBeenCalledWith(PLUGIN, OWNER, '4242');
         expect(rows.has(row.id)).toBe(false);
@@ -307,7 +352,10 @@ describe('FleetCloudService (FL-17)', () => {
     it('is dark while FLEET_CLOUD_ENABLED is off', async () => {
         process.env.FLEET_CLOUD_ENABLED = 'false';
         const { service } = harness();
-        expect((await refusal(service.create(caller, { ...request, fields: { confirm: true } })))?.code).toBe('not_found');
+        expect(
+            (await refusal(service.create(caller, { ...request, fields: { confirm: true } })))
+                ?.code,
+        ).toBe('not_found');
         await expect(service.reconcile()).resolves.toEqual({ machines: 0, changed: 0 });
     });
 });

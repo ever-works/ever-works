@@ -118,10 +118,14 @@ export const FLEET_CLOUD_VPN_KEY_PATH = '/run/ever-works/overlay-vpn-key';
 /** Throws on any value that could escape its YAML scalar or shell word. */
 export function assertBootstrapSafe(input: CloudBootstrapInput): void {
     if (!UUID_PATTERN.test(input.nodeId)) throw new Error('bootstrap: the node id is not a uuid');
-    if (!NAME_PATTERN.test(input.name)) throw new Error('bootstrap: the name is not a valid computer name');
-    if (!API_URL_PATTERN.test(input.apiUrl)) throw new Error('bootstrap: the API URL is not a plain http(s) origin');
-    if (!TOKEN_PATTERN.test(input.token)) throw new Error('bootstrap: the enrolment token has an unexpected shape');
-    if (!RUNTIME_SPEC_PATTERN.test(input.runtimeSpec)) throw new Error('bootstrap: the runtime spec is not allowed');
+    if (!NAME_PATTERN.test(input.name))
+        throw new Error('bootstrap: the name is not a valid computer name');
+    if (!API_URL_PATTERN.test(input.apiUrl))
+        throw new Error('bootstrap: the API URL is not a plain http(s) origin');
+    if (!TOKEN_PATTERN.test(input.token))
+        throw new Error('bootstrap: the enrolment token has an unexpected shape');
+    if (!RUNTIME_SPEC_PATTERN.test(input.runtimeSpec))
+        throw new Error('bootstrap: the runtime spec is not allowed');
     if (input.publicKey && !PUBLIC_KEY_PATTERN.test(input.publicKey)) {
         throw new Error('bootstrap: the public key is not an ed25519 OpenSSH key');
     }
@@ -133,8 +137,14 @@ export function assertBootstrapSafe(input: CloudBootstrapInput): void {
             throw new Error('bootstrap: the overlay-VPN auth key has an unexpected shape');
         }
         const join = input.overlayVpn.joinCommand;
-        if (join !== null && (!join.includes('{keyFile}') || !JOIN_COMMAND_PATTERN.test(join.replace('{keyFile}', 'KEYFILE')))) {
-            throw new Error('bootstrap: the overlay-VPN join command must be an absolute path with a {keyFile} placeholder');
+        if (
+            join !== null &&
+            (!join.includes('{keyFile}') ||
+                !JOIN_COMMAND_PATTERN.test(join.replace('{keyFile}', 'KEYFILE')))
+        ) {
+            throw new Error(
+                'bootstrap: the overlay-VPN join command must be an absolute path with a {keyFile} placeholder',
+            );
         }
     }
 }

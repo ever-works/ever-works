@@ -13,7 +13,11 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { isDangerDialog, typedNameMatches, type ConfirmDialogModel } from './machine-actions.shared';
+import {
+    isDangerDialog,
+    typedNameMatches,
+    type ConfirmDialogModel,
+} from './machine-actions.shared';
 
 /**
  * Machine actions (FL-09, spec §5.2) — the one confirm dialog of every

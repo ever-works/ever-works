@@ -808,7 +808,8 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 			route: POST('/api/fleet/nodes/{id}/runners/{runnerId}/{action}'),
 			cli: 'fleet runners action',
 			waitable: true,
-			confirmationNote: "plain to start; confirm to stop and restart (an Agent's stop or restart is held for the owner)"
+			confirmationNote:
+				"plain to start; confirm to stop and restart (an Agent's stop or restart is held for the owner)"
 		}
 	),
 	act(
@@ -833,7 +834,12 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'FLEET_ACTIONS_RUNNERS_ENABLED',
 		'live',
 		confirm('machine.admin'),
-		{ phase: 'P3', route: POST('/api/fleet/runners/jobs/cancel'), cli: 'fleet runners cancel-run', alwaysHeld: true }
+		{
+			phase: 'P3',
+			route: POST('/api/fleet/runners/jobs/cancel'),
+			cli: 'fleet runners cancel-run',
+			alwaysHeld: true
+		}
 	),
 
 	// ── usage (FL-20) ── P1 shipped: the Usage object (totals, by model, by computer, busiest

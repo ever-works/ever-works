@@ -48,26 +48,37 @@ export function createContainerReader(io: LogIo, container: string, nodeName: st
 		supportsEarlier: false,
 		async tail(lines): Promise<LogBatch> {
 			let lastStamp: string | null = null;
-			const result = await collectChild(io, 'docker', ['logs', '--tail', String(lines), '--timestamps', container], {
-				max: lines,
-				parse: (line) => {
-					const stamp = stampOf(line);
-					if (stamp && (!lastStamp || stamp > lastStamp)) lastStamp = stamp;
-					return parseDockerLine(line);
-				},
-				stderrIsData: true,
-				timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
-			});
+			const result = await collectChild(
+				io,
+				'docker',
+				['logs', '--tail', String(lines), '--timestamps', container],
+				{
+					max: lines,
+					parse: (line) => {
+						const stamp = stampOf(line);
+						if (stamp && (!lastStamp || stamp > lastStamp)) lastStamp = stamp;
+						return parseDockerLine(line);
+					},
+					stderrIsData: true,
+					timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
+				}
+			);
 			if (result.spawnError) {
 				throw new LogReadError('unsupported_on_node', `Docker is not installed on ${nodeName}`);
 			}
 			if (result.timedOut) {
-				throw new LogReadError('operation_failed', `docker logs did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`);
+				throw new LogReadError(
+					'operation_failed',
+					`docker logs did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`
+				);
 			}
 			if (result.code !== 0) {
 				const detail = firstLine(result.stderr.join('\n'));
 				if (NO_SUCH.test(detail)) throw new LogReadError('not_found', `${container} is gone`);
-				throw new LogReadError('operation_failed', `docker logs exited ${result.code ?? 'early'}${detail ? `: "${detail}"` : ''}`);
+				throw new LogReadError(
+					'operation_failed',
+					`docker logs exited ${result.code ?? 'early'}${detail ? `: "${detail}"` : ''}`
+				);
 			}
 			since = lastStamp;
 			// stdout and stderr arrive on two pipes: put them back in time order.
@@ -76,7 +87,13 @@ export function createContainerReader(io: LogIo, container: string, nodeName: st
 		},
 		follow(sink: LogFollowSink) {
 			const boundary = since;
-			const args = ['logs', '--follow', '--timestamps', ...(boundary ? ['--since', boundary] : ['--tail', '0']), container];
+			const args = [
+				'logs',
+				'--follow',
+				'--timestamps',
+				...(boundary ? ['--since', boundary] : ['--tail', '0']),
+				container
+			];
 			const child = io.spawn('docker', args);
 			let stopped = false;
 			child.onLine((line) => {

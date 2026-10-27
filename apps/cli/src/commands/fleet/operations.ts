@@ -29,7 +29,8 @@ const get = new Command('get')
     .option('--json', 'Machine-readable output')
     .action(async (id: string, options: { json?: boolean }) => {
         const json = options.json === true;
-        if (!id || id.length > 100) fleetUsage(json, '<id> is the operation id a verb answered with', 'id');
+        if (!id || id.length > 100)
+            fleetUsage(json, '<id> is the operation id a verb answered with', 'id');
         await runFleetVerb<FleetOperationView>(
             json,
             { method: 'GET', path: `/fleet/operations/${encodeURIComponent(id)}` },
@@ -45,7 +46,10 @@ const list = new Command('list')
     .option('--json', 'Machine-readable output')
     .action(async (options: { state?: string; on?: string; limit?: string; json?: boolean }) => {
         const json = options.json === true;
-        if (options.state && !(FLEET_OPERATION_STATES as readonly string[]).includes(options.state)) {
+        if (
+            options.state &&
+            !(FLEET_OPERATION_STATES as readonly string[]).includes(options.state)
+        ) {
             fleetUsage(json, `--state is ${FLEET_OPERATION_STATES.join(', ')}`, 'state');
         }
         const nodeId = options.on ? await resolveFleetNodeId(json, options.on) : undefined;

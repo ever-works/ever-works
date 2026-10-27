@@ -13,8 +13,13 @@ import {
  */
 
 /** Failed first, then running, then the rest, filtered by the find field. */
-export function visibleServices(services: readonly FleetServiceView[], find: string): FleetServiceView[] {
-    return services.filter((service) => fleetServiceMatchesFind(service, find)).sort(compareFleetServices);
+export function visibleServices(
+    services: readonly FleetServiceView[],
+    find: string,
+): FleetServiceView[] {
+    return services
+        .filter((service) => fleetServiceMatchesFind(service, find))
+        .sort(compareFleetServices);
 }
 
 /** The buttons in the row itself (spec §5.1): Start when not running; Restart and Stop while running. */
@@ -32,7 +37,9 @@ export function atBootAction(service: FleetServiceView): FleetServiceAction | nu
 }
 
 /** The `⚠` marker of a row: the node itself, or the kind of thing stopping it could cut off. */
-export function riskMarker(service: FleetServiceView): 'node' | 'network' | 'ssh' | 'vpn' | 'docker' | null {
+export function riskMarker(
+    service: FleetServiceView,
+): 'node' | 'network' | 'ssh' | 'vpn' | 'docker' | null {
     if (service.isNode) return 'node';
     return service.blastRadius?.kind ?? null;
 }
@@ -40,11 +47,22 @@ export function riskMarker(service: FleetServiceView): 'node' | 'network' | 'ssh
 /** The glyph a state shows (spec §5.1): ▲ failed, ● running, ○ the rest. */
 export function stateGlyph(service: FleetServiceView): '▲' | '●' | '○' {
     if (service.state === 'failed') return '▲';
-    if (service.state === 'running' || service.state === 'activating' || service.state === 'deactivating') return '●';
+    if (
+        service.state === 'running' ||
+        service.state === 'activating' ||
+        service.state === 'deactivating'
+    )
+        return '●';
     return '○';
 }
 
 /** Counts for the header: all, and failed. */
-export function serviceCounts(services: readonly FleetServiceView[]): { total: number; failed: number } {
-    return { total: services.length, failed: services.filter((service) => service.state === 'failed').length };
+export function serviceCounts(services: readonly FleetServiceView[]): {
+    total: number;
+    failed: number;
+} {
+    return {
+        total: services.length,
+        failed: services.filter((service) => service.state === 'failed').length,
+    };
 }

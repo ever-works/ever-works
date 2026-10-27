@@ -1,5 +1,10 @@
 import { bffProxy } from '@/lib/api/bff-proxy';
-import { appRuntimeApiUrl, forwardAppRuntimeCall, invalidIdResponse, isUuid } from '@/lib/api/app-runtime-bff';
+import {
+    appRuntimeApiUrl,
+    forwardAppRuntimeCall,
+    invalidIdResponse,
+    isUuid,
+} from '@/lib/api/app-runtime-bff';
 
 type RouteContext = { params: Promise<{ id: string }> };
 

@@ -238,9 +238,7 @@ export function buildFleetTaskFirstMessage(input: FleetTaskFirstMessageInput): s
 	}
 	lines.push(
 		'',
-		input.hasRepository
-			? 'When done, commit and open a pull request.'
-			: 'When done, summarise what you changed.'
+		input.hasRepository ? 'When done, commit and open a pull request.' : 'When done, summarise what you changed.'
 	);
 	const message = lines.join('\n');
 	return message.length <= FLEET_SESSION_FIRST_MESSAGE_MAX_LENGTH
@@ -393,9 +391,11 @@ export function fleetHandoffPullRequestFrom(payload: unknown): FleetHandoffPullR
 	const repository = typeof record.repoFullName === 'string' ? record.repoFullName.trim() : '';
 	const number = typeof record.prNumber === 'number' && Number.isSafeInteger(record.prNumber) ? record.prNumber : NaN;
 	if (!/^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(repository) || !(number > 0)) return null;
-	const headRef = typeof record.headRef === 'string' && record.headRef.trim() ? record.headRef.trim().slice(0, 255) : null;
+	const headRef =
+		typeof record.headRef === 'string' && record.headRef.trim() ? record.headRef.trim().slice(0, 255) : null;
 	const headRepo =
-		typeof record.headRepo === 'string' && /^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(record.headRepo.trim())
+		typeof record.headRepo === 'string' &&
+		/^[A-Za-z0-9._-]{1,100}\/[A-Za-z0-9._-]{1,100}$/.test(record.headRepo.trim())
 			? record.headRepo.trim()
 			: null;
 	const fork = record.fork === true || (headRepo !== null && headRepo.toLowerCase() !== repository.toLowerCase());

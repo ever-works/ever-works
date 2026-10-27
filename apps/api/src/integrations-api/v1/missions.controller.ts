@@ -470,11 +470,7 @@ export class IntegrationMissionsController {
             (field) => (dto as Record<string, unknown>)[field] !== undefined,
         );
         const resulting = dto.status ?? String(current.status);
-        if (
-            textFields.length > 0 &&
-            resulting === 'active' &&
-            integrationMissionEditPausedOnly()
-        ) {
+        if (textFields.length > 0 && resulting === 'active' && integrationMissionEditPausedOnly()) {
             throw new IntegrationHttpException(
                 422,
                 'domain_rule',

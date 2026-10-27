@@ -1,5 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
-import { ReservedTaskLabelError, TasksService, assertReservedLabelsUnchanged } from '../tasks.service';
+import {
+    ReservedTaskLabelError,
+    TasksService,
+    assertReservedLabelsUnchanged,
+} from '../tasks.service';
 
 /**
  * Works-security (2026-10-18) — reserved Task labels.
@@ -49,9 +53,9 @@ describe('TasksService — reserved labels', () => {
 
     it('refuses a restricted caller that strips awaiting-owner, and writes nothing', async () => {
         const { service, repos } = makeService(held);
-        await expect(service.update(USER, 't1', { labels: ['bug'] }, undefined, fleet)).rejects.toThrow(
-            /cannot remove "awaiting-owner"/,
-        );
+        await expect(
+            service.update(USER, 't1', { labels: ['bug'] }, undefined, fleet),
+        ).rejects.toThrow(/cannot remove "awaiting-owner"/);
         await expect(
             service.update(USER, 't1', { labels: ['bug'] }, undefined, fleet),
         ).rejects.toBeInstanceOf(ForbiddenException);
@@ -64,7 +68,13 @@ describe('TasksService — reserved labels', () => {
             service.update(USER, 't1', { labels: ['app-provision'] }, undefined, fleet),
         ).rejects.toBeInstanceOf(ReservedTaskLabelError);
         await expect(
-            service.update(USER, 't1', { labels: ['release:revert:stage-to-main'] }, undefined, fleet),
+            service.update(
+                USER,
+                't1',
+                { labels: ['release:revert:stage-to-main'] },
+                undefined,
+                fleet,
+            ),
         ).rejects.toBeInstanceOf(ReservedTaskLabelError);
     });
 

@@ -67,12 +67,24 @@ describe('sessions.shared (FL-04 P1b)', () => {
     it('leads the tab with offline, then a missing consent, then a down daemon', () => {
         expect(sessionsTabCard({ ...online, status: 'offline' }).kind).toBe('offline');
         expect(
-            sessionsTabCard({ ...online, consents: { work: false, attend: false, manage: false, usageScan: false } }),
+            sessionsTabCard({
+                ...online,
+                consents: { work: false, attend: false, manage: false, usageScan: false },
+            }),
         ).toEqual({ kind: 'consent-missing', command: 'ever-works-node start --manage' });
         expect(
-            sessionsTabCard({ ...online, sessionDaemon: { state: 'failed', reason: 'terminal support is missing', sessions: 0 } }),
+            sessionsTabCard({
+                ...online,
+                sessionDaemon: {
+                    state: 'failed',
+                    reason: 'terminal support is missing',
+                    sessions: 0,
+                },
+            }),
         ).toEqual({ kind: 'daemon-down', reason: 'terminal support is missing' });
-        expect(sessionsTabCard({ ...online, capabilities: ['claude-code'] }).kind).toBe('daemon-down');
+        expect(sessionsTabCard({ ...online, capabilities: ['claude-code'] }).kind).toBe(
+            'daemon-down',
+        );
         expect(sessionsTabCard(online).kind).toBe('none');
     });
 
@@ -103,18 +115,30 @@ describe('sessions.shared (FL-04 P1b)', () => {
     });
 
     it('groups live before ended and counts the owner limit', () => {
-        const sessions = [view({ id: 'a', state: 'ended', endedAt: '2026-10-21T08:00:00.000Z' }), view({ id: 'b' })];
+        const sessions = [
+            view({ id: 'a', state: 'ended', endedAt: '2026-10-21T08:00:00.000Z' }),
+            view({ id: 'b' }),
+        ];
         const grouped = groupSessions(sessions);
         expect(grouped.live.map((s) => s.id)).toEqual(['b']);
         expect(grouped.ended.map((s) => s.id)).toEqual(['a']);
-        expect(atOwnerLimit(Array.from({ length: 8 }, (_, i) => view({ id: String(i) })))).toBe(true);
-        expect(atOwnerLimit(Array.from({ length: 7 }, (_, i) => view({ id: String(i) })))).toBe(false);
+        expect(atOwnerLimit(Array.from({ length: 8 }, (_, i) => view({ id: String(i) })))).toBe(
+            true,
+        );
+        expect(atOwnerLimit(Array.from({ length: 7 }, (_, i) => view({ id: String(i) })))).toBe(
+            false,
+        );
     });
 
     it('words every ended reason', () => {
         expect(endedLine(view())).toBeNull();
-        expect(endedLine(view({ state: 'ended', endedReason: 'exit', exitCode: 2 }))).toEqual({ key: 'endedExit', code: 2 });
-        expect(endedLine(view({ state: 'ended', endedReason: 'exit', exitCode: null }))).toEqual({ key: 'endedLost' });
+        expect(endedLine(view({ state: 'ended', endedReason: 'exit', exitCode: 2 }))).toEqual({
+            key: 'endedExit',
+            code: 2,
+        });
+        expect(endedLine(view({ state: 'ended', endedReason: 'exit', exitCode: null }))).toEqual({
+            key: 'endedLost',
+        });
         for (const [reason, key] of [
             ['user', 'endedUser'],
             ['agent', 'endedAgent'],
@@ -136,9 +160,16 @@ describe('sessions.shared (FL-04 P1b)', () => {
             drivers: 1,
             watchers: 1,
         };
-        expect(roleSentence(presence, { userId: 'u1', role: 'driver' })).toEqual({ key: 'driving' });
-        expect(roleSentence(presence, { userId: 'u1', role: 'viewer' })).toEqual({ key: 'watchingDriven', others: 1 });
-        expect(roleSentence(undefined, { userId: 'u1', role: 'viewer' })).toEqual({ key: 'nobodyDriving' });
+        expect(roleSentence(presence, { userId: 'u1', role: 'driver' })).toEqual({
+            key: 'driving',
+        });
+        expect(roleSentence(presence, { userId: 'u1', role: 'viewer' })).toEqual({
+            key: 'watchingDriven',
+            others: 1,
+        });
+        expect(roleSentence(undefined, { userId: 'u1', role: 'viewer' })).toEqual({
+            key: 'nobodyDriving',
+        });
     });
 
     it('holds typed input up to its cap and counts its lines', () => {
@@ -151,12 +182,18 @@ describe('sessions.shared (FL-04 P1b)', () => {
     });
 
     it('backs off 1 s, 2 s, 4 s … up to 15 s', () => {
-        expect([0, 1, 2, 3, 4, 9].map(sessionReconnectDelayMs)).toEqual([1000, 2000, 4000, 8000, 15000, 15000]);
+        expect([0, 1, 2, 3, 4, 9].map(sessionReconnectDelayMs)).toEqual([
+            1000, 2000, 4000, 8000, 15000, 15000,
+        ]);
     });
 
     it('reads the CONTRACTS §8 envelope, else a code from the status', () => {
         const error = readSessionError(422, {
-            error: { code: 'invalid', hint: 'choose a folder on the computer', details: { field: 'cwd' } },
+            error: {
+                code: 'invalid',
+                hint: 'choose a folder on the computer',
+                details: { field: 'cwd' },
+            },
         });
         expect(error).toMatchObject({ code: 'invalid', hint: 'choose a folder on the computer' });
         expect(errorField(error)).toBe('cwd');

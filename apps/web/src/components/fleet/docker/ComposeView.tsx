@@ -69,14 +69,30 @@ export function ComposeView({
     const list = useMachineList(loadList, REFRESH_MS * 3);
 
     if (!list.data && list.loading) {
-        return <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark">{t('loading')}</p>;
+        return (
+            <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark">
+                {t('loading')}
+            </p>
+        );
     }
     if (!list.data && list.error) {
-        return <MachineTabNotice error={list.error} machine={machine} family="Compose" onRetry={() => void list.refresh()} testId="fleet-compose-notice" />;
+        return (
+            <MachineTabNotice
+                error={list.error}
+                machine={machine}
+                family="Compose"
+                onRetry={() => void list.refresh()}
+                testId="fleet-compose-notice"
+            />
+        );
     }
     const projects = list.data?.projects ?? [];
     if (projects.length === 0) {
-        return <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark">{t('empty', { name: machine })}</p>;
+        return (
+            <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark">
+                {t('empty', { name: machine })}
+            </p>
+        );
     }
     const current = projects.find((project) => project.name === selected) ?? null;
 
@@ -92,7 +108,8 @@ export function ComposeView({
                             onClick={() => setSelected(project.name)}
                             data-testid="fleet-compose-project"
                         >
-                            {project.name} · {project.filesMissing ? t('filesMissing') : project.status}
+                            {project.name} ·{' '}
+                            {project.filesMissing ? t('filesMissing') : project.status}
                         </Button>
                     </li>
                 ))}
@@ -108,7 +125,9 @@ export function ComposeView({
                     onOperation={onOperation}
                 />
             ) : (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark">{tDocker('compose.pick')}</p>
+                <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                    {tDocker('compose.pick')}
+                </p>
             )}
         </div>
     );
@@ -132,10 +151,17 @@ function ComposeProject({
     const t = useTranslations('fleet.docker.compose');
     const tDocker = useTranslations('fleet.docker');
     const [view, setView] = useState<'picture' | 'list'>('picture');
-    const load = useCallback(() => describeFleetComposeAction(nodeId, project.name), [nodeId, project.name]);
+    const load = useCallback(
+        () => describeFleetComposeAction(nodeId, project.name),
+        [nodeId, project.name],
+    );
     const described = useMachineList(load, REFRESH_MS);
     const onError = (error: FleetLinkError) =>
-        toast.error(error.hint ? tDocker('actionFailedWith', { hint: error.hint }) : tDocker('actionFailed'));
+        toast.error(
+            error.hint
+                ? tDocker('actionFailedWith', { hint: error.hint })
+                : tDocker('actionFailed'),
+        );
 
     const act = (action: FleetComposeAction) => {
         const label = t(`act.${action}`);
@@ -147,16 +173,24 @@ function ComposeProject({
                 title: t(`dialog.${action}`, { name: project.name, machine }),
                 ...(action === 'down'
                     ? {
-                          body: volumes.length > 0
-                              ? t('dialog.downKeeps', { count: project.serviceCount, volumes: volumes.join(', ') })
-                              : t('dialog.downKeepsNone', { count: project.serviceCount }),
+                          body:
+                              volumes.length > 0
+                                  ? t('dialog.downKeeps', {
+                                        count: project.serviceCount,
+                                        volumes: volumes.join(', '),
+                                    })
+                                  : t('dialog.downKeepsNone', { count: project.serviceCount }),
                       }
                     : {}),
             },
             actionLabel: label,
             run: (fields) => fleetComposeAction(nodeId, { project: project.name, action, fields }),
             onDone: (result) => {
-                onOperation(result, t(`running.${action}`, { name: project.name, machine }), t(`done.${action}`, { name: project.name }));
+                onOperation(
+                    result,
+                    t(`running.${action}`, { name: project.name, machine }),
+                    t(`done.${action}`, { name: project.name }),
+                );
                 void described.refresh();
             },
             onError,
@@ -170,10 +204,15 @@ function ComposeProject({
             key: `container:${service.containerId}`,
             dialog: {
                 class: 'confirm',
-                title: tDocker('dialog.title', { action: label, name: service.containerName ?? service.name, machine }),
+                title: tDocker('dialog.title', {
+                    action: label,
+                    name: service.containerName ?? service.name,
+                    machine,
+                }),
             },
             actionLabel: label,
-            run: (fields) => fleetContainerAction(nodeId, { container: service.containerId!, action, fields }),
+            run: (fields) =>
+                fleetContainerAction(nodeId, { container: service.containerId!, action, fields }),
             onDone: () => {
                 toast.success(tDocker('done', { action: label, name: service.name }));
                 void described.refresh();
@@ -185,12 +224,23 @@ function ComposeProject({
     const logsHref = `${ROUTES.DASHBOARD_FLEET_COMPUTER(nodeId, 'logs')}&source=compose&project=${encodeURIComponent(project.name)}`;
 
     return (
-        <section className="space-y-2 rounded-xl border border-border dark:border-border-dark p-3" aria-label={project.name}>
+        <section
+            className="space-y-2 rounded-xl border border-border dark:border-border-dark p-3"
+            aria-label={project.name}
+        >
             <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-semibold">{project.name}</h3>
                 <div role="tablist" className="flex gap-1">
                     {(['picture', 'list'] as const).map((id) => (
-                        <Button key={id} type="button" role="tab" aria-selected={view === id} size="sm" variant={view === id ? 'primary' : 'ghost'} onClick={() => setView(id)}>
+                        <Button
+                            key={id}
+                            type="button"
+                            role="tab"
+                            aria-selected={view === id}
+                            size="sm"
+                            variant={view === id ? 'primary' : 'ghost'}
+                            onClick={() => setView(id)}
+                        >
                             {t(id)}
                         </Button>
                     ))}
@@ -205,8 +255,16 @@ function ComposeProject({
                             type="button"
                             size="sm"
                             variant={action === 'down' ? 'ghost' : 'secondary'}
-                            disabled={!allowed || !project.actions.includes(action) || machineAction.busyKey === `compose:${project.name}`}
-                            title={!project.actions.includes(action) ? t('filesMissingHint') : undefined}
+                            disabled={
+                                !allowed ||
+                                !project.actions.includes(action) ||
+                                machineAction.busyKey === `compose:${project.name}`
+                            }
+                            title={
+                                !project.actions.includes(action)
+                                    ? t('filesMissingHint')
+                                    : undefined
+                            }
                             onClick={() => act(action)}
                             data-testid={`fleet-compose-${action}`}
                         >
@@ -216,10 +274,18 @@ function ComposeProject({
                 </span>
             </div>
             {project.filesMissing ? (
-                <p role="status" className="text-sm text-warning">{t('filesMissingHint')}</p>
+                <p role="status" className="text-sm text-warning">
+                    {t('filesMissingHint')}
+                </p>
             ) : null}
             {!described.data && described.error ? (
-                <MachineTabNotice error={described.error} machine={machine} family="Compose" onRetry={() => void described.refresh()} testId="fleet-compose-describe-notice" />
+                <MachineTabNotice
+                    error={described.error}
+                    machine={machine}
+                    family="Compose"
+                    onRetry={() => void described.refresh()}
+                    testId="fleet-compose-describe-notice"
+                />
             ) : null}
             {described.data ? (
                 view === 'picture' ? (
@@ -258,7 +324,15 @@ export function ComposePicture({ description }: { description: FleetComposeDescr
             >
                 <defs>
                     {Object.entries(EDGE_COLOURS).map(([tone, colour]) => (
-                        <marker key={tone} id={`fleet-compose-arrow-${tone}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                        <marker
+                            key={tone}
+                            id={`fleet-compose-arrow-${tone}`}
+                            markerWidth="8"
+                            markerHeight="8"
+                            refX="7"
+                            refY="4"
+                            orient="auto"
+                        >
                             <path d="M0,0 L8,4 L0,8 z" fill={colour} />
                         </marker>
                     ))}
@@ -283,7 +357,9 @@ export function ComposePicture({ description }: { description: FleetComposeDescr
                             data-testid="fleet-compose-edge"
                             data-tone={edge.tone}
                         >
-                            <title>{t(`edge.${edge.tone}`, { from: edge.from, to: edge.to })}</title>
+                            <title>
+                                {t(`edge.${edge.tone}`, { from: edge.from, to: edge.to })}
+                            </title>
                         </path>
                     );
                 })}
@@ -292,8 +368,20 @@ export function ComposePicture({ description }: { description: FleetComposeDescr
                     if (!service) return null;
                     const running = service.state === 'running';
                     return (
-                        <g key={box.name} transform={`translate(${box.x},${box.y})`} data-testid="fleet-compose-box" data-state={service.state}>
-                            <rect width={BOX_WIDTH} height={BOX_HEIGHT} rx={10} fill="none" stroke={running ? '#16a34a' : '#94a3b8'} strokeWidth={1.5} />
+                        <g
+                            key={box.name}
+                            transform={`translate(${box.x},${box.y})`}
+                            data-testid="fleet-compose-box"
+                            data-state={service.state}
+                        >
+                            <rect
+                                width={BOX_WIDTH}
+                                height={BOX_HEIGHT}
+                                rx={10}
+                                fill="none"
+                                stroke={running ? '#16a34a' : '#94a3b8'}
+                                strokeWidth={1.5}
+                            />
                             <text x={10} y={20} fontSize={13} fontWeight={600} fill="currentColor">
                                 {service.name} {running ? '●' : '○'} {service.health ?? ''}
                             </text>
@@ -301,19 +389,34 @@ export function ComposePicture({ description }: { description: FleetComposeDescr
                                 {(service.image ?? '—').slice(0, 30)}
                             </text>
                             <text x={10} y={55} fontSize={11} fill="currentColor" opacity={0.75}>
-                                {running ? `cpu ${formatPercent(service.cpuPercent)} · ${formatBytes(service.memBytes)}` : t(`state.${service.state === 'absent' ? 'absent' : 'stopped'}`)}
+                                {running
+                                    ? `cpu ${formatPercent(service.cpuPercent)} · ${formatBytes(service.memBytes)}`
+                                    : t(
+                                          `state.${service.state === 'absent' ? 'absent' : 'stopped'}`,
+                                      )}
                             </text>
                             <text x={10} y={72} fontSize={11} fill="currentColor" opacity={0.75}>
                                 {portsText(service.ports).slice(0, 34)}
                             </text>
                             <text x={10} y={89} fontSize={11} fill="currentColor" opacity={0.75}>
-                                {[...service.volumes.map((volume) => `vol ${volume}`), ...service.mounts.map((mount) => `file ${mount.split(/[\\/]/).pop()}`)]
+                                {[
+                                    ...service.volumes.map((volume) => `vol ${volume}`),
+                                    ...service.mounts.map(
+                                        (mount) => `file ${mount.split(/[\\/]/).pop()}`,
+                                    ),
+                                ]
                                     .join(' · ')
                                     .slice(0, 34)}
                             </text>
                             {service.networks.slice(0, 3).map((network, index) => (
                                 <g key={network} transform={`translate(${10 + index * 68},${96})`}>
-                                    <rect width={64} height={12} rx={6} fill={toneOf(network)} opacity={0.2} />
+                                    <rect
+                                        width={64}
+                                        height={12}
+                                        rx={6}
+                                        fill={toneOf(network)}
+                                        opacity={0.2}
+                                    />
                                     <text x={4} y={9} fontSize={9} fill={toneOf(network)}>
                                         {network.slice(0, 12)}
                                     </text>
@@ -364,36 +467,74 @@ function ServiceTable({
                 <tbody>
                     {services.map((service) => {
                         const running = service.state === 'running';
-                        const busy = service.containerId ? busyKey === `container:${service.containerId}` : false;
+                        const busy = service.containerId
+                            ? busyKey === `container:${service.containerId}`
+                            : false;
                         return (
-                            <tr key={service.name} className="border-t border-border dark:border-border-dark">
+                            <tr
+                                key={service.name}
+                                className="border-t border-border dark:border-border-dark"
+                            >
                                 <td className="px-2 py-1 font-medium">{service.name}</td>
-                                <td className="px-2 py-1 font-mono text-xs">{service.image ?? '—'}</td>
+                                <td className="px-2 py-1 font-mono text-xs">
+                                    {service.image ?? '—'}
+                                </td>
                                 <td className="px-2 py-1">{service.state}</td>
                                 <td className="px-2 py-1">{service.health ?? '—'}</td>
                                 <td className="px-2 py-1 text-xs">{portsText(service.ports)}</td>
-                                <td className="px-2 py-1 text-xs">{service.volumes.join(', ') || '—'}</td>
-                                <td className="px-2 py-1 text-xs">{service.networks.join(', ') || '—'}</td>
+                                <td className="px-2 py-1 text-xs">
+                                    {service.volumes.join(', ') || '—'}
+                                </td>
+                                <td className="px-2 py-1 text-xs">
+                                    {service.networks.join(', ') || '—'}
+                                </td>
                                 <td className="px-2 py-1">
                                     <div className="flex justify-end gap-1">
                                         {service.containerId ? (
                                             running ? (
                                                 <>
-                                                    <Button type="button" size="sm" variant="secondary" disabled={!allowed || busy} onClick={() => onAct(service, 'stop')}>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="secondary"
+                                                        disabled={!allowed || busy}
+                                                        onClick={() => onAct(service, 'stop')}
+                                                    >
                                                         {tDocker('act.stop')}
                                                     </Button>
-                                                    <Button type="button" size="sm" variant="secondary" disabled={!allowed || busy} onClick={() => onAct(service, 'restart')}>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="secondary"
+                                                        disabled={!allowed || busy}
+                                                        onClick={() => onAct(service, 'restart')}
+                                                    >
                                                         {tDocker('act.restart')}
                                                     </Button>
-                                                    <ShellInsideButton nodeId={nodeId} container={service.containerId} disabled={!allowed} />
+                                                    <ShellInsideButton
+                                                        nodeId={nodeId}
+                                                        container={service.containerId}
+                                                        disabled={!allowed}
+                                                    />
                                                 </>
                                             ) : (
-                                                <Button type="button" size="sm" variant="secondary" disabled={!allowed || busy} onClick={() => onAct(service, 'start')}>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    disabled={!allowed || busy}
+                                                    onClick={() => onAct(service, 'start')}
+                                                >
                                                     {tDocker('act.start')}
                                                 </Button>
                                             )
                                         ) : null}
-                                        <Button type="button" size="sm" variant="ghost" href={logsHref}>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            href={logsHref}
+                                        >
                                             {tDocker('logs')}
                                         </Button>
                                     </div>

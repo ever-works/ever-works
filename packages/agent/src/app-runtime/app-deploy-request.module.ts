@@ -309,10 +309,9 @@ import {
             useFactory: (moduleRef: ModuleRef, works?: WorkRepository) =>
                 appHostsRebuildRequester(
                     () =>
-                        getOptionalProvider<AppBuildsRebuildLike>(
-                            moduleRef,
-                            AppBuildsService,
-                        ) as AppBuildsRebuildLike | undefined,
+                        getOptionalProvider<AppBuildsRebuildLike>(moduleRef, AppBuildsService) as
+                            | AppBuildsRebuildLike
+                            | undefined,
                     works,
                 ),
             inject: [ModuleRef, { token: WorkRepository, optional: true }],

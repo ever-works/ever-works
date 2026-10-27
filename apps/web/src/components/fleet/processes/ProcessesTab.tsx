@@ -21,7 +21,13 @@ import { RootRequiredDialog } from '../machine/RootRequiredDialog';
 import { formatBytes, formatPercent, formatRuntime } from '../machine/machine-actions.shared';
 import { useMachineAction } from '../machine/use-machine-action';
 import { useMachineList } from '../machine/use-machine-list';
-import { gpuParts, isProtected, shouldOfferKill, STILL_RUNNING_AFTER_MS, visibleProcesses } from './processes.shared';
+import {
+    gpuParts,
+    isProtected,
+    shouldOfferKill,
+    STILL_RUNNING_AFTER_MS,
+    visibleProcesses,
+} from './processes.shared';
 
 /** The list refreshes every 5 s while the tab is visible (FR-9). */
 const REFRESH_MS = 5_000;
@@ -51,8 +57,14 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
         return () => clearInterval(timer);
     }, [stopped]);
 
-    const rows = useMemo(() => visibleProcesses(list.data?.processes ?? [], find), [list.data, find]);
-    const listed = useMemo(() => new Set((list.data?.processes ?? []).map((row) => row.pid)), [list.data]);
+    const rows = useMemo(
+        () => visibleProcesses(list.data?.processes ?? [], find),
+        [list.data, find],
+    );
+    const listed = useMemo(
+        () => new Set((list.data?.processes ?? []).map((row) => row.pid)),
+        [list.data],
+    );
 
     const onError = (error: FleetLinkError) => {
         toast.error(error.hint ? t('signalFailedWith', { hint: error.hint }) : t('signalFailed'));
@@ -61,8 +73,16 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
     const signal = (process: FleetProcessView, which: FleetProcessSignal) => {
         const title =
             which === 'KILL'
-                ? t('dialog.killTitle', { name: process.name, pid: process.pid, machine: node.name })
-                : t('dialog.stopTitle', { name: process.name, pid: process.pid, machine: node.name });
+                ? t('dialog.killTitle', {
+                      name: process.name,
+                      pid: process.pid,
+                      machine: node.name,
+                  })
+                : t('dialog.stopTitle', {
+                      name: process.name,
+                      pid: process.pid,
+                      machine: node.name,
+                  });
         machineAction.request({
             key: `pid:${process.pid}`,
             dialog: {
@@ -71,7 +91,8 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                 ...(which === 'KILL' ? { body: t('dialog.killBody') } : {}),
             },
             actionLabel: which === 'KILL' ? t('kill') : t('stop'),
-            run: (fields) => signalFleetProcessAction(node.id, { pid: process.pid, signal: which, fields }),
+            run: (fields) =>
+                signalFleetProcessAction(node.id, { pid: process.pid, signal: which, fields }),
             onDone: (result) => {
                 if (which === 'TERM') {
                     setStopped((previous) => ({ ...previous, [process.pid]: Date.now() }));
@@ -94,8 +115,14 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
 
     if (!list.data && list.loading) {
         return (
-            <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-processes-loading">
-                {list.slow ? tActions('states.slow', { name: node.name }) : tActions('states.asking', { name: node.name })}
+            <p
+                role="status"
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-processes-loading"
+            >
+                {list.slow
+                    ? tActions('states.slow', { name: node.name })
+                    : tActions('states.asking', { name: node.name })}
             </p>
         );
     }
@@ -116,12 +143,22 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
     return (
         <section className="space-y-3" data-testid="fleet-processes-tab" aria-label={t('title')}>
             {list.error ? (
-                <p role="status" className="rounded-md border border-warning/40 bg-warning/5 p-2 text-sm" data-testid="fleet-processes-stale">
-                    {list.error.code === 'kill_switch' ? tActions('states.killSwitchLastKnown') : tActions('states.lastKnown', { name: node.name })}
+                <p
+                    role="status"
+                    className="rounded-md border border-warning/40 bg-warning/5 p-2 text-sm"
+                    data-testid="fleet-processes-stale"
+                >
+                    {list.error.code === 'kill_switch'
+                        ? tActions('states.killSwitchLastKnown')
+                        : tActions('states.lastKnown', { name: node.name })}
                 </p>
             ) : null}
             {data.gpus.length > 0 ? (
-                <ul className="flex flex-wrap gap-3" aria-label={t('gpu.title')} data-testid="fleet-processes-gpus">
+                <ul
+                    className="flex flex-wrap gap-3"
+                    aria-label={t('gpu.title')}
+                    data-testid="fleet-processes-gpus"
+                >
                     {data.gpus.map((gpu, index) => {
                         const parts = gpuParts(gpu);
                         return (
@@ -130,13 +167,23 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                                 className="flex items-center gap-2 rounded-md border border-border dark:border-border-dark px-3 py-1.5 text-sm"
                                 data-testid="fleet-processes-gpu"
                             >
-                                <Cpu className="h-4 w-4 text-text-muted dark:text-text-muted-dark" aria-hidden />
+                                <Cpu
+                                    className="h-4 w-4 text-text-muted dark:text-text-muted-dark"
+                                    aria-hidden
+                                />
                                 <span className="font-medium">
-                                    {data.gpus.length > 1 ? t('gpu.numbered', { index: index + 1 }) : t('gpu.label')}
+                                    {data.gpus.length > 1
+                                        ? t('gpu.numbered', { index: index + 1 })
+                                        : t('gpu.label')}
                                 </span>
                                 <span>{parts.model}</span>
                                 {parts.memory ? (
-                                    <span>· {parts.shared ? t('gpu.shared', { memory: parts.memory }) : parts.memory}</span>
+                                    <span>
+                                        ·{' '}
+                                        {parts.shared
+                                            ? t('gpu.shared', { memory: parts.memory })
+                                            : parts.memory}
+                                    </span>
                                 ) : null}
                                 <span>
                                     ·{' '}
@@ -151,7 +198,9 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
             ) : null}
             <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-text dark:text-text-dark">
-                    {sort === 'mem' ? t('largest', { count: data.total }) : t('busiest', { count: data.total })}
+                    {sort === 'mem'
+                        ? t('largest', { count: data.total })
+                        : t('busiest', { count: data.total })}
                 </h2>
                 <input
                     type="search"
@@ -173,10 +222,15 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                         <option value="mem">{t('columns.memory')}</option>
                     </select>
                 </label>
-                <span className="ml-auto text-xs text-text-muted dark:text-text-muted-dark">{t('every5s')}</span>
+                <span className="ml-auto text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('every5s')}
+                </span>
             </div>
             {!allowed ? (
-                <p className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-processes-read-only">
+                <p
+                    className="text-sm text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-processes-read-only"
+                >
                     {t('ownerOnly', { name: node.name })}
                 </p>
             ) : null}
@@ -199,7 +253,11 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                     <tbody>
                         {rows.map((process) => {
                             const busy = machineAction.busyKey === `pid:${process.pid}`;
-                            const offerKill = shouldOfferKill(stopped[process.pid], listed.has(process.pid), now);
+                            const offerKill = shouldOfferKill(
+                                stopped[process.pid],
+                                listed.has(process.pid),
+                                now,
+                            );
                             const stopping = stopped[process.pid] !== undefined && !offerKill;
                             return (
                                 <tr
@@ -210,11 +268,20 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                                 >
                                     <td className="px-3 py-1.5 tabular-nums">{process.pid}</td>
                                     <td className="px-3 py-1.5 font-medium">{process.name}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">{formatPercent(process.cpuPercent)}</td>
-                                    <td className="px-3 py-1.5 text-right tabular-nums">{formatBytes(process.memBytes)}</td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums">
+                                        {formatPercent(process.cpuPercent)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right tabular-nums">
+                                        {formatBytes(process.memBytes)}
+                                    </td>
                                     <td className="px-3 py-1.5">{process.owner ?? '—'}</td>
-                                    <td className="px-3 py-1.5 tabular-nums">{formatRuntime(process.runtimeSec)}</td>
-                                    <td className="px-3 py-1.5 max-w-md truncate font-mono text-xs" title={process.command}>
+                                    <td className="px-3 py-1.5 tabular-nums">
+                                        {formatRuntime(process.runtimeSec)}
+                                    </td>
+                                    <td
+                                        className="px-3 py-1.5 max-w-md truncate font-mono text-xs"
+                                        title={process.command}
+                                    >
                                         {process.command}
                                     </td>
                                     <td className="px-3 py-1.5">
@@ -224,16 +291,26 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                                                 data-testid="fleet-process-protected"
                                                 data-kind={process.protected ?? undefined}
                                             >
-                                                <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
-                                                {process.protected === 'init' ? t('protectedInit') : t('protectedNode')}
+                                                <AlertTriangle
+                                                    className="h-3.5 w-3.5"
+                                                    aria-hidden
+                                                />
+                                                {process.protected === 'init'
+                                                    ? t('protectedInit')
+                                                    : t('protectedNode')}
                                             </span>
                                         ) : (
                                             <div className="flex items-center justify-end gap-1">
                                                 {stopping ? (
-                                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">{t('stopping')}</span>
+                                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                                        {t('stopping')}
+                                                    </span>
                                                 ) : null}
                                                 {offerKill ? (
-                                                    <span className="text-xs text-warning" data-testid="fleet-process-still-running">
+                                                    <span
+                                                        className="text-xs text-warning"
+                                                        data-testid="fleet-process-still-running"
+                                                    >
                                                         {t('stillRunning')}
                                                     </span>
                                                 ) : null}
@@ -278,7 +355,11 @@ export default function ProcessesTab({ node }: FleetComputerTabProps) {
                 onConfirm={machineAction.confirm}
                 onCancel={machineAction.cancel}
             />
-            <RootRequiredDialog model={machineAction.root} machine={node.name} onClose={machineAction.closeRoot} />
+            <RootRequiredDialog
+                model={machineAction.root}
+                machine={node.name}
+                onClose={machineAction.closeRoot}
+            />
         </section>
     );
 }

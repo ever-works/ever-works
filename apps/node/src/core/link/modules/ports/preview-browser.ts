@@ -17,11 +17,7 @@ import {
 import { systemScheduler, type Scheduler } from '../../../heartbeat';
 import type { Logger } from '../../../logger';
 import type { CapturedPicture, CaptureRequest } from '../../../screen/capture-backend';
-import {
-	MachineVerbError,
-	type NodeChannelContext,
-	type NodeChannelOpenResult
-} from '../registry';
+import { MachineVerbError, type NodeChannelContext, type NodeChannelOpenResult } from '../registry';
 
 /**
  * Servers and ports (FL-10, R-3, spec S4, FR-9 … FR-12, U8 … U10) — the
@@ -228,7 +224,10 @@ export class PreviewBrowserManager {
 				leaveTimer: null,
 				ended: false
 			};
-			session.hardTimer = this.scheduler.setTimeout(() => void this.end(session, 'hard'), FLEET_PORT_PREVIEW_MAX_MS);
+			session.hardTimer = this.scheduler.setTimeout(
+				() => void this.end(session, 'hard'),
+				FLEET_PORT_PREVIEW_MAX_MS
+			);
 			// The opener's pane attaches right after this answer; an unwatched preview does not linger.
 			session.leaveTimer = this.scheduler.setTimeout(
 				() => void this.end(session, 'left'),
@@ -377,7 +376,10 @@ export function openPreviewChannel(
 		end: (reason) => {
 			if (closed) return;
 			stop();
-			context.close(closeReasonFor(reason), reason === 'hard' ? 'the preview reached its 60-minute limit' : undefined);
+			context.close(
+				closeReasonFor(reason),
+				reason === 'hard' ? 'the preview reached its 60-minute limit' : undefined
+			);
 		}
 	};
 	const attached = manager.attach(viewId, viewer);

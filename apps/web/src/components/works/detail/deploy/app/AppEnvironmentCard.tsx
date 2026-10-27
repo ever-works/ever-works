@@ -197,7 +197,10 @@ export function AppEnvironmentCard({ workId, initialEnv = null }: AppEnvironment
                         setImporting(false);
                         setState((previous) =>
                             previous.kind === 'ready'
-                                ? { kind: 'ready', env: { ...previous.env, entries: answer.entries } }
+                                ? {
+                                      kind: 'ready',
+                                      env: { ...previous.env, entries: answer.entries },
+                                  }
                                 : previous,
                         );
                         void load();
@@ -216,7 +219,10 @@ export function AppEnvironmentCard({ workId, initialEnv = null }: AppEnvironment
                         setRotating(null);
                         setState((previous) =>
                             previous.kind === 'ready'
-                                ? { kind: 'ready', env: { ...previous.env, entries: answer.entries } }
+                                ? {
+                                      kind: 'ready',
+                                      env: { ...previous.env, entries: answer.entries },
+                                  }
                                 : previous,
                         );
                         void load();

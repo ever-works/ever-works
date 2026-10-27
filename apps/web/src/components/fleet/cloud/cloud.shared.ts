@@ -46,7 +46,10 @@ export function formatMemory(mib: number): string {
 }
 
 /** `3 d 7 h`, `4 h`, `12 min` — how long since an instant. */
-export function formatSince(at: string | null | undefined, nowMs: number = Date.now()): string | null {
+export function formatSince(
+    at: string | null | undefined,
+    nowMs: number = Date.now(),
+): string | null {
     const ms = at ? nowMs - Date.parse(at) : NaN;
     if (!Number.isFinite(ms) || ms < 0) return null;
     const minutes = Math.floor(ms / 60_000);
@@ -69,7 +72,13 @@ export const CLOUD_PHASE_KEYS: Readonly<Record<FleetCloudPhase, string>> = {
 };
 
 /** The create steps in order, for the progress strip (spec §5.2). */
-export const CLOUD_PROGRESS: readonly FleetCloudPhase[] = ['asking-provider', 'booting', 'installing', 'enrolling', 'online'];
+export const CLOUD_PROGRESS: readonly FleetCloudPhase[] = [
+    'asking-provider',
+    'booting',
+    'installing',
+    'enrolling',
+    'online',
+];
 
 /**
  * What the row and the block say about a cloud computer right now — one state
@@ -98,7 +107,10 @@ export function cloudDisplayState(
     if (cloud.pending === 'starting') return 'starting';
     if (node.status === 'enrolling') {
         const created = Date.parse(cloud.machineCreatedAt ?? '');
-        if (Number.isFinite(created) && nowMs - created > FLEET_CLOUD_UNENROLLED_AFTER_MIN * 60_000) {
+        if (
+            Number.isFinite(created) &&
+            nowMs - created > FLEET_CLOUD_UNENROLLED_AFTER_MIN * 60_000
+        ) {
             return 'unenrolled';
         }
         return 'creating';
@@ -123,7 +135,9 @@ export function cloudRemoveAvailability(node: Pick<FleetNodeView, 'cloud'>): {
     reasonKey: 'removeUnavailable.line' | null;
 } {
     if (!node.cloud) return { allowed: true, reasonKey: null };
-    return node.cloud.removable ? { allowed: true, reasonKey: null } : { allowed: false, reasonKey: 'removeUnavailable.line' };
+    return node.cloud.removable
+        ? { allowed: true, reasonKey: null }
+        : { allowed: false, reasonKey: 'removeUnavailable.line' };
 }
 
 // ─── The dialog ───────────────────────────────────────────────────────────
@@ -137,13 +151,24 @@ export interface CloudForm {
 }
 
 export function initialCloudForm(pluginId = ''): CloudForm {
-    return { pluginId, name: '', regionId: '', sizeId: '', software: [...FLEET_CLOUD_DEFAULT_SOFTWARE] };
+    return {
+        pluginId,
+        name: '',
+        regionId: '',
+        sizeId: '',
+        software: [...FLEET_CLOUD_DEFAULT_SOFTWARE],
+    };
 }
 
 /** The sizes offered in a region (a size with no region list is offered everywhere). */
-export function sizesForRegion(options: FleetCloudOptionsView | null, regionId: string): FleetCloudSizeView[] {
+export function sizesForRegion(
+    options: FleetCloudOptionsView | null,
+    regionId: string,
+): FleetCloudSizeView[] {
     if (!options) return [];
-    return options.sizes.filter((size) => size.available && (size.regions.length === 0 || size.regions.includes(regionId)));
+    return options.sizes.filter(
+        (size) => size.available && (size.regions.length === 0 || size.regions.includes(regionId)),
+    );
 }
 
 /**
@@ -163,15 +188,22 @@ export function withOptionDefaults(form: CloudForm, options: FleetCloudOptionsVi
 }
 
 /** "Create · $24/mo" — the Create button carries the price (spec §0, FR-6). */
-export function createLabelPrice(size: FleetCloudSizeView | null, currency?: string): string | null {
+export function createLabelPrice(
+    size: FleetCloudSizeView | null,
+    currency?: string,
+): string | null {
     return size ? money(size.priceMonthlyCents, currency) : null;
 }
 
 /** The current monthly price an `invalid` refusal carried (the price changed, spec U9), or null. */
-export function changedPriceOf(error: { code: string; details?: Record<string, unknown> } | null): number | null {
+export function changedPriceOf(
+    error: { code: string; details?: Record<string, unknown> } | null,
+): number | null {
     if (!error || error.code !== 'invalid') return null;
     const value = error.details?.currentPriceCents;
-    return typeof value === 'number' && Number.isFinite(value) && error.details?.field === 'acknowledgedPriceCents'
+    return typeof value === 'number' &&
+        Number.isFinite(value) &&
+        error.details?.field === 'acknowledgedPriceCents'
         ? value
         : null;
 }
@@ -194,9 +226,16 @@ export interface IdlePolicyDraft {
 }
 
 /** The editor starts from the stored policy, or the default "Tell me after 3 h" (spec FR-25, S6). */
-export function idlePolicyDraftOf(policy: FleetCloudIdlePolicy | null | undefined): IdlePolicyDraft {
-    const mode = policy && isFleetCloudIdlePolicyMode(policy.mode) ? policy.mode : FLEET_CLOUD_DEFAULT_IDLE_POLICY.mode;
-    const hours = policy ? clampFleetCloudIdleHours(policy.afterHours) : FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours;
+export function idlePolicyDraftOf(
+    policy: FleetCloudIdlePolicy | null | undefined,
+): IdlePolicyDraft {
+    const mode =
+        policy && isFleetCloudIdlePolicyMode(policy.mode)
+            ? policy.mode
+            : FLEET_CLOUD_DEFAULT_IDLE_POLICY.mode;
+    const hours = policy
+        ? clampFleetCloudIdleHours(policy.afterHours)
+        : FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours;
     return { mode, hours: String(hours) };
 }
 
@@ -204,8 +243,13 @@ export function idlePolicyDraftOf(policy: FleetCloudIdlePolicy | null | undefine
 export function idlePolicyFromDraft(draft: IdlePolicyDraft): FleetCloudIdlePolicy {
     const typed = draft.hours.trim();
     return {
-        mode: isFleetCloudIdlePolicyMode(draft.mode) ? draft.mode : FLEET_CLOUD_DEFAULT_IDLE_POLICY.mode,
-        afterHours: typed === '' ? FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours : clampFleetCloudIdleHours(typed),
+        mode: isFleetCloudIdlePolicyMode(draft.mode)
+            ? draft.mode
+            : FLEET_CLOUD_DEFAULT_IDLE_POLICY.mode,
+        afterHours:
+            typed === ''
+                ? FLEET_CLOUD_DEFAULT_IDLE_POLICY.afterHours
+                : clampFleetCloudIdleHours(typed),
     };
 }
 
@@ -217,7 +261,10 @@ export function idleHoursValid(hours: string): boolean {
 }
 
 /** Whether Save would change anything. */
-export function idlePolicyChanged(stored: FleetCloudIdlePolicy | null | undefined, draft: IdlePolicyDraft): boolean {
+export function idlePolicyChanged(
+    stored: FleetCloudIdlePolicy | null | undefined,
+    draft: IdlePolicyDraft,
+): boolean {
     const next = idlePolicyFromDraft(draft);
     const current = idlePolicyDraftOf(stored);
     if (next.mode !== current.mode) return true;
@@ -229,10 +276,20 @@ export function idlePolicyChanged(stored: FleetCloudIdlePolicy | null | undefine
  * powered off by it — null when neither (the policy line alone is shown).
  */
 export function cloudIdleState(
-    cloud: Pick<FleetNodeCloudView, 'idleWindowReached' | 'idleSince' | 'poweredOffByPolicyAt' | 'powerState' | 'pending'>,
+    cloud: Pick<
+        FleetNodeCloudView,
+        'idleWindowReached' | 'idleSince' | 'poweredOffByPolicyAt' | 'powerState' | 'pending'
+    >,
 ): 'idle' | 'poweredOffByPolicy' | null {
-    if (cloud.poweredOffByPolicyAt && cloud.powerState === 'off' && cloud.pending === null) return 'poweredOffByPolicy';
-    if (cloud.idleWindowReached && cloud.idleSince && cloud.pending === null && cloud.powerState === 'running') return 'idle';
+    if (cloud.poweredOffByPolicyAt && cloud.powerState === 'off' && cloud.pending === null)
+        return 'poweredOffByPolicy';
+    if (
+        cloud.idleWindowReached &&
+        cloud.idleSince &&
+        cloud.pending === null &&
+        cloud.powerState === 'running'
+    )
+        return 'idle';
     return null;
 }
 
@@ -240,9 +297,13 @@ export function cloudIdleState(
  * The usage table's rows (spec §5.7): live machines first by this month's
  * cost (highest first), then the ones destroyed this month, newest first.
  */
-export function cloudUsageRows(usage: Pick<FleetCloudUsageView, 'machines'> | null | undefined): FleetCloudUsageRow[] {
+export function cloudUsageRows(
+    usage: Pick<FleetCloudUsageView, 'machines'> | null | undefined,
+): FleetCloudUsageRow[] {
     const rows = [...(usage?.machines ?? [])];
-    const live = rows.filter((row) => !row.destroyedAt).sort((a, b) => b.monthToDateCents - a.monthToDateCents);
+    const live = rows
+        .filter((row) => !row.destroyedAt)
+        .sort((a, b) => b.monthToDateCents - a.monthToDateCents);
     const destroyed = rows
         .filter((row) => Boolean(row.destroyedAt))
         .sort((a, b) => Date.parse(b.destroyedAt ?? '') - Date.parse(a.destroyedAt ?? ''));
@@ -253,7 +314,9 @@ export function cloudUsageRows(usage: Pick<FleetCloudUsageView, 'machines'> | nu
  * The search parameter a "needs a look" item links with to open one of the
  * page's acts (`?cloud=power-off`), or null for anything else.
  */
-export function cloudActFromQuery(value: string | null | undefined): 'off' | 'on' | 'destroy' | null {
+export function cloudActFromQuery(
+    value: string | null | undefined,
+): 'off' | 'on' | 'destroy' | null {
     if (value === 'power-off') return 'off';
     if (value === 'power-on') return 'on';
     if (value === 'destroy') return 'destroy';

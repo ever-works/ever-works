@@ -36,19 +36,28 @@ function harness(
         ),
     };
     const works = {
-        findById: jest.fn(async (id: string) => ({ id, userId: options.ownerId ?? 'owner-1', kind: 'app' })),
+        findById: jest.fn(async (id: string) => ({
+            id,
+            userId: options.ownerId ?? 'owner-1',
+            kind: 'app',
+        })),
     };
     const states = {
-        countManagedForOwner: jest.fn(async (owner: string, opts: { excludeWorkId?: string | null }) => {
-            counted.push({ owner, exclude: opts?.excludeWorkId });
-            if (options.countThrows) throw new Error('db down');
-            const others = (options.managed ?? []).filter((m) => m.workId !== opts?.excludeWorkId);
-            return { count: others.length, names: others.map((m) => m.slug) };
-        }),
+        countManagedForOwner: jest.fn(
+            async (owner: string, opts: { excludeWorkId?: string | null }) => {
+                counted.push({ owner, exclude: opts?.excludeWorkId });
+                if (options.countThrows) throw new Error('db down');
+                const others = (options.managed ?? []).filter(
+                    (m) => m.workId !== opts?.excludeWorkId,
+                );
+                return { count: others.length, names: others.map((m) => m.slug) };
+            },
+        ),
     };
     const plans = {
         isEnabled: () => options.billing ?? true,
-        resolvePlanForUser: async () => (options.plan === null ? null : { code: options.plan ?? 'free' }),
+        resolvePlanForUser: async () =>
+            options.plan === null ? null : { code: options.plan ?? 'free' },
     };
     const service = new AppsTierEligibilityService(
         users as never,
@@ -181,7 +190,9 @@ describe('AppsTierEligibilityService — FR-35, in the order the spec lists the 
                 harness({ plan: 'standard' }).service.evaluate('owner-1', { workId: 'w-4' }),
             ).resolves.toMatchObject({ eligible: true });
             await expect(
-                harness({ plan: 'free', billing: false }).service.evaluate('owner-1', { workId: 'w-4' }),
+                harness({ plan: 'free', billing: false }).service.evaluate('owner-1', {
+                    workId: 'w-4',
+                }),
             ).resolves.toMatchObject({ eligible: true });
         });
     });
@@ -200,7 +211,11 @@ describe('ConfigAppsTierPolicy.eligibility reads the source once the tier is ope
 
     it('delegates when open, passing the Work through', async () => {
         const source = {
-            evaluate: jest.fn(async () => ({ eligible: false, reasons: ['capReached'], counted: ['cal'] })),
+            evaluate: jest.fn(async () => ({
+                eligible: false,
+                reasons: ['capReached'],
+                counted: ['cal'],
+            })),
         };
         const policy = new ConfigAppsTierPolicy({ [APPS_MANAGED_ENABLED_ENV]: 'true' }, source);
 
@@ -224,11 +239,16 @@ describe('ConfigAppsTierPolicy.eligibility reads the source once the tier is ope
     it('keeps the lean answer when constructed without a source argument (unit specs, lean contexts)', async () => {
         const policy = new ConfigAppsTierPolicy({ [APPS_MANAGED_ENABLED_ENV]: 'true' });
 
-        await expect(policy.eligibility('owner-1')).resolves.toEqual({ eligible: true, reasons: [] });
+        await expect(policy.eligibility('owner-1')).resolves.toEqual({
+            eligible: true,
+            reasons: [],
+        });
     });
 
     it('admits on a transport failure only when told the request was checked upstream (the worker)', async () => {
-        const failing = { evaluate: async () => Promise.reject(new Error('Unknown remote target')) };
+        const failing = {
+            evaluate: async () => Promise.reject(new Error('Unknown remote target')),
+        };
         const worker = new ConfigAppsTierPolicy({ [APPS_MANAGED_ENABLED_ENV]: 'true' }, failing, {
             onSourceFailure: 'admit',
         });

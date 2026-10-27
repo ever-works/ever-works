@@ -11,8 +11,18 @@ import { createContext, useContext, type ReactNode } from 'react';
  */
 const FleetTaskHandoffContext = createContext<boolean>(false);
 
-export function FleetTaskHandoffProvider({ enabled, children }: { enabled: boolean; children: ReactNode }) {
-    return <FleetTaskHandoffContext.Provider value={enabled}>{children}</FleetTaskHandoffContext.Provider>;
+export function FleetTaskHandoffProvider({
+    enabled,
+    children,
+}: {
+    enabled: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <FleetTaskHandoffContext.Provider value={enabled}>
+            {children}
+        </FleetTaskHandoffContext.Provider>
+    );
 }
 
 export function useFleetTaskHandoffEnabled(): boolean {
