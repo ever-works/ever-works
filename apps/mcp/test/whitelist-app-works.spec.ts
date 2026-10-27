@@ -270,7 +270,7 @@ describe('App Works MCP tools — what is offered and what is forwarded', () => 
 		expect(shape).not.toContain('confirmSlug');
 
 		const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ status: 'accepted' });
-		await lifecycle.handler({ id: 'work-1', action: 'remove', deleteData: true, confirmSlug: 'cal' });
+		await lifecycle.handler({ id: 'work-1', action: 'remove', deleteData: true, confirmSlug: 'my-app' });
 		expect(requestSpy).toHaveBeenCalledWith('POST', '/works/work-1/app-lifecycle', { action: 'remove' });
 	});
 });

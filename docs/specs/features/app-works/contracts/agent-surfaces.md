@@ -235,6 +235,14 @@ happens (T5).
 ([`../APW-01-app-work-kind/tasks.md`](./../APW-01-app-work-kind/tasks.md) T19) and is named by ACC-01-14.
 Until it lands, nothing pins the App Works MCP surface.
 
+> **Update 2026-10-27 (lane B1, #2960).** The spec exists and pins the App Works MCP surface: 32 entries
+> (19 reads, 3 read-shaped dispatches, 10 state-changing tools held back by `MCP_PRIVILEGED_TOOLS`), the
+> omitted human-only flags and the absence of 15 human-only routes. Two §3.2 "exposed" rows are not on the
+> whitelist: `POST …/app-jobs/:name/run` (the route now requires the member's `confirmFirstDeploy`, which an
+> agent must not answer) and `POST …/evolve` (left for the evolve / tool-policy work). The chat registry
+> covers the rows marked "planned" except those that would make the model carry a secret value (env set,
+> `.env` import) or type a deletion slug (dependency data, remove-with-data).
+
 ### 3.2 The route table
 
 | Route (owner)                                                                                                                                                 | MCP                                                                                                                                                                                                                         | Chat                                  | CLI                                                                                              | Rule                                                                                                                                                              |

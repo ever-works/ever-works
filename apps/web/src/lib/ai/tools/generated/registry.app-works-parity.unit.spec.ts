@@ -145,7 +145,7 @@ describe('App Works chat rows — what reaches the API', () => {
         const args = { id: 'w1', body: { action: 'remove' } };
         const out = await run(toolsConfirming('change_app_lifecycle', args).change_app_lifecycle, {
             id: 'w1',
-            body: { action: 'remove', deleteData: true, confirmSlug: 'cal' },
+            body: { action: 'remove', deleteData: true, confirmSlug: 'my-app' },
             confirmed: true,
         });
         expect(callApi).toHaveBeenCalledTimes(1);
@@ -237,7 +237,7 @@ describe('App Works chat rows are reachable, and stay out of unrelated turns', (
         ['sync the fork with upstream', 'sync_app_upstream'],
         ['sync anyway', 'sync_app_upstream'],
         ['which license does it have', 'list_app_licenses'],
-        ['can I fork github.com/calcom/cal.com?', 'inspectAppSource'],
+        ['can I fork github.com/acme/scheduler?', 'inspectAppSource'],
         ['roll back the app', 'rollback_app'],
     ])('%j reaches %s', (text, expected) => {
         expect(select(text)).toContain(expected);

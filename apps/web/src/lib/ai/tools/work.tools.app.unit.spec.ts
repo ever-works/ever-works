@@ -16,7 +16,7 @@ import type { AppSourceInspectResponse } from '@ever-works/contracts';
 const mocks = vi.hoisted(() => ({
     createWork: vi.fn(async () => ({
         success: true,
-        work: { id: 'w-app', name: 'Cal' },
+        work: { id: 'w-app', name: 'Scheduler' },
         message: 'created',
         appSource: { relation: 'fork' },
     })),
@@ -48,10 +48,10 @@ const run = (tool: unknown, args: Record<string, unknown>) =>
 function preview(overrides: Partial<AppSourceInspectResponse> = {}): AppSourceInspectResponse {
     return {
         repository: {
-            owner: 'calcom',
-            repo: 'cal.com',
-            fullName: 'calcom/cal.com',
-            url: 'https://github.com/calcom/cal.com',
+            owner: 'acme',
+            repo: 'scheduler',
+            fullName: 'acme/scheduler',
+            url: 'https://github.com/acme/scheduler',
             description: 'Scheduling infrastructure',
             defaultBranch: 'main',
             stars: 1,
@@ -80,7 +80,13 @@ function preview(overrides: Partial<AppSourceInspectResponse> = {}): AppSourceIn
                 existingForkChecked: true,
             },
         ],
-        blueprint: { status: 'matched', id: 'cal', name: 'Cal', version: '1.0.0', prompts: [] },
+        blueprint: {
+            status: 'matched',
+            id: 'scheduler',
+            name: 'Scheduler',
+            version: '1.0.0',
+            prompts: [],
+        },
         license: { spdx: 'AGPL-3.0', class: 'copyleft' as never, source: 'detected' as never },
         deployTargets: {
             none: { available: true },
@@ -91,11 +97,11 @@ function preview(overrides: Partial<AppSourceInspectResponse> = {}): AppSourceIn
 }
 
 const APP_ARGS = {
-    name: 'Cal',
-    slug: 'cal',
+    name: 'Scheduler',
+    slug: 'scheduler',
     gitProvider: 'github',
     kind: 'app',
-    repositoryUrl: 'https://github.com/calcom/cal.com',
+    repositoryUrl: 'https://github.com/acme/scheduler',
     repositoryMode: 'fork',
     targetOwner: 'me',
 };
@@ -109,17 +115,17 @@ beforeEach(() => {
 describe('inspectAppSource (APW-01 T32)', () => {
     it('answers modes, reasons, default mode and owners — no card, no write, no URL beyond fullName', async () => {
         const out = await run(inspectAppSource, {
-            repositoryUrl: 'https://github.com/calcom/cal.com',
+            repositoryUrl: 'https://github.com/acme/scheduler',
         });
 
         expect(out.__confirmationRequired).toBeUndefined();
         expect(mocks.createWork).not.toHaveBeenCalled();
         expect(out).toMatchObject({
             success: true,
-            repository: { fullName: 'calcom/cal.com' },
+            repository: { fullName: 'acme/scheduler' },
             defaultMode: 'fork',
             modes: { fork: { available: true }, link: { available: false } },
-            blueprint: { status: 'matched', name: 'Cal', promptCount: 0 },
+            blueprint: { status: 'matched', name: 'Scheduler', promptCount: 0 },
         });
         expect((out.targetOwners as Array<{ login: string }>).map((owner) => owner.login)).toEqual([
             'me',
@@ -146,20 +152,20 @@ describe('inspectAppSource (APW-01 T32)', () => {
 describe('createWorkManual with kind "app" (APW-01 T25 / T42)', () => {
     it('unconfirmed: a card naming the fork and the matched Blueprint — and no create call', async () => {
         const tool = createCreateWorkManualTool(
-            createUserConfirmationCheck({ latestUserText: 'make cal an app', pending: [] }),
+            createUserConfirmationCheck({ latestUserText: 'make it an app', pending: [] }),
         );
         const out = await run(tool, APP_ARGS);
 
         expect(mocks.inspectAppSourceAction).toHaveBeenCalledWith({
-            repositoryUrl: 'https://github.com/calcom/cal.com',
+            repositoryUrl: 'https://github.com/acme/scheduler',
             gitProvider: 'github',
         });
         expect(mocks.createWork).not.toHaveBeenCalled();
         expect(out.__confirmationRequired).toBe(true);
         expect(out.toolName).toBe('createWorkManual');
-        expect(out.target).toBe('calcom/cal.com');
+        expect(out.target).toBe('acme/scheduler');
         expect(out.action).toBe(
-            'Create an App Work by forking calcom/cal.com into me/cal.com with the Cal App Blueprint.',
+            'Create an App Work by forking acme/scheduler into me/scheduler with the Scheduler App Blueprint.',
         );
     });
 
@@ -195,7 +201,7 @@ describe('createWorkManual with kind "app" (APW-01 T25 / T42)', () => {
         const sent = (mocks.createWork.mock.calls[0] as unknown as [Record<string, unknown>])[0];
         expect(sent).toMatchObject({
             kind: 'app',
-            repositoryUrl: 'https://github.com/calcom/cal.com',
+            repositoryUrl: 'https://github.com/acme/scheduler',
             repositoryMode: 'fork',
             targetOwner: 'me',
             organization: false,
@@ -256,7 +262,7 @@ describe('createWorkManual with kind "app" (APW-01 T25 / T42)', () => {
             targetOwner: undefined,
         });
         expect(out.action).toBe(
-            'Create an App Work from calcom/cal.com (linked as is; a setup pull request is opened on calcom/cal.com) with the Cal App Blueprint.',
+            'Create an App Work from acme/scheduler (linked as is; a setup pull request is opened on acme/scheduler) with the Scheduler App Blueprint.',
         );
         expect(out.args).not.toHaveProperty('targetOwner');
     });
