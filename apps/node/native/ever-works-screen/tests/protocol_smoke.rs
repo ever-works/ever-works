@@ -19,6 +19,7 @@ use serde_json::Value;
 const MSG_START: u8 = 0x01;
 const MSG_INPUT: u8 = 0x10;
 const MSG_RELEASE_HELD: u8 = 0x12;
+const MSG_CONTROL_MARKER: u8 = 0x13;
 const MSG_HELLO: u8 = 0x81;
 const MSG_ERROR: u8 = 0x85;
 const MSG_INPUT_RESULT: u8 = 0x87;
@@ -143,6 +144,18 @@ fn says_hello_answers_errors_refuses_input_and_exits_on_stdin_close() {
     assert_eq!(platform, expected);
     assert!(hello["reasons"].is_array());
     assert!(hello["inputReasons"].is_array());
+    let features: Vec<&str> = hello["features"]
+        .as_array()
+        .expect("a feature list")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert!(features.contains(&"releaseHeld"));
+    assert_eq!(
+        features.contains(&"controlMarker"),
+        cfg!(any(windows, target_os = "linux")),
+        "the marker is offered where it can be drawn"
+    );
     let displays = hello["displays"].as_array().expect("a display list");
     for display in displays {
         let id = display["id"].as_str().expect("a display id");
@@ -159,6 +172,10 @@ fn says_hello_answers_errors_refuses_input_and_exits_on_stdin_close() {
         displays.iter().filter(|d| d["primary"] == true).count() <= 1,
         "at most one primary display"
     );
+
+    // The marker asked for with no stream running: nothing to show, nothing answered.
+    helper.send(MSG_CONTROL_MARKER, br#"{"visible":true}"#);
+    helper.send(MSG_CONTROL_MARKER, br#"{"visible":false}"#);
 
     // Out-of-range settings: answered `invalid`, and the helper keeps running.
     helper.send(

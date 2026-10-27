@@ -67,4 +67,15 @@ describe('helper input', () => {
 		const older = new HelperMessageDecoder().push(encodeHelperJson(HELPER_MESSAGES.hello, { protocol: 1 }))[0];
 		expect(parseHelperHello(older.payload)?.inputReasons).toEqual(['input-unavailable']);
 	});
+
+	it('reads the features a helper offers (known names only; none from an older helper)', () => {
+		const hello = encodeHelperJson(HELPER_MESSAGES.hello, {
+			protocol: 1,
+			features: ['controlMarker', 'shell', 'releaseHeld', 7]
+		});
+		const [message] = new HelperMessageDecoder().push(hello);
+		expect(parseHelperHello(message.payload)?.features).toEqual(['releaseHeld', 'controlMarker']);
+		const older = new HelperMessageDecoder().push(encodeHelperJson(HELPER_MESSAGES.hello, { protocol: 1 }))[0];
+		expect(parseHelperHello(older.payload)?.features).toEqual([]);
+	});
 });

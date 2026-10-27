@@ -16,12 +16,13 @@ serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = "=1.0.154"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-x11rb = { version = "=0.14.0", features = ["randr", "xfixes", "xtest"] }
+x11rb = { version = "=0.14.0", features = ["randr", "shape", "xfixes", "xtest"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = [
 	"Win32_Foundation",
 	"Win32_Graphics_Gdi",
+	"Win32_System_LibraryLoader",
 	"Win32_System_RemoteDesktop",
 	"Win32_System_StationsAndDesktops",
 	"Win32_System_Threading",
