@@ -55,7 +55,9 @@ function access() {
     };
 }
 
-function scanHarness(options: { stopped?: boolean; waiting?: { id: string } | null; acked?: number | null } = {}) {
+function scanHarness(
+    options: { stopped?: boolean; waiting?: { id: string } | null; acked?: number | null } = {},
+) {
     const candidates = Object.values(NODES).concat([
         node('55555555-5555-4555-8555-555555555555', { name: 'offline', status: 'offline' }),
     ]);
@@ -64,22 +66,38 @@ function scanHarness(options: { stopped?: boolean; waiting?: { id: string } | nu
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getMany: jest.fn(async () => candidates.filter((candidate) => candidate.status === 'online')),
+        getMany: jest.fn(async () =>
+            candidates.filter((candidate) => candidate.status === 'online'),
+        ),
     };
     const nodeRows = { createQueryBuilder: jest.fn(() => qb) };
     const jobRows = {
-        find: jest.fn(async (query: { where: Record<string, unknown> }): Promise<Array<Record<string, unknown>>> => {
-            if (query.where.status === 'done') {
-                return options.acked === undefined
-                    ? []
-                    : [{ id: 'done-1', result: { watermark: options.acked, ingestedAt: '2026-10-21T00:00:00.000Z' } }];
-            }
-            // Active scans: build-01 has none; team-box has one queued.
-            return [{ id: 'busy-job', targetNodeId: NODE_SHARED }];
-        }),
+        find: jest.fn(
+            async (query: {
+                where: Record<string, unknown>;
+            }): Promise<Array<Record<string, unknown>>> => {
+                if (query.where.status === 'done') {
+                    return options.acked === undefined
+                        ? []
+                        : [
+                              {
+                                  id: 'done-1',
+                                  result: {
+                                      watermark: options.acked,
+                                      ingestedAt: '2026-10-21T00:00:00.000Z',
+                                  },
+                              },
+                          ];
+                }
+                // Active scans: build-01 has none; team-box has one queued.
+                return [{ id: 'busy-job', targetNodeId: NODE_SHARED }];
+            },
+        ),
         findOne: jest.fn(async () => options.waiting ?? null),
     };
-    const jobs = { enqueue: jest.fn(async (input: Record<string, unknown>) => ({ id: 'job-new', ...input })) };
+    const jobs = {
+        enqueue: jest.fn(async (input: Record<string, unknown>) => ({ id: 'job-new', ...input })),
+    };
     const killSwitch = { isStopped: jest.fn(async () => options.stopped === true) };
     const service = new FleetUsageScanService(
         nodeRows as never,
@@ -95,7 +113,8 @@ async function refusal(promise: Promise<unknown>): Promise<{ code: string; hint:
     try {
         await promise;
     } catch (error) {
-        if (error instanceof FleetUsageException) return { code: error.code, hint: error.usageError.hint };
+        if (error instanceof FleetUsageException)
+            return { code: error.code, hint: error.usageError.hint };
         throw error;
     }
     throw new Error('expected a refusal');
@@ -130,7 +149,9 @@ describe('FleetUsageScanService', () => {
     it('hands the newest acknowledged watermark back as since', async () => {
         const h = scanHarness({ acked: 42 });
         await h.service.dispatchDue();
-        const payloads = h.jobs.enqueue.mock.calls.map((call) => (call[0] as { payload: unknown }).payload);
+        const payloads = h.jobs.enqueue.mock.calls.map(
+            (call) => (call[0] as { payload: unknown }).payload,
+        );
         expect(payloads).toContainEqual({ nodeId: NODE_ON, since: 42 });
     });
 
@@ -138,30 +159,43 @@ describe('FleetUsageScanService', () => {
         process.env.FLEET_USAGE_SCAN_ENABLED = 'false';
         expect(await scanHarness().service.dispatchDue()).toEqual({ nodes: 0, enqueued: 0 });
         process.env.FLEET_USAGE_SCAN_ENABLED = 'true';
-        expect(await scanHarness({ stopped: true }).service.dispatchDue()).toEqual({ nodes: 0, enqueued: 0 });
+        expect(await scanHarness({ stopped: true }).service.dispatchDue()).toEqual({
+            nodes: 0,
+            enqueued: 0,
+        });
     });
 
     it('answers every rescan refusal with its code and hint (FR-18)', async () => {
         const h = scanHarness();
-        await expect(h.service.rescan(NODE_SHARED, OWNER)).rejects.toBeInstanceOf(ForbiddenException);
+        await expect(h.service.rescan(NODE_SHARED, OWNER)).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
         expect(await refusal(h.service.rescan(NODE_OFF, OWNER))).toEqual({
             code: 'consent_missing',
             hint: 'Usage scan is off — run `ever-works-node start --usage-scan` on laptop',
         });
-        expect(await refusal(h.service.rescan(NODE_OLD, OWNER))).toMatchObject({ code: 'unsupported_on_node' });
-        expect(await refusal(scanHarness({ stopped: true }).service.rescan(NODE_ON, OWNER))).toMatchObject({
+        expect(await refusal(h.service.rescan(NODE_OLD, OWNER))).toMatchObject({
+            code: 'unsupported_on_node',
+        });
+        expect(
+            await refusal(scanHarness({ stopped: true }).service.rescan(NODE_ON, OWNER)),
+        ).toMatchObject({
             code: 'kill_switch',
         });
         NODES[NODE_ON].status = 'offline';
         try {
-            expect(await refusal(h.service.rescan(NODE_ON, OWNER))).toMatchObject({ code: 'unreachable' });
+            expect(await refusal(h.service.rescan(NODE_ON, OWNER))).toMatchObject({
+                code: 'unreachable',
+            });
         } finally {
             NODES[NODE_ON].status = 'online';
         }
     });
 
     it('returns a waiting scan rather than doubling it, else enqueues one now', async () => {
-        expect(await scanHarness({ waiting: { id: 'waiting-1' } }).service.rescan(NODE_ON, OWNER)).toEqual({
+        expect(
+            await scanHarness({ waiting: { id: 'waiting-1' } }).service.rescan(NODE_ON, OWNER),
+        ).toEqual({
             jobId: 'waiting-1',
         });
         const h = scanHarness();
@@ -188,7 +222,13 @@ describe('FleetUsageViewService', () => {
         };
         const scans = {
             factsFor: jest.fn(
-                async () => new Map([[NODE_ON, { lastScanAt: new Date('2026-10-21T11:56:00.000Z'), backlogPct: 58 }]]),
+                async () =>
+                    new Map([
+                        [
+                            NODE_ON,
+                            { lastScanAt: new Date('2026-10-21T11:56:00.000Z'), backlogPct: 58 },
+                        ],
+                    ]),
             ),
         };
         return new FleetUsageViewService(
@@ -222,7 +262,9 @@ describe('FleetUsageViewService', () => {
     });
 
     it('refuses a period that is not 1, 7, 30 or 90 with `invalid`', async () => {
-        expect(await refusal(viewHarness([]).view(OWNER, { days: 14 }))).toMatchObject({ code: 'invalid' });
+        expect(await refusal(viewHarness([]).view(OWNER, { days: 14 }))).toMatchObject({
+            code: 'invalid',
+        });
     });
 
     it('answers consent_missing / unsupported_on_node for one computer (U1, U3)', async () => {
@@ -254,9 +296,13 @@ describe('FleetUsageViewService', () => {
                 ['team-box', 'on'],
             ]),
         );
-        expect(view.byNode.find((line) => line.name === 'laptop')?.scan.hint).toContain('--usage-scan');
+        expect(view.byNode.find((line) => line.name === 'laptop')?.scan.hint).toContain(
+            '--usage-scan',
+        );
         expect(view.excluded.otherHidden).toBe(true);
-        expect(view.sessions.agents).toEqual([{ agentId: 'agent-1', name: 'Nina', sessions: 1, costCents: 300 }]);
+        expect(view.sessions.agents).toEqual([
+            { agentId: 'agent-1', name: 'Nina', sessions: 1, costCents: 300 },
+        ]);
         expect(view.sessions.other).toEqual({ sessions: 1, costCents: null });
         expect(view.catchingUp).toEqual({ nodeId: NODE_ON, nodeName: 'build-01', scannedPct: 42 });
     });

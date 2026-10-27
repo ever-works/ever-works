@@ -40,7 +40,8 @@ export default function ComputerOverviewUsageLine({ nodes }: FleetOverviewBlockP
                 );
             })
             .catch(() => {
-                if (!cancelled) setLoaded({ nodeId, view: null, error: { code: 'internal', hint: '' } });
+                if (!cancelled)
+                    setLoaded({ nodeId, view: null, error: { code: 'internal', hint: '' } });
             });
         return () => {
             cancelled = true;
@@ -58,16 +59,29 @@ export default function ComputerOverviewUsageLine({ nodes }: FleetOverviewBlockP
             code === 'consent_missing' || code === 'unsupported_on_node' ? (
                 <span data-testid="fleet-usage-line-hint">
                     {current.error.hint ||
-                        (code === 'consent_missing' ? t('off', { computer: node.name }) : t('unsupported', { computer: node.name }))}
+                        (code === 'consent_missing'
+                            ? t('off', { computer: node.name })
+                            : t('unsupported', { computer: node.name }))}
                 </span>
             ) : (
-                <span className="text-text-muted">{t('error', { hint: current.error.hint || code })}</span>
+                <span className="text-text-muted">
+                    {t('error', { hint: current.error.hint || code })}
+                </span>
             );
     } else if (current.view) {
-        const line = current.view.byNode.find((entry) => entry.nodeId === node.id) ?? current.view.byNode[0] ?? null;
-        const state = computerUsageLineState(line?.scan ?? null, current.view.totals.costCents, Date.now());
-        if (state.kind === 'off') body = <span>{line?.scan.hint ?? t('off', { computer: node.name })}</span>;
-        else if (state.kind === 'unsupported') body = <span>{t('unsupported', { computer: node.name })}</span>;
+        const line =
+            current.view.byNode.find((entry) => entry.nodeId === node.id) ??
+            current.view.byNode[0] ??
+            null;
+        const state = computerUsageLineState(
+            line?.scan ?? null,
+            current.view.totals.costCents,
+            Date.now(),
+        );
+        if (state.kind === 'off')
+            body = <span>{line?.scan.hint ?? t('off', { computer: node.name })}</span>;
+        else if (state.kind === 'unsupported')
+            body = <span>{t('unsupported', { computer: node.name })}</span>;
         else {
             const cost = state.cost ?? t('tokensOnly');
             body = (
@@ -75,7 +89,10 @@ export default function ComputerOverviewUsageLine({ nodes }: FleetOverviewBlockP
                     {state.age ? t('line', { cost, age: state.age }) : t('lineNoScan', { cost })}
                     {!state.online && <span className="text-text-muted"> · {t('offline')}</span>}
                     {state.scannedPct !== null && (
-                        <span className="text-text-muted"> · {t('catchingUp', { pct: state.scannedPct })}</span>
+                        <span className="text-text-muted">
+                            {' '}
+                            · {t('catchingUp', { pct: state.scannedPct })}
+                        </span>
                     )}{' '}
                     <Link
                         href={`${ROUTES.DASHBOARD_FLEET_USAGE}?node=${encodeURIComponent(node.id)}`}

@@ -23,8 +23,16 @@ function toolError(error: unknown): ToolError {
     if (known) return { error: known };
     const status = (error as { getStatus?: () => number })?.getStatus?.();
     if (status === 404) return { error: { code: 'not_found', hint: 'no such computer' } };
-    if (status === 403) return { error: { code: 'permission_denied', hint: 'that computer is not shared with you' } };
-    return { error: { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' } };
+    if (status === 403)
+        return {
+            error: { code: 'permission_denied', hint: 'that computer is not shared with you' },
+        };
+    return {
+        error: {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
+    };
 }
 
 export function buildFleetUsageTools(args: {
@@ -41,8 +49,14 @@ export function buildFleetUsageTools(args: {
             parameters: {
                 type: 'object',
                 properties: {
-                    days: { type: 'number', description: 'The period in days: 1, 7 (default), 30 or 90.' },
-                    node: { type: 'string', description: 'Optional: one computer (Fleet node id).' },
+                    days: {
+                        type: 'number',
+                        description: 'The period in days: 1, 7 (default), 30 or 90.',
+                    },
+                    node: {
+                        type: 'string',
+                        description: 'Optional: one computer (Fleet node id).',
+                    },
                     model: { type: 'string', description: 'Optional: only this model id.' },
                 },
                 required: [],

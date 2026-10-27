@@ -61,7 +61,10 @@ export class AddFleetSessionUsage1796200000000 implements MigrationInterface {
         ) {
             await queryRunner.createIndex(
                 'agent_runs',
-                new TableIndex({ name: 'idx_agent_runs_cli_session', columnNames: ['cliSessionId'] }),
+                new TableIndex({
+                    name: 'idx_agent_runs_cli_session',
+                    columnNames: ['cliSessionId'],
+                }),
             );
         }
     }
@@ -73,12 +76,15 @@ export class AddFleetSessionUsage1796200000000 implements MigrationInterface {
         }
         let sessions = await queryRunner.getTable('fleet_sessions');
         if (!sessions) return;
-        if (sessions.indices.some((index) => index.name === 'idx_fleet_sessions_provider_session')) {
+        if (
+            sessions.indices.some((index) => index.name === 'idx_fleet_sessions_provider_session')
+        ) {
             await queryRunner.dropIndex('fleet_sessions', 'idx_fleet_sessions_provider_session');
         }
         for (const name of ['costCents', 'tokens']) {
             sessions = await queryRunner.getTable('fleet_sessions');
-            if (sessions?.findColumnByName(name)) await queryRunner.dropColumn('fleet_sessions', name);
+            if (sessions?.findColumnByName(name))
+                await queryRunner.dropColumn('fleet_sessions', name);
         }
     }
 }

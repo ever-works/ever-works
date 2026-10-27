@@ -15757,7 +15757,11 @@
                 "cancel": "Cancel",
                 "create": "Create",
                 "createWithPrice": "Create · {price}/mo",
-                "created": "Creating {name} at {provider}…"
+                "created": "Creating {name} at {provider}…",
+                "signIn": "Sign in with {provider}",
+                "signInFailed": "Sign-in could not start; save a token in the plugin settings instead.",
+                "vpnKey": "Overlay-VPN auth key (optional)",
+                "vpnKeyHint": "Used once by the first-boot script to join your network. Ever Works never stores or shows it again."
             },
             "progress": {
                 "label": "Create progress",
@@ -15796,7 +15800,8 @@
                 "keepRunning": "Keep running",
                 "keptRunning": "{name} keeps running; the idle policy waits its hours again.",
                 "poweredOffByPolicy": "Powered off by the idle policy {duration} ago, after {hours} h idle.",
-                "changeIdlePolicy": "Change"
+                "changeIdlePolicy": "Change",
+                "unclaimed": "Unclaimed — found at {provider} with this Ever Works’ tags {duration} ago; no computer here created it. Destroy it to stop the bill."
             },
             "power": {
                 "off": "Power off",
@@ -15946,7 +15951,8 @@
                     "title": "No computer is reporting usage yet",
                     "command": "Switch it on on a computer:",
                     "promise": "The scan reads {sentence}."
-                }
+                },
+                "exportCsv": "Export CSV"
             },
             "agent": {
                 "title": "Fleet work by computer — last 30 days, at list price",
@@ -15962,6 +15968,17 @@
             "palette": {
                 "usage": "Fleet usage",
                 "usageOn": "Usage on {name}"
+            },
+            "prices": {
+                "title": "Price list v{version} — in effect since {since}",
+                "loading": "Loading the price list…",
+                "history": "Versions: {versions}. Figures keep the version they were priced at.",
+                "model": "Model",
+                "in": "Input",
+                "out": "Output",
+                "cacheRead": "Cache read",
+                "cacheWrite": "Cache write",
+                "perMillion": "US dollars per million tokens, at the providers’ published pay-as-you-go rates."
             }
         },
         "runners": {
