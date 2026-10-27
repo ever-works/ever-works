@@ -46,7 +46,9 @@ describe('evaluateUpstreamRateLimits (APW-09 FR-26 / FR-39)', () => {
         expect(
             evaluateUpstreamRateLimits({ ...empty, openedByUserOnUpstream: [inside] })?.limit,
         ).toBe('openedPerUpstreamPer24h');
-        expect(evaluateUpstreamRateLimits({ ...empty, openedByUserOnUpstream: [outside] })).toBeNull();
+        expect(
+            evaluateUpstreamRateLimits({ ...empty, openedByUserOnUpstream: [outside] }),
+        ).toBeNull();
     });
 
     it.each([
@@ -58,18 +60,25 @@ describe('evaluateUpstreamRateLimits (APW-09 FR-26 / FR-39)', () => {
         // The App spec cannot raise the cap past the ceiling of 10 (G15).
         [25, 10, true],
         [25, 9, false],
-    ])('maxOpen %i with %i open refuses=%s (openPerUpstream, no nextSlotAt)', (maxOpen, open, refuses) => {
-        const result = evaluateUpstreamRateLimits({ ...empty, maxOpen, openByUserOnUpstream: open });
-        if (refuses) {
-            expect(result).toEqual({
-                code: 'rateLimited',
-                limit: 'openPerUpstream',
-                limitValue: Math.min(maxOpen, 10),
+    ])(
+        'maxOpen %i with %i open refuses=%s (openPerUpstream, no nextSlotAt)',
+        (maxOpen, open, refuses) => {
+            const result = evaluateUpstreamRateLimits({
+                ...empty,
+                maxOpen,
+                openByUserOnUpstream: open,
             });
-        } else {
-            expect(result).toBeNull();
-        }
-    });
+            if (refuses) {
+                expect(result).toEqual({
+                    code: 'rateLimited',
+                    limit: 'openPerUpstream',
+                    limitValue: Math.min(maxOpen, 10),
+                });
+            } else {
+                expect(result).toBeNull();
+            }
+        },
+    );
 
     it('refuses a fourth pull request across all upstreams in 24 hours (default 3, CL-39)', () => {
         const opened = [at(5 * hour), at(3 * hour), at(hour)];
@@ -86,12 +95,19 @@ describe('evaluateUpstreamRateLimits (APW-09 FR-26 / FR-39)', () => {
     it('honours the operator override of the overall limit', () => {
         const opened = [at(5 * hour), at(3 * hour), at(hour)];
         expect(
-            evaluateUpstreamRateLimits({ ...empty, openedByUser: opened, limits: { openedOverallPer24h: 5 } }),
+            evaluateUpstreamRateLimits({
+                ...empty,
+                openedByUser: opened,
+                limits: { openedOverallPer24h: 5 },
+            }),
         ).toBeNull();
         // A malformed override falls back to the contract default rather than lifting the limit.
         expect(
-            evaluateUpstreamRateLimits({ ...empty, openedByUser: opened, limits: { openedOverallPer24h: 0 } })
-                ?.limit,
+            evaluateUpstreamRateLimits({
+                ...empty,
+                openedByUser: opened,
+                limits: { openedOverallPer24h: 0 },
+            })?.limit,
         ).toBe('openedOverallPer24h');
     });
 
@@ -103,7 +119,9 @@ describe('evaluateUpstreamRateLimits (APW-09 FR-26 / FR-39)', () => {
             limitValue: 5,
             nextSlotAt: new Date(others[0].getTime() + day).toISOString(),
         });
-        expect(evaluateUpstreamRateLimits({ ...empty, openedOnUpstream: others.slice(1) })).toBeNull();
+        expect(
+            evaluateUpstreamRateLimits({ ...empty, openedOnUpstream: others.slice(1) }),
+        ).toBeNull();
     });
 
     it('names the member limit first when both a member limit and the platform ceiling are full', () => {

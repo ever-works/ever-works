@@ -14,7 +14,10 @@ import { AppSpecService } from '../app-spec/app-spec.service';
 import { relationOf } from '../app-works/app-source-initializer.service';
 import { resolveTaskRepository } from '../tasks-domain/task-repository';
 import { UpstreamCredentialService } from './upstream-credential.service';
-import { decideUpstreamEligibility, type UpstreamEligibilityDecision } from './upstream-eligibility.rules';
+import {
+    decideUpstreamEligibility,
+    type UpstreamEligibilityDecision,
+} from './upstream-eligibility.rules';
 import { evaluateUpstreamRateLimits, type UpstreamRateLimitRefusal } from './upstream-rate-limits';
 
 /** The eligibility answer: the API view plus the active record the `409` names. */
@@ -121,7 +124,9 @@ export class UpstreamEligibilityService {
         let task: { prState: string | null } | null | undefined;
         let activeRecordId: string | null = null;
         if (input.taskId) {
-            const found = this.tasks ? await this.tasks.findById(input.taskId).catch(() => null) : null;
+            const found = this.tasks
+                ? await this.tasks.findById(input.taskId).catch(() => null)
+                : null;
             task = found && found.workId === work.id ? { prState: found.prState ?? null } : null;
             if (task) {
                 const active = await this.records.findActiveBySourceTask(work.id, input.taskId);
@@ -258,7 +263,9 @@ export class UpstreamEligibilityService {
             return {
                 ...view,
                 limit: refused.limit,
-                ...(typeof refused.limitValue === 'number' ? { limitValue: refused.limitValue } : {}),
+                ...(typeof refused.limitValue === 'number'
+                    ? { limitValue: refused.limitValue }
+                    : {}),
                 ...(refused.nextSlotAt ? { nextSlotAt: refused.nextSlotAt } : {}),
             };
         }
@@ -266,7 +273,9 @@ export class UpstreamEligibilityService {
     }
 }
 
-function safeTarget(work: Parameters<typeof resolveTaskRepository>[0]): { owner: string; repo: string } | null {
+function safeTarget(
+    work: Parameters<typeof resolveTaskRepository>[0],
+): { owner: string; repo: string } | null {
     try {
         const target = resolveTaskRepository(work);
         return target ? { owner: target.owner, repo: target.repo } : null;

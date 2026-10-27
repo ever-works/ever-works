@@ -248,7 +248,8 @@ export class UpstreamPullRequestRecordService {
                 status: 'refused',
                 httpStatus: 403,
                 code: 'authorRequired',
-                message: 'Only the member who proposed this pull request, or the App Work owner, can withdraw it.',
+                message:
+                    'Only the member who proposed this pull request, or the App Work owner, can withdraw it.',
             };
         }
         const withdrawable = UPSTREAM_WITHDRAWABLE_STATES as readonly UpstreamPullRequestState[];
@@ -299,7 +300,8 @@ export class UpstreamPullRequestRecordService {
                 status: 'refused',
                 httpStatus: 403,
                 code: 'authorRequired',
-                message: 'Only the member who will publish this pull request can acknowledge its extra files.',
+                message:
+                    'Only the member who will publish this pull request can acknowledge its extra files.',
             };
         }
         const extra = Array.isArray(row.diffStats?.extraFiles) ? row.diffStats.extraFiles : [];
@@ -321,13 +323,18 @@ export class UpstreamPullRequestRecordService {
                 status: 'refused',
                 httpStatus: 409,
                 code: 'notAwaitingApproval',
-                message: 'Extra files can only be acknowledged while the proposal is awaiting your approval.',
+                message:
+                    'Extra files can only be acknowledged while the proposal is awaiting your approval.',
             };
         }
         const fresh = await this.records.findForWork(workId, id);
         return {
             status: 'ok',
-            row: fresh ?? { ...row, extraFilesAcknowledgedAt: now, extraFilesAcknowledgedById: actorUserId },
+            row: fresh ?? {
+                ...row,
+                extraFilesAcknowledgedAt: now,
+                extraFilesAcknowledgedById: actorUserId,
+            },
         };
     }
 

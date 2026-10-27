@@ -16,7 +16,11 @@ jest.mock('@ever-works/agent/upstream-pull-requests', () => {
             userId: row.userId,
             state: row.state,
             sourceTaskId: row.sourceTaskId ?? null,
-            upstream: { owner: row.upstreamOwner, repo: row.upstreamRepo, baseBranch: row.baseBranch },
+            upstream: {
+                owner: row.upstreamOwner,
+                repo: row.upstreamRepo,
+                baseBranch: row.baseBranch,
+            },
             _contractsLoaded: Array.isArray(actual.UPSTREAM_PULL_REQUEST_STATES),
         }),
     };
@@ -48,12 +52,28 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
 const human = { userId: 'u1', authMethod: 'session' } as unknown as AuthenticatedUser;
 const apiKey = { userId: 'u1', authMethod: 'api_key' } as unknown as AuthenticatedUser;
 
-function build(options: { kind?: string; deny?: 'notFound' | 'forbidden'; role?: string; creator?: boolean } = {}) {
-    const work = { id: 'w1', userId: options.creator ? 'u1' : 'owner', kind: options.kind ?? 'app' };
+function build(
+    options: {
+        kind?: string;
+        deny?: 'notFound' | 'forbidden';
+        role?: string;
+        creator?: boolean;
+    } = {},
+) {
+    const work = {
+        id: 'w1',
+        userId: options.creator ? 'u1' : 'owner',
+        kind: options.kind ?? 'app',
+    };
     const refuse = () => {
         if (options.deny === 'notFound') throw new NotFoundException();
         if (options.deny === 'forbidden') throw new ForbiddenException();
-        return { work, role: options.role ?? 'editor', member: null, isCreator: options.creator === true };
+        return {
+            work,
+            role: options.role ?? 'editor',
+            member: null,
+            isCreator: options.creator === true,
+        };
     };
     const ownership = {
         ensureCanView: jest.fn(async () => refuse()),
@@ -74,14 +94,20 @@ function build(options: { kind?: string; deny?: 'notFound' | 'forbidden'; role?:
     };
     const records = {
         listForWork: jest.fn(async () => ({ rows: [row], total: 1 })),
-        findForWork: jest.fn(async (workId: string, id: string) => (workId === 'w1' && id === 'r1' ? row : null)),
+        findForWork: jest.fn(async (workId: string, id: string) =>
+            workId === 'w1' && id === 'r1' ? row : null,
+        ),
     };
     const writer = {
         withdraw: jest.fn(async () => ({ status: 'ok', row: { ...row, state: 'withdrawn' } })),
         acknowledgeExtraFiles: jest.fn(async () => ({ status: 'ok', row })),
     };
     const eligibility = {
-        evaluate: jest.fn(async () => ({ allowed: false, code: 'disabled', preparationAvailable: false })),
+        evaluate: jest.fn(async () => ({
+            allowed: false,
+            code: 'disabled',
+            preparationAvailable: false,
+        })),
     };
     const controller = new UpstreamPullRequestsController(
         ownership as never,
@@ -92,12 +118,17 @@ function build(options: { kind?: string; deny?: 'notFound' | 'forbidden'; role?:
     return { controller, ownership, records, writer, eligibility };
 }
 
-async function statusOf(promise: Promise<unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
+async function statusOf(
+    promise: Promise<unknown>,
+): Promise<{ status: number; body: Record<string, unknown> }> {
     try {
         await promise;
     } catch (error) {
         if (error instanceof HttpException) {
-            return { status: error.getStatus(), body: error.getResponse() as Record<string, unknown> };
+            return {
+                status: error.getStatus(),
+                body: error.getResponse() as Record<string, unknown>,
+            };
         }
         throw error;
     }
@@ -154,7 +185,10 @@ describe('UpstreamPullRequestsController (APW-09)', () => {
         it('lists the route Work’s records with their author, and no fingerprint', async () => {
             const { controller, records } = build();
             const result = await controller.list(human, 'w1', 'awaiting_approval', '5');
-            expect(records.listForWork).toHaveBeenCalledWith('w1', { state: 'awaiting_approval', limit: 5 });
+            expect(records.listForWork).toHaveBeenCalledWith('w1', {
+                state: 'awaiting_approval',
+                limit: 5,
+            });
             expect(result.meta).toEqual({ total: 1 });
             expect(result.data[0]).toMatchObject({ id: 'r1', userId: 'u1' });
             expect(JSON.stringify(result)).not.toContain('f'.repeat(64));
@@ -182,8 +216,15 @@ describe('UpstreamPullRequestsController (APW-09)', () => {
             await expect(controller.getEligibility(human, 'w1', 't1')).resolves.toMatchObject({
                 preparationAvailable: false,
             });
-            expect(eligibility.evaluate).toHaveBeenCalledWith({ workId: 'w1', userId: 'u1', taskId: 't1' });
-            eligibility.evaluate.mockResolvedValueOnce({ allowed: false, taskNotOnWork: true } as never);
+            expect(eligibility.evaluate).toHaveBeenCalledWith({
+                workId: 'w1',
+                userId: 'u1',
+                taskId: 't1',
+            });
+            eligibility.evaluate.mockResolvedValueOnce({
+                allowed: false,
+                taskNotOnWork: true,
+            } as never);
             const result = await statusOf(controller.getEligibility(human, 'w1', 't-other'));
             expect(result).toMatchObject({ status: 404, body: { code: 'taskNotOnWork' } });
         });
@@ -193,10 +234,16 @@ describe('UpstreamPullRequestsController (APW-09)', () => {
         it('withdraw passes the owner flag from the access check', async () => {
             const asMember = build();
             await asMember.controller.withdraw(human, 'w1', 'r1');
-            expect(asMember.writer.withdraw).toHaveBeenCalledWith('w1', 'r1', { userId: 'u1', isWorkOwner: false });
+            expect(asMember.writer.withdraw).toHaveBeenCalledWith('w1', 'r1', {
+                userId: 'u1',
+                isWorkOwner: false,
+            });
             const asCreator = build({ creator: true });
             await asCreator.controller.withdraw(human, 'w1', 'r1');
-            expect(asCreator.writer.withdraw).toHaveBeenCalledWith('w1', 'r1', { userId: 'u1', isWorkOwner: true });
+            expect(asCreator.writer.withdraw).toHaveBeenCalledWith('w1', 'r1', {
+                userId: 'u1',
+                isWorkOwner: true,
+            });
         });
 
         it('turns a service refusal into its status and code', async () => {
