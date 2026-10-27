@@ -111,6 +111,18 @@ describe('App Works MCP whitelist (APW-01 T19, lane B1)', () => {
 		}
 	});
 
+	it('has no App Works entry beyond the 32 — a new one must be classified here first', () => {
+		// Every App Works route family: the inspect, the per-Work App routes, Builds, upstream,
+		// provisioning, change requests and the Apps catalog.
+		const APP_WORKS_PATH =
+			/^\/api\/(works\/app-source\/|works\/\{id\}\/(app-[a-z-]+|builds|upstream|provision|provisioning|evolve|deploy)(\/|$)|apps-catalog(\/|$))/;
+		const actual = WHITELIST.filter((entry) => APP_WORKS_PATH.test(entry.path))
+			.map((entry) => `${entry.method} ${entry.path} ${entry.toolName}`)
+			.sort();
+		const expected = ALL.map(({ method, path, toolName }) => `${method} ${path} ${toolName}`).sort();
+		expect(actual).toEqual(expected);
+	});
+
 	it('marks every read read-only, and nothing else', () => {
 		for (const { toolName } of READS) {
 			const entry = WHITELIST.find((candidate) => candidate.toolName === toolName);

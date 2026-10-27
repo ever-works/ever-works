@@ -101,7 +101,7 @@ Three more rules close the paths that would make a held-back run starter one cal
 
 ## Available Tools (240)
 
-The authoritative list is `src/openapi-tools/whitelist.ts`; the tables below cover the main domains, and `test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts here against it.
+The authoritative list is `src/openapi-tools/whitelist.ts`; the tables below cover the main domains, and `test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts here against it. The count is the whitelist length, so it is the maximum: with `MCP_PRIVILEGED_TOOLS` off (the default) the privileged tools listed above are not registered.
 
 ### Works (12)
 
