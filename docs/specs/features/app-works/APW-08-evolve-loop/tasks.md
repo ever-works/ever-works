@@ -571,6 +571,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 ## P1.7 — API and chat
 
 - [ ] **T24. Delivery and cost endpoints.**
+      **Status (2026-10-27, lane B2 `aw-evolve`): the cost half is done** — `GET /api/tasks/:id/cost` answers `TaskCostView` (`packages/contracts/src/apps/task-delivery.types.ts`, new): each run's cost is its receipt lines summed (`getRunSpendLines`, `null` while unpriced) with `receiptUrl` `/agents/sessions/<runId>`, up to 50 runs newest first (`runsTruncated`), and `totalCents` is every usage row attributed to the Task; `builds` stays `[]` until per-Task Build accounting exists. Spec `apps/api/src/tasks/task-cost.spec.ts`. **Not built:** `GET :id/delivery`, `…/delivery/close`, `…/delivery/follow-up` and the list's `deliveryState` / `includeDelivery` — they read the delivery chain's columns (T7–T9, T20–T23), which do not exist yet; the types (`TaskDeliveryView`, `TASK_DELIVERY_STATES`) are published so the chain and the web type against one shape.
       **Modify** `apps/api/src/tasks/tasks.controller.ts` — `GET :id/delivery`, `POST :id/delivery/close`,
       `POST :id/delivery/follow-up`, `GET :id/cost`; list query `deliveryState`, `includeDelivery`; throttles and
       error codes per [plan §4](./plan.md); `ensureCanView` / `ensureCanEdit`.
@@ -1141,6 +1142,7 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       **Done when**: the specs are green and the pre-existing `app-change-guard.spec.ts` cases pass unchanged.
 
 - [ ] **T56. Per-App-Work cost rollup against the Work budget (XC-19, FR-73).**
+      **Status (2026-10-27, lane B2 `aw-evolve`): the read is done** — `GET /api/works/:id/cost?month=YYYY-MM` (`WorkCostController`, view access, one `404 not_found`, `400 invalidMonth`) answers `WorkCostRollup` from the usage ledger (`getTotalSpendCents`, the budget guard's own query, in the budget's currency) and the Work's existing global `WorkBudget`: spend, cap, remaining (never negative), percent and the EW-602 alert ladder (75 / 90 / 100 / overage). Spec `apps/api/src/works/work-cost.controller.spec.ts`. **Not built:** booking the App Work run paths against the Work's budget through the guard, and `WorkCostSummary` on the App Work overview.
       **Modify** `apps/api/src/works/work-evolve.controller.ts` — `GET /api/works/:id/cost` returning
       `WorkCostRollup` (month spend, cap, remaining, alert state) through the **existing** `WorkBudget` /
       `WorkBudgetAlertState` entities and `BudgetGuardService` (`packages/agent/src/entities/work-budget.entity.ts`;

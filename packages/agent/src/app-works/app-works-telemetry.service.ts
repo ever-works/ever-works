@@ -185,6 +185,21 @@ export class AppWorksTelemetryService {
         }
     }
 
+    /**
+     * APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — ANOTHER App Works epic's event, through
+     * this sink and this sanitizer. The epic owns its closed event set and its typed payloads
+     * (`app-builds/app-builds.telemetry.ts`); this service owns rules 1–3 above for every one of
+     * them, so there is one sanitizer for the programme rather than one per epic. Same guarantees
+     * as {@link track}: never throws, drops when unbound, keeps codes, counters and flags only.
+     */
+    trackEvent(
+        event: string,
+        properties: Record<string, unknown>,
+        distinctId?: string | null,
+    ): void {
+        this.track(event as AppWorksTelemetryEvent, properties as never, distinctId);
+    }
+
     /** A copy of the counters. */
     stats(): AppWorksTelemetryStats {
         return { ...this.counts };

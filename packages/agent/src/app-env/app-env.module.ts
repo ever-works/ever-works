@@ -88,11 +88,17 @@ import { AppEnvCrypto } from './app-env-crypto';
 import { AppSpecService } from '../app-spec/app-spec.service';
 import {
     APP_ENV_ACTIVITY,
+    APP_ENV_ACTOR_NAMES,
     APP_ENV_RESOLVER_FINGERPRINTS,
     APP_ENV_SPEC_SOURCE,
     AppEnvService,
+    type AppEnvActorNames,
     type AppEnvSpecSource,
 } from './app-env.service';
+import { appEnvActorNames } from './app-env-actor-names';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkMemberRepository } from '../database/repositories/work-member.repository';
+import { UserRepository } from '../database/repositories/user.repository';
 import { AppEnvActivityService } from './app-env.activity';
 import { AppEnvEditorService } from './app-env-editor.service';
 import { AppEnvSpecReadSource } from './app-env-spec.source';
@@ -149,6 +155,21 @@ import { APP_ENV_ENSURE_GENERATED, AppEnvResolver } from './app-env.resolver';
         { provide: APP_ENV_ACTIVITY, useExisting: AppEnvActivityService },
         // Lane aw-env-smtp — the two Environment routes' service (`GET`/`PUT /api/works/:id/app-env`).
         AppEnvEditorService,
+        // Lane aw-builds-bindings (2026-10-27) — "Set · by Maya" (plan §3.3:293): the display name
+        // of a Work's owner or member, never an email, never a stranger's. Lazy through `ModuleRef`
+        // like every cross-module read here, so this module still compiles standalone (no
+        // repository bound ⇒ `null`, which is what the unbound port answered).
+        {
+            provide: APP_ENV_ACTOR_NAMES,
+            useFactory: (ref: ModuleRef): AppEnvActorNames =>
+                appEnvActorNames({
+                    works: () => getOptionalProvider<WorkRepository>(ref, WorkRepository),
+                    members: () =>
+                        getOptionalProvider<WorkMemberRepository>(ref, WorkMemberRepository),
+                    users: () => getOptionalProvider<UserRepository>(ref, UserRepository),
+                }),
+            inject: [ModuleRef],
+        },
     ],
     exports: [
         AppEnvService,

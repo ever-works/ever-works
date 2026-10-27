@@ -12,6 +12,12 @@ import { ROUTES } from '@/lib/constants';
 import { ApiResponseError } from '@/lib/api/server-api';
 import { appBuildsWebAPI as appBuildsAPI, type AppBuildsListQuery } from '@/lib/api/app-builds';
 import type { AppBuildsList, AppBuildsPullAccess } from '@/lib/works/app-builds.shared';
+import { pluginsAPI } from '@/lib/api/plugins';
+import {
+    APP_BUILD_SETTINGS_KEYS,
+    normalizeAppBuildSettings,
+    type AppBuildSettings,
+} from '@/lib/works/app-build-settings.shared';
 
 /**
  * APW-05 T25 — the Builds tab's server actions (plan §6.2).
@@ -178,5 +184,90 @@ export async function setAppBuildPullTokenAction(
             };
         }
         return { success: false };
+    }
+}
+
+/* -------------------------------------------------------------------------- *
+ * APW-05 T28 / T46 (lane aw-builds-bindings, 2026-10-27) — Build settings
+ * -------------------------------------------------------------------------- */
+
+// The plugin id comes from the Builds list response's `provider` (plan §5) and is only
+// passed through; the schema bounds it to an id's shape so a crafted value cannot reach
+// another route.
+const pluginIdSchema = z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9][a-z0-9._-]*$/i);
+
+const buildSettingsPatchSchema = z
+    .object({
+        largerRunnerLabel: z.string().max(64).nullable().optional(),
+        largerRunnerMemoryGiB: z.number().int().nullable().optional(),
+        largerRunnerVcpu: z.number().int().nullable().optional(),
+        reclaimDisk: z.boolean().optional(),
+        attestations: z.boolean().optional(),
+        allowBuildValuesOnPullRequests: z.boolean().optional(),
+        // `verificationPromptedValuesRequireApproval` is deliberately absent, so `strict()`
+        // refuses it: the approval gate it switches (T46's `startVerification` half) is not
+        // built, and no path here may change a setting whose protection does not exist yet.
+    })
+    .strict();
+
+/**
+ * The build plugin's current Build settings for this Work: the Work's own values over the
+ * person's defaults over the schema's. Read from `GET /api/works/:id/plugins` (the Work's
+ * plugin rows, secrets masked); only the seven keys of the dialog are returned.
+ */
+export async function getAppBuildSettingsAction(
+    workId: string,
+    pluginId: string,
+): Promise<AppBuildActionResult<{ settings: AppBuildSettings }>> {
+    await requireUser();
+    if (!workIdSchema.safeParse(workId).success || !pluginIdSchema.safeParse(pluginId).success) {
+        return invalid();
+    }
+    try {
+        const list = await pluginsAPI.listForWork(workId);
+        const row = (list?.plugins ?? []).find((plugin) => plugin.pluginId === pluginId);
+        return {
+            success: true,
+            data: { settings: normalizeAppBuildSettings(row?.workSettings, row?.settings) },
+        };
+    } catch (error) {
+        return failure('read the Build settings', error);
+    }
+}
+
+/**
+ * Save the Build settings through `PATCH /api/works/:workId/plugins/:pluginId/settings`. Only
+ * the six keys the dialog edits are accepted (`strict`), so this action cannot write the pull
+ * token or any other plugin setting; the API checks edit access and validates against the
+ * plugin schema.
+ */
+export async function saveAppBuildSettingsAction(
+    workId: string,
+    pluginId: string,
+    settings: Record<string, unknown>,
+): Promise<AppBuildActionResult<{ saved: true }>> {
+    await requireUser();
+    const parsed = buildSettingsPatchSchema.safeParse(settings);
+    if (
+        !workIdSchema.safeParse(workId).success ||
+        !pluginIdSchema.safeParse(pluginId).success ||
+        !parsed.success
+    ) {
+        return invalid();
+    }
+    const body: Record<string, unknown> = {};
+    for (const key of APP_BUILD_SETTINGS_KEYS) {
+        if (key in parsed.data) body[key] = parsed.data[key];
+    }
+    try {
+        await pluginsAPI.updateWorkSettings(workId, pluginId, { settings: body });
+        revalidateBuilds(workId);
+        return { success: true, data: { saved: true } };
+    } catch (error) {
+        return failure('save the Build settings', error);
     }
 }

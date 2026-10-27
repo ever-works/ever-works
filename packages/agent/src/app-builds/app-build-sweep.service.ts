@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { APP_BUILD_TELEMETRY_EVENTS, AppBuildsTelemetry } from './app-builds.telemetry';
 import {
     APP_BUILD_ADOPT_WINDOW_MS,
     APP_BUILD_LOST_GRACE_MINUTES,
@@ -250,6 +251,10 @@ export class AppBuildSweepService {
         // graph without it (and every existing spec) still runs the other passes.
         @Optional()
         private readonly discovery?: AppBuildRunDiscoveryService,
+        // APW-05 T38 (lane aw-builds-bindings, 2026-10-27) — `app_build_sweep_tick`.
+        @Optional()
+        @Inject(AppBuildsTelemetry)
+        private readonly telemetry?: AppBuildsTelemetry,
     ) {}
 
     /**
@@ -364,6 +369,15 @@ export class AppBuildSweepService {
                 `App builds: the sweep's orphaned-secret read failed (${errorText(error)}).`,
             );
         }
+
+        // APW-05 T38 — plan §9.1's tick: `observed` is the open Builds this tick offered an
+        // observation (the silent pass's watches), `lost` the never-adopted Builds it failed,
+        // `verifySecretsRemoved` the orphaned verification secrets it removed. Counters only.
+        this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.sweepTick, {
+            observed: silent.silentDispatched,
+            lost: lost.lostMarked,
+            verifySecretsRemoved: orphans.orphanSecretsRemoved,
+        });
 
         return {
             ...emptySummary(null),

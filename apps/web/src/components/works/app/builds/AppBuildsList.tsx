@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Hammer, RefreshCw } from 'lucide-react';
+import { Hammer, RefreshCw, Settings2 } from 'lucide-react';
 import type { AppBuildSummary } from '@ever-works/contracts';
 import { cancelAppBuildAction, listAppBuildsAction } from '@/app/actions/dashboard/app-builds';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import { AppBuildStatusChip } from './AppBuildStatusChip';
 import { AppBuildBlockedNotice } from './AppBuildBlockedNotice';
 import { AppBuildDrawer } from './AppBuildDrawer';
 import { useStartAppBuild } from './use-start-app-build';
+import { AppBuildSettingsDialog } from './AppBuildSettingsDialog';
 
 /**
  * APW-05 T26 — the Builds tab: header with **Start build**, the list, and the
@@ -49,6 +50,8 @@ export function AppBuildsList({ workId, initialState, canEdit }: AppBuildsListPr
     const [openBuild, setOpenBuild] = useState<AppBuildSummary | null>(null);
     const [cancelling, setCancelling] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
+    // APW-05 T28 / T46 (lane aw-builds-bindings) — the Build settings dialog.
+    const [settingsOpen, setSettingsOpen] = useState(false);
     const mounted = useRef(true);
     const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -191,6 +194,21 @@ export function AppBuildsList({ workId, initialState, canEdit }: AppBuildsListPr
                             <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                             {t('refresh')}
                         </Button>
+                        {/* The plugin id is the list's `provider` (plan §5); no provider, no settings. */}
+                        {list?.provider?.pluginId && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSettingsOpen(true)}
+                                disabled={!canEdit}
+                                title={canEdit ? undefined : t('viewerDisabled')}
+                                data-testid="app-build-settings-open"
+                            >
+                                <Settings2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                {t('settings.open')}
+                            </Button>
+                        )}
                         <Button
                             type="button"
                             variant="primary"
@@ -353,6 +371,17 @@ export function AppBuildsList({ workId, initialState, canEdit }: AppBuildsListPr
                         </p>
                     )}
                 </>
+            )}
+
+            {list?.provider?.pluginId && (
+                <AppBuildSettingsDialog
+                    workId={workId}
+                    pluginId={list.provider.pluginId}
+                    open={settingsOpen}
+                    onOpenChange={setSettingsOpen}
+                    publicRepository={list.repository?.visibility === 'public'}
+                    canEdit={canEdit}
+                />
             )}
 
             <AppBuildDrawer
