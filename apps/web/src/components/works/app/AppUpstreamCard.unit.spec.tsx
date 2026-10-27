@@ -598,3 +598,128 @@ describe('upstreamResultLine', () => {
         ).toEqual({ key: 'resultLicenseChangedNoSpdx', pullRequestUrl: undefined });
     });
 });
+
+/**
+ * APW-02 T46 (2026-10-27, ACC-02-24) — the held-workflow row: Review the changes, the
+ * path list, and the owner-only two-step **Sync anyway** that sends the flag and the
+ * reviewed head. T47: the merged sync pull request line.
+ */
+describe('AppUpstreamCard — the workflow hold (T46) and the merged sync PR line (T47)', () => {
+    const HEAD = 'b'.repeat(40);
+
+    function heldState(canRelease: boolean): AppUpstreamStateResponse {
+        const base = upstreamState();
+        return upstreamState({
+            sync: {
+                ...base.sync!,
+                lastResult: 'skipped',
+                lastReason: 'held_for_workflow_review',
+                workflowHold: {
+                    headSha: HEAD,
+                    paths: ['.github/workflows/release.yml'],
+                    pathCount: 1,
+                    complete: true,
+                    heldAt: '2026-10-27T01:00:00.000Z',
+                    compareUrl: `https://github.com/me/tasks-app/compare/main...${HEAD}`,
+                    canRelease,
+                },
+            },
+        });
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        syncUpstreamActionMock.mockResolvedValue({ success: true, queued: true, runId: 'run-1' });
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => heldState(true) }),
+        );
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.unstubAllGlobals();
+    });
+
+    it('renders the hold row with the count, the review link and the paths', () => {
+        renderCard(heldState(true));
+
+        const row = screen.getByTestId('app-upstream-workflow-hold');
+        expect(row).toHaveTextContent('Upstream changed 1 workflow file. Nothing was synced.');
+        expect(screen.getByTestId('app-upstream-workflow-hold-review')).toHaveAttribute(
+            'href',
+            `https://github.com/me/tasks-app/compare/main...${HEAD}`,
+        );
+        fireEvent.click(screen.getByTestId('app-upstream-workflow-hold-paths-toggle'));
+        expect(screen.getByTestId('app-upstream-workflow-hold-paths')).toHaveTextContent(
+            '.github/workflows/release.yml',
+        );
+    });
+
+    it('sends the flag and the reviewed head only after the explicit confirm', async () => {
+        renderCard(heldState(true));
+
+        fireEvent.click(screen.getByTestId('app-upstream-sync-anyway'));
+        expect(syncUpstreamActionMock).not.toHaveBeenCalled();
+        expect(screen.getByTestId('app-upstream-sync-anyway-confirm')).toBeInTheDocument();
+
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('app-upstream-sync-anyway-confirm-yes'));
+        });
+
+        expect(syncUpstreamActionMock).toHaveBeenCalledWith('w1', {
+            confirmWorkflowChanges: true,
+            workflowHeadSha: HEAD,
+        });
+    });
+
+    it('cancels without sending anything', () => {
+        renderCard(heldState(true));
+
+        fireEvent.click(screen.getByTestId('app-upstream-sync-anyway'));
+        fireEvent.click(screen.getByTestId('app-upstream-sync-anyway-cancel'));
+
+        expect(syncUpstreamActionMock).not.toHaveBeenCalled();
+        expect(screen.queryByTestId('app-upstream-sync-anyway-confirm')).toBeNull();
+    });
+
+    it('offers no Sync anyway to anyone but the owner, and says who can', () => {
+        renderCard(heldState(false));
+
+        expect(screen.queryByTestId('app-upstream-sync-anyway')).toBeNull();
+        expect(screen.getByTestId('app-upstream-workflow-hold')).toHaveTextContent(
+            'Only the Work owner can accept upstream workflow changes.',
+        );
+    });
+
+    it('renders the API refusal for a hold that changed since the owner looked', async () => {
+        syncUpstreamActionMock.mockResolvedValue({
+            success: false,
+            code: 'workflow_hold_changed',
+            statusCode: 409,
+        });
+        renderCard(heldState(true));
+
+        fireEvent.click(screen.getByTestId('app-upstream-sync-anyway'));
+        await act(async () => {
+            fireEvent.click(screen.getByTestId('app-upstream-sync-anyway-confirm-yes'));
+        });
+
+        await waitFor(() =>
+            expect(screen.getByTestId('app-upstream-failure')).toHaveTextContent(
+                'Upstream moved since you reviewed it. Review the new changes first.',
+            ),
+        );
+    });
+
+    it('says the sync pull request was merged (T47)', () => {
+        expect(
+            upstreamResultLine({
+                ...upstreamState().sync!,
+                lastResult: 'up_to_date',
+                lastReason: 'pull_request_merged',
+                lastCommitCount: 4,
+            }),
+        ).toEqual({ key: 'resultPullRequestMerged', values: { count: 4 } });
+    });
+});
