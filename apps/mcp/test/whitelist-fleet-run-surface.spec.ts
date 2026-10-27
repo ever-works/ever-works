@@ -202,7 +202,42 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_runners_cancel_run: "cancels a whole workflow run of a person's repository",
 	// FL-07 desktop view & control: the `desktop` family (watching and controlling a person's
 	// screen) is never reachable with a run token — not even the read of its displays.
-	fleet_desktop_displays: "the displays of a person's computer (the desktop view family)"
+	fleet_desktop_displays: "the displays of a person's computer (the desktop view family)",
+	// App Works on MCP (823d5f029, APW-01 T19/T25/T32/T42) — 32 tools that landed without a
+	// run-token decision. None is in FLEET_RUN_TOKEN_ROUTES, so deny-by-omission already refused
+	// them; named here so the refusal is a decision. A person's MCP client keeps every one.
+	inspect_app_source: 'reads an arbitrary repository on behalf of a person (an App Work is created by a person)',
+	get_app_status: "a person's running app (runtime state)",
+	refresh_app_status: "probes a person's running app",
+	list_app_deployments: "a person's deployment history",
+	request_app_logs: "dispatches a log read against a person's cluster",
+	get_app_logs: "a person's application logs, which can carry secrets",
+	get_app_target: "where a person's app runs (the cluster target)",
+	get_app_deletion_preview: "what deleting a person's app would destroy",
+	run_app_smoke: "dispatches a smoke run against a person's app",
+	rollback_app: "redeploys an earlier release of a person's app",
+	change_app_lifecycle: "starts, stops or pauses a person's app",
+	list_app_builds: "a person's App Builds",
+	get_app_build: "a person's App Build and its log",
+	cancel_app_build: "cancels a person's App Build",
+	get_app_env: "a person's app environment (names and sources of its values)",
+	list_app_dependencies: "a person's app dependencies (databases, caches, storage)",
+	get_app_spec: "a person's App spec",
+	validate_app_spec: "evaluates a person's App spec",
+	apply_app_blueprint: "rewrites a person's App spec from a Blueprint",
+	upgrade_app_blueprint: "rewrites a person's App spec to a newer Blueprint",
+	dismiss_app_blueprint_upgrade: 'hides a Blueprint upgrade from the owner',
+	get_app_license: "a person's licence acknowledgements for their app",
+	list_app_catalog_entries: 'the App catalogue serves the person creating an App Work',
+	list_app_blueprints: 'the App catalogue serves the person creating an App Work',
+	list_app_licenses: 'the App catalogue serves the person creating an App Work',
+	get_app_catalog_entry: 'the App catalogue serves the person creating an App Work',
+	get_app_provisioning: "a person's App Work provisioning",
+	cancel_app_provisioning: "cancels a person's App Work provisioning",
+	list_app_changes: "a person's chat-to-modify change requests",
+	get_app_upstream: "a person's upstream relationship (fork or private copy)",
+	sync_app_upstream: "pulls upstream changes into a person's app",
+	retry_app_readiness: "re-dispatches a person's readiness work"
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */
