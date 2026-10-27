@@ -8,6 +8,8 @@ import { TaskChatService } from '../tasks-domain/task-chat.service';
 import { relationOf } from '../app-works/app-source-initializer.service';
 import { resolveTaskRepository } from '../tasks-domain/task-repository';
 import { UpstreamCredentialService } from './upstream-credential.service';
+import { ownershipScopeOf } from '../database/ownership-scope';
+import { UpstreamPullRequestRecordService } from './upstream-pull-request-record.service';
 
 /**
  * APW-09 — the first surface over the upstream-PR facade: open a pull request from a
@@ -27,9 +29,18 @@ import { UpstreamCredentialService } from './upstream-credential.service';
  *   - the branch is named explicitly or taken from one of THIS Work's Tasks (its
  *     `branchRef`), so the route cannot be pointed at an arbitrary repository.
  *
- * Not here yet (APW-09 plan): the `UpstreamPullRequest` row and its lifecycle jobs, the
- * contribution budget gate (T44), FR-41's deny list, and the prepare step that rebases the
- * change onto the upstream default branch.
+ * Not here yet (APW-09 plan): the lifecycle jobs (status polling), the contribution budget
+ * gate (T44) and the prepare step that rebases the change onto the upstream default branch.
+ *
+ * ## The record (APW-09 T7/T35, lane aw-upstream-prs — additive)
+ *
+ * When the `upstream_pull_requests` store is bound (`UpstreamPullRequestRecordService`), the
+ * route claims the source Task's one active slot BEFORE the provider is called (state
+ * `opening`, `origin: 'direct'`), then moves it to `open` with the number and URL, or to
+ * `failed` with the provider's message — each with its `app_upstream_pr` Activity line. A
+ * second request for a Task that already has an active record is refused
+ * `409 activeProposal` (FR-5) and reaches no provider. The success body is unchanged except
+ * for one added field, `recordId`. The record never holds the token.
  */
 
 export interface UpstreamPullRequestOpenInput {
@@ -58,10 +69,12 @@ export type UpstreamPullRequestOpenResult =
           readonly base: string;
           readonly upstream: string;
           readonly draft: boolean;
+          /** APW-09 — the `upstream_pull_requests` row, or `null` when no store is bound. */
+          readonly recordId?: string | null;
       }
     | {
           readonly status: 'refused';
-          readonly httpStatus: 404 | 422 | 502 | 503;
+          readonly httpStatus: 404 | 409 | 422 | 429 | 502 | 503;
           readonly code:
               | 'not_found'
               | 'notAppWork'
@@ -73,8 +86,17 @@ export type UpstreamPullRequestOpenResult =
               | 'providerRefused'
               | 'unavailable'
               | 'upstreamPaused'
-              | 'deniedUpstream';
+              | 'deniedUpstream'
+              // APW-09 (lane aw-upstream-prs) — appended.
+              | 'activeProposal'
+              | 'rateLimited'
+              | 'platformCapReached';
           readonly message: string;
+          /** `activeProposal`: the record that already holds the source Task's slot. */
+          readonly id?: string | null;
+          /** `rateLimited` / `platformCapReached`: which FR-26 / FR-39 limit refused (FR-27). */
+          readonly limit?: string;
+          readonly nextSlotAt?: string;
       };
 
 const BRANCH_PATTERN = /^[A-Za-z0-9._/-]{1,255}$/;
@@ -90,6 +112,8 @@ export class UpstreamPullRequestOpenService {
         @Optional() private readonly git?: GitFacadeService,
         // The record: when the PR came from a Task, the Task's thread says so (link + head).
         @Optional() private readonly taskChat?: TaskChatService,
+        // APW-09 T7/T35 — the `upstream_pull_requests` record. Appended LAST and optional.
+        @Optional() private readonly records?: UpstreamPullRequestRecordService,
     ) {}
 
     async open(input: UpstreamPullRequestOpenInput): Promise<UpstreamPullRequestOpenResult> {
@@ -184,6 +208,7 @@ export class UpstreamPullRequestOpenService {
         const credential = publishing.credential;
 
         const draft = input.draft !== false;
+        const maintainerCanModify = input.maintainerCanModify !== false;
         const base = upstream.defaultBranch || 'main';
         const title = (
             input.title?.trim() ||
@@ -195,6 +220,38 @@ export class UpstreamPullRequestOpenService {
             '',
             `Head: \`${fork.owner}/${fork.repo}:${branch}\`.`,
         ].join('\n');
+
+        // ── APW-09: claim the record (FR-5) before anything reaches the provider ──
+        const scope = ownershipScopeOf(work as never);
+        const claim = this.records
+            ? await this.records.claimDirect({
+                  workId: work.id,
+                  userId: input.callerUserId,
+                  sourceTaskId: recordOn?.id ?? null,
+                  upstreamOwner: upstream.owner,
+                  upstreamRepo: upstream.repo,
+                  baseBranch: base,
+                  headOwner: fork.owner,
+                  headRepo: fork.repo,
+                  headBranch: branch,
+                  title,
+                  body,
+                  draft,
+                  maintainerCanModify,
+                  tenantId: scope.tenantId ?? null,
+                  organizationId: scope.organizationId ?? null,
+              })
+            : ({ status: 'unrecorded' } as const);
+        if (claim.status === 'active') {
+            return {
+                status: 'refused',
+                httpStatus: 409,
+                code: 'activeProposal',
+                message: 'This Task already has a proposal. Open it instead of starting another.',
+                id: claim.activeId,
+            };
+        }
+        const row = claim.status === 'claimed' ? claim.row : null;
 
         try {
             const pr = await this.git.createPullRequest(
@@ -208,7 +265,7 @@ export class UpstreamPullRequestOpenService {
                     base,
                     body,
                     draft,
-                    maintainerCanModify: input.maintainerCanModify !== false,
+                    maintainerCanModify,
                 },
                 {
                     token: credential.token,
@@ -217,6 +274,15 @@ export class UpstreamPullRequestOpenService {
                     workId: work.id,
                 },
             );
+            if (row && this.records) {
+                await this.records
+                    .markOpened(row, { number: pr.number, url: pr.url })
+                    .catch((error: unknown) =>
+                        this.logger.warn(
+                            `Recording upstream PR ${pr.url} for work ${work.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+                        ),
+                    );
+            }
             if (recordOn) await this.record(recordOn, pr.url, `${fork.owner}:${branch}`, draft);
             return {
                 status: 'opened',
@@ -227,10 +293,17 @@ export class UpstreamPullRequestOpenService {
                 base,
                 upstream: `${upstream.owner}/${upstream.repo}`,
                 draft,
+                recordId: row?.id ?? null,
             };
         } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+            const message = redactProviderMessage(
+                error instanceof Error ? error.message : String(error),
+                credential.token,
+            );
             this.logger.warn(`Upstream PR for work ${work.id} (${branch}) was refused: ${message}`);
+            if (row && this.records) {
+                await this.records.markFailed(row, message).catch(() => undefined);
+            }
             return refused(
                 502,
                 'providerRefused',
@@ -262,8 +335,18 @@ export class UpstreamPullRequestOpenService {
     }
 }
 
+/**
+ * The provider's own message, safe to keep on the record: the member's token is never
+ * echoed (belt and braces — the provider SDK does not include it), and the text is capped.
+ */
+export function redactProviderMessage(message: string, token: string | null | undefined): string {
+    let text = String(message ?? '');
+    if (token && token.length >= 4) text = text.split(token).join('[redacted]');
+    return text.slice(0, 500);
+}
+
 function refused(
-    httpStatus: 404 | 422 | 502 | 503,
+    httpStatus: 404 | 409 | 422 | 429 | 502 | 503,
     code: Extract<UpstreamPullRequestOpenResult, { status: 'refused' }>['code'],
     message: string,
 ): UpstreamPullRequestOpenResult {

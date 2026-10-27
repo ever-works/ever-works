@@ -132,6 +132,10 @@ export * from './repositories/app-launcher-preference.repository';
 // Actions hygiene, schedule, divergence, manual-sync allowance). Also
 // feature-owned and wired by the App Works module (T15), for the same reason.
 export * from './repositories/work-upstream-state.repository';
+// APW-09 Upstream pull requests — the record of every upstream pull request an App
+// Work proposes or opens. Feature-owned, wired by `UpstreamPullRequestsModule`'s own
+// `forFeature`, so it is NOT listed in `_repository-inventory.ts`.
+export * from './repositories/upstream-pull-request.repository';
 // APW-06 T17 — the per-App-Work runtime state store behind WORK_APP_RUNTIME_STATES.
 export * from './repositories/work-app-runtime-state.repository';
 // APW-07 App env & dependencies — the stored Environment values of one App Work

@@ -421,6 +421,11 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     [ActivityActionType.APP_DEPLOY]: 'deliveryWhenCompleted',
     [ActivityActionType.APP_JOB]: 'work',
     [ActivityActionType.APP_SMOKE]: 'work',
+    // APW-06 T29 (lane aw-safety) landed `app_health` without its row, which turned this spec
+    // red on develop; added by lane aw-upstream-prs. A health reading is a check on a live app,
+    // like a smoke run, so it is `work`; a degraded / unreachable reading is written FAILED and
+    // reads as a `problem` through the status rule.
+    [ActivityActionType.APP_HEALTH]: 'work',
     // APW-07 T26 (lane aw-env-smtp) — an env change is configuration work on the App Work, never a
     // delivery: the Deployment it leads to has its own `app_deploy` row.
     [ActivityActionType.APP_ENV]: 'work',
@@ -428,6 +433,11 @@ export const FEED_KIND_RULES: Readonly<Record<string, FeedKindRule>> = {
     // the App Work; the provisioning it leads to is the worker's, and a failure is a `problem`
     // through the failed-status rule.
     [ActivityActionType.APP_DEPENDENCY]: 'work',
+    // APW-09 T6 (APW09-G03) — an upstream pull request is a long-running operation that becomes a
+    // delivery record: while it is prepared or opened it reads as work, an opened, merged or closed
+    // pull request reads as delivery, and a refused / failed / expired / withdrawn one is a problem
+    // through the status rule (plan §3.4's per-event status table).
+    [ActivityActionType.APP_UPSTREAM_PR]: 'deliveryWhenCompleted',
 };
 
 /** The rule for an action type: the explicit decision, else the suffix rule, else `work`. */
