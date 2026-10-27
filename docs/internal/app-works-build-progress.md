@@ -508,6 +508,13 @@ Every slice in this programme ends with a list of things its author found and de
 
 Newest first. One line per meaningful step, with the commit sha when pushed.
 
+- **2026-10-26 · Lane A4 aw-safety, PR #2926: App Work refusals (APW-01 T9/T10), import refusal (T41), Ever ID `invalid_grant` (APW-12 C28).**
+  - T9: `app-work-guard.ts`. T10: one `assertNotAppWork` / `isAppWork` line beside each repo check (generation, schedules, comparisons, item health, community PR, visibility, item listing, the works.yml repository sync, the KB git mirror).
+  - T41: an import entry claiming `kind: 'app'` creates nothing, and an existing App Work is never overwritten; each skipped entry reports `app_kind_not_importable`.
+  - C28: the token endpoint's `invalid_grant` throws `invalidGrant` (appended to `IDENTITY_TOKEN_REJECTION_CODES`). The API answers it as `transactionInvalid`, not `503 providerUnavailable`.
+
+  **Open:** backup classification of the App Works tables (needs per-column redaction decisions); the anonymous-user cleanup cascading App Works without teardown.
+
 - **2026-10-26 · Lane A4 aw-safety, PR #2924: App health alerts (APW-06 T29), `APP_PUBLISHED_HOSTS`, `APP_HOSTS_REBUILD_REQUESTER`.** Before this, the every-minute health poll called three optional producers that nobody implemented. The relay also refused the three event names the poll really emits (`app.health.degraded/.recovered/.unreachable`; only `app.health.changed` was catalogued), so no owner was told and no Activity row was written. Fixed:
   - The three producers on `AppRuntimeNotificationProducersAdapter`, using §9.4's dedupe keys. The 6 h window and recovered-after-down rule stay the health service's own.
   - The relay catalogue now includes the three names. New `APP_HEALTH` Activity rows are written per transition.

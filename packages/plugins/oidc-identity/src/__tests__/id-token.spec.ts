@@ -395,7 +395,9 @@ describe('the accepted token (FR-11) — everything valid, and the claims the pl
 		provider.mode = 'http500';
 		const { plugin } = await pluginFor(provider);
 
-		await expectRefusal(exchange(plugin), 'providerUnavailable');
+		// The fake's `http500` mode answers `400 { error: 'invalid_grant' }`: since APW-12 C28 that
+		// refusal has its own code (it was `providerUnavailable`).
+		await expectRefusal(exchange(plugin), 'invalidGrant');
 
 		// Discovery and the key set retry once (FR-15); the token endpoint does not,
 		// because a second attempt is a second redemption of a single-use code (FR-19).
@@ -744,11 +746,48 @@ describe('FR-25 — maxAuthAgeSeconds, the one caller-supplied bound', () => {
 });
 
 describe('the provider, not the token (FR-13, FR-15, plan §5.2)', () => {
-	it('answers providerUnavailable when the token endpoint refuses the grant', async () => {
+	it('answers invalidGrant when the token endpoint refuses the grant (APW-12 C28)', async () => {
 		const key = await makeKey('key-a');
 		const provider = fakeProvider();
 		provider.keys = [key.jwk];
 		provider.mode = 'http500';
+		const { plugin } = await pluginFor(provider);
+
+		// Was `providerUnavailable` (→ 503 "Ever ID is not responding"); a refused grant is the
+		// member's stale sign-in, so it has its own code since C28.
+		await expectRefusal(exchange(plugin), 'invalidGrant');
+	});
+
+	it('keeps providerUnavailable for a token endpoint that fails without an OAuth refusal', async () => {
+		const key = await makeKey('key-a');
+		const provider = fakeProvider();
+		provider.keys = [key.jwk];
+		provider.mode = 'http500';
+		const { plugin } = await pluginFor(provider);
+		const realFetch = provider.fetch;
+		provider.fetch = async (url, init) =>
+			url === TOKEN_ENDPOINT
+				? ({ ok: false, status: 500, json: async () => ({ error: 'server_error' }) } as never)
+				: realFetch(url, init);
+		const rebuilt = await pluginFor(provider);
+
+		await expectRefusal(exchange(rebuilt.plugin), 'providerUnavailable');
+		void plugin;
+	});
+
+	it('never reads a refusal’s description text — an unknown or malformed error is providerUnavailable', async () => {
+		const key = await makeKey('key-a');
+		const provider = fakeProvider();
+		provider.keys = [key.jwk];
+		const realFetch = provider.fetch;
+		provider.fetch = async (url, init) =>
+			url === TOKEN_ENDPOINT
+				? ({
+						ok: false,
+						status: 400,
+						json: async () => ({ error: 'Invalid Grant <b>', error_description: 'secret' })
+					} as never)
+				: realFetch(url, init);
 		const { plugin } = await pluginFor(provider);
 
 		await expectRefusal(exchange(plugin), 'providerUnavailable');
@@ -942,7 +981,9 @@ describe('FR-16 — no token material reaches an error message or a log line', (
 		const serialised = JSON.stringify({ captured, logger: logger.lines });
 		const leaks = { code: serialised.includes(CODE), secret: serialised.includes(SECRET) };
 		expect(leaks).toEqual({ code: false, secret: false });
-		expect(captured).toEqual({ message: 'providerUnavailable', code: 'providerUnavailable' });
+		// The fake's `http500` mode answers `400 { error: 'invalid_grant' }`, which has its own code
+		// since APW-12 C28 (was `providerUnavailable`); the message is still the code and nothing else.
+		expect(captured).toEqual({ message: 'invalidGrant', code: 'invalidGrant' });
 	});
 });
 
