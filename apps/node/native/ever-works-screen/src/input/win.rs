@@ -7,15 +7,16 @@
 use std::mem::size_of;
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
-    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN,
-    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
-    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, SendInput,
+    GetAsyncKeyState, INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT,
+    KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MOUSEEVENTF_HWHEEL,
+    MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP,
+    MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, SendInput,
+    VK_LBUTTON, VK_MBUTTON, VK_RBUTTON,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
 use super::keys::windows_vk;
-use super::{Button, Injector};
+use super::{Button, Held, Injector, RELEASABLE_MODIFIERS};
 
 /// One wheel notch.
 const WHEEL_DELTA: i32 = 120;
@@ -133,5 +134,25 @@ impl Injector for SendInputInjector {
         } else {
             send(&inputs)
         }
+    }
+
+    fn held(&mut self) -> Result<Held, String> {
+        // The async state includes injected input. Buttons are read and released as the same
+        // (physical) buttons `SendInput` presses, so a swapped mouse needs no mapping here.
+        let down = |vk: u16| (unsafe { GetAsyncKeyState(i32::from(vk)) } as u16) & 0x8000 != 0;
+        let keys = RELEASABLE_MODIFIERS
+            .into_iter()
+            .filter(|code| windows_vk(code).is_some_and(|(vk, _)| down(vk)))
+            .collect();
+        let buttons = [
+            (VK_LBUTTON, Button::Left),
+            (VK_MBUTTON, Button::Middle),
+            (VK_RBUTTON, Button::Right),
+        ]
+        .into_iter()
+        .filter(|(vk, _)| down(*vk))
+        .map(|(_, button)| button)
+        .collect();
+        Ok(Held { keys, buttons })
     }
 }

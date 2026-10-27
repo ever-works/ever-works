@@ -8,13 +8,13 @@ use std::collections::HashMap;
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::{
     BUTTON_PRESS_EVENT, BUTTON_RELEASE_EVENT, ConnectionExt as _, KEY_PRESS_EVENT,
-    KEY_RELEASE_EVENT, MOTION_NOTIFY_EVENT, Window,
+    KEY_RELEASE_EVENT, KeyButMask, MOTION_NOTIFY_EVENT, Window,
 };
 use x11rb::protocol::xtest::ConnectionExt as _;
 use x11rb::rust_connection::RustConnection;
 
 use super::keys::x11_keysym;
-use super::{Button, Injector};
+use super::{Button, Held, Injector, RELEASABLE_MODIFIERS};
 use crate::capture::linux_session_reasons;
 
 const SHIFT_L: u32 = 0xffe1;
@@ -168,5 +168,43 @@ impl Injector for XTestInjector {
             }
         }
         Ok(())
+    }
+
+    fn held(&mut self) -> Result<Held, String> {
+        let keymap = self
+            .conn
+            .query_keymap()
+            .map_err(|error| error.to_string())?
+            .reply()
+            .map_err(|error| error.to_string())?
+            .keys;
+        let is_down = |keycode: u8| keymap[usize::from(keycode / 8)] & (1u8 << (keycode % 8)) != 0;
+        // The keycodes this injector presses for each modifier (the same keysym → keycode map).
+        let keys = RELEASABLE_MODIFIERS
+            .into_iter()
+            .filter(|code| {
+                x11_keysym(code)
+                    .and_then(|keysym| self.keymap.get(&keysym))
+                    .is_some_and(|&(keycode, _)| is_down(keycode))
+            })
+            .collect();
+        let mask = u16::from(
+            self.conn
+                .query_pointer(self.root)
+                .map_err(|error| error.to_string())?
+                .reply()
+                .map_err(|error| error.to_string())?
+                .mask,
+        );
+        let buttons = [
+            (KeyButMask::BUTTON1, Button::Left),
+            (KeyButMask::BUTTON2, Button::Middle),
+            (KeyButMask::BUTTON3, Button::Right),
+        ]
+        .into_iter()
+        .filter(|(bit, _)| mask & u16::from(*bit) != 0)
+        .map(|(_, button)| button)
+        .collect();
+        Ok(Held { keys, buttons })
     }
 }

@@ -18,6 +18,7 @@ use serde_json::Value;
 
 const MSG_START: u8 = 0x01;
 const MSG_INPUT: u8 = 0x10;
+const MSG_RELEASE_HELD: u8 = 0x12;
 const MSG_HELLO: u8 = 0x81;
 const MSG_ERROR: u8 = 0x85;
 const MSG_INPUT_RESULT: u8 = 0x87;
@@ -184,6 +185,46 @@ fn says_hello_answers_errors_refuses_input_and_exits_on_stdin_close() {
         after < Duration::from_secs(5),
         "exited {after:?} after stdin closed"
     );
+}
+
+#[test]
+fn a_fresh_helper_takes_release_held_first_and_answers_only_a_refusal() {
+    let mut helper = spawn();
+    let (kind, _) = helper.next();
+    assert_eq!(kind, MSG_HELLO);
+
+    // What a node sends a fresh helper after one died mid-control. It only ever releases:
+    // nothing is answered when it was done (or nothing was held), a refusal names why not.
+    helper.send(MSG_RELEASE_HELD, &[]);
+    // A malformed start as a marker: its `error` shows every answer to releaseHeld has arrived.
+    helper.send(
+        MSG_START,
+        br#"{"width":2,"quality":70,"maxFps":4,"keyframeMs":5000}"#,
+    );
+    let (kind, message) = helper.next();
+    if kind == MSG_INPUT_RESULT {
+        assert_eq!(message["outcome"], "refused");
+        let code = message["code"].as_str().expect("a refusal code");
+        assert!(
+            [
+                "no-display-session",
+                "wayland-unsupported",
+                "kind-unsupported",
+                "permission-accessibility",
+                "inject-failed"
+            ]
+            .contains(&code),
+            "unexpected refusal {code}"
+        );
+        let (kind, _) = helper.next();
+        assert_eq!(kind, MSG_ERROR);
+    } else {
+        assert_eq!(kind, MSG_ERROR, "only the marker's error follows");
+        assert_eq!(message["code"], "invalid");
+    }
+
+    let (code, _) = helper.close_and_wait();
+    assert_eq!(code, Some(0));
 }
 
 #[test]

@@ -7,7 +7,7 @@
 use std::ffi::c_void;
 
 use super::keys::mac_keycode;
-use super::{Button, Injector};
+use super::{Button, Held, Injector, RELEASABLE_MODIFIERS};
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -36,6 +36,8 @@ unsafe extern "C" {
     ) -> *mut c_void;
     fn CGEventKeyboardSetUnicodeString(event: *mut c_void, length: usize, string: *const u16);
     fn CGEventPost(tap: u32, event: *mut c_void);
+    fn CGEventSourceKeyState(state: i32, key: u16) -> bool;
+    fn CGEventSourceButtonState(state: i32, button: u32) -> bool;
 }
 
 #[link(name = "CoreFoundation", kind = "framework")]
@@ -44,6 +46,9 @@ unsafe extern "C" {
 }
 
 const HID_EVENT_TAP: u32 = 0;
+/// `kCGEventSourceStateCombinedSessionState` and `kCGEventSourceStateHIDSystemState`.
+const COMBINED_SESSION_STATE: i32 = 0;
+const HID_SYSTEM_STATE: i32 = 1;
 const SCROLL_UNIT_PIXEL: u32 = 0;
 const LEFT_DOWN: u32 = 1;
 const LEFT_UP: u32 = 2;
@@ -153,5 +158,26 @@ impl Injector for QuartzInjector {
             }
         }
         Ok(())
+    }
+
+    fn held(&mut self) -> Result<Held, String> {
+        // Held in either the session's combined state or the HID system's (where events are posted).
+        let key_down = |keycode: u16| unsafe {
+            CGEventSourceKeyState(COMBINED_SESSION_STATE, keycode)
+                || CGEventSourceKeyState(HID_SYSTEM_STATE, keycode)
+        };
+        let button_down = |button: Button| unsafe {
+            CGEventSourceButtonState(COMBINED_SESSION_STATE, button_number(button))
+                || CGEventSourceButtonState(HID_SYSTEM_STATE, button_number(button))
+        };
+        let keys = RELEASABLE_MODIFIERS
+            .into_iter()
+            .filter(|code| mac_keycode(code).is_some_and(key_down))
+            .collect();
+        let buttons = [Button::Left, Button::Middle, Button::Right]
+            .into_iter()
+            .filter(|button| button_down(*button))
+            .collect();
+        Ok(Held { keys, buttons })
     }
 }
