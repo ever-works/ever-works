@@ -10,6 +10,7 @@ import { WorkMemberRole, GenerateStatusType, WorkScheduleStatus } from '@src/ent
 import { WorkOwnershipService } from './work-ownership.service';
 import { normalizeGeneratorError, rethrowAsNormalized } from './utils/error.utils';
 import { assertNotRepositoryWork, isRepositoryWork } from '@src/works/repository-work-guard';
+import { isAppWork } from '@src/works/app-work-guard';
 import { workKindHasRepository } from '@ever-works/contracts';
 import { trimEdgeChars } from '@src/utils/text.utils';
 import {
@@ -609,7 +610,9 @@ export class WorkQueryService {
         // to discover that. Answer the read without the clone — a read is
         // not refused, it is simply empty.
         // EW-P2-4: a Project Work has no repository at all — same answer.
-        if (isRepositoryWork(work) || !workKindHasRepository(work.kind)) {
+        // APW-01 T10 (lane aw-safety): an App Work has no items either — `getItems` would clone a
+        // derived `<slug>-data` name nobody owns. A read, so empty rather than refused.
+        if (isRepositoryWork(work) || !workKindHasRepository(work.kind) || isAppWork(work)) {
             return { status: 'success', items: [] };
         }
 

@@ -169,24 +169,24 @@
 
 # PHASE 2 — Actions jobs
 
-- [ ] **T-22**. Service: `jobs(userId, targets)` (facade `listJobs` per watched target with ETags;
+- [x] **T-22**. Service: `jobs(userId, targets)` (facade `listJobs` per watched target with ETags;
       `diagnoseJob` from the plugin; busy count), `setWatched`, `cancelRun` (permission `actions: write`; requires `confirm: true`; audit `node.runner.job.cancel`, CONTRACTS §7),
       `checkPermission` (org).
       **Test**: extend `fleet-runners.service.spec.ts` — diagnosis per job; cancel refused outside
       `machines`; watched targets must be App-covered.
-- [ ] **T-23**. API: `GET /runners/jobs` (30 s cache), `PUT /runners/jobs/watched`,
+- [x] **T-23**. API: `GET /runners/jobs` (30 s cache), `PUT /runners/jobs/watched`,
       `POST /runners/jobs/cancel`, `GET /runners/jobs/permission`.
       **Test**: extend the controller spec; rate-limited response carries `rateLimitedUntil`.
-- [ ] **T-24**. Poll task P2: jobs + `job-unassignable` producer (5 min; cleared on start/cancel);
+- [x] **T-24**. Poll task P2: jobs + `job-unassignable` producer (5 min; cleared on start/cancel);
       rate-limit back-off.
       **Test**: extend `fleet-runners-poll.task.spec.ts`.
-- [ ] **T-25**. Web: `ActionsJobsPanel.tsx`, `ActionsJobRow.tsx`, `WatchedTargetsEditor.tsx`,
+- [x] **T-25**. Web: `ActionsJobsPanel.tsx`, `ActionsJobRow.tsx`, `WatchedTargetsEditor.tsx`,
       `GrantAccessCard.tsx`; register the Actions jobs panel on the hub Overview with FL-01's
       `registerOverviewBlock` (CONTRACTS R-37 — no seventh tab, no route); org scope in the install dialog with
       the permission check and **Grant access**; BFF under `apps/web/src/app/api/fleet/runners/jobs/**`.
       **Test**: `ActionsJobsPanel.unit.spec.tsx` (diagnosis strings; Cancel hidden outside
       `machines`; rate-limited copy), `GrantAccessCard.unit.spec.tsx`.
-- [ ] **T-26**. Tools: `fleet_runners_jobs` (readOnly), `fleet_runners_cancel_run`; MCP whitelist;
+- [x] **T-26**. Tools: `fleet_runners_jobs` (readOnly), `fleet_runners_cancel_run`; MCP whitelist;
       extend the e2e spec (unassignable job → Cancel workflow run; Grant access card).
       **Test**: tools spec; e2e green.
 
@@ -194,24 +194,24 @@
 
 # PHASE 3 — Docker-isolated runners, versions, CLI
 
-- [ ] **T-27**. Node: `runner-docker.ts` (container per runner from the official runner image pinned by
+- [x] **T-27**. Node: `runner-docker.ts` (container per runner from the official runner image pinned by
       digest, runner folder mounted, `--restart unless-stopped`; the Docker socket shared only with the
       explicit labelled option); dialog mode offered when `docker` on Linux.
       **Test**: `runner-docker.spec.ts` — no socket mount by default; argv assertions.
-- [ ] **T-28**. Version visibility: poll task compares installed version with GitHub's latest download;
+- [x] **T-28**. Version visibility: poll task compares installed version with GitHub's latest download;
       **Update available** note; reinstall action (`runner-control` `reinstall`).
       **Test**: poll spec; row renders the note.
-- [ ] **T-29**. CLI `apps/cli/src/commands/fleet/runners.ts` under FL-19's `fleet` root.
+- [x] **T-29**. CLI `apps/cli/src/commands/fleet/runners.ts` under FL-19's `fleet` root.
       **Test**: `apps/cli/src/commands/fleet/__tests__/runners.spec.ts` — `--json` shapes equal DTOs.
 
 ---
 
 # Docs & rollout
 
-- [ ] **T-30**. Finish `docs/features/fleet-actions-runners.md` (what is installed where, token
+- [x] **T-30**. Finish `docs/features/fleet-actions-runners.md` (what is installed where, token
       handling, permissions needed, diagnosis meanings, Windows service-only, Docker mode caveats).
       **Test**: `pnpm --filter ever-works-docs build` has no broken-link warning.
-- [ ] **T-31**. Update `docs/specs/features/fleet/TRACKER.md`; plugin count only in the canonical doc.
+- [x] **T-31**. Update `docs/specs/features/fleet/TRACKER.md`; plugin count only in the canonical doc.
       **Test**: the FL-18 TRACKER row shows `FLEET_ACTIONS_RUNNERS_ENABLED` and slot `1796180000000`.
 - [ ] **T-32**. `pnpm format && pnpm lint && pnpm test && pnpm build` green; banned-terms grep over
       this folder, the plugin and the docs prints nothing.

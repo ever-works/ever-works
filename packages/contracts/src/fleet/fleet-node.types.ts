@@ -43,6 +43,8 @@ import type { FleetConsents, FleetNodeLinkView } from './fleet-link.types.js';
 import type { FleetSessionDaemonReport } from './fleet-sessions.types.js';
 import type { FleetNodeOrigin, FleetNodeVirtualView } from './fleet-virtual.types.js';
 import type { FleetNodeCloudView } from './fleet-cloud.types.js';
+import type { FleetDisplayView, FleetHelperTrust, FleetNodeDesktopView } from './fleet-desktop.types.js';
+import type { FleetHelperEvent } from './fleet-helper.types.js';
 
 /**
  * App shape of a fleet node.
@@ -404,6 +406,36 @@ export interface FleetNodeSelfDescription {
 	 * `isFleetTimeZone`; an unusable value is dropped, never a 400.
 	 */
 	timeZone?: string;
+	/**
+	 * Desktop view & control (FL-07, CONTRACTS §1.1, R-8) — how far the
+	 * machine's native screen helper may be trusted: `none`, `hash-pinned`
+	 * (labelled "reduced trust") or `signed`. A wire `string`, normalised by
+	 * the platform (`normalizeFleetHelperTrust`): anything it does not know
+	 * reads `none`. Heartbeat only, in the node's newest strip tier together
+	 * with the four fields below.
+	 */
+	helperTrust?: string;
+	/**
+	 * Desktop view & control (FL-07) — the helper's state: trust, present,
+	 * admitted, version, fingerprint prefix, last verification. Shape-checked
+	 * at the edge and re-read with `normalizeFleetHelperStatus`; never a hash.
+	 */
+	helper?: Record<string, unknown>;
+	/** Desktop view & control (FL-07) — the displays the helper enumerated (`normalizeFleetDisplays`). */
+	displays?: FleetDisplayView[];
+	/**
+	 * Desktop view & control (FL-07, FR-3, FR-4) — why the Desktop source is
+	 * unavailable on this machine right now (empty when it is available);
+	 * unknown reasons are dropped by the platform, never a 400.
+	 */
+	desktopReasons?: string[];
+	/**
+	 * Desktop view & control (FL-07, FR-16, FR-19, U3) — the helper admission
+	 * events the node holds (admit, revoke, verify-failed), newest last, at
+	 * most twenty. The platform writes one `node.helper.*` audit row per event
+	 * id and remembers the ids it has written.
+	 */
+	helperEvents?: FleetHelperEvent[];
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -679,6 +711,19 @@ export interface FleetNodeView {
 	 * the source of "can a session start here".
 	 */
 	sessionDaemon?: FleetSessionDaemonReport | null;
+	/**
+	 * Desktop view & control (FL-07, CONTRACTS §4.1, R-8) — the helper trust
+	 * the machine last reported (`none` when it never did). The UI labels
+	 * `hash-pinned` "Reduced trust" on the Desktop tab, the drawer and the
+	 * Computers list (FR-17).
+	 */
+	helperTrust?: FleetHelperTrust;
+	/**
+	 * Desktop view & control (FL-07) — what the last heartbeat said about the
+	 * desktop: the helper, the displays, and why the Desktop source is not
+	 * available. Null / absent when the machine never reported it.
+	 */
+	desktop?: FleetNodeDesktopView | null;
 }
 
 /**

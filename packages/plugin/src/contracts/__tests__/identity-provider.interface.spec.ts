@@ -354,7 +354,9 @@ describe('the closed IdentityTokenRejectedError code set (APW-12 T4)', () => {
 			'badAuthorizedParty',
 			'badLogoutEvent',
 			'nonceInLogoutToken',
-			'providerUnavailable'
+			'providerUnavailable',
+			// APW-12 C28 (2026-10-26) — appended, never reordered (append-only).
+			'invalidGrant'
 		]);
 		// Closed means no duplicates either: a repeated member would make a count-based
 		// caller (the facade's per-code counter, §9.1) report one reason twice.

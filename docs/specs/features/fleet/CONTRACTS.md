@@ -191,6 +191,14 @@ overwrites the platform's resolved `pr` while the branch is unchanged; audit nam
 
 ---
 
+**Revision 23 (2026-10-26)** — FL-07 P1 (lane log `docs/internal/fleet/lanes/FL-07.md`): the `desktop` family's
+Desktop source answers `desktop.started { display, displays, fellBack, quality }` (node → platform, once, right after
+`channel.ready`) before its first `FRAME` (§3.3); `fleet_nodes.desktopFacts` (simple-json, FL-07 slot 00, beside
+`helperTrust`) stores what the heartbeat's `helper`, `displays` and `desktopReasons` said and the admission event ids
+already audited (§4.1); the eight desktop reasons are their own union (`FLEET_DESKTOP_REASONS`), leaving
+`COMPUTER_UNWATCHABLE_REASONS` unchanged for the browser source; CONTRACTS §7's `node.desktop.openUrl` is written
+`node.desktop.open-url` when it lands (the audit vocabulary is lowercase kebab) — not in P1.
+
 ## 0. Resolutions (R-1 … R-41)
 
 Rulings that settle questions more than one epic would otherwise answer differently.
@@ -397,7 +405,7 @@ state-changing requests, leave processes running), `link.resume`, and `link.drai
 | Family     | Opens with                                                                                   | Messages (JSON on the channel)                                                                                                                                                                                                                                        | Consent                      |
 | ---------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
 | `session`  | `{ sessionId, mode: 'viewer'\|'driver', kind?: 'owner'\|'agent' }`                            | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`, `session.screen`; platform→node (channel 0): `session.ack { sessionIds }`; node→platform (channel 0): `session.list { sessions[], daemon }`, `session.event` (optional `reason`, e.g. on `exited`), `session.status`, `session.attention`; node→viewer on the channel: `session.notice` (`paused · resumed · drain · slow-viewer · size · replay`) | work (Agent) / manage (owner) |
-| `desktop`  | `{ source: 'desktop'\|'browser', display?, profile?: 'agent'\|'preview', viewId, quality? }` | `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`, `desktop.openUrl`, `desktop.mode`; node→platform `desktop.stats`, `desktop.displayChanged`; input via `INPUT`                                                                         | attend                       |
+| `desktop`  | `{ source: 'desktop'\|'browser', display?, profile?: 'agent'\|'preview', viewId, quality? }` | `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`, `desktop.openUrl`, `desktop.mode`; node→platform `desktop.started`, `desktop.stats`, `desktop.displayChanged`; input via `INPUT`                                                                         | attend                       |
 | `logs`     | `{ source, path?, unit?, container?, lines, sources?[] }`                                    | `logs.read`, `logs.follow`, `logs.pause`, `logs.resume`, `logs.earlier`; node→platform `logs.initial-done`, `logs.earlier-done`, `logs.notice`. `logs.sources` is a `machine` verb (a list needs no open channel)                                                     | manage                       |
 | `machine`  | (one per link, lazily)                                                                       | `services.list\|action`, `docker.*`, `compose.*`, `processes.list\|signal`, `ports.list\|open\|preview`, `checkouts.list\|create\|delete\|sync\|changes`, `git.identity\|setIdentity`, `health.now`, `wake.send`, `vm.*`, `runner.*`                                  | manage (see §2.1 for family) |
 | `files`    | `{ root, path }`                                                                             | `files.list`, `files.stat`, `files.pack` (DATA out), `files.unpack` (DATA in), `files.delete`                                                                                                                                                                         | manage                       |
@@ -492,6 +500,7 @@ allowed values validated in code, as existing fleet columns are.
 | `macAddress`, `lanId`   | text null                                   | for wake; `lanId` identifies the network a sibling shares                                      | FL-03 |
 | `lastWakeAttemptAt`     | timestamptz null                            |                                                                                                | FL-03 |
 | `helperTrust`           | enum `none · hash-pinned · signed`          | R-8                                                                                            | FL-07 |
+| `desktopFacts`          | jsonb null                                  | the last heartbeat's `helper`, `displays`, `desktopReasons` and the audited `helperEvents` ids (revision 23) | FL-07 |
 | `timeZone`              | text null (IANA)                            | from heartbeat; schedules show both zones                                                      | FL-13 |
 | `origin`                | enum `enrolled · virtual · cloud`           | default `enrolled`                                                                             | FL-16 |
 | `hostNodeId`            | uuid null → `FleetNode`                     | virtual computers                                                                              | FL-16 |

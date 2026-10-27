@@ -113,6 +113,23 @@ export class AppRuntimeActivityListener {
         await this.write(ActivityActionType.APP_SMOKE, payload, 'app.smoke.failed');
     }
 
+    // Lane aw-safety (2026-10-26) — APW-06 T29's `APP_HEALTH` rows, one per transition the
+    // every-minute poll observes (the poll emits only on a transition, never per poll).
+    @OnEvent('app.health.degraded', { async: true })
+    async onHealthDegraded(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_HEALTH, payload, 'app.health.degraded');
+    }
+
+    @OnEvent('app.health.recovered', { async: true })
+    async onHealthRecovered(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_HEALTH, payload, 'app.health.recovered');
+    }
+
+    @OnEvent('app.health.unreachable', { async: true })
+    async onHealthUnreachable(payload: Record<string, unknown>): Promise<void> {
+        await this.write(ActivityActionType.APP_HEALTH, payload, 'app.health.unreachable');
+    }
+
     /** One row for one relayed event. */
     async write(
         actionType: ActivityActionType,
@@ -185,6 +202,8 @@ export class AppRuntimeActivityListener {
 
 function statusFor(action: string): ActivityStatus {
     if (/\.(failed|rolled_back)$/.test(action)) return ActivityStatus.FAILED;
+    // Lane aw-safety — a health transition to "down" or "unreachable" is a failure row.
+    if (/^app\.health\.(degraded|unreachable)$/.test(action)) return ActivityStatus.FAILED;
     if (action.endsWith('.started')) return ActivityStatus.IN_PROGRESS;
     if (action.endsWith('.removed') || action.endsWith('.paused')) return ActivityStatus.COMPLETED;
     return ActivityStatus.COMPLETED;
@@ -208,6 +227,19 @@ function summaryFor(
                     : 'App removed with the Work deletion';
             }
             return `Deployment ${verb.replace('_', ' ')}${metadata.code ? ` (${String(metadata.code)})` : ''}`;
+        case ActivityActionType.APP_HEALTH:
+            // Lane aw-safety — the transition in words, with the poll's code and component names.
+            return (
+                (verb === 'recovered'
+                    ? 'App is healthy again'
+                    : verb === 'unreachable'
+                      ? 'App’s cluster cannot be reached'
+                      : 'App is unhealthy') +
+                (metadata.code ? ` (${String(metadata.code)})` : '') +
+                (Array.isArray(metadata.names) && (metadata.names as string[]).length > 0
+                    ? `: ${(metadata.names as string[]).join(', ')}`
+                    : '')
+            );
         case ActivityActionType.APP_JOB:
             return `Job ${Array.isArray(metadata.names) ? (metadata.names as string[]).join(', ') : ''} ${verb}`
                 .replace(/\s+/g, ' ')

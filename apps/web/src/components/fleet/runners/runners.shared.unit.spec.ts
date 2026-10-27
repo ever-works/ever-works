@@ -1,12 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
+    FLEET_ACTIONS_JOB_DIAGNOSES,
+    FLEET_ACTIONS_MAX_WATCHED_TARGETS,
     FLEET_ACTIONS_RUNNER_PHASES,
     FLEET_ACTIONS_RUNNER_STATES,
+    type FleetActionsJobView,
     type FleetActionsRunnerTargetOption,
     type FleetActionsRunnerView,
 } from '@ever-works/contracts';
 import messages from '../../../../messages/en.json';
 import {
+    ACTIONS_JOBS_ANCHOR,
+    ACTIONS_JOB_PARAM,
+    actionsJobKey,
+    actionsJobParamValue,
+    actionsJobsHref,
+    actionsJobsPanelHasContent,
+    addWatchedTarget,
+    cancelRunDialog,
+    cancelRunRequest,
+    formatWaited,
+    isHighlightedJob,
+    jobCounts,
+    jobDiagnosisLine,
+    parseActionsJobParam,
+    removeWatchedTarget,
+    sameWatchedTarget,
+    watchableTargets,
+    watchedTargetsText,
     RUNNER_PHASE_KEYS,
     RUNNER_STATE_GLYPHS,
     clampInstallCount,
@@ -23,6 +44,11 @@ import {
     runnerActDialog,
     runnerLabelChips,
     runnerModesFor,
+    runnerReinstallAvailability,
+    runnerReinstallDialog,
+    runnerReinstallPlacement,
+    runnerUpdateAvailable,
+    RUNNER_DOCKER_SHIPPED,
     runnerStatus,
     runnersInstallHref,
     runnersThatFit,
@@ -257,8 +283,10 @@ describe('the Install dialog (spec §5.1)', () => {
         expect(runnerModesFor('windows', ['service'])).toEqual(['service']);
     });
 
-    it('never offers the container mode in P1, and only on Linux hosts that advertise it once shipped', () => {
-        expect(runnerModesFor('linux', ['service', 'docker'])).toEqual(['service']);
+    it('offers the container mode only on Linux hosts that advertise it, and only while the gate is on', () => {
+        // P3 shipped it (FR-27): on by default; with the gate off it is never offered.
+        expect(runnerModesFor('linux', ['service', 'docker'])).toEqual(['service', 'docker']);
+        expect(runnerModesFor('linux', ['service', 'docker'], false)).toEqual(['service']);
         expect(runnerModesFor('linux', ['service', 'docker'], true)).toEqual(['service', 'docker']);
         expect(runnerModesFor('darwin', ['service', 'docker'], true)).toEqual(['service']);
         expect(runnerModesFor('linux', [])).toEqual([]);
@@ -359,5 +387,291 @@ describe('the Install dialog (spec §5.1)', () => {
             mode: 'service',
             confirm: true,
         });
+    });
+});
+
+/** Actions jobs (FL-18 P2, spec §5.4, FR-20 – FR-25, T-25) — the pure decisions behind the hub panel. */
+
+const jobsMessages = (
+    messages as unknown as { fleet: { runners: { diagnosis: Record<string, string> } } }
+).fleet.runners.diagnosis;
+
+function actionsJob(overrides: Partial<FleetActionsJobView> = {}): FleetActionsJobView {
+    return {
+        repository: 'acme/api',
+        runId: 4822,
+        runNumber: 4822,
+        jobId: 1,
+        name: 'e2e · windows',
+        workflowName: 'CI',
+        labels: ['self-hosted', 'windows'],
+        status: 'queued',
+        runnerName: null,
+        startedAt: null,
+        queuedAt: null,
+        url: null,
+        diagnosis: null,
+        diagnosisDetail: null,
+        unassignable: false,
+        ...overrides,
+    };
+}
+
+describe('Actions jobs — diagnosis (FR-22)', () => {
+    it('says every diagnosis of the closed set in English, and only "waiting for" is not a problem', () => {
+        for (const diagnosis of FLEET_ACTIONS_JOB_DIAGNOSES) {
+            const line = jobDiagnosisLine(actionsJob({ diagnosis, diagnosisDetail: 'x' }));
+            expect(line).not.toBeNull();
+            expect(jobsMessages[line!.key]).toEqual(expect.any(String));
+            expect(line!.problem).toBe(diagnosis !== 'all-busy');
+        }
+        expect(jobDiagnosisLine(actionsJob({ diagnosis: null }))).toBeNull();
+    });
+
+    it('names the label, the target and the runner waited for', () => {
+        expect(
+            jobDiagnosisLine(
+                actionsJob({ diagnosis: 'missing-label', diagnosisDetail: 'windows' }),
+            ),
+        ).toEqual({
+            key: 'missingLabel',
+            values: { label: 'windows' },
+            problem: true,
+        });
+        expect(
+            jobDiagnosisLine(actionsJob({ diagnosis: 'wrong-scope', diagnosisDetail: null })),
+        ).toEqual({
+            key: 'wrongScope',
+            values: { target: 'acme/api' },
+            problem: true,
+        });
+        expect(
+            jobDiagnosisLine(actionsJob({ diagnosis: 'all-busy', diagnosisDetail: 'build-01-2' })),
+        ).toEqual({
+            key: 'waitingFor',
+            values: { runner: 'build-01-2' },
+            problem: false,
+        });
+        expect(
+            jobDiagnosisLine(actionsJob({ diagnosis: 'missing-label', diagnosisDetail: ' ' }))?.key,
+        ).toBe('missingLabelUnnamed');
+        expect(
+            jobDiagnosisLine(actionsJob({ diagnosis: 'all-busy', diagnosisDetail: null }))?.key,
+        ).toBe('waitingForAny');
+    });
+});
+
+describe('Actions jobs — the panel', () => {
+    it('counts queued and running jobs', () => {
+        expect(
+            jobCounts([
+                actionsJob(),
+                actionsJob({ status: 'in_progress' }),
+                actionsJob({ jobId: 2 }),
+            ]),
+        ).toEqual({ queued: 2, running: 1 });
+    });
+
+    it('formats how long a job has waited or run', () => {
+        const now = Date.parse('2026-10-27T10:00:00.000Z');
+        expect(formatWaited('2026-10-27T09:53:30.000Z', now)).toBe('6 min');
+        expect(formatWaited('2026-10-27T09:59:59.000Z', now)).toBe('1 min');
+        expect(formatWaited('2026-10-27T07:00:00.000Z', now)).toBe('3 h');
+        expect(formatWaited('2026-10-24T10:00:00.000Z', now)).toBe('3 d');
+        expect(formatWaited(null, now)).toBeNull();
+        expect(formatWaited('nope', now)).toBeNull();
+    });
+
+    it('shows no panel to someone with nothing to show', () => {
+        const empty = {
+            jobs: [],
+            totalRunners: 0,
+            watched: [],
+            watchedSaved: false,
+            unreadable: [],
+        };
+        expect(actionsJobsPanelHasContent(empty)).toBe(false);
+        expect(actionsJobsPanelHasContent({ ...empty, totalRunners: 1 })).toBe(true);
+        expect(actionsJobsPanelHasContent({ ...empty, watchedSaved: true })).toBe(true);
+        expect(actionsJobsPanelHasContent({ ...empty, jobs: [actionsJob()] })).toBe(true);
+    });
+
+    it('confirms Cancel workflow run with the contracts’ sentence and sends confirm: true', () => {
+        expect(cancelRunDialog(actionsJob())).toEqual({
+            class: 'confirm',
+            title: 'Cancel workflow run #4822 of acme/api?',
+            body: 'Every job in it stops. This cannot be undone.',
+        });
+        expect(cancelRunDialog(actionsJob({ runNumber: null })).title).toBe(
+            'Cancel workflow run of acme/api?',
+        );
+        expect(cancelRunRequest(actionsJob(), true)).toEqual({
+            repository: 'acme/api',
+            runId: 4822,
+            runNumber: 4822,
+            confirm: true,
+        });
+        expect(cancelRunRequest(actionsJob({ runNumber: null }), false)).toEqual({
+            repository: 'acme/api',
+            runId: 4822,
+        });
+    });
+
+    it('reads the needs-a-look item’s ?actionsJob= value and matches its run', () => {
+        const value = actionsJobParamValue('acme/api', 4822);
+        expect(value).toBe('acme/api#4822');
+        // The producer writes it with encodeURIComponent; URLSearchParams decodes it.
+        const read = new URLSearchParams(`actionsJob=${encodeURIComponent(value)}`).get(
+            ACTIONS_JOB_PARAM,
+        );
+        const parsed = parseActionsJobParam(read);
+        expect(parsed).toEqual({ repository: 'acme/api', runId: 4822 });
+        expect(isHighlightedJob(actionsJob({ repository: 'ACME/api' }), parsed)).toBe(true);
+        expect(isHighlightedJob(actionsJob({ runId: 1 }), parsed)).toBe(false);
+        expect(isHighlightedJob(actionsJob(), null)).toBe(false);
+        for (const bad of [
+            null,
+            '',
+            'acme/api',
+            '#4822',
+            'acme/api#',
+            'acme/api#x',
+            'not a repo#1',
+            'acme/api#0',
+        ]) {
+            expect(parseActionsJobParam(bad)).toBeNull();
+        }
+    });
+
+    it('opens the hub at the panel from the palette', () => {
+        expect(actionsJobsHref()).toBe(`/fleet#${ACTIONS_JOBS_ANCHOR}`);
+    });
+
+    it('keys a row by repository, run and job', () => {
+        expect(actionsJobKey(actionsJob({ repository: 'Acme/Api', jobId: 9 }))).toBe(
+            'acme/api#4822:9',
+        );
+    });
+});
+
+describe('Actions jobs — the watched list (FR-21)', () => {
+    const api = { scope: 'repo' as const, target: 'acme/api' };
+    const web = { scope: 'repo' as const, target: 'acme/web' };
+    const org = { scope: 'org' as const, target: 'acme' };
+
+    it('adds once (case-insensitively) and removes', () => {
+        expect(addWatchedTarget([api], { scope: 'repo', target: 'ACME/API' })).toEqual([api]);
+        expect(addWatchedTarget([api], web)).toEqual([api, web]);
+        expect(removeWatchedTarget([api, web], { scope: 'repo', target: 'Acme/Web' })).toEqual([
+            api,
+        ]);
+        expect(sameWatchedTarget(org, { scope: 'repo', target: 'acme' })).toBe(false);
+    });
+
+    it('stops at the most a person may watch', () => {
+        const full = Array.from({ length: FLEET_ACTIONS_MAX_WATCHED_TARGETS }, (_, index) => ({
+            scope: 'repo' as const,
+            target: `acme/r${index}`,
+        }));
+        expect(addWatchedTarget(full, web)).toHaveLength(FLEET_ACTIONS_MAX_WATCHED_TARGETS);
+    });
+
+    it('offers what the App covers and is not watched yet, repositories first', () => {
+        expect(watchableTargets([org, api, web], [api])).toEqual([web, org]);
+    });
+
+    it('names the watched list', () => {
+        expect(watchedTargetsText([api, web])).toBe('acme/api, acme/web');
+        expect(watchedTargetsText([])).toBe('');
+    });
+});
+
+/** Container-isolated runners and versions (FL-18 P3, spec FR-27, FR-28, T-27, T-28). */
+describe('P3 — the container mode (FR-27)', () => {
+    it('is shipped, offered on Linux only when the server lists it, never on Windows or macOS', () => {
+        expect(RUNNER_DOCKER_SHIPPED).toBe(true);
+        expect(runnerModesFor('linux', ['service', 'docker'])).toEqual(['service', 'docker']);
+        expect(runnerModesFor('linux', ['service'])).toEqual(['service']);
+        expect(runnerModesFor('win32', ['service', 'docker'])).toEqual(['service']);
+        expect(runnerModesFor('windows', ['service', 'docker'])).toEqual(['service']);
+        expect(runnerModesFor('darwin', ['service', 'docker'])).toEqual(['service']);
+    });
+
+    it('sends the daemon opt-in only with the container mode, exactly as ticked', () => {
+        const base = {
+            targetKey: 'repo:acme/api',
+            count: 1,
+            names: ['build-01-1'],
+            labelsText: '',
+        };
+        expect(installRequestFrom({ ...base, mode: 'docker' }, target(), [])).toMatchObject({
+            mode: 'docker',
+            shareDockerDaemon: false,
+        });
+        expect(
+            installRequestFrom({ ...base, mode: 'docker', shareDockerDaemon: true }, target(), []),
+        ).toMatchObject({ mode: 'docker', shareDockerDaemon: true });
+        expect(
+            installRequestFrom({ ...base, mode: 'service', shareDockerDaemon: true }, target(), []),
+        ).not.toHaveProperty('shareDockerDaemon');
+    });
+});
+
+describe('P3 — versions and Reinstall (FR-28)', () => {
+    it('shows "Update available" only for a newer build', () => {
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.321.0', updateAvailable: '2.322.0' })),
+        ).toBe('2.322.0');
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.322.0', updateAvailable: '2.322.0' })),
+        ).toBeNull();
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.330.0', updateAvailable: '2.322.0' })),
+        ).toBeNull();
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.321.0', updateAvailable: null })),
+        ).toBeNull();
+        expect(runnerUpdateAvailable(runner({ runnerVersion: '2.321.0' }))).toBeNull();
+        // The installed version unknown: the API's word stands.
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: null, updateAvailable: '2.322.0' })),
+        ).toBe('2.322.0');
+    });
+
+    it('offers Reinstall for idle, offline, stopped and failed runners only', () => {
+        const offered = FLEET_ACTIONS_RUNNER_STATES.filter(
+            (state) => runnerReinstallAvailability(runner({ state })) === 'enabled',
+        );
+        expect(offered).toEqual(['idle', 'offline', 'stopped', 'failed']);
+        expect(runnerReinstallAvailability(runner({ state: 'idle', phase: 'removing' }))).toBe(
+            'hidden',
+        );
+        expect(runnerReinstallAvailability(runner({ state: 'working' }))).toBe('hidden');
+        expect(
+            runnerReinstallAvailability(runner({ state: 'installing', phase: 'verifying' })),
+        ).toBe('hidden');
+    });
+
+    it('is the failed row’s Retry, in the row when an update is available, else in the ⋯ menu', () => {
+        expect(runnerReinstallPlacement(runner({ state: 'failed' }))).toBe('retry');
+        expect(
+            runnerReinstallPlacement(
+                runner({ state: 'idle', runnerVersion: '2.321.0', updateAvailable: '2.322.0' }),
+            ),
+        ).toBe('inline');
+        expect(runnerReinstallPlacement(runner({ state: 'idle' }))).toBe('menu');
+    });
+
+    it('confirms Reinstall with the contracts’ sentence, naming the newer build', () => {
+        expect(
+            runnerReinstallDialog(runner({ runnerVersion: '2.321.0', updateAvailable: '2.322.0' })),
+        ).toEqual({
+            class: 'confirm',
+            title: 'Reinstall build-01-1 with runner 2.322.0?',
+            body: 'It is deregistered, downloaded again, verified and registered with the same name and labels.',
+        });
+        expect(runnerReinstallDialog(runner({ updateAvailable: null })).title).toBe(
+            'Reinstall build-01-1?',
+        );
     });
 });

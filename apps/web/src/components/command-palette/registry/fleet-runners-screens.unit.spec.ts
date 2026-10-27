@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEnTranslator } from '../__tests__/en-translator';
-import { fleetRunnersScreens } from './screens';
+import { fleetActionsJobsScreens, fleetRunnersScreens } from './screens';
 
 /** Actions runners on computers (FL-18, spec §5.7, T-17) — "Install Actions runners on <computer>" in the palette. */
 describe('fleetRunnersScreens', () => {
@@ -21,5 +21,21 @@ describe('fleetRunnersScreens', () => {
         expect(screens[0].href).toBe('/fleet/computers/n1?runners=install');
         expect(screens[0].title(t)).toBe('Install Actions runners on build-01');
         expect(screens[0].breadcrumb?.(t).length).toBeGreaterThan(0);
+    });
+});
+
+/** Actions jobs (FL-18 P2, spec §5.7) — "Actions jobs" in the palette. */
+describe('fleetActionsJobsScreens', () => {
+    it('offers nothing while FLEET_ACTIONS_RUNNERS_ENABLED is off', () => {
+        expect(fleetActionsJobsScreens(false)).toEqual([]);
+    });
+
+    it('opens the hub’s Overview at the Actions jobs panel', () => {
+        const t = createEnTranslator();
+        const [screen, ...rest] = fleetActionsJobsScreens(true);
+        expect(rest).toEqual([]);
+        expect(screen.id).toBe('fleet.runners.jobs');
+        expect(screen.href).toBe('/fleet#fleet-actions-jobs');
+        expect(screen.title(t)).toBe('Actions jobs');
     });
 });

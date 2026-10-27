@@ -95,6 +95,10 @@ export async function createFleetCloudAction(
         acknowledgedPriceCents: request.acknowledgedPriceCents,
         ...(request.software ? { software: request.software } : {}),
         ...(request.confirm === true ? { confirm: true } : {}),
+        // P3 (FR-32): the overlay-VPN key, once, into the first-boot script; never stored.
+        ...(typeof request.vpnAuthKey === 'string' && request.vpnAuthKey.trim()
+            ? { vpnAuthKey: request.vpnAuthKey.trim() }
+            : {}),
     };
     return run(() => fleetCloudAPI.create(body));
 }

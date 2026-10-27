@@ -32,21 +32,50 @@ export class FleetActionsRunnersProposalListener {
         if (event.decidedVia !== 'user' || !event.decidedById) return;
         const payload = (event.payload ?? {}) as Record<string, unknown>;
         if (payload.kind !== FLEET_RUNNERS_ACTION_PROPOSAL_KIND) return;
-        if (payload.agentId !== event.agentId || typeof payload.nodeId !== 'string' || !payload.nodeId) {
-            this.logger.warn(`Approved runner act ${event.proposalId} names another Agent or no computer; not run`);
+        if (
+            payload.agentId !== event.agentId ||
+            typeof payload.nodeId !== 'string' ||
+            (!payload.nodeId && payload.verb !== 'cancel-run')
+        ) {
+            this.logger.warn(
+                `Approved runner act ${event.proposalId} names another Agent or no computer; not run`,
+            );
             return;
         }
         const args = (payload.args ?? {}) as Record<string, unknown>;
-        const caller = { kind: 'agent' as const, agentId: event.agentId, ownerUserId: event.userId };
+        const caller = {
+            kind: 'agent' as const,
+            agentId: event.agentId,
+            ownerUserId: event.userId,
+        };
         try {
+            if (payload.verb === 'cancel-run') {
+                // P2 (FR-23): a whole workflow run of a repository the owner's installation covers.
+                await this.runners.cancelRun(caller, {
+                    repository: args.repository,
+                    runId: args.runId,
+                    runNumber: args.runNumber,
+                    fields: { confirm: true },
+                });
+                return;
+            }
             if (payload.verb === 'install') {
                 const target = (args.target ?? {}) as { scope?: unknown; target?: unknown };
-                if (!isFleetActionsRunnerScope(target.scope) || !isFleetActionsRunnerTarget(target.scope, target.target)) {
-                    this.logger.warn(`Approved runner install ${event.proposalId} is invalid; not run`);
+                if (
+                    !isFleetActionsRunnerScope(target.scope) ||
+                    !isFleetActionsRunnerTarget(target.scope, target.target)
+                ) {
+                    this.logger.warn(
+                        `Approved runner install ${event.proposalId} is invalid; not run`,
+                    );
                     return;
                 }
-                const names = Array.isArray(args.names) ? args.names.filter((name) => isFleetActionsRunnerName(name)) : [];
-                const labels = Array.isArray(args.labels) ? args.labels.filter((label): label is string => typeof label === 'string') : [];
+                const names = Array.isArray(args.names)
+                    ? args.names.filter((name) => isFleetActionsRunnerName(name))
+                    : [];
+                const labels = Array.isArray(args.labels)
+                    ? args.labels.filter((label): label is string => typeof label === 'string')
+                    : [];
                 await this.runners.install(caller, payload.nodeId, {
                     target: { scope: target.scope, target: target.target as string },
                     count: clampFleetActionsRunnerCount(args.count),
@@ -58,19 +87,31 @@ export class FleetActionsRunnersProposalListener {
                 return;
             }
             if (typeof payload.runnerId !== 'string' || !payload.runnerId) {
-                this.logger.warn(`Approved runner act ${event.proposalId} names no runner; not run`);
+                this.logger.warn(
+                    `Approved runner act ${event.proposalId} names no runner; not run`,
+                );
                 return;
             }
-            if (payload.verb === 'stop' || payload.verb === 'restart') {
-                await this.runners.control(caller, payload.nodeId, payload.runnerId, payload.verb, { confirm: true });
+            if (
+                payload.verb === 'stop' ||
+                payload.verb === 'restart' ||
+                payload.verb === 'reinstall'
+            ) {
+                await this.runners.control(caller, payload.nodeId, payload.runnerId, payload.verb, {
+                    confirm: true,
+                });
                 return;
             }
             if (payload.verb === 'remove') {
                 if (!isFleetActionsRunnerName(args.name)) {
-                    this.logger.warn(`Approved runner remove ${event.proposalId} has no name; not run`);
+                    this.logger.warn(
+                        `Approved runner remove ${event.proposalId} has no name; not run`,
+                    );
                     return;
                 }
-                await this.runners.control(caller, payload.nodeId, payload.runnerId, 'remove', { confirmName: args.name });
+                await this.runners.control(caller, payload.nodeId, payload.runnerId, 'remove', {
+                    confirmName: args.name,
+                });
             }
         } catch (error) {
             this.logger.warn(

@@ -141,6 +141,8 @@ import {
     AppRuntimeEventRelayService,
     // APW-06 T58 / §9.8 (lane aw-safety) — the deletion's completion edge (`finishDeletion`).
     AppRuntimeDeletionService,
+    // APW-10 T27 / APW-06 T45 (lane aw-safety) — the worker's tier-eligibility re-check.
+    AppsTierEligibilityService,
 } from '@ever-works/agent/app-runtime';
 // APW-06 T71 (A0.7) — the runtime-state row and the env source the isolated App runtime worker
 // proxies by name (plan §6.4). Both read or write rows, so neither can be local in the worker.
@@ -763,6 +765,11 @@ export class TriggerInternalController implements OnModuleInit {
         // `AppRuntimePortsModule`). Appended LAST + `@Optional()` per the arity rule above.
         @Optional()
         private readonly appRuntimeDeletionService?: AppRuntimeDeletionService,
+        // APW-10 T27 / APW-06 T45 (lane aw-safety, 2026-10-26) — the worker's re-check of the
+        // managed tier's eligibility (`ConfigAppsTierPolicy` in `TriggerAppRuntimeModule`).
+        // Provided by the `@Global()` `AppsTierPolicyBindingModule`. Appended LAST + `@Optional()`.
+        @Optional()
+        private readonly appsTierEligibilityService?: AppsTierEligibilityService,
         // APW-03 T28 (lane aw-blueprints) — the `app-blueprint-apply` job's runner: the
         // worker proxies `run` by name, and the run writes the App spec state row and
         // Activity, which only this process can. A one-method facade over
@@ -1126,6 +1133,19 @@ export class TriggerInternalController implements OnModuleInit {
                                     >[1])
                                   : undefined,
                           ),
+                  }
+                : undefined,
+            // APW-10 T27 / APW-06 T45 (lane aw-safety) — a ONE-member facade: the worker may ask
+            // whether an account may run an App on the managed tier, and nothing else.
+            AppsTierEligibilityService: this.appsTierEligibilityService
+                ? {
+                      evaluate: (userId: string, opts?: { workId?: unknown }) =>
+                          this.appsTierEligibilityService!.evaluate(String(userId ?? ''), {
+                              workId:
+                                  typeof opts?.workId === 'string' && opts.workId
+                                      ? opts.workId
+                                      : null,
+                          }),
                   }
                 : undefined,
             ...(this.workProposalsApiService

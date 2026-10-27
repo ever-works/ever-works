@@ -1,0 +1,63 @@
+name: Screen Helper
+
+# Desktop view & control (FL-07) — the native screen helper crate
+# (`apps/node/native/ever-works-screen`).
+#
+# GATED OFF: `workflow_dispatch` only, never a required check. The crate was
+# written on a workstation without a Rust toolchain and has not yet been
+# compiled; this workflow is where it first is. Run it on demand:
+#   gh workflow run screen-helper.yml --ref <branch>
+# Once it is green on all three runners (and `Cargo.lock` is committed), a
+# later change may add the `stage` / `main` push trigger the job launcher's
+# workflow has — that is an owner decision, recorded in the FL-07 lane log.
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: 'Also run the reproducible release build (needs a committed Cargo.lock)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/node/native/ever-works-screen
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Show the pinned toolchain
+        run: rustup show
+
+      - name: Verify Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test
+
+      - name: Reproducible release build (Linux, macOS)
+        if: ${{ inputs.release && runner.os != 'Windows' }}
+        shell: bash
+        run: ./build-release.sh dist
+
+      - name: Reproducible release build (Windows)
+        if: ${{ inputs.release && runner.os == 'Windows' }}
+        shell: pwsh
+        run: ./build-release.ps1 -OutDir dist

@@ -31,6 +31,11 @@ deployment must also know the address a new machine enrols against: `FLEET_NODE_
 2. In **Fleet → Computers**, choose **Add computer ▾ → New cloud computer…**. With no provider connected the dialog
    says so and links to Plugins.
 
+**Or sign in instead of pasting a token.** Where the operator registered an OAuth application with the provider (see
+_Operator setup_ below), the dialog offers **Sign in with DigitalOcean**: you approve access at DigitalOcean and come
+back to the dialog, connected. A token you saved still wins over a sign-in. A sign-in lasts as long as the provider's
+token does (30 days at DigitalOcean); sign in again, or save a token, when it runs out.
+
 ## Create one
 
 The dialog lists the providers you connected (with the account they are connected to), then:
@@ -52,6 +57,13 @@ it asks the provider, tags the machine with that registration's id, and hands th
 that expires after 15 minutes; the machine reads it from a private file, enrols, and deletes it.
 
 At most **10** cloud computers per owner.
+
+### The overlay-VPN client
+
+When the operator configured an overlay-VPN client (see _Operator setup_), the software list offers it. Tick it and,
+optionally, paste a **one-time auth key**: the first-boot script installs the client and joins your network with it.
+The key is handed to the machine once, as a private file the script deletes; Ever Works never stores it, shows it
+again, logs it or writes it to an audit row. Agents and the command line cannot pass a key.
 
 ## What the page shows
 
@@ -111,6 +123,12 @@ any machine existed.
 - **Could not be created** — the provider refused (for example a droplet limit); its first line is shown, nothing bills.
 - **Gone at the provider** — destroyed outside Ever Works; it no longer bills and can be removed.
 - **Idle for N hours** and **powered off after N hours idle** — from the idle policy (above).
+- **Unclaimed machine at DigitalOcean — tagged ever-works** — once an hour Ever Works asks the provider for every
+  machine carrying its tags. A machine whose registration never learned its id is repaired in place. A machine that
+  carries **this** deployment's tags but no registration (for example, the create was given up on, then the provider
+  finished it) is added to your Fleet as **unclaimed**, with its price where the provider names its size, so you see
+  the bill and can **Destroy…** it. Machines tagged by another Ever Works deployment on the same account are never
+  touched.
 
 ## Agents, MCP and the API
 
@@ -132,6 +150,30 @@ MCP the four acts register only when the operator sets `MCP_PRIVILEGED_TOOLS=tru
 | `PUT /api/fleet/cloud/:id/idle-policy` (or `PATCH`)   | `mode` (`nothing`, `tell-me` or `power-off`) and `afterHours` (1–72) |
 | `POST /api/fleet/cloud/:id/keep-running`              | Start the idle count again                                           |
 
-## Coming next
+## From the command line
 
-Sign-in with the provider, the overlay-VPN preset, unclaimed-machine detection and the `ever-works fleet cloud` CLI.
+```bash
+ever-works fleet cloud providers
+ever-works fleet cloud options digitalocean-machines          # prices; the last column is --acknowledge-price
+ever-works fleet cloud create nyc-ops --provider digitalocean-machines --region nyc3 --size s-2vcpu-4gb \
+    --acknowledge-price 2400 --yes
+ever-works fleet cloud list
+ever-works fleet cloud usage [nyc-ops]
+ever-works fleet cloud power nyc-ops off --yes
+ever-works fleet cloud idle-policy nyc-ops power-off --after 2
+ever-works fleet cloud destroy nyc-ops --confirm-name nyc-ops
+```
+
+Every verb takes `--json` (the API's own answer in `{ ok, data }`) and exits 0 / 1 / 2. `create` without
+`--acknowledge-price` exits 2 before anything is sent.
+
+## Operator setup
+
+| Variable                                                           | What it does                                                                                                                                                                                                    |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLEET_CLOUD_ENABLED`                                              | Switches cloud computers on (default off).                                                                                                                                                                      |
+| `FLEET_NODE_API_URL`                                               | The public API origin new machines enrol against (else `PLATFORM_API_URL`). Its hash is also the deployment's site tag on every machine.                                                                        |
+| `DIGITALOCEAN_OAUTH_CLIENT_ID`, `DIGITALOCEAN_OAUTH_CLIENT_SECRET` | Offer **Sign in with DigitalOcean** (or the plugin's admin-only `clientId` / `clientSecret` settings). Register the application's redirect URI as `<app URL>/api/oauth/digitalocean-machines/callback/plugins`. |
+| `FLEET_CLOUD_OVERLAY_VPN_INSTALL_URL`                              | An `https://` script that installs your overlay-VPN client; without it the preset is not offered.                                                                                                               |
+| `FLEET_CLOUD_OVERLAY_VPN_JOIN_COMMAND`                             | The client's join command, an absolute path with a `{keyFile}` placeholder (for example `/usr/bin/vpn-client up --auth-key-file={keyFile}`); without it the client is installed but no key is accepted.         |
+| `EVER_WORKS_NODE_CLOUD_RUNTIME_SPEC`                               | Pins another node runtime than the default the bootstrap installs.                                                                                                                                              |

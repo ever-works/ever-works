@@ -365,6 +365,21 @@ describe('FL-03 producers — each fires exactly in its condition (ACC-FL03-05)'
                 ),
             ).toEqual([]);
         });
+
+        it('warns when the helper changed since it was approved (FL-07 U3), whatever the trust', () => {
+            const changed = node({
+                helperTrust: 'none',
+                desktop: { helper: null, displays: [], reasons: ['helper-untrusted'], reportedAt: null },
+            } as never);
+            expect(helperUntrustedItems([changed], CONTEXT)).toEqual([
+                expect.objectContaining({
+                    id: 'helper-untrusted:n1',
+                    severity: 'warn',
+                    kind: 'helper-untrusted',
+                    title: "design-mac's screen helper has changed since it was approved",
+                }),
+            ]);
+        });
     });
 
     it('every producer gives the same id and since on a second render of the same condition (FR-17)', () => {

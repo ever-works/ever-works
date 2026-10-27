@@ -500,6 +500,11 @@ export enum ActivityActionType {
     APP_DEPLOY = 'app_deploy',
     APP_JOB = 'app_job',
     APP_SMOKE = 'app_smoke',
+    // APW-06 T29 (lane aw-safety, 2026-10-26) — the health family: one row per relayed health
+    // transition (`app.health.degraded` / `.recovered` / `.unreachable`), written by
+    // `AppRuntimeActivityListener`. `metadata` carries the code and component names only. Additive
+    // member — `actionType` is a plain varchar.
+    APP_HEALTH = 'app_health',
     // APW-07 T26 (lane aw-env-smtp, 2026-10-18) — the Environment table's family (R-2): one row per
     // `AppEnvService.apply` call that changed anything (`app.env.changed`) and one per rotation
     // (`app.env.rotated`), written by `AppEnvActivityService`. `metadata` carries env NAMES and action

@@ -28,13 +28,21 @@ import {
     APP_HOSTS_APPS_DOMAIN,
     APP_HOSTS_DEPLOY_REQUESTER,
     APP_HOSTS_DEPLOYMENT_STORE,
+    APP_HOSTS_REBUILD_REQUESTER,
     APP_HOSTS_WORK_STORE,
     AppHostsService,
 } from './app-hosts.service';
+import { appHostsRebuildRequester, type AppBuildsRebuildLike } from './app-hosts-rebuild.requester';
+import { AppBuildsService } from '../app-builds/app-builds.service';
+import { getOptionalProvider } from '../utils/optional-provider.util';
 import { AppDomainsService } from './app-domains.service';
 import { APP_DEPLOY_HOST_SOURCE } from './app-deploy-preconditions.service';
 import { ConfigAppsTierPolicy } from '../apps-tier/config-apps-tier-policy';
 import { APPS_TIER_POLICY } from './ports';
+import {
+    APPS_TIER_ELIGIBILITY_SOURCE,
+    type AppsTierEligibilitySource,
+} from '../apps-tier/apps-tier-eligibility.port';
 import { APP_DEPLOY_DEPLOYMENT_STORE, AppDeployRequestService } from './app-deploy-request.service';
 import { AppLicenseGate } from './app-license-gate';
 import { AppLicenseModule } from '../app-license/app-license.module';
@@ -258,7 +266,16 @@ import {
         ...buildAppClusterOpDispatcherProviders(),
         AppClusterOpDispatchRelay,
         AppTargetService,
-        { provide: APPS_TIER_POLICY, useFactory: () => new ConfigAppsTierPolicy() },
+        // Lane aw-safety (2026-10-26, APW-10 T27 / APW-06 T45): the policy reads the API's
+        // `AppsTierEligibilityService` (global, `AppsTierPolicyBindingModule`) — the email, the
+        // per-owner cap and the plan. `null` when it is not in the graph: the policy then FAILS
+        // CLOSED once the tier is open, instead of admitting everyone.
+        {
+            provide: APPS_TIER_POLICY,
+            useFactory: (source?: AppsTierEligibilitySource) =>
+                new ConfigAppsTierPolicy(process.env, source ?? null),
+            inject: [{ token: APPS_TIER_ELIGIBILITY_SOURCE, optional: true }],
+        },
         // C43 / APW-06 T26 (lane aw-deploy-2) — the hosts and domains services in the API, so the
         // App branch of `DeployFacadeService`'s four domain methods is live here (the facade finds
         // `AppDomainsService` through `ModuleRef`). Neither dials a cluster: a non-primary change
@@ -283,6 +300,22 @@ import {
         {
             provide: APP_HOSTS_APPS_DOMAIN,
             useValue: { getDomain: (): string | null => config.everWorks.apps.getDomain() },
+        },
+        // Lane aw-safety (2026-10-26) — APW-05's rebuild, LAZILY (this module and `AppBuildsModule`
+        // must not import each other). Unbound before, so a primary-domain change under the
+        // `rebuild` policy answered `rebuild_unavailable` for every App Work.
+        {
+            provide: APP_HOSTS_REBUILD_REQUESTER,
+            useFactory: (moduleRef: ModuleRef, works?: WorkRepository) =>
+                appHostsRebuildRequester(
+                    () =>
+                        getOptionalProvider<AppBuildsRebuildLike>(
+                            moduleRef,
+                            AppBuildsService,
+                        ) as AppBuildsRebuildLike | undefined,
+                    works,
+                ),
+            inject: [ModuleRef, { token: WorkRepository, optional: true }],
         },
     ],
     exports: [

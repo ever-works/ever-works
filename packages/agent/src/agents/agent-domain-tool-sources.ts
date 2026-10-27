@@ -26,6 +26,7 @@ import type { NeedsALookService } from '../fleet/needs-a-look/needs-a-look.servi
 import type { FleetPortsService } from '../fleet/ports/fleet-ports.service';
 import type { FleetLogsReaderPort } from '../fleet/logs/agent-fleet-logs-tools';
 import type { FleetFilesReaderPort } from '../fleet/files/agent-fleet-files-tools';
+import type { FleetDesktopReaderPort } from '../fleet/desktop/agent-fleet-desktop-tools';
 import type { FleetGitIdentityToolPort, FleetTaskHandoffToolPort } from '../fleet/agent-fleet-task-tools';
 import type { FleetPortTunnelService } from '../fleet/ports/fleet-port-tunnel.service';
 import type { FleetOperationsToolPort, FleetStatusReaderPort, FleetWakeToolPort } from '../fleet/fleet-status';
@@ -149,7 +150,9 @@ export interface AgentFleetToolSource {
      * Actions runners on computers (FL-18) — backs `fleet_runners_*`. Optional:
      * unbound (or `FLEET_ACTIONS_RUNNERS_ENABLED` off), those tools are simply not offered.
      */
-    runners?: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'>;
+    runners?: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'> &
+        // P2: `fleet_runners_jobs` / `fleet_runners_cancel_run` are offered when the binding carries them.
+        Partial<Pick<FleetActionsRunnersService, 'actionsJobs' | 'cancelRun'>>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'
@@ -218,6 +221,16 @@ export interface AgentFleetToolSource {
      */
     files?: {
         reader: FleetFilesReaderPort;
+    };
+    /**
+     * Desktop view & control (FL-07) — when bound, the read-only
+     * `fleet_desktop_displays` tool is offered (`buildFleetDesktopTools`),
+     * reading what the machine reported through the API's desktop service (the
+     * API binds the port under `FLEET_DESKTOP_READER` while
+     * `FLEET_DESKTOP_ENABLED` is on). Unbound by default.
+     */
+    desktop?: {
+        reader: FleetDesktopReaderPort;
     };
     /**
      * FL-19 — `fleet_status` ("how is my fleet?" in one call): the API's status

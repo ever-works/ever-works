@@ -549,6 +549,90 @@ export class AppRuntimeNotificationProducersAdapter implements AppRuntimeNotific
         });
     }
 
+    // ── T29's three health producers (§9.4:1337-1339, lane aw-safety 2026-10-26) ─────────────
+    //
+    // `AppHealthService` (the every-minute `app-health-poll`) calls these through OPTIONAL members
+    // that nothing implemented, so an App could be down for hours and its owner was never told.
+    // The dedupe keys are §9.4's. The de-dup WINDOW (6 h between down notices) and "recovered only
+    // after a down notice of the same streak" are the health service's own rules
+    // (`appHealthStreaks`, `lastHealthNotifiedAt`, the shared streak handle) — these only write.
+
+    async notifyAppUnhealthy(args: {
+        userId: string;
+        workId: string;
+        failureStreakStartMs: number;
+    }): Promise<void> {
+        if (!this.writer?.create || !args?.userId || !args?.workId) return;
+        await this.writer.create({
+            userId: args.userId,
+            type: NotificationType.ERROR,
+            category: NotificationCategory.SYSTEM,
+            title: 'Your App is down',
+            message:
+                'Your App failed its health checks several times in a row. Open the Deploy tab to ' +
+                'see which component is failing.',
+            actionUrl: deployTabUrl(args.workId),
+            actionLabel: 'Open Deploy',
+            isPersistent: true,
+            deduplicationKey: `app-unhealthy:${args.workId}:${streakKey(args.failureStreakStartMs)}`,
+            metadata: {
+                eventKey: 'app_unhealthy',
+                urgent: true,
+                workId: args.workId,
+            },
+        });
+    }
+
+    async notifyAppRecovered(args: {
+        userId: string;
+        workId: string;
+        failureStreakStartMs: number;
+    }): Promise<void> {
+        if (!this.writer?.create || !args?.userId || !args?.workId) return;
+        await this.writer.create({
+            userId: args.userId,
+            type: NotificationType.SUCCESS,
+            category: NotificationCategory.SYSTEM,
+            title: 'Your App is back up',
+            message: 'Your App is passing its health checks again.',
+            actionUrl: deployTabUrl(args.workId),
+            actionLabel: 'Open Deploy',
+            deduplicationKey: `app-recovered:${args.workId}:${streakKey(args.failureStreakStartMs)}`,
+            metadata: {
+                eventKey: 'app_recovered',
+                workId: args.workId,
+            },
+        });
+    }
+
+    async notifyAppClusterUnreachable(args: {
+        userId: string;
+        workId: string;
+        unreachableStreakStartMs: number;
+    }): Promise<void> {
+        if (!this.writer?.create || !args?.userId || !args?.workId) return;
+        await this.writer.create({
+            userId: args.userId,
+            type: NotificationType.ERROR,
+            category: NotificationCategory.SYSTEM,
+            title: 'The cluster your App runs on cannot be reached',
+            message:
+                'The platform could not reach the cluster your App runs on, so its health is ' +
+                'unknown. Check the cluster connection on the Deploy tab.',
+            actionUrl: deployTabUrl(args.workId),
+            actionLabel: 'Open Deploy',
+            isPersistent: true,
+            deduplicationKey: `app-cluster-unreachable:${args.workId}:${streakKey(
+                args.unreachableStreakStartMs,
+            )}`,
+            metadata: {
+                eventKey: 'app_cluster_unreachable',
+                urgent: true,
+                workId: args.workId,
+            },
+        });
+    }
+
     async notifyAppRollbackFailed(args: {
         userId: string;
         workId: string;
@@ -578,6 +662,11 @@ export class AppRuntimeNotificationProducersAdapter implements AppRuntimeNotific
 
 function deployTabUrl(workId: string): string {
     return `/works/${encodeURIComponent(String(workId))}/deploy`;
+}
+
+/** §9.4's streak handle as a dedupe-key segment — an integer epoch ms, or `0` when unusable. */
+function streakKey(ms: number): string {
+    return Number.isFinite(ms) && ms > 0 ? String(Math.floor(ms)) : '0';
 }
 
 /* -------------------------------------------------------------------------- *
@@ -678,6 +767,12 @@ export const APP_RUNTIME_RELAYED_EVENTS: ReadonlySet<string> = new Set([
     'app.smoke.passed',
     'app.smoke.failed',
     'app.health.changed',
+    // Lane aw-safety (2026-10-26) — the three names `AppHealthService.emitTransition` REALLY emits
+    // (`APP_HEALTH_EVENT_*`). Only `app.health.changed` was catalogued, so every health transition
+    // was refused here and no health Activity row was ever written.
+    'app.health.degraded',
+    'app.health.recovered',
+    'app.health.unreachable',
     'app.dependency.ready',
     'app.dependency.failed',
     'app.dependency.removed',
@@ -857,6 +952,58 @@ export function workerAppWorkDeletionCompletion(
                     ).slice(0, 60)}).`,
                 );
             }
+        },
+    };
+}
+
+/* -------------------------------------------------------------------------- *
+ * APPS_TIER_POLICY eligibility in the worker (APW-10 T27 / APW-06 T45, lane aw-safety 2026-10-26)
+ * -------------------------------------------------------------------------- */
+
+/** The ONE member of the API's `AppsTierEligibilityService` the worker may dial. */
+export interface AppsTierEligibilityRemote {
+    evaluate(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible?: boolean; reasons?: unknown; counted?: unknown; max?: unknown } | null | undefined>;
+}
+
+/**
+ * The worker's eligibility source for its `ConfigAppsTierPolicy`: the API's
+ * `AppsTierEligibilityService.evaluate` over the internal channel (`remoteMap`), because the facts
+ * (the account, the plan, the owner's other App Works) are rows the worker cannot read.
+ *
+ * Narrow (one method, the answer rebuilt field by field). A malformed answer THROWS, and the
+ * worker's policy is built with `onSourceFailure: 'admit'` — the API already ran the authoritative
+ * check when the Deployment was requested; the worker's re-check exists to catch a concurrent
+ * Deployment, and must not refuse everything during an API/worker rollout skew.
+ */
+export function workerAppsTierEligibilitySource(remote: AppsTierEligibilityRemote): {
+    evaluate(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<{ eligible: boolean; reasons: string[]; counted?: string[]; max?: number }>;
+} {
+    return {
+        async evaluate(userId: string, opts?: { workId?: string | null }) {
+            const workId = typeof opts?.workId === 'string' && opts.workId ? opts.workId : null;
+            const answer = await remote.evaluate(String(userId ?? ''), workId ? { workId } : {});
+            if (!answer || typeof answer.eligible !== 'boolean') {
+                throw new Error('The API answered no eligibility verdict.');
+            }
+            const out: { eligible: boolean; reasons: string[]; counted?: string[]; max?: number } = {
+                eligible: answer.eligible === true,
+                reasons: Array.isArray(answer.reasons)
+                    ? answer.reasons.map((reason) => String(reason)).slice(0, 10)
+                    : [],
+            };
+            if (Array.isArray(answer.counted)) {
+                out.counted = answer.counted.map((name) => String(name)).slice(0, 20);
+            }
+            if (typeof answer.max === 'number') {
+                out.max = answer.max;
+            }
+            return out;
         },
     };
 }

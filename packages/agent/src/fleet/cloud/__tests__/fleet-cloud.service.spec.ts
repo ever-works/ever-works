@@ -197,7 +197,10 @@ describe('FleetCloudService (FL-17)', () => {
         expect(row.providerMachineRef).toBe('4242');
         expect((row.providerMeta as { phase: string }).phase).toBe('booting');
         const input = (machines.create.mock.calls[0] as unknown[])[2] as { bootstrapScript: string; tags: string[]; publicKey: string };
-        expect(input.tags).toEqual(['ever-works', `ever-works-node:${created.nodeId}`]);
+        // The two P1 tags, then (P3, FR-30) this deployment's site tag.
+        expect(input.tags.slice(0, 2)).toEqual(['ever-works', `ever-works-node:${created.nodeId}`]);
+        expect(input.tags[2]).toMatch(/^ever-works-site:[0-9a-f]{16}$/);
+        expect(input.tags).toHaveLength(3);
         expect(input.bootstrapScript.startsWith('#cloud-config')).toBe(true);
         expect(input.publicKey.startsWith('ssh-ed25519 ')).toBe(true);
         // The token is only in the bootstrap; neither the row nor any audit row carries it.

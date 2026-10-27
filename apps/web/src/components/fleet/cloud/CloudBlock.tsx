@@ -158,6 +158,14 @@ export default function CloudBlock({ nodes }: FleetOverviewBlockProps) {
             <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
                 {t('block.disclaimer', { provider: cloud.providerName })}
             </p>
+            {cloud.unclaimedAt && state !== 'gone' ? (
+                <p className="mt-1 text-xs text-warning" data-testid="fleet-cloud-block-unclaimed">
+                    {t('block.unclaimed', {
+                        provider: cloud.providerName,
+                        duration: formatSince(cloud.unclaimedAt) ?? '',
+                    })}
+                </p>
+            ) : null}
             {live && idle === 'idle' ? (
                 <p className="mt-1 flex flex-wrap items-center gap-2 text-xs" data-testid="fleet-cloud-block-idle-for">
                     <span>{t('block.idleFor', { duration: formatSince(cloud.idleSince) ?? '' })}</span>
