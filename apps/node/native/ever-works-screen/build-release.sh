@@ -3,8 +3,8 @@
 #
 # Builds twice in clean target directories and compares the SHA-256 of both
 # binaries; a mismatch fails. Writes unsigned-release-metadata.json with
-# productionEligible: false. Uploads nothing. UNVERIFIED: written on a machine
-# without a Rust toolchain (see PACKAGING.md).
+# productionEligible: false. Uploads nothing. Run by the Screen Helper workflow
+# on Linux and macOS (see PACKAGING.md).
 set -euo pipefail
 
 cd "$(dirname "$0")"

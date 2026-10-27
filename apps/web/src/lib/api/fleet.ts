@@ -247,6 +247,19 @@ export const fleetAPI = {
         });
     },
 
+    /** Desktop view & control (FL-07 P3) — record watching sessions / keep recordings for (owner only). */
+    setDesktopRecordingSettings: async (
+        nodeId: string,
+        settings: { recordWatchSessions?: boolean; recordingRetentionDays?: number },
+    ) => {
+        return serverMutation<FleetNodeView>({
+            endpoint: `${BASE}/nodes/${encodeURIComponent(nodeId)}`,
+            data: settings,
+            method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
     /** Fleet hub (FL-01) — change who may act in some action families (owner only). */
     setPolicyFamilies: async (
         nodeId: string,
