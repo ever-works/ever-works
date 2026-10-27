@@ -199,9 +199,17 @@ export function AppsCatalogBrowser({ onPick, disabled }: AppsCatalogBrowserProps
                 >
                     {state.items.map((item) => {
                         const pick = pickOfListingItem(item);
+                        // APW-10 T31 (lane aw-blueprints): Ever Works (managed) is offered only
+                        // when the API judged it `available` — a closed tier, an unverified
+                        // Blueprint or a licence it cannot host all hide it. An older API
+                        // without `managed` keeps the row's own `allowed`.
+                        const managedAvailable =
+                            item.managed !== undefined
+                                ? item.managed === 'available'
+                                : item.managedHosting.allowed;
                         const targets = [
                             item.yourCluster ? t('targetYourCluster') : null,
-                            item.managedHosting.allowed ? t('targetManaged') : null,
+                            managedAvailable ? t('targetManaged') : null,
                         ]
                             .filter(Boolean)
                             .join(' · ');
