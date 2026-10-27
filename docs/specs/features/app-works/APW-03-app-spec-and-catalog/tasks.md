@@ -887,7 +887,7 @@ _Delivers spec FR-53…FR-65._
       order (`app.blueprint.matched` → `app.blueprint.applied` → `app.spec.applied`) holds in the service-level
       integration case.
 
-- [ ] **T54 (P1, lands with T9–T10). Classify new tables for workspace backup (R-25).**
+- [x] **T54 (P1, lands with T9–T10). Classify new tables for workspace backup (R-25).** _(2026-10-27, #2964: `works/app-spec-states.jsonl`; the three `*Hash` digests were already benign.)_
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain:
       `{ file: 'app-spec-states.jsonl', entity: 'WorkAppSpecState', scope: { by: 'parent', column: 'workId', from: 'workIds' } }`.
       **Modify** `packages/agent/src/account-transfer/backup/redaction.ts` — add `headSpecHash`, `effectiveSpecHash` and

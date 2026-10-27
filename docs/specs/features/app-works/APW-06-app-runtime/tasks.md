@@ -1045,7 +1045,7 @@ _Delivers FR-7 (scope `any`), FR-52, FR-53._
       `pnpm --filter ever-works-web test:e2e flow-app-deploy-domains` are green and non-app Works render
       `SubdomainManagement` unchanged.
 
-- [ ] **T65 (P1, lands with T16–T18). Classify new tables for workspace backup (R-25).**
+- [x] **T65 (P1, lands with T16–T18). Classify new tables for workspace backup (R-25).** _(2026-10-27, #2964: `works/app-runtime-states.jsonl`, nothing redacted.)_
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain:
       `{ file: 'app-runtime-states.jsonl', entity: 'WorkAppRuntimeState', scope: { by: 'parent', column: 'workId', from: 'workIds' } }`.
       `packages/agent/src/account-transfer/backup/redaction.ts` is **not** modified: `WorkAppRuntimeState` holds no

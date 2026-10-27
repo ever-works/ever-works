@@ -56,7 +56,7 @@ export class WorkCostController {
     async cost(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
-        @Query('month') month?: string,
+        @Query('month') month?: unknown,
     ): Promise<WorkCostRollup> {
         await this.authorize(id, auth.userId);
         const window = monthWindow(month);
@@ -103,15 +103,21 @@ export class WorkCostController {
     }
 }
 
-/** The UTC month `month` names (default: this month), or a `400 invalidMonth`. */
+/**
+ * The UTC month `month` names (default: this month), or a `400 invalidMonth`.
+ *
+ * `month` is typed `unknown` on purpose: a repeated query parameter (`?month=a&month=b`) arrives
+ * as an ARRAY, and `['2026-09']` stringifies to a value the pattern accepts. Only a string is a
+ * month; anything else is refused before the pattern is consulted.
+ */
 export function monthWindow(
-    month?: string,
+    month?: unknown,
     now: Date = new Date(),
 ): { label: string; start: Date; end: Date } {
     let year = now.getUTCFullYear();
     let index = now.getUTCMonth();
     if (month !== undefined && month !== '') {
-        if (!WORK_COST_MONTH_PATTERN.test(month)) {
+        if (typeof month !== 'string' || !WORK_COST_MONTH_PATTERN.test(month)) {
             throw new HttpException(
                 { status: 'error', code: 'invalidMonth', message: 'month must be YYYY-MM.' },
                 HttpStatus.BAD_REQUEST,

@@ -110,7 +110,16 @@ describe('WorkCostController (APW-08 T56)', () => {
     });
 
     it('a malformed month is a 400 invalidMonth', () => {
-        for (const bad of ['2026-13', '2026-1', 'september', '2026-09-01']) {
+        // A repeated parameter arrives as an array; `['2026-09']` stringifies to a valid month.
+        for (const bad of [
+            '2026-13',
+            '2026-1',
+            'september',
+            '2026-09-01',
+            ['2026-09'],
+            ['2026-09', 'x'],
+            202609,
+        ]) {
             let refusal: unknown;
             try {
                 monthWindow(bad);

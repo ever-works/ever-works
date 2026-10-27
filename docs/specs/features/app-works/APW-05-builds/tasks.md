@@ -759,7 +759,7 @@ BuildDetailDrawer` are green.
 
 # Cross-phase closing tasks
 
-- [ ] **T38. Telemetry.**
+- [x] **T38. Telemetry.** _(2026-10-27, lane aw-builds-bindings: `app-builds.telemetry.ts`, the eleven events over APW-01's sink; `app_build_webhook` has no emitter until T19a.)_
       **Create** `packages/agent/src/app-builds/app-builds.telemetry.ts` emitting the events in [plan §9.1](./plan.md)
       through APW-01 T36's pattern: an `@Optional()` sink token bound by the API — reuse `APP_WORKS_TELEMETRY_SINK` /
       `AppWorksTelemetryService` (`packages/agent/src/app-works/app-works-telemetry.service.ts`) rather than importing
@@ -880,7 +880,7 @@ suggestion }` templates with `{param}` placeholders equal to plan §8's `failure
       **Done when**: `pnpm --filter @ever-works/agent test -- app-build-failure-copy` and `pnpm --filter ever-works-web test --
       app-build-failure-copy.parity` are green.
 
-- [ ] **T45 (P1, lands with T4–T5; recheck with T34). Classify new tables for workspace backup (R-25).**
+- [x] **T45 (P1, lands with T4–T5; recheck with T34). Classify new tables for workspace backup (R-25).** _(2026-10-27, #2964: `builds.jsonl` + `build-preparations.jsonl`, `buildInputsHash` dropped on both; `failureDetail`, `verificationResult`, `repositoryBlock` reviewed per entity.)_
       **Modify** `packages/agent/src/account-transfer/backup/collectors/domain-specs.ts` — append to the `works` domain:
       `{ file: 'builds.jsonl', entity: 'WorkBuild', scope: { by: 'parent', column: 'workId', from: 'workIds' } }` **and**
       `{ file: 'build-preparations.jsonl', entity: 'WorkBuildPreparation', scope: { by: 'parent', column: 'workId', from:
