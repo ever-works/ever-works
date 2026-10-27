@@ -121,6 +121,15 @@ export class ComputerSessionRepository {
         return this.repository.findOne({ where: { id, userId, agentId } });
     }
 
+    /**
+     * A Desktop-source view (FL-07 P2), by the person who opened it — who may
+     * be an Organization member in the computer's `desktop` audience rather
+     * than its owner. A foreign id resolves to null, exactly like an unknown one.
+     */
+    async findDesktopViewFor(id: string, openedByUserId: string): Promise<ComputerSession | null> {
+        return this.repository.findOne({ where: { id, openedByUserId, source: 'desktop', agentId: IsNull() } });
+    }
+
     /** Node-scoped: the only read a node credential buys. */
     async findForNode(id: string, nodeId: string): Promise<ComputerSession | null> {
         return this.repository.findOne({ where: { id, nodeId } });

@@ -63,7 +63,22 @@ export interface ComputerControlActor {
     userId: string;
     agentId: string;
     sessionId: string;
+    /**
+     * Desktop view & control (FL-07 P2): `desktop` for a Desktop-source view —
+     * a `computer_sessions` row with no Agent, opened by `userId` (who may be
+     * an Organization member in the computer's `desktop` audience, not its
+     * owner). Its row is found by who opened it instead of by owner + Agent;
+     * every other rule (one lock per machine, the `desktop` audience, the idle
+     * and ceiling releases, request and hand-over) is the same.
+     */
+    source?: 'desktop';
 }
+
+/** The fleet audit action a desktop view's control act writes (CONTRACTS §7), instead of `computer.*`. */
+type DesktopControlAuditAction =
+    | 'node.desktop.control.take'
+    | 'node.desktop.control.release'
+    | 'node.desktop.control.request';
 
 export type ComputerControlOutcome =
     | { state: ComputerControlStateView }
@@ -169,11 +184,7 @@ export class ComputerControlArbiter {
 
     /** Control as `actor`'s view sees it. Null when the view is not theirs. */
     async getState(actor: ComputerControlActor): Promise<ComputerControlStateView | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -186,11 +197,7 @@ export class ComputerControlArbiter {
 
     /** Take control of the machine from `actor`'s view. */
     async take(actor: ComputerControlActor): Promise<ComputerControlOutcome | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -228,11 +235,7 @@ export class ComputerControlArbiter {
 
     /** Give control back from `actor`'s view. Idempotent: a view that does not hold it has nothing to give back. */
     async giveBack(actor: ComputerControlActor): Promise<ComputerControlOutcome | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -245,11 +248,7 @@ export class ComputerControlArbiter {
 
     /** Ask whoever holds the machine to hand control over to `actor`'s view. */
     async request(actor: ComputerControlActor): Promise<ComputerControlOutcome | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -288,6 +287,12 @@ export class ComputerControlArbiter {
                 current.controlHolderSessionId ? 'already-requested' : 'not-held',
                 current,
             );
+        if (ControlArbiterDesktop.is(session)) {
+            await this.auditDesktop(session, 'node.desktop.control.request', actor.userId, lock.userId, {
+                outcome: 'requested',
+                holderSessionId: holder,
+            });
+        }
         return { state: await this.view(session.id, actor.userId, current, now) };
     }
 
@@ -297,11 +302,7 @@ export class ComputerControlArbiter {
         requestId: string,
         decision: ComputerControlDecision,
     ): Promise<ComputerControlOutcome | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -356,11 +357,7 @@ export class ComputerControlArbiter {
 
     /** "Keep control" on the idle warning: push the idle deadline from `actor`'s holding view. */
     async keep(actor: ComputerControlActor): Promise<ComputerControlOutcome | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -386,11 +383,7 @@ export class ComputerControlArbiter {
 
     /** Extend the current stretch of control, once. */
     async extend(actor: ComputerControlActor): Promise<ComputerControlOutcome | null> {
-        const session = await this.sessions.findForOwner(
-            actor.sessionId,
-            actor.userId,
-            actor.agentId,
-        );
+        const session = await this.findActorSession(actor);
         if (!session) return null;
         const now = this.clock();
         const lock = await this.settle(session, now);
@@ -484,6 +477,45 @@ export class ComputerControlArbiter {
     // ── Internals ─────────────────────────────────────────────────────────
 
     /**
+     * The row an act is made from: an Agent's view by its owner and Agent (as
+     * always), a Desktop view by the person who opened it (FL-07 P2).
+     */
+    private findActorSession(actor: ComputerControlActor): Promise<ComputerSession | null> {
+        if (actor.source === 'desktop') {
+            return this.sessions.findDesktopViewFor(actor.sessionId, actor.userId);
+        }
+        return this.sessions.findForOwner(actor.sessionId, actor.userId, actor.agentId);
+    }
+
+    /**
+     * A Desktop view's control row (CONTRACTS §2.3, §7): `family: 'desktop'`,
+     * the view as `target`, who asked, the confirmation class (`confirm` for a
+     * take — the person confirmed it in the view), the outcome.
+     */
+    private async auditDesktop(
+        session: ComputerSession,
+        action: DesktopControlAuditAction,
+        actorUserId: string | null,
+        ownerUserId: string,
+        extra: Record<string, unknown>,
+    ): Promise<void> {
+        await this.audit?.tryRecord({
+            action,
+            actorUserId,
+            ownerUserId,
+            nodeId: session.nodeId,
+            details: {
+                family: 'desktop',
+                target: session.id,
+                source: 'desktop',
+                requestedBy: actorUserId ? `user:${actorUserId}` : 'system:control-arbiter',
+                confirmationClass: action === 'node.desktop.control.take' ? 'confirm' : 'plain',
+                ...extra,
+            },
+        });
+    }
+
+    /**
      * Read the machine's lock and settle whatever has already expired: a hold
      * past its ceiling, idle deadline or acknowledgement floor, a hold whose
      * view has ended, and a request that declined on its own or whose view
@@ -570,17 +602,25 @@ export class ComputerControlArbiter {
         if (session) {
             await this.writeSpans(session, closeSpan(session.controlSpans, now, reason));
         }
-        await this.audit?.tryRecord({
-            action: 'computer.control-release',
-            actorUserId,
-            ownerUserId: lock.userId,
-            nodeId: lock.id,
-            details: computerAuditDetails('computer.control-release', {
-                sessionId,
+        if (session && ControlArbiterDesktop.is(session)) {
+            await this.auditDesktop(session, 'node.desktop.control.release', actorUserId, lock.userId, {
+                outcome: 'released',
                 releaseReason: reason,
                 heldMs,
-            }),
-        });
+            });
+        } else {
+            await this.audit?.tryRecord({
+                action: 'computer.control-release',
+                actorUserId,
+                ownerUserId: lock.userId,
+                nodeId: lock.id,
+                details: computerAuditDetails('computer.control-release', {
+                    sessionId,
+                    releaseReason: reason,
+                    heldMs,
+                }),
+            });
+        }
         this.emit({
             nodeId: lock.id,
             sessionId,
@@ -602,16 +642,23 @@ export class ComputerControlArbiter {
     ): Promise<void> {
         const holderUserId = lock.controlHolderUserId ?? actorUserId;
         await this.writeSpans(session, openSpan(session.controlSpans, holderUserId, now));
-        await this.audit?.tryRecord({
-            action: 'computer.control-grant',
-            actorUserId,
-            ownerUserId: lock.userId,
-            nodeId: lock.id,
-            details: computerAuditDetails('computer.control-grant', {
-                sessionId: session.id,
-                agentId: session.agentId,
-            }),
-        });
+        if (ControlArbiterDesktop.is(session)) {
+            await this.auditDesktop(session, 'node.desktop.control.take', actorUserId, lock.userId, {
+                outcome: 'granted',
+                holderUserId,
+            });
+        } else {
+            await this.audit?.tryRecord({
+                action: 'computer.control-grant',
+                actorUserId,
+                ownerUserId: lock.userId,
+                nodeId: lock.id,
+                details: computerAuditDetails('computer.control-grant', {
+                    sessionId: session.id,
+                    agentId: session.agentId,
+                }),
+            });
+        }
         this.emitHeld(session, actorUserId, lock);
     }
 
@@ -638,6 +685,14 @@ export class ComputerControlArbiter {
         actorUserId: string,
         lock: ComputerControlLockRow,
     ): Promise<void> {
+        if (ControlArbiterDesktop.is(session)) {
+            await this.auditDesktop(session, 'node.desktop.control.take', actorUserId, lock.userId, {
+                outcome: 'refused',
+                policy: this.desktopPolicy(lock),
+                holderPresent: Boolean(lock.controlHolderSessionId),
+            });
+            return;
+        }
         await this.audit?.tryRecord({
             action: 'computer.control-refused',
             actorUserId,
@@ -807,3 +862,10 @@ function lastClosedSpan(
     const last = spans[spans.length - 1];
     return last.endedAt ? last : null;
 }
+
+/** Desktop view & control (FL-07 P2): is this row a Desktop-source view? */
+const ControlArbiterDesktop = {
+    is(session: Pick<ComputerSession, 'source'> | null | undefined): boolean {
+        return session?.source === 'desktop';
+    },
+};

@@ -1,6 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
-import { COMPUTER_QUALITIES, type ComputerQuality } from '@ever-works/contracts';
+import { IsBoolean, IsIn, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import {
+    COMPUTER_CONTROL_DECISIONS,
+    COMPUTER_QUALITIES,
+    type ComputerControlDecision,
+    type ComputerQuality,
+} from '@ever-works/contracts';
 
 /** A display id the contracts accept (`isFleetDisplayId`). */
 const DISPLAY_ID = /^[A-Za-z0-9._:-]{1,64}$/;
@@ -41,4 +46,31 @@ export class UpdateFleetDesktopViewDto {
     @IsOptional()
     @IsIn([...COMPUTER_QUALITIES])
     quality?: ComputerQuality;
+}
+
+/** `POST …/views/:viewId/control` (FL-07 P2): take control (`confirm: true`), or ask for it (`request: true`). */
+export class FleetDesktopControlDto {
+    @ApiProperty({ required: false, description: 'Ask whoever holds control to hand it over, instead of taking it.' })
+    @IsOptional()
+    @IsBoolean()
+    request?: boolean;
+
+    @ApiProperty({
+        required: false,
+        description: 'CONTRACTS §2.2 class `confirm`: without it a take answers 409 `confirmation_required`.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    confirm?: boolean;
+}
+
+/** `POST …/views/:viewId/control/handover`: the holding view answers a request. */
+export class AnswerFleetDesktopControlDto {
+    @ApiProperty({ format: 'uuid', description: 'The requesting view (the request id the control state names).' })
+    @IsUUID()
+    requestId!: string;
+
+    @ApiProperty({ enum: COMPUTER_CONTROL_DECISIONS })
+    @IsIn([...COMPUTER_CONTROL_DECISIONS])
+    decision!: ComputerControlDecision;
 }

@@ -339,6 +339,14 @@ export function createDesktopSourceOpener(options: DesktopSourceOptions): Deskto
 							});
 							return;
 						case FLEET_DESKTOP_MESSAGES.setDisplay: {
+							// A controller's socket may send any JSON; a display switch goes through the
+							// platform (`PATCH …/views/:viewId`, audited `node.desktop.display.set`).
+							if (controlling) {
+								reply(message.requestId, {
+									error: makeFleetLinkError('invalid', 'switch the display from the view’s display picker')
+								});
+								return;
+							}
 							if (!isFleetDisplayId(message.display)) {
 								reply(message.requestId, { error: makeFleetLinkError('invalid', 'display') });
 								return;

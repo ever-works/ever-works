@@ -17,14 +17,15 @@
 //! | 0x04 | node → helper  | `refresh`      | —                                                |
 //! | 0x05 | node → helper  | `quality`      | JSON `{ width, quality, maxFps, keyframeMs }`    |
 //! | 0x06 | node → helper  | `listDisplays` | —                                                |
-//! | 0x10 | node → helper  | `input`        | reserved for control (P2)                        |
-//! | 0x11 | node → helper  | `releaseAll`   | reserved for control (P2)                        |
-//! | 0x81 | helper → node  | `hello`        | JSON `{ protocol, version, platform, reasons, displays }` |
+//! | 0x10 | node → helper  | `input`        | JSON input frame + `pictureWidth`, `pictureHeight` |
+//! | 0x11 | node → helper  | `releaseAll`   | — (let go of every pressed key and button)       |
+//! | 0x81 | helper → node  | `hello`        | JSON `{ protocol, version, platform, reasons, displays, inputReasons }` |
 //! | 0x82 | helper → node  | `frame`        | `[width u16][height u16][JPEG]` — a keyframe     |
 //! | 0x83 | helper → node  | `tiles`        | the contracts `TILES` payload, verbatim          |
 //! | 0x84 | helper → node  | `displays`     | JSON `{ displays, fallback? }`                   |
 //! | 0x85 | helper → node  | `error`        | JSON `{ code, message }`                         |
 //! | 0x86 | helper → node  | `started`      | JSON `{ display, displays, fellBack }`           |
+//! | 0x87 | helper → node  | `inputResult`  | JSON `{ outcome, code }` — only for an input that was not injected |
 //!
 //! Decoding never panics: every malformed message is an `Err`.
 
@@ -56,6 +57,7 @@ pub const MSG_TILES: u8 = 0x83;
 pub const MSG_DISPLAYS: u8 = 0x84;
 pub const MSG_ERROR: u8 = 0x85;
 pub const MSG_STARTED: u8 = 0x86;
+pub const MSG_INPUT_RESULT: u8 = 0x87;
 
 /// Bounds a stream setting must respect (the platform's presets live well inside them).
 pub const MIN_WIDTH: u32 = 16;
@@ -87,8 +89,8 @@ pub enum Command {
     Refresh,
     Quality(StreamSettings),
     ListDisplays,
-    /// Control arrives in P2; the helper answers `error unsupported` until then.
-    Input,
+    /// One input (JSON: the contracts' input frame + the picture size), P2 control.
+    Input(Vec<u8>),
     ReleaseAll,
 }
 
@@ -205,7 +207,12 @@ pub fn decode_command(kind: u8, payload: &[u8]) -> Result<Command, DecodeError> 
             )?))
         }
         MSG_LIST_DISPLAYS => empty(payload, Command::ListDisplays),
-        MSG_INPUT => Ok(Command::Input),
+        MSG_INPUT => {
+            if payload.is_empty() || payload.len() > 16 * 1024 {
+                return Err(DecodeError::BadPayload("input"));
+            }
+            Ok(Command::Input(payload.to_vec()))
+        }
         MSG_RELEASE_ALL => empty(payload, Command::ReleaseAll),
         other => Err(DecodeError::UnknownType(other)),
     }
@@ -343,6 +350,15 @@ mod tests {
         assert!(read_message(&mut &empty[..], MAX_INBOUND_BYTES).is_err());
         let truncated = [0u8, 0];
         assert!(read_message(&mut &truncated[..], MAX_INBOUND_BYTES).is_err());
+    }
+
+    #[test]
+    fn carries_an_input_payload_and_bounds_it() {
+        let text = br#"{"kind":"text","text":"a"}"#;
+        assert_eq!(decode_command(MSG_INPUT, text).unwrap(), Command::Input(text.to_vec()));
+        assert!(decode_command(MSG_INPUT, &[]).is_err());
+        assert!(decode_command(MSG_INPUT, &vec![b'x'; 16 * 1024 + 1]).is_err());
+        assert_eq!(decode_command(MSG_RELEASE_ALL, &[]).unwrap(), Command::ReleaseAll);
     }
 
     #[test]
