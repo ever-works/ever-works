@@ -981,7 +981,9 @@ describe('FR-16 — no token material reaches an error message or a log line', (
 		const serialised = JSON.stringify({ captured, logger: logger.lines });
 		const leaks = { code: serialised.includes(CODE), secret: serialised.includes(SECRET) };
 		expect(leaks).toEqual({ code: false, secret: false });
-		expect(captured).toEqual({ message: 'providerUnavailable', code: 'providerUnavailable' });
+		// The fake's `http500` mode answers `400 { error: 'invalid_grant' }`, which has its own code
+		// since APW-12 C28 (was `providerUnavailable`); the message is still the code and nothing else.
+		expect(captured).toEqual({ message: 'invalidGrant', code: 'invalidGrant' });
 	});
 });
 
