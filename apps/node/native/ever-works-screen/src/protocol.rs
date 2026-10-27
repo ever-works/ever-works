@@ -19,8 +19,9 @@
 //! | 0x06 | node → helper  | `listDisplays` | —                                                |
 //! | 0x10 | node → helper  | `input`        | JSON input frame + `pictureWidth`, `pictureHeight` |
 //! | 0x11 | node → helper  | `releaseAll`   | — (let go of every pressed key and button)       |
+//! | 0x13 | node → helper  | `controlMarker`| JSON `{ visible }` — show the border while the stream is controlled |
 //! | 0x12 | node → helper  | `releaseHeld`  | — (let go of every modifier and button the OS reports held; sent to a fresh helper after a crash during control) |
-//! | 0x81 | helper → node  | `hello`        | JSON `{ protocol, version, platform, reasons, displays, inputReasons }` |
+//! | 0x81 | helper → node  | `hello`        | JSON `{ protocol, version, platform, reasons, displays, inputReasons, features }` |
 //! | 0x82 | helper → node  | `frame`        | `[width u16][height u16][JPEG]` — a keyframe     |
 //! | 0x83 | helper → node  | `tiles`        | the contracts `TILES` payload, verbatim          |
 //! | 0x84 | helper → node  | `displays`     | JSON `{ displays, fallback? }`                   |
@@ -52,6 +53,7 @@ pub const MSG_LIST_DISPLAYS: u8 = 0x06;
 pub const MSG_INPUT: u8 = 0x10;
 pub const MSG_RELEASE_ALL: u8 = 0x11;
 pub const MSG_RELEASE_HELD: u8 = 0x12;
+pub const MSG_CONTROL_MARKER: u8 = 0x13;
 
 pub const MSG_HELLO: u8 = 0x81;
 pub const MSG_FRAME: u8 = 0x82;
@@ -96,6 +98,8 @@ pub enum Command {
     ReleaseAll,
     /// Owner question 14: release every modifier and button the OS reports held.
     ReleaseHeld,
+    /// Owner question 10: show (true) or hide the controlled-machine marker.
+    ControlMarker(bool),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -131,6 +135,12 @@ struct QualityJson {
     quality: u8,
     max_fps: u32,
     keyframe_ms: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MarkerJson {
+    visible: bool,
 }
 
 #[derive(Deserialize)]
@@ -219,6 +229,11 @@ pub fn decode_command(kind: u8, payload: &[u8]) -> Result<Command, DecodeError> 
         }
         MSG_RELEASE_ALL => empty(payload, Command::ReleaseAll),
         MSG_RELEASE_HELD => empty(payload, Command::ReleaseHeld),
+        MSG_CONTROL_MARKER => {
+            let json: MarkerJson = serde_json::from_slice(payload)
+                .map_err(|_| DecodeError::BadPayload("controlMarker"))?;
+            Ok(Command::ControlMarker(json.visible))
+        }
         other => Err(DecodeError::UnknownType(other)),
     }
 }
@@ -387,6 +402,13 @@ mod tests {
             Command::ReleaseHeld
         );
         assert!(decode_command(MSG_RELEASE_HELD, &[0]).is_err());
+        assert_eq!(
+            decode_command(MSG_CONTROL_MARKER, br#"{"visible":true}"#).unwrap(),
+            Command::ControlMarker(true)
+        );
+        assert!(decode_command(MSG_CONTROL_MARKER, br#"{"visible":1}"#).is_err());
+        assert!(decode_command(MSG_CONTROL_MARKER, br#"{"visible":true,"text":"x"}"#).is_err());
+        assert!(decode_command(MSG_CONTROL_MARKER, &[]).is_err());
     }
 
     #[test]

@@ -30,9 +30,16 @@
 //! helper `releaseHeld` before anything else, which lets go of every modifier
 //! key and mouse button the OS reports held; and a helper that panics after
 //! injecting anything does the same from its panic hook before it aborts.
+//!
+//! While the node says a stream is in controlling mode (`controlMarker`, owner
+//! question 10), the helper draws a border around the controlled display so
+//! the person at the machine sees it is being driven (`marker/`).
 
 mod capture;
 mod input;
+// macOS draws no marker yet: its geometry and colour go unused there.
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+mod marker;
 mod protocol;
 mod scale;
 mod tiles;
@@ -45,8 +52,9 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
-use capture::{Capturer, Display};
+use capture::{Capturer, Display, DisplayRect};
 use input::{Injector, InputFrame, InputOutcome, InputState};
+use marker::Marker;
 use protocol::{
     Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED,
     MSG_TILES, PROTOCOL_VERSION, StartRequest, StreamSettings,
@@ -178,6 +186,23 @@ struct Helper<W: Write> {
     /// Why the injector could not be opened, once that was tried.
     injector_refused: Option<&'static str>,
     pressed: InputState,
+    /// Owner question 10: the node asked for the marker (a stream in controlling mode).
+    marker_wanted: bool,
+    /// The marker, opened the first time it is wanted.
+    marker: Option<Box<dyn Marker>>,
+    /// The marker could not be opened here (it is not tried again).
+    marker_failed: bool,
+    /// Where the marker is shown now; None while it is hidden.
+    marker_at: Option<DisplayRect>,
+}
+
+/// What this helper can do beyond protocol 1's first messages (`hello.features`).
+fn features() -> Vec<&'static str> {
+    let mut features = vec!["releaseHeld"];
+    if marker::supported() {
+        features.push("controlMarker");
+    }
+    features
 }
 
 fn run() -> io::Result<()> {
@@ -196,6 +221,10 @@ fn run() -> io::Result<()> {
         injector: None,
         injector_refused: None,
         pressed: InputState::default(),
+        marker_wanted: false,
+        marker: None,
+        marker_failed: false,
+        marker_at: None,
     };
     helper.refresh_displays();
     helper.out.json(
@@ -208,6 +237,8 @@ fn run() -> io::Result<()> {
             "displays": helper.displays,
             // P2: what would stop input, known without opening anything (macOS Accessibility).
             "inputReasons": input::probe(),
+            // What the node may ask beyond the first messages (an older helper sends none).
+            "features": features(),
         }),
     )?;
     loop {
@@ -225,9 +256,11 @@ fn run() -> io::Result<()> {
             Ok(Inbound::Closed) | Err(RecvTimeoutError::Disconnected) => break,
             Err(RecvTimeoutError::Timeout) => {}
         }
+        helper.sync_marker(false);
         if helper.session.is_some() {
             if helper.last_display_check.elapsed() >= DISPLAY_CHECK_EVERY {
                 helper.check_displays()?;
+                helper.sync_marker(true);
             }
             let due = helper
                 .session
@@ -242,6 +275,9 @@ fn run() -> io::Result<()> {
     // Never leave a key or a button held on the machine (FR-39).
     helper.release_all();
     helper.session = None;
+    helper.marker_wanted = false;
+    helper.sync_marker(false);
+    helper.marker = None;
     Ok(())
 }
 
@@ -294,6 +330,52 @@ impl<W: Write> Helper<W> {
                 Ok(())
             }
             Command::ReleaseHeld => self.release_held(),
+            Command::ControlMarker(visible) => {
+                self.marker_wanted = visible;
+                Ok(())
+            }
+        }
+    }
+
+    /// Show the marker around the streamed display while it is wanted and a stream runs;
+    /// hide it otherwise. `raise` puts a shown marker back on top (windows raised since).
+    fn sync_marker(&mut self, raise: bool) {
+        let target = if self.marker_wanted {
+            let display = self.session.as_ref().map(|session| session.display.clone());
+            display.and_then(|display| {
+                self.capturer
+                    .as_mut()
+                    .and_then(|capturer| capturer.display_rect(&display))
+            })
+        } else {
+            None
+        };
+        if target == self.marker_at {
+            if raise
+                && target.is_some()
+                && let Some(marker) = self.marker.as_mut()
+            {
+                marker.raise();
+            }
+            return;
+        }
+        match target {
+            Some(rect) => {
+                if self.marker.is_none() && !self.marker_failed {
+                    self.marker = marker::open();
+                    self.marker_failed = self.marker.is_none();
+                }
+                if let Some(marker) = self.marker.as_mut() {
+                    marker.show(rect);
+                    self.marker_at = Some(rect);
+                }
+            }
+            None => {
+                if let Some(marker) = self.marker.as_mut() {
+                    marker.hide();
+                }
+                self.marker_at = None;
+            }
         }
     }
 

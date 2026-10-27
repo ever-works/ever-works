@@ -370,6 +370,8 @@ export class DesktopHelperHost {
 		record.started = started;
 		this.streams.add(record);
 		this.ensureWatch();
+		// Owner question 10: the person at the machine sees it is being driven (where the helper can draw it).
+		if (request.controlling && hello.features.includes('controlMarker')) record.showMarker();
 		return { ok: true, stream: record.handle() };
 	}
 
@@ -592,6 +594,9 @@ class StreamRecord {
 	/** The controlling half ended (withdrawn on the machine); the stream may still show the picture. */
 	private controlEnded = false;
 
+	/** Owner question 10: the helper is drawing the controlled-machine marker. */
+	private markerShown = false;
+
 	constructor(
 		private readonly host: DesktopHelperHost,
 		readonly admittedSha256: string,
@@ -604,7 +609,21 @@ class StreamRecord {
 		if (!this.controlling || this.controlEnded || this.ended) return;
 		this.controlEnded = true;
 		this.helper?.send(encodeHelperMessage(HELPER_MESSAGES.releaseAll));
+		this.hideMarker();
 		this.handlers.onControlRevoked?.(reason);
+	}
+
+	/** Owner question 10: draw the border around the controlled display. */
+	showMarker(): void {
+		if (!this.controlling || this.controlEnded || this.ended || this.markerShown) return;
+		this.markerShown = true;
+		this.helper?.send(encodeHelperJson(HELPER_MESSAGES.controlMarker, { visible: true }));
+	}
+
+	private hideMarker(): void {
+		if (!this.markerShown) return;
+		this.markerShown = false;
+		this.helper?.send(encodeHelperJson(HELPER_MESSAGES.controlMarker, { visible: false }));
 	}
 
 	waitHello(ms: number): Promise<HelperHello | null> {

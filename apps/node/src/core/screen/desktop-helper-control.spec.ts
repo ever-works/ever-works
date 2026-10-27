@@ -253,3 +253,44 @@ describe('a helper that dies during control (owner question 14)', () => {
 		expect(fake.children.length).toBe(count);
 	});
 });
+
+describe('the on-screen marker while controlled (owner question 10)', () => {
+	const FILES = { [paths.installPath]: BINARY, [paths.policyPath]: RECORD, [helperControlPath(paths)]: ALLOWED };
+	const markers = (received: Array<{ kind: number; payload: Uint8Array }>) =>
+		received
+			.filter((message) => message.kind === HELPER_MESSAGES.controlMarker)
+			.map((message) => JSON.parse(new TextDecoder().decode(message.payload)) as { visible: boolean });
+
+	it('asks a helper that offers it to draw the marker, and to remove it when control is withdrawn', async () => {
+		vi.useFakeTimers();
+		const { desktop, fs, fake } = host(FILES, { features: ['releaseHeld', 'controlMarker'] });
+		const opening = desktop.openStream({ display: null, quality: 'smooth', controlling: true }, handlers());
+		await vi.advanceTimersByTimeAsync(0);
+		const opened = await opening;
+		expect(opened.ok).toBe(true);
+		const child = fake.children[fake.children.length - 1];
+		expect(markers(child.received)).toEqual([{ visible: true }]);
+		// After `started`: the marker frames the display the stream shows.
+		const kinds = child.received.map((message) => message.kind);
+		expect(kinds.indexOf(HELPER_MESSAGES.start)).toBeLessThan(kinds.indexOf(HELPER_MESSAGES.controlMarker));
+
+		await fs.remove(helperControlPath(paths));
+		await vi.advanceTimersByTimeAsync(1_100);
+		expect(markers(child.received)).toEqual([{ visible: true }, { visible: false }]);
+	});
+
+	it('never asks a helper that does not offer it, nor for a stream that only watches', async () => {
+		const older = host(FILES);
+		const controlled = await older.desktop.openStream(
+			{ display: null, quality: 'smooth', controlling: true },
+			handlers()
+		);
+		expect(controlled.ok).toBe(true);
+		expect(older.fake.children.flatMap((child) => markers(child.received))).toEqual([]);
+
+		const watching = host(FILES, { features: ['releaseHeld', 'controlMarker'] });
+		const watched = await watching.desktop.openStream({ display: null, quality: 'smooth' }, handlers());
+		expect(watched.ok).toBe(true);
+		expect(watching.fake.children.flatMap((child) => markers(child.received))).toEqual([]);
+	});
+});
