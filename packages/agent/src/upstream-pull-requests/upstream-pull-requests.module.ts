@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { AppWorksModule } from '../app-works/app-works.module';
@@ -11,6 +12,14 @@ import {
 import { UpstreamCredentialStateStore } from './upstream-credential.store';
 import { UpstreamContributionBudgetService } from './upstream-contribution-budget.service';
 import { UpstreamPullRequestOpenService } from './upstream-pull-request-open.service';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { UpstreamPullRequest } from '../entities/upstream-pull-request.entity';
+import { WorkUpstreamPrSetting } from '../entities/work-upstream-pr-setting.entity';
+import { UpstreamPrSuggestion } from '../entities/upstream-pr-suggestion.entity';
+import { UpstreamPullRequestRepository } from '../database/repositories/upstream-pull-request.repository';
+import { UpstreamPullRequestRecordService } from './upstream-pull-request-record.service';
+import { UpstreamEligibilityService } from './upstream-eligibility.service';
+import { AppSpecModule } from '../app-spec/app-spec.module';
 
 /**
  * APW-09 (Upstream pull requests) — the epic's agent-side module, and the home
@@ -95,6 +104,15 @@ import { UpstreamPullRequestOpenService } from './upstream-pull-request-open.ser
  * Both of the service's collaborators are `@Optional()` at the injection site, so
  * this module still compiles in a shell that has not imported `BudgetsModule` —
  * where the gate reports `gate: 'ungated'` rather than pretending a check ran.
+ *
+ * ## T7/T35 — the record (lane aw-upstream-prs, 2026-10-27)
+ *
+ * The epic's own three tables are registered here with `TypeOrmModule.forFeature` (the
+ * `AppWorksModule` / `AppSpecModule` shape), and `UpstreamPullRequestRepository` is provided
+ * here — feature-owned, so it is exported from `database/index.ts` but NOT listed in
+ * `_repository-inventory.ts`. `UpstreamPullRequestRecordService` is the one writer of the
+ * rows and of their `app_upstream_pr` Activity (R-2); `ActivityLogModule` is imported for its
+ * `ActivityLogService` (a leaf: it imports only `DatabaseModule`).
  */
 @Module({
     imports: [
@@ -110,6 +128,17 @@ import { UpstreamPullRequestOpenService } from './upstream-pull-request-open.ser
         // APW-09 (lane aw-ai) — `TaskRepository` for the upstream-PR open service's
         // "a Task of this Work" read. `AppWorksModule` imports it too, but does not re-export it.
         TasksDomainModule,
+        // APW-09 T7 (lane aw-upstream-prs) — the epic's own tables, and the Activity writer.
+        TypeOrmModule.forFeature([
+            UpstreamPullRequest,
+            WorkUpstreamPrSetting,
+            UpstreamPrSuggestion,
+        ]),
+        ActivityLogModule,
+        // APW-09 T9 — `AppSpecService` for the opt-in and `maxOpen` (G15). A leaf: it imports
+        // only `DatabaseModule`, `FacadesModule` and `ActivityLogModule`, none of which imports
+        // this module.
+        AppSpecModule,
     ],
     providers: [
         UpstreamCredentialStateStore,
@@ -117,6 +146,11 @@ import { UpstreamPullRequestOpenService } from './upstream-pull-request-open.ser
         UpstreamContributionBudgetService,
         // APW-09 (lane aw-ai, 2026-10-17) — `POST /api/works/:id/upstream-pr`'s service.
         UpstreamPullRequestOpenService,
+        // APW-09 T7/T35 (lane aw-upstream-prs) — the record and its one writer.
+        UpstreamPullRequestRepository,
+        UpstreamPullRequestRecordService,
+        // APW-09 T8/T9 — eligibility and the FR-26 / FR-39 limits.
+        UpstreamEligibilityService,
         {
             provide: UPSTREAM_CREDENTIAL_STORE,
             useExisting: UpstreamCredentialStateStore,
@@ -128,6 +162,9 @@ import { UpstreamPullRequestOpenService } from './upstream-pull-request-open.ser
         UpstreamContributionBudgetService,
         UpstreamPullRequestOpenService,
         UPSTREAM_CREDENTIAL_STORE,
+        UpstreamPullRequestRepository,
+        UpstreamPullRequestRecordService,
+        UpstreamEligibilityService,
     ],
 })
 export class UpstreamPullRequestsModule {}

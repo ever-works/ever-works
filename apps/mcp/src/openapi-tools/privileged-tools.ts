@@ -71,7 +71,20 @@ export const MCP_PRIVILEGED_TOOLS: Readonly<Record<string, string>> = Object.fre
 	fleet_cloud_destroy: 'destroys a cloud machine and its disk at the provider',
 	// P2: the idle policy decides when the platform powers a billed machine off (or stops telling the owner).
 	fleet_cloud_idle_policy:
-		'decides when a billed cloud machine is powered off, or whether its owner is told it sits idle'
+		'decides when a billed cloud machine is powered off, or whether its owner is told it sits idle',
+	// App Works (lane B1, 2026-10-27) — every state-changing App tool. Each one acts on a live
+	// app, its repository or a run the owner started; a prompt-injected client must not take
+	// the app down, roll it back, push to its fork or cancel the owner's runs.
+	run_app_smoke: 'sends the App spec smoke requests to the live app',
+	rollback_app: 'replaces the live Deployment of an app with an earlier one',
+	change_app_lifecycle: 'pauses, resumes or removes a live app',
+	cancel_app_build: 'stops a Build the owner started',
+	cancel_app_provisioning: 'stops the provisioning agent run the owner started',
+	apply_app_blueprint: 'opens a pull request on the app repository',
+	upgrade_app_blueprint: 'opens a pull request on the app repository',
+	dismiss_app_blueprint_upgrade: 'hides an upgrade notice from the owner',
+	sync_app_upstream: 'merges upstream changes into the app fork',
+	retry_app_readiness: 're-runs the fork preparation of an app'
 });
 
 /**

@@ -252,6 +252,11 @@ export * from './external-identity.entity';
 // APW-02 Fork lifecycle — one row per App Work: readiness, Actions hygiene,
 // the sync schedule, the divergence reading and the manual-sync allowance.
 export * from './work-upstream-state.entity';
+// APW-09 Upstream pull requests — the record of every upstream pull request
+// (proposal or direct), the toggle's in-flight state and FR-34's suggestions.
+export * from './upstream-pull-request.entity';
+export * from './work-upstream-pr-setting.entity';
+export * from './upstream-pr-suggestion.entity';
 // APW-07 App env & dependencies — one encrypted value per (Work, name) and one
 // row per (Work, kind) recording what a dependency provider provisioned.
 export * from './work-app-env-value.entity';

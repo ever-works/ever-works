@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseModule, WorkRepository } from '@ever-works/agent/database';
 import { NotificationService, NotificationsModule } from '@ever-works/agent/notifications';
 import { WorkLifecycleService } from '@ever-works/agent/services';
@@ -26,6 +27,14 @@ import {
 import { AppDependenciesModule } from '@ever-works/agent/app-dependencies';
 import { APP_PUBLISHED_HOSTS, type AppPublishedHostsPort } from '@ever-works/agent/app-launcher';
 import { AppHostsService } from '@ever-works/agent/app-runtime';
+import {
+    APP_RUNTIME_EVENT_SINK,
+    APP_RUNTIME_TARGET,
+    AppRuntimeEventRelayService,
+    UnavailableRuntimeTarget,
+    type AppRuntimeEventSink,
+    type AppRuntimeTargetPort,
+} from '@ever-works/agent/app-runtime';
 
 /**
  * APW-06 T33 / T58 / T73, plan §9.8 (lane aw-safety, 2026-10-26) — **the API's App runtime ports
@@ -62,6 +71,29 @@ import { AppHostsService } from '@ever-works/agent/app-runtime';
  * - **`APP_CLUSTER_OP_DISPATCHER`**, local and NOT exported: the same stateless gate
  *   `AppDeployRequestModule` builds (`buildAppClusterOpDispatcherProviders`) — exporting it from
  *   a `@Global()` module would bind the token in every module of the API as a side effect.
+ *
+ * ## The event sink and the runtime target (lane aw-builds-bindings, 2026-10-27)
+ *
+ * §9.8 lists two more tokens this module provides in the API, and until now nothing did, so
+ * `AppDependenciesService` (APW-07) ran in the API with both unbound
+ * (`app-works-di-reachability.spec.ts` carried `AppDependenciesModule | AppDependenciesService |
+ * APP_RUNTIME_EVENT_SINK` and `… | APP_RUNTIME_TARGET`):
+ *
+ * - **`APP_RUNTIME_EVENT_SINK`** → "EventEmitter2 in the API" (`ports.ts`), through the SAME
+ *   `AppRuntimeEventRelayService` the worker's events arrive at — so an event the API's own copy
+ *   of `AppDependenciesService` emits (a data deletion, a release) is held to the same catalogue
+ *   and forbidden-key check as a relayed one, and reaches `AppRuntimeActivityListener` as an
+ *   `app_dependency` Activity row. Unbound, those events were dropped without a trace.
+ * - **`APP_RUNTIME_TARGET`** → §9.6's `UnavailableRuntimeTarget`, answering `cluster_unreachable`.
+ *   The API never dials a cluster (§6.2): §9.9's resolver is worker-only and refuses outside the
+ *   worker, which `AppDependenciesService.prepareTarget` reads as exactly that discriminant. Bound,
+ *   the answer is explicit and RETRYABLE, where unbound it was `target_not_checked` — a definite
+ *   "check your cluster" for a cluster that may be fine. Only the isolated worker provisions a
+ *   dependency (`app-dependency-provision.task.ts` binds the real adapter there).
+ *
+ * Both are exported from this `@Global()` module, so they are visible to `AppDependenciesModule`
+ * without an import edge. No other API provider asks for either token today; the reachability
+ * spec is what would show one that starts to.
  *
  * Imported once, by the API's `AppWorksModule` (`app-works.module.ts`), so the root module's
  * import list is untouched.
@@ -152,7 +184,25 @@ import { AppHostsService } from '@ever-works/agent/app-runtime';
             }),
             inject: [ModuleRef],
         },
+        // Lane aw-builds-bindings (2026-10-27) — §9.8's event sink and runtime target (see above).
+        {
+            provide: APP_RUNTIME_EVENT_SINK,
+            useFactory: (emitter?: EventEmitter2): AppRuntimeEventSink =>
+                new AppRuntimeEventRelayService(emitter),
+            inject: [{ token: EventEmitter2, optional: true }],
+        },
+        {
+            provide: APP_RUNTIME_TARGET,
+            useFactory: (): AppRuntimeTargetPort =>
+                new UnavailableRuntimeTarget('cluster_unreachable'),
+        },
     ],
-    exports: [APP_WORK_DELETION_PORT, AppRuntimeDeletionService, APP_PUBLISHED_HOSTS],
+    exports: [
+        APP_WORK_DELETION_PORT,
+        AppRuntimeDeletionService,
+        APP_PUBLISHED_HOSTS,
+        APP_RUNTIME_EVENT_SINK,
+        APP_RUNTIME_TARGET,
+    ],
 })
 export class AppRuntimePortsModule {}

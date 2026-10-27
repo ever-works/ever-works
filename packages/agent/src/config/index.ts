@@ -1482,6 +1482,19 @@ export const config = {
             },
 
             /**
+             * APW-09 FR-26 / R-31 — the operator's override of the per-member "opened across all
+             * upstreams per 24 hours" limit (`EVER_WORKS_APP_UPSTREAM_PR_MAX_PER_DAY`, default 3,
+             * CONTRACTS §7A). An integer 1–20; anything else (unset, malformed, out of range) is
+             * `null` and the contract default applies. Read per call.
+             */
+            upstreamPullRequestMaxPerDay(): number | null {
+                const raw = (process.env.EVER_WORKS_APP_UPSTREAM_PR_MAX_PER_DAY ?? '').trim();
+                if (!/^\d{1,2}$/.test(raw)) return null;
+                const value = Number(raw);
+                return value >= 1 && value <= 20 ? value : null;
+            },
+
+            /**
              * APW-06 T19 — the apex an App Work's managed subdomain lives under
              * (`EVER_WORKS_APPS_DOMAIN`, plan §8.3, spec FR-40, Resolution R-16).
              *

@@ -1,6 +1,14 @@
 import { randomBytes } from 'node:crypto';
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { PromptAssemblerService } from '@ever-works/agent/agents';
+import {
+    APP_RUN_BRIEF_SOURCE,
+    APP_WORK_TOOL_POLICY_REFUSAL_CODE,
+    appWorkTaskToolPolicyApplies,
+    describeAppChangesPaused,
+    readAppWorkSwitches,
+    type AppRunBriefSource,
+} from '@ever-works/agent/app-works';
 import { config } from '@ever-works/agent/config';
 import {
     AgentRepository,
@@ -23,6 +31,7 @@ import {
     type AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
 import {
+    isAppWorkKind,
     composeFleetTaskCommitMessage,
     FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
     FLEET_RUN_MCP_SERVER_NAME,
@@ -485,6 +494,12 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // fails closed at the publish (which is the guarantee that
         // matters — this only moves the failure twenty minutes earlier).
         @Optional() private readonly pushCredentials?: FleetPushCredentialService,
+        // APW-08 T18 — the App Work run brief (the App rules at the base commit and the
+        // fenced instruction files). Bound + exported by the api @Global() AgentsModule.
+        // Appended LAST + @Optional(): absent, an App Work run is briefed as before.
+        @Optional()
+        @Inject(APP_RUN_BRIEF_SOURCE)
+        private readonly appRunBriefs?: AppRunBriefSource,
     ) {}
 
     /**
@@ -769,6 +784,18 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         }
 
         const work = task.workId ? await this.works.findById(task.workId) : null;
+        // APW-08 T49 (R-30) — the operator's change switch, read again here because a resumed
+        // or drained run reaches the planner without passing `dispatchAgentRun`. Off, a Task on an
+        // App Work (or one whose Work cannot be read) is refused before any job is written.
+        if (
+            !readAppWorkSwitches().changesEnabled &&
+            task.workId &&
+            (!work || isAppWorkKind(work.kind))
+        ) {
+            throw new FleetAgentTaskPlanError(
+                `Task ${task.slug ?? task.id}: ${describeAppChangesPaused()}`,
+            );
+        }
         // Owner-authored, from the Work's defaults and the Task's own list.
         // `safeResolveChecks` swallows a read failure to `[]` deliberately:
         // an unreadable Work grades nothing, and that was true before this
@@ -834,11 +861,32 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // promises Tasks/Inbox tools to a run with no bridge produces a
         // model that hunts for them and gives up, and a bridge nobody
         // told the model about is a credential minted for nothing.
-        const mcp = resolveMcpBridge(agent, settings);
+        //
+        // APW-08 T47 (FR-69) — an App Work run gets NO platform tools on a node either: the
+        // bridge IS the run's MCP tool surface, and the App Work Task tool policy denies every
+        // MCP tool. Re-checked here, at dispatch, from the Task's and the Agent's Work rows,
+        // whatever the three bridge switches say (the run-credential mint refuses a job whose
+        // payload carries no bridge, so no run token can be minted for it either).
+        const appWorkRun = await this.isAppWorkRun(task, work, agent);
+        const mcp = appWorkRun ? null : resolveMcpBridge(agent, settings);
+        if (appWorkRun && resolveMcpBridge(agent, settings)) {
+            this.logger.log(
+                `Task ${task.slug ?? task.id}: App Work run — the platform-MCP bridge is withheld (${APP_WORK_TOOL_POLICY_REFUSAL_CODE}).`,
+            );
+        }
+        // APW-08 T18 — an App Work run's brief: the App rules at the workspace's base, and the
+        // repository's instruction files fenced as untrusted content. Best-effort (`null` when
+        // the Task is not on an App Work or the brief could not be composed).
+        const appBrief = this.appRunBriefs
+            ? await this.appRunBriefs
+                  .forTask({ taskId: task.id, baseRef: workspace.baseRef })
+                  .catch(() => null)
+            : null;
         const { instructions, continuation } = await this.composeInstructions({
             agent,
             task,
             workspace,
+            appBrief,
             acceptanceChecks,
             setup,
             ownerMessages,
@@ -887,6 +935,16 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         );
         if (resume) execution.resume = resume;
 
+        // APW-08 T47 — the last look before the payload is sealed: an App Work run's job never
+        // carries a bridge. Unreachable today (the bridge is withheld above); it is what keeps
+        // a later edit between the two from shipping one.
+        if (appWorkRun && mcp) {
+            throw new FleetAgentTaskPlanError(
+                `${APP_WORK_TOOL_POLICY_REFUSAL_CODE}: Task ${task.slug ?? task.id} works on an App Work, and its fleet job would ` +
+                    'have carried platform MCP tools, which the App Work Task tool policy denies. The run was refused before any job was written.',
+            );
+        }
+
         return {
             execution,
             workspace,
@@ -908,6 +966,38 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             // job changes shape because this slice exists.
             ...(mcp ? { mcp } : {}),
         };
+    }
+
+    /**
+     * APW-08 T47 (FR-69) — does the App Work Task tool policy apply to this run? The Task's own
+     * Work (already loaded by {@link plan}) or the Agent's scope Work being an App Work. Fail
+     * closed: a Work id that resolves to nothing, or a read that throws, answers `true` — the
+     * run then plans without the bridge, which only ever removes tools.
+     */
+    private async isAppWorkRun(
+        task: Pick<Task, 'workId'>,
+        taskWork: { kind?: string | null } | null,
+        agent: Pick<Agent, 'workId'>,
+    ): Promise<boolean> {
+        if (task.workId && !taskWork) return true;
+        let agentWorkKind: string | null = null;
+        if (agent.workId && agent.workId !== task.workId) {
+            try {
+                const agentWork = await this.works.findById(agent.workId);
+                if (!agentWork) return true;
+                agentWorkKind = agentWork.kind ?? null;
+            } catch {
+                return true;
+            }
+        } else if (agent.workId) {
+            agentWorkKind = taskWork?.kind ?? null;
+        }
+        return appWorkTaskToolPolicyApplies({
+            taskWorkKind: taskWork?.kind ?? null,
+            agentWorkKind,
+            // A fleet run is never its owner's own Conversation turn.
+            ownerConversationTurn: false,
+        });
     }
 
     /**
@@ -1200,6 +1290,12 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         settings: FleetAgentExecutionSettings;
         /** Slice Z — present only when the run actually gets platform tools. */
         mcp?: FleetAgentTaskMcpBridge | null;
+        /**
+         * APW-08 T18 — an App Work run's rules (platform text, never truncated: it sits in
+         * the tail) and its fenced instruction files (optional, left out with a warning when
+         * the payload would not fit, like the answer trail).
+         */
+        appBrief?: { rules: string; instructions: string | null } | null;
     }): Promise<{
         /** The complete fresh-session prompt — what runs unless a node resumes. */
         instructions: string;
@@ -1312,11 +1408,29 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // BEFORE the newest answer so the whole history reads in order.
         const trailSection =
             answerTrail.length > 0 ? composeAnswerTrailSection(answerTrail, fenceNonce) : null;
+        const appRules = input.appBrief?.rules ?? null;
+        let appInstructions = input.appBrief?.instructions ?? null;
         const tailOf = (trail: string | null): string =>
-            [composeTaskSection(userMessage, fenceNonce), trail, ownerSection, fleetSections]
+            [
+                appRules,
+                composeTaskSection(userMessage, fenceNonce),
+                trail,
+                ownerSection,
+                fleetSections,
+                appInstructions,
+            ]
                 .filter(Boolean)
                 .join('\n\n');
         let tail = tailOf(trailSection);
+        // APW-08 T18 — the instruction files are the first thing left out when the payload
+        // would not fit: the rules and the brief are what the run cannot do without.
+        if (appInstructions && byteLength(tail) > FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES) {
+            this.logger.warn(
+                `Fleet instructions for task ${task.id}: the App Work's instruction files were left out — they would not fit the job payload`,
+            );
+            appInstructions = null;
+            tail = tailOf(trailSection);
+        }
         // The trail is the one optional part of the tail: a run without its
         // history can still go ahead honestly, a run without its brief
         // cannot. Left out — and said so — rather than failing the plan.

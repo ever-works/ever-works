@@ -458,7 +458,8 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `cd apps/api && pnpm test agents.module.spec`.
       **Done when**: both specs are green.
 
-- [ ] **T18. Run brief: protected paths, size guidance, instruction files.**
+- [x] **T18. Run brief: protected paths, size guidance, instruction files.**
+      **Status (2026-10-27, lane B2 `aw-evolve`): done, with one residual** — `app-run-brief.ts` builds the platform `# APP RULES` block from `AppWorkRulesService` at the base commit (protected and human-merge paths as neutralized inline code, the size guidance and its 3x refusal, R-17's push line, the guarded `.works/works.yml` blocks) and the `# UNTRUSTED REPOSITORY CONTENT` block (each instruction file in a nonce'd `untrusted_repository_content` fence, control tokens neutralized, 5 files / 32 KB / 64 KB, a path that could leave the repository refused before any read). `AppRunBriefService` (`APP_RUN_BRIEF_SOURCE`, bound + exported by the api `@Global()` `AgentsModule`) reads the Task, its Work, the base head and each file at that commit; best-effort, an unreadable spec yields a "could not be read" block. Cloud: `AgentRunService` appends both to a task-kind App Work run's system message (the in-process executor of `agent-task-execute`, so the task file itself is unchanged) with an `app-rules` run-log row; fleet: `composeInstructions` puts the rules in the never-truncated tail before the Task and the files after the workspace facts, dropped with a warning when the payload would not fit. Specs `app-run-brief.spec.ts` and the planner's T18 block. **Residual:** a symlink is refused only when the git provider cannot read it as a file (a link out of the repository); the GitHub contents API resolves a link to another file inside the repository and returns that file's content, which then arrives fenced like any other repository text.
       **Modify** `packages/tasks/src/tasks/trigger/agent-task-execute.task.ts` (cloud) and
       `apps/api/src/fleet/fleet-agent-task-planner.service.ts` `composeInstructions` (Fleet) — for App Works prepend
       the protected paths and size guidance and the line "This Task pushes its branch and opens the pull request for
@@ -570,6 +571,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 ## P1.7 — API and chat
 
 - [ ] **T24. Delivery and cost endpoints.**
+      **Status (2026-10-27, lane B2 `aw-evolve`): the cost half is done** — `GET /api/tasks/:id/cost` answers `TaskCostView` (`packages/contracts/src/apps/task-delivery.types.ts`, new): each run's cost is its receipt lines summed (`getRunSpendLines`, `null` while unpriced) with `receiptUrl` `/agents/sessions/<runId>`, up to 50 runs newest first (`runsTruncated`), and `totalCents` is every usage row attributed to the Task; `builds` stays `[]` until per-Task Build accounting exists. Spec `apps/api/src/tasks/task-cost.spec.ts`. **Not built:** `GET :id/delivery`, `…/delivery/close`, `…/delivery/follow-up` and the list's `deliveryState` / `includeDelivery` — they read the delivery chain's columns (T7–T9, T20–T23), which do not exist yet; the types (`TaskDeliveryView`, `TASK_DELIVERY_STATES`) are published so the chain and the web type against one shape.
       **Modify** `apps/api/src/tasks/tasks.controller.ts` — `GET :id/delivery`, `POST :id/delivery/close`,
       `POST :id/delivery/follow-up`, `GET :id/cost`; list query `deliveryState`, `includeDelivery`; throttles and
       error codes per [plan §4](./plan.md); `ensureCanView` / `ensureCanEdit`.
@@ -647,6 +649,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 ## P1.8 — Web
 
 - [ ] **T27. Chips, sections, dialog, filter.**
+      **Status (2026-10-27, lane B2 `aw-evolve`): the dialog and the cost summary are done** — `RequestChangeDialog` (one field, `POST /api/works/:id/evolve` with `channel: 'card'` through `requestAppChangeAction`; the filed Task with the held-for-owner and cloud-push notes, or the refusal by the API's own code) and `WorkCostSummary` (`GET /api/works/:id/cost`: spent, monthly budget, remaining, alert) on `AppWorkOverviewCard`; English copy under `dashboard.workDetail.appChange` / `.appCost` (other locales fall back to English). Spec `RequestChangeDialog.unit.spec.tsx` (8). **Not built:** the delivery chips, the Task page's Delivery and Cost sections and the `deliveryState` filter (they need the delivery chain).
       **Create** `apps/web/src/components/tasks/TaskDeliveryChips.tsx`,
       `apps/web/src/components/tasks/TaskDeliverySection.tsx`, `apps/web/src/components/tasks/TaskCostSection.tsx`,
       `apps/web/src/components/works/detail/RequestChangeDialog.tsx` (all new).
@@ -969,7 +972,8 @@ _Delivers FR-56…FR-60._
 _Numbered from T47 so every earlier task id stays stable. All are P1 except where noted, and each one is an
 **addition**: no task above is removed, renumbered or narrowed._
 
-- [ ] **T47. The App Work Task tool policy (XC-05, FR-69).**
+- [x] **T47. The App Work Task tool policy (XC-05, FR-69).**
+      **Status (2026-10-27, lane B2 `aw-evolve`, PR #2961): done** — `app-work-task-tool-policy.ts` is an allow-list (`ask_human`, `commitToRepo`, `openPullRequest`, `submitTaskReview`, every `read.internal` tool) reported under the five spec groups plus an additive sixth, `platform-action` (every other acting tool, and any tool nobody has classified); names compare case-insensitively. Applied last in `resolveAllowedTools`; `resolveGrantedTools` skips the MCP source and reports the withheld names by group. `AgentRunService` classifies the run through `APP_WORK_RUN_CLASSIFIER` (Task's Work, or the Agent's Work unless it is the owner's own Conversation turn; fail closed), writes the per-group counter as one WARN run-log row, and re-checks the final list at dispatch (a violation refuses the run: `app_work_tool_policy` on the run row, an ERROR row, an `agent_run_failed` Activity row). The fleet planner withholds the MCP bridge from an App Work run. The spec is `app-work-tool-policy.spec.ts` (21 cases) plus `fleet-agent-task-planner.app-work-policy.spec.ts`. Residual: a fleet node CLI's own built-in web tools (T48, node side).
       **Create** `packages/agent/src/app-works/app-work-task-tool-policy.ts` (new) — `APP_WORK_TASK_TOOL_POLICY` and
       the constants of plan §3.4: deny outbound messaging (`sendEmail`, channel notifications, agent-to-agent
       messages), web fetch and search, every MCP tool, sub-agents and delegation, and every App Works mutation tool
@@ -1010,7 +1014,8 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test run-containment`.
       **Done when**: the spec is green and `fleet-agent-task-reconciler.spec.ts` passes unchanged.
 
-- [ ] **T49. Operator kill switches for the evolve loop and auto-delivery (XC-10, FR-74, R-30).**
+- [x] **T49. Operator kill switches for the evolve loop and auto-delivery (XC-10, FR-74, R-30).**
+      **Status (2026-10-27, lane B2 `aw-evolve`): done for every dispatcher that exists** — `app-work-switches.ts` (`readAppWorkSwitches`; unset/blank = on, unrecognised = off). Read by `AppChangeRequestService.request` (`503 switchOff`, nothing filed), `TaskTransitionService.dispatchAgentRun` (no run row for a Task on an App Work; Goals dispatch through it), `AgentRunService.execute` (a resumed, drained, assign-task or already-queued run fails with `switch_off` before any model call), the fleet planner, and APW-06 T35's `AppBuildSucceededListener` (auto-deploy). Review runs pass. `app-change-delivery.task.ts`, the merge hook's follow-ups and the Mission tick's App Work branch do not exist yet (T21–T23, T35): each must read `readAppWorkSwitches()` itself when it lands. Spec `app-work-kill-switch.spec.ts` (19). Not built: the read-only banner in the web, and parking with automatic resume (a refused Task is run again by hand).
       **Read R-30's switches; do not invent a family.** `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED` already exists
       (CONTRACTS §7, R-30) and already names APW-08: `false` pauses auto-delivery and auto-deploy. The **new**-change
       switch is the one addition, requested from the lead as `EVER_WORKS_APP_CHANGES_ENABLED` (CONTRACTS §7 plus an
@@ -1138,6 +1143,7 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       **Done when**: the specs are green and the pre-existing `app-change-guard.spec.ts` cases pass unchanged.
 
 - [ ] **T56. Per-App-Work cost rollup against the Work budget (XC-19, FR-73).**
+      **Status (2026-10-27, lane B2 `aw-evolve`): the read is done** — `GET /api/works/:id/cost?month=YYYY-MM` (`WorkCostController`, view access, one `404 not_found`, `400 invalidMonth`) answers `WorkCostRollup` from the usage ledger (`getTotalSpendCents`, the budget guard's own query, in the budget's currency) and the Work's existing global `WorkBudget`: spend, cap, remaining (never negative), percent and the EW-602 alert ladder (75 / 90 / 100 / overage). Spec `apps/api/src/works/work-cost.controller.spec.ts`. **Not built:** booking the App Work run paths against the Work's budget through the guard, and `WorkCostSummary` on the App Work overview.
       **Modify** `apps/api/src/works/work-evolve.controller.ts` — `GET /api/works/:id/cost` returning
       `WorkCostRollup` (month spend, cap, remaining, alert state) through the **existing** `WorkBudget` /
       `WorkBudgetAlertState` entities and `BudgetGuardService` (`packages/agent/src/entities/work-budget.entity.ts`;

@@ -12,8 +12,9 @@ import type { AppUpstreamStateResponse } from '@ever-works/contracts';
  * which is the substitution ACC-02-21 exists to catch.
  */
 
-const { getUpstreamMock, notFoundMock } = vi.hoisted(() => ({
+const { getUpstreamMock, notFoundMock, listUpstreamPrsMock } = vi.hoisted(() => ({
     getUpstreamMock: vi.fn(),
+    listUpstreamPrsMock: vi.fn(),
     notFoundMock: vi.fn(() => {
         throw new Error('NEXT_NOT_FOUND');
     }),
@@ -24,6 +25,30 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('next/navigation', () => ({ notFound: notFoundMock }));
+
+// APW-09 — the section's list read and the section itself (lane aw-upstream-prs).
+vi.mock('@/lib/api/upstream-pull-requests', () => ({
+    upstreamPullRequestsAPI: { list: listUpstreamPrsMock },
+}));
+
+vi.mock('@/components/works/detail/upstream/UpstreamPullRequestsSection', () => ({
+    UpstreamPullRequestsSection: ({
+        rows,
+        relation,
+        upstream,
+    }: {
+        rows: unknown[] | null;
+        relation: string;
+        upstream: string | null;
+    }) => (
+        <div
+            data-testid="upstream-pull-requests-section-stub"
+            data-rows={rows === null ? 'null' : String(rows.length)}
+            data-relation={relation}
+            data-upstream={upstream ?? ''}
+        />
+    ),
+}));
 
 vi.mock('next-intl/server', () => ({
     getTranslations: async () => (key: string) => key,
@@ -93,6 +118,7 @@ function renderPage() {
 describe('WorkUpstreamPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        listUpstreamPrsMock.mockResolvedValue({ data: [], meta: { total: 0 } });
     });
 
     afterEach(() => {
@@ -107,6 +133,36 @@ describe('WorkUpstreamPage', () => {
         expect(screen.getByTestId('app-upstream-card-stub')).toHaveAttribute('data-variant', 'tab');
         expect(screen.getByTestId('app-upstream-card-stub')).toHaveAttribute('data-work-id', 'w1');
         expect(screen.getByTestId('app-upstream-pull-requests-slot')).toBeInTheDocument();
+        expect(notFoundMock).not.toHaveBeenCalled();
+    });
+
+    it('mounts the APW-09 section in the slot with the Work’s list', async () => {
+        getUpstreamMock.mockResolvedValue(upstreamState());
+        listUpstreamPrsMock.mockResolvedValue({
+            data: [{ id: 'r1' }, { id: 'r2' }],
+            meta: { total: 2 },
+        });
+
+        render(await renderPage());
+
+        expect(listUpstreamPrsMock).toHaveBeenCalledWith('w1', { limit: 20 });
+        const section = screen.getByTestId('upstream-pull-requests-section-stub');
+        expect(section).toHaveAttribute('data-rows', '2');
+        expect(section).toHaveAttribute('data-relation', 'fork');
+        expect(section).toHaveAttribute('data-upstream', 'acme/tasks-app');
+    });
+
+    it('keeps the tab when the list read fails, and says so in the section (rows: null)', async () => {
+        getUpstreamMock.mockResolvedValue(upstreamState());
+        listUpstreamPrsMock.mockRejectedValue(new Error('500'));
+
+        render(await renderPage());
+
+        expect(screen.getByTestId('app-upstream-card-stub')).toBeInTheDocument();
+        expect(screen.getByTestId('upstream-pull-requests-section-stub')).toHaveAttribute(
+            'data-rows',
+            'null',
+        );
         expect(notFoundMock).not.toHaveBeenCalled();
     });
 

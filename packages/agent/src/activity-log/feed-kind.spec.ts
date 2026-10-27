@@ -131,6 +131,30 @@ describe('feed kind map', () => {
         });
     });
 
+    describe('APW-09 app_upstream_pr (plan §3.4)', () => {
+        it('reads as work while in progress, delivery once completed, problem when it failed', () => {
+            expect(FEED_KIND_RULES[ActivityActionType.APP_UPSTREAM_PR]).toBe(
+                'deliveryWhenCompleted',
+            );
+            // `app.upstream_pr.proposed` / `.needs_signature`
+            expect(
+                resolveFeedKind(ActivityActionType.APP_UPSTREAM_PR, ActivityStatus.IN_PROGRESS),
+            ).toBe('work');
+            // `app.upstream_pr.opened` / `.merged` / `.closed`
+            expect(
+                resolveFeedKind(ActivityActionType.APP_UPSTREAM_PR, ActivityStatus.COMPLETED),
+            ).toBe('delivery');
+            // `app.upstream_pr.refused` / `.failed` / `.expired`
+            expect(resolveFeedKind(ActivityActionType.APP_UPSTREAM_PR, ActivityStatus.FAILED)).toBe(
+                'problem',
+            );
+            // `app.upstream_pr.withdrawn`
+            expect(
+                resolveFeedKind(ActivityActionType.APP_UPSTREAM_PR, ActivityStatus.CANCELLED),
+            ).toBe('problem');
+        });
+    });
+
     describe('normalizeFeedKinds', () => {
         it('returns no predicate for an empty or complete selection', () => {
             expect(normalizeFeedKinds(undefined, false)).toBeUndefined();

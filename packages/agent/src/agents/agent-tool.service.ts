@@ -97,6 +97,12 @@ import { classifyAction } from '../safety/action-category';
 import { buildInboxTools } from '../inbox/agent-inbox-tools';
 // APW-08 T26 — the App change chat tools. A leaf: every import it has is type-only.
 import { buildAppChangeTools } from '../app-works/agent-app-change-tools';
+// APW-08 T47 (FR-69) — a leaf file (contracts + the action classifier only), so no cycle.
+import {
+    applyAppWorkTaskToolPolicy,
+    type AppWorkTaskToolDenial,
+    type AppWorkTaskToolPolicyCounts,
+} from '../app-works/app-work-task-tool-policy';
 import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
@@ -358,6 +364,13 @@ export class AgentToolService {
              * own files a change held for the owner). Absent = not an owner chat turn.
              */
             ownerChatTurn?: boolean;
+            /**
+             * APW-08 T47 (FR-69) — the run works on an App Work, as `AgentRunService`
+             * classified it from the Task and Work rows (never the model). `true` filters
+             * the list through `APP_WORK_TASK_TOOL_POLICY`: no outbound messaging, web
+             * fetch, MCP, sub-agent or App Works mutation tool reaches the run.
+             */
+            appWorkTask?: boolean;
         } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
@@ -508,7 +521,15 @@ export class AgentToolService {
         // CredentialResolver is bound, and even then a no-op for every
         // call whose arguments reference no credential — so ordering,
         // names and schemas are untouched.
-        return tools.map((tool) => this.withCredentialInterpolation(agent, tool));
+        const assembled = tools.map((tool) => this.withCredentialInterpolation(agent, tool));
+
+        // APW-08 T47 (FR-69) — an App Work run gets the App Work Task tool list. Applied
+        // LAST, over the whole assembly (built-in, facade and domain tools alike), so no
+        // permission flag or bound facade above can add a tool the policy denies.
+        if (runContext.appWorkTask === true) {
+            return applyAppWorkTaskToolPolicy(assembled).kept;
+        }
+        return assembled;
     }
 
     /**
@@ -1049,19 +1070,43 @@ export class AgentToolService {
             taskId?: string;
             /** See {@link resolveAllowedTools}. */
             ownerChatTurn?: boolean;
+            /** See {@link resolveAllowedTools}. */
+            appWorkTask?: boolean;
         } = {
             runId: 'no-run',
             editsThisRunByFile: new Set(),
         },
-    ): Promise<{ tools: AgentToolDescriptor[]; refused: ToolGrantDecision[] }> {
-        const tools = this.resolveAllowedTools(agent, runContext);
+    ): Promise<{
+        tools: AgentToolDescriptor[];
+        refused: ToolGrantDecision[];
+        /**
+         * APW-08 T47 — what the App Work Task tool policy withheld from this run, by name
+         * and group (never an argument), plus the per-group counts. Present only on an
+         * App Work run.
+         */
+        appWorkPolicy?: { denied: AppWorkTaskToolDenial[]; counts: AppWorkTaskToolPolicyCounts };
+    }> {
+        // APW-08 T47 — resolved WITHOUT the policy first, so the withheld names can be
+        // reported, then split here by the same function `resolveAllowedTools` applies.
+        const appWorkTask = runContext.appWorkTask === true;
+        let tools = this.resolveAllowedTools(agent, { ...runContext, appWorkTask: false });
+        let appWorkPolicy:
+            | { denied: AppWorkTaskToolDenial[]; counts: AppWorkTaskToolPolicyCounts }
+            | undefined;
+        if (appWorkTask) {
+            const split = applyAppWorkTaskToolPolicy(tools);
+            tools = split.kept;
+            appWorkPolicy = { denied: split.denied, counts: split.counts };
+        }
 
         // Agent Plugins MCP slice (T26): append the MCP descriptors BEFORE
         // the grant partition so `mcp__<server>__<tool>` names flow through
         // the tool-grant matrix like every other tool. Failure-isolated on
         // BOTH levels: the source itself already skips dead servers, and a
         // broken source contributes zero tools — never a failed run.
-        if (this.mcpTools) {
+        // APW-08 T47 — an App Work run receives no MCP tool at all (FR-69), so the source is
+        // not even asked: no stdio server is launched, no remote client is opened for it.
+        if (this.mcpTools && !appWorkTask) {
             try {
                 // AW-17 — the run's Task and Mission ride along so a tool
                 // call's usage row lands in the run's receipt, the Task's
@@ -1107,7 +1152,8 @@ export class AgentToolService {
             }
         }
 
-        if (!this.toolGrants) return { tools, refused: [] };
+        const policyField = appWorkPolicy ? { appWorkPolicy } : {};
+        if (!this.toolGrants) return { tools, refused: [], ...policyField };
 
         try {
             const resolved = await this.toolGrants.resolve({
@@ -1121,11 +1167,12 @@ export class AgentToolService {
                 resolved,
                 tools.map((tool) => tool.name),
             );
-            if (refused.length === 0) return { tools, refused: [] };
+            if (refused.length === 0) return { tools, refused: [], ...policyField };
             const refusedNames = new Set(refused.map((decision) => decision.toolName));
             return {
                 tools: tools.filter((tool) => !refusedNames.has(tool.name)),
                 refused,
+                ...policyField,
             };
         } catch (err) {
             // Prompt-injection hardening: fail CLOSED for everything that
@@ -1155,7 +1202,7 @@ export class AgentToolService {
                     });
                 }
             }
-            return { tools: kept, refused };
+            return { tools: kept, refused, ...policyField };
         }
     }
 

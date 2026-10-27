@@ -10,6 +10,7 @@ import {
     type FleetPortTunnelOpenResponse,
     type FleetPortTunnelView,
 } from '@ever-works/contracts';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { readSessionError, type SessionErrorRead } from '../sessions/sessions.shared';
 
 /**
@@ -151,7 +152,7 @@ export interface PortOpenAnswer {
 
 async function call<T>(input: string, init?: RequestInit): Promise<PortsResult<T>> {
     try {
-        const response = await fetch(input, { cache: 'no-store', ...init });
+        const response = await browserApiFetch(input, { cache: 'no-store', ...init });
         const body = (await response.json().catch(() => null)) as unknown;
         if (!response.ok) return { ok: false, error: readPortsError(response.status, body) };
         return { ok: true, data: body as T };
@@ -171,7 +172,7 @@ export const portsClient = {
     /** Phase 3 — a watched server stopped: file the Inbox item (best-effort). */
     async watchStopped(nodeId: string, port: number): Promise<void> {
         try {
-            await fetch(
+            await browserApiFetch(
                 `/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/watch-stopped`,
                 {
                     method: 'POST',
@@ -195,7 +196,7 @@ export const portsClient = {
     /** Phase 2 — close the person's preview tunnel. */
     async closePreview(nodeId: string, port: number): Promise<PortsResult<null>> {
         try {
-            const response = await fetch(
+            const response = await browserApiFetch(
                 `/api/fleet/nodes/${encodeURIComponent(nodeId)}/ports/${port}/preview`,
                 {
                     method: 'DELETE',

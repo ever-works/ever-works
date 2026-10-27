@@ -182,3 +182,17 @@ export * from '../apps-catalog/app-spec-merge';
 export * from '../apps-catalog/app-blueprint-apply.job';
 export * from '../apps-catalog/app-blueprint-upgrade.service';
 export * from '../apps-catalog/app-blueprint-apply.runner';
+
+// APW-08 T47 (XC-05, FR-69, lane B2) — the App Work Task tool policy (the ONE list; APW-09
+// consumes it) and the run classifier the API binds for `AgentRunService`.
+export * from './app-work-task-tool-policy';
+export * from './app-work-run-classifier';
+
+// APW-08 T49 (XC-10, FR-74, R-30, lane B2) — the evolve loop's operator kill switches.
+export * from './app-work-switches';
+
+// APW-08 T18 (lane B2) — the App Work run brief from the App rules at the base commit, and the
+// source both run paths (AgentRunService, the fleet planner) ask for it.
+export * from './app-run-brief';
+export * from './app-run-brief.port';
+export * from './app-run-brief.service';

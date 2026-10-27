@@ -1059,3 +1059,230 @@ describe('withRetries', () => {
         expect(attempts).toBe(3);
     });
 });
+
+/**
+ * Resolution R-25 — every table an App Works epic adds is classified for the
+ * archive (APW-02 T45, APW-03 T54, APW-04 T47, APW-05 T45, APW-06 T65,
+ * APW-07 T45). Each one is a Work child, reached through the parent Work ids,
+ * and its secret columns come out as `{ wasSet }` or not at all.
+ */
+describe('the App Works tables (R-25)', () => {
+    const APP_WORKS_FILES: Record<string, string> = {
+        WorkUpstreamState: 'upstream-states.jsonl',
+        WorkAppSpecState: 'app-spec-states.jsonl',
+        WorkAppProvisioning: 'app-provisionings.jsonl',
+        WorkBuild: 'builds.jsonl',
+        WorkBuildPreparation: 'build-preparations.jsonl',
+        WorkAppRuntimeState: 'app-runtime-states.jsonl',
+        WorkAppEnvValue: 'app-env-values.jsonl',
+        WorkAppDependency: 'app-dependencies.jsonl',
+    };
+    const works = BACKUP_DOMAIN_SPECS.find((spec) => spec.key === 'works')!;
+    /** A sentinel no archive line may ever contain. */
+    const SENTINEL = 'enc::v1::sentinel-value-that-must-never-ship';
+
+    it.each(Object.entries(APP_WORKS_FILES))(
+        'classifies %s exactly once, in works, through the parent Work ids',
+        (entity, file) => {
+            const placements = BACKUP_DOMAIN_SPECS.flatMap((spec) =>
+                spec.files
+                    .filter((candidate) => candidate.entity === entity)
+                    .map((candidate) => `${spec.key}/${candidate.file}`),
+            );
+            expect(placements).toEqual([`works/${file}`]);
+            const spec = works.files.find((candidate) => candidate.entity === entity)!;
+            // Never `by: 'user'`: that would also export the rows of Works the
+            // person runs in another workspace.
+            expect(spec.scope).toEqual({ by: 'parent', column: 'workId', from: 'workIds' });
+            expect(shouldDropEntirely(entity)).toBe(false);
+            expect(BACKUP_DROPPED_ENTITIES).not.toContain(entity);
+        },
+    );
+
+    it('places every App Works file after works.jsonl registers the Work ids', () => {
+        const files = works.files.map((candidate) => candidate.file);
+        const registered = files.indexOf('works.jsonl');
+        expect(works.files[registered].registerIdsAs).toBe('workIds');
+        for (const file of Object.values(APP_WORKS_FILES)) {
+            expect(files.indexOf(file)).toBeGreaterThan(registered);
+        }
+    });
+
+    /** Plan the works domain, drain works.jsonl, then collect one App Works file. */
+    async function collect(
+        entity: string,
+        rows: Record<string, unknown>[],
+        workRows: Record<string, unknown>[] = [{ id: 'w1', userId: 'u1', organizationId: 'org-1' }],
+    ): Promise<{ lines: Record<string, unknown>[]; within: unknown }> {
+        const source = new FixtureRowSource(
+            { Work: workRows, [entity]: rows },
+            {
+                Work: ['id', 'userId', 'organizationId'],
+                [entity]: Object.keys(rows[0] ?? { id: '', workId: '' }),
+            },
+        );
+        const collector = new EntityBackupCollector(works);
+        const context = contextFor(source);
+        const first = await collector.plan(context);
+        for await (const _row of collector.rows(
+            context,
+            first.find((plan) => plan.file === 'works.jsonl')!,
+        )) {
+            void _row;
+        }
+        const plan = await collector.replan(
+            context,
+            first.find((candidate) => candidate.file === APP_WORKS_FILES[entity])!,
+        );
+        const lines: Record<string, unknown>[] = [];
+        for await (const row of collector.rows(context, plan)) lines.push(row);
+        return { lines, within: plan.query.within };
+    }
+
+    it('narrows an App Works query to the registered Work ids, and reads nothing without one', async () => {
+        const row = { id: 'us1', workId: 'w1', relation: 'fork', readinessState: 'ready' };
+        const found = await collect('WorkUpstreamState', [row]);
+        expect(found.within).toEqual({ column: 'workId', ids: ['w1'] });
+        expect(found.lines).toEqual([row]);
+
+        const none = await collect('WorkUpstreamState', [row], []);
+        expect(none.within).toEqual({ column: 'workId', ids: [] });
+        expect(none.lines).toEqual([]);
+    });
+
+    it('exports an env value as its name and origin, with the value as { wasSet } and no length', async () => {
+        const { lines } = await collect('WorkAppEnvValue', [
+            {
+                id: 'e1',
+                workId: 'w1',
+                name: 'SESSION_SECRET',
+                origin: 'generated',
+                valueEncrypted: SENTINEL,
+                valueBytes: 44,
+                version: 2,
+            },
+        ]);
+        expect(lines).toEqual([
+            {
+                id: 'e1',
+                workId: 'w1',
+                name: 'SESSION_SECRET',
+                origin: 'generated',
+                valueEncrypted: { wasSet: true },
+                version: 2,
+            },
+        ]);
+        expect(JSON.stringify(lines)).not.toContain('enc::v1::');
+    });
+
+    it('exports a dependency with config and outputs as { wasSet }: true for an envelope, false for null', async () => {
+        const { lines } = await collect('WorkAppDependency', [
+            {
+                id: 'd1',
+                workId: 'w1',
+                kind: 'postgres',
+                status: 'ready',
+                configEncrypted: SENTINEL,
+                outputsEncrypted: SENTINEL,
+            },
+            {
+                id: 'd2',
+                workId: 'w1',
+                kind: 'redis',
+                status: 'ready',
+                configEncrypted: null,
+                outputsEncrypted: null,
+            },
+        ]);
+        expect(lines.map((line) => [line.configEncrypted, line.outputsEncrypted])).toEqual([
+            [{ wasSet: true }, { wasSet: true }],
+            [{ wasSet: false }, { wasSet: false }],
+        ]);
+        expect(lines.map((line) => line.kind)).toEqual(['postgres', 'redis']);
+        expect(JSON.stringify(lines)).not.toContain('enc::v1::');
+    });
+
+    it('exports a Build with its secret NAMES intact and no buildInputsHash key', async () => {
+        const { lines } = await collect('WorkBuild', [
+            {
+                id: 'b1',
+                workId: 'w1',
+                number: 7,
+                status: 'succeeded',
+                appSpecHash: 'a'.repeat(64),
+                buildInputsHash: 'b'.repeat(64),
+                buildSecretNames: ['EW_DATABASE_URL'],
+                secretCheck: 'passed',
+            },
+        ]);
+        expect(lines).toHaveLength(1);
+        expect(lines[0].buildSecretNames).toEqual(['EW_DATABASE_URL']);
+        expect(lines[0].appSpecHash).toBe('a'.repeat(64));
+        expect(lines[0].secretCheck).toBe('passed');
+        expect('buildInputsHash' in lines[0]).toBe(false);
+    });
+
+    it('exports a build preparation with webhookId and runsEtag intact and no buildInputsHash key', async () => {
+        const { lines } = await collect('WorkBuildPreparation', [
+            {
+                id: 'p1',
+                workId: 'w1',
+                webhookId: '123',
+                runsEtag: 'W/"etag"',
+                buildInputsHash: 'c'.repeat(64),
+                repositoryBlock: null,
+            },
+        ]);
+        expect(lines[0]).toEqual({
+            id: 'p1',
+            workId: 'w1',
+            webhookId: '123',
+            runsEtag: 'W/"etag"',
+            repositoryBlock: null,
+        });
+    });
+
+    it('exports a provisioning run without the four never-on-the-wire columns', async () => {
+        const { lines } = await collect('WorkAppProvisioning', [
+            {
+                id: 'r1',
+                workId: 'w1',
+                status: 'succeeded',
+                tokenCap: 3_000_000,
+                tokensUsed: 120_000,
+                suggestionBundle: '{"files":{}}',
+                suggestionUpstream: 'https://example.invalid/o/r',
+                lastRunOutput: 'agent output',
+                verificationNamespace: 'ew-verify-abc',
+            },
+        ]);
+        expect(lines[0]).toEqual({
+            id: 'r1',
+            workId: 'w1',
+            status: 'succeeded',
+            tokenCap: 3_000_000,
+            tokensUsed: 120_000,
+        });
+    });
+
+    it('exports spec, runtime and upstream state as stored', async () => {
+        const spec = {
+            id: 's1',
+            workId: 'w1',
+            headSpecHash: 'd'.repeat(64),
+            effectiveSpecHash: 'e'.repeat(64),
+            licenseRegistryHash: 'f'.repeat(64),
+        };
+        expect((await collect('WorkAppSpecState', [spec])).lines).toEqual([spec]);
+
+        const runtime = {
+            id: 'rt1',
+            workId: 'w1',
+            target: 'your-cluster',
+            cancelRequestedByUserId: 'u1',
+            pendingDomainRebuildBuildId: 'b1',
+            upstreamSyncJudgedToSha: 'a'.repeat(40),
+        };
+        expect((await collect('WorkAppRuntimeState', [runtime])).lines).toEqual([runtime]);
+    });
+});

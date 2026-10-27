@@ -52,3 +52,7 @@ export * from './tenant-postgres-ddl.js';
 export * from './work-app-spec.dto.js';
 export * from './app-provisioning.js';
 export * from './app-provisioning-copy.js';
+// APW-09 — upstream pull requests: states, refusal codes, limits, views (plan §3.3).
+export * from './upstream-pull-request.types.js';
+// APW-08 — the delivery and cost views (plan §3.4): `GET /api/tasks/:id/cost`, `GET /api/works/:id/cost`.
+export * from './task-delivery.types.js';

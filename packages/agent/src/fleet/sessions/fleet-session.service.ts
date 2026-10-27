@@ -1704,6 +1704,14 @@ export class FleetSessionService {
         });
         let runId: string;
         try {
+            // DOCUMENTED dispatch-gate bypass. This Run is the bookkeeping row
+            // for a session a person started on their own machine, not a new
+            // admission: the fleet stop switch the gate would consult
+            // (`FleetKillSwitchService`, the gate's `RunKillSwitch` port) was
+            // already checked above, the model work runs on that machine's own
+            // CLI rather than platform credits, and the node's lease
+            // concurrency bounds how many sessions run at once. The agent pause
+            // brake is NOT applied here (owner question, 2026-10-27).
             const run = await this.runs.createQueued({
                 agentId,
                 userId: actor.userId,

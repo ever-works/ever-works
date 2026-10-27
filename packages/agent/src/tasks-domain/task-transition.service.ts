@@ -65,10 +65,12 @@ import {
     type AgentReviewPlanMode,
 } from './task-agent-review';
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
-import { normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
+import { isAppWorkKind, normalizeCommitSha, type SubAgentScope } from '@ever-works/contracts';
 import { randomUUID } from 'node:crypto';
 import { AWAITING_OWNER_LABEL, isAwaitingOwner, withoutAwaitingOwner } from './awaiting-owner';
 import { agentBlockLiftRefusal, agentMayLiftBlock } from './agent-block-lift';
+// APW-08 T49 — a leaf (the Nest logger only).
+import { describeAppChangesPaused, readAppWorkSwitches } from '../app-works/app-work-switches';
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -1294,6 +1296,24 @@ export class TaskTransitionService {
     }
 
     /**
+     * APW-08 T49 — is `EVER_WORKS_APP_CHANGES_ENABLED` off AND this Task on an App Work? The
+     * switch is read first, so the common case (switch on) costs no query. Fail closed once the
+     * switch is off: a Work that cannot be read, or no Work repository, counts as an App Work —
+     * an operator who stopped changes is never surprised by one that slipped through.
+     */
+    private async appChangesPausedFor(task: Pick<Task, 'id' | 'workId'>): Promise<boolean> {
+        if (readAppWorkSwitches().changesEnabled) return false;
+        if (!task.workId) return false;
+        if (!this.works) return true;
+        try {
+            const work = await this.works.findById(task.workId);
+            return !work || isAppWorkKind(work.kind);
+        } catch {
+            return true;
+        }
+    }
+
+    /**
      * THE dispatch path for one (Task, Agent) pair — gate admit →
      * pre-created queued run → board denorm → job-runtime enqueue →
      * triggerRunId stamp, with the loud-degradation error handling.
@@ -1403,6 +1423,16 @@ export class TaskTransitionService {
         // checked just above, at the one dispatch choke point.
         if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
             return this.sessionSchedules.dispatch(task, agentId);
+        }
+        // APW-08 T49 (R-30) — the operator's change switch, read HERE, at the one dispatch
+        // choke point, so it bites for every surface (board, chat, Goal, recurrence, fan-out)
+        // and for Tasks created before it was flipped. Off, an App Work Task gets no new run
+        // and no run row; the Task stays where it is, to be run again once changes resume.
+        // A review run is not a change (it reads the PR and records a verdict), so it passes.
+        if (!opts.reviewId && (await this.appChangesPausedFor(task))) {
+            const error = describeAppChangesPaused();
+            this.logger.warn(`Task ${task.id}: no run dispatched — ${error}`);
+            return { runId: null, dispatched: false, parked: false, error };
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;
