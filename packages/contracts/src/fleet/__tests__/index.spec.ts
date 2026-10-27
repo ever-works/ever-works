@@ -1518,6 +1518,14 @@ const CLOUD_P2_EXPORTS = [
 	'fleetCloudIdleHours'
 ] as const;
 
+/** Cloud computers P3 (FL-17, #2902) — the deployment site tag and the reconcile requester (same module). */
+const CLOUD_P3_EXPORTS = [
+	'FLEET_CLOUD_SITE_TAG_PREFIX',
+	'FLEET_CLOUD_RECONCILE_REQUESTER',
+	'fleetCloudSiteTag',
+	'fleetCloudSiteFromTags'
+] as const;
+
 const MODEL_LIST_PRICES_EXPORTS = ['MODEL_TOKEN_CLASSES', 'findModelListPriceEntry', 'priceModelTokensCents'] as const;
 
 const ALL_EXPORTS = [
@@ -1565,6 +1573,7 @@ const ALL_EXPORTS = [
 	...USAGE_EXPORTS,
 	...MODEL_LIST_PRICES_EXPORTS,
 	...CLOUD_P2_EXPORTS,
+	...CLOUD_P3_EXPORTS,
 	...ACTIONS_RUNNERS_EXPORTS
 ];
 
@@ -2023,6 +2032,8 @@ const FUNCTION_EXPORTS = [
 	'isFleetVirtualState',
 	'fleetCloudNodeTag',
 	'fleetCloudNodeIdFromTags',
+	'fleetCloudSiteTag',
+	'fleetCloudSiteFromTags',
 	'isFleetCloudName',
 	'isFleetCloudSoftwareId',
 	'normalizeFleetCloudSoftware',
@@ -2219,7 +2230,8 @@ describe('fleet barrel', () => {
 		// `fleet-actions-runners.types.ts` — a NEW module, one row below — and
 		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
 		// → +11 with FL-18 P2 (Actions jobs): same module.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11);
+		// → +4 with FL-17 P3 (site tag, reconcile requester), same module (`CLOUD_P3_EXPORTS`).
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4);
 	});
 
 	it.each([

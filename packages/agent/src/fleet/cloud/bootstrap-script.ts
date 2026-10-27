@@ -98,6 +98,20 @@ const INSTALL_URL_PATTERN = /^https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~/-]*)?$/
 const VPN_KEY_PATTERN = /^[A-Za-z0-9_:-]{8,200}$/;
 const JOIN_COMMAND_PATTERN = /^\/[A-Za-z0-9._/-]+(?: [A-Za-z0-9._/=:-]+)*$/;
 
+/** P3 (spec FR-32): an overlay-VPN auth key the bootstrap accepts — letters, digits, `_`, `:`, `-`; 8–200 long. */
+export function isFleetCloudVpnAuthKey(value: unknown): value is string {
+    return typeof value === 'string' && VPN_KEY_PATTERN.test(value);
+}
+
+/** P3: an operator join command the bootstrap accepts — an absolute path with a `{keyFile}` placeholder. */
+export function isFleetCloudVpnJoinCommand(value: unknown): value is string {
+    return (
+        typeof value === 'string' &&
+        value.includes('{keyFile}') &&
+        JOIN_COMMAND_PATTERN.test(value.replace('{keyFile}', 'KEYFILE'))
+    );
+}
+
 /** Where the overlay-VPN key waits for its single use (tmpfs, 0600). */
 export const FLEET_CLOUD_VPN_KEY_PATH = '/run/ever-works/overlay-vpn-key';
 
