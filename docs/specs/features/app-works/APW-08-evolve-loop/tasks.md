@@ -649,6 +649,7 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 ## P1.8 — Web
 
 - [ ] **T27. Chips, sections, dialog, filter.**
+      **Status (2026-10-27, lane B2 `aw-evolve`): the dialog and the cost summary are done** — `RequestChangeDialog` (one field, `POST /api/works/:id/evolve` with `channel: 'card'` through `requestAppChangeAction`; the filed Task with the held-for-owner and cloud-push notes, or the refusal by the API's own code) and `WorkCostSummary` (`GET /api/works/:id/cost`: spent, monthly budget, remaining, alert) on `AppWorkOverviewCard`; English copy under `dashboard.workDetail.appChange` / `.appCost` (other locales fall back to English). Spec `RequestChangeDialog.unit.spec.tsx` (8). **Not built:** the delivery chips, the Task page's Delivery and Cost sections and the `deliveryState` filter (they need the delivery chain).
       **Create** `apps/web/src/components/tasks/TaskDeliveryChips.tsx`,
       `apps/web/src/components/tasks/TaskDeliverySection.tsx`, `apps/web/src/components/tasks/TaskCostSection.tsx`,
       `apps/web/src/components/works/detail/RequestChangeDialog.tsx` (all new).
