@@ -12,6 +12,11 @@ import {
     type AppBlueprintApplyRef,
     type AppBlueprintApplyStatus,
     type AppBlueprintUpgradePr,
+    type AppBlueprintRunMode,
+    type AppBlueprintUpgradeConflictSummary,
+    type AppBlueprintUpgradeStatus,
+    APP_BLUEPRINT_RUN_MODES,
+    APP_BLUEPRINT_UPGRADE_STATUSES,
     type AppLicenseEvidence,
     type AppLicenseHeaderFinding,
     type AppSpec,
@@ -218,6 +223,41 @@ export class AppBlueprintUpgradePrDto implements AppBlueprintUpgradePr {
 
     @ApiProperty({ description: 'A `MAJOR` bump sets this (FR-51).' })
     breaking!: boolean;
+
+    // ── Additive (APW-03 T28/T31, lane aw-blueprints) ───────────────────────
+
+    @ApiPropertyOptional({ enum: APP_BLUEPRINT_RUN_MODES })
+    mode?: AppBlueprintRunMode;
+
+    @ApiPropertyOptional({ nullable: true, description: 'The version followed when proposed.' })
+    fromVersion?: string | null;
+
+    @ApiPropertyOptional({ description: 'The branch the pull request is opened from.' })
+    branch?: string;
+
+    @ApiPropertyOptional({ nullable: true })
+    blueprintSha?: string | null;
+
+    @ApiPropertyOptional({
+        description:
+            '`false` when the applied version could not be read and the merge was two-way.',
+    })
+    baseKnown?: boolean;
+
+    @ApiPropertyOptional({
+        description: 'Every conflict found; the member value was kept for each.',
+    })
+    conflictCount?: number;
+
+    @ApiPropertyOptional({
+        description:
+            'The first conflicts: `{ path, kind, proposed? }` — paths and the Blueprint’s proposed value only, ' +
+            'never the member’s.',
+    })
+    conflicts?: readonly AppBlueprintUpgradeConflictSummary[];
+
+    @ApiPropertyOptional()
+    updatedAt?: string;
 }
 
 /** One licence header finding (plan §2.6:324-325). */
@@ -385,6 +425,19 @@ export class WorkAppSpecStateResponseDto implements WorkAppSpecStateDto {
 
     @ApiProperty({ type: () => AppBlueprintUpgradePrDto, nullable: true })
     blueprintUpgradePr!: AppBlueprintUpgradePrDto | null;
+
+    @ApiPropertyOptional({
+        enum: APP_BLUEPRINT_UPGRADE_STATUSES,
+        nullable: true,
+        description: 'The latest Blueprint apply / upgrade run (APW-03 T28).',
+    })
+    blueprintUpgradeStatus?: AppBlueprintUpgradeStatus | null;
+
+    @ApiPropertyOptional({ nullable: true, description: 'The reason code of a `failed` run.' })
+    blueprintUpgradeError?: string | null;
+
+    @ApiPropertyOptional({ nullable: true })
+    blueprintUpgradeRequestedAt?: string | null;
 
     @ApiProperty({ nullable: true })
     licenseSpdx!: string | null;
@@ -570,6 +623,9 @@ export function toWorkAppSpecStateResponse(
         blueprintLatestVersion: state.blueprintLatestVersion ?? null,
         blueprintUpgradeDismissedVersion: state.blueprintUpgradeDismissedVersion ?? null,
         blueprintUpgradePr: state.blueprintUpgradePr ?? null,
+        blueprintUpgradeStatus: state.blueprintUpgradeStatus ?? null,
+        blueprintUpgradeError: state.blueprintUpgradeError ?? null,
+        blueprintUpgradeRequestedAt: iso(state.blueprintUpgradeRequestedAt),
         licenseSpdx: state.licenseSpdx ?? null,
         licenseClass: state.licenseClass ?? null,
         licenseSource: state.licenseSource ?? null,
