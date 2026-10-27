@@ -197,8 +197,8 @@ export class SessionHookOverlay implements HookOverlayPort {
 				return null;
 			}
 			if (provider === 'codex') {
-				const command = [this.options.nodePath, this.options.paths.clientPath, 'codex', sessionId].map((part) =>
-					this.options.platform === 'win32' ? part.replace(/\\/g, '/') : part
+				const command = [this.options.nodePath, this.options.paths.clientPath, 'codex', sessionId].map(
+					(part) => (this.options.platform === 'win32' ? part.replace(/\\/g, '/') : part)
 				);
 				const notifyReplaced =
 					kind === 'owner' &&
@@ -227,7 +227,9 @@ export class SessionHookOverlay implements HookOverlayPort {
 				this.options.platform
 			);
 			if (!command) {
-				this.options.logger?.warn('Session status: the hook command could not be quoted; status comes from the screen');
+				this.options.logger?.warn(
+					'Session status: the hook command could not be quoted; status comes from the screen'
+				);
 				const hooks: FleetSessionHooks = { provider, injected: false, events: [] };
 				this.injected.set(sessionId, hooks);
 				return { args: [], env, hooks };

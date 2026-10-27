@@ -5,7 +5,10 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import { execInFleetContainerAction, fleetContainerShellsAction } from '@/app/actions/fleet/machine';
+import {
+    execInFleetContainerAction,
+    fleetContainerShellsAction,
+} from '@/app/actions/fleet/machine';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -48,7 +51,9 @@ export function ShellInsideButton({
         startTransition(async () => {
             const result = await execInFleetContainerAction(nodeId, { container, shell });
             if (!result.ok) {
-                toast.error(result.error.hint ? t('failedWith', { hint: result.error.hint }) : t('failed'));
+                toast.error(
+                    result.error.hint ? t('failedWith', { hint: result.error.hint }) : t('failed'),
+                );
                 return;
             }
             router.push(ROUTES.DASHBOARD_FLEET_SESSION(result.data.sessionId));

@@ -66,16 +66,29 @@ export function ScheduleRunHistory({
 
     return (
         <div className="space-y-1 px-2 py-1" data-testid="fleet-schedule-history">
-            <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('title', { computer })}</p>
+            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                {t('title', { computer })}
+            </p>
             <ul className="space-y-1">
                 {runs.map((run) => {
-                    const fire = twoZoneTime(run.scheduledFor ?? run.startedAt, schedule.nodeTimeZone, viewerZone);
+                    const fire = twoZoneTime(
+                        run.scheduledFor ?? run.startedAt,
+                        schedule.nodeTimeZone,
+                        viewerZone,
+                    );
                     const skip = runSkipText(run, computer);
                     const hasOutput = run.outputHead.length > 0 || run.outputTail.length > 0;
                     return (
                         <li key={run.id} className="text-xs" data-testid="fleet-schedule-run">
                             <span className="font-mono">{runGlyph(run.status)}</span>{' '}
-                            {fire ? (fire.viewer ? t('twoZones', { computer: fire.computer, viewer: fire.viewer }) : fire.computer) : '—'}
+                            {fire
+                                ? fire.viewer
+                                    ? t('twoZones', {
+                                          computer: fire.computer,
+                                          viewer: fire.viewer,
+                                      })
+                                    : fire.computer
+                                : '—'}
                             {run.scheduledFor === null ? ` · ${t('runNow')}` : ''}
                             {skip ? (
                                 <span className="text-text-muted"> — {skip}</span>
@@ -101,7 +114,11 @@ export function ScheduleRunHistory({
                                         </button>
                                     ) : null}
                                     {run.hasFullOutput && schedule.linkUp ? (
-                                        <button type="button" className="ml-2 underline" onClick={() => void download(run)}>
+                                        <button
+                                            type="button"
+                                            className="ml-2 underline"
+                                            onClick={() => void download(run)}
+                                        >
                                             {t('fullOutput')}
                                         </button>
                                     ) : null}

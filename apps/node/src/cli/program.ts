@@ -1,15 +1,32 @@
 import { Command, CommanderError } from 'commander';
-import { homedir as osHomedir } from 'node:os';
+import { homedir as osHomedir, hostname as osHostname } from 'node:os';
 import { stat as statFile, unlink as removeFile } from 'node:fs/promises';
 import { posix, win32 } from 'node:path';
 import type { FleetVirtualSystemId } from '@ever-works/contracts';
-import { parseCatalogueLock, resolveVirtualImage, VIRTUAL_CONTAINER_IMAGES } from '../core/link/modules/virtual/catalogue';
+import {
+	parseCatalogueLock,
+	resolveVirtualImage,
+	VIRTUAL_CONTAINER_IMAGES
+} from '../core/link/modules/virtual/catalogue';
 import { resolveWindowsImage } from '../core/link/modules/virtual/windows';
 import { createNativeScheduler } from '../core/link/modules/schedule/native-scheduler';
 import { ScheduleHistory } from '../core/link/modules/schedule/schedule-history';
 import { ScheduleLoop } from '../core/link/modules/schedule/schedule-loop';
 import { ScheduleStore } from '../core/link/modules/schedule/schedule-store';
 import { describeSelf } from '../core/capabilities';
+import {
+	helperAdmit,
+	helperAdmitSigned,
+	HelperAdmissionError,
+	helperInstall,
+	helperRevoke,
+	helperStatus,
+	type HelperAdmissionDeps
+} from '../core/screen/helper/helper-admission';
+import { helperControlAllow, helperControlDeny, helperControlStatus } from '../core/screen/helper/helper-control';
+import { BAKED_HELPER_MANIFEST } from '../core/screen/helper/helper-manifest';
+import { nodeHelperSignatureChecker } from '../core/screen/helper/helper-signature';
+import { createHelperFs, helperPathsFor, type HelperFs } from '../core/screen/helper/helper-trust';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
 import { FleetClientError } from '../core/fleet-client';
@@ -189,6 +206,19 @@ export interface CliDeps {
 	 * upgrades) from anything else (which it refuses). Unset → refused.
 	 */
 	entryPath?: string | null;
+	/**
+	 * Desktop view & control (FL-07) — read one typed line from the person at
+	 * this machine's keyboard (`helper admit` asks for the word `admit`). Set by
+	 * the real executable only when stdin is a terminal; absent, `helper admit`
+	 * refuses rather than approving without a person.
+	 */
+	readLine?: (prompt: string) => Promise<string | null>;
+	/** Desktop view & control (FL-07) — `process.arch`, for the helper's build target. */
+	arch?: string;
+	/** Desktop view & control (FL-07) — the screen helper's filesystem (tests inject a fake). */
+	helperFs?: HelperFs;
+	/** Desktop view & control (FL-07) — the `helper install` download (tests inject a fake). */
+	helperFetch?: typeof fetch;
 }
 
 /**
@@ -422,7 +452,9 @@ export async function resolveEnrollToken(
 				throw new CliError(`The token file ${path} belongs to another user; refusing to read it`);
 			}
 			if ((info.mode & 0o077) !== 0) {
-				throw new CliError(`The token file ${path} is readable by other users (it must be 0600); refusing to read it`);
+				throw new CliError(
+					`The token file ${path} is readable by other users (it must be 0600); refusing to read it`
+				);
 			}
 		}
 		const raw = await io.readFile(path);
@@ -827,6 +859,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 				}
 			: {}),
 		...(deps.restrictFile ? { restrictFile: deps.restrictFile } : {}),
+		// Desktop view & control (FL-07): the screen helper's files, beside the config
+		// (used only under --attend).
+		screenHelperPaths: helperPathsFor(deps.configPath, deps.platform),
 		// Commands on computers (FL-12): the last 30 runs' full output, beside the config.
 		commandOutputDir: (deps.platform === 'win32' ? win32 : posix).join(
 			(deps.platform === 'win32' ? win32 : posix).dirname(deps.configPath),
@@ -1941,7 +1976,11 @@ export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): P
 	const virtual = await describeVirtualCatalogue(deps);
 	if (options.json === true) {
 		deps.out(
-			JSON.stringify({ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual }, null, 2)
+			JSON.stringify(
+				{ ...housekeepingJson(report), ...lifecycleJson(deps, lifecycle), sessions, virtual },
+				null,
+				2
+			)
 		);
 		return;
 	}
@@ -2282,10 +2321,83 @@ export function buildProgram(deps: CliDeps): Command {
 			await runGc(deps, options);
 		});
 
+	// Desktop view & control (FL-07): the native screen helper's admission — on
+	// this machine, by the person at its keyboard, never from the web (FR-15).
+	const helper = program
+		.command('helper')
+		.description('The native screen helper that shows this computer’s desktop in a live view (Desktop source)');
+	helper
+		.command('install')
+		.description(
+			'Download the screen helper this node version publishes for this platform and check its fingerprint'
+		)
+		.action(async () => {
+			await runHelperCommand(deps, (helperDeps) => helperInstall(helperDeps));
+		});
+	helper
+		.command('admit')
+		.description('Approve the screen helper on this machine after comparing its fingerprint (type "admit")')
+		.option('--path <file>', 'Approve this helper file instead of the installed one')
+		.option('--allow-unpublished', 'Approve a helper this node version does not publish (a build of your own)')
+		.option(
+			'--signed',
+			'Approve it by its code signature (macOS Developer ID / Windows Authenticode of the publisher this node version names): updates keep the approval'
+		)
+		.action(async (options: { path?: string; allowUnpublished?: boolean; signed?: boolean }) => {
+			if (options.signed) {
+				await runHelperCommand(deps, (helperDeps) =>
+					helperAdmitSigned(helperDeps, options.path ? { path: options.path } : {})
+				);
+				return;
+			}
+			await runHelperCommand(deps, (helperDeps) => helperAdmit(helperDeps, options));
+		});
+	helper
+		.command('revoke')
+		.description('Withdraw the approval: a running node stops the helper and ends every desktop view')
+		.action(async () => {
+			await runHelperCommand(deps, (helperDeps) => helperRevoke(helperDeps));
+		});
+	helper
+		.command('status')
+		.description('Show whether the screen helper is installed, approved and unchanged')
+		.option('--json', 'Emit the report as one JSON object')
+		.action(async (options: { json?: boolean }) => {
+			await runHelperCommand(deps, (helperDeps) => helperStatus(helperDeps, options));
+		});
+	// FL-07 P2: the owner's permission, on this machine, for people to take control of
+	// its mouse and keyboard from a live view (default: not allowed).
+	const helperControl = helper
+		.command('control')
+		.description(
+			'Allow or withdraw control of this computer’s mouse and keyboard from a live view (default: not allowed)'
+		);
+	helperControl
+		.command('allow')
+		.description('Let the people you allow take control of this computer from a live view (type "control")')
+		.action(async () => {
+			await runHelperCommand(deps, (helperDeps) => helperControlAllow(helperDeps));
+		});
+	helperControl
+		.command('deny')
+		.description('Withdraw control: a running node lets go of every key and button and ends any control at once')
+		.action(async () => {
+			await runHelperCommand(deps, (helperDeps) => helperControlDeny(helperDeps));
+		});
+	helperControl
+		.command('status')
+		.description('Show whether control of this computer is allowed')
+		.option('--json', 'Emit the report as one JSON object')
+		.action(async (options: { json?: boolean }) => {
+			await runHelperCommand(deps, (helperDeps) => helperControlStatus(helperDeps, options));
+		});
+
 	// Schedules on computers (FL-13 P3): what the OS scheduler starts. Hidden.
 	program
 		.command('schedule-run', { hidden: true })
-		.description("Run what is due of this computer's schedules once (started by the OS scheduler; not for direct use)")
+		.description(
+			"Run what is due of this computer's schedules once (started by the OS scheduler; not for direct use)"
+		)
 		.argument('<id>', 'The schedule the OS scheduler fired')
 		.action(async (id: string) => {
 			await runScheduleRun(deps, id);
@@ -2393,6 +2505,49 @@ export async function runCli(argv: string[], deps: CliDeps): Promise<number> {
 		const message = error instanceof Error ? error.message : String(error);
 		deps.io.logger.error(deps.io.logger.redact(message));
 		return EXIT_FAILURE;
+	}
+}
+
+/** The screen helper's admission deps for this CLI (FL-07). */
+export function helperAdmissionDeps(deps: CliDeps): HelperAdmissionDeps {
+	const arch = deps.arch ?? deps.io.environment.arch;
+	// P3: the OS signature check (macOS, Windows), bound to the signer this node version publishes.
+	const checkSignature = nodeHelperSignatureChecker(deps.io.runner, deps.platform, arch, BAKED_HELPER_MANIFEST);
+	return {
+		fs:
+			deps.helperFs ??
+			createHelperFs({ platform: deps.platform, ...(deps.restrictFile ? { restrict: deps.restrictFile } : {}) }),
+		paths: helperPathsFor(deps.configPath, deps.platform),
+		platform: deps.platform,
+		arch,
+		manifest: BAKED_HELPER_MANIFEST,
+		hostName: safeHostname(),
+		out: deps.out,
+		...(deps.readLine ? { readLine: deps.readLine } : {}),
+		...(deps.helperFetch ? { fetchFn: deps.helperFetch } : {}),
+		...(deps.now ? { now: deps.now } : {}),
+		...(checkSignature ? { checkSignature } : {})
+	};
+}
+
+function safeHostname(): string {
+	try {
+		return osHostname() || 'this computer';
+	} catch {
+		return 'this computer';
+	}
+}
+
+/** Run one `helper …` verb, turning its refusal into the CLI's own error. */
+async function runHelperCommand(
+	deps: CliDeps,
+	run: (helperDeps: HelperAdmissionDeps) => Promise<unknown>
+): Promise<void> {
+	try {
+		await run(helperAdmissionDeps(deps));
+	} catch (error) {
+		if (error instanceof HelperAdmissionError) throw new CliError(error.message, error.exitCode);
+		throw error;
 	}
 }
 

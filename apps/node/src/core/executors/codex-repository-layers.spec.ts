@@ -146,7 +146,10 @@ describe('withCodexDisclosures', () => {
 
 	it('appends the disclosures after the standing downgrades, without mutating the input', () => {
 		const next = withCodexDisclosures(record, [{ control: CODEX_WINDOWS_SANDBOX_CONTROL, reason: 'w' }, null]);
-		expect(next.downgrades.map((entry) => entry.control)).toEqual(['network-egress', CODEX_WINDOWS_SANDBOX_CONTROL]);
+		expect(next.downgrades.map((entry) => entry.control)).toEqual([
+			'network-egress',
+			CODEX_WINDOWS_SANDBOX_CONTROL
+		]);
 		expect(record.downgrades).toHaveLength(1);
 		expect(next.executionPath).toBe('ordinary');
 	});

@@ -270,7 +270,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'GET',
         path: '/api/apps-catalog/licenses',
         wrapper: 'listAppCatalogLicenses',
-        shipped: false,
+        // APW-03 T25 (lane aw-blueprints, 2026-10-27) — `AppsCatalogLicensesController`.
+        shipped: true,
     },
     {
         id: '03-4',
@@ -302,7 +303,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'POST',
         path: '/api/works/:id/app-spec/blueprint',
         wrapper: 'applyAppSpecBlueprint',
-        shipped: false,
+        // APW-03 T29 (lane aw-blueprints, 2026-10-27) — `WorkAppSpecController`.
+        shipped: true,
     },
     {
         id: '03-8',
@@ -310,7 +312,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'POST',
         path: '/api/works/:id/app-spec/blueprint/upgrade',
         wrapper: 'upgradeAppSpecBlueprint',
-        shipped: false,
+        // APW-03 T29 (lane aw-blueprints, 2026-10-27) — `WorkAppSpecController`.
+        shipped: true,
     },
     {
         id: '03-9',
@@ -318,7 +321,8 @@ export const CONTRACTS_S4_ROUTES: readonly ContractsRouteRow[] = [
         method: 'POST',
         path: '/api/works/:id/app-spec/blueprint/dismiss',
         wrapper: 'dismissAppSpecBlueprint',
-        shipped: false,
+        // APW-03 T29 (lane aw-blueprints, 2026-10-27) — `WorkAppSpecController`.
+        shipped: true,
     },
     {
         id: '03-10',
@@ -998,7 +1002,7 @@ export function getAppsCatalogEntry(
     return rawApi(request, 'GET', `/api/apps-catalog/${seg(input.catalogId)}`, input);
 }
 
-/** **Unshipped / contract-only** (APW-03): `GET /api/apps-catalog/licenses` (public). */
+/** **Shipped** (APW-03 T25, 2026-10-27): `GET /api/apps-catalog/licenses` (public). */
 export function listAppCatalogLicenses(
     request: APIRequestContext,
     input: WrapperOptions = {},
@@ -1030,7 +1034,7 @@ export function validateAppSpec(
     return rawApi(request, 'POST', `/api/works/${seg(input.workId)}/app-spec/validate`, input);
 }
 
-/** **Unshipped / contract-only** (APW-03): `POST /api/works/:id/app-spec/blueprint` (`202`). */
+/** **Shipped** (APW-03 T29, 2026-10-27): `POST /api/works/:id/app-spec/blueprint` (`202`). */
 export function applyAppSpecBlueprint(
     request: APIRequestContext,
     input: WorkScopedInput & BodyInput<Record<string, unknown>>,
@@ -1039,8 +1043,8 @@ export function applyAppSpecBlueprint(
 }
 
 /**
- * **Unshipped / contract-only** (APW-03):
- * `POST /api/works/:id/app-spec/blueprint/upgrade` (`202`).
+ * **Shipped** (APW-03 T29, 2026-10-27):
+ * `POST /api/works/:id/app-spec/blueprint/upgrade` (`202`, or `200` with the open pull request).
  */
 export function upgradeAppSpecBlueprint(
     request: APIRequestContext,
@@ -1055,7 +1059,7 @@ export function upgradeAppSpecBlueprint(
 }
 
 /**
- * **Unshipped / contract-only** (APW-03):
+ * **Shipped** (APW-03 T29, 2026-10-27):
  * `POST /api/works/:id/app-spec/blueprint/dismiss`.
  */
 export function dismissAppSpecBlueprint(

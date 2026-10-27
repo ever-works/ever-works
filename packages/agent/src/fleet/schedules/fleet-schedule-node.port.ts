@@ -35,7 +35,11 @@ export interface FleetScheduleNodePort {
         caller: FleetCommandPortCaller,
     ): Promise<FleetScheduleSyncResult>;
     /** Runs that ended since `since`, and the ones running (`schedule.runs`). */
-    runs(nodeId: string, since: string | null, caller: FleetCommandPortCaller): Promise<FleetScheduleRunsResult>;
+    runs(
+        nodeId: string,
+        since: string | null,
+        caller: FleetCommandPortCaller,
+    ): Promise<FleetScheduleRunsResult>;
     /** Run one schedule now (`schedule.runNow`); `busy` while one runs. */
     runNow(
         nodeId: string,

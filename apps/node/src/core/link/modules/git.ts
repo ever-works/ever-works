@@ -32,7 +32,9 @@ export function createGitModule(options: GitModuleOptions = {}): NodeModule {
 		const facts = await readGitIdentity(runner);
 		if (facts.gitMissing) {
 			throw new MachineVerbError(
-				makeFleetLinkError('unsupported_on_node', `git is not installed on ${context.nodeName}`, { missing: 'git' })
+				makeFleetLinkError('unsupported_on_node', `git is not installed on ${context.nodeName}`, {
+					missing: 'git'
+				})
 			);
 		}
 		return { name: facts.name, email: facts.email, helper: facts.helper, readAt: new Date().toISOString() };
@@ -43,7 +45,13 @@ export function createGitModule(options: GitModuleOptions = {}): NodeModule {
 			const { fields } = await setGitIdentity(runner, { name: context.params.name, email: context.params.email });
 			context.logger?.info(`git: global identity set (${fields.join(', ')})`);
 			const facts = await readGitIdentity(runner);
-			return { fields, name: facts.name, email: facts.email, helper: facts.helper, readAt: new Date().toISOString() };
+			return {
+				fields,
+				name: facts.name,
+				email: facts.email,
+				helper: facts.helper,
+				readAt: new Date().toISOString()
+			};
 		} catch (error) {
 			if (error instanceof GitIdentityError) {
 				throw new MachineVerbError(

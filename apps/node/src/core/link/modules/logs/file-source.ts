@@ -1,9 +1,5 @@
 import { StringDecoder } from 'string_decoder';
-import {
-	classifyLogLevel,
-	FLEET_LOGS_FILE_SCAN_MAX_BYTES,
-	leadingFleetLogTimestamp
-} from '@ever-works/contracts';
+import { classifyLogLevel, FLEET_LOGS_FILE_SCAN_MAX_BYTES, leadingFleetLogTimestamp } from '@ever-works/contracts';
 import { LogReadError, type LogIo, type RawLogLine } from './log-io';
 import type { LogBatch, LogFollowSink, LogReader } from './log-reader';
 
@@ -96,7 +92,10 @@ export async function scanBackward(
 	if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
 	const kept = parts.slice(-lines);
 	// Bytes of the dropped leading lines move the start offset forward.
-	const droppedText = parts.slice(0, parts.length - kept.length).map((part) => `${part}\n`).join('');
+	const droppedText = parts
+		.slice(0, parts.length - kept.length)
+		.map((part) => `${part}\n`)
+		.join('');
 	startOffset += Buffer.byteLength(droppedText, 'utf8');
 	const scanLimited = kept.length < lines && position > 0;
 	return { lines: kept, startOffset, scanLimited };
@@ -123,7 +122,10 @@ export function createFileReader(io: LogIo, path: string): LogReader {
 			if (!stat) throw new LogReadError('not_found', `${label} is gone`);
 			if (!stat.isFile) throw new LogReadError('invalid', `${label} is not a file`);
 			if (!(await io.fs.canRead(path))) {
-				throw new LogReadError('unsupported_on_node', `${label} is readable by ${io.platform === 'win32' ? 'an administrator' : 'root'} only on this computer`);
+				throw new LogReadError(
+					'unsupported_on_node',
+					`${label} is readable by ${io.platform === 'win32' ? 'an administrator' : 'root'} only on this computer`
+				);
 			}
 			const scan = await scanBackward(io, path, stat.size, lines);
 			offset = stat.size;
@@ -160,14 +162,21 @@ export function createFileReader(io: LogIo, path: string): LogReader {
 						restart();
 					}
 					if (stat.size - offset > FILE_MAX_BACKLOG_BYTES) {
-						sink.notice('dropped', `skipped ${Math.round((stat.size - offset - FILE_READ_PER_POLL_BYTES) / (1024 * 1024))} MiB — the log is faster than the link`);
+						sink.notice(
+							'dropped',
+							`skipped ${Math.round((stat.size - offset - FILE_READ_PER_POLL_BYTES) / (1024 * 1024))} MiB — the log is faster than the link`
+						);
 						offset = stat.size - FILE_READ_PER_POLL_BYTES;
 						carry = '';
 						decoder = new StringDecoder('utf8');
 					}
 					if (stat.size > offset) {
 						try {
-							const chunk = await io.fs.read(path, offset, Math.min(stat.size - offset, FILE_READ_PER_POLL_BYTES));
+							const chunk = await io.fs.read(
+								path,
+								offset,
+								Math.min(stat.size - offset, FILE_READ_PER_POLL_BYTES)
+							);
 							offset += chunk.byteLength;
 							carry += decoder.write(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength));
 							const parts = carry.split('\n');

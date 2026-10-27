@@ -17,5 +17,8 @@ export const GET = bffProxy<RouteContext>(async ({ request, headers }, ctx) => {
     const { id } = await ctx.params;
     if (!isUuid(id)) return invalidIdResponse();
     const query = sanitizeRunsQuery(new URL(request.url).searchParams);
-    return forwardFleetCall(fleetApiUrl(`/commands/${id}/runs${query}`), { method: 'GET', headers });
+    return forwardFleetCall(fleetApiUrl(`/commands/${id}/runs${query}`), {
+        method: 'GET',
+        headers,
+    });
 });

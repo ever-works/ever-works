@@ -19,7 +19,13 @@ import { checkoutsCommand } from './checkout';
 import { commandsCommand } from './command';
 import { schedulesCommand } from './schedule';
 import { commandsGetCommand, commandsListCommand } from './commands-read';
-import { dockerCommand, logsCommand, portsCommand, processesCommand, servicesCommand } from './machine';
+import {
+    dockerCommand,
+    logsCommand,
+    portsCommand,
+    processesCommand,
+    servicesCommand,
+} from './machine';
 import { nodesCommand } from './nodes';
 import { operationsCommand } from './operations';
 import { attachCommand } from './session/attach';
@@ -37,7 +43,9 @@ import {
 } from './session/actions';
 import { fleetTasksCommand, gitIdentityCommand, sessionStartCommand } from './task-handoff';
 import { virtualCommand } from './virtual';
+import { cloudCommand } from './cloud';
 import { usageCommand } from './usage';
+import { runnersCommand } from './runners';
 
 /**
  * `ever-works fleet` (FL-04 P2, plan §9) — your computers from the terminal.
@@ -66,7 +74,10 @@ checkoutsCommand.addCommand(checkoutChangesCommand).addCommand(checkoutPullReque
 nodesCommand.addCommand(gitIdentityCommand);
 
 // FL-19 T-10 — the reads beside FL-12's `fleet commands run`; P2 adds cancel.
-commandsCommand.addCommand(commandsListCommand).addCommand(commandsGetCommand).addCommand(commandsCancelCommand);
+commandsCommand
+    .addCommand(commandsListCommand)
+    .addCommand(commandsGetCommand)
+    .addCommand(commandsCancelCommand);
 
 // FL-19 P2 (T-16) — the acts, beside each family's reads, all through `--yes` / `--confirm-name`.
 fleetSessionCommand.addCommand(sessionsEndCommand).addCommand(sessionsRenameCommand);
@@ -122,5 +133,9 @@ export const fleetCommand = new Command('fleet')
     .addCommand(fleetTasksCommand)
     // Virtual computers (FL-16 P3): `fleet virtual list|options|create|start|stop|power|resize|rebuild|destroy`.
     .addCommand(virtualCommand)
+    // Cloud computers (FL-17 P3): `fleet cloud providers|options|list|create|power|destroy|usage|idle-policy`.
+    .addCommand(cloudCommand)
     // Usage & cost on the fleet (FL-20): `fleet usage [--days] [--on] [--model]` (read-only).
-    .addCommand(usageCommand);
+    .addCommand(usageCommand)
+    // Actions runners on computers (FL-18 P3): `fleet runners list|jobs|install|start|stop|restart|reinstall|remove|cancel-run`.
+    .addCommand(runnersCommand);

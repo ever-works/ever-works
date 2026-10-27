@@ -1,8 +1,4 @@
-import {
-	classifyLogLevel,
-	FLEET_LOGS_READ_TIMEOUT_MS,
-	leadingFleetLogTimestamp
-} from '@ever-works/contracts';
+import { classifyLogLevel, FLEET_LOGS_READ_TIMEOUT_MS, leadingFleetLogTimestamp } from '@ever-works/contracts';
 import { collectChild, firstLine, LogReadError, type LogIo, type RawLogLine } from './log-io';
 import type { LogBatch, LogFollowSink, LogReader } from './log-reader';
 
@@ -59,17 +55,31 @@ export function createUnifiedLogReader(io: LogIo, options: UnifiedLogReaderOptio
 				io,
 				'log',
 				['show', '--style', 'ndjson', '--last', window, ...predicateArgs(options)],
-				{ max: lines, parse: parseUnifiedLogLine, timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS, partialOnTimeout: true }
+				{
+					max: lines,
+					parse: parseUnifiedLogLine,
+					timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS,
+					partialOnTimeout: true
+				}
 			);
 			if (result.spawnError) {
-				throw new LogReadError('unsupported_on_node', 'the unified log (log) is not available on this computer');
+				throw new LogReadError(
+					'unsupported_on_node',
+					'the unified log (log) is not available on this computer'
+				);
 			}
 			if (result.timedOut && result.entries.length === 0) {
-				throw new LogReadError('operation_failed', `log show did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`);
+				throw new LogReadError(
+					'operation_failed',
+					`log show did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`
+				);
 			}
 			if (!result.timedOut && result.code !== 0 && result.entries.length === 0) {
 				const detail = firstLine(result.stderr.join('\n'));
-				throw new LogReadError('operation_failed', `log show exited ${result.code ?? 'early'}${detail ? `: "${detail}"` : ''}`);
+				throw new LogReadError(
+					'operation_failed',
+					`log show exited ${result.code ?? 'early'}${detail ? `: "${detail}"` : ''}`
+				);
 			}
 			return { lines: result.entries };
 		},

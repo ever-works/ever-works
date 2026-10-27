@@ -5,6 +5,10 @@ import type {
 	GitActionsPermissionsResult,
 	GitForkDivergence,
 	GitForkSyncResult,
+	GitRepositoryCopyBranchMoveInput,
+	GitRepositoryCopyBranchMoveResult,
+	GitRepositoryCopyDivergence,
+	GitRepositoryCopyDivergenceInput,
 	GitRepositoryCopyInput,
 	GitRepositoryCopyResult,
 	GitWebhookInput
@@ -194,6 +198,43 @@ export interface GitPushOptions {
 	 */
 	readonly owner?: string;
 	readonly repo?: string;
+}
+
+/**
+ * Fetch ONE branch of a repository into an existing working copy (APW-02 T48).
+ *
+ * The fetch goes to the URL the provider computes for `owner`/`repo` and to no
+ * URL read from the checkout's config, with the credentials passed explicitly,
+ * and the fetched head lands under `refs/remotes/<remote>/<branch>` — so a
+ * second repository's history can be brought next to the checkout's own
+ * without touching its branches. `remote` defaults to `upstream`.
+ */
+export interface GitFetchBranchOptions {
+	readonly dir: string;
+	readonly owner: string;
+	readonly repo: string;
+	readonly branch: string;
+	readonly token: string;
+	readonly remote?: string;
+}
+
+/**
+ * Count the commits reachable from `include` and NOT from `exclude` — the
+ * `exclude..include` range — in a working copy (APW-02 T48).
+ *
+ * `max` caps the count: an implementation stops walking once it has counted
+ * `max` commits and reports `capped: true`.
+ */
+export interface GitCommitRangeOptions {
+	readonly include: string;
+	readonly exclude: string;
+	readonly max: number;
+}
+
+/** What {@link GitCommitRangeOptions} counted. */
+export interface GitCommitRangeCount {
+	readonly count: number;
+	readonly capped: boolean;
 }
 
 export interface CreateRepoOptions {
@@ -835,6 +876,36 @@ export interface IGitOperations {
 	removeLocalDir(owner: string, repo: string, checkoutKey?: string): Promise<void>;
 	replaceRemote(dir: string, remote: string, url: string): Promise<void>;
 	renameBranch(dir: string, oldName: string, newName: string): Promise<void>;
+
+	// ── APW-02 T48 — the private copy's sync (FR-63) ──────────────────────
+	//
+	// All OPTIONAL, so every existing implementation keeps compiling, and a
+	// caller MUST verify each one is present before calling it. Together they
+	// let a provider plugin compare a private copy with its upstream and push
+	// one exact upstream commit onto it without the platform layer ever
+	// running git itself.
+
+	/**
+	 * Fetch one branch of `owner/repo` into `dir` (see {@link GitFetchBranchOptions}).
+	 * Answers the fetched head's sha, or `null` when the repository has no such
+	 * branch.
+	 */
+	fetchBranch?(options: GitFetchBranchOptions): Promise<string | null>;
+	/** The sha a ref (a branch, a remote-tracking ref, `HEAD`) resolves to in `dir`, or `null`. */
+	resolveRef?(dir: string, ref: string): Promise<string | null>;
+	/** Whether the commit `oid` is present in `dir`. */
+	hasCommit?(dir: string, oid: string): Promise<boolean>;
+	/** The best common ancestor of two commits in `dir`, or `null` when they share none. */
+	findMergeBase?(dir: string, oids: readonly [string, string]): Promise<string | null>;
+	/** Count `exclude..include` in `dir`, capped (see {@link GitCommitRangeOptions}). */
+	countCommitsBetween?(dir: string, options: GitCommitRangeOptions): Promise<GitCommitRangeCount>;
+	/**
+	 * Point the LOCAL branch `branch` of `dir` at `oid` (created when absent).
+	 * Never touches a remote and never checks anything out.
+	 */
+	writeBranchRef?(dir: string, branch: string, oid: string): Promise<void>;
+	/** Remove a working copy `cloneBranch` returned — that directory and nothing else. */
+	removeWorkingCopy?(dir: string): Promise<void>;
 }
 
 /**
@@ -1121,6 +1192,35 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 	 * before calling it (the lazy-plugin proxy over-reports optional methods).
 	 */
 	createRepositoryCopy?(input: GitRepositoryCopyInput, token: string): Promise<GitRepositoryCopyResult>;
+
+	/**
+	 * How far a private copy's branch has drifted from its upstream branch —
+	 * the private copy's half of "your App is N behind" (APW-02 T48, FR-63).
+	 * The counts are measured from the two branches' merge base and capped at
+	 * `input.maxCommits` (`capped: true` ⇒ "10000+").
+	 *
+	 * OPTIONAL. Callers MUST materialise `getRepositoryCopyDivergence` on the
+	 * plugin before calling it (the lazy-plugin proxy over-reports optional
+	 * methods); a provider without it is a typed refusal, never a local git call.
+	 */
+	getRepositoryCopyDivergence?(
+		input: GitRepositoryCopyDivergenceInput,
+		token: string
+	): Promise<GitRepositoryCopyDivergence>;
+
+	/**
+	 * Point a private copy's branch at one exact upstream commit, fast-forward
+	 * only — the private copy's `ever-works/upstream-sync` move (APW-02 T48,
+	 * FR-63). Never a force push: a branch `input.headSha` does not descend from
+	 * answers `not_fast_forward`.
+	 *
+	 * OPTIONAL. Callers MUST materialise `moveRepositoryCopyBranch` on the plugin
+	 * before calling it (the lazy-plugin proxy over-reports optional methods).
+	 */
+	moveRepositoryCopyBranch?(
+		input: GitRepositoryCopyBranchMoveInput,
+		token: string
+	): Promise<GitRepositoryCopyBranchMoveResult>;
 
 	/**
 	 * Apply APW-05's Actions hygiene to a repository: the repo-level Actions

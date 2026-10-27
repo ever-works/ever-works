@@ -46,7 +46,9 @@ export class FleetActionsRunnersPollCronService {
             {
                 ttlMs: 4 * 60 * 1000,
                 onLocked: () =>
-                    this.logger.debug('Skipping fleet-runners-poll pass because another instance holds the task lock'),
+                    this.logger.debug(
+                        'Skipping fleet-runners-poll pass because another instance holds the task lock',
+                    ),
             },
         );
     }

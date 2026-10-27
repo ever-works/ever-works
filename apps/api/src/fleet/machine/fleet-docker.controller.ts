@@ -62,7 +62,8 @@ function accepted<T extends object>(result: T, res: StatusResponse | undefined):
     return result;
 }
 
-const REFUSAL_WHY = 'an Agent acts on Docker through its tools, where a risky act waits for its owner.';
+const REFUSAL_WHY =
+    'an Agent acts on Docker through its tools, where a risky act waits for its owner.';
 
 /**
  * Docker on computers (FL-09 P2, plan §5, CONTRACTS §11.2) — containers and
@@ -144,7 +145,9 @@ export class FleetDockerController {
     ): Promise<object> {
         refuseMachinePrincipalAction(auth, req, 'change a container on a computer', REFUSAL_WHY);
         if (!isFleetContainerRef(container)) {
-            throw fleetMachineError('invalid', 'that is not a container id or name', { field: 'cid' });
+            throw fleetMachineError('invalid', 'that is not a container id or name', {
+                field: 'cid',
+            });
         }
         // Shell inside (FL-09 P3, FR-35): an owner Session whose process is a shell in the container.
         if (action === 'exec') {
@@ -172,7 +175,8 @@ export class FleetDockerController {
 
     @Get('nodes/:id/docker/containers/:cid/shells')
     @ApiOperation({
-        summary: 'Which shells (`bash`, `sh`) a running container has, for “Shell inside”. Needs `--manage`.',
+        summary:
+            'Which shells (`bash`, `sh`) a running container has, for “Shell inside”. Needs `--manage`.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
@@ -182,7 +186,9 @@ export class FleetDockerController {
         @Param('cid') container: string,
     ): Promise<FleetContainerShellsResult> {
         if (!isFleetContainerRef(container)) {
-            throw fleetMachineError('invalid', 'that is not a container id or name', { field: 'cid' });
+            throw fleetMachineError('invalid', 'that is not a container id or name', {
+                field: 'cid',
+            });
         }
         return this.machine.containerShells(id, { kind: 'user', userId: auth.userId }, container);
     }
@@ -202,7 +208,9 @@ export class FleetDockerController {
         const caller = { kind: 'user' as const, userId: auth.userId };
         if (query.project !== undefined) {
             if (!isFleetComposeProject(query.project)) {
-                throw fleetMachineError('invalid', 'that is not a Compose project name', { field: 'project' });
+                throw fleetMachineError('invalid', 'that is not a Compose project name', {
+                    field: 'project',
+                });
             }
             return this.machine.describeComposeProject(id, caller, query.project);
         }
@@ -225,15 +233,26 @@ export class FleetDockerController {
         @Res({ passthrough: true }) res?: StatusResponse,
         @Req() req?: MachinePrincipalRequest,
     ): Promise<object> {
-        refuseMachinePrincipalAction(auth, req, 'change a Compose project on a computer', REFUSAL_WHY);
+        refuseMachinePrincipalAction(
+            auth,
+            req,
+            'change a Compose project on a computer',
+            REFUSAL_WHY,
+        );
         if (!isFleetComposeProject(project)) {
-            throw fleetMachineError('invalid', 'that is not a Compose project name', { field: 'project' });
+            throw fleetMachineError('invalid', 'that is not a Compose project name', {
+                field: 'project',
+            });
         }
         if (!isFleetComposeAction(action)) {
-            throw fleetMachineError('invalid', 'action must be up, down, restart or pull', { field: 'action' });
+            throw fleetMachineError('invalid', 'action must be up, down, restart or pull', {
+                field: 'action',
+            });
         }
         if (body.service !== undefined && !isFleetComposeService(body.service)) {
-            throw fleetMachineError('invalid', 'that is not a Compose service name', { field: 'service' });
+            throw fleetMachineError('invalid', 'that is not a Compose service name', {
+                field: 'service',
+            });
         }
         return accepted(
             await this.machine.composeAction(
@@ -266,7 +285,8 @@ export class FleetDockerController {
 
     @Post('nodes/:id/docker/images')
     @ApiOperation({
-        summary: 'Pull an image (`ref`). Send `confirm: true`. Answers 202 `{ operationId }` while it pulls.',
+        summary:
+            'Pull an image (`ref`). Send `confirm: true`. Answers 202 `{ operationId }` while it pulls.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
@@ -337,9 +357,13 @@ export class FleetDockerController {
     ): Promise<object> {
         refuseMachinePrincipalAction(auth, req, 'remove images on a computer', REFUSAL_WHY);
         if (query.unused !== 'true') {
-            throw fleetMachineError('invalid', 'only unused images can be removed in bulk: unused=true', {
-                field: 'unused',
-            });
+            throw fleetMachineError(
+                'invalid',
+                'only unused images can be removed in bulk: unused=true',
+                {
+                    field: 'unused',
+                },
+            );
         }
         return accepted(
             await this.machine.pruneImages(

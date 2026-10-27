@@ -19,7 +19,11 @@ import {
     FleetSessionTaskService,
     type FleetSessionNodePort,
 } from '@ever-works/agent/fleet';
-import { resolveTaskRepository, taskBranchName, TasksService } from '@ever-works/agent/tasks-domain';
+import {
+    resolveTaskRepository,
+    taskBranchName,
+    TasksService,
+} from '@ever-works/agent/tasks-domain';
 import {
     buildFleetTaskFirstMessage,
     compareFleetHandoffComputers,
@@ -90,7 +94,11 @@ function describeAgo(since: Date | string | null | undefined, now: number): stri
 }
 
 /** The clone URL of a Work's Task repository on the providers the platform knows. */
-function cloneUrlFor(gitProvider: string | null | undefined, owner: string, repo: string): string | null {
+function cloneUrlFor(
+    gitProvider: string | null | undefined,
+    owner: string,
+    repo: string,
+): string | null {
     const host =
         !gitProvider || gitProvider === 'github'
             ? 'github.com'
@@ -140,8 +148,12 @@ export class FleetTaskHandoffService {
         // P3 (spec FR-20): a Trigger-made Task's fire and the event behind it — where a
         // pull-request Task's head branch is read. @Optional(): without them a Task
         // falls back to its own branch.
-        @Optional() @InjectRepository(InboundTriggerFire) private readonly fires?: Repository<InboundTriggerFire>,
-        @Optional() @InjectRepository(IngestedEvent) private readonly events?: Repository<IngestedEvent>,
+        @Optional()
+        @InjectRepository(InboundTriggerFire)
+        private readonly fires?: Repository<InboundTriggerFire>,
+        @Optional()
+        @InjectRepository(IngestedEvent)
+        private readonly events?: Repository<IngestedEvent>,
     ) {}
 
     /**
@@ -154,7 +166,11 @@ export class FleetTaskHandoffService {
     private async pullRequestOf(taskId: string): Promise<FleetHandoffPullRequest | null> {
         if (!this.fires || !this.events) return null;
         try {
-            const fires = await this.fires.find({ where: { taskId }, order: { firedAt: 'ASC' }, take: 5 });
+            const fires = await this.fires.find({
+                where: { taskId },
+                order: { firedAt: 'ASC' },
+                take: 5,
+            });
             for (const fire of fires) {
                 if (!/^[0-9a-f-]{36}$/i.test(fire.dedupeKey ?? '')) continue;
                 const event = await this.events.findOne({ where: { id: fire.dedupeKey } });
@@ -182,7 +198,9 @@ export class FleetTaskHandoffService {
         const pullRequest = await this.pullRequestOf(task.id);
         // P3 (FR-20, S4, U8): a pull-request Task works on the pull request's head —
         // its branch, in the repository that branch lives in (a fork's, when it is one).
-        const headRepository = pullRequest?.headRef ? (pullRequest.headRepo ?? pullRequest.repository) : null;
+        const headRepository = pullRequest?.headRef
+            ? (pullRequest.headRepo ?? pullRequest.repository)
+            : null;
         const repoUrl = headRepository
             ? `https://github.com/${headRepository}.git`
             : target
@@ -199,14 +217,18 @@ export class FleetTaskHandoffService {
         const source = parseFleetTaskSourceLink(task.description ?? '');
 
         // ── Agents (FR-4): the Run-with-agent resolver, then each Agent's facts.
-        const candidates = await this.tasks.listRunCandidates(userId, taskId, scope).catch(() => []);
+        const candidates = await this.tasks
+            .listRunCandidates(userId, taskId, scope)
+            .catch(() => []);
         const ownNodes = ((await this.nodes.findByUser(userId)) as unknown as HandoffNode[]).filter(
             (node) => node.status !== 'enrolling' && node.kind !== 'k8s',
         );
         const nodeNames = new Map(ownNodes.map((node) => [node.id, node.name]));
         const agents: FleetHandoffCandidateAgent[] = [];
         for (const candidate of candidates) {
-            const agent = await this.agents.findByIdAndUser(candidate.id, userId, scope).catch(() => null);
+            const agent = await this.agents
+                .findByIdAndUser(candidate.id, userId, scope)
+                .catch(() => null);
             if (!agent) continue;
             const pinnedNodeId = await this.sessionTasks.pinnedNodeId(userId, {
                 id: agent.id,
@@ -225,8 +247,7 @@ export class FleetTaskHandoffService {
                 pinnedNodeName: pinnedNodeId ? (nodeNames.get(pinnedNodeId) ?? null) : null,
             });
         }
-        const selected =
-            agents.find((agent) => agent.id === requestedAgentId) ?? agents[0] ?? null;
+        const selected = agents.find((agent) => agent.id === requestedAgentId) ?? agents[0] ?? null;
 
         // ── Computers (FR-2, FR-3, U1–U6).
         const killSwitchOn = await this.killSwitch.isStopped().catch(() => true);
@@ -238,7 +259,8 @@ export class FleetTaskHandoffService {
         try {
             for (const { node } of await this.access.listSharedWith(userId)) {
                 const shared = node as unknown as HandoffNode;
-                if (shared.kind === 'k8s' || computers.some((row) => row.nodeId === shared.id)) continue;
+                if (shared.kind === 'k8s' || computers.some((row) => row.nodeId === shared.id))
+                    continue;
                 computers.push({
                     ...this.describe(shared),
                     selectable: false,
@@ -292,8 +314,11 @@ export class FleetTaskHandoffService {
         });
         let activeSessionId: string | null = null;
         if (selected) {
-            const inflight = await this.runs.findInFlightForTaskAgent(task.id, selected.id).catch(() => null);
-            activeSessionId = (inflight as { fleetSessionId?: string | null } | null)?.fleetSessionId ?? null;
+            const inflight = await this.runs
+                .findInFlightForTaskAgent(task.id, selected.id)
+                .catch(() => null);
+            activeSessionId =
+                (inflight as { fleetSessionId?: string | null } | null)?.fleetSessionId ?? null;
         }
 
         return {
@@ -328,7 +353,10 @@ export class FleetTaskHandoffService {
     ): Promise<FleetHandoffComputer> {
         const base = this.describe(node);
         const liveAgentSessions = await this.sessions.countLiveAgentForNode(node.id).catch(() => 0);
-        const slots = typeof node.effectiveMaxConcurrentJobs === 'number' ? node.effectiveMaxConcurrentJobs : null;
+        const slots =
+            typeof node.effectiveMaxConcurrentJobs === 'number'
+                ? node.effectiveMaxConcurrentJobs
+                : null;
         const cli: FleetAgentSessionProvider = agent?.cli ?? 'claude-code';
         const refusal = canStartFleetSession({
             node: {
@@ -411,7 +439,9 @@ export class FleetTaskHandoffService {
         const others: FleetHandoffCheckoutRef[] = [];
         const usable = rows
             .filter((row) => row.state === 'ready' && row.isolation !== 'container')
-            .sort((a, b) => (iso(b.updatedAt ?? null) ?? '').localeCompare(iso(a.updatedAt ?? null) ?? ''));
+            .sort((a, b) =>
+                (iso(b.updatedAt ?? null) ?? '').localeCompare(iso(a.updatedAt ?? null) ?? ''),
+            );
         for (const row of usable) {
             const matches =
                 (workId !== null && row.workId === workId) ||

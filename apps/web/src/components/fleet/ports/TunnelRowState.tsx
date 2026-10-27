@@ -53,7 +53,12 @@ export function TunnelRowState({
                         : [];
                     toast.error(t('limit'), {
                         description: listed
-                            .map((entry) => t('limitRow', { port: entry.port, left: timeLeft(entry.endsAt, Date.now()) }))
+                            .map((entry) =>
+                                t('limitRow', {
+                                    port: entry.port,
+                                    left: timeLeft(entry.endsAt, Date.now()),
+                                }),
+                            )
                             .join(' · '),
                     });
                 } else {
@@ -107,7 +112,10 @@ export function TunnelRowState({
     }
 
     return (
-        <span className="flex flex-wrap items-center gap-2 text-xs" data-testid={`fleet-port-previewing-${port.port}`}>
+        <span
+            className="flex flex-wrap items-center gap-2 text-xs"
+            data-testid={`fleet-port-previewing-${port.port}`}
+        >
             <span className="font-medium text-info">{t('previewing')}</span>
             <span>{t('timeLeft', { time: timeLeft(tunnel.endsAt, nowMs) })}</span>
             <span>{t('requests', { count: tunnel.requestCount })}</span>

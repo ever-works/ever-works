@@ -849,6 +849,117 @@ describe('AppDeployPreconditionsService — the managed tier (§5.1)', () => {
         expect(entryFor(result, 'managed_ineligible').names).toEqual(['emailUnverified']);
     });
 
+    // ── Lane aw-safety (2026-10-26) — APW-10 T27 / APW-06 T45 ────────────────────────────────
+
+    it('asks the tier with the Work, so the cap never counts a redeploy against itself', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        const asked: unknown[][] = [];
+        harness.tier.eligibility = (async (...args: unknown[]) => {
+            asked.push(args);
+            return { eligible: true, reasons: [] };
+        }) as never;
+
+        await harness.service.evaluate(request());
+
+        expect(asked).toEqual([['user-1', { workId: 'work-1' }]]);
+    });
+
+    it('judges an event-driven Deployment (no userId) as the Work — it is no longer unchecked', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        const asked: unknown[][] = [];
+        harness.tier.eligibility = (async (...args: unknown[]) => {
+            asked.push(args);
+            return {
+                eligible: false,
+                reasons: ['capReached'],
+                counted: ['cal', 'umami', 'ghost'],
+                max: 3,
+            };
+        }) as never;
+
+        const result = await harness.service.evaluate(request({ userId: null }));
+
+        expect(asked).toEqual([['', { workId: 'work-1' }]]);
+        expect(codes(result)).toEqual(['quota_exceeded']);
+        expect(result.warnings.map((warning) => warning.code)).not.toContain(
+            'managed_eligibility_unchecked',
+        );
+    });
+
+    it('names the counted App Works and the cap in quota_exceeded (APW-06 T45)', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        harness.tier.eligibility = (async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            counted: ['cal', 'umami', 'ghost'],
+            max: 3,
+        })) as never;
+
+        const result = await harness.service.evaluate(request());
+
+        const entry = entryFor(result, 'quota_exceeded');
+        expect(entry.names).toEqual(['cal', 'umami', 'ghost']);
+        expect(entry.message).toContain('3 App Works');
+        expect(entry.message).toContain('cal, umami, ghost');
+        // Not a free owner a paid plan would admit: no upgrade sentence.
+        expect(entry.message).not.toContain('paid plan');
+    });
+
+    it('tells a free owner at the cap that a paid plan lifts it (owner decision 2026-10-27)', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        harness.tier.eligibility = (async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            counted: ['cal', 'umami', 'ghost'],
+            max: 3,
+            paidPlanAllowsMore: true,
+        })) as never;
+
+        const result = await harness.service.evaluate(request());
+
+        const entry = entryFor(result, 'quota_exceeded');
+        // Still the one `quota_exceeded` row with the counted Works — the hint is in the message.
+        expect(codes(result)).toEqual(['quota_exceeded']);
+        expect(entry.names).toEqual(['cal', 'umami', 'ghost']);
+        expect(entry.message).toContain('A paid plan allows more App Works on Ever Works Apps');
+    });
+
+    it('says why in managed_ineligible — one sentence per reason', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        harness.tier.eligible = false;
+        harness.tier.reasons = ['emailUnverified'];
+
+        const result = await harness.service.evaluate(request());
+
+        expect(entryFor(result, 'managed_ineligible').message).toContain(
+            'Verify the email address',
+        );
+    });
+
+    it('fails CLOSED when the eligibility read throws (it used to warn and deploy)', async () => {
+        const harness = managedHarness();
+        harness.tier.open = true;
+        harness.tier.scope = 'any';
+        harness.tier.eligibility = (async () => {
+            throw new Error('db down');
+        }) as never;
+
+        const result = await harness.service.evaluate(request());
+
+        expect(codes(result)).toEqual(['managed_ineligible']);
+        expect(entryFor(result, 'managed_ineligible').names).toEqual(['eligibilityUnavailable']);
+    });
+
     it('refuses with managed_sandbox_unavailable when the tier has no sandboxed runtime (R-24)', async () => {
         const harness = managedHarness();
         harness.tier.open = true;

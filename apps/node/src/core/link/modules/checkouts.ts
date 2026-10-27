@@ -38,7 +38,12 @@ import {
 	isContainerImageReference
 } from './checkouts/checkout-container';
 import { linkSharedFolders } from './checkouts/checkout-shared-folders';
-import { createCheckoutGitRunner, redactedStderrHead, type CheckoutGitResult, type CheckoutGitRunner } from './checkouts/checkout-git';
+import {
+	createCheckoutGitRunner,
+	redactedStderrHead,
+	type CheckoutGitResult,
+	type CheckoutGitRunner
+} from './checkouts/checkout-git';
 import { isGitCheckout, readCheckoutFacts, readWorktreeMain, type CheckoutFacts } from './checkouts/checkout-git-line';
 import {
 	addWorktree,
@@ -116,7 +121,10 @@ export interface CheckoutsModuleOptions {
 	/** The platform's scoped-credential route (P2); absent, a checkout Ever Works made cannot reach its remote. */
 	credentials?: CheckoutCredentialClient;
 	/** Injected for specs: the pool scan (offline). */
-	scanTaskWorkspaces?: (root: string, options: { measureSize: boolean; signal?: AbortSignal }) => Promise<WorkspaceInventory>;
+	scanTaskWorkspaces?: (
+		root: string,
+		options: { measureSize: boolean; signal?: AbortSignal }
+	) => Promise<WorkspaceInventory>;
 	/** Injected for specs: bytes under a folder. */
 	measure?: (path: string) => Promise<number>;
 	/** The reaper's max age, for the Task worktree note. */
@@ -177,7 +185,11 @@ async function mapLimit<T, R>(items: readonly T[], limit: number, run: (item: T)
 	return out;
 }
 
-function refuse(code: Parameters<typeof makeFleetLinkError>[0], hint: string, details?: Record<string, unknown>): never {
+function refuse(
+	code: Parameters<typeof makeFleetLinkError>[0],
+	hint: string,
+	details?: Record<string, unknown>
+): never {
 	throw new MachineVerbError(makeFleetLinkError(code, hint, details));
 }
 
@@ -235,7 +247,10 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 		return state.entries.find((candidate) => keyOf(candidate.path) === keyOf(path));
 	};
 
-	const operationOptions = (signal: AbortSignal, credentialEnv?: Record<string, string>): CheckoutOperationOptions => ({
+	const operationOptions = (
+		signal: AbortSignal,
+		credentialEnv?: Record<string, string>
+	): CheckoutOperationOptions => ({
 		git,
 		signal,
 		...(credentialEnv ? { credentialEnv } : {})
@@ -272,7 +287,9 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 			return run({ git, signal, credentialEnv: anonymousGitEnv() });
 		}
 		if (!options.credentials || !entry.checkoutId) {
-			refuse('operation_failed', 'this node cannot ask the platform for a scoped credential', { path: entry.path });
+			refuse('operation_failed', 'this node cannot ask the platform for a scoped credential', {
+				path: entry.path
+			});
 		}
 		const remoteUrl = await remoteOf(entry.path, signal);
 		if (!remoteUrl) refuse('operation_failed', 'this checkout has no origin remote', { path: entry.path });
@@ -546,7 +563,9 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 			});
 		}
 		const checkoutId =
-			typeof params.checkoutId === 'string' && /^[0-9a-f-]{36}$/i.test(params.checkoutId) ? params.checkoutId : null;
+			typeof params.checkoutId === 'string' && /^[0-9a-f-]{36}$/i.test(params.checkoutId)
+				? params.checkoutId
+				: null;
 		if (!checkoutId) refuse('invalid', 'checkoutId', { field: 'checkoutId' });
 		if (!checkoutsRoot) {
 			refuse('unsupported_on_node', `${context.nodeName} has no folder for new checkouts (no workspace root)`, {
@@ -737,7 +756,9 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 			if (evidence.hasLocks) {
 				refuse('busy', 'another git command is running in this checkout', { path: entry.path, reason: 'lock' });
 			}
-			const expected = context.params.expected as { uncommitted?: unknown; unpushedCommits?: unknown } | undefined;
+			const expected = context.params.expected as
+				| { uncommitted?: unknown; unpushedCommits?: unknown }
+				| undefined;
 			const confirmed =
 				expected && typeof expected.uncommitted === 'number' && typeof expected.unpushedCommits === 'number'
 					? { uncommitted: expected.uncommitted, unpushedCommits: expected.unpushedCommits }
@@ -758,9 +779,15 @@ export function createCheckoutsModule(options: CheckoutsModuleOptions): Checkout
 				branchKept = read?.branch ?? null;
 				const mainPath = main.mainPath ?? entry.parentPath;
 				if (!mainPath) refuse('operation_failed', 'the main checkout of this worktree could not be found');
-				const result = await removeWorktree({ path: entry.path, mainPath: mainPath! }, operationOptions(signal));
+				const result = await removeWorktree(
+					{ path: entry.path, mainPath: mainPath! },
+					operationOptions(signal)
+				);
 				if (result.code !== 0) {
-					refuse('operation_failed', redactedStderrHead(result.stderr) ?? 'git could not remove the worktree');
+					refuse(
+						'operation_failed',
+						redactedStderrHead(result.stderr) ?? 'git could not remove the worktree'
+					);
 				}
 			} else {
 				// A clone Ever Works made: only ever under the checkouts root.

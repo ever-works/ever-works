@@ -123,7 +123,10 @@ export interface PaletteSessions {
 }
 
 /** FL-05: the empty query's session sections (spec §5.12). */
-function sessionSections(t: PaletteTranslator, sessions: PaletteSessions | null | undefined): PaletteSection[] {
+function sessionSections(
+    t: PaletteTranslator,
+    sessions: PaletteSessions | null | undefined,
+): PaletteSection[] {
     if (!sessions) return [];
     const row = (entry: PaletteSessionEntry, prefix: string, waiting: boolean): PaletteRow => ({
         key: `${prefix}:${entry.id}`,
@@ -134,7 +137,9 @@ function sessionSections(t: PaletteTranslator, sessions: PaletteSessions | null 
         action: { type: 'screen', href: `/fleet/sessions/${encodeURIComponent(entry.id)}` },
         filter: null,
     });
-    const needsYou = sessions.needsYou.slice(0, PALETTE_NEEDS_YOU_ROWS).map((entry) => row(entry, 'needs-you', true));
+    const needsYou = sessions.needsYou
+        .slice(0, PALETTE_NEEDS_YOU_ROWS)
+        .map((entry) => row(entry, 'needs-you', true));
     const recent = sessions.recent
         .slice(0, PALETTE_RECENT_SESSION_ROWS)
         .map((entry) => row(entry, 'recent-session', false));

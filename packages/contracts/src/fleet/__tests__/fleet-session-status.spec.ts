@@ -15,6 +15,7 @@ import {
 	parseFleetSessionAttentionMessage,
 	parseFleetSessionStatusMessage,
 	type FleetSessionEvidence,
+	type FleetSessionMergeContext,
 	type FleetSessionStatusSnapshot
 } from '../fleet-session-status.types.js';
 
@@ -24,7 +25,7 @@ const shell = { sessionId: SESSION, provider: 'shell' as const };
 
 function run(
 	events: Array<Partial<FleetSessionEvidence> & Pick<FleetSessionEvidence, 'event'>>,
-	ctx = claude,
+	ctx: FleetSessionMergeContext = claude,
 	start: FleetSessionStatusSnapshot = initialFleetSessionStatus(0)
 ) {
 	let snapshot = start;
@@ -188,12 +189,22 @@ describe('mergeFleetSessionEvidence — a shell (FR-19, U20)', () => {
 describe('attention keys and unread (CONTRACTS §5.2)', () => {
 	it('round-trips', () => {
 		const key = fleetSessionAttentionKey(SESSION, 'question', 'tool_use:9');
-		expect(parseFleetSessionAttentionKey(key)).toEqual({ sessionId: SESSION, reason: 'question', promptId: 'tool_use9' });
+		expect(parseFleetSessionAttentionKey(key)).toEqual({
+			sessionId: SESSION,
+			reason: 'question',
+			promptId: 'tool_use9'
+		});
 		expect(parseFleetSessionAttentionKey('fleet-session:x/y:question:1')).toBeNull();
 	});
 
 	it('acknowledgedAt < raisedAt is unread', () => {
-		const base = { key: 'k', reason: 'finished' as const, prompt: '', options: [], raisedAt: '2026-10-21T10:00:00Z' };
+		const base = {
+			key: 'k',
+			reason: 'finished' as const,
+			prompt: '',
+			options: [],
+			raisedAt: '2026-10-21T10:00:00Z'
+		};
 		expect(isFleetSessionAttentionUnread({ ...base, acknowledgedAt: null })).toBe(true);
 		expect(isFleetSessionAttentionUnread({ ...base, acknowledgedAt: '2026-10-21T09:59:00Z' })).toBe(true);
 		expect(isFleetSessionAttentionUnread({ ...base, acknowledgedAt: '2026-10-21T10:01:00Z' })).toBe(false);
@@ -246,10 +257,16 @@ describe('link messages (CONTRACTS §3.3)', () => {
 			raisedAt: '2026-10-21T10:00:00.000Z',
 			acknowledgedAt: null
 		};
-		expect(parseFleetSessionAttentionMessage({ type: 'session.attention', sessionId: SESSION, seq: 1, attention })).toBeNull();
 		expect(
-			parseFleetSessionAttentionMessage({ type: 'session.attention', sessionId: SESSION, seq: 1, attention: null })
-				?.attention
+			parseFleetSessionAttentionMessage({ type: 'session.attention', sessionId: SESSION, seq: 1, attention })
+		).toBeNull();
+		expect(
+			parseFleetSessionAttentionMessage({
+				type: 'session.attention',
+				sessionId: SESSION,
+				seq: 1,
+				attention: null
+			})?.attention
 		).toBeNull();
 	});
 

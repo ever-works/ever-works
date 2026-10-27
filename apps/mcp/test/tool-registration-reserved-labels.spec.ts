@@ -45,7 +45,9 @@ describe('MCP Task tools — reserved labels', () => {
 		}
 	];
 
-	function handlerFor(name: string): (args: Record<string, unknown>) => Promise<{ isError?: boolean; content: Array<{ text: string }> }> {
+	function handlerFor(
+		name: string
+	): (args: Record<string, unknown>) => Promise<{ isError?: boolean; content: Array<{ text: string }> }> {
 		const call = registry.registerTool.mock.calls.find((c: unknown[]) => (c[0] as { name: string }).name === name);
 		return (call![0] as { handler: never }).handler;
 	}

@@ -56,11 +56,7 @@ import type { AppClusterCredentialProvenance } from '../entities/work-app-runtim
 import type { AppLogTail } from '@ever-works/plugin';
 import { CACHE_MANAGER, type Cache } from '../cache';
 import { APP_RUNTIME_ENV_SOURCE } from './ports';
-import {
-    APP_OP_CACHE_TTL_MS,
-    appLogsCacheKey,
-    appOpCacheKey,
-} from './app-lifecycle-ops.service';
+import { APP_OP_CACHE_TTL_MS, appLogsCacheKey, appOpCacheKey } from './app-lifecycle-ops.service';
 import { redactAppLogTail } from './app-log-redaction';
 
 /**
@@ -161,7 +157,13 @@ export interface AppTargetBody {
     namespace: string | null;
     clusterCheck: unknown;
     clusterCheckedAt: string | null;
-    eligibility: { managed: { eligible: boolean; reasons: string[] } } | null;
+    /**
+     * `paidPlanAllowsMore` (additive, owner decision 2026-10-27): present and `true` only beside
+     * `capReached` for an owner on an unpaid plan when a paid plan would admit the App.
+     */
+    eligibility: {
+        managed: { eligible: boolean; reasons: string[]; paidPlanAllowsMore?: boolean };
+    } | null;
 }
 
 /** A refusal the controller answers verbatim. */
@@ -360,7 +362,7 @@ export class AppTargetService {
 
     async getTarget(workId: string, userId: string): Promise<AppTargetBody> {
         const row = await this.readState(workId);
-        return this.targetBody(row, userId);
+        return this.targetBody(row, userId, workId);
     }
 
     /* ---------------------------------------------------------------------- *
@@ -392,7 +394,7 @@ export class AppTargetService {
         }
 
         if (target === 'ever-works-apps') {
-            const unmet = await this.managedRefusals(userId);
+            const unmet = await this.managedRefusals(userId, workId);
             if (unmet.length > 0) {
                 return {
                     ok: false,
@@ -440,7 +442,10 @@ export class AppTargetService {
             await this.dispatchOp({ op: 'prepare-namespace', workId, userId });
         }
 
-        return { ok: true, body: await this.targetBody(await this.readState(workId), userId) };
+        return {
+            ok: true,
+            body: await this.targetBody(await this.readState(workId), userId, workId),
+        };
     }
 
     /* ---------------------------------------------------------------------- *
@@ -590,7 +595,11 @@ export class AppTargetService {
     async rollback(
         workId: string,
         userId: string,
-        body: { deploymentId?: unknown; runPreDeployJobs?: unknown; confirmClusterChange?: unknown },
+        body: {
+            deploymentId?: unknown;
+            runPreDeployJobs?: unknown;
+            confirmClusterChange?: unknown;
+        },
         options?: { requestedByHumanSession?: boolean },
     ): Promise<
         { ok: true; result: AppDeployRequestResult } | { ok: false; refusal: AppTargetRefusal }
@@ -782,14 +791,25 @@ export class AppTargetService {
     ): Promise<AppOpsAccepted | { ok: false; refusal: AppTargetRefusal }> {
         const component = text(body?.component);
         const job = text(body?.job);
-        if ((component && !APP_RUNTIME_NAME.test(component)) || (job && !APP_RUNTIME_NAME.test(job))) {
+        if (
+            (component && !APP_RUNTIME_NAME.test(component)) ||
+            (job && !APP_RUNTIME_NAME.test(job))
+        ) {
             return refuse(400, 'invalid_log_target', 'Name one component or job of this App.');
         }
         if (component && job) {
-            return refuse(400, 'log_target_ambiguous', 'Ask for the logs of a component or a job, not both.');
+            return refuse(
+                400,
+                'log_target_ambiguous',
+                'Ask for the logs of a component or a job, not both.',
+            );
         }
         if (!component && !job) {
-            return refuse(400, 'log_target_required', 'Name the component or the job to read logs from.');
+            return refuse(
+                400,
+                'log_target_required',
+                'Name the component or the job to read logs from.',
+            );
         }
         const deploymentId = text(body?.deploymentId);
         if (deploymentId && !UUID.test(deploymentId)) {
@@ -802,7 +822,11 @@ export class AppTargetService {
         if (body?.lines !== undefined && body.lines !== null) {
             const asked = Number(body.lines);
             if (!Number.isFinite(asked) || asked < 1) {
-                return refuse(400, 'invalid_lines', `lines must be between 1 and ${APP_LOG_LINES_MAX}.`);
+                return refuse(
+                    400,
+                    'invalid_lines',
+                    `lines must be between 1 and ${APP_LOG_LINES_MAX}.`,
+                );
             }
             lines = Math.min(APP_LOG_LINES_MAX, Math.floor(asked));
         }
@@ -838,7 +862,11 @@ export class AppTargetService {
             lines,
         });
         if (!dispatched) {
-            await this.cacheSet(key, { state: 'failed', code: 'worker_unavailable' }, APP_OP_CACHE_TTL_MS);
+            await this.cacheSet(
+                key,
+                { state: 'failed', code: 'worker_unavailable' },
+                APP_OP_CACHE_TTL_MS,
+            );
         }
         return { ok: true, httpStatus: 202, op: 'logs', requestId, dispatched };
     }
@@ -935,7 +963,13 @@ export class AppTargetService {
             return refuse(409, 'job_active', `A run of ${jobName} is still going.`);
         }
 
-        return this.queueOp(workId, userId, 'job-run', { jobName, confirmFirstDeploy: true }, jobName);
+        return this.queueOp(
+            workId,
+            userId,
+            'job-run',
+            { jobName, confirmFirstDeploy: true },
+            jobName,
+        );
     }
 
     /* ---------------------------------------------------------------------- *
@@ -956,7 +990,11 @@ export class AppTargetService {
         const blocked = refuseUnlessDeployed(row);
         if (blocked) return blocked;
         if (row?.paused === true || row?.pausedAt) {
-            return refuse(409, 'app_paused', 'The app is paused. Resume it to run the smoke checks.');
+            return refuse(
+                409,
+                'app_paused',
+                'The app is paused. Resume it to run the smoke checks.',
+            );
         }
         if (text(row?.deployLockId)) {
             return refuse(
@@ -1227,7 +1265,9 @@ export class AppTargetService {
             }
         }
         if (typeof plugin?.checkClusterCredentialShape !== 'function') return null;
-        let verdict: ReturnType<NonNullable<ClusterCredentialShapeCheck['checkClusterCredentialShape']>>;
+        let verdict: ReturnType<
+            NonNullable<ClusterCredentialShapeCheck['checkClusterCredentialShape']>
+        >;
         try {
             verdict = plugin.checkClusterCredentialShape(kubeconfig, kubeContext || undefined);
         } catch {
@@ -1262,19 +1302,25 @@ export class AppTargetService {
     private async targetBody(
         row: AppTargetStateRow | null,
         userId: string,
+        workId?: string,
     ): Promise<AppTargetBody> {
         const target = (TARGETS.find((choice) => choice === row?.target) ??
             'none') as AppDeployTarget;
         let eligibility: AppTargetBody['eligibility'] = null;
         if (this.tier?.eligibility) {
             try {
-                const answer = await this.tier.eligibility(userId);
+                // `workId` lets the per-owner cap count the owner's OTHER App Works (lane aw-safety, #2914).
+                const answer = await this.tier.eligibility(userId, { workId: workId ?? null });
                 eligibility = {
                     managed: {
                         eligible: answer?.eligible === true && this.tier.isOpen() === true,
                         reasons: [...(answer?.reasons ?? [])],
                     },
                 };
+                // Owner decision 2026-10-27: a free owner at the cap is told a paid plan lifts it.
+                if (answer?.paidPlanAllowsMore === true) {
+                    eligibility.managed.paidPlanAllowsMore = true;
+                }
             } catch {
                 eligibility = null;
             }
@@ -1296,7 +1342,7 @@ export class AppTargetService {
         };
     }
 
-    private async managedRefusals(userId: string): Promise<AppPrecondition[]> {
+    private async managedRefusals(userId: string, workId?: string): Promise<AppPrecondition[]> {
         const open = (() => {
             try {
                 return this.tier?.isOpen?.() === true;
@@ -1313,13 +1359,19 @@ export class AppTargetService {
             ];
         }
         try {
-            const answer = await this.tier!.eligibility(userId);
+            // Choosing the managed tier is judged like a deploy to it: the cap counts the owner's other App Works.
+            const answer = await this.tier!.eligibility(userId, { workId: workId ?? null });
             if (answer?.eligible !== true) {
+                // Owner decision 2026-10-27: a free owner at the cap is told a paid plan lifts it.
+                const upgrade =
+                    answer?.paidPlanAllowsMore === true
+                        ? ' A paid plan allows more App Works on Ever Works Apps: upgrade to lift this limit.'
+                        : '';
                 return [
                     {
                         code: 'managed_ineligible',
                         names: [...(answer?.reasons ?? [])],
-                        message: 'Your account is not eligible for Ever Works Apps hosting.',
+                        message: `Your account is not eligible for Ever Works Apps hosting.${upgrade}`,
                     },
                 ];
             }

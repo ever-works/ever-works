@@ -81,7 +81,8 @@ const utf8 = new TextEncoder();
 /** Bytes of a socket message, whatever shape the runtime hands it in. */
 function messageBytes(data: unknown): Uint8Array | null {
     if (data instanceof ArrayBuffer) return new Uint8Array(data);
-    if (ArrayBuffer.isView(data)) return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    if (ArrayBuffer.isView(data))
+        return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     return null;
 }
 
@@ -182,7 +183,11 @@ export class FleetSessionSocket {
     /** Send keystrokes. False when they could not go (not attached, not a driver): the caller may hold them. */
     sendInput(data: string): boolean {
         if (!this.isAttached || this.grantedRole !== 'driver' || data.length === 0) return false;
-        const frame = encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.DATA, utf8.encode(data));
+        const frame = encodeFleetLinkFrame(
+            FLEET_LINK_VIEWER_CHANNEL,
+            FLEET_LINK_FRAME_KINDS.DATA,
+            utf8.encode(data),
+        );
         return this.send(frame);
     }
 
@@ -191,7 +196,9 @@ export class FleetSessionSocket {
         if (!this.isAttached || this.grantedRole !== 'driver') return;
         const payload = encodeFleetLinkResize(cols, rows);
         if (!payload) return;
-        this.send(encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.RESIZE, payload));
+        this.send(
+            encodeFleetLinkFrame(FLEET_LINK_VIEWER_CHANNEL, FLEET_LINK_FRAME_KINDS.RESIZE, payload),
+        );
     }
 
     /** Detach. The session keeps running on the machine. */
@@ -268,7 +275,10 @@ export class FleetSessionSocket {
                 return;
             }
             case 'channel.close': {
-                this.linkReason = typeof message.reason === 'string' ? (message.reason as FleetLinkCloseReason) : null;
+                this.linkReason =
+                    typeof message.reason === 'string'
+                        ? (message.reason as FleetLinkCloseReason)
+                        : null;
                 this.hint = typeof message.hint === 'string' ? message.hint : null;
                 return;
             }
@@ -340,7 +350,10 @@ const REFUSING_CODES: readonly string[] = [
     'confirmation_required',
 ];
 
-export function sessionCloseVerdict(close: SessionSocketClose, detachedByUs: boolean): SessionCloseVerdict {
+export function sessionCloseVerdict(
+    close: SessionSocketClose,
+    detachedByUs: boolean,
+): SessionCloseVerdict {
     if (close.exitCode !== null) return 'ended';
     if (detachedByUs) return 'detached';
     const error = close.mintError ?? close.attachError;

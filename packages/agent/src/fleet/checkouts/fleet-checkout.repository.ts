@@ -38,7 +38,9 @@ export class FleetCheckoutRepository {
 
     /** FL-06: the checkouts these sessions work in (one batched read for a page of session views). */
     async findByIds(ids: readonly string[]): Promise<FleetCheckout[]> {
-        const wanted = [...new Set(ids.filter((id) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
+        const wanted = [
+            ...new Set(ids.filter((id) => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id))),
+        ];
         if (wanted.length === 0) return [];
         return this.repository.find({ where: { id: In(wanted) } });
     }

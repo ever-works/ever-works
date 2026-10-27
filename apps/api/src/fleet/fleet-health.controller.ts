@@ -247,7 +247,7 @@ export class FleetHealthController {
     @Post('nodes/:id/wake')
     @ApiOperation({
         summary:
-            "Wake an offline computer: send a Wake-on-LAN packet through another online computer of the same owner on the same network (one started with --manage). Needs the `machines` family on the computer being woken; refused `unsupported_on_node` when it never reported a hardware address or no computer on its network can wake it, `kill_switch` while all computers are stopped, `limit_exceeded` past 3 attempts in 5 minutes. Answers 202 with the computer the packet went through; ask GET /nodes/:id/wake at 20 s and 60 s whether it came back. Audited (`node.wake`).",
+            'Wake an offline computer: send a Wake-on-LAN packet through another online computer of the same owner on the same network (one started with --manage). Needs the `machines` family on the computer being woken; refused `unsupported_on_node` when it never reported a hardware address or no computer on its network can wake it, `kill_switch` while all computers are stopped, `limit_exceeded` past 3 attempts in 5 minutes. Answers 202 with the computer the packet went through; ask GET /nodes/:id/wake at 20 s and 60 s whether it came back. Audited (`node.wake`).',
     })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
@@ -395,7 +395,10 @@ export class FleetHealthController {
         role: FleetViewerRole,
         now: number,
         offlineAfterMs: number,
-    ): Promise<{ wake: FleetNodeWakeAvailability; refresh: FleetHealthRefreshAvailability } | null> {
+    ): Promise<{
+        wake: FleetNodeWakeAvailability;
+        refresh: FleetHealthRefreshAvailability;
+    } | null> {
         if (!this.link || !this.nodes) return null;
         let row: FleetNode | null;
         try {
@@ -527,11 +530,15 @@ export class FleetHealthController {
         if (view.viewerRole !== undefined && view.viewerRole !== 'owner') return error;
         const route = view.canWake ?? null;
         if (!route) return error;
-        return fleetLinkError('unreachable', `${error.linkError.hint}; wake it from ${route.name}?`, {
-            ...(error.linkError.details ?? {}),
-            nodeId,
-            wakeVia: route.nodeId,
-        });
+        return fleetLinkError(
+            'unreachable',
+            `${error.linkError.hint}; wake it from ${route.name}?`,
+            {
+                ...(error.linkError.details ?? {}),
+                nodeId,
+                wakeVia: route.nodeId,
+            },
+        );
     }
 
     private async recordWake(

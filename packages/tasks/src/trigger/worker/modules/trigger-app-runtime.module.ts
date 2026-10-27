@@ -61,6 +61,9 @@ import {
     RegistryAppImageReferenceResolver,
     RegistryAppImageUserInspector,
     workerAppDeployDispatcher,
+    // Lane aw-safety (2026-10-26) — APW-10 T27 / APW-06 T45: the tier's eligibility facts.
+    workerAppsTierEligibilitySource,
+    type AppsTierEligibilityRemote,
     // Lane aw-safety (2026-10-26) — APW-06 T58 / §9.8's completion edge.
     APP_WORK_DELETION_COMPLETION,
     workerAppWorkDeletionCompletion,
@@ -374,6 +377,8 @@ export const APP_RUNTIME_REMOTE_PROXIES = [
     // APW-06 T58 / §9.8 (lane aw-safety, 2026-10-26) — the deletion's completion edge: the API's
     // `AppRuntimeDeletionService.finishDeletion`, a one-member facade on `remoteMap`.
     'AppRuntimeDeletionService',
+    // APW-10 T27 / APW-06 T45 (lane aw-safety, 2026-10-26) — the tier's eligibility facts.
+    'AppsTierEligibilityService',
 ] as const;
 
 /**
@@ -726,7 +731,25 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
         // narrow real answer (`packages/agent/src/app-runtime/app-runtime-worker.adapters.ts`);
         // the verification sink stays fail-closed (T60's sink is APW-04's, not in this slice).
         // T44 / APW-10 minimal: the managed target opens only with EVER_WORKS_APPS_MANAGED_ENABLED.
-        { provide: APPS_TIER_POLICY, useFactory: () => new ConfigAppsTierPolicy() },
+        // Lane aw-safety (2026-10-26, APW-10 T27 / APW-06 T45): the eligibility facts are read in
+        // the API (`remoteMap.AppsTierEligibilityService`). `admit` on a TRANSPORT failure only —
+        // the API ran the authoritative check when the Deployment was requested; a refusal it
+        // answers is still a refusal here.
+        {
+            provide: APPS_TIER_POLICY,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                new ConfigAppsTierPolicy(
+                    process.env,
+                    workerAppsTierEligibilitySource(
+                        createRemoteProxy(
+                            apiClient,
+                            'AppsTierEligibilityService',
+                        ) as unknown as AppsTierEligibilityRemote,
+                    ),
+                    { onSourceFailure: 'admit' },
+                ),
+            inject: [TriggerInternalApiClient],
+        },
         // T73: a Build's image — public => no credential; private GHCR => the owner's GitHub token.
         {
             provide: APP_IMAGE_PULL_CREDENTIAL_SOURCE,

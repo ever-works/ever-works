@@ -1,8 +1,4 @@
-import {
-	classifyLogLevel,
-	FLEET_LOGS_READ_TIMEOUT_MS,
-	fleetLogLevelFromSyslogPriority
-} from '@ever-works/contracts';
+import { classifyLogLevel, FLEET_LOGS_READ_TIMEOUT_MS, fleetLogLevelFromSyslogPriority } from '@ever-works/contracts';
 import { collectChild, firstLine, LogReadError, type LogIo, type RawLogLine } from './log-io';
 import type { LogBatch, LogFollowSink, LogReader } from './log-reader';
 
@@ -90,20 +86,34 @@ export function createJournalReader(io: LogIo, options: JournalReaderOptions = {
 	let oldest: { cursor: string | null; realtimeUs: number | null } | null = null;
 
 	const run = async (args: string[], max: number) => {
-		const result = await collectChild(io, 'journalctl', ['-o', 'json', '--no-pager', ...args, ...filterArgs(options)], {
-			max,
-			parse: parseJournalLine,
-			timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
-		});
+		const result = await collectChild(
+			io,
+			'journalctl',
+			['-o', 'json', '--no-pager', ...args, ...filterArgs(options)],
+			{
+				max,
+				parse: parseJournalLine,
+				timeoutMs: FLEET_LOGS_READ_TIMEOUT_MS
+			}
+		);
 		if (result.spawnError) {
-			throw new LogReadError('unsupported_on_node', 'the system journal (journalctl) is not available on this computer');
+			throw new LogReadError(
+				'unsupported_on_node',
+				'the system journal (journalctl) is not available on this computer'
+			);
 		}
 		if (result.timedOut) {
-			throw new LogReadError('operation_failed', `journalctl did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`);
+			throw new LogReadError(
+				'operation_failed',
+				`journalctl did not answer within ${FLEET_LOGS_READ_TIMEOUT_MS / 1000} seconds`
+			);
 		}
 		if (result.code !== 0 && result.entries.length === 0) {
 			const detail = firstLine(result.stderr.join('\n'));
-			throw new LogReadError('operation_failed', `journalctl exited ${result.code ?? 'early'}${detail ? `: "${detail}"` : ''}`);
+			throw new LogReadError(
+				'operation_failed',
+				`journalctl exited ${result.code ?? 'early'}${detail ? `: "${detail}"` : ''}`
+			);
 		}
 		return result;
 	};
@@ -125,7 +135,13 @@ export function createJournalReader(io: LogIo, options: JournalReaderOptions = {
 			return batch;
 		},
 		follow(sink: LogFollowSink) {
-			const args = ['-o', 'json', '--no-pager', '-f', ...(lastCursor ? [`--after-cursor=${lastCursor}`] : ['-n', '0'])];
+			const args = [
+				'-o',
+				'json',
+				'--no-pager',
+				'-f',
+				...(lastCursor ? [`--after-cursor=${lastCursor}`] : ['-n', '0'])
+			];
 			const child = io.spawn('journalctl', [...args, ...filterArgs(options)]);
 			let stopped = false;
 			child.onLine((line, stream) => {
@@ -137,7 +153,10 @@ export function createJournalReader(io: LogIo, options: JournalReaderOptions = {
 			});
 			child.onExit((code, spawnError) => {
 				if (stopped) return;
-				sink.notice('error', spawnError ? 'journalctl could not be started' : `journalctl stopped (exit ${code ?? 'signal'})`);
+				sink.notice(
+					'error',
+					spawnError ? 'journalctl could not be started' : `journalctl stopped (exit ${code ?? 'signal'})`
+				);
 				sink.ended();
 			});
 			return {

@@ -22,13 +22,19 @@ export function CloudCardLine({ node }: { node: FleetNodeView }) {
         cost: money(cloud.cost.sinceCreatedCents, cloud.currency),
     });
     let suffix: string | null = null;
-    if (state === 'creating') suffix = t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as Parameters<typeof t>[0], { provider: cloud.providerName });
+    if (state === 'creating')
+        suffix = t(`progress.${CLOUD_PHASE_KEYS[cloud.phase]}` as Parameters<typeof t>[0], {
+            provider: cloud.providerName,
+        });
     else if (state === 'failed') suffix = t('card.failed');
     else if (state === 'gone') suffix = t('card.gone', { provider: cloud.providerName });
     else if (state === 'unenrolled') suffix = t('card.unenrolled');
     else if (state === 'off') suffix = t('card.off');
     return (
-        <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-cloud-card-line">
+        <p
+            className="mt-1 text-xs text-text-muted dark:text-text-muted-dark"
+            data-testid="fleet-cloud-card-line"
+        >
             {base}
             {suffix ? ` · ${suffix}` : ''}
         </p>

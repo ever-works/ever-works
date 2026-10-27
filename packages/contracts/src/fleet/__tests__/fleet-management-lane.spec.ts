@@ -12,7 +12,13 @@ describe('the management lane', () => {
 	it('carries exactly the kinds epics registered: FL-16 vm-* (--manage), FL-20 usage-scan (--usage-scan), FL-18 runner-* (--work)', () => {
 		// FL-02 shipped the list empty ("no node starts the lane until an epic
 		// registers a kind"); FL-16 registered its kinds first, FL-20 and FL-18 appended theirs.
-		expect(FLEET_MANAGEMENT_LANE_KINDS).toEqual(['vm-create', 'vm-control', 'usage-scan', 'runner-install', 'runner-control']);
+		expect(FLEET_MANAGEMENT_LANE_KINDS).toEqual([
+			'vm-create',
+			'vm-control',
+			'usage-scan',
+			'runner-install',
+			'runner-control'
+		]);
 		expect(FLEET_MANAGEMENT_LANE_CONSENT).toEqual({
 			'vm-create': 'manage',
 			'vm-control': 'manage',
@@ -24,7 +30,10 @@ describe('the management lane', () => {
 			fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true, manage: true, usageScan: true })
 		).toEqual(['vm-create', 'vm-control', 'usage-scan', 'runner-install', 'runner-control']);
 		// --work alone leases the runner jobs only; --usage-scan alone leases only the scan.
-		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true })).toEqual(['runner-install', 'runner-control']);
+		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true })).toEqual([
+			'runner-install',
+			'runner-control'
+		]);
 		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, usageScan: true })).toEqual(['usage-scan']);
 		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, work: true, usageScan: true })).toEqual([
 			'usage-scan',
@@ -32,7 +41,10 @@ describe('the management lane', () => {
 			'runner-control'
 		]);
 		// --manage never leases the scan (its own consent) nor a runner job (runner jobs are work, CONTRACTS §1.1).
-		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, manage: true })).toEqual(['vm-create', 'vm-control']);
+		expect(fleetManagementLaneKindsFor({ ...FLEET_NO_CONSENTS, manage: true })).toEqual([
+			'vm-create',
+			'vm-control'
+		]);
 	});
 
 	it('needs manage for a kind the table does not name (the safest reading)', () => {

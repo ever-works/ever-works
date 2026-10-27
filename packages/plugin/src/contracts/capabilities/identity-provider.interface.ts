@@ -179,7 +179,12 @@ export const IDENTITY_TOKEN_REJECTION_CODES = [
 	'badAuthorizedParty',
 	'badLogoutEvent',
 	'nonceInLogoutToken',
-	'providerUnavailable'
+	'providerUnavailable',
+	// APW-12 C28 (lane aw-safety, 2026-10-26) — appended: the token endpoint REFUSED the grant
+	// (RFC 6749 §5.2 `invalid_grant` — an authorization code expired, already redeemed, or issued
+	// to another client). Before this it was `providerUnavailable`, which the API answered `503`
+	// ("Ever ID is not responding") for what is the member's own stale sign-in.
+	'invalidGrant'
 ] as const;
 
 /** Union derived from {@link IDENTITY_TOKEN_REJECTION_CODES}. */

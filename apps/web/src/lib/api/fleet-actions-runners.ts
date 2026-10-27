@@ -1,5 +1,10 @@
 import 'server-only';
 import type {
+    FleetActionsCancelRunRequest,
+    FleetActionsJobsView,
+    FleetActionsRunnerScope,
+    FleetActionsRunnersPermissionView,
+    FleetActionsWatchedTarget,
     FleetActionsRunnerInstallRequest,
     FleetActionsRunnerInstallResponse,
     FleetActionsRunnerOperationResponse,
@@ -58,4 +63,50 @@ export const fleetActionsRunnersAPI = {
             method: 'POST',
             wrapInData: false,
         }),
+
+    /** P3 (FR-28): download GitHub's newest build again and re-register with the same name and labels (`confirm`). */
+    reinstall: async (nodeId: string, runnerId: string, confirm: boolean) =>
+        serverMutation<FleetActionsRunnerOperationResponse>({
+            endpoint: `${base(nodeId)}/${encodeURIComponent(runnerId)}/reinstall`,
+            data: confirm ? { confirm: true } : {},
+            method: 'POST',
+            wrapInData: false,
+        }),
+};
+
+/** What `PUT /api/fleet/runners/jobs/watched` answers: the list the panel watches now (the default after `[]`). */
+export interface FleetActionsWatchedTargetsResponse {
+    watched: FleetActionsWatchedTarget[];
+}
+
+/**
+ * Actions jobs (FL-18 P2, FR-20 – FR-26) — the web client for
+ * `/api/fleet/runners/jobs/**`: the hub panel's read, the watched list, the
+ * workflow-run cancel (CONTRACTS §2.2 `confirm`, forwarded verbatim) and the
+ * organisation permission check behind **Grant access**. Off, every route
+ * answers 404.
+ */
+export const fleetActionsJobsAPI = {
+    jobs: async () => serverFetch<FleetActionsJobsView>('/fleet/runners/jobs'),
+
+    setWatched: async (targets: FleetActionsWatchedTarget[]) =>
+        serverMutation<FleetActionsWatchedTargetsResponse>({
+            endpoint: '/fleet/runners/jobs/watched',
+            data: { targets },
+            method: 'PUT',
+            wrapInData: false,
+        }),
+
+    cancelRun: async (body: FleetActionsCancelRunRequest) =>
+        serverMutation<Record<string, unknown>>({
+            endpoint: '/fleet/runners/jobs/cancel',
+            data: body,
+            method: 'POST',
+            wrapInData: false,
+        }),
+
+    permission: async (scope: FleetActionsRunnerScope, target: string) =>
+        serverFetch<FleetActionsRunnersPermissionView>(
+            `/fleet/runners/jobs/permission?scope=${encodeURIComponent(scope)}&target=${encodeURIComponent(target)}`,
+        ),
 };

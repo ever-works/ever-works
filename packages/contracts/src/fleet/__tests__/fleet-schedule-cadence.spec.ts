@@ -27,7 +27,11 @@ const at = (iso: string) => Date.parse(iso);
 const iso = (ms: number | null) => (ms === null ? null : new Date(ms).toISOString());
 const daily = (time: string): FleetScheduleCadence => ({ kind: 'daily', at: time, timezone: 'node' });
 const weekdays = (time: string): FleetScheduleCadence => ({ kind: 'weekdays', at: time, timezone: 'node' });
-const every = (minutes: number): FleetScheduleCadence => ({ kind: 'interval', expr: String(minutes), timezone: 'node' });
+const every = (minutes: number): FleetScheduleCadence => ({
+	kind: 'interval',
+	expr: String(minutes),
+	timezone: 'node'
+});
 const cron = (expr: string): FleetScheduleCadence => ({ kind: 'cron', expr, timezone: 'node' });
 
 describe('parseFleetScheduleCadence (FR-6)', () => {
@@ -37,7 +41,9 @@ describe('parseFleetScheduleCadence (FR-6)', () => {
 		expect(parseFleetScheduleCadence({ kind: 'weekdays', at: '08:30', timezone: 'node' }).cadence).toEqual(
 			weekdays('08:30')
 		);
-		expect(parseFleetScheduleCadence({ kind: 'cron', expr: ' 0  9 * * 1,3 ' }).cadence).toEqual(cron('0 9 * * 1,3'));
+		expect(parseFleetScheduleCadence({ kind: 'cron', expr: ' 0  9 * * 1,3 ' }).cadence).toEqual(
+			cron('0 9 * * 1,3')
+		);
 	});
 
 	it.each([
@@ -117,8 +123,12 @@ describe('nextFleetScheduleFire — on the computer clock', () => {
 	});
 
 	it('restarts every N minutes at the hour', () => {
-		expect(iso(nextFleetScheduleFire(every(30), 'UTC', at('2026-01-01T00:10:00Z')))).toBe('2026-01-01T00:30:00.000Z');
-		expect(iso(nextFleetScheduleFire(every(25), 'UTC', at('2026-01-01T00:51:00Z')))).toBe('2026-01-01T01:00:00.000Z');
+		expect(iso(nextFleetScheduleFire(every(30), 'UTC', at('2026-01-01T00:10:00Z')))).toBe(
+			'2026-01-01T00:30:00.000Z'
+		);
+		expect(iso(nextFleetScheduleFire(every(25), 'UTC', at('2026-01-01T00:51:00Z')))).toBe(
+			'2026-01-01T01:00:00.000Z'
+		);
 	});
 
 	it('fires hourly on the hour of a 45-minute zone', () => {

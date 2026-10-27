@@ -80,7 +80,12 @@ import { buildFleetSessionGitTools } from '../fleet/session-git/agent-fleet-sess
 import { buildFleetPortsTools } from '../fleet/ports/agent-fleet-ports-tools';
 import { buildFleetLogsTools } from '../fleet/logs/agent-fleet-logs-tools';
 import { buildFleetFilesTools } from '../fleet/files/agent-fleet-files-tools';
-import { buildFleetActTools, buildFleetCoreTools, decorateFleetTool } from '../fleet/fleet-tool-factory';
+import { buildFleetDesktopTools } from '../fleet/desktop/agent-fleet-desktop-tools';
+import {
+    buildFleetActTools,
+    buildFleetCoreTools,
+    decorateFleetTool,
+} from '../fleet/fleet-tool-factory';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { AGENT_FILE_EDIT_PROPOSAL_KIND } from './agent-proposal-kinds';
@@ -342,6 +347,12 @@ export class AgentToolService {
             editsThisRunByFile: Set<string>;
             missionId?: string;
             /**
+             * APW-04 T10 — the Task this run executes, as the run service set it (never
+             * the model). The git tools hand it to the adapter, which holds an App
+             * provisioning Task's writes to `.works/works.yml` / `.works/overlay/**`.
+             */
+            taskId?: string;
+            /**
              * Works-security (2026-10-18) — the run is a Conversation reply its Agent's
              * OWNER started. Only `request_app_change` reads it (an agent acting on its
              * own files a change held for the owner). Absent = not an owner chat turn.
@@ -424,7 +435,7 @@ export class AgentToolService {
         // the model receives an actionable response instead of a missing
         // tool. Work-scoped Agents pass through to the adapter.
         if (agent.permissions?.canCommitToRepo && this.git) {
-            tools.push(this.buildCommitToRepoTool(agent));
+            tools.push(this.buildCommitToRepoTool(agent, runContext.taskId));
         }
 
         // Phase 16.7 — openPullRequest. Permission chain enforced at the
@@ -433,7 +444,7 @@ export class AgentToolService {
         // commit permission grant. We still gate the descriptor on the
         // granular flag.
         if (agent.permissions?.canOpenPullRequests && this.git) {
-            tools.push(this.buildOpenPullRequestTool(agent));
+            tools.push(this.buildOpenPullRequestTool(agent, runContext.taskId));
         }
 
         // Phase 16.10 — plugin pass-through tools (searchWeb /
@@ -662,7 +673,9 @@ export class AgentToolService {
             // Usage & cost on the fleet (FL-20): `fleet_usage_get`, read-only, as the Agent's owner.
             if (fleet.usage) {
                 const usage = fleet.usage;
-                add('fleet-usage', () => buildFleetUsageTools({ userId: agent.userId, service: usage }));
+                add('fleet-usage', () =>
+                    buildFleetUsageTools({ userId: agent.userId, service: usage }),
+                );
             }
             // Actions runners (FL-18): list read-only; an install, a stop, a restart and a
             // remove are held for the owner's approval (spec S8); a start runs at once.
@@ -749,6 +762,17 @@ export class AgentToolService {
                         agentId: agent.id,
                         userId: agent.userId,
                         reader: logs.reader,
+                    }),
+                );
+            }
+            // Desktop view & control (FL-07): the read-only display list, when bound.
+            if (fleet.desktop) {
+                const desktop = fleet.desktop;
+                add('fleet-desktop', () =>
+                    buildFleetDesktopTools({
+                        agentId: agent.id,
+                        userId: agent.userId,
+                        reader: desktop.reader,
                     }),
                 );
             }
@@ -1722,6 +1746,8 @@ export class AgentToolService {
 
     private buildCommitToRepoTool(
         agent: Agent,
+        /** APW-04 T10 — the run's Task (server-set); absent outside a Task run. */
+        taskId?: string,
     ): AgentToolDescriptor<
         { message: string; files?: { path: string; body: string }[]; branch?: string },
         AgentCommitToRepoResult
@@ -1775,6 +1801,7 @@ export class AgentToolService {
                         message: args.message,
                         files: args.files,
                         branch: args.branch,
+                        ...(taskId ? { taskId } : {}),
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };
@@ -1785,6 +1812,8 @@ export class AgentToolService {
 
     private buildOpenPullRequestTool(
         agent: Agent,
+        /** APW-04 T10 — the run's Task (server-set); absent outside a Task run. */
+        taskId?: string,
     ): AgentToolDescriptor<
         { title: string; body: string; head: string; base?: string; draft?: boolean },
         AgentOpenPullRequestResult
@@ -1847,6 +1876,7 @@ export class AgentToolService {
                         head: args.head,
                         base: args.base,
                         draft: args.draft,
+                        ...(taskId ? { taskId } : {}),
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };

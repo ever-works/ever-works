@@ -9,12 +9,21 @@ import {
     FleetSchedulesModule,
     FleetSessionsModule,
 } from '@ever-works/agent/fleet';
-import { TASK_SESSION_SCHEDULE_DISPATCHER, TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import {
+    TASK_SESSION_SCHEDULE_DISPATCHER,
+    TasksDomainModule,
+} from '@ever-works/agent/tasks-domain';
 import { NODE_SCHEDULE_PORT } from '@ever-works/agent/schedules';
 import { FleetScheduleLinkAdapter, FleetScheduleLinkListener } from './fleet-schedule-link.adapter';
 import { FleetScheduleReconcileCronService } from './fleet-schedule-reconcile-cron.service';
-import { FleetScheduleTasksAdapter, FleetSessionScheduleDispatcher } from './fleet-session-schedule.adapters';
-import { FleetNodeSchedulesController, FleetSchedulesController } from './fleet-schedules.controller';
+import {
+    FleetScheduleTasksAdapter,
+    FleetSessionScheduleDispatcher,
+} from './fleet-session-schedule.adapters';
+import {
+    FleetNodeSchedulesController,
+    FleetSchedulesController,
+} from './fleet-schedules.controller';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetCommandsEnabledGuard } from '../commands/fleet-commands-enabled.guard';
 
@@ -47,7 +56,13 @@ import { FleetCommandsEnabledGuard } from '../commands/fleet-commands-enabled.gu
     // supplies `FleetAgentNodeAffinityRepository`, which the session dispatcher
     // reads to find the computer an Agent is pinned to — without it the API
     // does not boot (`UnknownDependenciesException`, Egress audit run 40003838391).
-    imports: [FleetModule, FleetSchedulesModule, FleetSessionsModule, TasksDomainModule, DatabaseModule],
+    imports: [
+        FleetModule,
+        FleetSchedulesModule,
+        FleetSessionsModule,
+        TasksDomainModule,
+        DatabaseModule,
+    ],
     // P2: the resource routes the FL-19 catalogue names, and the breaker.
     controllers: [FleetSchedulesController, FleetNodeSchedulesController],
     providers: [

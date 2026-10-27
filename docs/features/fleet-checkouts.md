@@ -33,13 +33,14 @@ route answers 404.
 
 - **Found on the computer** — the machine's owner lists the folders they keep code in, on the machine itself:
 
-  ```bash
-  ever-works-node start --manage --code-folder ~/code --code-folder ~/work
-  ```
+    ```bash
+    ever-works-node start --manage --code-folder ~/code --code-folder ~/work
+    ```
 
-  **Scan now** walks those folders three levels deep for git clones (it stops at a clone's own folder, skips
-  `node_modules`, build output and hidden folders, never follows a link, and stops at 300). Your home folder as a
-  whole is never scanned, and the platform never chooses the folders.
+    **Scan now** walks those folders three levels deep for git clones (it stops at a clone's own folder, skips
+    `node_modules`, build output and hidden folders, never follows a link, and stops at 300). Your home folder as a
+    whole is never scanned, and the platform never chooses the folders.
+
 - **The computer's own Task worktrees** — the worktrees Task runs use are listed too (badge **Task**), with a note
   when the computer's clean-up would tidy one. They are kept in sync by their runs.
 - **Made by Ever Works** — **New checkout** makes a fresh clone, or a worktree of a checkout on the same computer on a

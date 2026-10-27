@@ -531,7 +531,10 @@ export function createSessionModule(options: SessionModuleOptions): SessionModul
 						}
 						if (!options.answer) {
 							reply(requestId, {
-								error: makeFleetLinkError('unsupported_on_node', 'this node cannot answer session prompts yet')
+								error: makeFleetLinkError(
+									'unsupported_on_node',
+									'this node cannot answer session prompts yet'
+								)
 							});
 							return;
 						}

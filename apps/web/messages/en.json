@@ -3959,6 +3959,7 @@
             "sourceTypes": {
                 "inboundTrigger": "Inbound trigger",
                 "nodeSchedule": "Computer",
+                "appUpstreamSync": "Upstream sync",
                 "recurringTask": "Recurring task",
                 "agentHeartbeat": "Agent heartbeat",
                 "workSchedule": "Work schedule",
@@ -6353,7 +6354,8 @@
                 "sourceValidation": "source check",
                 "dataSync": "data sync",
                 "inboundTrigger": "trigger",
-                "nodeSchedule": "computer schedule"
+                "nodeSchedule": "computer schedule",
+                "appUpstreamSync": "upstream sync"
             },
             "todayTitle": "Today",
             "ranAt": "ran at {time}",
@@ -7589,7 +7591,24 @@
                     "openOnGitHub": "Open on GitHub",
                     "enableBuildWorkflow": "Enable the build workflow"
                 },
-                "editAccessRequired": "You need edit access to this App Work to do that."
+                "editAccessRequired": "You need edit access to this App Work to do that.",
+                "resultPullRequestMerged": "{count, plural, =1 {Sync pull request merged (1 commit)} other {Sync pull request merged (# commits)}}",
+                "workflowHold": {
+                    "title": "Upstream changed {count, plural, =1 {1 workflow file} other {# workflow files}}. Nothing was synced.",
+                    "incomplete": "Upstream's changes are too large to check every file for workflow changes. Nothing was synced.",
+                    "explain": "Syncing lets these workflows run in this repository with its secrets. Review the changes first.",
+                    "review": "Review the changes",
+                    "syncAnyway": "Sync anyway",
+                    "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
+                    "confirmYes": "Yes, sync anyway",
+                    "cancel": "Cancel",
+                    "ownerOnly": "Only the Work owner or an Owner of its Organization can accept upstream workflow changes.",
+                    "released": "These upstream workflow changes were accepted {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner or an Owner of its Organization must review them before this App Work can sync.",
+                    "changed": "Upstream moved since you reviewed it. Review the new changes first.",
+                    "noHold": "No upstream workflow change is waiting for review.",
+                    "ownerRequired": "Only the Work owner or an Owner of its Organization can accept upstream workflow changes."
+                }
             },
             "appDependencies": {
                 "status": {
@@ -7760,6 +7779,63 @@
                         "buildStrategyUnavailable": "No enabled build plugin supports the `{strategy}` strategy.",
                         "dependencyUnavailable": "No {kind} provider is available.",
                         "trackedBranchMissing": "The tracked branch does not exist."
+                    },
+                    "blueprint": {
+                        "title": "Blueprint",
+                        "follows": "Follows the {id} Blueprint, version {version}.",
+                        "none": "This App Work follows no Blueprint.",
+                        "applyLabel": "Blueprint id",
+                        "apply": "Apply a Blueprint",
+                        "applyFailed": "The Blueprint could not be applied ({code}).",
+                        "upgradeAvailable": "Version {version} of this Blueprint is available.",
+                        "breaking": "Breaking",
+                        "reviewUpgrade": "Review upgrade",
+                        "dismiss": "Dismiss",
+                        "runPending": "Preparing the pull request…",
+                        "proposalUpgrade": "Pull request #{number} upgrades to version {version}",
+                        "proposalApply": "Pull request #{number} applies version {version}",
+                        "baseUnknown": "The version you applied could not be read, so every difference was treated as a conflict and your values were kept.",
+                        "conflicts": "{count, plural, =1 {1 conflict: your value was kept.} other {# conflicts: your values were kept.}}",
+                        "noConflicts": "No conflicts: nothing you changed is touched.",
+                        "proposed": "the Blueprint proposes {value}",
+                        "unchanged": "Your App spec already matches the latest Blueprint version.",
+                        "runFailed": "The last Blueprint run could not open a pull request ({code}).",
+                        "match": {
+                            "manifest": "Listed",
+                            "alias": "Listed",
+                            "fork": "Fork of a listed app",
+                            "probe": "Unlisted",
+                            "explicit": "Chosen for this repository",
+                            "file": "From the file"
+                        },
+                        "refusal": {
+                            "blueprintNotFound": "No Blueprint has that id.",
+                            "blueprintVersionNotFound": "That Blueprint version could not be found.",
+                            "blueprintAlreadyApplied": "This App Work already follows a Blueprint. Upgrade it instead.",
+                            "applyInProgress": "A Blueprint run is already in progress for this App Work.",
+                            "noBlueprint": "This App Work follows no Blueprint.",
+                            "noUpgrade": "That version is not newer than the one applied.",
+                            "notAnAppWork": "This Work is not an App Work.",
+                            "catalogUnavailable": "The Blueprint repositories cannot be read right now. Please try again later.",
+                            "dependenciesUnavailable": "Blueprint upgrades are not available on this instance.",
+                            "notFound": "This App Work could not be found.",
+                            "throttled": "Blueprint runs are limited to 5 an hour per App Work. Please try again later.",
+                            "forbidden": "You do not have permission to change this App Work.",
+                            "unknown": "Something went wrong. Please try again."
+                        },
+                        "dialog": {
+                            "applyTitle": "Apply the {id} Blueprint",
+                            "applyBody": "Ever Works composes the Blueprint into this App Work’s App spec.",
+                            "upgradeTitle": "Upgrade the {id} Blueprint to {version}",
+                            "upgradeBody": "From version {from} to version {version}.",
+                            "pointPullRequest": "A pull request is opened on the App’s repository. Only .works/works.yml changes.",
+                            "pointKept": "Values you changed are kept, never overwritten. Every conflict is listed in the pull request.",
+                            "pointMerge": "Nothing takes effect until you merge the pull request.",
+                            "breaking": "This is a major version bump. Read the pull request before you merge it.",
+                            "cancel": "Cancel",
+                            "confirmApply": "Open the pull request",
+                            "confirmUpgrade": "Open the pull request"
+                        }
                     }
                 },
                 "budgets": {
@@ -9066,6 +9142,81 @@
                 },
                 "editAccessRequired": "You need edit access to this App Work to try again."
             },
+            "appProvisioning": {
+                "title": "Provisioning",
+                "headline": {
+                    "notStarted": "Not provisioned yet. Provisioning inspects the repository and writes its App spec (.works/works.yml) through a pull request.",
+                    "blueprintSpec": "Not needed: this App's spec comes from its Blueprint.",
+                    "autoProvisionOff": "Not started: automatic provisioning was turned off when this App Work was created.",
+                    "awaitingOwner": "Waiting for the Work owner to start it.",
+                    "queued": "Queued — waiting for its Agent to start.",
+                    "running": "Provisioning is running.",
+                    "inReview": "A pull request with the App spec is ready for review.",
+                    "blocked": "Provisioning is blocked and needs your input on the Task.",
+                    "succeeded": "Provisioned.",
+                    "cancelled": "The last provisioning was cancelled."
+                },
+                "trigger": {
+                    "autoCreate": "Started when the App Work was created.",
+                    "manual": "Started by a member.",
+                    "smokeFailed": "Started because the smoke tests failed after an upstream sync.",
+                    "targetUpdated": "Started because the deploy target changed.",
+                    "buildFailed": "Started because the merged App spec failed to build or boot."
+                },
+                "status": {
+                    "backlog": "Backlog",
+                    "todo": "To do",
+                    "inProgress": "In progress",
+                    "inReview": "In review",
+                    "blocked": "Blocked",
+                    "done": "Done",
+                    "cancelled": "Cancelled",
+                    "unknown": "Unknown"
+                },
+                "banner": {
+                    "upstreamBroke": "The last upstream sync broke this App's smoke tests. A re-provisioning Task is looking at what changed upstream."
+                },
+                "awaitingOwnerNote": "Starting it runs the owner's Agent with the owner's credentials, so only the owner can press Run on the Task.",
+                "openTask": "Open Task {slug}",
+                "openPullRequest": "Open the pull request",
+                "actions": {
+                    "provision": "Provision",
+                    "reprovision": "Re-provision",
+                    "restart": "Start over",
+                    "cancel": "Cancel"
+                },
+                "dialog": {
+                    "back": "Back",
+                    "start": {
+                        "title": "Provision this App Work?",
+                        "description": "An Agent inspects the repository and opens a pull request that writes only .works/works.yml and .works/overlay/. Nothing else in the repository changes, and nothing is merged without you.",
+                        "confirm": "Provision"
+                    },
+                    "restart": {
+                        "title": "Start provisioning over?",
+                        "description": "A provisioning Task is already open. Starting over files a new provisioning Task; the open one is left as it is, so cancel it if you no longer need it.",
+                        "confirm": "Start over"
+                    },
+                    "cancel": {
+                        "title": "Cancel provisioning?",
+                        "description": "The running provisioning is stopped and its Task is cancelled. Anything it already pushed stays on its branch; no pull request is merged.",
+                        "confirm": "Cancel provisioning"
+                    }
+                },
+                "toasts": {
+                    "start": "Provisioning started.",
+                    "restart": "Provisioning started over.",
+                    "cancel": "Provisioning cancelled."
+                },
+                "errors": {
+                    "alreadyProvisioning": "A provisioning Task is already open.",
+                    "nothingToCancel": "No provisioning is running.",
+                    "cancelRefused": "The provisioning Task could not be cancelled. Open the Task to see why.",
+                    "notAppWork": "Only App Works can be provisioned.",
+                    "notFound": "This Work could not be found.",
+                    "failed": "That did not work. Try again in a moment."
+                }
+            },
             "builds": {
                 "title": "Builds",
                 "subtitle": "Built on GitHub-hosted runners in {repository} · image {imageRepository}",
@@ -9289,6 +9440,19 @@
                     "deployableOther": "Deployable build: {sha}",
                     "noDeployable": "No deployable build yet",
                     "open": "Open Builds"
+                }
+            },
+            "appsTierEligibility": {
+                "reasons": {
+                    "emailUnverified": "Verify the email address of your account first.",
+                    "planRequired": "Ever Works Apps needs a paid plan.",
+                    "ownerQuarantined": "An App of this account is quarantined.",
+                    "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
+                    "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
+                    "unknown": "Not eligible ({reason})."
+                },
+                "hints": {
+                    "capReachedPaidPlan": "A paid plan allows more Apps on Ever Works Apps. Upgrade your plan to lift this limit."
                 }
             },
             "appDeploy": {
@@ -9575,6 +9739,58 @@
                         "undeclaredName": "The App spec doesn't declare this name.",
                         "specUnavailable": "This app has no usable App spec yet.",
                         "failed": "The value couldn't be saved. Try again."
+                    },
+                    "import": {
+                        "open": "Import .env",
+                        "title": "Import a .env file",
+                        "description": "Paste the contents of a .env file, or pick one. Only names the App spec declares are imported, and generated values are never overwritten. Values are sent once and never shown again.",
+                        "pasteLabel": "Contents",
+                        "fileLabel": "Or pick a file:",
+                        "preview": "Preview changes",
+                        "import": "{count, plural, =0 {Nothing to import} one {Import # change} other {Import # changes}}",
+                        "cancel": "Cancel",
+                        "imported": "{count, plural, =0 {Nothing changed} one {# value imported} other {# values imported}}",
+                        "failed": "Couldn't import: {reason}",
+                        "summary": "{add} new · {replace} replaced · {remove} removed · {refused} refused",
+                        "undeclared": "The App spec doesn't declare {names}. Remove those lines to import the rest.",
+                        "line": "line {line}",
+                        "actions": {
+                            "add": "will be added",
+                            "replace": "will replace the stored value",
+                            "remove": "will remove the stored value",
+                            "skipped": "skipped",
+                            "refused": "refused"
+                        },
+                        "refusals": {
+                            "undeclaredName": "Some lines name values the App spec doesn't declare. Remove them and try again.",
+                            "specUnavailable": "This app has no usable App spec yet.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so values can't be saved.",
+                            "storeUnavailable": "The environment store isn't available right now. Nothing was changed.",
+                            "tooLarge": "This file is larger than 1 MiB.",
+                            "tooMany": "This file has more lines than allowed.",
+                            "forbidden": "You need edit access to this App to import values.",
+                            "invalid": "This isn't a .env file Ever Works can read."
+                        }
+                    },
+                    "rotate": {
+                        "open": "Rotate",
+                        "aria": "Rotate {name}",
+                        "title": "Rotate {name}?",
+                        "description": "Ever Works generates a fresh value. The app uses it from its next Deployment.",
+                        "warning": "Data the app encrypted or signed with the current value may become unreadable, and sessions or tokens made with it stop working. This can't be undone.",
+                        "typeToConfirm": "Type {name} to confirm",
+                        "confirm": "Rotate",
+                        "cancel": "Cancel",
+                        "rotated": "{name} rotated.",
+                        "failed": "Couldn't rotate: {reason}",
+                        "refusals": {
+                            "mismatch": "The name you typed doesn't match.",
+                            "notGenerated": "This value isn't generated, so it can't be rotated.",
+                            "generatorUnavailable": "This value's generator isn't available on this installation.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation.",
+                            "rateLimited": "Too many rotations. Try again later.",
+                            "forbidden": "You need edit access to this App to rotate values."
+                        }
                     }
                 },
                 "dependencies": {
@@ -9608,10 +9824,217 @@
                         "requested": "Deleting the {kind} data.",
                         "failed": "The data couldn't be deleted. {reason}"
                     },
-                    "deleteDataOwnerOnly": "Only the Work owner can delete this data."
+                    "deleteDataOwnerOnly": "Only the Work owner can delete this data.",
+                    "configure": {
+                        "open": "Configure",
+                        "aria": "Configure {kind}",
+                        "title": "Configure {kind}",
+                        "description": "Choose where it runs and give its settings. Secret settings are sent once and never shown again.",
+                        "provider": "Provider",
+                        "size": "Volume size (GiB)",
+                        "sizeHint": "Leave empty to use the default size.",
+                        "sizeGrowOnly": "Currently {size} GiB. A volume can only grow.",
+                        "sizeTooSmall": "The size must be a whole number of at least {size} GiB.",
+                        "required": "required",
+                        "stored": "A value is set.",
+                        "secretStored": "A value is stored. Type a new one to replace it, or leave this empty to keep it.",
+                        "save": "Save and provision",
+                        "cancel": "Cancel",
+                        "saved": "{kind}: settings saved. A new provisioning attempt is scheduled.",
+                        "failed": "Couldn't save: {reason}",
+                        "refusals": {
+                            "providerNotSupported": "That provider can't serve this dependency here.",
+                            "sizeShrink": "A volume can't be made smaller.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so settings can't be saved.",
+                            "notDeclared": "The App spec doesn't declare this dependency.",
+                            "forbidden": "You need edit access to this App to configure dependencies.",
+                            "invalid": "Check the settings and try again.",
+                            "leaseHeld": "This dependency is being provisioned right now. Try again in a moment."
+                        }
+                    }
                 },
                 "ownerRequired": "Only the Work owner can do this.",
-                "ownerConfirmCluster": "Another member saved this cluster connection, so the Work owner has to deploy once to confirm it."
+                "ownerConfirmCluster": "Another member saved this cluster connection, so the Work owner has to deploy once to confirm it.",
+                "live": {
+                    "title": "Running now",
+                    "notObserved": "The cluster hasn't been observed yet. Refresh to read it.",
+                    "observed": "Observed",
+                    "observedRecently": "Checked in the last few minutes",
+                    "refresh": "Refresh",
+                    "refreshIn": "Refresh in {seconds}s",
+                    "runSmoke": "Run smoke checks",
+                    "notDispatched": "No isolated worker is available to run this right now.",
+                    "refreshQueued": "Refreshing the status…",
+                    "smokeQueued": "Smoke checks started.",
+                    "refreshWait": "Refresh is allowed once every 15 seconds. Try again in {seconds}s.",
+                    "actionFailed": "Couldn't do that: {reason}",
+                    "refusals": {
+                        "notDeployed": "Nothing of this app is deployed right now.",
+                        "paused": "The app is paused. Resume it to run the smoke checks.",
+                        "deployInProgress": "A Deployment is running. Wait for it to finish.",
+                        "deleting": "This App Work is being deleted.",
+                        "forbidden": "You need permission to deploy this app to do that."
+                    },
+                    "requests": {
+                        "refresh": "Status refresh",
+                        "job": "Run of {name}",
+                        "smoke": "Smoke checks",
+                        "inFlight": "{what} — in progress",
+                        "failed": "{what} failed ({code})"
+                    },
+                    "components": "Components",
+                    "smoke": "Smoke checks",
+                    "jobs": "Jobs",
+                    "cron": "Scheduled calls",
+                    "noSnapshot": "The cluster hasn't been observed yet."
+                },
+                "components": {
+                    "empty": "No components are running.",
+                    "caption": "Components and their replicas",
+                    "name": "Component",
+                    "ready": "Ready",
+                    "restarts": "Restarts",
+                    "lastStop": "Last stop",
+                    "logs": "Logs",
+                    "logsAria": "Logs of {name}",
+                    "roles": {
+                        "web": "web",
+                        "worker": "worker"
+                    },
+                    "readyOf": "{ready}/{desired}",
+                    "oomRecent": "out of memory in the last 24 hours"
+                },
+                "smoke": {
+                    "none": "No smoke checks have run on this Deployment yet.",
+                    "inCluster": "Inside",
+                    "public": "Public",
+                    "hairpin": "Own address",
+                    "count": "{label} {passed}/{total}",
+                    "isolation": {
+                        "enforced": "Network isolation: enforced",
+                        "notEnforced": "Network isolation: not enforced",
+                        "unknown": "Network isolation: unknown"
+                    },
+                    "classifications": {
+                        "dnsNotPointing": "DNS doesn't point at the cluster yet",
+                        "tlsNotReady": "the certificate isn't ready yet",
+                        "unreachable": "unreachable",
+                        "checkFailed": "the check failed"
+                    },
+                    "httpStatus": "answered HTTP {status}",
+                    "failed": "failed"
+                },
+                "jobs": {
+                    "empty": "The App spec declares no jobs.",
+                    "when": {
+                        "preDeploy": "before each Deployment",
+                        "firstDeploy": "first Deployment only",
+                        "postDeploy": "after each Deployment"
+                    },
+                    "status": {
+                        "succeeded": "Succeeded",
+                        "failed": "Failed",
+                        "timeout": "Timed out",
+                        "running": "Running…",
+                        "queued": "Queued…"
+                    },
+                    "lastRunWithDuration": "{status} · {seconds}s",
+                    "neverRun": "Hasn't run yet",
+                    "exitCode": "exit code {code}",
+                    "logs": "Logs",
+                    "logsAria": "Logs of the {name} job",
+                    "run": "Run now",
+                    "runAria": "Run the {name} job now",
+                    "deployInProgress": "Wait for the current Deployment to finish.",
+                    "active": "A run of this job is still going.",
+                    "notDispatched": "{name}: no isolated worker is available to run it right now.",
+                    "queued": "{name} started.",
+                    "failed": "Couldn't start the job: {reason}",
+                    "refusals": {
+                        "jobActive": "A run of this job is still going. Wait for it to finish.",
+                        "deployInProgress": "Wait for the current Deployment to finish, or cancel it.",
+                        "confirmRequired": "Confirm the run first.",
+                        "notDeployed": "Nothing is deployed, so there is no live version to run the job with.",
+                        "deleting": "This App Work is being deleted.",
+                        "invalidName": "That job name isn't valid.",
+                        "forbidden": "You need permission to deploy this app to run its jobs."
+                    },
+                    "runTitle": "Run {name} now?",
+                    "runDescription": "The job runs once, with the image and env of the live version. It can change the app's data — a migration or a seed acts on the real database.",
+                    "firstDeployWarning": "This job is meant to run only on the first Deployment. Running it again can overwrite or duplicate data.",
+                    "confirmCheckbox": "I understand this runs against the live app and its data.",
+                    "cancel": "Cancel",
+                    "runConfirm": "Run"
+                },
+                "cron": {
+                    "lastRun": "last run {when}",
+                    "lastSuccess": "last success {when}",
+                    "neverRun": "hasn't run yet"
+                },
+                "logs": {
+                    "title": "Logs",
+                    "description": "The last lines of one component or job. Secret values are replaced by their names, and nothing is kept after you close this.",
+                    "noTargets": "Nothing has been observed on the cluster yet, so there are no logs to show.",
+                    "target": "Show logs of",
+                    "components": "Components",
+                    "jobs": "Jobs",
+                    "lines": "Lines",
+                    "previous": "Previous container (after a restart)",
+                    "follow": "Follow",
+                    "refresh": "Refresh",
+                    "loading": "Fetching logs…",
+                    "empty": "No containers were found.",
+                    "noOutput": "No output.",
+                    "truncated": "truncated",
+                    "redacted": "Hidden: {names}",
+                    "errors": {
+                        "expired": "These logs expired. Refresh to fetch them again.",
+                        "tooMany": "Too many log requests. Wait a minute and try again.",
+                        "failed": "Couldn't fetch the logs ({code}).",
+                        "timedOut": "The cluster didn't answer in time. Try again.",
+                        "clusterUnreachable": "Ever Works couldn't reach the cluster.",
+                        "workerUnavailable": "No isolated worker is available to fetch logs right now.",
+                        "redactionUnavailable": "The logs can't be shown: the app's secret values couldn't be read to hide them.",
+                        "unsupported": "This target can't show logs.",
+                        "targetNone": "This app runs nowhere yet.",
+                        "unavailable": "Logs can't be fetched on this instance.",
+                        "deleting": "This App Work is being deleted.",
+                        "forbidden": "You need permission to deploy this app to read its logs."
+                    }
+                },
+                "history": {
+                    "title": "History",
+                    "loading": "Reading the history…",
+                    "error": "Couldn't read the history.",
+                    "empty": "No Deployments yet.",
+                    "caption": "Deployments of this app, newest first",
+                    "state": "State",
+                    "trigger": "Started by",
+                    "version": "Version",
+                    "when": "When",
+                    "smoke": "Smoke",
+                    "states": {
+                        "live": "Live",
+                        "failed": "Failed",
+                        "timedOut": "Timed out",
+                        "rolledBack": "Rolled back",
+                        "cancelled": "Cancelled",
+                        "skipped": "Skipped",
+                        "queued": "Queued",
+                        "inProgress": "In progress"
+                    },
+                    "current": "current",
+                    "triggers": {
+                        "manual": "Deploy",
+                        "build": "Build",
+                        "rollback": "Rollback",
+                        "specApplied": "App spec change",
+                        "envChange": "Env change",
+                        "domainChange": "Domain change"
+                    },
+                    "build": "Build",
+                    "smokeCount": "{passed}/{total} passed"
+                }
             }
         },
         "newPage": {
@@ -15462,6 +15885,180 @@
                 "cancel": "Cancel",
                 "paste": "Paste",
                 "failed": "The paste failed"
+            },
+            "checking": "Looking at the desktop of {name}…",
+            "watch": "Watch the desktop",
+            "opening": "Opening…",
+            "watchHint": "Shows the whole screen of {name} — every window, the system bars and the pointer. Watching pauses nothing on {name} and spends no credits.",
+            "connecting": "Waking up the view… Asking {name} for a picture.",
+            "stalled": "Stream stalled — waiting for a fresh picture",
+            "ended": "The stream stopped. The computer may be busy or asleep.",
+            "reconnect": "Reconnect",
+            "refresh": "Refresh the picture",
+            "end": "End view",
+            "live": "LIVE",
+            "strip": "{name} · Desktop · Display {index} of {count} · {quality}",
+            "noCredits": "This view spends no credits.",
+            "bandwidth": "Bandwidth used: {amount}",
+            "status": {
+                "watching": "Watching — nothing on {name} is paused."
+            },
+            "quality": {
+                "label": "Quality",
+                "sharp": "Sharp",
+                "smooth": "Smooth",
+                "steady": "Steady"
+            },
+            "displays": {
+                "label": "Display",
+                "option": "Display {index} · {name} · {size}",
+                "primary": "primary",
+                "virtual": "virtual",
+                "remembered": "Remembered for you on {name}.",
+                "fellBack": "The display you chose went away — showing {current}."
+            },
+            "helper": {
+                "reducedTrust": "Reduced trust — the screen helper on {name} is hash-pinned, not signed.",
+                "fingerprint": "Fingerprint {prefix}…",
+                "unpublished": "It is a build its owner approved themselves.",
+                "signedAvailable": "A signed helper is available for it — on that computer, run"
+            },
+            "stage": {
+                "label": "Desktop of {name}, watching"
+            },
+            "errors": {
+                "generic": "The desktop could not be shown. Try again in a moment."
+            },
+            "unavailable": {
+                "killSwitch": {
+                    "title": "All computers are stopped",
+                    "body": "The fleet-wide stop is on. Clear it under Settings → Fleet to show desktops again."
+                },
+                "kindUnsupported": {
+                    "title": "Not available on this kind of computer yet",
+                    "body": "The desktop app cannot show its screen here yet."
+                },
+                "offline": {
+                    "title": "{name} is offline",
+                    "body": "Last heard from {lastSeen}."
+                },
+                "consentMissing": {
+                    "title": "Live viewing is switched off on {name}",
+                    "body": "Start the node with --attend on {name}. Run this on {name}:"
+                },
+                "permissionDenied": {
+                    "title": "Only the owner of {name} can see its screen",
+                    "body": "Ask them to allow organization members: desktop."
+                },
+                "waylandUnsupported": {
+                    "title": "{name} is on Wayland",
+                    "body": "Desktop view needs an X11 session; Wayland is not supported yet."
+                },
+                "helperMissing": {
+                    "title": "{name} cannot show its desktop yet",
+                    "body": "The screen helper is not installed on it. Run this on {name}:"
+                },
+                "helperUnadmitted": {
+                    "title": "The screen helper is waiting for your approval on {name}",
+                    "body": "Approve it on {name} itself. Run this there:"
+                },
+                "helperUntrusted": {
+                    "title": "The screen helper on {name} has changed since you approved it",
+                    "body": "Nothing starts until you approve it again. Check it on {name}:"
+                },
+                "noDisplaySession": {
+                    "title": "Nobody is signed in on {name}",
+                    "body": "Sign in there to show its desktop."
+                },
+                "permissionScreenRecording": {
+                    "title": "{name} has not allowed screen recording",
+                    "body": "It must be allowed on {name} itself. A hash-pinned helper asks again after each update."
+                },
+                "linkUnavailable": {
+                    "title": "{name} is not connected right now",
+                    "body": "It reconnects on its own; try again in a moment."
+                },
+                "settingsOn": "On {name}: {path} → allow ever-works-screen.",
+                "browserStill": "You can still watch the Agent's browser on this computer.",
+                "copy": "Copy",
+                "copied": "Copied",
+                "tryAgain": "Try again",
+                "never": "never"
+            },
+            "control": {
+                "you": "YOU",
+                "status": {
+                    "watching": "Watching — nothing on {name} is paused.",
+                    "controlling": "You have control of {name}.",
+                    "other": "Someone else has control of {name}."
+                },
+                "take": "Take control",
+                "request": "Request control",
+                "requestWaiting": "Asked — waiting {countdown}",
+                "giveBack": "Give back control",
+                "extend": "Extend",
+                "keepControl": "Keep control",
+                "handOver": "Hand over",
+                "idleIn": "Gives back in {countdown} without input",
+                "idleWarning": "Control goes back in {countdown} — nothing was typed or clicked.",
+                "incoming": "Someone is asking for control of {name}.",
+                "autoDeclines": "Declines on its own in {countdown}.",
+                "notInAudience": "You can watch {name}, but its owner has not allowed you to control it.",
+                "blocked": "Not sent to the computer: {list}",
+                "confirm": {
+                    "title": "Take control of {name}?",
+                    "body": "Your mouse and keyboard will drive {name}. Everyone watching sees it, and {name} shows who is controlling it. Control goes back after 10 minutes without input, or when you press Escape twice.",
+                    "yes": "Take control",
+                    "no": "Cancel"
+                },
+                "refused": {
+                    "blockedShortcut": "That shortcut is never sent to the computer.",
+                    "notControlling": "This view no longer has control.",
+                    "controlNotAllowed": "Control was turned off on the computer.",
+                    "permissionAccessibility": "macOS has not allowed the screen helper to use the mouse and keyboard.",
+                    "inputUnavailable": "The computer does not take input in this session.",
+                    "injectFailed": "The computer did not take that input."
+                }
+            },
+            "recordings": {
+                "settings": {
+                    "title": "Desktop recordings",
+                    "body": "A Desktop view of this computer is always recorded while someone controls it.",
+                    "watch": "Record watching sessions",
+                    "watchHint": "Also record views that only watch. Off by default.",
+                    "retention": "Keep recordings for",
+                    "days": "{count, plural, one {# day} other {# days}}",
+                    "retentionHint": "A new value applies to recordings that stop from now on.",
+                    "saved": "Saved.",
+                    "failed": "Could not save the recording settings."
+                },
+                "title": "Recordings of {name}",
+                "none": "Nothing recorded yet. A view is recorded whenever someone has control.",
+                "error": "The recordings could not be read.",
+                "on": "RECORDING",
+                "failed": "This view is not being recorded: the recording could not be stored.",
+                "expires": "Deleted on {date}",
+                "watch": "Watch",
+                "close": "Close",
+                "loading": "Loading the recording…",
+                "player": "Recording of {name}",
+                "watermark": "EVER WORKS · RECORDING · DESKTOP · {name}",
+                "play": "Play",
+                "pause": "Pause",
+                "back10": "−10 s",
+                "back1": "−1 s",
+                "forward1": "+1 s",
+                "forward10": "+10 s",
+                "scrubber": "Position in the recording",
+                "facts": "Display {display} · {quality} · stored in {storage} · {size} · deleted on {date}",
+                "primary": "primary",
+                "never": "never",
+                "spans": "Amber marks the stretches when someone had control.",
+                "delete": "Delete now",
+                "deleteTitle": "Delete this recording of {name}?",
+                "deleteBody": "It is removed from storage at once and cannot be brought back.",
+                "deleteYes": "Delete",
+                "deleteNo": "Cancel"
             }
         },
         "cloud": {
@@ -15498,7 +16095,11 @@
                 "cancel": "Cancel",
                 "create": "Create",
                 "createWithPrice": "Create · {price}/mo",
-                "created": "Creating {name} at {provider}…"
+                "created": "Creating {name} at {provider}…",
+                "signIn": "Sign in with {provider}",
+                "signInFailed": "Sign-in could not start; save a token in the plugin settings instead.",
+                "vpnKey": "Overlay-VPN auth key (optional)",
+                "vpnKeyHint": "Used once by the first-boot script to join your network. Ever Works never stores or shows it again."
             },
             "progress": {
                 "label": "Create progress",
@@ -15537,7 +16138,8 @@
                 "keepRunning": "Keep running",
                 "keptRunning": "{name} keeps running; the idle policy waits its hours again.",
                 "poweredOffByPolicy": "Powered off by the idle policy {duration} ago, after {hours} h idle.",
-                "changeIdlePolicy": "Change"
+                "changeIdlePolicy": "Change",
+                "unclaimed": "Unclaimed — found at {provider} with this Ever Works’ tags {duration} ago; no computer here created it. Destroy it to stop the bill."
             },
             "power": {
                 "off": "Power off",
@@ -15687,7 +16289,8 @@
                     "title": "No computer is reporting usage yet",
                     "command": "Switch it on on a computer:",
                     "promise": "The scan reads {sentence}."
-                }
+                },
+                "exportCsv": "Export CSV"
             },
             "agent": {
                 "title": "Fleet work by computer — last 30 days, at list price",
@@ -15703,6 +16306,17 @@
             "palette": {
                 "usage": "Fleet usage",
                 "usageOn": "Usage on {name}"
+            },
+            "prices": {
+                "title": "Price list v{version} — in effect since {since}",
+                "loading": "Loading the price list…",
+                "history": "Versions: {versions}. Figures keep the version they were priced at.",
+                "model": "Model",
+                "in": "Input",
+                "out": "Output",
+                "cacheRead": "Cache read",
+                "cacheWrite": "Cache write",
+                "perMillion": "US dollars per million tokens, at the providers’ published pay-as-you-go rates."
             }
         },
         "runners": {
@@ -15751,6 +16365,7 @@
                     "docker": "container-isolated"
                 },
                 "sourceGithub": "as GitHub reports it",
+                "acceptPermission": "The Ever Works GitHub App lacks “{permission}” here. Accept the App’s updated permissions on GitHub (installation settings → “Review request” → “Accept new permissions”), then Reinstall.",
                 "sourceNode": "as {name} reports it",
                 "job": "“{job}”",
                 "jobRun": "“{job}” run #{run}",
@@ -15760,7 +16375,8 @@
                 "logs": "Logs",
                 "logsOf": "Logs of {name}",
                 "openJob": "Open job on GitHub",
-                "openOnGitHub": "Open on GitHub"
+                "openOnGitHub": "Open on GitHub",
+                "updateAvailable": "Update available: {version}"
             },
             "actions": {
                 "start": "Start",
@@ -15822,10 +16438,96 @@
                 "cancel": "Cancel",
                 "submit": "{count, plural, one {Install # runner} other {Install # runners}}",
                 "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
-                "failed": "The runners could not be installed."
+                "failed": "The runners could not be installed.",
+                "choose": "Choose a repository or organisation",
+                "checkingPermission": "Checking the GitHub App’s permission on {target}…",
+                "repoPermissionHint": "Repository runners need the Ever Works GitHub App to have “Administration: Read and write” on the repository. If its installation predates that permission, accept the App’s updated permissions on GitHub first: installation settings → “Review request” → “Accept new permissions”.",
+                "shareWarning": "Ticked, these runners can control every container on {name} and run anything as root there. Leave it unticked unless your jobs need it."
             },
             "palette": {
-                "install": "Install Actions runners on {name}"
+                "install": "Install Actions runners on {name}",
+                "jobs": "Actions jobs"
+            },
+            "jobs": {
+                "title": "Actions jobs",
+                "counts": "{queued} queued · {running} running",
+                "busy": "{busy} of {total, plural, one {# runner} other {# runners}} busy",
+                "listLabel": "Queued and running Actions jobs",
+                "loading": "Loading Actions jobs…",
+                "loadFailed": "The Actions jobs could not be read.",
+                "lastKnown": "Last known jobs — {reason}",
+                "checked": "checked {time}",
+                "notChecked": "not checked yet",
+                "rateLimited": "GitHub is rate-limiting; next check {time}",
+                "rateLimitedWait": "GitHub is rate-limiting; the next check waits until it allows one",
+                "killSwitch": "All computers are stopped — runners keep running; installing and cancelling are paused.",
+                "empty": "No queued or running jobs on your runners",
+                "watching": "watching {targets}",
+                "watchingNone": "not watching any repository or organisation yet",
+                "watchingDefault": "(the default: every repository and organisation your runners are registered for)",
+                "change": "Change",
+                "unreadable": "Could not read {target}: {reason}",
+                "grantAccess": "Grant access",
+                "highlightGone": "That workflow run is no longer queued or running.",
+                "run": "#{number}",
+                "queued": "queued {duration}",
+                "queuedNow": "queued",
+                "running": "running {duration}",
+                "runningNow": "running",
+                "noRunner": "no runner can take it",
+                "openJob": "Open job on GitHub",
+                "cancel": "Cancel workflow run…",
+                "cancelConfirm": "Cancel workflow run",
+                "cancelPaused": "Paused while all computers are stopped",
+                "cancelling": "Cancelling workflow run #{number} of {repository}…",
+                "cancellingNoNumber": "Cancelling the workflow run of {repository}…",
+                "cancelFailed": "The workflow run could not be cancelled.",
+                "watched": {
+                    "title": "Watched repositories and organisations",
+                    "description": "The Actions jobs panel lists the queued and running jobs of these that target your self-hosted runners.",
+                    "defaultNote": "Nothing saved yet: the panel watches every repository and organisation your runners are registered for.",
+                    "empty": "Nothing in the list.",
+                    "add": "Add",
+                    "addLabel": "Add a repository or organisation",
+                    "choose": "Choose…",
+                    "repository": "repository",
+                    "organisation": "organisation",
+                    "remove": "Stop watching {target}",
+                    "limit": "At most {max} repositories and organisations.",
+                    "noneAvailable": "Your GitHub App does not cover a repository or organisation yet.",
+                    "openAppSettings": "Open GitHub App settings",
+                    "save": "Save",
+                    "useDefault": "Use the default",
+                    "cancel": "Cancel",
+                    "saved": "Saved the watched list.",
+                    "failed": "The watched list could not be saved."
+                }
+            },
+            "diagnosis": {
+                "offline": "the only matching runner is offline",
+                "missingLabel": "no runner has the label {label}",
+                "missingLabelUnnamed": "no runner has every label it asks for",
+                "wrongScope": "no runner is registered to {target}",
+                "waitingFor": "waiting for {runner}",
+                "waitingForAny": "waiting for a busy runner"
+            },
+            "grantAccess": {
+                "title": "Organisation runners need one more permission",
+                "body": "The Ever Works GitHub App on {account} needs “{permission}”. Grant it on GitHub, then come back and press Check again.",
+                "bodyUnnamed": "The Ever Works GitHub App on {account} needs one more permission. Grant it on GitHub, then come back and press Check again.",
+                "grant": "Grant access",
+                "checkAgain": "Check again",
+                "checking": "Checking…",
+                "useRepository": "Use a repository instead",
+                "accept": "What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, check that “{permission}” is listed, then press “Accept new permissions”. No request there? The App does not ask for that permission yet: whoever manages the App adds it under “Permissions & events” first.",
+                "acceptUnnamed": "What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, then “Accept new permissions”. No request there? The App does not ask for that permission yet: whoever manages the App adds it under “Permissions & events” first."
+            },
+            "reinstall": {
+                "button": "Reinstall…",
+                "retry": "Retry",
+                "confirm": "Reinstall",
+                "reinstalling": "Reinstalling {name}…",
+                "failed": "The runner could not be reinstalled."
             }
         }
     }

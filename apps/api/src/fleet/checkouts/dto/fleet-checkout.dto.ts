@@ -54,7 +54,11 @@ export class ListFleetCheckoutsQueryDto {
     @IsUUID()
     workId?: string;
 
-    @ApiProperty({ required: false, enum: FLEET_CHECKOUT_STATES, description: '`archived` is the bin.' })
+    @ApiProperty({
+        required: false,
+        enum: FLEET_CHECKOUT_STATES,
+        description: '`archived` is the bin.',
+    })
     @IsOptional()
     @IsIn(FLEET_CHECKOUT_STATES as unknown as string[])
     state?: FleetCheckoutState;
@@ -90,7 +94,10 @@ export class ListNodeCheckoutsQueryDto {
     @IsBoolean()
     rescan?: boolean;
 
-    @ApiProperty({ required: false, description: 'Recompute every git line now (never contacts a remote).' })
+    @ApiProperty({
+        required: false,
+        description: 'Recompute every git line now (never contacts a remote).',
+    })
     @IsOptional()
     @Transform(queryBoolean)
     @IsBoolean()
@@ -118,7 +125,8 @@ export class SyncFleetCheckoutDto {
 export class ArchiveFleetCheckoutDto {
     @ApiProperty({
         required: false,
-        description: 'CONTRACTS §2.2 class `confirm`: without it the answer is `confirmation_required`.',
+        description:
+            'CONTRACTS §2.2 class `confirm`: without it the answer is `confirmation_required`.',
     })
     @IsOptional()
     @IsBoolean()
@@ -137,7 +145,10 @@ export class FleetCheckoutCreateSourceDto {
     @MaxLength(FLEET_CHECKOUT_REMOTE_MAX_LENGTH)
     repoUrl?: string;
 
-    @ApiProperty({ required: false, description: 'worktree: the checkout on the same computer to branch off.' })
+    @ApiProperty({
+        required: false,
+        description: 'worktree: the checkout on the same computer to branch off.',
+    })
     @IsOptional()
     @IsUUID()
     parentCheckoutId?: string;
@@ -174,7 +185,8 @@ export class CreateFleetCheckoutDto {
     @ApiProperty({
         required: false,
         type: [String],
-        description: 'Worktrees only: ignored folders of the parent linked (not copied) into the new worktree.',
+        description:
+            'Worktrees only: ignored folders of the parent linked (not copied) into the new worktree.',
     })
     @IsOptional()
     @IsString({ each: true })
@@ -205,7 +217,10 @@ export class DeleteFleetCheckoutDto {
     @IsBoolean()
     confirm?: boolean;
 
-    @ApiProperty({ required: false, description: 'Class `confirm-destructive`: the checkout’s folder name.' })
+    @ApiProperty({
+        required: false,
+        description: 'Class `confirm-destructive`: the checkout’s folder name.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(FLEET_CHECKOUT_PATH_MAX_LENGTH)
@@ -220,7 +235,10 @@ export class DeleteFleetCheckoutDto {
 
 /** `DELETE /api/fleet/checkouts/:id?cleanUp=1` — FL-06's Clean up gate. */
 export class DeleteFleetCheckoutQueryDto {
-    @ApiProperty({ required: false, description: 'FL-06 Clean up: worktree, pull request merged or closed, no session.' })
+    @ApiProperty({
+        required: false,
+        description: 'FL-06 Clean up: worktree, pull request merged or closed, no session.',
+    })
     @IsOptional()
     @Transform(queryBoolean)
     @IsBoolean()

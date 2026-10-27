@@ -156,7 +156,10 @@ export class WorkAppOpsController {
         @Res({ passthrough: true }) response: OpsResponse,
     ): Promise<AcceptedBody> {
         await this.authorize(id, auth.userId, 'edit');
-        const answer = accepted(await this.targets.runJob(id, auth.userId, name, body ?? {}), response);
+        const answer = accepted(
+            await this.targets.runJob(id, auth.userId, name, body ?? {}),
+            response,
+        );
         const jobName = String(name ?? '').slice(0, 63);
         recordAppOpsActivity(this.activity, {
             userId: auth.userId,

@@ -1,7 +1,11 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { FleetHandoffCheckoutRef, FleetHandoffNodeCheckouts, FleetHandoffTask } from '@ever-works/contracts';
+import type {
+    FleetHandoffCheckoutRef,
+    FleetHandoffNodeCheckouts,
+    FleetHandoffTask,
+} from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
 import type { HandoffCheckoutChoice } from './task-handoff.shared';
 
@@ -75,7 +79,12 @@ export function CheckoutChoice({
         );
 
     return (
-        <div role="radiogroup" aria-label={t('label')} className="space-y-1.5" data-testid="fleet-handoff-checkouts">
+        <div
+            role="radiogroup"
+            aria-label={t('label')}
+            className="space-y-1.5"
+            data-testid="fleet-handoff-checkouts"
+        >
             {hasRepository ? (
                 <>
                     {allowWorktree && matching.map(worktree)}
@@ -95,9 +104,17 @@ export function CheckoutChoice({
                 </>
             ) : (
                 <>
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('noRepository')}</p>
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('noRepository')}
+                    </p>
                     {[...matching, ...others].map(existing)}
-                    {option('none', value.mode === 'none', t('none'), { mode: 'none' }, 'fleet-handoff-checkout-none')}
+                    {option(
+                        'none',
+                        value.mode === 'none',
+                        t('none'),
+                        { mode: 'none' },
+                        'fleet-handoff-checkout-none',
+                    )}
                 </>
             )}
             {step?.stale && <p className="text-xs text-warning">{step.stale}</p>}

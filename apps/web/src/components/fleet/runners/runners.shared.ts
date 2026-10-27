@@ -17,6 +17,16 @@ import {
     type FleetActionsRunnerState,
     type FleetActionsRunnerTargetOption,
     type FleetActionsRunnerView,
+    FLEET_ACTIONS_MAX_WATCHED_TARGETS,
+    fleetActionsRunCancelSummary,
+    isFleetActionsJobProblem,
+    isFleetActionsRunnerTarget,
+    type FleetActionsCancelRunRequest,
+    type FleetActionsJobView,
+    type FleetActionsJobsView,
+    type FleetActionsWatchedTarget,
+    fleetActionsRunnerReinstallSummary,
+    fleetActionsRunnerUpdateAvailable,
 } from '@ever-works/contracts';
 import { ROUTES } from '@/lib/constants';
 import type { ConfirmDialogModel } from '../machine/machine-actions.shared';
@@ -151,6 +161,34 @@ export function runnerStatus(
     };
 }
 
+/**
+ * The GitHub App permission names FL-18 can report as missing — the facade's
+ * `actionsRunnersPermissionLabel` values, matched verbatim.
+ */
+export const RUNNER_APP_PERMISSION_NAMES: readonly string[] = [
+    'Administration: Read and write',
+    'Self-hosted runners: Read and write',
+    'Actions: Read and write',
+    'Actions: Read-only',
+];
+
+/**
+ * The GitHub App permission a FAILED runner's error says is missing (`… the Ever Works
+ * GitHub App on acme needs "Administration: Read and write"`), so the row can say what to
+ * accept on GitHub; null for any other failure or state.
+ */
+export function runnerMissingAppPermission(
+    runner: Pick<FleetActionsRunnerView, 'state' | 'lastError'>,
+): string | null {
+    if (runner.state !== 'failed' || typeof runner.lastError !== 'string') return null;
+    const text = runner.lastError;
+    if (!text.includes('GitHub App')) return null;
+    for (const name of RUNNER_APP_PERMISSION_NAMES) {
+        if (text.includes(`needs "${name}"`) || text.includes(`needs “${name}”`)) return name;
+    }
+    return null;
+}
+
 /** Every label the row shows as a chip: GitHub's own first, then the owner's. */
 export function runnerLabelChips(
     runner: Pick<FleetActionsRunnerView, 'defaultLabels' | 'labels'>,
@@ -256,6 +294,69 @@ export function runnerActDialog(
     }
 }
 
+// ─── Versions and Reinstall (P3, spec FR-28) ────────────────────────────────
+
+/**
+ * The newer runner build to show as "Update available" (FR-28): the API's
+ * `updateAvailable`, kept only when it is newer than the installed version
+ * (the contracts' comparison); when the installed version is unknown, the
+ * API's word stands. Updating is the owner's act — Reinstall — never automatic.
+ */
+export function runnerUpdateAvailable(
+    runner: Pick<FleetActionsRunnerView, 'runnerVersion'> & { updateAvailable?: string | null },
+): string | null {
+    const latest = runner.updateAvailable?.trim() || null;
+    if (!latest) return null;
+    return runner.runnerVersion
+        ? fleetActionsRunnerUpdateAvailable(runner.runnerVersion, latest)
+        : latest;
+}
+
+/**
+ * Whether a row offers **Reinstall…** (FR-28): while it is idle, offline,
+ * stopped or failed — a failed install's **Retry** is this act. Never mid-job,
+ * mid-install, while unknown or while a remove runs; the server still decides.
+ */
+export function runnerReinstallAvailability(
+    runner: Pick<FleetActionsRunnerView, 'state' | 'phase'>,
+): RunnerActAvailability {
+    if (runner.phase === 'removing') return 'hidden';
+    return runner.state === 'idle' ||
+        runner.state === 'offline' ||
+        runner.state === 'stopped' ||
+        runner.state === 'failed'
+        ? 'enabled'
+        : 'hidden';
+}
+
+/** The confirmation of **Reinstall…** (`confirm`, CONTRACTS §2.2), naming the build it installs when one is newer. */
+export function runnerReinstallDialog(
+    runner: Pick<FleetActionsRunnerView, 'name' | 'runnerVersion'> & {
+        updateAvailable?: string | null;
+    },
+): ConfirmDialogModel {
+    return {
+        class: 'confirm',
+        ...splitSummary(
+            fleetActionsRunnerReinstallSummary(runner.name, runnerUpdateAvailable(runner)),
+        ),
+    };
+}
+
+/**
+ * Where a row puts **Reinstall…**: in the row itself when it matters now (a
+ * failed install's **Retry**, or a newer build), else in the ⋯ menu beside
+ * Remove runner….
+ */
+export function runnerReinstallPlacement(
+    runner: Pick<FleetActionsRunnerView, 'state' | 'runnerVersion'> & {
+        updateAvailable?: string | null;
+    },
+): 'retry' | 'inline' | 'menu' {
+    if (runner.state === 'failed') return 'retry';
+    return runnerUpdateAvailable(runner) ? 'inline' : 'menu';
+}
+
 // ─── The Install dialog (spec §5.1, FR-2, FR-3, FR-30) ──────────────────────
 
 /** True for a Windows computer (`win32`, as nodes report it). */
@@ -263,8 +364,12 @@ export function isWindowsOs(os: string | null | undefined): boolean {
     return os === 'win32' || os === 'windows';
 }
 
-/** Container-isolated runners (mode `docker`) are phase 3: P1 never offers them, whatever the server lists. */
-export const RUNNER_DOCKER_SHIPPED = false;
+/**
+ * Container-isolated runners (mode `docker`) shipped with phase 3 (FR-27): the
+ * dialog offers them wherever the server lists them (Linux computers that
+ * advertise `actions-runner-docker`). P1 kept this gate off; it stays a gate.
+ */
+export const RUNNER_DOCKER_SHIPPED = true;
 
 /**
  * The run modes the dialog offers (FR-3, FR-9, FR-27): those the server
@@ -400,6 +505,8 @@ export interface RunnerInstallForm {
     names: string[];
     labelsText: string;
     mode: FleetActionsRunnerMode;
+    /** P3, container mode only (FR-27): share the host's container daemon — an explicit, unticked-by-default opt-in. */
+    shareDockerDaemon?: boolean;
 }
 
 /** The request Install sends (the dialog IS the confirmation: `confirm: true`). */
@@ -415,6 +522,222 @@ export function installRequestFrom(
         ...(names.length === form.count ? { names } : {}),
         ...(labels.length > 0 ? { labels: [...labels] } : {}),
         mode: form.mode,
+        // P3 (FR-27): the opt-in travels only with the container mode, exactly as ticked.
+        ...(form.mode === 'docker' ? { shareDockerDaemon: form.shareDockerDaemon === true } : {}),
         confirm: true,
     };
+}
+
+// ─── Actions jobs (P2, spec §5.4, FR-20 – FR-25) ────────────────────────────
+
+/** The hub panel's anchor (the palette's "Actions jobs" scrolls to it). */
+export const ACTIONS_JOBS_ANCHOR = 'fleet-actions-jobs';
+
+/** The query the `job-unassignable` item opens the hub with: `?actionsJob=<owner/repo>%23<runId>`. */
+export const ACTIONS_JOB_PARAM = 'actionsJob';
+
+/** The hub's Overview, at the Actions jobs panel (`/fleet#fleet-actions-jobs`). */
+export function actionsJobsHref(): string {
+    return `${ROUTES.DASHBOARD_FLEET}#${ACTIONS_JOBS_ANCHOR}`;
+}
+
+/** The `actionsJob` value naming one workflow run (`acme/api#4822`), as the needs-a-look item writes it. */
+export function actionsJobParamValue(repository: string, runId: number): string {
+    return `${repository}#${runId}`;
+}
+
+/** The workflow run an `actionsJob` value names, or null when it names none. */
+export function parseActionsJobParam(
+    value: string | null | undefined,
+): { repository: string; runId: number } | null {
+    if (!value) return null;
+    const at = value.lastIndexOf('#');
+    if (at <= 0) return null;
+    const repository = value.slice(0, at).trim();
+    const raw = value.slice(at + 1).trim();
+    if (!/^\d{1,15}$/.test(raw)) return null;
+    const runId = Number(raw);
+    if (!Number.isSafeInteger(runId) || runId <= 0) return null;
+    if (!isFleetActionsRunnerTarget('repo', repository)) return null;
+    return { repository, runId };
+}
+
+/** True when a job belongs to the workflow run an `actionsJob` value names (repository case-insensitively). */
+export function isHighlightedJob(
+    job: Pick<FleetActionsJobView, 'repository' | 'runId'>,
+    highlight: { repository: string; runId: number } | null,
+): boolean {
+    return (
+        highlight !== null &&
+        job.runId === highlight.runId &&
+        job.repository.toLowerCase() === highlight.repository.toLowerCase()
+    );
+}
+
+/** A stable React key for one job row. */
+export function actionsJobKey(
+    job: Pick<FleetActionsJobView, 'repository' | 'runId' | 'jobId'>,
+): string {
+    return `${job.repository.toLowerCase()}#${job.runId}:${job.jobId}`;
+}
+
+/** What a job's diagnosis line says: the key under `fleet.runners.diagnosis`, its values, and whether it is a problem. */
+export interface JobDiagnosisLine {
+    key:
+        | 'offline'
+        | 'missingLabel'
+        | 'missingLabelUnnamed'
+        | 'wrongScope'
+        | 'waitingFor'
+        | 'waitingForAny';
+    values: Record<string, string>;
+    /** No runner of the owner can take the job (FR-22) — not a wait that ends by itself. */
+    problem: boolean;
+}
+
+/**
+ * The diagnosis sentence of a queued job (FR-22, spec §5.4), from the closed
+ * set the API computed: "the only matching runner is offline" · "no runner has
+ * the label <label>" · "no runner is registered to <target>" · "waiting for
+ * <runner>" (all busy — not a problem). Null when the job has none.
+ */
+export function jobDiagnosisLine(
+    job: Pick<FleetActionsJobView, 'diagnosis' | 'diagnosisDetail' | 'repository'>,
+): JobDiagnosisLine | null {
+    const problem = isFleetActionsJobProblem(job.diagnosis);
+    const detail = job.diagnosisDetail?.trim() || null;
+    switch (job.diagnosis) {
+        case 'offline-matching-runner':
+            return { key: 'offline', values: {}, problem };
+        case 'missing-label':
+            return detail
+                ? { key: 'missingLabel', values: { label: detail }, problem }
+                : { key: 'missingLabelUnnamed', values: {}, problem };
+        case 'wrong-scope':
+            return { key: 'wrongScope', values: { target: detail ?? job.repository }, problem };
+        case 'all-busy':
+            return detail
+                ? { key: 'waitingFor', values: { runner: detail }, problem }
+                : { key: 'waitingForAny', values: {}, problem };
+        default:
+            return null;
+    }
+}
+
+/** `7 min`, `2 h`, `3 d` since an instant (at least `1 min`), or null when unknown. */
+export function formatWaited(
+    iso: string | null | undefined,
+    nowMs: number = Date.now(),
+): string | null {
+    const at = iso ? Date.parse(iso) : NaN;
+    if (!Number.isFinite(at)) return null;
+    const minutes = Math.floor(Math.max(0, nowMs - at) / 60_000);
+    if (minutes < 60) return `${Math.max(1, minutes)} min`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 48) return `${hours} h`;
+    return `${Math.floor(hours / 24)} d`;
+}
+
+/** How many of the listed jobs are queued and how many running. */
+export function jobCounts(jobs: readonly Pick<FleetActionsJobView, 'status'>[]): {
+    queued: number;
+    running: number;
+} {
+    let queued = 0;
+    let running = 0;
+    for (const job of jobs) {
+        if (job.status === 'queued') queued += 1;
+        else running += 1;
+    }
+    return { queued, running };
+}
+
+/**
+ * Whether the panel has anything to say: jobs, runners, a watched list or an
+ * unreadable target. Someone with none of these (runners on, never installed
+ * one) gets no panel rather than an empty one on every visit to the hub.
+ */
+export function actionsJobsPanelHasContent(
+    view: Pick<
+        FleetActionsJobsView,
+        'jobs' | 'totalRunners' | 'watched' | 'watchedSaved' | 'unreadable'
+    >,
+): boolean {
+    return (
+        view.jobs.length > 0 ||
+        view.totalRunners > 0 ||
+        view.watched.length > 0 ||
+        view.watchedSaved ||
+        view.unreadable.length > 0
+    );
+}
+
+/** The confirmation of **Cancel workflow run…** (FR-23, spec §5.3): `confirm`, with the contracts' sentence. */
+export function cancelRunDialog(
+    job: Pick<FleetActionsJobView, 'repository' | 'runNumber'>,
+): ConfirmDialogModel {
+    return {
+        class: 'confirm',
+        ...splitSummary(fleetActionsRunCancelSummary(job.runNumber, job.repository)),
+    };
+}
+
+/** The request Cancel sends (with `confirm: true` once the dialog was confirmed). */
+export function cancelRunRequest(
+    job: Pick<FleetActionsJobView, 'repository' | 'runId' | 'runNumber'>,
+    confirm: boolean,
+): FleetActionsCancelRunRequest {
+    return {
+        repository: job.repository,
+        runId: job.runId,
+        ...(typeof job.runNumber === 'number' ? { runNumber: job.runNumber } : {}),
+        ...(confirm ? { confirm: true } : {}),
+    };
+}
+
+// ─── The watched list (FR-21) ───────────────────────────────────────────────
+
+/** True when two watched targets name the same repository or organisation (case-insensitively). */
+export function sameWatchedTarget(
+    a: FleetActionsWatchedTarget,
+    b: FleetActionsWatchedTarget,
+): boolean {
+    return a.scope === b.scope && a.target.toLowerCase() === b.target.toLowerCase();
+}
+
+/** The watched list with one more target (no duplicates, at most {@link FLEET_ACTIONS_MAX_WATCHED_TARGETS}). */
+export function addWatchedTarget(
+    list: readonly FleetActionsWatchedTarget[],
+    target: FleetActionsWatchedTarget,
+): FleetActionsWatchedTarget[] {
+    if (list.some((entry) => sameWatchedTarget(entry, target))) return [...list];
+    if (list.length >= FLEET_ACTIONS_MAX_WATCHED_TARGETS) return [...list];
+    return [...list, { scope: target.scope, target: target.target }];
+}
+
+/** The watched list without one target. */
+export function removeWatchedTarget(
+    list: readonly FleetActionsWatchedTarget[],
+    target: FleetActionsWatchedTarget,
+): FleetActionsWatchedTarget[] {
+    return list.filter((entry) => !sameWatchedTarget(entry, target));
+}
+
+/** What the editor may still add: the App's targets not watched yet, repositories first. */
+export function watchableTargets(
+    available: readonly FleetActionsWatchedTarget[],
+    list: readonly FleetActionsWatchedTarget[],
+): FleetActionsWatchedTarget[] {
+    const rest = available.filter(
+        (entry) => !list.some((watched) => sameWatchedTarget(watched, entry)),
+    );
+    return [
+        ...rest.filter((entry) => entry.scope === 'repo'),
+        ...rest.filter((entry) => entry.scope === 'org'),
+    ];
+}
+
+/** `acme/api, acme/web` — the watched list as the panel names it. */
+export function watchedTargetsText(list: readonly FleetActionsWatchedTarget[]): string {
+    return list.map((entry) => entry.target).join(', ');
 }

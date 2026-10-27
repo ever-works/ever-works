@@ -38,6 +38,10 @@ export interface RunnerMeta {
 	configured: boolean;
 	serviceUnit: string | null;
 	installedAt: string | null;
+	/** P3, Docker mode: GitHub's runner image as pinned (`<repo>@sha256:…`) the first time it was pulled. */
+	image?: string | null;
+	/** P3, Docker mode: the labelled opt-in — the host's Docker daemon is shared (runs as root). */
+	shareDockerDaemon?: boolean;
 }
 
 export const RUNNER_META_FILE = 'ever-works.json';
@@ -151,12 +155,16 @@ export function parseRunnerMeta(raw: string): RunnerMeta | null {
 		name: value.name,
 		scope: value.scope,
 		target: value.target,
-		labels: Array.isArray(value.labels) ? value.labels.filter((label): label is string => typeof label === 'string') : [],
+		labels: Array.isArray(value.labels)
+			? value.labels.filter((label): label is string => typeof label === 'string')
+			: [],
 		mode: isFleetActionsRunnerMode(value.mode) ? value.mode : 'service',
 		runnerVersion: typeof value.runnerVersion === 'string' ? value.runnerVersion : null,
 		sha256: typeof value.sha256 === 'string' ? value.sha256 : null,
 		configured: value.configured === true,
 		serviceUnit: typeof value.serviceUnit === 'string' ? value.serviceUnit : null,
-		installedAt: typeof value.installedAt === 'string' ? value.installedAt : null
+		installedAt: typeof value.installedAt === 'string' ? value.installedAt : null,
+		image: typeof value.image === 'string' ? value.image : null,
+		shareDockerDaemon: value.shareDockerDaemon === true
 	};
 }

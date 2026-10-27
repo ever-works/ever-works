@@ -174,7 +174,9 @@ export const FLEET_VIRTUAL_SYSTEMS: readonly FleetVirtualSystem[] = [
 	}
 ];
 
-export const FLEET_VIRTUAL_SYSTEM_IDS: readonly FleetVirtualSystemId[] = FLEET_VIRTUAL_SYSTEMS.map((system) => system.id);
+export const FLEET_VIRTUAL_SYSTEM_IDS: readonly FleetVirtualSystemId[] = FLEET_VIRTUAL_SYSTEMS.map(
+	(system) => system.id
+);
 
 export function isFleetVirtualSystemId(value: unknown): value is FleetVirtualSystemId {
 	return typeof value === 'string' && (FLEET_VIRTUAL_SYSTEM_IDS as readonly string[]).includes(value);
@@ -211,7 +213,9 @@ export const FLEET_VIRTUAL_WINDOWS_PASSWORD_LENGTH = 24;
 export const FLEET_VIRTUAL_PASSWORD_REVEAL_SEC = 60;
 
 /** The systems a surface offers right now (Windows only once phase 2 shipped them). */
-export function fleetVirtualOfferedSystems(vmSystemsShipped: boolean = FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED): FleetVirtualSystem[] {
+export function fleetVirtualOfferedSystems(
+	vmSystemsShipped: boolean = FLEET_VIRTUAL_VM_SYSTEMS_SHIPPED
+): FleetVirtualSystem[] {
 	return FLEET_VIRTUAL_SYSTEMS.filter((system) => system.kind === 'container' || vmSystemsShipped);
 }
 
@@ -402,7 +406,8 @@ export function fleetVirtualCreateSummary(input: {
 	diskGiB?: number | null;
 }): string {
 	const noun = input.system.kind === 'vm' ? 'VM' : 'Container';
-	const disk = input.system.kind === 'vm' ? (input.diskGiB ?? FLEET_VIRTUAL_DEFAULT_DISK_GIB) : input.system.approxDiskGiB;
+	const disk =
+		input.system.kind === 'vm' ? (input.diskGiB ?? FLEET_VIRTUAL_DEFAULT_DISK_GIB) : input.system.approxDiskGiB;
 	return `Creates a ${noun} on ${input.hostName} using ${input.cpus} CPUs, ${input.memoryGiB} GB of memory and about ${disk} GB of disk. No credits are spent.`;
 }
 
@@ -537,7 +542,15 @@ export function isFleetVirtualPhase(value: unknown): value is FleetVirtualPhase 
 /** The phases a kind passes through, in order (the progress line, FR-13). */
 export function fleetVirtualPhasesFor(kind: FleetVirtualKind): FleetVirtualPhase[] {
 	return kind === 'vm'
-		? ['pulling-image', 'downloading-windows', 'installing', 'first-boot', 'installing-runtime', 'enrolling', 'online']
+		? [
+				'pulling-image',
+				'downloading-windows',
+				'installing',
+				'first-boot',
+				'installing-runtime',
+				'enrolling',
+				'online'
+			]
 		: ['pulling-image', 'starting', 'installing-runtime', 'enrolling', 'online'];
 }
 

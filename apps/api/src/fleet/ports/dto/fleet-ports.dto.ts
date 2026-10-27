@@ -5,7 +5,8 @@ import { FLEET_PORT_OPEN_TARGETS, type FleetPortOpenTarget } from '@ever-works/c
 /** `GET /api/fleet/nodes/:id/ports?watch=4000,4001` — ports to watch for ("Open a port…"). */
 export class ListFleetPortsQueryDto {
     @ApiPropertyOptional({
-        description: 'Comma-separated ports to report as waiting until something listens on them (at most 8).',
+        description:
+            'Comma-separated ports to report as waiting until something listens on them (at most 8).',
         example: '4000,4001',
     })
     @IsOptional()
@@ -25,7 +26,10 @@ export class OpenFleetPortDto {
     @IsIn(FLEET_PORT_OPEN_TARGETS as unknown as string[])
     target?: FleetPortOpenTarget;
 
-    @ApiPropertyOptional({ enum: ['http', 'https'], description: '`https` when the list showed the https badge.' })
+    @ApiPropertyOptional({
+        enum: ['http', 'https'],
+        description: '`https` when the list showed the https badge.',
+    })
     @IsOptional()
     @IsIn(['http', 'https'])
     scheme?: 'http' | 'https';

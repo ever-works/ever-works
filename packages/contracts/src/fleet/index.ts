@@ -41,3 +41,8 @@ export * from './fleet-cloud.types.js';
 export * from './fleet-usage.types.js';
 export * from './fleet-model-list-prices.types.js';
 export * from './fleet-actions-runners.types.js';
+export * from './fleet-desktop.types.js';
+export * from './fleet-desktop-tiles.codec.js';
+export * from './fleet-helper.types.js';
+export * from './fleet-desktop-control.types.js';
+export * from './fleet-desktop-recording.types.js';

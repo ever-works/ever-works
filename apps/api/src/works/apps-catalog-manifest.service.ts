@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     APPS_CATALOG_CACHE_TTL_MS,
     APPS_CATALOG_ENTRY_STATUSES,
@@ -12,8 +12,11 @@ import {
     type AppsCatalogEntryStatus,
     type AppsCatalogListingItem,
     type AppsCatalogListingResponse,
+    type AppsCatalogManagedTier,
+    type ManagedHostingAvailability,
 } from '@ever-works/contracts';
 import { GitFacadeService } from '@ever-works/agent/facades';
+import { APPS_TIER_POLICY, type AppsTierPolicy } from '@ever-works/agent/app-runtime';
 
 /**
  * APW-03 — the manifest-backed Apps catalog (`GET /api/apps-catalog`).
@@ -159,6 +162,16 @@ export function toListingItem(row: unknown): AppsCatalogListingItem | null {
 
     const managed = isObject(row.managedHosting) ? row.managedHosting : {};
     const trademark = isObject(row.trademark) ? row.trademark : null;
+    // FR-35's first three reasons depend on the row alone; the tier's two are added at
+    // read time by `managedHostingAvailability` (the tier can open or close at runtime).
+    const managedRowReason: ManagedHostingAvailability =
+        license.class !== 'green' && license.class !== 'amber'
+            ? 'licenseNotGreen'
+            : license.class === 'amber' && !isObject(managed.upstreamAgreement)
+              ? 'upstreamAgreementMissing'
+              : managed.allowed !== true
+                ? 'entryDisallows'
+                : 'available';
     const sha = str(blueprint.sha) ?? str(template.sha);
     const verifiedFlag = row.verified === true || blueprint.verified === true;
     const tags = Array.isArray(row.tags)
@@ -200,7 +213,47 @@ export function toListingItem(row: unknown): AppsCatalogListingItem | null {
               }
             : null,
         yourCluster: true,
+        managed: managedRowReason,
     };
+}
+
+/** The tier state while `APPS_TIER_POLICY` is unbound: closed, verified Blueprints only (R-5). */
+export const CLOSED_MANAGED_TIER: AppsCatalogManagedTier = Object.freeze({
+    open: false,
+    scope: 'verified-blueprints',
+});
+
+/**
+ * APW-03 T23 / APW-10 T31 — FR-35's managed-hosting availability of one listed row:
+ * `available`, or the FIRST failing reason in `MANAGED_HOSTING_REASONS` order.
+ *
+ * **Pure** (plan §2.4:216): the tier is passed in — never read from a policy, an env
+ * var or a singleton here — so the same inputs always give the same answer. The row
+ * reasons (`licenseNotGreen`, `upstreamAgreementMissing`, `entryDisallows`) come first and
+ * are carried on the row from `toListingItem`; then `blueprintNotVerified` (the tier
+ * admits verified Blueprints only and this one is not), then `managedTierDisabled`.
+ */
+export function managedHostingAvailability(
+    item: Pick<AppsCatalogListingItem, 'managed' | 'blueprint' | 'license' | 'managedHosting'>,
+    tier: AppsCatalogManagedTier,
+): ManagedHostingAvailability {
+    const rowReason: ManagedHostingAvailability =
+        item.managed ??
+        (item.license.class !== 'green' && item.license.class !== 'amber'
+            ? 'licenseNotGreen'
+            : item.managedHosting.allowed
+              ? 'available'
+              : 'entryDisallows');
+    if (rowReason !== 'available') {
+        return rowReason;
+    }
+    if (tier.scope === 'verified-blueprints' && item.blueprint.verified !== true) {
+        return 'blueprintNotVerified';
+    }
+    if (!tier.open) {
+        return 'managedTierDisabled';
+    }
+    return 'available';
 }
 
 /** Every listable row of a parsed manifest (either shape), unique by id, capped. */
@@ -283,18 +336,65 @@ export class AppsCatalogManifestService {
     fetchImpl: FetchLike = (url, init) => fetch(url, init);
     now: () => number = () => Date.now();
 
-    constructor(private readonly git: GitFacadeService) {}
+    constructor(
+        private readonly git: GitFacadeService,
+        /**
+         * APW-10 T31 (lane aw-blueprints) — the managed tier's state, read through the ONE
+         * port R-5 allows (`isOpen()` / `managedScope()`); bound by the API's `@Global()`
+         * `AppsTierPolicyBindingModule`. Unbound ⇒ closed. Appended and `@Optional()` so the
+         * spec's one-argument construction keeps compiling.
+         */
+        @Optional()
+        @Inject(APPS_TIER_POLICY)
+        private readonly tierPolicy?: AppsTierPolicy,
+    ) {}
 
     async list(query: AppsCatalogListQueryInput = {}): Promise<AppsCatalogListingResponse> {
         const source = appsCatalogSource();
         const { items, available } = await this.read(source);
-        return { ...pageListing(items, query), available, source: 'manifest', ...source };
+        const managedTier = this.managedTier();
+        const page = pageListing(items, query);
+        return {
+            ...page,
+            items: page.items.map((item) => this.withAvailability(item, managedTier)),
+            available,
+            source: 'manifest',
+            ...source,
+            managedTier,
+        };
     }
 
     async get(id: string): Promise<AppsCatalogListingItem | null> {
         if (!ID_PATTERN.test(id)) return null;
         const { items } = await this.read(appsCatalogSource());
-        return items.find((item) => item.id === id) ?? null;
+        const item = items.find((candidate) => candidate.id === id);
+        return item ? this.withAvailability(item, this.managedTier()) : null;
+    }
+
+    /** The tier as the policy reports it NOW; a policy that throws reads as closed. */
+    managedTier(): AppsCatalogManagedTier {
+        const policy = this.tierPolicy;
+        if (!policy) return CLOSED_MANAGED_TIER;
+        try {
+            return {
+                open: policy.isOpen() === true,
+                scope: policy.managedScope() === 'any' ? 'any' : 'verified-blueprints',
+            };
+        } catch (error) {
+            this.logger.warn(
+                `Apps catalog: reading the managed tier failed (${
+                    error instanceof Error ? error.message : String(error)
+                }); answering closed.`,
+            );
+            return CLOSED_MANAGED_TIER;
+        }
+    }
+
+    private withAvailability(
+        item: AppsCatalogListingItem,
+        tier: AppsCatalogManagedTier,
+    ): AppsCatalogListingItem {
+        return { ...item, managed: managedHostingAvailability(item, tier) };
     }
 
     private async read(source: { repo: string; ref: string }) {

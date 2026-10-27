@@ -219,7 +219,8 @@ function zForParamType(type?: string): z.ZodTypeAny {
 }
 
 function buildInputSchema(spec: OperationSpec): z.ZodObject<z.ZodRawShape> {
-    const shape: z.ZodRawShape = {};
+    // zod 4 types `ZodRawShape` as read-only, so the shape is built as a plain record.
+    const shape: Record<string, z.ZodType> = {};
 
     for (const param of spec.params ?? []) {
         let base = zForParamType(param.type);

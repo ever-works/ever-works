@@ -4,7 +4,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { FileDiff, RefreshCw } from 'lucide-react';
-import { isFleetSessionLive, type FleetCheckoutPullRequestFacts, type FleetSessionView } from '@ever-works/contracts';
+import {
+    isFleetSessionLive,
+    type FleetCheckoutPullRequestFacts,
+    type FleetSessionView,
+} from '@ever-works/contracts';
 import { getCheckoutPullRequestAction } from '@/app/actions/fleet-session-git';
 import { refreshCheckoutAction } from '@/app/actions/fleet-checkouts';
 import { SHORTCUT_PRIORITY } from '@/lib/keyboard/shortcut-registry';
@@ -63,7 +67,9 @@ export function SessionGitPanel({
         const result = await refreshCheckoutAction(checkoutId);
         setRefreshing(false);
         if (!result.success) {
-            toast.error(`${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`);
+            toast.error(
+                `${tErrors(sessionGitErrorTitleKey(result.code))}${result.hint ? ` — ${result.hint}` : ''}`,
+            );
             return;
         }
         onRefreshed();
@@ -71,23 +77,45 @@ export function SessionGitPanel({
     }, [checkoutId, refreshing, onRefreshed, readFacts, tErrors]);
 
     useShortcut(
-        { id: 'fleet.session.changes', scope: 'fleet-session', priority: SHORTCUT_PRIORITY.screen, enabled: usable && !offline },
-        (event) => event.key.toLowerCase() === 'd' && !event.ctrlKey && !event.metaKey && !event.altKey,
+        {
+            id: 'fleet.session.changes',
+            scope: 'fleet-session',
+            priority: SHORTCUT_PRIORITY.screen,
+            enabled: usable && !offline,
+        },
+        (event) =>
+            event.key.toLowerCase() === 'd' && !event.ctrlKey && !event.metaKey && !event.altKey,
         () => setChangesOpen(true),
     );
     useShortcut(
-        { id: 'fleet.session.git-refresh', scope: 'fleet-session', priority: SHORTCUT_PRIORITY.screen, enabled: usable && !offline },
-        (event) => event.key.toLowerCase() === 'g' && !event.ctrlKey && !event.metaKey && !event.altKey,
+        {
+            id: 'fleet.session.git-refresh',
+            scope: 'fleet-session',
+            priority: SHORTCUT_PRIORITY.screen,
+            enabled: usable && !offline,
+        },
+        (event) =>
+            event.key.toLowerCase() === 'g' && !event.ctrlKey && !event.metaKey && !event.altKey,
         () => void refresh(),
     );
 
-    const unknownMinutes = facts?.unknownSince ? minutesSince(facts.unknownSince, now.getTime()) : null;
+    const unknownMinutes = facts?.unknownSince
+        ? minutesSince(facts.unknownSince, now.getTime())
+        : null;
     const pr = facts?.pr ?? git?.gitLine?.pr ?? null;
-    const shown = git && git.gitLine && pr !== git.gitLine.pr ? { ...git, gitLine: { ...git.gitLine, pr } } : git;
+    const shown =
+        git && git.gitLine && pr !== git.gitLine.pr
+            ? { ...git, gitLine: { ...git.gitLine, pr } }
+            : git;
 
     return (
         <div className="flex flex-wrap items-center gap-2" data-testid="fleet-session-git-panel">
-            <SessionGitLine git={shown} now={now} offline={offline !== null} unknownMinutes={unknownMinutes} />
+            <SessionGitLine
+                git={shown}
+                now={now}
+                offline={offline !== null}
+                unknownMinutes={unknownMinutes}
+            />
             {git ? (
                 <>
                     <Button
@@ -110,17 +138,24 @@ export function SessionGitPanel({
                         aria-label={t('refreshTitle')}
                         data-testid="fleet-session-git-refresh"
                     >
-                        <RefreshCw className={refreshing ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'} aria-hidden="true" />
+                        <RefreshCw
+                            className={refreshing ? 'w-3.5 h-3.5 animate-spin' : 'w-3.5 h-3.5'}
+                            aria-hidden="true"
+                        />
                     </Button>
                     {offline ? (
-                        <span className="text-xs text-text-muted dark:text-text-muted-dark">{offline.hint}</span>
+                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {offline.hint}
+                        </span>
                     ) : null}
                     {checkoutId ? (
                         <ChangesPanel
                             checkoutId={checkoutId}
                             open={changesOpen}
                             onClose={() => setChangesOpen(false)}
-                            working={isFleetSessionLive(session.state) && session.state === 'working'}
+                            working={
+                                isFleetSessionLive(session.state) && session.state === 'working'
+                            }
                             agentName={session.kind === 'agent' ? agentName : null}
                             pr={pr}
                         />

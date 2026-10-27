@@ -9,6 +9,7 @@ import {
     APP_UPSTREAM_SYNC_BRANCH,
     APP_UPSTREAM_SYNC_MAX_PROVIDER_CALLS,
     APP_UPSTREAM_UNAVAILABLE_RECHECK_MS,
+    APP_UPSTREAM_WORKFLOW_HOLD_MAX_PATHS,
     appRateLimitAllowsSync,
     type AppLicenseEvaluationReason,
     type AppSpec,
@@ -25,7 +26,10 @@ import {
     ActivityStatus,
     type CreateActivityLogDto,
 } from '../entities/activity-log.types';
-import type { WorkUpstreamState } from '../entities/work-upstream-state.entity';
+import type {
+    WorkUpstreamState,
+    WorkUpstreamWorkflowRelease,
+} from '../entities/work-upstream-state.entity';
 import { GitFacadeService, GitOperationNotSupportedError } from '../facades/git.facade';
 import {
     AppActionsHygieneService,
@@ -135,10 +139,15 @@ import {
  * compare cannot be read, or cannot prove it is the whole range — it moves
  * nothing, opens nothing, records `skipped` / `held_for_workflow_review`, and
  * emits one `app.upstream.held` naming the paths (never their content). Every
- * trigger takes the same branch: scheduled, manual and retried. The only way
- * past it is an operator listing the Work in
- * `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS` — never the App spec, which the
- * upstream author can write.
+ * trigger takes the same branch: scheduled, manual and retried. There are two
+ * ways past it, and the App spec — which the upstream author can write — is
+ * neither: an operator listing the Work in
+ * `APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS`, or (T46, 2026-10-27) the Work
+ * OWNER's recorded release of that exact held head ("Sync anyway",
+ * `workflowRelease`), which only `AppUpstreamStateService.requestSync` writes,
+ * behind the owner-and-signed-in-session gate of the API route — never a member,
+ * an API key, a run token or an Agent. The release covers one upstream head and
+ * nothing the owner was not shown (`workflowReleaseCovers`).
  *
  * ## Fail-closed everywhere a seam is missing
  *
@@ -466,6 +475,7 @@ interface SyncEvent {
         | 'app.upstream.behind'
         | 'app.upstream.unavailable'
         | 'app.upstream.held'
+        | 'app.upstream.workflow_release_used'
         | 'app.fork.missing';
     actionType: ActivityActionType;
     status: ActivityStatus;
@@ -496,6 +506,8 @@ interface SyncOutcome {
     rateLimited?: boolean;
     /** `true` ⇒ the tracked branch moved; the licence and hygiene legs run (FR-40). */
     trackedBranchChanged?: boolean;
+    /** T47 — the licence re-evaluation reason when the tracked branch moved (default `upstream_synced`). */
+    licenseReason?: AppLicenseEvaluationReason;
     /** `true` ⇒ `nextSyncAt` is cleared (the pause states, §6.4). */
     pause?: boolean;
     /** The sync-owned columns this run wrote outside `finishSync` (§3.1). */
@@ -650,7 +662,10 @@ export class AppUpstreamSyncService {
             // merge is worse than saying so (plan §6.4).
             return { result: 'skipped', reason: 'disabled_by_spec' };
         }
-        if (trigger !== 'manual' && context.settings.enabled !== true) {
+        // T47: `merged` finishing a pull request the MEMBER merged is bookkeeping, never "a
+        // sync the spec turned off" — so its `enabled` gate is decided once the row says
+        // whether there is a pull request to finish (below).
+        if (trigger !== 'manual' && trigger !== 'merged' && context.settings.enabled !== true) {
             // FR-64: the *scheduled* path is off. A manual **Sync now** deliberately
             // ignores this — a person is never locked out of their own repository.
             return { result: 'skipped', reason: 'disabled_by_spec' };
@@ -662,6 +677,13 @@ export class AppUpstreamSyncService {
             return { result: 'failed', reason: 'state_not_found' };
         }
         context.row = row;
+
+        // T47: a `merged` dispatch with no sync pull request on record has nothing to finish —
+        // it is an ordinary scheduled-style run, so the spec's `enabled` applies to it.
+        const finishing = trigger === 'merged' && typeof row.syncPullRequestNumber === 'number';
+        if (trigger === 'merged' && !finishing && context.settings.enabled !== true) {
+            return { result: 'skipped', reason: 'disabled_by_spec' };
+        }
 
         if (row.relation === 'link' || !row.upstreamOwner || !row.upstreamRepo) {
             // `beginSync` refuses a link, so this is the "no upstream coordinates" case
@@ -697,6 +719,13 @@ export class AppUpstreamSyncService {
         const ownerUserId = owner.userId;
         context.ownerUserId = ownerUserId;
         context.ownerScope = owner.scope;
+
+        // T47 (FR-62): the finish path — and NOT the compare-and-open path. Without a pull
+        // request on record (the first finish already cleared it) the dispatch falls through
+        // to the ordinary run, where the workflow hold applies exactly as on every other path.
+        if (finishing) {
+            return await this.finishMergedPullRequest(context, row);
+        }
 
         const upstream = await context.budget.call(() =>
             this.git.getRepository(row.upstreamOwner as string, row.upstreamRepo as string, {
@@ -880,7 +909,10 @@ export class AppUpstreamSyncService {
             return await this.pullRequestPath(context, row, base);
         }
 
-        if (comparison.aheadBy === 0) {
+        // T46: a range let through on the owner's workflow release never fast-forwards the
+        // tracked branch — it goes through the one sync pull request, so the workflow change
+        // reaches the default branch only when a person merges it.
+        if (comparison.aheadBy === 0 && context.workflowReleaseUsed !== true) {
             // FR-35: behind-only — the one case a fast-forward is written for. (R-4
             // gives every fork a commit of its own, so this stays the exception;
             // ACC-02-25 is the rule.)
@@ -943,6 +975,51 @@ export class AppUpstreamSyncService {
         return await this.pullRequestPath(context, row, base);
     }
 
+    // ── T47 — a merged sync pull request finishes the sync (FR-62) ───────────
+
+    /**
+     * The `merged` finish path. Guarded by the row, so a re-dispatch is a no-op: the first run
+     * clears `syncPullRequestNumber`, and a run that finds none on record (or a pull request
+     * that is not merged after all) settles with the outcome already recorded.
+     *
+     * A merge moved the tracked branch, so `trackedBranchChanged` runs FR-40's two follow-ups
+     * exactly once, through settle: the licence re-evaluation with reason `upstream_merged`,
+     * and Actions hygiene (the merged range may have brought workflows the owner released).
+     */
+    private async finishMergedPullRequest(
+        context: RunContext,
+        row: WorkUpstreamState,
+    ): Promise<SyncOutcome> {
+        const number = row.syncPullRequestNumber;
+        if (typeof number !== 'number') {
+            return recordedOutcomeOf(row, {});
+        }
+        const status = await context.budget.call(() =>
+            this.git.getPullRequestStatus(row.dataOwner, row.dataRepo, number, {
+                userId: context.ownerUserId as string,
+                providerId: context.providerId,
+                workId: context.workId,
+            }),
+        );
+        const merged = status?.merged === true || status?.state === 'merged';
+        if (!merged) {
+            return recordedOutcomeOf(row, {});
+        }
+        const headSha = nonEmptyString(status?.headSha) ?? row.lastSyncedUpstreamSha ?? null;
+        return {
+            result: 'up_to_date',
+            reason: 'pull_request_merged',
+            commits: row.lastSyncCommitCount ?? null,
+            fromSha: row.lastSyncedUpstreamSha ?? null,
+            toSha: headSha,
+            pullRequestNumber: null,
+            pullRequestUrl: null,
+            trackedBranchChanged: true,
+            licenseReason: 'upstream_merged',
+            rowPatch: row.workflowHold ? { workflowHold: null } : undefined,
+        };
+    }
+
     // ── the workflow hold (FR-60, FR-61, T46) ─────────────────────────────────
 
     /**
@@ -969,6 +1046,26 @@ export class AppUpstreamSyncService {
 
         const changes = await this.readUpstreamWorkflowChanges(context, row, headSha);
         if (!holdsForWorkflowReview(changes)) {
+            // T46: the range is clean, so a hold recorded by an earlier run no longer
+            // describes anything — clear it with the rest of this run's row patch.
+            if (row.workflowHold) {
+                base.rowPatch = { ...(base.rowPatch ?? {}), workflowHold: null };
+            }
+            return null;
+        }
+
+        // T46 (FR-60/FR-61) — the owner's "Sync anyway". Honoured only for the EXACT head
+        // the owner released, and only while this compare shows nothing the owner was not
+        // shown (see `workflowReleaseCovers`). Written by `AppUpstreamStateService.requestSync`
+        // behind the owner-and-signed-in-session gate; never by the App spec, a member, an
+        // API key, a run token or an Agent.
+        if (workflowReleaseCovers(row.workflowRelease ?? null, headSha, changes)) {
+            this.logger.warn(
+                `App upstream sync: work ${context.workId} — the upstream range to ${headSha} changes ${changes.pathCount} workflow/action path(s) and is synced on the owner's recorded release (${row.workflowRelease?.releasedByUserId ?? 'unknown'} at ${row.workflowRelease?.releasedAt ?? 'unknown'}).`,
+            );
+            context.workflowReleaseUsed = true;
+            base.rowPatch = { ...(base.rowPatch ?? {}), workflowHold: null };
+            base.events = [...(base.events ?? []), workflowReleaseUsedEvent(headSha, changes, row)];
             return null;
         }
 
@@ -987,6 +1084,18 @@ export class AppUpstreamSyncService {
             ...base,
             result: 'skipped',
             reason: 'held_for_workflow_review',
+            // T46: what the Upstream card shows and what the owner releases — the exact
+            // head and the paths (never their content).
+            rowPatch: {
+                ...(base.rowPatch ?? {}),
+                workflowHold: {
+                    headSha: headSha || '',
+                    paths: changes.paths.slice(0, APP_UPSTREAM_WORKFLOW_HOLD_MAX_PATHS),
+                    pathCount: changes.pathCount,
+                    complete: changes.complete === true,
+                    heldAt: new Date(context.now()).toISOString(),
+                },
+            },
             events: [
                 ...(base.events ?? []),
                 ...(alreadyHeld ? [] : [workflowHeldEvent(headSha, changes)]),
@@ -1328,15 +1437,29 @@ export class AppUpstreamSyncService {
         await context.budget.call(() =>
             this.git.deleteBranch(row.dataOwner, row.dataRepo, APP_UPSTREAM_SYNC_BRANCH, options),
         );
-        await context.budget.call(() =>
-            this.git.createBranchFromSha(
-                row.dataOwner,
-                row.dataRepo,
-                APP_UPSTREAM_SYNC_BRANCH,
+        if (row.relation === 'private-copy') {
+            // APW-02 T48 (FR-63): a private copy shares no objects with upstream, so a REST
+            // ref create could never name an upstream sha there — the capability pushes the
+            // checked commit onto the branch just deleted instead.
+            const recreated = await this.moveSyncBranchForRelation(
+                context,
+                row,
                 String(outcome.toSha ?? ''),
-                options,
-            ),
-        );
+            );
+            if (recreated !== 'moved') {
+                return { ...outcome, result: 'failed', reason: 'upstream_history_rewritten' };
+            }
+        } else {
+            await context.budget.call(() =>
+                this.git.createBranchFromSha(
+                    row.dataOwner,
+                    row.dataRepo,
+                    APP_UPSTREAM_SYNC_BRANCH,
+                    String(outcome.toSha ?? ''),
+                    options,
+                ),
+            );
+        }
 
         // The branch is at the new head now, so only the pull request is left.
         return await this.pullRequestPath(context, row, outcome, undefined, { moveBranch: false });
@@ -1753,7 +1876,18 @@ export class AppUpstreamSyncService {
 
         // ── step 8's two follow-ups: only when the tracked branch changed ────
         if (outcome.trackedBranchChanged === true) {
-            result.licenseRequested = await this.requestLicense(workId, 'upstream_synced');
+            result.licenseRequested = await this.requestLicense(
+                workId,
+                outcome.licenseReason ?? 'upstream_synced',
+            );
+            result.hygiene = await this.runHygiene(workId);
+        } else if (
+            context.workflowReleaseUsed === true &&
+            RELEASED_MOVE_RESULTS.has(String(outcome.result))
+        ) {
+            // T46 — a released range moved `ever-works/upstream-sync`, so new upstream
+            // workflows may now exist in the repository: disable them as soon as the
+            // platform can see them (best effort, never fatal — FR-30).
             result.hygiene = await this.runHygiene(workId);
         }
     }
@@ -1952,6 +2086,13 @@ interface RunContext {
     ownerScope: OwnershipScope | null;
     settings: AppUpstreamSyncSettings;
     result: AppUpstreamSyncRunResult;
+    /**
+     * APW-02 T46 — `true` ⇔ this run let a held range through on the owner's recorded
+     * release (`workflowRelease`) for the exact head it checked. Settle then runs Actions
+     * hygiene even on the pull-request path, so the newly arrived workflows are disabled
+     * as soon as the platform can see them.
+     */
+    workflowReleaseUsed?: boolean;
 }
 
 /** §9.2: `mergeable` is re-read up to three times, 5 s apart. */
@@ -2046,6 +2187,77 @@ function workflowHeldEvent(headSha: string, changes: UpstreamWorkflowChanges): S
             pathCount: changes.pathCount,
             complete: changes.complete,
             optIn: APP_UPSTREAM_WORKFLOW_CHANGES_ALLOWED_WORKS_ENV,
+        },
+    };
+}
+
+/** T46 — the outcomes in which a released range moved the sync branch or the tracked branch. */
+const RELEASED_MOVE_RESULTS: ReadonlySet<string> = new Set([
+    'fast_forwarded',
+    'pull_request_opened',
+    'pull_request_updated',
+    'conflict',
+]);
+
+/**
+ * APW-02 T46 — whether the owner's recorded release covers THIS range.
+ *
+ * 1. **Same head, exactly.** The release names one upstream commit; a newer head is a
+ *    new range the owner has not seen, so it is held again.
+ * 2. **Nothing the owner was not shown.** A release made on a complete compare covers a
+ *    complete compare whose protected paths are all among the released ones (and no more
+ *    of them than were counted). A compare that is now incomplete — the range grew past
+ *    what the owner reviewed — is not covered.
+ * 3. A release made on an INCOMPLETE compare (the range was too large to prove clean,
+ *    and the owner accepted it anyway) covers that same head whatever this compare says.
+ *
+ * Pure; exported for the spec.
+ */
+export function workflowReleaseCovers(
+    release: WorkUpstreamWorkflowRelease | null | undefined,
+    headSha: string,
+    changes: UpstreamWorkflowChanges,
+): boolean {
+    if (!release || typeof release.headSha !== 'string') return false;
+    const released = release.headSha.trim().toLowerCase();
+    const head = String(headSha ?? '')
+        .trim()
+        .toLowerCase();
+    if (!released || !head || released !== head) return false;
+    if (typeof release.releasedByUserId !== 'string' || !release.releasedByUserId) return false;
+
+    if (release.complete === false) {
+        return true;
+    }
+    if (changes.complete !== true) {
+        return false;
+    }
+    const releasedPaths = new Set(Array.isArray(release.paths) ? release.paths : []);
+    const releasedCount =
+        typeof release.pathCount === 'number' ? release.pathCount : releasedPaths.size;
+    if (changes.pathCount > releasedCount) return false;
+    return changes.paths.every((path) => releasedPaths.has(path));
+}
+
+/** T46 — the audit row for a range synced on the owner's release (paths and counts only). */
+function workflowReleaseUsedEvent(
+    headSha: string,
+    changes: UpstreamWorkflowChanges,
+    row: WorkUpstreamState,
+): SyncEvent {
+    return {
+        action: 'app.upstream.workflow_release_used',
+        actionType: ActivityActionType.APP_UPSTREAM,
+        status: ActivityStatus.COMPLETED,
+        summary: 'Upstream workflow changes synced on the owner release',
+        details: {
+            reason: 'workflow_release_used',
+            upstreamHeadSha: headSha || null,
+            paths: changes.paths,
+            pathCount: changes.pathCount,
+            complete: changes.complete,
+            releasedByUserId: row.workflowRelease?.releasedByUserId ?? null,
+            releasedAt: row.workflowRelease?.releasedAt ?? null,
         },
     };
 }

@@ -28,7 +28,8 @@ export function parseJsonLines(stdout: string): Record<string, unknown>[] {
 		if (!trimmed.startsWith('{')) continue;
 		try {
 			const parsed = JSON.parse(trimmed) as unknown;
-			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) out.push(parsed as Record<string, unknown>);
+			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+				out.push(parsed as Record<string, unknown>);
 		} catch {
 			// not JSON: skip
 		}
@@ -91,7 +92,12 @@ export function parseDockerPorts(value: string): FleetContainerPort[] {
 			const key = `-:${exposed[1]}/${exposed[2]}`;
 			if (seen.has(key)) continue;
 			seen.add(key);
-			out.push({ hostIp: null, hostPort: null, containerPort: Number(exposed[1]), proto: exposed[2] as FleetContainerPort['proto'] });
+			out.push({
+				hostIp: null,
+				hostPort: null,
+				containerPort: Number(exposed[1]),
+				proto: exposed[2] as FleetContainerPort['proto']
+			});
 		}
 	}
 	return out;
@@ -161,7 +167,9 @@ export function parseStats(stdout: string): Map<string, { cpuPercent: number | n
 export function parseImages(stdout: string): FleetImageView[] {
 	const byId = new Map<string, FleetImageView>();
 	for (const row of parseJsonLines(stdout)) {
-		const id = text(row.ID).replace(/^sha256:/, '').slice(0, 12);
+		const id = text(row.ID)
+			.replace(/^sha256:/, '')
+			.slice(0, 12);
 		if (!/^[a-f0-9]{12}$/.test(id)) continue;
 		const repo = text(row.Repository);
 		const tag = text(row.Tag);
@@ -185,7 +193,9 @@ export function parseImages(stdout: string): FleetImageView[] {
 /** How many containers use each image: matched by `repo:tag` (or `repo` = `repo:latest`) or by id prefix. */
 export function countImageUse(images: FleetImageView[], containerImages: readonly string[]): FleetImageView[] {
 	return images.map((image) => {
-		const names = new Set(image.repoTags.flatMap((tag) => (tag.endsWith(':latest') ? [tag, tag.slice(0, -7)] : [tag])));
+		const names = new Set(
+			image.repoTags.flatMap((tag) => (tag.endsWith(':latest') ? [tag, tag.slice(0, -7)] : [tag]))
+		);
 		const inUseBy = containerImages.filter((ref) => {
 			const bare = ref.replace(/^sha256:/, '');
 			return names.has(ref) || (bare.length >= 12 && image.id.startsWith(bare.slice(0, 12)));
@@ -204,9 +214,16 @@ export async function dockerStatus(runner: CommandRunner): Promise<FleetDockerSt
 	} catch {
 		parsed = null;
 	}
-	const server = parsed && typeof parsed.Server === 'object' && parsed.Server ? (parsed.Server as Record<string, unknown>) : null;
+	const server =
+		parsed && typeof parsed.Server === 'object' && parsed.Server
+			? (parsed.Server as Record<string, unknown>)
+			: null;
 	if (result.code === 0 && server) {
-		return { installed: true, daemonRunning: true, version: typeof server.Version === 'string' ? server.Version : null };
+		return {
+			installed: true,
+			daemonRunning: true,
+			version: typeof server.Version === 'string' ? server.Version : null
+		};
 	}
 	return {
 		installed: true,

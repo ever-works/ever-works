@@ -41,7 +41,11 @@ export default function CloudUsageBlock(_props: Partial<FleetOverviewBlockProps>
 
     if (failed) {
         return (
-            <p role="status" className="text-sm text-text-muted dark:text-text-muted-dark" data-testid="fleet-cloud-usage-failed">
+            <p
+                role="status"
+                className="text-sm text-text-muted dark:text-text-muted-dark"
+                data-testid="fleet-cloud-usage-failed"
+            >
                 {t('failed')}
             </p>
         );
@@ -68,8 +72,15 @@ export default function CloudUsageBlock(_props: Partial<FleetOverviewBlockProps>
                 })}
             </p>
             {(usage.providerMonthToDate ?? []).map((figure) => (
-                <p key={figure.providerPluginId} className="mt-1 text-xs" data-testid="fleet-cloud-usage-provider-mtd">
-                    {t('providerMtd', { provider: figure.providerName, amount: money(figure.monthToDateCents, currency) })}
+                <p
+                    key={figure.providerPluginId}
+                    className="mt-1 text-xs"
+                    data-testid="fleet-cloud-usage-provider-mtd"
+                >
+                    {t('providerMtd', {
+                        provider: figure.providerName,
+                        amount: money(figure.monthToDateCents, currency),
+                    })}
                 </p>
             ))}
             <table className="mt-3 w-full text-left text-xs tabular-nums">
@@ -95,21 +106,37 @@ export default function CloudUsageBlock(_props: Partial<FleetOverviewBlockProps>
                 </thead>
                 <tbody>
                     {rows.map((row) => (
-                        <tr key={`${row.nodeId}:${row.destroyedAt ?? ''}`} data-testid="fleet-cloud-usage-row">
+                        <tr
+                            key={`${row.nodeId}:${row.destroyedAt ?? ''}`}
+                            data-testid="fleet-cloud-usage-row"
+                        >
                             <td className="py-1 pr-3">
-                                {row.destroyedAt ? t('destroyedName', { name: row.name, date: row.destroyedAt.slice(0, 10) }) : row.name}
+                                {row.destroyedAt
+                                    ? t('destroyedName', {
+                                          name: row.name,
+                                          date: row.destroyedAt.slice(0, 10),
+                                      })
+                                    : row.name}
                             </td>
                             <td className="py-1 pr-3">
-                                {[row.providerName, row.regionId, row.sizeLabel].filter(Boolean).join(' · ')}
+                                {[row.providerName, row.regionId, row.sizeLabel]
+                                    .filter(Boolean)
+                                    .join(' · ')}
                             </td>
                             <td className="py-1 pr-3">{hourly(row.hourlyCents, currency)}</td>
                             <td className="py-1 pr-3">{money(row.monthToDateCents, currency)}</td>
-                            <td className="py-1">{row.destroyedAt ? t('states.destroyed') : t(`states.${row.state}` as Parameters<typeof t>[0])}</td>
+                            <td className="py-1">
+                                {row.destroyedAt
+                                    ? t('states.destroyed')
+                                    : t(`states.${row.state}` as Parameters<typeof t>[0])}
+                            </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
-            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">{t('disclaimer')}</p>
+            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                {t('disclaimer')}
+            </p>
         </section>
     );
 }

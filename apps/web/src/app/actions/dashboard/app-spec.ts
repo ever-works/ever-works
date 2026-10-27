@@ -2,7 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { workAppSpecAPI, type AppSpecValidateResult } from '@/lib/api/work-app-spec';
+import {
+    workAppSpecAPI,
+    type AppBlueprintRunAccepted,
+    type AppSpecValidateResult,
+} from '@/lib/api/work-app-spec';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 // Security: import ApiResponseError so HTTP status codes can be mapped to
@@ -92,5 +96,98 @@ export async function recheckAppSpecAction(workId: string): Promise<RecheckAppSp
             data: null,
             error: toRecheckClientError(error, 'Failed to re-check the App spec'),
         };
+    }
+}
+
+/* -------------------------------------------------------------------------- *
+ * APW-03 T31 (lane aw-blueprints) — the Blueprint card's three actions
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The refusal codes the Blueprint routes answer (plan §4.2 plus this lane's), passed
+ * to the card so it renders translated copy. Only a code in this list leaves the
+ * server; anything else becomes `unknown`, never the backend's own sentence.
+ */
+const BLUEPRINT_REFUSAL_CODES = [
+    'blueprintNotFound',
+    'blueprintVersionNotFound',
+    'blueprintAlreadyApplied',
+    'applyInProgress',
+    'noBlueprint',
+    'noUpgrade',
+    'notAnAppWork',
+    'catalogUnavailable',
+    'dependenciesUnavailable',
+    'not_found',
+] as const;
+
+export type BlueprintRefusalCode =
+    | (typeof BLUEPRINT_REFUSAL_CODES)[number]
+    | 'throttled'
+    | 'forbidden'
+    | 'unknown';
+
+export type BlueprintActionResult<T> =
+    | { success: true; data: T; code: null }
+    | { success: false; data: null; code: BlueprintRefusalCode };
+
+function blueprintRefusalOf(error: unknown): BlueprintRefusalCode {
+    if (error instanceof ApiResponseError) {
+        if (error.statusCode === 429) return 'throttled';
+        if (error.statusCode === 403) return 'forbidden';
+        const code = error.code ?? '';
+        if ((BLUEPRINT_REFUSAL_CODES as readonly string[]).includes(code)) {
+            return code as BlueprintRefusalCode;
+        }
+        if (error.statusCode === 404) return 'not_found';
+    }
+    return 'unknown';
+}
+
+/** **Apply a Blueprint** — to an App Work created without one (edit). */
+export async function applyBlueprintAction(
+    workId: string,
+    blueprintId: string,
+): Promise<BlueprintActionResult<AppBlueprintRunAccepted>> {
+    await requireAuth();
+    try {
+        const data = await workAppSpecAPI.applyBlueprint(workId, { blueprintId });
+        revalidatePath(appSpecPath(workId));
+        return { success: true as const, data, code: null };
+    } catch (error) {
+        console.error('[applyBlueprintAction]', error);
+        return { success: false as const, data: null, code: blueprintRefusalOf(error) };
+    }
+}
+
+/** **Review upgrade** — propose the newer Blueprint version as a pull request (edit). */
+export async function upgradeBlueprintAction(
+    workId: string,
+    version: string,
+): Promise<BlueprintActionResult<AppBlueprintRunAccepted>> {
+    await requireAuth();
+    try {
+        const data = await workAppSpecAPI.upgradeBlueprint(workId, { version });
+        revalidatePath(appSpecPath(workId));
+        return { success: true as const, data, code: null };
+    } catch (error) {
+        console.error('[upgradeBlueprintAction]', error);
+        return { success: false as const, data: null, code: blueprintRefusalOf(error) };
+    }
+}
+
+/** **Dismiss** — hide the upgrade notice for this version only (edit). */
+export async function dismissBlueprintUpgradeAction(
+    workId: string,
+    version: string,
+): Promise<BlueprintActionResult<{ status: 'dismissed'; version: string }>> {
+    await requireAuth();
+    try {
+        const data = await workAppSpecAPI.dismissBlueprintUpgrade(workId, { version });
+        revalidatePath(appSpecPath(workId));
+        return { success: true as const, data, code: null };
+    } catch (error) {
+        console.error('[dismissBlueprintUpgradeAction]', error);
+        return { success: false as const, data: null, code: blueprintRefusalOf(error) };
     }
 }

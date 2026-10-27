@@ -100,11 +100,15 @@ describe('FleetSessionsController', () => {
 
     it('starts as the signed-in person, and a restartOf start restarts on that computer only', async () => {
         await controller.start(USER, NODE_ID, { kind: 'owner', provider: 'shell', cwd: '~' });
-        expect(service.start).toHaveBeenCalledWith(NODE_ID, { userId: 'user-1' }, {
-            kind: 'owner',
-            provider: 'shell',
-            cwd: '~',
-        });
+        expect(service.start).toHaveBeenCalledWith(
+            NODE_ID,
+            { userId: 'user-1' },
+            {
+                kind: 'owner',
+                provider: 'shell',
+                cwd: '~',
+            },
+        );
         await controller.start(USER, NODE_ID, {
             kind: 'owner',
             provider: 'shell',
@@ -122,9 +126,17 @@ describe('FleetSessionsController', () => {
 
     it('passes confirm through to end only when it is literally true', async () => {
         await controller.end(USER, SESSION_ID, {});
-        expect(service.end).toHaveBeenLastCalledWith(SESSION_ID, { userId: 'user-1' }, { confirm: false });
+        expect(service.end).toHaveBeenLastCalledWith(
+            SESSION_ID,
+            { userId: 'user-1' },
+            { confirm: false },
+        );
         await controller.end(USER, SESSION_ID, { confirm: true });
-        expect(service.end).toHaveBeenLastCalledWith(SESSION_ID, { userId: 'user-1' }, { confirm: true });
+        expect(service.end).toHaveBeenLastCalledWith(
+            SESSION_ID,
+            { userId: 'user-1' },
+            { confirm: true },
+        );
     });
 
     it('turns the since query into a date and drops one that is not', async () => {

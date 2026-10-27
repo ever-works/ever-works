@@ -46,8 +46,9 @@ async function ensureAuth() {
 
 function refusal(error: unknown): CheckoutActionResult<never> {
     if (error instanceof ApiResponseError) {
-        const envelope = (error.details as { error?: { hint?: unknown; details?: unknown } } | undefined)
-            ?.error;
+        const envelope = (
+            error.details as { error?: { hint?: unknown; details?: unknown } } | undefined
+        )?.error;
         return {
             success: false,
             code: error.code ?? null,

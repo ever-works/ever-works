@@ -49,7 +49,10 @@ function factState(state: string): FleetVirtualMachineFact['state'] {
 }
 
 /** Every child this machine hosts (containers by label, plus folders whose container is gone). */
-export async function listVirtualMachines(deps: { state: VirtualState; runner: CommandRunner }): Promise<FleetVirtualListResult> {
+export async function listVirtualMachines(deps: {
+	state: VirtualState;
+	runner: CommandRunner;
+}): Promise<FleetVirtualListResult> {
 	const result = await deps.runner.run(DOCKER, containerListArgs(), { timeoutMs: 15_000 });
 	if (result.code !== 0) return { docker: false, machines: [] };
 	const machines = new Map<string, FleetVirtualMachineFact>();
@@ -115,11 +118,14 @@ export function createVirtualModule(deps: VirtualModuleDeps): NodeModule {
 				run: async (context) => {
 					const childId = context.params.childId;
 					if (!isChildNodeId(childId)) {
-						throw new MachineVerbError(makeFleetLinkError('invalid', 'childId must be a virtual computer id'));
+						throw new MachineVerbError(
+							makeFleetLinkError('invalid', 'childId must be a virtual computer id')
+						);
 					}
 					const listed = await listVirtualMachines(full);
 					const fact = listed.machines.find((machine) => machine.childNodeId === childId.toLowerCase());
-					if (!fact) throw new MachineVerbError(makeFleetLinkError('not_found', 'no such virtual computer here'));
+					if (!fact)
+						throw new MachineVerbError(makeFleetLinkError('not_found', 'no such virtual computer here'));
 					return fact;
 				}
 			},
@@ -134,16 +140,23 @@ export function createVirtualModule(deps: VirtualModuleDeps): NodeModule {
 				run: async (context) => {
 					const childId = context.params.childId;
 					if (!isChildNodeId(childId)) {
-						throw new MachineVerbError(makeFleetLinkError('invalid', 'childId must be a virtual computer id'));
+						throw new MachineVerbError(
+							makeFleetLinkError('invalid', 'childId must be a virtual computer id')
+						);
 					}
 					const meta = await deps.state.readMeta(childId);
-					if (!meta) throw new MachineVerbError(makeFleetLinkError('not_found', 'no such virtual computer here'));
+					if (!meta)
+						throw new MachineVerbError(makeFleetLinkError('not_found', 'no such virtual computer here'));
 					if (meta.kind !== 'vm') {
-						throw new MachineVerbError(makeFleetLinkError('unsupported_on_node', 'a Container has no generated password'));
+						throw new MachineVerbError(
+							makeFleetLinkError('unsupported_on_node', 'a Container has no generated password')
+						);
 					}
 					const password = deps.passwords ? await deps.passwords.get(childId) : null;
 					if (!password) {
-						throw new MachineVerbError(makeFleetLinkError('not_found', 'no password is kept for it on this computer'));
+						throw new MachineVerbError(
+							makeFleetLinkError('not_found', 'no password is kept for it on this computer')
+						);
 					}
 					return { password };
 				}

@@ -738,6 +738,16 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Desktop view & control (1) — `apps/api/src/fleet/desktop/fleet-desktop.controller.ts`
+	// (FL-07, CONTRACTS §11.3). A read only: a computer's displays. Opening a live view, its
+	// socket and the screenshot are not MCP tools. Dark (404) unless FLEET_DESKTOP_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/desktop/displays',
+		toolName: 'fleet_desktop_displays',
+		annotations: { readOnlyHint: true }
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
@@ -1051,7 +1061,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/runners/{runnerId}/{action}',
 		toolName: 'fleet_runners_action',
 		description:
-			'Start, stop or restart one Actions runner ({action} = start | stop | restart; stop and restart need `confirm: true`). Remove is fleet_runners_remove.',
+			'Start, stop, restart or reinstall one Actions runner ({action} = start | stop | restart | reinstall; stop, restart and reinstall need `confirm: true`; reinstall takes GitHub’s current build with the same name and labels). Remove is fleet_runners_remove.',
 		annotations: { destructiveHint: true }
 	},
 	{
@@ -1060,6 +1070,23 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'fleet_runners_remove',
 		description:
 			'Remove one Actions runner: deregister it at GitHub, uninstall its service and delete its folder on the computer. Irreversible; needs `confirmName` = its name. Refused while it runs a job.',
+		annotations: { destructiveHint: true }
+	},
+	// FL-18 P2 — the Actions jobs read and Cancel workflow run (`confirm: true`; the 409 names the run).
+	{
+		method: 'GET',
+		path: '/api/fleet/runners/jobs',
+		toolName: 'fleet_runners_jobs',
+		description:
+			'The queued and running GitHub Actions jobs that target self-hosted runners in the watched repositories and organisations, each queued one with why no runner of yours takes it (the only matching runner is offline · no runner has a label · no runner is registered for the repository · all matching runners are busy), and how many runners are busy. Read-only.',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'POST',
+		path: '/api/fleet/runners/jobs/cancel',
+		toolName: 'fleet_runners_cancel_run',
+		description:
+			'Cancel a whole GitHub Actions workflow run of a repository your GitHub App covers (`repository`, `runId`). Every job in it stops; it cannot be undone. Needs `confirm: true`; without it the answer is 409 naming the run and repository.',
 		annotations: { destructiveHint: true }
 	},
 
@@ -1167,7 +1194,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/services/{name}/{action}',
 		toolName: 'fleet_services_action',
 		description:
-			"Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.",
+			'Start, stop, restart, enable or disable one service on one of my fleet computers. Class confirm: without confirm: true it answers confirmation_required with the sentence; when the computer warns the act could cut it off it also needs acknowledgeBlastRadius: true. A service that needs root without a password is refused with the exact command to run. Audited.',
 		annotations: { destructiveHint: true }
 	},
 	{

@@ -3,20 +3,23 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Check, Copy, ExternalLink } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import {
     FLEET_ACTIONS_RUNNER_MAX_LABELS,
+    FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL,
     FLEET_ACTIONS_RUNNERS_MAX_PER_NODE,
     fleetActionsRunnerInstallSummary,
     type FleetActionsRunnerInstallResponse,
     type FleetActionsRunnerMode,
     type FleetActionsRunnerOptionsView,
+    type FleetActionsRunnersPermissionView,
     type FleetLinkError,
 } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import {
     fleetActionsRunnerOptionsAction,
+    fleetActionsRunnersPermissionAction,
     installFleetActionsRunnersAction,
 } from '@/app/actions/fleet/runners';
 import { Button } from '@/components/ui/button';
@@ -29,6 +32,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { rootRequiredFrom } from '../machine/machine-actions.shared';
+import { GrantAccessCard } from './GrantAccessCard';
 import {
     clampInstallCount,
     defaultRunnerNames,
@@ -85,6 +89,8 @@ function formFor(
         names: namesForCount([], 1, namePool(options, existingNames)),
         labelsText: '',
         mode: modes[0] ?? 'service',
+        // P3 (FR-27): never ticked for the person.
+        shareDockerDaemon: false,
     };
 }
 
@@ -139,14 +145,19 @@ function CopyableCommand({
  *
  *  - **Register with** — the repositories and organisations the owner's
  *    GitHub App covers (FR-2); none → "Install the Ever Works GitHub App …
- *    first" with a link to the GitHub App settings; an organisation the App
- *    lacks the permission for → **Grant access** (spec §5.6);
+ *    first" with a link to the GitHub App settings; an organisation target
+ *    is checked with the API first (P2, FR-26) and, when the App lacks the
+ *    permission, shows the **Grant access** card (spec §5.6) instead of
+ *    enabling Install — Check again re-asks, Use a repository instead
+ *    switches to a repository;
  *  - **How many** — 1 … what still fits of 16 per computer;
  *  - **Names** — prefilled `<computer>-<n>`, editable, unique;
  *  - **Extra labels** — comma-separated, cleaned by the contracts' rule, with
  *    the labels GitHub adds itself shown as fixed chips;
- *  - **Run as** — Service (Windows: the only mode); the container mode is not
- *    offered in P1;
+ *  - **Run as** — Service (Windows: the only mode); on a Linux computer that
+ *    advertises it, **Container-isolated** (P3, FR-27) with its labelled,
+ *    unticked opt-in to share the host's container daemon (runs as root) and a
+ *    one-line warning of what that grants;
  *  - the confirmation sentence (target, count, mode, computer, "no credits are
  *    spent", FR-30) — the dialog IS the confirmation: Install sends
  *    `confirm: true`.
@@ -179,6 +190,10 @@ export function InstallRunnersDialog({
     const [error, setError] = useState<FleetLinkError | null>(null);
     const [reloadKey, setReloadKey] = useState(0);
     const [pending, startTransition] = useTransition();
+    // P2 (FR-26): the App's permission on the organisation picked, asked when one is picked.
+    const [permission, setPermission] = useState<FleetActionsRunnersPermissionView | null>(null);
+    const [checkingPermission, setCheckingPermission] = useState(false);
+    const [permissionKey, setPermissionKey] = useState(0);
     // Read when the options arrive, without re-reading them each time the list refreshes.
     const existingNamesRef = useRef(existingNames);
     existingNamesRef.current = existingNames;
@@ -214,12 +229,42 @@ export function InstallRunnersDialog({
     );
     const groups = useMemo(() => groupTargets(options?.targets ?? []), [options]);
     const target = options ? targetFromKey(form.targetKey, options.targets) : null;
+    const orgToCheck = open && target?.scope === 'org' ? target.target : null;
+
+    // Ask whether the GitHub App may register runners at the organisation picked (FR-26).
+    useEffect(() => {
+        if (!orgToCheck) return;
+        let live = true;
+        setCheckingPermission(true);
+        void Promise.resolve(fleetActionsRunnersPermissionAction('org', orgToCheck))
+            .then((result) => {
+                if (!live) return;
+                setPermission(result && result.ok ? result.data : null);
+            })
+            .catch(() => {
+                if (live) setPermission(null);
+            })
+            .finally(() => {
+                if (live) setCheckingPermission(false);
+            });
+        return () => {
+            live = false;
+        };
+    }, [orgToCheck, permissionKey]);
     const labels = parseExtraLabels(form.labelsText, options?.defaultLabels ?? []);
     const names = form.names.slice(0, form.count);
     const nameIssue = namesProblem(names);
     const noApp = Boolean(options && !options.appInstalled);
     const noTargets = Boolean(options && options.appInstalled && options.targets.length === 0);
-    const permissionMissing = target?.permission === 'missing';
+    // A fresh answer for THIS organisation wins over what the options said when they were read.
+    const checked =
+        target?.scope === 'org' &&
+        permission &&
+        permission.target.toLowerCase() === target.target.toLowerCase()
+            ? permission
+            : null;
+    const permissionMissing = checked ? !checked.ok : target?.permission === 'missing';
+    const awaitingPermission = target?.scope === 'org' && checkingPermission && !checked;
     const root = rootRequiredFrom(error);
     const canInstall = Boolean(
         options &&
@@ -227,6 +272,7 @@ export function InstallRunnersDialog({
         fit > 0 &&
         target &&
         !permissionMissing &&
+        !awaitingPermission &&
         modes.includes(form.mode) &&
         names.length === form.count &&
         !nameIssue &&
@@ -286,6 +332,7 @@ export function InstallRunnersDialog({
               : t('modes.service');
 
     const grantUrl =
+        checked?.grantUrl ??
         (target?.permission === 'missing' ? target.grantUrl : null) ??
         (error && typeof error.details?.grantUrl === 'string'
             ? (error.details.grantUrl as string)
@@ -365,6 +412,11 @@ export function InstallRunnersDialog({
                                 }
                                 data-testid="fleet-runners-install-target"
                             >
+                                {form.targetKey === '' ? (
+                                    <option value="" disabled>
+                                        {t('choose')}
+                                    </option>
+                                ) : null}
                                 {groups.repo.length > 0 ? (
                                     <optgroup label={t('repositories')}>
                                         {groups.repo.map((entry) => (
@@ -389,39 +441,47 @@ export function InstallRunnersDialog({
                             </span>
                         </label>
 
-                        {permissionMissing && target ? (
-                            <div
-                                className="flex flex-col gap-2 rounded-md bg-warning/10 p-2 text-xs"
-                                role="status"
-                                data-testid="fleet-runners-install-permission"
+                        {target?.scope === 'repo' ? (
+                            // A repository's permission is only known when the token is minted
+                            // (at install), so say up front what the App needs and what to accept.
+                            <p
+                                className="text-xs text-text-muted dark:text-text-muted-dark"
+                                data-testid="fleet-runners-install-repo-permission"
                             >
-                                <p>
-                                    {t('permissionMissing', {
-                                        target: target.target,
-                                        account: target.accountLogin,
-                                    })}
-                                </p>
-                                <div className="flex flex-wrap items-center gap-3">
-                                    {grantUrl ? (
-                                        <a
-                                            href={grantUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-primary underline"
-                                        >
-                                            {t('grantAccess')}
-                                            <ExternalLink className="h-3 w-3" aria-hidden />
-                                        </a>
-                                    ) : null}
-                                    <button
-                                        type="button"
-                                        className="text-primary underline"
-                                        onClick={() => setReloadKey((key) => key + 1)}
-                                    >
-                                        {t('checkAgain')}
-                                    </button>
-                                </div>
-                            </div>
+                                {t('repoPermissionHint')}
+                            </p>
+                        ) : null}
+
+                        {permissionMissing && target ? (
+                            <GrantAccessCard
+                                account={target.accountLogin || target.target}
+                                permission={checked?.missing ?? null}
+                                grantUrl={grantUrl}
+                                checking={checkingPermission}
+                                onCheckAgain={() =>
+                                    target.scope === 'org'
+                                        ? setPermissionKey((key) => key + 1)
+                                        : setReloadKey((key) => key + 1)
+                                }
+                                onUseRepository={() =>
+                                    setForm((previous) => {
+                                        const repo = options ? defaultTarget(groups.repo) : null;
+                                        return {
+                                            ...previous,
+                                            targetKey: repo ? targetKey(repo) : '',
+                                        };
+                                    })
+                                }
+                                testId="fleet-runners-install-permission"
+                            />
+                        ) : awaitingPermission && target ? (
+                            <p
+                                className="text-xs text-text-muted dark:text-text-muted-dark"
+                                role="status"
+                                data-testid="fleet-runners-install-checking"
+                            >
+                                {t('checkingPermission', { target: target.target })}
+                            </p>
                         ) : null}
 
                         <label className="flex flex-col gap-1">
@@ -538,6 +598,30 @@ export function InstallRunnersDialog({
                                     ))}
                                 </div>
                             )}
+                            {form.mode === 'docker' && modes.includes('docker') ? (
+                                <div
+                                    className="mt-1 flex flex-col gap-1 pl-6"
+                                    data-testid="fleet-runners-install-share"
+                                >
+                                    <label className="inline-flex items-center gap-2">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.shareDockerDaemon === true}
+                                            onChange={(event) =>
+                                                setForm((previous) => ({
+                                                    ...previous,
+                                                    shareDockerDaemon: event.target.checked,
+                                                }))
+                                            }
+                                            data-testid="fleet-runners-install-share-daemon"
+                                        />
+                                        {FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL}
+                                    </label>
+                                    <span className="text-xs text-warning">
+                                        {t('shareWarning', { name })}
+                                    </span>
+                                </div>
+                            ) : null}
                         </fieldset>
 
                         <p className="text-xs text-text-muted dark:text-text-muted-dark">

@@ -32,8 +32,18 @@ export class AddFleetNodeProviderFields1796170000000 implements MigrationInterfa
                 isNullable: false,
                 default: "'enrolled'",
             }),
-            new TableColumn({ name: 'providerPluginId', type: 'varchar', length: '64', isNullable: true }),
-            new TableColumn({ name: 'providerMachineRef', type: 'varchar', length: '128', isNullable: true }),
+            new TableColumn({
+                name: 'providerPluginId',
+                type: 'varchar',
+                length: '64',
+                isNullable: true,
+            }),
+            new TableColumn({
+                name: 'providerMachineRef',
+                type: 'varchar',
+                length: '128',
+                isNullable: true,
+            }),
             new TableColumn({ name: 'providerMeta', type: 'text', isNullable: true }),
         ];
         for (const column of columns) {
@@ -45,7 +55,10 @@ export class AddFleetNodeProviderFields1796170000000 implements MigrationInterfa
             }
         }
         const nodes = await queryRunner.getTable('fleet_nodes');
-        if (nodes && !nodes.indices.some((index) => index.name === 'idx_fleet_nodes_provider_machine')) {
+        if (
+            nodes &&
+            !nodes.indices.some((index) => index.name === 'idx_fleet_nodes_provider_machine')
+        ) {
             await queryRunner.createIndex(
                 'fleet_nodes',
                 new TableIndex({

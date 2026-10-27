@@ -16,5 +16,11 @@ export default async function SessionsTabServer({ node }: FleetComputerTabProps)
         fleetSessionsAPI.listForNode(node.id, { limit: 100 }).catch(() => null),
         getAuthFromCookie().catch(() => null),
     ]);
-    return <SessionsTab node={node} initial={page ? page.sessions : null} viewerUserId={user?.id ?? null} />;
+    return (
+        <SessionsTab
+            node={node}
+            initial={page ? page.sessions : null}
+            viewerUserId={user?.id ?? null}
+        />
+    );
 }

@@ -12,6 +12,7 @@ import {
 	type FleetRunnerInstallPayload
 } from '@ever-works/contracts';
 import { configureRunner } from '../link/modules/runners/config';
+import { configureDockerRunner, pinRunnerImage, startDockerRunner } from '../link/modules/runners/docker';
 import { assertRunnerDownloadFor, downloadRunnerArchive, extractRunnerArchive } from '../link/modules/runners/download';
 import { fetchRunnerToken, reportRunner, RunnerHostError, type RunnerHostDeps } from '../link/modules/runners/host';
 import { assertCanInstallService, installRunnerService } from '../link/modules/runners/service';
@@ -43,6 +44,12 @@ import type { RunnerMeta } from '../link/modules/runners/state';
  * Resumable (U11): a runner whose folder already says it is registered (a
  * lapsed claim re-run) is not downloaded or registered again — only its
  * service is (re)installed and started.
+ *
+ * Docker-isolated (P3, FR-27): the same verified build in the same folder, then
+ * GitHub's runner image pinned to its digest (`../link/modules/runners/docker`):
+ * registration in a throw-away container (the token in Docker's environment
+ * only) and the runner in its own `--restart unless-stopped` container, with the
+ * host's Docker daemon only under the labelled opt-in.
  */
 
 /** The `runner-install` payload off the job, validated on the machine (never trusted from the platform). */
@@ -56,7 +63,11 @@ export function parseRunnerInstallPayload(job: FleetJobView): FleetRunnerInstall
 		throw new RunnerHostError('the job names an unexpected registration URL');
 	}
 	if (!isFleetActionsRunnerMode(raw.mode)) throw new RunnerHostError('the job names no run mode');
-	if (!Array.isArray(raw.runners) || raw.runners.length === 0 || raw.runners.length > FLEET_ACTIONS_RUNNERS_MAX_PER_NODE) {
+	if (
+		!Array.isArray(raw.runners) ||
+		raw.runners.length === 0 ||
+		raw.runners.length > FLEET_ACTIONS_RUNNERS_MAX_PER_NODE
+	) {
 		throw new RunnerHostError('the job names no runners');
 	}
 	const runners: FleetActionsRunnerInstallItem[] = [];
@@ -78,8 +89,135 @@ export function parseRunnerInstallPayload(job: FleetJobView): FleetRunnerInstall
 		url: raw.url,
 		labels,
 		mode: raw.mode,
-		download: raw.download as FleetRunnerInstallPayload['download']
+		download: raw.download as FleetRunnerInstallPayload['download'],
+		...(raw.mode === 'docker' ? { shareDockerDaemon: raw.shareDockerDaemon === true } : {})
 	};
+}
+
+/** What one runner's install needs besides its id and name (an Install's payload, or a reinstall's). */
+export interface RunnerInstallContext {
+	scope: FleetRunnerInstallPayload['scope'];
+	target: string;
+	url: string;
+	labels: string[];
+	mode: FleetRunnerInstallPayload['mode'];
+	download: NonNullable<FleetRunnerInstallPayload['download']>;
+	runnerVersion: string | null;
+	shareDockerDaemon: boolean;
+}
+
+/** The node user's `uid:gid` a runner container runs as, or a refusal. */
+function containerUser(deps: RunnerHostDeps): string {
+	const user = deps.uidGid?.() ?? null;
+	if (!user) {
+		throw new RunnerHostError(
+			'container-isolated runners need a Unix user id on this computer',
+			'unsupported_on_node'
+		);
+	}
+	return user;
+}
+
+/**
+ * Install one runner (the verified archive is shared through `archive`):
+ * extract, refuse before registering, register with the one-time token, run it
+ * as a service or in its own container, report `idle`. Throws the first failure.
+ */
+export async function installOneRunner(
+	deps: RunnerHostDeps,
+	job: FleetJobView,
+	ctx: RunnerInstallContext,
+	runner: FleetActionsRunnerInstallItem,
+	archive: () => Promise<string>,
+	signal: AbortSignal
+): Promise<void> {
+	const docker = ctx.mode === 'docker';
+	if (docker && (deps.platform !== 'linux' || deps.hasDocker?.() !== true)) {
+		throw new RunnerHostError(`${deps.nodeName} cannot run container-isolated runners`, 'unsupported_on_node');
+	}
+	const existing = await deps.state.readMeta(runner.name);
+	if (existing && existing.runnerId !== runner.runnerId) {
+		throw new RunnerHostError(`a runner named ${runner.name} already exists on ${deps.nodeName}`, 'invalid');
+	}
+	let meta: RunnerMeta;
+	const dir = deps.state.dir(runner.name);
+	if (existing?.configured) {
+		// A re-run after a lapsed claim: registered already — only the service / container is left.
+		meta = existing;
+	} else {
+		await reportRunner(deps, job, runner.runnerId, { phase: 'downloading', runnerVersion: ctx.runnerVersion });
+		const verified = await archive();
+		await reportRunner(deps, job, runner.runnerId, { phase: 'verifying' });
+		// The archive was verified against GitHub's SHA-256 while it was fetched.
+		await deps.state.prepare(runner.name);
+		await extractRunnerArchive(deps, verified, dir, { keepArchive: true });
+		meta = {
+			runnerId: runner.runnerId,
+			name: runner.name,
+			scope: ctx.scope,
+			target: ctx.target,
+			labels: ctx.labels,
+			mode: ctx.mode,
+			runnerVersion: ctx.runnerVersion,
+			sha256: ctx.download.sha256.toLowerCase(),
+			configured: false,
+			serviceUnit: null,
+			installedAt: null,
+			...(docker ? { shareDockerDaemon: ctx.shareDockerDaemon } : {})
+		};
+		await deps.state.writeMeta(meta);
+		// U3 – U5: refuse BEFORE anything is registered at GitHub.
+		if (docker) {
+			const image = await pinRunnerImage(deps, ctx.runnerVersion);
+			meta = { ...meta, image };
+			await deps.state.writeMeta(meta);
+		} else {
+			await assertCanInstallService(deps, dir);
+		}
+		await reportRunner(deps, job, runner.runnerId, { phase: 'awaiting-token' });
+		const minted = await fetchRunnerToken(deps, job, runner.runnerId, 'register', signal);
+		await reportRunner(deps, job, runner.runnerId, { phase: 'registering' });
+		const config = {
+			platform: deps.platform,
+			url: ctx.url,
+			name: runner.name,
+			labels: ctx.labels,
+			replace: minted.replace
+		};
+		if (docker) {
+			await configureDockerRunner(
+				deps,
+				{ runnerId: runner.runnerId, dir, image: meta.image as string, user: containerUser(deps), config },
+				minted.token
+			);
+		} else {
+			await configureRunner(deps.exec, dir, config, minted.token);
+		}
+		meta = { ...meta, configured: true };
+		await deps.state.writeMeta(meta);
+	}
+	await reportRunner(deps, job, runner.runnerId, { phase: 'installing-service' });
+	const serviceUnit = docker
+		? await startDockerRunner(deps, {
+				runnerId: runner.runnerId,
+				dir,
+				image: meta.image as string,
+				user: containerUser(deps),
+				shareDockerDaemon: meta.shareDockerDaemon === true
+			})
+		: await installRunnerService(deps, dir, meta);
+	await reportRunner(deps, job, runner.runnerId, { phase: 'starting', serviceUnit });
+	const githubRunnerId = await deps.state.githubRunnerId(runner.name).catch(() => null);
+	meta = { ...meta, serviceUnit, installedAt: meta.installedAt ?? new Date(deps.now()).toISOString() };
+	await deps.state.writeMeta(meta);
+	await reportRunner(deps, job, runner.runnerId, {
+		phase: 'done',
+		state: 'idle',
+		error: null,
+		serviceUnit,
+		runnerVersion: meta.runnerVersion,
+		githubRunnerId
+	});
 }
 
 /** The first line of an error, bounded — what a person reads on the row. */
@@ -92,19 +230,32 @@ function firstLine(error: unknown): string {
 function failsEveryRunner(error: unknown): boolean {
 	return (
 		error instanceof RunnerHostError &&
-		(error.code === 'root_required' || error.code === 'unsupported_on_node' || /token could not be fetched|was cancelled/.test(error.message))
+		(error.code === 'root_required' ||
+			error.code === 'unsupported_on_node' ||
+			/token could not be fetched|was cancelled/.test(error.message))
 	);
 }
 
 export function createRunnerInstallExecutor(deps: RunnerHostDeps) {
 	return async (job: FleetJobView, signal: AbortSignal): Promise<Record<string, unknown>> => {
 		const payload = parseRunnerInstallPayload(job);
-		if (payload.mode !== 'service') {
-			throw new RunnerHostError('Docker-isolated runners are not available on this computer yet', 'unsupported_on_node');
-		}
 		const download = assertRunnerDownloadFor(payload.download, deps.platform, deps.arch);
-		const runnerVersion = fleetActionsRunnerVersionOf(download.filename);
-		let archive: string | null = null;
+		const ctx: RunnerInstallContext = {
+			scope: payload.scope,
+			target: payload.target,
+			url: payload.url,
+			labels: payload.labels,
+			mode: payload.mode,
+			download,
+			runnerVersion: fleetActionsRunnerVersionOf(download.filename),
+			shareDockerDaemon: payload.shareDockerDaemon === true
+		};
+		// One download per install, shared by every runner of it (decision 7).
+		const archive: { path: string | null } = { path: null };
+		const fetchArchive = async (): Promise<string> => {
+			if (!archive.path) archive.path = await downloadRunnerArchive(deps, download, signal);
+			return archive.path;
+		};
 		const installed: string[] = [];
 		const failed: Array<{ name: string; error: string }> = [];
 
@@ -121,70 +272,7 @@ export function createRunnerInstallExecutor(deps: RunnerHostDeps) {
 				const runner = payload.runners[index];
 				if (signal.aborted) throw new RunnerHostError('the install was cancelled');
 				try {
-					const existing = await deps.state.readMeta(runner.name);
-					if (existing && existing.runnerId !== runner.runnerId) {
-						throw new RunnerHostError(`a runner named ${runner.name} already exists on ${deps.nodeName}`, 'invalid');
-					}
-					let meta: RunnerMeta;
-					const dir = deps.state.dir(runner.name);
-					if (existing?.configured) {
-						// A re-run after a lapsed claim: registered already — only the service is left.
-						meta = existing;
-					} else {
-						await reportRunner(deps, job, runner.runnerId, { phase: 'downloading', runnerVersion });
-						if (!archive) archive = await downloadRunnerArchive(deps, download, signal);
-						await reportRunner(deps, job, runner.runnerId, { phase: 'verifying' });
-						// The archive was verified against GitHub's SHA-256 while it was fetched.
-						await deps.state.prepare(runner.name);
-						await extractRunnerArchive(deps, archive, dir, { keepArchive: true });
-						meta = {
-							runnerId: runner.runnerId,
-							name: runner.name,
-							scope: payload.scope,
-							target: payload.target,
-							labels: payload.labels,
-							mode: payload.mode,
-							runnerVersion,
-							sha256: download.sha256.toLowerCase(),
-							configured: false,
-							serviceUnit: null,
-							installedAt: null
-						};
-						await deps.state.writeMeta(meta);
-						// U3 – U5: refuse BEFORE anything is registered at GitHub.
-						await assertCanInstallService(deps, dir);
-						await reportRunner(deps, job, runner.runnerId, { phase: 'awaiting-token' });
-						const minted = await fetchRunnerToken(deps, job, runner.runnerId, 'register', signal);
-						await reportRunner(deps, job, runner.runnerId, { phase: 'registering' });
-						await configureRunner(
-							deps.exec,
-							dir,
-							{
-								platform: deps.platform,
-								url: payload.url,
-								name: runner.name,
-								labels: payload.labels,
-								replace: minted.replace
-							},
-							minted.token
-						);
-						meta = { ...meta, configured: true };
-						await deps.state.writeMeta(meta);
-					}
-					await reportRunner(deps, job, runner.runnerId, { phase: 'installing-service' });
-					const serviceUnit = await installRunnerService(deps, dir, meta);
-					await reportRunner(deps, job, runner.runnerId, { phase: 'starting', serviceUnit });
-					const githubRunnerId = await deps.state.githubRunnerId(runner.name).catch(() => null);
-					meta = { ...meta, serviceUnit, installedAt: meta.installedAt ?? new Date(deps.now()).toISOString() };
-					await deps.state.writeMeta(meta);
-					await reportRunner(deps, job, runner.runnerId, {
-						phase: 'done',
-						state: 'idle',
-						error: null,
-						serviceUnit,
-						runnerVersion: meta.runnerVersion,
-						githubRunnerId
-					});
+					await installOneRunner(deps, job, ctx, runner, fetchArchive, signal);
 					installed.push(runner.runnerId);
 				} catch (error) {
 					const message = firstLine(error);
@@ -202,7 +290,7 @@ export function createRunnerInstallExecutor(deps: RunnerHostDeps) {
 				}
 			}
 		} finally {
-			if (archive) await rm(archive, { force: true }).catch(() => undefined);
+			if (archive.path) await rm(archive.path, { force: true }).catch(() => undefined);
 		}
 
 		if (failed.length > 0) {

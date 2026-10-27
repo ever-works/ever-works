@@ -66,7 +66,11 @@ function seed(fs: MemoryUsageFs): void {
 		[
 			codexMetaLine('0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000', '2026-10-20T11:00:00.000Z', '/srv/elsewhere/project'),
 			codexTurnLine('2026-10-20T11:00:01.000Z'),
-			codexTokenLine('2026-10-20T11:00:02.000Z', { input: 1000, cached: 600, output: 50 }, { input: 1000, cached: 600, output: 50 })
+			codexTokenLine(
+				'2026-10-20T11:00:02.000Z',
+				{ input: 1000, cached: 600, output: 50 },
+				{ input: 1000, cached: 600, output: 50 }
+			)
 		].join('\n') + '\n'
 	);
 }
@@ -91,7 +95,13 @@ describe('runUsageScan (FL-20 T-11)', () => {
 		const report = await runUsageScan(deps(fs), null);
 		expect(report.truncated).toBe(false);
 		expect(report.backlogPct).toBe(0);
-		expect(totals(report)).toEqual({ in: 15 + 400, out: 200 + 50, cacheRead: 3000 + 600, cacheWrite: 200, requests: 3 });
+		expect(totals(report)).toEqual({
+			in: 15 + 400,
+			out: 200 + 50,
+			cacheRead: 3000 + 600,
+			cacheWrite: 200,
+			requests: 3
+		});
 		const claude = report.rows.find((row) => row.provider === 'claude-code');
 		expect(claude).toMatchObject({
 			providerSessionId: 'c0ffee00-1111-4222-8333-444455556666',
@@ -157,7 +167,12 @@ describe('runUsageScan (FL-20 T-11)', () => {
 	it('leaves a line still being written for the next scan', async () => {
 		const fs = new MemoryUsageFs();
 		const path = `${CLAUDE_DIR}/partial.jsonl`;
-		const full = claudeLine({ sessionId: 's-1', messageId: 'msg_p', at: '2026-10-20T10:00:00.000Z', usage: { input: 3, output: 4 } });
+		const full = claudeLine({
+			sessionId: 's-1',
+			messageId: 'msg_p',
+			at: '2026-10-20T10:00:00.000Z',
+			usage: { input: 3, output: 4 }
+		});
 		fs.addFile(path, full.slice(0, 40));
 		expect((await runUsageScan(deps(fs), null)).rows).toEqual([]);
 		fs.append(path, `${full.slice(40)}\n`);
@@ -169,7 +184,9 @@ describe('runUsageScan (FL-20 T-11)', () => {
 		const lines: string[] = [];
 		for (let i = 0; i < 30; i += 1) {
 			const hour = new Date(Date.parse('2026-09-01T00:00:00.000Z') + i * 3_600_000).toISOString();
-			lines.push(claudeLine({ sessionId: 's-big', messageId: `msg_${i}`, at: hour, usage: { input: 1, output: 1 } }));
+			lines.push(
+				claudeLine({ sessionId: 's-big', messageId: `msg_${i}`, at: hour, usage: { input: 1, output: 1 } })
+			);
 		}
 		// A byte budget smaller than the file: the first scan reports a backlog.
 		const fs2 = new MemoryUsageFs();
@@ -190,7 +207,9 @@ describe('runUsageScan (FL-20 T-11)', () => {
 		const lines: string[] = [];
 		for (let i = 0; i < 520; i += 1) {
 			const hour = new Date(Date.parse('2026-01-01T00:00:00.000Z') + i * 3_600_000).toISOString();
-			lines.push(claudeLine({ sessionId: 's-cap', messageId: `msg_${i}`, at: hour, usage: { input: 1, output: 1 } }));
+			lines.push(
+				claudeLine({ sessionId: 's-cap', messageId: `msg_${i}`, at: hour, usage: { input: 1, output: 1 } })
+			);
 		}
 		fs.addFile(`${CLAUDE_DIR}/cap.jsonl`, lines.join('\n') + '\n');
 		const first = await runUsageScan(deps(fs), null);
@@ -206,7 +225,9 @@ describe('runUsageScan (FL-20 T-11)', () => {
 
 	it('refuses when the owner switched the scan off (defence in depth)', async () => {
 		const fs = new MemoryUsageFs();
-		await expect(runUsageScan(deps(fs, { enabled: () => false }), null)).rejects.toBeInstanceOf(UsageScanRefusedError);
+		await expect(runUsageScan(deps(fs, { enabled: () => false }), null)).rejects.toBeInstanceOf(
+			UsageScanRefusedError
+		);
 	});
 
 	it('re-sends everything when the platform is ahead of a node that lost its state', async () => {
@@ -237,16 +258,24 @@ describe('usage roots and folders (FL-20 T-08)', () => {
 		fs.addFile(`${CLAUDE_DIR}/real.jsonl`, '\n');
 		fs.addLink(`${HOME}/.claude/projects/escape`);
 		fs.addLink(`${CLAUDE_DIR}/linked.jsonl`);
-		const files = await listUsageRecordFiles({ provider: 'claude-code', dir: `${HOME}/.claude/projects` }, fs, 'linux');
+		const files = await listUsageRecordFiles(
+			{ provider: 'claude-code', dir: `${HOME}/.claude/projects` },
+			fs,
+			'linux'
+		);
 		expect(files.map((file) => file.path)).toEqual([`${CLAUDE_DIR}/real.jsonl`]);
 	});
 
 	it('buckets a folder as its longest root, else an opaque hash, case-insensitively on Windows', () => {
-		expect(usageFolderBucket('/home/owner/code/api/src', ['/home/owner/code', '/home/owner/code/api'], 'linux')).toBe(
-			'/home/owner/code/api'
+		expect(
+			usageFolderBucket('/home/owner/code/api/src', ['/home/owner/code', '/home/owner/code/api'], 'linux')
+		).toBe('/home/owner/code/api');
+		expect(usageFolderBucket('/home/owner/code-other', ['/home/owner/code'], 'linux')).toMatch(
+			/^other:[0-9a-f]{8}$/
 		);
-		expect(usageFolderBucket('/home/owner/code-other', ['/home/owner/code'], 'linux')).toMatch(/^other:[0-9a-f]{8}$/);
-		expect(usageFolderBucket('C:\\Users\\Owner\\Code\\Api', ['c:\\users\\owner\\code'], 'win32')).toBe('c:\\users\\owner\\code');
+		expect(usageFolderBucket('C:\\Users\\Owner\\Code\\Api', ['c:\\users\\owner\\code'], 'win32')).toBe(
+			'c:\\users\\owner\\code'
+		);
 		expect(usageFolderBucket(null, ['/x'], 'linux')).toBeNull();
 	});
 });
@@ -256,12 +285,17 @@ describe('readUsageLines', () => {
 		const big = 'x'.repeat(5000);
 		const content = Buffer.from(`${big}\n{"ok":1}\n`, 'utf8');
 		const handle = {
-			read: async (length: number, position: number) => Buffer.from(content.subarray(position, position + length)),
+			read: async (length: number, position: number) =>
+				Buffer.from(content.subarray(position, position + length)),
 			close: async () => undefined
 		};
 		const seen: string[] = [];
-		const first = await readUsageLines(handle, 0, content.length, { budgetBytes: 1000, maxLineBytes: 100, chunkBytes: 256 }, (line) =>
-			seen.push(line)
+		const first = await readUsageLines(
+			handle,
+			0,
+			content.length,
+			{ budgetBytes: 1000, maxLineBytes: 100, chunkBytes: 256 },
+			(line) => seen.push(line)
 		);
 		expect(first.skipping).toBe(true);
 		expect(first.nextOffset).toBe(1000);

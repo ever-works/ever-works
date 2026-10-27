@@ -352,7 +352,7 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/nodes/{id}/desktop/screenshot'),
 		cli: 'fleet desktop screenshot'
 	}),
-	read('fleet_desktop_displays', 'desktop', 'FL-07', 'FLEET_DESKTOP_ENABLED', 'planned', {
+	read('fleet_desktop_displays', 'desktop', 'FL-07', 'FLEET_DESKTOP_ENABLED', 'live', {
 		route: GET('/api/fleet/nodes/{id}/desktop/displays'),
 		cli: 'fleet desktop displays'
 	}),
@@ -635,6 +635,9 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		route: GET('/api/fleet/checkouts/{id}/changes'),
 		cli: 'fleet checkouts changes'
 	}),
+	read('fleet_checkouts_pull_request_get', 'checkouts', 'FL-06', 'FLEET_CHECKOUTS_ENABLED', 'planned', {
+		route: GET('/api/fleet/checkouts/{id}/pull-request')
+	}),
 	act('fleet_checkouts_create', 'checkouts', 'FL-14', 'FLEET_CHECKOUTS_ENABLED', 'live', plain('machine.run'), {
 		route: POST('/api/fleet/checkouts'),
 		cli: 'fleet checkouts create',
@@ -767,13 +770,13 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 
 	// ── runners (FL-18) ── P1 shipped: list, install, start / stop / restart, remove. An install, a
 	// stop, a restart and a remove asked by an Agent are held for the owner's approval
-	// (`agent-fleet-runners-tools.ts`). The Actions jobs read and Cancel workflow run arrive with P2.
+	// (`agent-fleet-runners-tools.ts`). P2: the Actions jobs read and Cancel workflow run (always held for an Agent).
 	read('fleet_runners_list', 'view', 'FL-18', 'FLEET_ACTIONS_RUNNERS_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/nodes/{id}/runners'),
 		cli: 'fleet runners list'
 	}),
-	read('fleet_runners_jobs', 'view', 'FL-18', 'FLEET_ACTIONS_RUNNERS_ENABLED', 'planned', {
+	read('fleet_runners_jobs', 'view', 'FL-18', 'FLEET_ACTIONS_RUNNERS_ENABLED', 'live', {
 		phase: 'P3',
 		route: GET('/api/fleet/runners/jobs'),
 		cli: 'fleet runners jobs'
@@ -805,7 +808,8 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 			route: POST('/api/fleet/nodes/{id}/runners/{runnerId}/{action}'),
 			cli: 'fleet runners action',
 			waitable: true,
-			confirmationNote: "plain to start; confirm to stop and restart (an Agent's stop or restart is held for the owner)"
+			confirmationNote:
+				"plain to start; confirm to stop and restart (an Agent's stop or restart is held for the owner)"
 		}
 	),
 	act(
@@ -828,9 +832,14 @@ export const FLEET_TOOL_CATALOGUE: readonly FleetToolCatalogueEntry[] = Object.f
 		'machines',
 		'FL-18',
 		'FLEET_ACTIONS_RUNNERS_ENABLED',
-		'planned',
+		'live',
 		confirm('machine.admin'),
-		{ phase: 'P3', route: POST('/api/fleet/runners/jobs/cancel'), cli: 'fleet runners cancel-run' }
+		{
+			phase: 'P3',
+			route: POST('/api/fleet/runners/jobs/cancel'),
+			cli: 'fleet runners cancel-run',
+			alwaysHeld: true
+		}
 	),
 
 	// ── usage (FL-20) ── P1 shipped: the Usage object (totals, by model, by computer, busiest

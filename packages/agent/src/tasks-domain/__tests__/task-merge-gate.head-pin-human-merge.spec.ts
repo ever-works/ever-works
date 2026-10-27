@@ -131,10 +131,14 @@ describe('TaskMergeGateService — head pin and human-merge paths', () => {
     it('pure helpers compare only what both sides know', () => {
         expect(pullRequestHeadMismatch({ branchRef: 'a' }, { headRef: 'a' })).toBeNull();
         expect(pullRequestHeadMismatch({ branchRef: 'refs/heads/a' }, { headRef: 'a' })).toBeNull();
-        expect(pullRequestHeadMismatch({ branchRef: 'a' }, { headRef: 'b' })).toMatch(/not the Task's branch/);
+        expect(pullRequestHeadMismatch({ branchRef: 'a' }, { headRef: 'b' })).toMatch(
+            /not the Task's branch/,
+        );
         expect(pullRequestHeadMismatch({ branchRef: null }, { headRef: 'b' })).toBeNull();
         expect(pullRequestHeadMismatch({ branchRef: 'a' }, {})).toBeNull();
-        expect(pullRequestHeadRepoMismatch('acme/shop', { headRepoFullName: 'ACME/Shop' })).toBeNull();
+        expect(
+            pullRequestHeadRepoMismatch('acme/shop', { headRepoFullName: 'ACME/Shop' }),
+        ).toBeNull();
         expect(pullRequestHeadRepoMismatch('acme/shop', { headRepoFullName: 'evil/shop' })).toMatch(
             /evil\/shop/,
         );

@@ -65,11 +65,19 @@ const permission: FleetSessionAttention = {
 describe('glyphs and tint', () => {
     it('follows the vocabulary', () => {
         expect(sessionGlyph(session())).toBe('spinner');
-        expect(sessionGlyph(session({ state: 'needs_you', attention: permission }))).toBe('question');
-        expect(sessionGlyph(session({ state: 'needs_you', attention: { ...permission, reason: 'blocked' } }))).toBe('redDot');
+        expect(sessionGlyph(session({ state: 'needs_you', attention: permission }))).toBe(
+            'question',
+        );
+        expect(
+            sessionGlyph(
+                session({ state: 'needs_you', attention: { ...permission, reason: 'blocked' } }),
+            ),
+        ).toBe('redDot');
         expect(sessionGlyph(session({ state: 'done', outcome: 'success' }))).toBe('check');
         expect(sessionGlyph(session({ state: 'done', outcome: 'interrupted' }))).toBe('mutedDot');
-        expect(sessionGlyph(session({ state: 'ended', outcome: 'unconfirmed' }))).toBe('dashedRing');
+        expect(sessionGlyph(session({ state: 'ended', outcome: 'unconfirmed' }))).toBe(
+            'dashedRing',
+        );
         expect(sessionGlyph(session({ state: 'idle' }))).toBe('greyDot');
         expect(sessionGlyph(session({ provider: 'shell' }))).toBe('none');
     });
@@ -96,12 +104,18 @@ describe('glyphs and tint', () => {
 
 describe('the body', () => {
     it('shows the prompt while it needs you, else the last lines, else the ended line', () => {
-        expect(sessionCardBody(session({ state: 'needs_you', attention: permission })).kind).toBe('attention');
-        expect(sessionCardBody(session({ state: 'ended', outcome: 'failure', exitCode: 1 }))).toEqual({
+        expect(sessionCardBody(session({ state: 'needs_you', attention: permission })).kind).toBe(
+            'attention',
+        );
+        expect(
+            sessionCardBody(session({ state: 'ended', outcome: 'failure', exitCode: 1 })),
+        ).toEqual({
             kind: 'exited',
             code: 1,
         });
-        expect(sessionCardBody(session({ state: 'ended', outcome: 'unconfirmed' }))).toEqual({ kind: 'unconfirmed' });
+        expect(sessionCardBody(session({ state: 'ended', outcome: 'unconfirmed' }))).toEqual({
+            kind: 'unconfirmed',
+        });
         expect(
             sessionCardBody(
                 session({
@@ -110,7 +124,12 @@ describe('the body', () => {
                     lastEvidence: {
                         source: 'hook',
                         at: '2026-10-21T11:56:00.000Z',
-                        detail: { event: 'stop', seq: 9, userLine: 'run the tests', agentLine: 'All 42 tests pass.' },
+                        detail: {
+                            event: 'stop',
+                            seq: 9,
+                            userLine: 'run the tests',
+                            agentLine: 'All 42 tests pass.',
+                        },
                     },
                 }),
             ),
@@ -121,7 +140,9 @@ describe('the body', () => {
 describe('elapsed, unread, status source', () => {
     it('measures from when the state moved', () => {
         expect(sessionElapsedSlot(session(), NOW)).toEqual({ key: 'workingFor', span: '4 min' });
-        expect(sessionElapsedSlot(session({ state: 'needs_you', attention: permission }), NOW)).toEqual({
+        expect(
+            sessionElapsedSlot(session({ state: 'needs_you', attention: permission }), NOW),
+        ).toEqual({
             key: 'waiting',
             span: '3 min',
         });
@@ -130,9 +151,13 @@ describe('elapsed, unread, status source', () => {
 
     it('unread = raised and not acknowledged since', () => {
         expect(isSessionUnread(session({ attention: permission }))).toBe(true);
-        expect(isSessionUnread(session({ attention: { ...permission, acknowledgedAt: '2026-10-21T11:58:00.000Z' } }))).toBe(
-            false,
-        );
+        expect(
+            isSessionUnread(
+                session({
+                    attention: { ...permission, acknowledgedAt: '2026-10-21T11:58:00.000Z' },
+                }),
+            ),
+        ).toBe(false);
         expect(isSessionUnread(session())).toBe(false);
     });
 
@@ -144,18 +169,28 @@ describe('elapsed, unread, status source', () => {
         };
         expect(statusSourceNote(session({ hooks }))).toBeNull();
         expect(statusSourceNote(session({ hooks }), { detail: true })).toBe('hooks');
-        expect(statusSourceNote(session({ hooks: { ...hooks, events: ['Stop'] } }), { detail: true })).toBe('partial');
+        expect(
+            statusSourceNote(session({ hooks: { ...hooks, events: ['Stop'] } }), { detail: true }),
+        ).toBe('partial');
         expect(statusSourceNote(session({ hooks: null }))).toBe('fromScreen');
         expect(statusSourceNote(session({ provider: 'shell' }), { detail: true })).toBe('shell');
         expect(statusSourceNote(session({ provider: 'shell' }))).toBeNull();
     });
 
     it('surfaces hook health from the daemon block', () => {
-        expect(hookHealthLines({ state: 'running', sessions: 1, hooks: { badTokenLastMinute: 23, spooled: 12 } })).toEqual([
+        expect(
+            hookHealthLines({
+                state: 'running',
+                sessions: 1,
+                hooks: { badTokenLastMinute: 23, spooled: 12 },
+            }),
+        ).toEqual([
             { key: 'badToken', count: 23 },
             { key: 'spooled', count: 12 },
         ]);
-        expect(hookHealthLines({ state: 'running', sessions: 1, hooks: { badTokenLastMinute: 3 } })).toEqual([]);
+        expect(
+            hookHealthLines({ state: 'running', sessions: 1, hooks: { badTokenLastMinute: 3 } }),
+        ).toEqual([]);
         expect(hookHealthLines(null)).toEqual([]);
     });
 });

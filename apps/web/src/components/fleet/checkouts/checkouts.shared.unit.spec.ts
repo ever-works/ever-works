@@ -56,7 +56,9 @@ describe('groupCheckoutsByRepository (FL-14 spec §5.1, S2)', () => {
             row({ id: 'c', repository: 'acme/web', path: '/home/nina/web' }),
             row({ id: 'd', repository: null, remoteUrl: null, path: '/home/nina/scratch' }),
         ]);
-        expect(groups.map((group) => [group.kind, group.label, group.rows.length, group.computers])).toEqual([
+        expect(
+            groups.map((group) => [group.kind, group.label, group.rows.length, group.computers]),
+        ).toEqual([
             ['work', 'API', 2, 2],
             ['repository', 'acme/web', 1, 1],
             ['unlinked', null, 1, 1],
@@ -75,16 +77,28 @@ describe('groupCheckoutsByRepository (FL-14 spec §5.1, S2)', () => {
 describe('checkoutActionState (spec U1–U4, U9, FR-13, FR-26)', () => {
     it('allows fetch, refresh and archive on a ready row for the owner of an online computer', () => {
         for (const action of ['fetch', 'refresh', 'archive'] as const) {
-            expect(checkoutActionState(action, row(), { node: ONLINE_OWNER })).toEqual({ enabled: true });
+            expect(checkoutActionState(action, row(), { node: ONLINE_OWNER })).toEqual({
+                enabled: true,
+            });
         }
     });
 
     it.each([
         ['fetch', row(), { node: { ...ONLINE_OWNER, status: 'offline' as const } }, 'offline'],
-        ['fetch', row(), { node: { ...ONLINE_OWNER, viewerRole: 'org-member' as const } }, 'notAllowed'],
+        [
+            'fetch',
+            row(),
+            { node: { ...ONLINE_OWNER, viewerRole: 'org-member' as const } },
+            'notAllowed',
+        ],
         ['fetch', row(), { node: ONLINE_OWNER, stopped: true }, 'killSwitch'],
         ['fetch', row({ state: 'missing' }), { node: ONLINE_OWNER }, 'missing'],
-        ['fetch', row({ createdBy: 'task', kind: 'worktree' }), { node: ONLINE_OWNER }, 'taskWorktree'],
+        [
+            'fetch',
+            row({ createdBy: 'task', kind: 'worktree' }),
+            { node: ONLINE_OWNER },
+            'taskWorktree',
+        ],
         [
             'fetch',
             row(),
@@ -92,7 +106,12 @@ describe('checkoutActionState (spec U1–U4, U9, FR-13, FR-26)', () => {
             'consentMissing',
         ],
         ['archive', row({ busy: 'session' }), { node: ONLINE_OWNER }, 'busy'],
-        ['restore', row({ state: 'archived', folderRemoved: true }), { node: ONLINE_OWNER }, 'folderRemoved'],
+        [
+            'restore',
+            row({ state: 'archived', folderRemoved: true }),
+            { node: ONLINE_OWNER },
+            'folderRemoved',
+        ],
         ['restore', row(), { node: ONLINE_OWNER }, 'archived'],
     ] as const)('%s is off: %s', (action, subject, context, reason) => {
         expect(checkoutActionState(action, subject, context)).toEqual({ enabled: false, reason });
@@ -134,7 +153,14 @@ describe('formatters', () => {
         expect(checkoutsPollMs([{ state: 'creating', lastCommand: null }])).toBe(10_000);
         expect(
             checkoutsPollMs([
-                { state: 'ready', lastCommand: { command: 'fetch', exitCode: null, at: '2026-10-21T00:00:00.000Z' } },
+                {
+                    state: 'ready',
+                    lastCommand: {
+                        command: 'fetch',
+                        exitCode: null,
+                        at: '2026-10-21T00:00:00.000Z',
+                    },
+                },
             ]),
         ).toBe(10_000);
     });

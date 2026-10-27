@@ -36,9 +36,15 @@ function toMs(value: Date | string | null | undefined): number | null {
 }
 
 /** The stored cadence, re-read (a hand-edited row reads as a 00:00 daily rather than crashing a list). */
-export function storedFleetScheduleCadence(command: Pick<FleetCommand, 'cadence'>): FleetScheduleCadence {
+export function storedFleetScheduleCadence(
+    command: Pick<FleetCommand, 'cadence'>,
+): FleetScheduleCadence {
     return (
-        parseFleetScheduleCadence(command.cadence).cadence ?? { kind: 'daily', at: '00:00', timezone: 'node' }
+        parseFleetScheduleCadence(command.cadence).cadence ?? {
+            kind: 'daily',
+            at: '00:00',
+            timezone: 'node',
+        }
     );
 }
 
@@ -103,14 +109,18 @@ export function toFleetScheduleView(facts: FleetScheduleViewFacts): FleetSchedul
         cadenceHuman: describeFleetScheduleCadence(cadence),
         enabled: !paused && !deleted,
         pausedAt: toIso(command.pausedAt),
-        pausedReason: isFleetSchedulePausedReason(command.pausedReason) ? command.pausedReason : null,
+        pausedReason: isFleetSchedulePausedReason(command.pausedReason)
+            ? command.pausedReason
+            : null,
         nextRunAt: next === null ? null : new Date(next).toISOString(),
         lastRunAt: toIso(command.lastRunAt) ?? lastRun?.startedAt ?? null,
         lastRun,
         running: latest?.status === 'running',
         linkUp: facts.linkUp,
         requestedBy: command.requestedBy === 'agent' ? 'agent' : 'user',
-        failureStreak: fleetScheduleFailureStreak(counted as Array<{ status: FleetCommandRunStatus }>),
+        failureStreak: fleetScheduleFailureStreak(
+            counted as Array<{ status: FleetCommandRunStatus }>,
+        ),
         syncState,
         syncError: facts.refusal,
         neverRuns: deleted ? null : facts.neverRuns,
@@ -140,7 +150,12 @@ export function toFleetScheduleRunView(
         error: run.errorCode ? { code: run.errorCode, hint: run.errorHint ?? '' } : null,
         startedAt: new Date(started).toISOString(),
         endedAt: ended === null ? null : new Date(ended).toISOString(),
-        durationMs: ended === null ? (run.status === 'running' ? Math.max(0, now - started) : null) : ended - started,
+        durationMs:
+            ended === null
+                ? run.status === 'running'
+                    ? Math.max(0, now - started)
+                    : null
+                : ended - started,
         outputHead: run.outputHead ?? '',
         outputTail: run.outputTail ?? '',
         truncated: Boolean(run.truncated),

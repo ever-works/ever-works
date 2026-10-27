@@ -39,7 +39,10 @@ export function PreviewBrowserSwitch({ node }: { node: FleetNodeView }) {
     };
 
     return (
-        <section className="flex items-start justify-between gap-4" data-testid="fleet-preview-browser-switch">
+        <section
+            className="flex items-start justify-between gap-4"
+            data-testid="fleet-preview-browser-switch"
+        >
             <div>
                 <h3 className="text-sm font-semibold">{t('title')}</h3>
                 <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('body')}</p>

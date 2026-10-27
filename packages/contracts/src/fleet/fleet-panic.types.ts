@@ -312,7 +312,41 @@ export type FleetAuditAction =
 	| 'node.runner.restart'
 	| 'node.runner.remove'
 	/** A whole GitHub workflow run cancelled from the Actions jobs panel (P2, R-37) — the run as `target`. */
-	| 'node.runner.job.cancel';
+	| 'node.runner.job.cancel'
+	/**
+	 * Desktop view & control (FL-07, CONTRACTS §7) — Desktop-source views only
+	 * (an Agent's browser view keeps writing the `computer.*` names, so nothing
+	 * is audited twice). Every row carries `family: 'desktop'`, the view id as
+	 * `target`, `requestedBy` (`user:<id>` | `agent:<id>`), `confirmationClass`
+	 * and `outcome`, plus `source`, `displayId`, `quality`; never a picture, a
+	 * tile or typed text.
+	 */
+	| 'node.desktop.view'
+	| 'node.desktop.display.set'
+	| 'node.desktop.display.add'
+	| 'node.desktop.display.remove'
+	| 'node.desktop.control.take'
+	| 'node.desktop.control.release'
+	| 'node.desktop.control.request'
+	| 'node.desktop.recording.start'
+	| 'node.desktop.recording.stop'
+	| 'node.desktop.recording.delete'
+	/**
+	 * The native screen helper's admission (FL-07, R-8, FR-16, FR-19, U3) —
+	 * written from the node's heartbeat `helperEvents`, one row per event id.
+	 * Details carry the level, version, `fingerprintPrefix` (8 hex digits —
+	 * never a full hash) and, for `verify-failed`, the reason.
+	 */
+	| 'node.helper.admit'
+	| 'node.helper.revoke'
+	| 'node.helper.verify-failed'
+	/**
+	 * The owner allowed or withdrew control of the desktop ON the machine
+	 * (FL-07 P2, `ever-works-node helper control allow|deny`) — written from the
+	 * heartbeat's `helperEvents` like the admission rows.
+	 */
+	| 'node.helper.control-allow'
+	| 'node.helper.control-deny';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
@@ -418,12 +452,28 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.cloud.create',
 	'node.cloud.power',
 	'node.cloud.destroy',
+	// Desktop view & control (FL-07, CONTRACTS §7).
+	'node.desktop.view',
+	'node.desktop.display.set',
+	'node.desktop.display.add',
+	'node.desktop.display.remove',
+	'node.desktop.control.take',
+	'node.desktop.control.release',
+	'node.desktop.control.request',
+	'node.desktop.recording.start',
+	'node.desktop.recording.stop',
+	'node.desktop.recording.delete',
+	'node.helper.admit',
+	'node.helper.revoke',
+	'node.helper.verify-failed',
 	'node.runner.install',
 	'node.runner.start',
 	'node.runner.stop',
 	'node.runner.restart',
 	'node.runner.remove',
-	'node.runner.job.cancel'
+	'node.runner.job.cancel',
+	'node.helper.control-allow',
+	'node.helper.control-deny'
 ];
 
 /**

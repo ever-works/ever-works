@@ -22,7 +22,13 @@ const PROVIDER_NAMES: Readonly<Record<string, string>> = {
  * routes it). Renders nothing for every other source type. Every value is
  * rendered as TEXT.
  */
-export function InboxSessionSource({ item, compact = false }: { item: InboxItem; compact?: boolean }) {
+export function InboxSessionSource({
+    item,
+    compact = false,
+}: {
+    item: InboxItem;
+    compact?: boolean;
+}) {
     const t = useTranslations('dashboard.inbox');
     if (!isSessionAttention(item)) return null;
     if (compact) {
@@ -47,7 +53,9 @@ export function InboxSessionSource({ item, compact = false }: { item: InboxItem;
             <span className={BADGE_CLASS} data-testid="inbox-session-source-badge">
                 {t('sessionSource.badge')}
             </span>
-            {parts.length > 0 && <span data-testid="inbox-session-source-provenance">{parts.join(' · ')}</span>}
+            {parts.length > 0 && (
+                <span data-testid="inbox-session-source-provenance">{parts.join(' · ')}</span>
+            )}
             {sessionId && (
                 <Link
                     href={ROUTES.DASHBOARD_FLEET_SESSION(sessionId)}

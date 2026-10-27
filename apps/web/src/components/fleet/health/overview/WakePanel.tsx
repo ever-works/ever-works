@@ -37,7 +37,8 @@ export interface WakePanelProps {
 // Module-level, so the defaults keep one identity across renders: the timer
 // cleanup below runs only on unmount, never because a parent re-rendered.
 const defaultSetTimer = (callback: () => void, ms: number): unknown => setTimeout(callback, ms);
-const defaultClearTimer = (handle: unknown): void => clearTimeout(handle as ReturnType<typeof setTimeout>);
+const defaultClearTimer = (handle: unknown): void =>
+    clearTimeout(handle as ReturnType<typeof setTimeout>);
 
 /**
  * Where a wake is:
@@ -141,7 +142,10 @@ export function WakePanel({
         }
         setVia(result.data.via.name);
         setPhase('listening');
-        const checkpoints = result.data.checkAfterMs.length > 0 ? result.data.checkAfterMs : FLEET_WAKE_CHECK_AFTER_MS;
+        const checkpoints =
+            result.data.checkAfterMs.length > 0
+                ? result.data.checkAfterMs
+                : FLEET_WAKE_CHECK_AFTER_MS;
         checkpoints.forEach((ms, index) => {
             timers.current.push(setTimer(() => void check(index === checkpoints.length - 1), ms));
         });
@@ -223,7 +227,9 @@ export function WakePanel({
             {lastAttempt && phase === 'idle' ? (
                 <span className="text-xs text-text-muted dark:text-text-muted-dark">
                     {t('lastAttempt', {
-                        relative: tHealth(`relative.${lastAttempt.unit}`, { value: lastAttempt.value }),
+                        relative: tHealth(`relative.${lastAttempt.unit}`, {
+                            value: lastAttempt.value,
+                        }),
                     })}
                 </span>
             ) : null}

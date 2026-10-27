@@ -21,6 +21,11 @@
 import type { AppLimitRangeInput, AppQuotaInput } from '@ever-works/plugin';
 
 import { DisabledAppsTierPolicy } from '../app-runtime/default-ports';
+import {
+    APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON,
+    type AppsTierEligibilityAnswer,
+    type AppsTierEligibilitySource,
+} from './apps-tier-eligibility.port';
 import { AppPortUnavailableError, type AppsTierPolicy } from '../app-runtime/ports';
 import { isAppClusterWorkerContext } from '../app-runtime/worker-context';
 
@@ -81,7 +86,22 @@ const MANAGED_LIMIT_RANGE: AppLimitRangeInput = {
 export class ConfigAppsTierPolicy implements AppsTierPolicy {
     private readonly closed = new DisabledAppsTierPolicy();
 
-    constructor(private readonly env: NodeJS.ProcessEnv = process.env) {}
+    /**
+     * @param eligibilitySource lane aw-safety (2026-10-26, APW-10 T27 / APW-06 T45) — the facts behind
+     *   {@link eligibility} once the tier is open (`AppsTierEligibilityService` in the API, its proxy in
+     *   the worker). **Omitted** keeps the pre-2026-10-26 lean answer (unit specs, lean contexts);
+     *   every production binding passes the source it resolved or an explicit `null`, and `null`
+     *   FAILS CLOSED — an open tier must never mean "unlimited, for anyone".
+     * @param options.onSourceFailure what a THROWING source answers: `refuse` (the default, the API —
+     *   the authoritative gate) or `admit` (the isolated worker's re-check only, so an API/worker
+     *   rollout skew — "Unknown remote target" — cannot refuse every managed Deployment that the API
+     *   already admitted).
+     */
+    constructor(
+        private readonly env: NodeJS.ProcessEnv = process.env,
+        private readonly eligibilitySource?: AppsTierEligibilitySource | null,
+        private readonly options: { onSourceFailure?: 'refuse' | 'admit' } = {},
+    ) {}
 
     isOpen(): boolean {
         return this.env[APPS_MANAGED_ENABLED_ENV] === 'true';
@@ -148,9 +168,43 @@ export class ConfigAppsTierPolicy implements AppsTierPolicy {
         };
     }
 
-    async eligibility(userId: string): Promise<{ eligible: boolean; reasons: string[] }> {
+    async eligibility(
+        userId: string,
+        opts?: { workId?: string | null },
+    ): Promise<AppsTierEligibilityAnswer> {
         if (!this.isOpen()) return this.closed.eligibility(userId);
-        return { eligible: true, reasons: [] };
+        // Constructed without a source (a unit spec, a lean context): the original lean answer.
+        if (this.eligibilitySource === undefined) return { eligible: true, reasons: [] };
+        if (!this.eligibilitySource || typeof this.eligibilitySource.evaluate !== 'function') {
+            return { eligible: false, reasons: [APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON] };
+        }
+
+        try {
+            const workId = typeof opts?.workId === 'string' && opts.workId ? opts.workId : null;
+            const answer = await this.eligibilitySource.evaluate(userId, workId ? { workId } : {});
+            if (!answer || typeof answer.eligible !== 'boolean') {
+                return this.sourceFailed();
+            }
+            const out: AppsTierEligibilityAnswer = {
+                eligible: answer.eligible === true,
+                reasons: Array.isArray(answer.reasons) ? answer.reasons.map((r) => String(r)) : [],
+            };
+            if (Array.isArray(answer.counted)) out.counted = answer.counted.map((n) => String(n));
+            if (typeof answer.max === 'number') out.max = answer.max;
+            if (answer.paidPlanAllowsMore === true) out.paidPlanAllowsMore = true;
+            if (!out.eligible && out.reasons.length === 0) {
+                out.reasons.push(APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON);
+            }
+            return out;
+        } catch {
+            return this.sourceFailed();
+        }
+    }
+
+    private sourceFailed(): AppsTierEligibilityAnswer {
+        return this.options.onSourceFailure === 'admit'
+            ? { eligible: true, reasons: [] }
+            : { eligible: false, reasons: [APPS_TIER_ELIGIBILITY_UNAVAILABLE_REASON] };
     }
 }
 

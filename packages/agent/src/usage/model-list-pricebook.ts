@@ -1,4 +1,8 @@
-import type { ModelListPriceEntry, ModelListPriceListVersion } from '@ever-works/contracts';
+import type {
+    FleetUsageTokens,
+    ModelListPriceEntry,
+    ModelListPriceListVersion,
+} from '@ever-works/contracts';
 
 /**
  * Usage & cost on the fleet (FL-20, CONTRACTS R-30) — the PUBLISHED, versioned
@@ -21,6 +25,26 @@ import type { ModelListPriceEntry, ModelListPriceListVersion } from '@ever-works
  * Codex CLIs run, at the providers' published pay-as-you-go rates as of that
  * date (cache write = the 5-minute cache tier). Owner question 1 in the FL-20
  * lane log asks for a check before the flag is switched on anywhere.
+ *
+ * v2 (2026-10-27) is v1 checked against the vendors' live public pricing pages
+ * on 2026-10-27 (the owner's condition for switching the flag on). One rate
+ * differed and is corrected (`MODEL_LIST_PRICEBOOK_V2_CORRECTIONS`); every other listed rate matched.
+ * Pages read 2026-10-27:
+ *
+ *  - Claude: https://platform.claude.com/docs/en/about-claude/pricing (full
+ *    table and the prompt-caching multipliers: 5-minute write = 1.25 x input for
+ *    every model) and https://claude.com/pricing (www.anthropic.com/pricing
+ *    redirects there); retirements from
+ *    https://platform.claude.com/docs/en/about-claude/model-deprecations.
+ *  - OpenAI (Standard tier): https://developers.openai.com/api/docs/pricing
+ *    (platform.openai.com/docs/pricing redirects there), and the per-model pages
+ *    https://developers.openai.com/api/docs/models/<id> for the Codex ids the
+ *    pricing page no longer lists.
+ *
+ * The per-model source, date and status table is in
+ * `docs/internal/fleet/lanes/FL-20.md` (decision 20). Claude 3.x Sonnet / Haiku /
+ * Opus are retired and absent from the page: their v1 rates are kept and marked
+ * unverified there.
  */
 
 const claude = (
@@ -94,9 +118,42 @@ const V1: ModelListPriceListVersion = Object.freeze({
     ]) as readonly ModelListPriceEntry[],
 });
 
-/** Every published version, by number. Append-only. */
-export const MODEL_LIST_PRICEBOOK_HISTORY: Readonly<Record<number, Readonly<ModelListPriceListVersion>>> =
-    Object.freeze({ 1: V1 });
+/**
+ * v2's corrections to v1, per family, each read on the vendor's own pricing page
+ * on 2026-10-27. Everything not named here is v1's rate, verified unchanged.
+ *
+ *  - claude-sonnet-5-5 cache read: $0.10, not $0.20 — "On Claude Opus 5.5 and
+ *    Claude Sonnet 5.5, a cache hit costs 5% of the standard input price ($0.20
+ *    USD per million tokens on Claude Opus 5.5, $0.10 USD on Claude Sonnet 5.5)"
+ *    (https://platform.claude.com/docs/en/about-claude/pricing).
+ */
+export const MODEL_LIST_PRICEBOOK_V2_CORRECTIONS: Readonly<
+    Record<string, Partial<FleetUsageTokens>>
+> = Object.freeze({
+    'claude-sonnet-5-5': Object.freeze({ cacheRead: 0.1 }),
+});
 
-/** The version new figures are priced at. */
-export const MODEL_LIST_PRICEBOOK_VERSION = 1;
+const V2: ModelListPriceListVersion = Object.freeze({
+    version: 2,
+    effectiveFrom: '2026-10-27',
+    entries: Object.freeze(
+        V1.entries.map(
+            (entry): ModelListPriceEntry => ({
+                ...entry,
+                match: [...entry.match],
+                perMillionUsd: {
+                    ...entry.perMillionUsd,
+                    ...MODEL_LIST_PRICEBOOK_V2_CORRECTIONS[entry.model],
+                },
+            }),
+        ),
+    ) as readonly ModelListPriceEntry[],
+});
+
+/** Every published version, by number. Append-only. */
+export const MODEL_LIST_PRICEBOOK_HISTORY: Readonly<
+    Record<number, Readonly<ModelListPriceListVersion>>
+> = Object.freeze({ 1: V1, 2: V2 });
+
+/** The version new figures are priced at (v2: v1 verified against the vendors' pages, 2026-10-27). */
+export const MODEL_LIST_PRICEBOOK_VERSION = 2;

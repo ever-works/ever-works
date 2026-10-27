@@ -12,9 +12,19 @@ export type ScheduleSourceType =
     | 'data_sync'
     | 'inbound_trigger'
     /** Schedules on computers (FL-13): a Command scheduled on one of the person's computers. */
-    | 'node_schedule';
+    | 'node_schedule'
+    /** APW-02 T53: an App Work's upstream sync (read only; Sync now is on the Upstream tab). */
+    | 'app_upstream_sync';
 
-export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger' | 'node';
+export type ScheduleOwnerType =
+    | 'task'
+    | 'agent'
+    | 'work'
+    | 'mission'
+    | 'trigger'
+    | 'node'
+    /** APW-02 T53. */
+    | 'app_work';
 
 export type ScheduleStatus = 'active' | 'paused' | 'disabled' | 'error' | 'ended';
 
@@ -234,12 +244,18 @@ export const schedulesAPI = {
     getHealth: async (): Promise<ScheduleHealthSummary> =>
         serverFetch<ScheduleHealthSummary>('/schedules/health'),
 
-    runNow: async (id: string, options: { confirm?: boolean } = {}): Promise<ScheduleRunNowResult> =>
+    runNow: async (
+        id: string,
+        options: { confirm?: boolean } = {},
+    ): Promise<ScheduleRunNowResult> =>
         serverFetch<ScheduleRunNowResult>(`/schedules/${encodeURIComponent(id)}/run-now`, {
             method: 'POST',
             // FL-13: a Command schedule on a computer runs only with `confirm` (FR-25).
             ...(options.confirm
-                ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) }
+                ? {
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ confirm: true }),
+                  }
                 : {}),
         }),
 

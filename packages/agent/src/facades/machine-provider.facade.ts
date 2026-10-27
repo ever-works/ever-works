@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     IMachineProviderPlugin,
     MachineProviderCreateInput,
@@ -7,7 +7,13 @@ import type {
     MachineProviderOptions,
     MachineProviderUsage,
 } from '@ever-works/plugin';
-import { isMachineProviderError, PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import {
+    isMachineProviderError,
+    PLUGIN_CAPABILITIES,
+    type PluginSettings,
+} from '@ever-works/plugin';
+import { AuthAccountRepository } from '../database/repositories/auth-account.repository';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { BaseFacadeService, FacadeError } from './base.facade';
@@ -54,8 +60,50 @@ export class MachineProviderFacadeService extends BaseFacadeService {
     protected readonly logger = new Logger(MachineProviderFacadeService.name);
     protected readonly CAPABILITY = PLUGIN_CAPABILITIES.MACHINE_PROVIDER;
 
-    constructor(registry: PluginRegistryService, settingsService: PluginSettingsService) {
+    constructor(
+        registry: PluginRegistryService,
+        settingsService: PluginSettingsService,
+        // P3 (spec FR-31): the owner's completed "Sign in with <provider>" (the
+        // `plugin:<id>` account row). Appended LAST + @Optional(): absent, only a
+        // saved API token configures a provider — today's behaviour.
+        @Optional() private readonly authAccounts?: AuthAccountRepository,
+    ) {
         super(registry, settingsService);
+    }
+
+    /**
+     * The settings one call runs with: the 4-level resolved plugin settings,
+     * plus — when the owner signed in with the provider and that sign-in has not
+     * expired — its access token as `oauthAccessToken` (P3, spec FR-31). The
+     * plugin prefers a saved `apiToken`. Never logged.
+     */
+    private async callSettings(pluginId: string, userId: string): Promise<PluginSettings> {
+        const settings = ((await this.getResolvedSettings(pluginId, { userId })) ??
+            {}) as PluginSettings;
+        if (!this.authAccounts || !userId) return settings;
+        try {
+            const account = await this.authAccounts.findConnectedProviderAccount(userId, pluginId, {
+                usePluginProviderId: true,
+            });
+            const token = account?.accessToken;
+            if (typeof token === 'string' && token.length > 0)
+                return { ...settings, oauthAccessToken: token };
+        } catch (error) {
+            this.logger.debug(
+                `machine provider ${pluginId}: the sign-in could not be read: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+        return settings;
+    }
+
+    /** Whether the LIVE plugin advertises `oauth` (its env-gated getter), not the cold manifest list. */
+    private async liveOAuth(plugin: unknown): Promise<boolean> {
+        try {
+            const live = (await materializePlugin(plugin)) as { capabilities?: readonly string[] };
+            return (live.capabilities ?? []).includes(PLUGIN_CAPABILITIES.OAUTH);
+        } catch {
+            return false;
+        }
     }
 
     /** Every machine provider enabled for the owner, with whether it is configured (spec FR-2). */
@@ -66,8 +114,11 @@ export class MachineProviderFacadeService extends BaseFacadeService {
             const plugin = registered.plugin as IMachineProviderPlugin;
             let configured = false;
             try {
-                const settings = await this.getResolvedSettings(plugin.id, { userId });
-                configured = typeof plugin.isConfigured === 'function' ? plugin.isConfigured(settings) : false;
+                const settings = await this.callSettings(plugin.id, userId);
+                configured =
+                    typeof plugin.isConfigured === 'function'
+                        ? plugin.isConfigured(settings)
+                        : false;
             } catch (error) {
                 this.logger.debug(
                     `machine provider ${plugin.id}: settings could not be read: ${error instanceof Error ? error.message : String(error)}`,
@@ -78,7 +129,9 @@ export class MachineProviderFacadeService extends BaseFacadeService {
                 name: registered.manifest.name ?? plugin.id,
                 providerName: this.providerNameOf(plugin),
                 configured,
-                oauthAvailable: (plugin.capabilities ?? []).includes(PLUGIN_CAPABILITIES.OAUTH),
+                // P3: the live instance's env-gated capability — the manifest lists `oauth`
+                // for the registry's index even where the operator registered no application.
+                oauthAvailable: await this.liveOAuth(registered.plugin),
             });
         }
         return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -95,7 +148,7 @@ export class MachineProviderFacadeService extends BaseFacadeService {
 
     async listOptions(pluginId: string, userId: string): Promise<MachineProviderOptions> {
         const plugin = await this.resolveProvider(pluginId, userId);
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             return await plugin.listOptions(settings);
         } catch (error) {
@@ -109,7 +162,7 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         input: MachineProviderCreateInput,
     ): Promise<MachineProviderCreateResult> {
         const plugin = await this.resolveProvider(pluginId, userId);
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             return await plugin.create(input, settings);
         } catch (error) {
@@ -117,9 +170,14 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    async power(pluginId: string, userId: string, machineRef: string, action: 'on' | 'off'): Promise<void> {
+    async power(
+        pluginId: string,
+        userId: string,
+        machineRef: string,
+        action: 'on' | 'off',
+    ): Promise<void> {
         const plugin = await this.resolveProvider(pluginId, userId);
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             await plugin.power(machineRef, action, settings);
         } catch (error) {
@@ -129,7 +187,7 @@ export class MachineProviderFacadeService extends BaseFacadeService {
 
     async destroy(pluginId: string, userId: string, machineRef: string): Promise<void> {
         const plugin = await this.resolveProvider(pluginId, userId);
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             await plugin.destroy(machineRef, settings);
         } catch (error) {
@@ -137,9 +195,13 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    async getMachine(pluginId: string, userId: string, machineRef: string): Promise<MachineProviderMachine> {
+    async getMachine(
+        pluginId: string,
+        userId: string,
+        machineRef: string,
+    ): Promise<MachineProviderMachine> {
         const plugin = await this.resolveProvider(pluginId, userId);
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             return await plugin.getMachine(machineRef, settings);
         } catch (error) {
@@ -147,9 +209,13 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    async listTagged(pluginId: string, userId: string, tag: string): Promise<MachineProviderMachine[]> {
+    async listTagged(
+        pluginId: string,
+        userId: string,
+        tag: string,
+    ): Promise<MachineProviderMachine[]> {
         const plugin = await this.resolveProvider(pluginId, userId);
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             return await plugin.listTagged(tag, settings);
         } catch (error) {
@@ -158,10 +224,14 @@ export class MachineProviderFacadeService extends BaseFacadeService {
     }
 
     /** The provider's own month-to-date figure, or null when the plugin cannot read one (P2). */
-    async usage(pluginId: string, userId: string, machineRefs: readonly string[]): Promise<MachineProviderUsage | null> {
+    async usage(
+        pluginId: string,
+        userId: string,
+        machineRefs: readonly string[],
+    ): Promise<MachineProviderUsage | null> {
         const plugin = await this.resolveProvider(pluginId, userId);
         if (typeof plugin.usage !== 'function') return null;
-        const settings = await this.getResolvedSettings(plugin.id, { userId });
+        const settings = await this.callSettings(plugin.id, userId);
         try {
             return await plugin.usage(machineRefs, settings);
         } catch (error) {
@@ -169,7 +239,10 @@ export class MachineProviderFacadeService extends BaseFacadeService {
         }
     }
 
-    private async resolveProvider(pluginId: string, userId: string): Promise<IMachineProviderPlugin> {
+    private async resolveProvider(
+        pluginId: string,
+        userId: string,
+    ): Promise<IMachineProviderPlugin> {
         // An explicit pluginId behaves like a provider override: it must be a
         // loaded `machine-provider` plugin enabled for the owner, else
         // ProviderNotFoundError (the service turns that into "the plugin is

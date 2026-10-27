@@ -46,16 +46,24 @@ function nodeRead(
 // ── logs (FL-08) ──
 
 const logsRead = new Command('read')
-    .description(`Read the newest lines (at most ${FLEET_LOGS_INITIAL_LINES}) of one log source, secret-scanned on the machine`)
+    .description(
+        `Read the newest lines (at most ${FLEET_LOGS_INITIAL_LINES}) of one log source, secret-scanned on the machine`,
+    )
     .requiredOption('--on <computer>', 'The computer (id or name)')
-    .requiredOption('--source <id>', 'A source id from `fleet logs sources` (e.g. service:nginx.service)')
+    .requiredOption(
+        '--source <id>',
+        'A source id from `fleet logs sources` (e.g. service:nginx.service)',
+    )
     .option('--lines <n>', `How many of the newest lines (1–${FLEET_LOGS_INITIAL_LINES})`)
     .option('--filter <text>', 'Keep only lines containing this text')
     .option('--json', 'Machine-readable output')
     .action(async (options: JsonOption & { source: string; lines?: string; filter?: string }) => {
         const json = options.json === true;
         const lines = options.lines === undefined ? undefined : Number(options.lines);
-        if (lines !== undefined && (!Number.isInteger(lines) || lines < 1 || lines > FLEET_LOGS_INITIAL_LINES)) {
+        if (
+            lines !== undefined &&
+            (!Number.isInteger(lines) || lines < 1 || lines > FLEET_LOGS_INITIAL_LINES)
+        ) {
             fleetUsage(json, `--lines is 1–${FLEET_LOGS_INITIAL_LINES}`, 'lines');
         }
         const nodeId = await resolveFleetNodeId(json, options.on);
@@ -73,7 +81,8 @@ const logsRead = new Command('read')
             (result) => {
                 const out = result.lines ?? [];
                 if (out.length === 0) console.log(chalk.yellow('No lines.'));
-                for (const line of out) console.log(typeof line === 'string' ? line : (line.text ?? ''));
+                for (const line of out)
+                    console.log(typeof line === 'string' ? line : (line.text ?? ''));
             },
         );
     });

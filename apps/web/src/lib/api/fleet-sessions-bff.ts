@@ -27,7 +27,12 @@ import { isUuid } from './computer-bff';
  * their hints instead of a generic failure.
  */
 
-export { isUuid, invalidIdResponse, readJsonBody, forwardComputerCall as forwardFleetCall } from './computer-bff';
+export {
+    isUuid,
+    invalidIdResponse,
+    readJsonBody,
+    forwardComputerCall as forwardFleetCall,
+} from './computer-bff';
 
 /** `${API_URL}/fleet<path>` — the platform's Fleet controller (`api/fleet`). */
 export function fleetApiUrl(path: string): string {
@@ -87,7 +92,9 @@ export function sanitizeRenameBody(raw: Record<string, unknown>): { title?: stri
  * FL-05: the PATCH body — a rename (`title`) or an acknowledgement (`acknowledge`,
  * an attention key the reader saw); a title wins when both are sent.
  */
-export function sanitizePatchBody(raw: Record<string, unknown>): { title?: string } | { acknowledge: string } {
+export function sanitizePatchBody(
+    raw: Record<string, unknown>,
+): { title?: string } | { acknowledge: string } {
     const renamed = sanitizeRenameBody(raw);
     if (renamed.title !== undefined) return renamed;
     const key = text(raw.acknowledge, 200);
@@ -102,15 +109,22 @@ const ANSWER_SOURCES = ['card', 'detail', 'inbox', 'decisions'] as const;
  * (the route answers 400). The text is passed through as typed: it goes into
  * the session and is never stored.
  */
-export function sanitizeAnswerBody(
-    raw: Record<string, unknown>,
-): { key: string; optionId?: string; text?: string; source?: (typeof ANSWER_SOURCES)[number] } | null {
+export function sanitizeAnswerBody(raw: Record<string, unknown>): {
+    key: string;
+    optionId?: string;
+    text?: string;
+    source?: (typeof ANSWER_SOURCES)[number];
+} | null {
     const key = text(raw.key, 200);
     if (key === undefined) return null;
     const optionId =
-        typeof raw.optionId === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(raw.optionId) ? raw.optionId : undefined;
+        typeof raw.optionId === 'string' && /^[A-Za-z0-9._-]{1,64}$/.test(raw.optionId)
+            ? raw.optionId
+            : undefined;
     const answerText =
-        typeof raw.text === 'string' && raw.text.trim().length > 0 && raw.text.length <= FLEET_SESSION_ANSWER_TEXT_MAX_CHARS
+        typeof raw.text === 'string' &&
+        raw.text.trim().length > 0 &&
+        raw.text.length <= FLEET_SESSION_ANSWER_TEXT_MAX_CHARS
             ? raw.text
             : undefined;
     if ((optionId === undefined) === (answerText === undefined)) return null;
@@ -131,7 +145,10 @@ export function sanitizeEndBody(raw: Record<string, unknown>): { confirm?: true 
 }
 
 /** The restart body: only a terminal size survives. */
-export function sanitizeRestartBody(raw: Record<string, unknown>): { cols?: number; rows?: number } {
+export function sanitizeRestartBody(raw: Record<string, unknown>): {
+    cols?: number;
+    rows?: number;
+} {
     return size(raw);
 }
 
@@ -175,7 +192,8 @@ export function sanitizeListQuery(params: URLSearchParams): string {
     const limit = Number(params.get('limit'));
     if (Number.isInteger(limit) && limit >= 1 && limit <= 200) out.set('limit', String(limit));
     const cursor = params.get('cursor');
-    if (cursor && cursor.length <= 120 && /^[A-Za-z0-9:.|_-]+$/.test(cursor)) out.set('cursor', cursor);
+    if (cursor && cursor.length <= 120 && /^[A-Za-z0-9:.|_-]+$/.test(cursor))
+        out.set('cursor', cursor);
     const query = out.toString();
     return query ? `?${query}` : '';
 }

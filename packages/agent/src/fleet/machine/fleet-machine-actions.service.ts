@@ -45,7 +45,11 @@ import {
 import { config } from '../../config';
 import { FleetAuditService } from '../fleet-audit.service';
 import { FleetSessionService } from '../sessions/fleet-session.service';
-import { fleetMachineError, FleetMachineException, readFleetMachineError } from './fleet-machine.errors';
+import {
+    fleetMachineError,
+    FleetMachineException,
+    readFleetMachineError,
+} from './fleet-machine.errors';
 import {
     describeFleetMachineCaller,
     FLEET_MACHINE_NODE_PORT,
@@ -191,7 +195,10 @@ export class FleetMachineActionsService {
                       : `${verbWord} ${input.name} on ${machine}?`,
             params,
             fields: input.fields,
-            auditDetails: { scope: params.scope, ...(params.manager ? { manager: params.manager } : {}) },
+            auditDetails: {
+                scope: params.scope,
+                ...(params.manager ? { manager: params.manager } : {}),
+            },
         });
     }
 
@@ -233,7 +240,10 @@ export class FleetMachineActionsService {
 
     // ─── Docker (P2) ───────────────────────────────────────────────────────
 
-    async listContainers(nodeId: string, caller: FleetMachineCaller): Promise<FleetContainersListResult> {
+    async listContainers(
+        nodeId: string,
+        caller: FleetMachineCaller,
+    ): Promise<FleetContainersListResult> {
         return this.list<FleetContainersListResult>(nodeId, caller, 'docker.containers', {});
     }
 
@@ -249,7 +259,11 @@ export class FleetMachineActionsService {
     async containerAction(
         nodeId: string,
         caller: FleetMachineCaller,
-        input: { container: string; action: FleetContainerAction; fields?: FleetActionConfirmFields | null },
+        input: {
+            container: string;
+            action: FleetContainerAction;
+            fields?: FleetActionConfirmFields | null;
+        },
     ): Promise<Record<string, unknown> | FleetOperationRef> {
         let name = input.container;
         if (input.action === 'remove') {
@@ -257,7 +271,11 @@ export class FleetMachineActionsService {
             const found = listed.containers.find(
                 (row) => row.id === input.container.slice(0, 12) || row.name === input.container,
             );
-            if (!found) throw fleetMachineError('not_found', `${input.container} is not a container on this computer`);
+            if (!found)
+                throw fleetMachineError(
+                    'not_found',
+                    `${input.container} is not a container on this computer`,
+                );
             name = found.name;
         }
         const verbWord = `${input.action[0].toUpperCase()}${input.action.slice(1)}`;
@@ -302,7 +320,8 @@ export class FleetMachineActionsService {
             auditAction: 'node.docker.container.run',
             target: request.name ?? request.image,
             baseClass: 'confirm',
-            summary: (machine) => `Run ${request.image}${request.name ? ` as ${request.name}` : ''} on ${machine}?`,
+            summary: (machine) =>
+                `Run ${request.image}${request.name ? ` as ${request.name}` : ''} on ${machine}?`,
             preview: fleetRunPreview(request),
             params: { request },
             fields: input.fields,
@@ -310,7 +329,9 @@ export class FleetMachineActionsService {
             auditDetails: {
                 image: request.image,
                 ...(request.name ? { name: request.name } : {}),
-                ports: request.ports.map((port) => `${port.host}:${port.container}/${port.proto ?? 'tcp'}`),
+                ports: request.ports.map(
+                    (port) => `${port.host}:${port.container}/${port.proto ?? 'tcp'}`,
+                ),
                 envVarNames: request.env.map((variable) => variable.name),
                 volumeTargets: request.volumes.map((volume) => volume.target),
                 restart: request.restart,
@@ -381,7 +402,10 @@ export class FleetMachineActionsService {
 
     // ─── Compose and Shell inside (P3) ─────────────────────────────────────
 
-    async listComposeProjects(nodeId: string, caller: FleetMachineCaller): Promise<FleetComposeListResult> {
+    async listComposeProjects(
+        nodeId: string,
+        caller: FleetMachineCaller,
+    ): Promise<FleetComposeListResult> {
         return this.list<FleetComposeListResult>(nodeId, caller, 'compose.list', {});
     }
 
@@ -397,7 +421,12 @@ export class FleetMachineActionsService {
     async composeAction(
         nodeId: string,
         caller: FleetMachineCaller,
-        input: { project: string; action: FleetComposeAction; service?: string; fields?: FleetActionConfirmFields | null },
+        input: {
+            project: string;
+            action: FleetComposeAction;
+            service?: string;
+            fields?: FleetActionConfirmFields | null;
+        },
     ): Promise<Record<string, unknown> | FleetOperationRef> {
         const what = input.service ? `${input.service} of ${input.project}` : input.project;
         return this.act<Record<string, unknown>>({
@@ -416,10 +445,17 @@ export class FleetMachineActionsService {
                       : input.action === 'restart'
                         ? `Restart ${what} on ${machine}?`
                         : `Pull the images of ${what} on ${machine}?`,
-            params: { project: input.project, action: input.action, ...(input.service ? { service: input.service } : {}) },
+            params: {
+                project: input.project,
+                action: input.action,
+                ...(input.service ? { service: input.service } : {}),
+            },
             fields: input.fields,
             awaitOperationMs: 0,
-            auditDetails: { project: input.project, ...(input.service ? { service: input.service } : {}) },
+            auditDetails: {
+                project: input.project,
+                ...(input.service ? { service: input.service } : {}),
+            },
         });
     }
 
@@ -428,7 +464,9 @@ export class FleetMachineActionsService {
         caller: FleetMachineCaller,
         container: string,
     ): Promise<FleetContainerShellsResult> {
-        return this.list<FleetContainerShellsResult>(nodeId, caller, 'docker.container.shells', { id: container });
+        return this.list<FleetContainerShellsResult>(nodeId, caller, 'docker.container.shells', {
+            id: container,
+        });
     }
 
     /**
@@ -464,7 +502,10 @@ export class FleetMachineActionsService {
                 throw fleetMachineError('invalid', 'shell must be bash or sh', { field: 'shell' });
             }
             if (!this.sessions || !config.fleet.isSessionsEnabled()) {
-                throw fleetMachineError('unsupported_on_node', 'sessions on computers are switched off on this deployment');
+                throw fleetMachineError(
+                    'unsupported_on_node',
+                    'sessions on computers are switched off on this deployment',
+                );
             }
             facts = await port.authorize({
                 nodeId,
@@ -478,8 +519,13 @@ export class FleetMachineActionsService {
             const found = listed.containers.find(
                 (row) => row.id === input.container.slice(0, 12) || row.name === input.container,
             );
-            if (!found) throw fleetMachineError('not_found', `${input.container} is not a container on ${facts.name}`);
-            if (found.state !== 'running') throw fleetMachineError('busy', `${found.name} is not running; start it first`);
+            if (!found)
+                throw fleetMachineError(
+                    'not_found',
+                    `${input.container} is not a container on ${facts.name}`,
+                );
+            if (found.state !== 'running')
+                throw fleetMachineError('busy', `${found.name} is not running; start it first`);
             const session = await this.sessions.start(
                 nodeId,
                 { userId: caller.userId },
@@ -502,7 +548,8 @@ export class FleetMachineActionsService {
         } catch (error) {
             const refusal = readFleetMachineError(error);
             if (refusal && refusal.code !== 'not_found') {
-                const owner = facts ?? (port.describe ? await port.describe(nodeId).catch(() => null) : null);
+                const owner =
+                    facts ?? (port.describe ? await port.describe(nodeId).catch(() => null) : null);
                 await this.record(spec, owner, {
                     requestedBy,
                     confirmationClass: 'plain',
@@ -536,9 +583,13 @@ export class FleetMachineActionsService {
         if ('operationId' in reply && reply.operationId) {
             // A list never outlives the inline window on a healthy node; one that
             // did is reported as busy rather than handing a read an operation id.
-            throw fleetMachineError('busy', 'the computer is still reading this; try again in a moment', {
-                operationId: reply.operationId,
-            });
+            throw fleetMachineError(
+                'busy',
+                'the computer is still reading this; try again in a moment',
+                {
+                    operationId: reply.operationId,
+                },
+            );
         }
         return reply.result as T;
     }
@@ -560,7 +611,9 @@ export class FleetMachineActionsService {
         } catch (error) {
             const refusal = readFleetMachineError(error);
             if (refusal && refusal.code !== 'not_found') {
-                const owner = port.describe ? await port.describe(spec.nodeId).catch(() => null) : null;
+                const owner = port.describe
+                    ? await port.describe(spec.nodeId).catch(() => null)
+                    : null;
                 await this.record(spec, owner, {
                     requestedBy,
                     confirmationClass: spec.baseClass,
@@ -580,7 +633,9 @@ export class FleetMachineActionsService {
             const details: FleetConfirmationRequiredDetails = {
                 class: missing,
                 summary: spec.summary(facts.name),
-                ...(missing === 'confirm-destructive' ? { target: spec.confirmTarget ?? spec.target } : {}),
+                ...(missing === 'confirm-destructive'
+                    ? { target: spec.confirmTarget ?? spec.target }
+                    : {}),
                 ...(spec.preview ? { preview: spec.preview } : {}),
             };
             throw fleetMachineError(
@@ -619,7 +674,8 @@ export class FleetMachineActionsService {
                     summary: spec.summary(facts.name),
                 });
             }
-            const known = refusal ?? makeFleetLinkError('internal', 'the computer could not be reached');
+            const known =
+                refusal ?? makeFleetLinkError('internal', 'the computer could not be reached');
             await this.record(spec, facts, {
                 requestedBy,
                 confirmationClass: spec.baseClass,
@@ -658,7 +714,8 @@ export class FleetMachineActionsService {
     }
 
     private port(): FleetMachineNodePort {
-        if (!this.node) throw fleetMachineError('unreachable', 'this deployment cannot reach computers');
+        if (!this.node)
+            throw fleetMachineError('unreachable', 'this deployment cannot reach computers');
         return this.node;
     }
 

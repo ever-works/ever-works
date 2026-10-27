@@ -6,8 +6,8 @@
 
 **Feature ID**: `FL-17-cloud-computers`
 **Spec**: [`./spec.md`](./spec.md) · **Plan**: [`./plan.md`](./plan.md)
-**Status**: `Draft` · P1 merged (#2873; T-21 Playwright and the controller spec left for the cascade); P2 built on `feat/fl-17-cost-idle-p2` (#2884) — lane log `docs/internal/fleet/lanes/FL-17.md`
-**Last updated**: 2026-10-26
+**Status**: `Draft` · P1 merged (#2873; T-21 Playwright and the controller spec left for the cascade); P2 merged (#2884); P3 built on `feat/fl-17-signin-p3` (#2902) — lane log `docs/internal/fleet/lanes/FL-17.md`
+**Last updated**: 2026-10-27
 
 ---
 
@@ -218,23 +218,31 @@
 
 # PHASE 3 — Sign-in, presets, reconciliation, CLI
 
-- [ ] **T-28**. OAuth: implement `IOAuthPlugin` members in the plugin (env-gated capability getter as
+- [x] **T-28**. OAuth: implement `IOAuthPlugin` members in the plugin (env-gated capability getter as
       `vercel.plugin.ts:72-74`), admin-scope `oauthClientId/Secret` settings with `x-envVar`; the
       dialog shows **Sign in with the provider** via the existing `connectOAuthProvider` action
       (`apps/web/src/app/actions/dashboard/oauth.ts`) when `oauthAvailable`.
       **Test**: plugin spec — capability absent without env; facade spec — account label from the
       OAuth user.
-- [ ] **T-29**. VPN preset: `vpnAuthKey` accepted at create, passed into the bootstrap only, excluded
+      _Built (P3, #2902): settings are `clientId` / `clientSecret` (what the OAuth service reads — lane decision 23);
+      the facade hands the sign-in token over as `oauthAccessToken` (decision 21); the plugins callback accepts a
+      listed sign-in machine provider (decision 22). `digitalocean-oauth.spec.ts`, `fleet-cloud-p3.service.spec.ts`,
+      `machine-provider-sign-in.unit.spec.ts`._
+- [x] **T-29**. VPN preset: `vpnAuthKey` accepted at create, passed into the bootstrap only, excluded
       from responses/logs; dialog field shown only when the preset is ticked.
       **Test**: bootstrap spec; controller spec (`vpnAuthKey` never echoed, never audited).
-- [ ] **T-30**. Reconcile P3: `listTagged('ever-works')` → unclaimed machines → needs-a-look item with
+      _Built (P3, #2902): needs the operator join command too (decision 24); never echoed / stored / audited is pinned
+      at the service in `fleet-cloud-p3.service.spec.ts` (the controller spec is still open)._
+- [x] **T-30**. Reconcile P3: `listTagged('ever-works')` → unclaimed machines → needs-a-look item with
       Destroy; repair rows missing `providerMachineRef`.
       **Test**: extend `fleet-cloud-reconcile.task.spec.ts`.
-- [ ] **T-31**. CLI `apps/cli/src/commands/fleet/cloud.ts` under FL-19's `fleet` root
+      _Built (P3, #2902): site tag + repair + adoption as an `unclaimed` row (decisions 25, 26), pinned in
+      `fleet-cloud-p3.service.spec.ts` (the task file itself is unchanged)._
+- [x] **T-31**. CLI `apps/cli/src/commands/fleet/cloud.ts` under FL-19's `fleet` root
       (`providers|options|list|create|power|destroy|usage|idle-policy [--json]`; exit 0/1/2).
       **Test**: `apps/cli/src/commands/fleet/__tests__/cloud.spec.ts` — `create` without
       `--acknowledge-price` exits 2; `--json` shapes equal the DTOs.
-- [ ] **T-32**. Write `docs/plugin-system/creating-machine-provider-plugin.md` (contract review for a
+- [x] **T-32**. Write `docs/plugin-system/creating-machine-provider-plugin.md` (contract review for a
       second provider; what `billsWhileOff` and `usage` mean) and link it from the Machine Providers
       section.
       **Test**: docs build clean.

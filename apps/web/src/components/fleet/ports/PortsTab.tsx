@@ -48,7 +48,9 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
     const router = useRouter();
     const params = useSearchParams();
     const selectedPort = Number(params?.get('port') ?? NaN);
-    const { list, error, loading, slow, watch, addWatch, removeWatch, reload } = usePortsLive(node.id);
+    const { list, error, loading, slow, watch, addWatch, removeWatch, reload } = usePortsLive(
+        node.id,
+    );
     const [showOthers, setShowOthers] = useState(false);
     const [showSystem, setShowSystem] = useState(false);
     const [opening, setOpening] = useState<number | null>(null);
@@ -69,7 +71,10 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
         const { stopped, live } = watchedStopped(list, watch, liveWatched.current);
         liveWatched.current = live;
         if (stopped.length === 0) return;
-        setStoppedNotices((current) => [...current.filter((port) => !stopped.includes(port)), ...stopped]);
+        setStoppedNotices((current) => [
+            ...current.filter((port) => !stopped.includes(port)),
+            ...stopped,
+        ]);
         for (const port of stopped) void portsClient.watchStopped(node.id, port);
     }, [list, watch, node.id]);
 
@@ -88,7 +93,8 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
                 toast.success(t('openedDesktop', { url: result.data.url, name: node.name }), {
                     action: {
                         label: t('watchDesktop'),
-                        onClick: () => router.push(ROUTES.DASHBOARD_FLEET_COMPUTER(node.id, 'desktop')),
+                        onClick: () =>
+                            router.push(ROUTES.DASHBOARD_FLEET_COMPUTER(node.id, 'desktop')),
                     },
                 });
                 return;
@@ -118,7 +124,9 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
 
     const header = (
         <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide">{t('title', { name: node.name })}</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide">
+                {t('title', { name: node.name })}
+            </h2>
             <form
                 className="ml-auto flex items-center gap-2"
                 onSubmit={(event) => {
@@ -163,7 +171,9 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
                     <ErrorCard error={error} nodeName={node.name} onRetry={() => void reload()} />
                 ) : (
                     <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {loading && slow ? t('states.slow', { name: node.name }) : t('states.loading', { name: node.name })}
+                        {loading && slow
+                            ? t('states.slow', { name: node.name })
+                            : t('states.loading', { name: node.name })}
                     </p>
                 )}
             </div>
@@ -176,9 +186,18 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
         <div className="space-y-4" data-testid="fleet-ports-tab">
             {header}
             {error && (
-                <ErrorCard error={error} nodeName={node.name} onRetry={() => void reload()} lastKnown />
+                <ErrorCard
+                    error={error}
+                    nodeName={node.name}
+                    onRetry={() => void reload()}
+                    lastKnown
+                />
             )}
-            {!list.canOpen && <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('noOpen', { name: node.name })}</p>}
+            {!list.canOpen && (
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('noOpen', { name: node.name })}
+                </p>
+            )}
 
             {stoppedNotices.map((port) => (
                 <div
@@ -192,7 +211,11 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
                         className="ml-auto"
                         size="sm"
                         variant="ghost"
-                        onClick={() => setStoppedNotices((current) => current.filter((value) => value !== port))}
+                        onClick={() =>
+                            setStoppedNotices((current) =>
+                                current.filter((value) => value !== port),
+                            )
+                        }
                     >
                         {t('dismiss')}
                     </Button>
@@ -212,7 +235,12 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
             {listedPorts === 0 && groups.waiting.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border p-6 text-center text-sm dark:border-border-dark">
                     <p>{t('states.empty', { name: node.name })}</p>
-                    <Button className="mt-3" size="sm" variant="secondary" onClick={() => fieldRef.current?.focus()}>
+                    <Button
+                        className="mt-3"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => fieldRef.current?.focus()}
+                    >
                         {t('openAPort')}
                     </Button>
                 </div>
@@ -314,7 +342,9 @@ export default function PortsTab({ node }: FleetComputerTabProps) {
                 </ul>
             )}
             {watch.length > 0 && groups.waiting.length === 0 && (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('watchLive')}</p>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('watchLive')}
+                </p>
             )}
         </div>
     );
@@ -332,9 +362,11 @@ function ErrorCard({
     lastKnown?: boolean;
 }) {
     const t = useTranslations('fleet.ports.states');
-    const consent = typeof error.details?.consent === 'string' ? (error.details.consent as string) : null;
+    const consent =
+        typeof error.details?.consent === 'string' ? (error.details.consent as string) : null;
     const command =
-        error.code === 'consent_missing' && (consent === 'manage' || consent === 'attend' || consent === 'work')
+        error.code === 'consent_missing' &&
+        (consent === 'manage' || consent === 'attend' || consent === 'work')
             ? FLEET_CONSENT_START_COMMANDS[consent]
             : null;
     const heading =
@@ -356,9 +388,15 @@ function ErrorCard({
             data-testid="fleet-ports-error"
         >
             <p className="font-medium">{heading}</p>
-            {error.hint && <p className="mt-1 text-text-muted dark:text-text-muted-dark">{error.hint}</p>}
+            {error.hint && (
+                <p className="mt-1 text-text-muted dark:text-text-muted-dark">{error.hint}</p>
+            )}
             {command && <code className="mt-2 block font-mono text-xs">{command}</code>}
-            {lastKnown && <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">{t('lastKnown')}</p>}
+            {lastKnown && (
+                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                    {t('lastKnown')}
+                </p>
+            )}
             <Button className="mt-3" size="sm" variant="secondary" onClick={onRetry}>
                 {t('tryAgain')}
             </Button>

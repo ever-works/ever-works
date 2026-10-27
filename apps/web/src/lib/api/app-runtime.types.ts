@@ -62,7 +62,14 @@ export interface AppTargetView {
     clusterCheck: AppClusterCheckView | null;
     clusterCheckedAt: string | null;
     /** APW-03 hosting eligibility, read and never stored (R-3). Opaque here. */
-    eligibility?: { managed?: { eligible: boolean; reasons?: string[] } } | null;
+    eligibility?: {
+        managed?: {
+            eligible: boolean;
+            reasons?: string[];
+            /** Owner decision 2026-10-27: a free owner at the cap, whom a paid plan would admit. */
+            paidPlanAllowsMore?: boolean;
+        };
+    } | null;
     routeAvailable: boolean;
 }
 
@@ -307,9 +314,7 @@ export const APP_RUNTIME_ROUTE_UNAVAILABLE = 'route_unavailable';
 export const APP_OWNER_REQUIRED_CODE = 'ownerRequired';
 
 /** Whether an action's answer is the owner-only refusal ({@link APP_OWNER_REQUIRED_CODE}). */
-export function isAppOwnerRequired(
-    result: { code?: string | null } | null | undefined,
-): boolean {
+export function isAppOwnerRequired(result: { code?: string | null } | null | undefined): boolean {
     return result?.code === APP_OWNER_REQUIRED_CODE;
 }
 

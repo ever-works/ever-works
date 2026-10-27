@@ -2,7 +2,11 @@
 
 import { useTranslations } from 'next-intl';
 import { Check, GitBranch, RefreshCw, TriangleAlert } from 'lucide-react';
-import { fleetGitIdentityIncomplete, type FleetGitIdentityField, type FleetNodeView } from '@ever-works/contracts';
+import {
+    fleetGitIdentityIncomplete,
+    type FleetGitIdentityField,
+    type FleetNodeView,
+} from '@ever-works/contracts';
 import { UseMyIdentityButton } from './UseMyIdentityButton';
 import { useGitIdentity } from './use-git-identity';
 
@@ -22,7 +26,11 @@ function Mark({ ok }: { ok: boolean }) {
  * agents there and why not, and, for the owner when name or email is unset,
  * **Use my Ever Works identity**. Needs `--manage` on the computer.
  */
-export function GitIdentityCard({ node }: { node: Pick<FleetNodeView, 'id' | 'name' | 'viewerRole'> }) {
+export function GitIdentityCard({
+    node,
+}: {
+    node: Pick<FleetNodeView, 'id' | 'name' | 'viewerRole'>;
+}) {
     const t = useTranslations('fleet.gitIdentity');
     const { state, refresh, replace } = useGitIdentity(node.id);
     const isOwner = node.viewerRole === undefined || node.viewerRole === 'owner';
@@ -47,7 +55,9 @@ export function GitIdentityCard({ node }: { node: Pick<FleetNodeView, 'id' | 'na
                     {t('card.refresh')}
                 </button>
             </div>
-            {state.kind === 'loading' && <p className="text-sm text-text-muted">{t('card.loading')}</p>}
+            {state.kind === 'loading' && (
+                <p className="text-sm text-text-muted">{t('card.loading')}</p>
+            )}
             {state.kind === 'error' && (
                 <p className="text-sm text-text-muted dark:text-text-muted-dark" role="status">
                     {state.code === 'consent_missing'
@@ -66,7 +76,10 @@ export function GitIdentityCard({ node }: { node: Pick<FleetNodeView, 'id' | 'na
                             <Mark ok={state.identity.name.set} />
                         </dd>
                         <dt className="text-text-muted">{t('card.email')}</dt>
-                        <dd className="truncate font-mono text-xs" data-testid="fleet-git-identity-email">
+                        <dd
+                            className="truncate font-mono text-xs"
+                            data-testid="fleet-git-identity-email"
+                        >
                             {valueOf(state.identity.email)}
                         </dd>
                         <dd>
@@ -84,9 +97,13 @@ export function GitIdentityCard({ node }: { node: Pick<FleetNodeView, 'id' | 'na
                     <p className="text-sm" data-testid="fleet-git-identity-push">
                         {state.identity.canPushForAgents.ok
                             ? t('card.canPushYes', {
-                                  repositories: (state.identity.canPushForAgents.repositories ?? []).join(', '),
+                                  repositories: (
+                                      state.identity.canPushForAgents.repositories ?? []
+                                  ).join(', '),
                               })
-                            : t('card.canPushNo', { reason: state.identity.canPushForAgents.reason ?? '' })}
+                            : t('card.canPushNo', {
+                                  reason: state.identity.canPushForAgents.reason ?? '',
+                              })}
                     </p>
                     {isOwner && (
                         <div className="flex flex-wrap items-center gap-2">

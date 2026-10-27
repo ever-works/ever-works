@@ -57,7 +57,9 @@ export interface AgentSessionEnqueueRequest {
  * accident travels to the machine. `nodeId` is what the fleet pins the job
  * to; the first message travels already redacted.
  */
-export function buildAgentSessionJobPayload(payload: FleetAgentSessionPayload): Record<string, unknown> {
+export function buildAgentSessionJobPayload(
+    payload: FleetAgentSessionPayload,
+): Record<string, unknown> {
     return {
         fleetSessionId: payload.fleetSessionId,
         agentId: payload.agentId,
@@ -74,7 +76,9 @@ export function buildAgentSessionJobPayload(payload: FleetAgentSessionPayload): 
     };
 }
 
-export function buildAgentSessionEnqueueRequest(input: AgentSessionDispatchInput): AgentSessionEnqueueRequest {
+export function buildAgentSessionEnqueueRequest(
+    input: AgentSessionDispatchInput,
+): AgentSessionEnqueueRequest {
     return {
         kind: 'agent-session',
         userId: input.userId,

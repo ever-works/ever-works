@@ -189,6 +189,33 @@ describe('RunnersBlock', () => {
         expect(screen.getByText('Actions runners (8)')).toBeInTheDocument();
     });
 
+    it('tells a runner that failed on a missing App permission what to accept (FL-18 A16)', async () => {
+        list.mockResolvedValue({
+            ok: true,
+            data: view({
+                runners: [
+                    runner({
+                        state: 'failed',
+                        lastError:
+                            'the registration token could not be fetched: the Ever Works GitHub App on acme needs "Administration: Read and write"',
+                    }),
+                    runner({
+                        id: 'r2',
+                        name: 'build-01-2',
+                        state: 'failed',
+                        lastError: 'checksum mismatch for actions-runner-linux-x64-2.321.0.tar.gz',
+                    }),
+                ],
+            }),
+        });
+        render(<RunnersBlock nodes={[node()]} flags={{}} />);
+        const hints = await screen.findAllByTestId('fleet-runner-accept-permission');
+        expect(hints).toHaveLength(1);
+        expect(hints[0]).toHaveTextContent(
+            'The Ever Works GitHub App lacks “Administration: Read and write” here. Accept the App’s updated permissions on GitHub (installation settings → “Review request” → “Accept new permissions”), then Reinstall.',
+        );
+    });
+
     it('names the job a working runner is on and links Logs and GitHub', async () => {
         list.mockResolvedValue({
             ok: true,
@@ -273,5 +300,25 @@ describe('RunnersBlock', () => {
         expect(await screen.findByTestId('fleet-runner-stop')).toBeDisabled();
         expect(screen.queryByTestId('fleet-runners-install')).toBeNull();
         expect(options).not.toHaveBeenCalled();
+    });
+
+    it('notes a newer runner build and names the container mode (P3)', async () => {
+        list.mockResolvedValue({
+            ok: true,
+            data: view({
+                runners: [
+                    runner({
+                        mode: 'docker',
+                        runnerVersion: '2.321.0',
+                        updateAvailable: '2.322.0',
+                    }),
+                ],
+            }),
+        });
+        render(<RunnersBlock nodes={[node()]} flags={{}} />);
+        expect(await screen.findByTestId('fleet-runner-update')).toHaveTextContent(
+            'Update available: 2.322.0',
+        );
+        expect(screen.getByTestId('fleet-runner-row')).toHaveTextContent('container-isolated');
     });
 });

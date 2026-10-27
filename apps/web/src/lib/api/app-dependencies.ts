@@ -30,6 +30,29 @@ export const appDependenciesAPI = {
         });
     },
 
+    /**
+     * Lane aw-ops (APW-07 T29) — `PUT …/:kind` `{ providerId?, config?, sizeGiB? }` — **Configure**:
+     * the provider, its prompted settings (write-only: sent once, never read back) and the volume.
+     */
+    configure: async (
+        workId: string,
+        kind: AppDependencyKind,
+        input: { providerId?: string; config?: Record<string, string>; sizeGiB?: number },
+    ): Promise<AppDependencyWriteResponse> => {
+        return serverMutation<AppDependencyWriteResponse>({
+            endpoint: `${base(workId)}/${encodeURIComponent(kind)}`,
+            data: {
+                ...(input.providerId ? { providerId: input.providerId } : {}),
+                ...(input.config && Object.keys(input.config).length > 0
+                    ? { config: input.config }
+                    : {}),
+                ...(typeof input.sizeGiB === 'number' ? { sizeGiB: input.sizeGiB } : {}),
+            },
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
     /** `DELETE …/:kind` with `{ confirmSlug }` — **Delete data**. */
     deleteData: async (
         workId: string,

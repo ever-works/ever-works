@@ -76,7 +76,9 @@ describe('cloud idle policy (FL-17 P2)', () => {
         expect(opened.act).toBe('none');
 
         const later = NOW + 3 * 60 * 60 * 1000;
-        const due = evaluateCloudIdle(evidence({ meta: meta({ idleSince: opened.idleSince }), nowMs: later }));
+        const due = evaluateCloudIdle(
+            evidence({ meta: meta({ idleSince: opened.idleSince }), nowMs: later }),
+        );
         expect(due.windowReached).toBe(true);
         expect(due.act).toBe('tell-me');
         expect(due.attentionKey).toBe(`fleet-node:${NODE}:cloud-idle:${opened.idleSince}`);
@@ -94,16 +96,32 @@ describe('cloud idle policy (FL-17 P2)', () => {
     it('powers off when told, and does nothing for "nothing"', () => {
         const since = new Date(NOW - 2 * 60 * 60 * 1000).toISOString();
         expect(
-            evaluateCloudIdle(evidence({ meta: meta({ idleSince: since, idlePolicy: { mode: 'power-off', afterHours: 2 } }) })).act,
+            evaluateCloudIdle(
+                evidence({
+                    meta: meta({
+                        idleSince: since,
+                        idlePolicy: { mode: 'power-off', afterHours: 2 },
+                    }),
+                }),
+            ).act,
         ).toBe('power-off');
         expect(
-            evaluateCloudIdle(evidence({ meta: meta({ idleSince: since, idlePolicy: { mode: 'nothing', afterHours: 1 } }) })).act,
+            evaluateCloudIdle(
+                evidence({
+                    meta: meta({
+                        idleSince: since,
+                        idlePolicy: { mode: 'nothing', afterHours: 1 },
+                    }),
+                }),
+            ).act,
         ).toBe('none');
     });
 
     it('closes the window when the machine gets busy', () => {
         const since = new Date(NOW - 5 * 60 * 60 * 1000).toISOString();
-        expect(evaluateCloudIdle(evidence({ meta: meta({ idleSince: since }), busySessions: 1 }))).toEqual({
+        expect(
+            evaluateCloudIdle(evidence({ meta: meta({ idleSince: since }), busySessions: 1 })),
+        ).toEqual({
             idleSince: null,
             windowReached: false,
             act: 'none',

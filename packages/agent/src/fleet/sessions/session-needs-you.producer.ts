@@ -49,7 +49,10 @@ export class SessionNeedsYouProducer implements NeedsALookProducer, OnModuleInit
         this.registry?.register(this);
     }
 
-    async produce(nodes: readonly FleetNodeView[], context: NeedsALookContext): Promise<NeedsALookItem[]> {
+    async produce(
+        nodes: readonly FleetNodeView[],
+        context: NeedsALookContext,
+    ): Promise<NeedsALookItem[]> {
         if (nodes.length === 0) return [];
         const byId = new Map(nodes.map((node) => [node.id, node]));
         const items: NeedsALookItem[] = [];
@@ -79,8 +82,13 @@ export class SessionNeedsYouProducer implements NeedsALookProducer, OnModuleInit
                     kind: 'session-needs-you',
                     title: `${who} waiting for you on ${node.name}${prompt}`,
                     detail: row.title,
-                    action: { label: 'Answer', route: `/fleet/sessions/${encodeURIComponent(row.id)}` },
-                    since: attention?.raisedAt ?? new Date(row.stateChangedAt ?? row.updatedAt ?? context.now).toISOString(),
+                    action: {
+                        label: 'Answer',
+                        route: `/fleet/sessions/${encodeURIComponent(row.id)}`,
+                    },
+                    since:
+                        attention?.raisedAt ??
+                        new Date(row.stateChangedAt ?? row.updatedAt ?? context.now).toISOString(),
                 });
             } catch (error) {
                 this.logger.debug(
@@ -94,7 +102,8 @@ export class SessionNeedsYouProducer implements NeedsALookProducer, OnModuleInit
         const perNode = new Map<string, { count: number; first: Date }>();
         for (const row of ended) {
             if (row.endedReason !== 'node-restart') continue;
-            const at = row.endedAt instanceof Date ? row.endedAt : new Date(row.endedAt ?? context.now);
+            const at =
+                row.endedAt instanceof Date ? row.endedAt : new Date(row.endedAt ?? context.now);
             const entry = perNode.get(row.nodeId) ?? { count: 0, first: at };
             entry.count += 1;
             if (at < entry.first) entry.first = at;
@@ -110,7 +119,10 @@ export class SessionNeedsYouProducer implements NeedsALookProducer, OnModuleInit
                 kind: 'session-unconfirmed',
                 title: `${node.name} restarted — ${entry.count} ${entry.count === 1 ? 'session' : 'sessions'} ended without a result`,
                 detail: 'Their last screens are kept on the computer’s Sessions tab.',
-                action: { label: 'Open', route: `/fleet/computers/${encodeURIComponent(nodeId)}?tab=sessions` },
+                action: {
+                    label: 'Open',
+                    route: `/fleet/computers/${encodeURIComponent(nodeId)}?tab=sessions`,
+                },
                 since: entry.first.toISOString(),
             });
         }

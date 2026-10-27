@@ -41,7 +41,12 @@ export class CreateFleetUsageSamples1796200100000 implements MigrationInterface 
                         { name: 'fleetSessionId', type: 'uuid', isNullable: true },
                         { name: 'agentRunId', type: 'uuid', isNullable: true },
                         { name: 'provider', type: 'varchar', length: '32', isNullable: false },
-                        { name: 'providerSessionId', type: 'varchar', length: '128', isNullable: true },
+                        {
+                            name: 'providerSessionId',
+                            type: 'varchar',
+                            length: '128',
+                            isNullable: true,
+                        },
                         { name: 'model', type: 'varchar', length: '120', isNullable: false },
                         { name: 'inputTokens', type: 'bigint', isNullable: false, default: 0 },
                         { name: 'outputTokens', type: 'bigint', isNullable: false, default: 0 },
@@ -69,8 +74,14 @@ export class CreateFleetUsageSamples1796200100000 implements MigrationInterface 
                 columnNames: ['dedupeKey'],
                 isUnique: true,
             }),
-            new TableIndex({ name: 'idx_fleet_usage_samples_node_bucket', columnNames: ['nodeId', 'bucketStart'] }),
-            new TableIndex({ name: 'idx_fleet_usage_samples_session', columnNames: ['fleetSessionId'] }),
+            new TableIndex({
+                name: 'idx_fleet_usage_samples_node_bucket',
+                columnNames: ['nodeId', 'bucketStart'],
+            }),
+            new TableIndex({
+                name: 'idx_fleet_usage_samples_session',
+                columnNames: ['fleetSessionId'],
+            }),
             new TableIndex({ name: 'idx_fleet_usage_samples_run', columnNames: ['agentRunId'] }),
             new TableIndex({
                 name: 'idx_fleet_usage_samples_provider_session',

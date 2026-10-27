@@ -41,15 +41,25 @@ export class AddAgentRunFleetSessionId1796040100000 implements MigrationInterfac
             );
         }
         const fresh = await queryRunner.getTable('agent_runs');
-        if (fresh && !fresh.indices.some((index) => index.name === AddAgentRunFleetSessionId1796040100000.INDEX.name)) {
-            await queryRunner.createIndex('agent_runs', AddAgentRunFleetSessionId1796040100000.INDEX);
+        if (
+            fresh &&
+            !fresh.indices.some(
+                (index) => index.name === AddAgentRunFleetSessionId1796040100000.INDEX.name,
+            )
+        ) {
+            await queryRunner.createIndex(
+                'agent_runs',
+                AddAgentRunFleetSessionId1796040100000.INDEX,
+            );
         }
         const withIndex = await queryRunner.getTable('agent_runs');
         const sessions = await queryRunner.hasTable('fleet_sessions');
         if (
             sessions &&
             withIndex &&
-            !withIndex.foreignKeys.some((fk) => fk.name === AddAgentRunFleetSessionId1796040100000.FK_NAME)
+            !withIndex.foreignKeys.some(
+                (fk) => fk.name === AddAgentRunFleetSessionId1796040100000.FK_NAME,
+            )
         ) {
             await queryRunner.createForeignKey(
                 'agent_runs',
@@ -67,10 +77,15 @@ export class AddAgentRunFleetSessionId1796040100000 implements MigrationInterfac
     public async down(queryRunner: QueryRunner): Promise<void> {
         const table = await queryRunner.getTable('agent_runs');
         if (!table) return;
-        const fk = table.foreignKeys.find((entry) => entry.name === AddAgentRunFleetSessionId1796040100000.FK_NAME);
+        const fk = table.foreignKeys.find(
+            (entry) => entry.name === AddAgentRunFleetSessionId1796040100000.FK_NAME,
+        );
         if (fk) await queryRunner.dropForeignKey('agent_runs', fk);
-        const index = table.indices.find((entry) => entry.name === AddAgentRunFleetSessionId1796040100000.INDEX.name);
+        const index = table.indices.find(
+            (entry) => entry.name === AddAgentRunFleetSessionId1796040100000.INDEX.name,
+        );
         if (index) await queryRunner.dropIndex('agent_runs', index);
-        if (table.findColumnByName('fleetSessionId')) await queryRunner.dropColumn('agent_runs', 'fleetSessionId');
+        if (table.findColumnByName('fleetSessionId'))
+            await queryRunner.dropColumn('agent_runs', 'fleetSessionId');
     }
 }

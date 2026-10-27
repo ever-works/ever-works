@@ -52,7 +52,12 @@ describe('parseClaudeUsageLine', () => {
 			usage: { input: 1, output: 1 }
 		});
 		expect(parseClaudeUsageLine(synthetic)).toBeNull();
-		const zero = claudeLine({ sessionId: 's1', messageId: 'msg_z', at: '2026-10-20T10:00:00.000Z', usage: { input: 0, output: 0 } });
+		const zero = claudeLine({
+			sessionId: 's1',
+			messageId: 'msg_z',
+			at: '2026-10-20T10:00:00.000Z',
+			usage: { input: 0, output: 0 }
+		});
 		expect(parseClaudeUsageLine(zero)).toBeNull();
 	});
 });
@@ -60,7 +65,12 @@ describe('parseClaudeUsageLine', () => {
 describe('parseCodexUsageLine', () => {
 	it('carries the session and model from the meta and turn lines; input excludes cached input', () => {
 		const state = emptyCodexFileState();
-		expect(parseCodexUsageLine(codexMetaLine('0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000', '2026-10-20T11:00:00.000Z'), state)).toBeNull();
+		expect(
+			parseCodexUsageLine(
+				codexMetaLine('0199aaaa-bbbb-7ccc-8ddd-eeeeffff0000', '2026-10-20T11:00:00.000Z'),
+				state
+			)
+		).toBeNull();
 		expect(parseCodexUsageLine(codexTurnLine('2026-10-20T11:00:01.000Z'), state)).toBeNull();
 		expect(parseCodexUsageLine(codexMessageLine('2026-10-20T11:00:02.000Z'), state)).toBeNull();
 		expect(parseCodexUsageLine(codexReasoningLine('2026-10-20T11:00:03.000Z'), state)).toBeNull();
@@ -103,7 +113,11 @@ describe('parseCodexUsageLine', () => {
 	it('gives a re-emitted event the same identity (counted once by the dedupe)', () => {
 		const state = emptyCodexFileState();
 		parseCodexUsageLine(codexMetaLine('0199aaaa-bbbb-7ccc-8ddd-eeeeffff0002', '2026-10-20T11:00:00.000Z'), state);
-		const line = codexTokenLine('2026-10-20T11:00:01.000Z', { input: 100, cached: 0, output: 10 }, { input: 100, cached: 0, output: 10 });
+		const line = codexTokenLine(
+			'2026-10-20T11:00:01.000Z',
+			{ input: 100, cached: 0, output: 10 },
+			{ input: 100, cached: 0, output: 10 }
+		);
 		const a = parseCodexUsageLine(line, state);
 		const b = parseCodexUsageLine(line, state);
 		expect(a?.key).toBe(b?.key);

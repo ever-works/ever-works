@@ -96,7 +96,10 @@ export function validateFleetSessionRulesFile(value: unknown): FleetSessionRules
 	if (value.version !== 1) return { ok: false, ruleId: null, problem: 'version must be 1' };
 	if (typeof value.provider !== 'string' || value.provider.length === 0)
 		return { ok: false, ruleId: null, problem: 'provider is required' };
-	if (value.anchors !== undefined && (!Array.isArray(value.anchors) || value.anchors.some((a) => typeof a !== 'string')))
+	if (
+		value.anchors !== undefined &&
+		(!Array.isArray(value.anchors) || value.anchors.some((a) => typeof a !== 'string'))
+	)
 		return { ok: false, ruleId: null, problem: 'anchors must be strings' };
 	if (!Array.isArray(value.rules)) return { ok: false, ruleId: null, problem: 'rules must be a list' };
 	const seen = new Set<string>();
@@ -121,14 +124,20 @@ export function validateFleetSessionRulesFile(value: unknown): FleetSessionRules
 		} catch {
 			return { ok: false, ruleId: id, problem: 'match does not compile' };
 		}
-		if (when.quietMs !== undefined && (typeof when.quietMs !== 'number' || when.quietMs < 0 || when.quietMs > 60_000))
+		if (
+			when.quietMs !== undefined &&
+			(typeof when.quietMs !== 'number' || when.quietMs < 0 || when.quietMs > 60_000)
+		)
 			return { ok: false, ruleId: id, problem: 'quietMs is 0–60 000' };
 		const then = raw.then;
 		if (!isRecord(then)) return { ok: false, ruleId: id, problem: 'then is required' };
 		if (then.state === 'done') return { ok: false, ruleId: id, problem: 'no rule may raise done' };
 		if (!(FLEET_SESSION_RULE_STATES as readonly string[]).includes(then.state as string))
 			return { ok: false, ruleId: id, problem: 'unknown state' };
-		if (then.state === 'needs_you' && !(FLEET_SESSION_RULE_REASONS as readonly string[]).includes(then.reason as string))
+		if (
+			then.state === 'needs_you' &&
+			!(FLEET_SESSION_RULE_REASONS as readonly string[]).includes(then.reason as string)
+		)
 			return { ok: false, ruleId: id, problem: 'needs_you needs a reason' };
 		if (then.options !== undefined) {
 			if (!Array.isArray(then.options) || then.options.length > 9)

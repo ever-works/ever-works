@@ -46,18 +46,27 @@ describe('classifyListener', () => {
 
 	it('hides Windows noise and never counts the built-in HTTP error page as a web server (spec U7)', () => {
 		expect(
-			classifyListener({ listener: { port: 5357, bind: '0.0.0.0', pid: 4, program: 'System' }, platform: 'win32', probe: web(503, 'Microsoft-HTTPAPI/2.0') })
-				.kind
+			classifyListener({
+				listener: { port: 5357, bind: '0.0.0.0', pid: 4, program: 'System' },
+				platform: 'win32',
+				probe: web(503, 'Microsoft-HTTPAPI/2.0')
+			}).kind
 		).toBe('noise');
 		expect(isSystemNoise({ port: 49670, bind: '0.0.0.0', pid: 900, program: 'lsass' }, 'win32')).toBe(true);
 		expect(
-			classifyListener({ listener: { port: 8081, bind: '0.0.0.0', pid: 4, program: 'System' }, platform: 'win32', probe: web(404, 'Microsoft-HTTPAPI/2.0') })
-				.kind
+			classifyListener({
+				listener: { port: 8081, bind: '0.0.0.0', pid: 4, program: 'System' },
+				platform: 'win32',
+				probe: web(404, 'Microsoft-HTTPAPI/2.0')
+			}).kind
 		).toBe('noise');
 		// A real site on HTTP.sys answers with its own server name.
 		expect(
-			classifyListener({ listener: { port: 80, bind: '0.0.0.0', pid: 4, program: 'System' }, platform: 'win32', probe: web(200, 'Microsoft-IIS/10.0') })
-				.kind
+			classifyListener({
+				listener: { port: 80, bind: '0.0.0.0', pid: 4, program: 'System' },
+				platform: 'win32',
+				probe: web(200, 'Microsoft-IIS/10.0')
+			}).kind
 		).toBe('web');
 	});
 
@@ -105,7 +114,9 @@ describe('waiting and stopped rows', () => {
 
 describe('joins', () => {
 	it('maps published host ports to containers', () => {
-		const map = parseDockerPorts('abc123\tacme-proxy\t0.0.0.0:8080->80/tcp, :::8080->80/tcp\nfff\tminio\t127.0.0.1:9000-9001->9000-9001/tcp');
+		const map = parseDockerPorts(
+			'abc123\tacme-proxy\t0.0.0.0:8080->80/tcp, :::8080->80/tcp\nfff\tminio\t127.0.0.1:9000-9001->9000-9001/tcp'
+		);
 		expect(map.get(8080)).toEqual({ id: 'abc123', name: 'acme-proxy' });
 		expect(map.get(9001)?.name).toBe('minio');
 	});

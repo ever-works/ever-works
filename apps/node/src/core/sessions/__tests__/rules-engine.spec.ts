@@ -21,9 +21,14 @@ const CODEX_APPROVAL = [
 	'  3. No, and tell Codex what to do differently (esc)'
 ].join('\n');
 
-const CLAUDE_TRUST = ['Do you trust the files in this folder?', '', '/home/dana/code/api', '', '❯ 1. Yes, proceed', '  2. No, exit'].join(
-	'\n'
-);
+const CLAUDE_TRUST = [
+	'Do you trust the files in this folder?',
+	'',
+	'/home/dana/code/api',
+	'',
+	'❯ 1. Yes, proceed',
+	'  2. No, exit'
+].join('\n');
 
 const CLAUDE_WORKING = ['✻ Running the migration tests… (12s · esc to interrupt)'].join('\n');
 
@@ -41,8 +46,12 @@ describe('SessionRulesEngine', () => {
 
 	it('reads a trust prompt and a running turn', () => {
 		const engine = new SessionRulesEngine();
-		expect(engine.evaluate('s2', 'claude-code', { screen: CLAUDE_TRUST, title: '' }, 0)?.evidence.event).toBe('question');
-		expect(engine.evaluate('s3', 'claude-code', { screen: CLAUDE_WORKING, title: '' }, 0)?.evidence.event).toBe('working');
+		expect(engine.evaluate('s2', 'claude-code', { screen: CLAUDE_TRUST, title: '' }, 0)?.evidence.event).toBe(
+			'question'
+		);
+		expect(engine.evaluate('s3', 'claude-code', { screen: CLAUDE_WORKING, title: '' }, 0)?.evidence.event).toBe(
+			'working'
+		);
 	});
 
 	it('has no rules for a shell, and no rule can raise done', () => {
@@ -111,6 +120,8 @@ describe('keysForAnswer', () => {
 			ok: true,
 			keys: '3ap-south\r'
 		});
-		expect(keysForAnswer({ provider: 'claude-code', attention: question, answer: { text: 'a\u0003b' } }).ok).toBe(false);
+		expect(keysForAnswer({ provider: 'claude-code', attention: question, answer: { text: 'a\u0003b' } }).ok).toBe(
+			false
+		);
 	});
 });

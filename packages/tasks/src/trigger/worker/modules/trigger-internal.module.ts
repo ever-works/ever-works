@@ -58,6 +58,7 @@ import {
     FleetActionsRunnersPollService,
 } from '@ever-works/agent/fleet';
 import { ModelAccountHealthService } from '@ever-works/agent/model-routing';
+import { DesktopRecordingService } from '@ever-works/agent/computer';
 import { SkillReadinessService } from '@ever-works/agent/skills';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
@@ -339,6 +340,15 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         // Actions runners on computers (FL-18) — the fleet-runners-poll cron calls
         // reconcile() over the internal RPC channel; GitHub, the repositories and the
         // node link live API-side.
+        // Desktop recordings (FL-07 P2.C) — the computer-recording-gc cron calls
+        // sweepExpired() over the internal RPC channel; the storage plugin and the
+        // rows live API-side.
+        {
+            provide: DesktopRecordingService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'DesktopRecordingService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: FleetActionsRunnersPollService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -666,6 +676,7 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
         FleetVirtualReconcileService,
         FleetCloudSweepService,
         FleetActionsRunnersPollService,
+        DesktopRecordingService,
         TaskGateRunnerService,
         TaskGateJudgeService,
         WorkRepository,

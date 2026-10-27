@@ -1,10 +1,6 @@
 import { mkdir, readFile, readdir, rm, writeFile, chmod, unlink } from 'node:fs/promises';
 import { posix } from 'node:path';
-import {
-	isFleetVirtualSystemId,
-	type FleetVirtualKind,
-	type FleetVirtualSystemId
-} from '@ever-works/contracts';
+import { isFleetVirtualSystemId, type FleetVirtualKind, type FleetVirtualSystemId } from '@ever-works/contracts';
 import { parseCatalogueLock, type VirtualCatalogueLock } from './catalogue';
 import { isChildNodeId } from './docker-args';
 
@@ -124,7 +120,11 @@ export class VirtualState {
 		await this.fs.mkdir(this.oemDir(childNodeId));
 		await this.fs.mkdir(this.sharedDir(childNodeId));
 		await this.fs.writeFile(posix.join(this.oemDir(childNodeId), 'install.bat'), files.installBat, 0o644);
-		await this.fs.writeFile(posix.join(this.oemDir(childNodeId), 'ever-works-first-boot.ps1'), files.firstBoot, 0o644);
+		await this.fs.writeFile(
+			posix.join(this.oemDir(childNodeId), 'ever-works-first-boot.ps1'),
+			files.firstBoot,
+			0o644
+		);
 	}
 
 	/** Write a private (0600) file in the child's folder; answers its path. */
@@ -178,7 +178,11 @@ export class VirtualState {
 
 	async writeLock(lock: VirtualCatalogueLock): Promise<void> {
 		await this.fs.mkdir(this.root);
-		await this.fs.writeFile(posix.join(this.root, 'catalogue.lock.json'), `${JSON.stringify(lock, null, 2)}\n`, 0o600);
+		await this.fs.writeFile(
+			posix.join(this.root, 'catalogue.lock.json'),
+			`${JSON.stringify(lock, null, 2)}\n`,
+			0o600
+		);
 	}
 }
 
@@ -200,7 +204,10 @@ export function parseChildMeta(raw: string | null): VirtualChildMeta | null {
 			diskGiB: typeof value.diskGiB === 'number' ? value.diskGiB : null,
 			image:
 				value.image && typeof value.image.ref === 'string'
-					? { ref: value.image.ref, digest: typeof value.image.digest === 'string' ? value.image.digest : null }
+					? {
+							ref: value.image.ref,
+							digest: typeof value.image.digest === 'string' ? value.image.digest : null
+						}
 					: null,
 			createdAt: typeof value.createdAt === 'string' ? value.createdAt : new Date(0).toISOString()
 		};

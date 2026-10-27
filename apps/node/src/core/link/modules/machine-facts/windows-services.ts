@@ -45,7 +45,9 @@ export function windowsState(state: string, startMode: string, exitCode: number 
 		case 'Pause Pending':
 			return 'deactivating';
 		case 'Stopped':
-			return startMode === 'Auto' && exitCode !== null && exitCode !== 0 && exitCode !== 1077 ? 'failed' : 'inactive';
+			return startMode === 'Auto' && exitCode !== null && exitCode !== 0 && exitCode !== 1077
+				? 'failed'
+				: 'inactive';
 		case 'Paused':
 			return 'inactive';
 		default:
@@ -66,7 +68,12 @@ export function parseWindowsServices(stdout: string): WindowsServiceRow[] {
 			description: typeof raw.DisplayName === 'string' && raw.DisplayName !== raw.Name ? raw.DisplayName : null,
 			state,
 			exitCode: state === 'failed' ? exitCode : null,
-			atBoot: startMode === 'Auto' || startMode === 'Boot' || startMode === 'System' ? true : startMode ? false : null,
+			atBoot:
+				startMode === 'Auto' || startMode === 'Boot' || startMode === 'System'
+					? true
+					: startMode
+						? false
+						: null,
 			disabled: startMode === 'Disabled',
 			pid: state === 'running' ? pid : null
 		});
@@ -112,7 +119,10 @@ function actionScript(name: string, action: FleetServiceAction): string {
 
 export interface WindowsServicesManager {
 	list(): Promise<{ rows: WindowsServiceRow[]; error?: string }>;
-	act(input: { name: string; action: FleetServiceAction }): Promise<
+	act(input: {
+		name: string;
+		action: FleetServiceAction;
+	}): Promise<
 		| { ok: true; row: WindowsServiceRow | null }
 		| { ok: false; refusal: 'root'; command: string }
 		| { ok: false; refusal: 'not-found' }
@@ -120,7 +130,10 @@ export interface WindowsServicesManager {
 	>;
 }
 
-export function createWindowsServicesManager(deps: { runner: CommandRunner; root: RootRunner }): WindowsServicesManager {
+export function createWindowsServicesManager(deps: {
+	runner: CommandRunner;
+	root: RootRunner;
+}): WindowsServicesManager {
 	const { runner, root } = deps;
 	return {
 		async list() {
@@ -141,7 +154,8 @@ export function createWindowsServicesManager(deps: { runner: CommandRunner; root
 			if (!outcome.ok) return { ok: false, refusal: 'root', command: outcome.command };
 			if (outcome.code !== 0) {
 				const message = firstLine(outcome.stderr || outcome.stdout, `PowerShell exited ${outcome.code ?? 1}`);
-				if (/cannot find any service|NoServiceFoundForGivenName/i.test(message)) return { ok: false, refusal: 'not-found' };
+				if (/cannot find any service|NoServiceFoundForGivenName/i.test(message))
+					return { ok: false, refusal: 'not-found' };
 				if (/access is denied|PermissionDenied/i.test(message)) {
 					return { ok: false, refusal: 'root', command: windowsActionCommand(name, action) };
 				}

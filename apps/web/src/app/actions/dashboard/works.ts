@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { ZOD3_ERROR_MESSAGES } from '@ever-works/plugin/helpers';
 import {
     workAPI,
     CreateWorkDto,
@@ -165,14 +166,14 @@ const getCreateWorkSchema = async () => {
         if (data.kind !== 'app') return;
         if (!data.repositoryUrl) {
             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: 'custom',
                 path: ['repositoryUrl'],
                 message: t('app.repositoryUrlRequired'),
             });
         }
         if (!data.repositoryMode) {
             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: 'custom',
                 path: ['repositoryMode'],
                 message: t('app.repositoryModeRequired'),
             });
@@ -181,7 +182,7 @@ const getCreateWorkSchema = async () => {
             !data.targetOwner
         ) {
             ctx.addIssue({
-                code: z.ZodIssueCode.custom,
+                code: 'custom',
                 path: ['targetOwner'],
                 message: t('app.targetOwnerRequired'),
             });
@@ -338,11 +339,11 @@ export async function createWork(data: CreateWorkDto): Promise<CreateWorkResult>
 
     try {
         // Validate input data
-        const validation = createWorkSchema.safeParse(data);
+        const validation = createWorkSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -576,7 +577,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
                     .optional(),
             ),
         gitProvider: z.string().optional(),
-        proposalId: z.string().uuid().optional(),
+        proposalId: z.guid().optional(),
         workKind: aiWorkKindSchema.optional(),
     });
 
@@ -584,18 +585,21 @@ export async function createWorkWithAI(request: AIWorkOptions) {
 
     try {
         // Validate input
-        const validation = aiPromptSchema.safeParse({
-            prompt: request.prompt,
-            name: request.name,
-            slug: request.slug,
-            gitProvider: request.gitProvider,
-            proposalId: request.proposalId,
-            workKind: request.workKind,
-        });
+        const validation = aiPromptSchema.safeParse(
+            {
+                prompt: request.prompt,
+                name: request.name,
+                slug: request.slug,
+                gitProvider: request.gitProvider,
+                proposalId: request.proposalId,
+                workKind: request.workKind,
+            },
+            ZOD3_ERROR_MESSAGES,
+        );
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -796,11 +800,11 @@ export async function updateWork(workId: string, data: UpdateWorkDto) {
 
     try {
         // Validate input data
-        const validation = updateWorkSchema.safeParse(data);
+        const validation = updateWorkSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -846,16 +850,16 @@ export async function updateWorkTemplate(workId: string, websiteTemplateId: stri
     const t = await getTranslations('actions.works');
 
     const schema = z.object({
-        workId: z.string().uuid(t('invalidId')),
+        workId: z.string().guid(t('invalidId')),
         websiteTemplateId: z.string().nullable(),
     });
 
     try {
-        const validation = schema.safeParse({ workId, websiteTemplateId });
+        const validation = schema.safeParse({ workId, websiteTemplateId }, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -956,16 +960,16 @@ export async function deleteWork(workId: string, options?: DeleteWorkDto) {
 
     // Delete work validation schema
     const deleteWorkSchema = z.object({
-        id: z.string().uuid(t('invalidId')),
+        id: z.string().guid(t('invalidId')),
     });
 
     try {
         // Validate the work ID
-        const validation = deleteWorkSchema.safeParse({ id: workId });
+        const validation = deleteWorkSchema.safeParse({ id: workId }, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1109,11 +1113,11 @@ export async function analyzeRepository(sourceUrl: string, providerId?: string) 
     const urlSchema = z.string().url(t('import.invalidUrl'));
 
     try {
-        const validation = urlSchema.safeParse(sourceUrl);
+        const validation = urlSchema.safeParse(sourceUrl, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1196,7 +1200,7 @@ export async function importWork(data: ImportWorkRequest) {
         restoreWorksConfig: z.boolean().optional(),
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
-        providers: z.record(z.string()).optional(),
+        providers: z.record(z.string(), z.string()).optional(),
         enrichmentConfig: z
             .object({
                 expansionFactor: z.number().min(1.5).max(5).optional(),
@@ -1205,11 +1209,11 @@ export async function importWork(data: ImportWorkRequest) {
     });
 
     try {
-        const validation = importSchema.safeParse(data);
+        const validation = importSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1306,11 +1310,11 @@ export async function analyzeForLinking(sourceUrl: string, providerId: string) {
     const urlSchema = z.string().url(t('import.invalidUrl'));
 
     try {
-        const validation = urlSchema.safeParse(sourceUrl);
+        const validation = urlSchema.safeParse(sourceUrl, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1497,11 +1501,11 @@ export async function updateAdvancedPrompts(workId: string, data: UpdateWorkAdva
     });
 
     try {
-        const validation = advancedPromptsSchema.safeParse(data);
+        const validation = advancedPromptsSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1610,11 +1614,11 @@ export async function updateWebsiteSettings(
         export_enabled: z.boolean().optional(),
         import_enabled: z.boolean().optional(),
     });
-    const scalarValidation = websiteSettingsScalarSchema.safeParse(data);
+    const scalarValidation = websiteSettingsScalarSchema.safeParse(data, ZOD3_ERROR_MESSAGES);
     if (!scalarValidation.success) {
         return {
             success: false,
-            error: scalarValidation.error.errors[0].message,
+            error: scalarValidation.error.issues[0].message,
         };
     }
 
@@ -1770,11 +1774,11 @@ export async function updateTaskIsolationSettings(
     });
 
     try {
-        const validation = taskIsolationSchema.safeParse(settings);
+        const validation = taskIsolationSchema.safeParse(settings, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1834,11 +1838,11 @@ export async function updateQualityGatesSettings(
     });
 
     try {
-        const validation = qualityGatesSchema.safeParse(settings);
+        const validation = qualityGatesSchema.safeParse(settings, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1895,11 +1899,11 @@ export async function updateWorkMergePolicy(
         .nullable();
 
     try {
-        const validation = mergePolicySchema.safeParse(mergePolicy);
+        const validation = mergePolicySchema.safeParse(mergePolicy, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -1981,11 +1985,11 @@ export async function updateWorkExternalRefs(
         .nullable();
 
     try {
-        const validation = refsSchema.safeParse(externalRefs);
+        const validation = refsSchema.safeParse(externalRefs, ZOD3_ERROR_MESSAGES);
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -2048,9 +2052,9 @@ export async function createCampaignWork(input: {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const validation = campaignBriefSchema.safeParse(input);
+    const validation = campaignBriefSchema.safeParse(input, ZOD3_ERROR_MESSAGES);
     if (!validation.success) {
-        return { success: false as const, error: validation.error.errors[0].message };
+        return { success: false as const, error: validation.error.issues[0].message };
     }
 
     try {
@@ -2129,16 +2133,19 @@ export async function setWorkAppLauncherExposureAction(
     const t = await getTranslations('actions.works');
 
     const schema = z.object({
-        workId: z.string().uuid(t('invalidId')),
+        workId: z.string().guid(t('invalidId')),
         appLauncherExposed: z.boolean().nullable(),
     });
 
     try {
-        const validation = schema.safeParse({ workId, appLauncherExposed: value });
+        const validation = schema.safeParse(
+            { workId, appLauncherExposed: value },
+            ZOD3_ERROR_MESSAGES,
+        );
         if (!validation.success) {
             return {
                 success: false,
-                error: validation.error.errors[0].message,
+                error: validation.error.issues[0].message,
             };
         }
 
@@ -2208,7 +2215,13 @@ export interface AppUpstreamActionResult {
  * revalidated — a person who lands back on the Overview must not read a cached
  * card that predates their own click.
  */
-export async function syncUpstreamAction(workId: string): Promise<AppUpstreamActionResult> {
+export async function syncUpstreamAction(
+    workId: string,
+    // APW-02 T46 — optional: the owner's "Sync anyway" for a held workflow change. The API
+    // admits it only from the Work owner's signed-in session; this action forwards the two
+    // fields and nothing else.
+    options?: { confirmWorkflowChanges?: boolean; workflowHeadSha?: string },
+): Promise<AppUpstreamActionResult> {
     // Security: verify authentication at the server-action boundary before
     // proxying a mutation — UI gating alone is not a security boundary.
     const user = await getAuthFromCookie();
@@ -2217,7 +2230,19 @@ export async function syncUpstreamAction(workId: string): Promise<AppUpstreamAct
     }
 
     try {
-        const result = await workAPI.syncUpstream(workId);
+        let result: Awaited<ReturnType<typeof workAPI.syncUpstream>>;
+        if (options?.confirmWorkflowChanges === true) {
+            const body: { confirmWorkflowChanges: true; workflowHeadSha?: string } = {
+                confirmWorkflowChanges: true,
+            };
+            if (typeof options.workflowHeadSha === 'string' && options.workflowHeadSha) {
+                body.workflowHeadSha = options.workflowHeadSha;
+            }
+            result = await workAPI.syncUpstream(workId, body);
+        } else {
+            // Exactly the call every caller made before T46.
+            result = await workAPI.syncUpstream(workId);
+        }
 
         revalidatePath(ROUTES.DASHBOARD_WORK(workId));
         revalidatePath(ROUTES.DASHBOARD_WORK_UPSTREAM(workId));

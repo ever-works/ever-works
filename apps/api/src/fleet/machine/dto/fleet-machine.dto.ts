@@ -37,7 +37,8 @@ export class FleetActionConfirmDto implements FleetActionConfirmFields {
 
     @ApiProperty({
         required: false,
-        description: 'Satisfies the warning half of `blast-radius`: the caller read the computer’s sentence.',
+        description:
+            'Satisfies the warning half of `blast-radius`: the caller read the computer’s sentence.',
     })
     @IsOptional()
     @IsBoolean()
@@ -66,7 +67,8 @@ export class FleetServiceActionDto extends FleetActionConfirmDto {
     @ApiProperty({
         required: false,
         enum: FLEET_SERVICE_MANAGERS,
-        description: 'Which manager holds it (macOS: `launchd` or `brew`); the computer’s own by default.',
+        description:
+            'Which manager holds it (macOS: `launchd` or `brew`); the computer’s own by default.',
     })
     @IsOptional()
     @IsIn([...FLEET_SERVICE_MANAGERS])
@@ -79,7 +81,11 @@ export class ListFleetProcessesQueryDto {
     @IsIn(['cpu', 'mem'])
     sort?: 'cpu' | 'mem';
 
-    @ApiProperty({ required: false, maxLength: 200, description: 'Filter by name, command, owner or pid.' })
+    @ApiProperty({
+        required: false,
+        maxLength: 200,
+        description: 'Filter by name, command, owner or pid.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(200)
@@ -109,7 +115,10 @@ export class FleetRunContainerDto extends FleetActionConfirmDto {
 
 /** `POST …/docker/images` — pull. */
 export class FleetPullImageDto extends FleetActionConfirmDto {
-    @ApiProperty({ description: 'The image reference (`redis:7`, `ghcr.io/acme/api:1.4`).', maxLength: 255 })
+    @ApiProperty({
+        description: 'The image reference (`redis:7`, `ghcr.io/acme/api:1.4`).',
+        maxLength: 255,
+    })
     @IsString()
     @MaxLength(255)
     ref!: string;
@@ -125,7 +134,10 @@ export class FleetPruneImagesQueryDto {
 
 /** `GET …/docker/compose[?project=]` (FL-09 P3). */
 export class FleetComposeQueryDto {
-    @ApiProperty({ required: false, description: 'A project name: answer its description instead of the list.' })
+    @ApiProperty({
+        required: false,
+        description: 'A project name: answer its description instead of the list.',
+    })
     @IsOptional()
     @IsString()
     @MaxLength(128)
@@ -134,7 +146,11 @@ export class FleetComposeQueryDto {
 
 /** `POST …/docker/compose/:project/:action` — up · down · restart · pull, optionally one service. */
 export class FleetComposeActionDto extends FleetActionConfirmDto {
-    @ApiProperty({ required: false, description: 'One service of the project (up, restart, pull).', maxLength: 128 })
+    @ApiProperty({
+        required: false,
+        description: 'One service of the project (up, restart, pull).',
+        maxLength: 128,
+    })
     @IsOptional()
     @IsString()
     @MaxLength(128)
@@ -153,7 +169,9 @@ export class FleetContainerExecDto extends FleetActionConfirmDto {
 }
 
 /** The confirmation fields of a body, as the service reads them (only the three CONTRACTS fields). */
-export function confirmFieldsOf(body: FleetActionConfirmDto | null | undefined): FleetActionConfirmFields {
+export function confirmFieldsOf(
+    body: FleetActionConfirmDto | null | undefined,
+): FleetActionConfirmFields {
     const out: FleetActionConfirmFields = {};
     if (body?.confirm === true) out.confirm = true;
     if (typeof body?.confirmName === 'string') out.confirmName = body.confirmName;

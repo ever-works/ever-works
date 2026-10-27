@@ -660,10 +660,12 @@ export class FleetController {
             body.dailyCostCeilingCents === undefined &&
             typeof body.isFavorite !== 'boolean' &&
             body.controlPolicyFamilies === undefined &&
-            typeof body.previewProfileEnabled !== 'boolean'
+            typeof body.previewProfileEnabled !== 'boolean' &&
+            typeof body.recordWatchSessions !== 'boolean' &&
+            body.recordingRetentionDays === undefined
         ) {
             throw new BadRequestException(
-                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite, controlPolicyFamilies and/or previewProfileEnabled',
+                'Provide name, disabled, paused, capabilities, dailyCostCeilingCents, isFavorite, controlPolicyFamilies, previewProfileEnabled, recordWatchSessions and/or recordingRetentionDays',
             );
         }
         // Fleet hub (FL-01, FR-22): rename, pause / resume and disable /
@@ -684,7 +686,9 @@ export class FleetController {
                 body.dailyCostCeilingCents !== undefined ||
                 typeof body.isFavorite === 'boolean' ||
                 body.controlPolicyFamilies !== undefined ||
-                typeof body.previewProfileEnabled === 'boolean')
+                typeof body.previewProfileEnabled === 'boolean' ||
+                typeof body.recordWatchSessions === 'boolean' ||
+                body.recordingRetentionDays !== undefined)
         ) {
             // Owner-only edits beside a lifecycle act are refused before ANY
             // write, so a mixed body can never half-apply.
@@ -741,6 +745,20 @@ export class FleetController {
                 id,
                 body.previewProfileEnabled,
             );
+        }
+        // Desktop view & control (FL-07 P3): the recording settings, owner only.
+        if (
+            typeof body.recordWatchSessions === 'boolean' ||
+            body.recordingRetentionDays !== undefined
+        ) {
+            view = await this.service.setDesktopRecordingSettingsForUser(auth.userId, id, {
+                ...(typeof body.recordWatchSessions === 'boolean'
+                    ? { recordWatchSessions: body.recordWatchSessions }
+                    : {}),
+                ...(body.recordingRetentionDays !== undefined
+                    ? { recordingRetentionDays: body.recordingRetentionDays }
+                    : {}),
+            });
         }
         // Pause first, disable second: when both arrive, the harder stop
         // is the one that must be visible in the returned view.
@@ -873,6 +891,13 @@ export class FleetController {
             selfUpdate: body.selfUpdate,
             // Schedules on computers (FL-13): the machine's time zone, validated by the service.
             timeZone: body.timeZone,
+            // Desktop view & control (FL-07): the screen helper's trust and state, the
+            // displays, the desktop reasons and the admission events, re-normalised by the service.
+            helperTrust: body.helperTrust,
+            helper: body.helper,
+            displays: body.displays,
+            desktopReasons: body.desktopReasons,
+            helperEvents: body.helperEvents,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -930,6 +955,13 @@ export class FleetController {
             selfUpdate: body.selfUpdate,
             // Schedules on computers (FL-13): the machine's time zone, validated by the service.
             timeZone: body.timeZone,
+            // Desktop view & control (FL-07): the screen helper's trust and state, the
+            // displays, the desktop reasons and the admission events, re-normalised by the service.
+            helperTrust: body.helperTrust,
+            helper: body.helper,
+            displays: body.displays,
+            desktopReasons: body.desktopReasons,
+            helperEvents: body.helperEvents,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

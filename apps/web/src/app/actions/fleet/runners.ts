@@ -2,6 +2,14 @@
 
 import { redirect } from 'next/navigation';
 import {
+    isFleetActionsRunnerScope,
+    isFleetActionsRunnerTarget,
+    normalizeFleetActionsWatchedTargets,
+    type FleetActionsCancelRunRequest,
+    type FleetActionsJobsView,
+    type FleetActionsRunnerScope,
+    type FleetActionsRunnersPermissionView,
+    type FleetActionsWatchedTarget,
     isFleetLinkErrorCode,
     type FleetActionsRunnerInstallRequest,
     type FleetActionsRunnerInstallResponse,
@@ -13,7 +21,11 @@ import {
 import { ROUTES } from '@/lib/constants';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
-import { fleetActionsRunnersAPI } from '@/lib/api/fleet-actions-runners';
+import {
+    fleetActionsJobsAPI,
+    fleetActionsRunnersAPI,
+    type FleetActionsWatchedTargetsResponse,
+} from '@/lib/api/fleet-actions-runners';
 
 /**
  * Actions runners on computers (FL-18 P1) — Server Actions over
@@ -95,6 +107,10 @@ export async function installFleetActionsRunnersAction(
         ...(request.names ? { names: request.names } : {}),
         ...(request.labels ? { labels: request.labels } : {}),
         ...(request.mode ? { mode: request.mode } : {}),
+        // P3 (FR-27): the container mode's labelled opt-in, forwarded exactly as ticked.
+        ...(request.mode === 'docker' && typeof request.shareDockerDaemon === 'boolean'
+            ? { shareDockerDaemon: request.shareDockerDaemon }
+            : {}),
         ...(request.confirm === true ? { confirm: true } : {}),
     };
     return run(() => fleetActionsRunnersAPI.install(nodeId, body));
@@ -120,4 +136,61 @@ export async function removeFleetActionsRunnerAction(
     confirmName?: string,
 ): Promise<FleetActionsRunnersResult<FleetActionsRunnerOperationResponse>> {
     return run(() => fleetActionsRunnersAPI.remove(nodeId, runnerId, confirmName));
+}
+
+/** Reinstall one runner with GitHub's newest build (P3, FR-28; `confirm`). Answers 202. */
+export async function reinstallFleetActionsRunnerAction(
+    nodeId: string,
+    runnerId: string,
+    confirm = false,
+): Promise<FleetActionsRunnersResult<FleetActionsRunnerOperationResponse>> {
+    return run(() => fleetActionsRunnersAPI.reinstall(nodeId, runnerId, confirm));
+}
+
+// ─── Actions jobs (FL-18 P2, FR-20 – FR-26) ─────────────────────────────────
+
+/** The hub panel: queued and running jobs of the watched targets, the busy count, the watched list. */
+export async function listFleetActionsJobsAction(): Promise<
+    FleetActionsRunnersResult<FleetActionsJobsView>
+> {
+    return run(() => fleetActionsJobsAPI.jobs());
+}
+
+/** Save the watched list (FR-21); an empty list goes back to the default. Answers the list watched now. */
+export async function setFleetActionsWatchedTargetsAction(
+    targets: FleetActionsWatchedTarget[],
+): Promise<FleetActionsRunnersResult<FleetActionsWatchedTargetsResponse>> {
+    const clean = normalizeFleetActionsWatchedTargets(targets);
+    if (!clean) return { ok: false, error: { code: 'invalid', hint: '' } };
+    return run(() => fleetActionsJobsAPI.setWatched(clean));
+}
+
+/** Cancel a whole workflow run (FR-23, `confirm`). Answers 202. */
+export async function cancelFleetActionsRunAction(
+    request: FleetActionsCancelRunRequest,
+): Promise<FleetActionsRunnersResult<Record<string, unknown>>> {
+    if (
+        !isFleetActionsRunnerTarget('repo', request.repository) ||
+        !Number.isSafeInteger(request.runId)
+    ) {
+        return { ok: false, error: { code: 'invalid', hint: '' } };
+    }
+    const body: FleetActionsCancelRunRequest = {
+        repository: request.repository,
+        runId: request.runId,
+        ...(typeof request.runNumber === 'number' ? { runNumber: request.runNumber } : {}),
+        ...(request.confirm === true ? { confirm: true } : {}),
+    };
+    return run(() => fleetActionsJobsAPI.cancelRun(body));
+}
+
+/** Whether the GitHub App may register runners at an organisation (FR-26, spec §5.6). */
+export async function fleetActionsRunnersPermissionAction(
+    scope: FleetActionsRunnerScope,
+    target: string,
+): Promise<FleetActionsRunnersResult<FleetActionsRunnersPermissionView>> {
+    if (!isFleetActionsRunnerScope(scope) || !isFleetActionsRunnerTarget(scope, target)) {
+        return { ok: false, error: { code: 'invalid', hint: '' } };
+    }
+    return run(() => fleetActionsJobsAPI.permission(scope, target));
 }

@@ -53,21 +53,29 @@ export const sessionsClient = {
         if (query.state) params.set('state', query.state);
         if (query.limit) params.set('limit', String(query.limit));
         const suffix = params.toString() ? `?${params.toString()}` : '';
-        return call<FleetSessionListResponse>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/sessions${suffix}`, {
-            method: 'GET',
-        });
+        return call<FleetSessionListResponse>(
+            `/api/fleet/nodes/${encodeURIComponent(nodeId)}/sessions${suffix}`,
+            {
+                method: 'GET',
+            },
+        );
     },
     listForAgent: (agentId: string, limit = 20) =>
-        call<FleetSessionListResponse>(`/api/fleet/sessions?agentId=${encodeURIComponent(agentId)}&limit=${limit}`, {
-            method: 'GET',
-        }),
+        call<FleetSessionListResponse>(
+            `/api/fleet/sessions?agentId=${encodeURIComponent(agentId)}&limit=${limit}`,
+            {
+                method: 'GET',
+            },
+        ),
     start: (nodeId: string, request: FleetSessionStartRequest) =>
         call<FleetSessionView>(`/api/fleet/nodes/${encodeURIComponent(nodeId)}/sessions`, {
             method: 'POST',
             body: request as unknown as Record<string, unknown>,
         }),
     get: (sessionId: string) =>
-        call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}`, { method: 'GET' }),
+        call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}`, {
+            method: 'GET',
+        }),
     rename: (sessionId: string, title: string) =>
         call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}`, {
             method: 'PATCH',
@@ -80,9 +88,12 @@ export const sessionsClient = {
         }),
     /** P3: the recording's manifest. */
     recording: (sessionId: string) =>
-        call<FleetSessionRecordingManifest>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/recording`, {
-            method: 'GET',
-        }),
+        call<FleetSessionRecordingManifest>(
+            `/api/fleet/sessions/${encodeURIComponent(sessionId)}/recording`,
+            {
+                method: 'GET',
+            },
+        ),
     /** P3: one page of the recording, `seq >= from`. */
     recordingPage: (sessionId: string, from: number, limit = 200) =>
         call<FleetSessionRecordingPage>(
@@ -101,25 +112,34 @@ export const sessionsClient = {
         if (query.nodeId) params.set('nodeId', query.nodeId);
         if (query.agentId) params.set('agentId', query.agentId);
         if (query.kind) params.set('kind', query.kind);
-        return call<FleetSessionBoardResponse>(`/api/fleet/sessions?${params.toString()}`, { method: 'GET' });
+        return call<FleetSessionBoardResponse>(`/api/fleet/sessions?${params.toString()}`, {
+            method: 'GET',
+        });
     },
     /** FL-05 P3: the list (live and ended), most recently active first. */
-    list: (query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent'; limit?: number } = {}) => {
+    list: (
+        query: { nodeId?: string; agentId?: string; kind?: 'owner' | 'agent'; limit?: number } = {},
+    ) => {
         const params = new URLSearchParams({ limit: String(query.limit ?? 200) });
         if (query.nodeId) params.set('nodeId', query.nodeId);
         if (query.agentId) params.set('agentId', query.agentId);
         if (query.kind) params.set('kind', query.kind);
-        return call<FleetSessionListResponse>(`/api/fleet/sessions?${params.toString()}`, { method: 'GET' });
+        return call<FleetSessionListResponse>(`/api/fleet/sessions?${params.toString()}`, {
+            method: 'GET',
+        });
     },
     /** FL-05 P2: answer what a session asks — one option, or a free text. */
     answer: (
         sessionId: string,
         answer: { key: string; optionId?: string; text?: string; source?: 'card' | 'detail' },
     ) =>
-        call<FleetSessionAnswerResponse>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}/answer`, {
-            method: 'POST',
-            body: answer,
-        }),
+        call<FleetSessionAnswerResponse>(
+            `/api/fleet/sessions/${encodeURIComponent(sessionId)}/answer`,
+            {
+                method: 'POST',
+                body: answer,
+            },
+        ),
     /** FL-05 P2: opening a session acknowledges its attention (clears unread, never the prompt). */
     acknowledge: (sessionId: string, key: string) =>
         call<FleetSessionView>(`/api/fleet/sessions/${encodeURIComponent(sessionId)}`, {

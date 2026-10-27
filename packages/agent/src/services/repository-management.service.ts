@@ -8,6 +8,7 @@ import {
     assertRepositoryRole,
     hasRepositoryRole,
 } from '../works/repository-work-guard';
+import { assertNotAppWork } from '../works/app-work-guard';
 
 export type RepositoryType = 'data' | 'work' | 'website';
 
@@ -153,6 +154,9 @@ export class RepositoryManagementService {
         // provision (a Company Work has no website repo to flip). Checked
         // after the switch so an unknown role keeps its own error.
         assertNotRepositoryWork(work, 'changing repository visibility');
+        // APW-01 T10 (lane aw-safety) — the visibility of an App Work's repository (a fork, a
+        // private copy, a linked repository) is the member's, set on the code host.
+        assertNotAppWork(work, 'changing repository visibility');
         assertRepositoryRole(work, repoType);
 
         const updated = await this.gitFacade.updateRepository(

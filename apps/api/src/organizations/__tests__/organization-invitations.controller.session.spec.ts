@@ -121,7 +121,9 @@ describe('OrganizationInvitationsController — member changes need a signed-in 
     it('the switch is on unless exactly false', () => {
         expect(organizationMemberChangesSessionOnly({})).toBe(true);
         expect(
-            organizationMemberChangesSessionOnly({ ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY: 'no' }),
+            organizationMemberChangesSessionOnly({
+                ORGANIZATION_MEMBER_CHANGES_SESSION_ONLY: 'no',
+            }),
         ).toBe(true);
         expect(
             organizationMemberChangesSessionOnly({

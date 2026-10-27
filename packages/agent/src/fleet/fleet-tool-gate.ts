@@ -159,7 +159,9 @@ function computerRefusal(
     }
     const key = computer.consentRequired;
     if (key && computer.consents?.[key] !== true) {
-        return refuse('consent', 'consent_missing', fleetConsentHint(key, computer.name), { consent: key });
+        return refuse('consent', 'consent_missing', fleetConsentHint(key, computer.name), {
+            consent: key,
+        });
     }
     return null;
 }
@@ -173,7 +175,8 @@ export function decideFleetToolCall(input: FleetToolGateInput): FleetToolGateDec
     const isRead = tool.readOnly === true;
 
     if (!isRead) {
-        if (input.killSwitch) return refuse('kill_switch', 'kill_switch', FLEET_TOOL_COPY.killSwitch());
+        if (input.killSwitch)
+            return refuse('kill_switch', 'kill_switch', FLEET_TOOL_COPY.killSwitch());
         if (input.workspacePaused) {
             return refuse(
                 'workspace_pause',
@@ -182,7 +185,11 @@ export function decideFleetToolCall(input: FleetToolGateInput): FleetToolGateDec
             );
         }
         if (input.agentPaused) {
-            return refuse('agent_pause', 'permission_denied', `${input.agentName} is paused — resume it on its page`);
+            return refuse(
+                'agent_pause',
+                'permission_denied',
+                `${input.agentName} is paused — resume it on its page`,
+            );
         }
     }
 

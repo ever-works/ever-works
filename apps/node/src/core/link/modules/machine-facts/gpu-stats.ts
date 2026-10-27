@@ -107,7 +107,10 @@ export function parseWindowsVideoControllers(stdout: string): FleetGpuView[] {
 			utilizationPercent: null,
 			memUsedBytes: null,
 			// AdapterRAM is a uint32 and saturates at 4 GiB; a saturated value is not a fact.
-			memTotalBytes: typeof raw.AdapterRAM === 'number' && raw.AdapterRAM > 0 && raw.AdapterRAM < 4294967295 ? raw.AdapterRAM : null
+			memTotalBytes:
+				typeof raw.AdapterRAM === 'number' && raw.AdapterRAM > 0 && raw.AdapterRAM < 4294967295
+					? raw.AdapterRAM
+					: null
 		});
 	}
 	return out;
@@ -115,7 +118,9 @@ export function parseWindowsVideoControllers(stdout: string): FleetGpuView[] {
 
 async function amdSysfs(deps: GpuStatsDeps): Promise<FleetGpuView[]> {
 	if (!deps.readText || !deps.listDir) return [];
-	const cards = (await deps.listDir('/sys/class/drm').catch(() => [] as string[])).filter((entry) => /^card\d+$/.test(entry));
+	const cards = (await deps.listDir('/sys/class/drm').catch(() => [] as string[])).filter((entry) =>
+		/^card\d+$/.test(entry)
+	);
 	const out: FleetGpuView[] = [];
 	for (const card of cards.sort()) {
 		const base = `/sys/class/drm/${card}/device`;
@@ -152,7 +157,9 @@ export async function readGpus(deps: GpuStatsDeps): Promise<FleetGpuView[]> {
 	if (platform === 'linux') {
 		gpus.push(...(await amdSysfs(deps)));
 	} else if (platform === 'darwin') {
-		const result = await runner.run('system_profiler', ['SPDisplaysDataType', '-json'], { timeoutMs: 10_000 }).catch(() => null);
+		const result = await runner
+			.run('system_profiler', ['SPDisplaysDataType', '-json'], { timeoutMs: 10_000 })
+			.catch(() => null);
 		if (result && result.code === 0) {
 			const others = parseAppleDisplays(result.stdout, deps.totalMemBytes?.() ?? null).filter(
 				(gpu) => gpu.vendor !== 'nvidia' || gpus.every((known) => known.model !== gpu.model)
@@ -160,10 +167,16 @@ export async function readGpus(deps: GpuStatsDeps): Promise<FleetGpuView[]> {
 			gpus.push(...others);
 		}
 	} else if (platform === 'win32') {
-		const result = await runner.run(POWERSHELL, powerShellArgs(WINDOWS_SCRIPT), { timeoutMs: 10_000 }).catch(() => null);
+		const result = await runner
+			.run(POWERSHELL, powerShellArgs(WINDOWS_SCRIPT), { timeoutMs: 10_000 })
+			.catch(() => null);
 		if (result && result.code === 0) {
 			// nvidia-smi already described its cards with live numbers; keep the rest.
-			gpus.push(...parseWindowsVideoControllers(result.stdout).filter((gpu) => gpu.vendor !== 'nvidia' || gpus.length === 0));
+			gpus.push(
+				...parseWindowsVideoControllers(result.stdout).filter(
+					(gpu) => gpu.vendor !== 'nvidia' || gpus.length === 0
+				)
+			);
 		}
 	}
 
@@ -171,7 +184,13 @@ export async function readGpus(deps: GpuStatsDeps): Promise<FleetGpuView[]> {
 		// Last resort: the heartbeat's own probe — a model, nothing more.
 		const known = await detectGpu(runner, platform).catch(() => null);
 		if (known) {
-			gpus.push({ vendor: known.vendor, model: known.model, utilizationPercent: null, memUsedBytes: null, memTotalBytes: null });
+			gpus.push({
+				vendor: known.vendor,
+				model: known.model,
+				utilizationPercent: null,
+				memUsedBytes: null,
+				memTotalBytes: null
+			});
 		}
 	}
 	return gpus.slice(0, 16);

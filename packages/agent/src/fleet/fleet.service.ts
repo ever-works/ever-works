@@ -46,6 +46,7 @@ import {
     fleetConsentsDiffer,
     isFleetNodeVersionBelowFloor,
     normalizeFleetConsents,
+    normalizeFleetHelperTrust,
     normalizeFleetNodeSelfUpdate,
     isFleetTimeZone,
     normalizeFleetNodeWorkerState,
@@ -63,6 +64,11 @@ import {
 } from '@ever-works/contracts';
 import { fleetVirtualViewOf } from './virtual/fleet-virtual.view';
 import { fleetCloudRemovableNode, fleetCloudViewOf } from './cloud/fleet-cloud.view';
+import {
+    applyReportedDesktop,
+    fleetNodeDesktopViewOf,
+    helperEventAudit,
+} from './desktop/fleet-desktop-facts';
 import type {
     FleetAuditAction,
     FleetNodeHealthStored,
@@ -302,6 +308,17 @@ export interface EnrollInput {
      * unusable leaves the stored zone alone.
      */
     timeZone?: unknown;
+    /**
+     * Desktop view & control (FL-07, CONTRACTS §1.1, R-8) — the screen
+     * helper's trust and state, the displays, the desktop reasons and the
+     * admission events. Untrusted: re-normalised by `applyReportedDesktop`;
+     * a beat carrying none of them leaves the stored facts alone.
+     */
+    helperTrust?: unknown;
+    helper?: unknown;
+    displays?: unknown;
+    desktopReasons?: unknown;
+    helperEvents?: unknown;
 }
 
 /** The enroll patch, widened with the telemetry columns a fresh row is stamped with. */
@@ -785,6 +802,10 @@ export class FleetService {
         if (isFleetTimeZone(refresh.timeZone) && node.timeZone !== refresh.timeZone) {
             patch.timeZone = refresh.timeZone;
         }
+        // Desktop view & control (FL-07): the helper's trust and the desktop
+        // facts; admission events not seen before are audited after the write.
+        const desktopReport = applyReportedDesktop(node, refresh, receivedAt);
+        if (desktopReport) Object.assign(patch, desktopReport.patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -819,6 +840,18 @@ export class FleetService {
         // with both sets. The first report of a daemon is not a change, and
         // an unchanged beat writes nothing — one row per node per minute is
         // the firehose the header above refuses.
+        // Desktop view & control (FL-07, FR-16, FR-19, U3): one row per admission
+        // event id — admit, revoke, verify-failed — never a second for a re-send.
+        for (const event of desktopReport?.newEvents ?? []) {
+            const row = helperEventAudit(event);
+            await this.tryAuditNode({
+                action: row.action,
+                actorUserId: null,
+                ownerUserId: node.userId,
+                nodeId: node.id,
+                extra: row.extra,
+            });
+        }
         if (consentChange?.before) {
             await this.tryAuditNode({
                 action: 'node.consent.change',
@@ -1398,6 +1431,95 @@ export class FleetService {
     }
 
     /**
+     * Desktop view & control (FL-07 P3, spec §5.9, FR-48 / FR-52) — the
+     * recording settings of a computer, the first writer of AW-11's two
+     * columns: **Record watching sessions** (`recordWatchSessions`, default
+     * off; a view under control is always recorded) and **Keep recordings
+     * for** (`recordingRetentionDays`, 1–90, default 14). Owner only (anyone
+     * else who may see the node is refused `permission_denied`). Each change
+     * writes one `node.policy.change` audit row `{ setting, from, to }`; a
+     * write that changes nothing writes nothing. A new retention applies to
+     * recordings that stop from now on.
+     */
+    async setDesktopRecordingSettingsForUser(
+        userId: string,
+        nodeId: string,
+        settings: { recordWatchSessions?: unknown; recordingRetentionDays?: unknown },
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
+        const wanted: { recordWatchSessions?: boolean; recordingRetentionDays?: number } = {};
+        if (settings.recordWatchSessions !== undefined) {
+            if (typeof settings.recordWatchSessions !== 'boolean') {
+                throw new BadRequestException('recordWatchSessions must be true or false');
+            }
+            wanted.recordWatchSessions = settings.recordWatchSessions;
+        }
+        if (settings.recordingRetentionDays !== undefined) {
+            const days = settings.recordingRetentionDays;
+            if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) {
+                throw new BadRequestException(
+                    'recordingRetentionDays must be a whole number of days from 1 to 90',
+                );
+            }
+            wanted.recordingRetentionDays = days;
+        }
+        const node = await this.getOwnedNodeForOwnerAct(userId, nodeId, 'view');
+        const changes: Array<{
+            setting: 'recordWatchSessions' | 'recordingRetentionDays';
+            from: unknown;
+            to: unknown;
+        }> = [];
+        if (
+            wanted.recordWatchSessions !== undefined &&
+            Boolean(node.recordWatchSessions) !== wanted.recordWatchSessions
+        ) {
+            changes.push({
+                setting: 'recordWatchSessions',
+                from: Boolean(node.recordWatchSessions),
+                to: wanted.recordWatchSessions,
+            });
+        }
+        const storedDays = toOptionalNumber(node.recordingRetentionDays) ?? 14;
+        if (
+            wanted.recordingRetentionDays !== undefined &&
+            storedDays !== wanted.recordingRetentionDays
+        ) {
+            changes.push({
+                setting: 'recordingRetentionDays',
+                from: storedDays,
+                to: wanted.recordingRetentionDays,
+            });
+        }
+        if (changes.length === 0) return this.toView(node);
+        const write: Partial<FleetNode> = {};
+        if (changes.some((change) => change.setting === 'recordWatchSessions')) {
+            write.recordWatchSessions = wanted.recordWatchSessions;
+        }
+        if (changes.some((change) => change.setting === 'recordingRetentionDays')) {
+            write.recordingRetentionDays = wanted.recordingRetentionDays;
+        }
+        await this.repository.update(node.id, write);
+        const actor = ctx.actorUserId === undefined ? userId : ctx.actorUserId;
+        for (const change of changes) {
+            await this.auditLifecycle('node.policy.change', userId, node, ctx, {
+                before: { [change.setting]: change.from },
+                after: { [change.setting]: change.to },
+                extra: {
+                    family: 'desktop',
+                    setting: change.setting,
+                    from: change.from,
+                    to: change.to,
+                    target: change.setting,
+                    requestedBy: actor ? `user:${actor}` : 'system:fleet',
+                    confirmationClass: 'plain',
+                    outcome: 'success',
+                },
+            });
+        }
+        return this.toView({ ...node, ...write } as FleetNode);
+    }
+
+    /**
      * Fleet hub (FL-01) — change who may act in one or more action families
      * (CONTRACTS §2.1). Owner only. `families` is a PARTIAL map: families it
      * names change, the rest keep what they had.
@@ -1497,37 +1619,44 @@ export class FleetService {
         const rows = await this.repository.findByUser(userId);
         const now = Date.now();
         const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
-        return rows
-            // A virtual computer being built (FL-16) is not a token a person
-            // minted: its row waits for the guest, which is handed its own
-            // token when it is ready. The hub shows it under its host instead.
-            // A cloud computer (FL-17) is the same: its token went into the
-            // provider's bootstrap, and the hub shows the row with its phase.
-            .filter((row) => row.status === 'enrolling' && row.origin !== 'virtual' && row.origin !== 'cloud')
-            .map((row) => {
-                const issuedAtMs = credentialIssuedAtMs(row);
-                const hasIssuedAt = Number.isFinite(issuedAtMs);
-                // The LIVE TTL, not the exported default: this list is the
-                // expiry an operator is SHOWN, and `enroll` validates
-                // against `config.fleet.getEnrollmentTokenTtlMs()`. Reading
-                // the constant here made the two disagree the moment
-                // `FLEET_ENROLLMENT_TOKEN_TTL_MS` was set — a token listed
-                // as live that enroll refuses, or the reverse.
-                const expiresAtMs = issuedAtMs + ttlMs;
-                return {
-                    nodeId: row.id,
-                    name: row.name,
-                    kind: row.kind,
-                    issuedAt: hasIssuedAt ? new Date(issuedAtMs).toISOString() : null,
-                    expiresAt: hasIssuedAt ? new Date(expiresAtMs).toISOString() : null,
-                    // A row we cannot date is treated as expired — the
-                    // enroll path refuses it for the same reason.
-                    expired: !hasIssuedAt || expiresAtMs <= now,
-                    // A rotation mints a token on a row that already
-                    // beat once; a fresh "add node" never has.
-                    rotated: Boolean(row.lastHeartbeatAt),
-                };
-            });
+        return (
+            rows
+                // A virtual computer being built (FL-16) is not a token a person
+                // minted: its row waits for the guest, which is handed its own
+                // token when it is ready. The hub shows it under its host instead.
+                // A cloud computer (FL-17) is the same: its token went into the
+                // provider's bootstrap, and the hub shows the row with its phase.
+                .filter(
+                    (row) =>
+                        row.status === 'enrolling' &&
+                        row.origin !== 'virtual' &&
+                        row.origin !== 'cloud',
+                )
+                .map((row) => {
+                    const issuedAtMs = credentialIssuedAtMs(row);
+                    const hasIssuedAt = Number.isFinite(issuedAtMs);
+                    // The LIVE TTL, not the exported default: this list is the
+                    // expiry an operator is SHOWN, and `enroll` validates
+                    // against `config.fleet.getEnrollmentTokenTtlMs()`. Reading
+                    // the constant here made the two disagree the moment
+                    // `FLEET_ENROLLMENT_TOKEN_TTL_MS` was set — a token listed
+                    // as live that enroll refuses, or the reverse.
+                    const expiresAtMs = issuedAtMs + ttlMs;
+                    return {
+                        nodeId: row.id,
+                        name: row.name,
+                        kind: row.kind,
+                        issuedAt: hasIssuedAt ? new Date(issuedAtMs).toISOString() : null,
+                        expiresAt: hasIssuedAt ? new Date(expiresAtMs).toISOString() : null,
+                        // A row we cannot date is treated as expired — the
+                        // enroll path refuses it for the same reason.
+                        expired: !hasIssuedAt || expiresAtMs <= now,
+                        // A rotation mints a token on a row that already
+                        // beat once; a fresh "add node" never has.
+                        rotated: Boolean(row.lastHeartbeatAt),
+                    };
+                })
+        );
     }
 
     /**
@@ -1958,7 +2087,10 @@ export class FleetService {
         // bill — the owner destroys it from the Fleet. Its credential dies here
         // (heartbeat fails closed on a NULL hash) and the row stays, drained.
         if ((node.origin === 'cloud' || node.providerPluginId) && !fleetCloudRemovableNode(node)) {
-            await this.repository.update(node.id, { status: 'disabled', enrollmentTokenHash: null });
+            await this.repository.update(node.id, {
+                status: 'disabled',
+                enrollmentTokenHash: null,
+            });
             await this.tryAuditNode({
                 action: 'node.unenroll',
                 actorUserId: null,
@@ -2038,7 +2170,11 @@ export class FleetService {
         throw new UnprocessableEntityException({
             statusCode: 422,
             message: hint,
-            error: { code: 'unsupported_on_node', hint, details: { origin: 'cloud', action: 'destroy' } },
+            error: {
+                code: 'unsupported_on_node',
+                hint,
+                details: { origin: 'cloud', action: 'destroy' },
+            },
         });
     }
 
@@ -2060,7 +2196,8 @@ export class FleetService {
         // Read through a guard: a repository double built before FL-16 has no
         // children finder, and a registry without one has no children.
         const finder = (this.repository as Partial<FleetNodeRepository>).findByHostNodeIds;
-        const children = typeof finder === 'function' ? await finder.call(this.repository, [node.id]) : [];
+        const children =
+            typeof finder === 'function' ? await finder.call(this.repository, [node.id]) : [];
         if (children.length > 0) {
             const names = children.map((child) => child.name).sort();
             const hint =
@@ -2080,7 +2217,11 @@ export class FleetService {
         const host = node.hostNodeId ? await this.repository.findById(node.hostNodeId) : null;
         if (!host) return;
         const hostBeat = host.lastHeartbeatAt ? new Date(host.lastHeartbeatAt).getTime() : NaN;
-        if (!Number.isFinite(hostBeat) || Date.now() - hostBeat > FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS) return;
+        if (
+            !Number.isFinite(hostBeat) ||
+            Date.now() - hostBeat > FLEET_VIRTUAL_ORPHAN_HOST_SILENCE_MS
+        )
+            return;
         const hint = `${node.name} still runs on ${host.name}; destroy it instead`;
         throw new UnprocessableEntityException({
             statusCode: 422,
@@ -2415,6 +2556,9 @@ export class FleetService {
             // (provider, region, size, power, phase, cost, R-36 removability).
             providerPluginId: node.providerPluginId ?? null,
             cloud: fleetCloudViewOf(node),
+            // Desktop view & control (FL-07): the helper's trust and the desktop facts.
+            helperTrust: normalizeFleetHelperTrust(node.helperTrust),
+            desktop: fleetNodeDesktopViewOf(node),
         };
     }
 
@@ -2691,6 +2835,13 @@ function toSharedView(
         // no unit name. The disk floor and the resource ceilings stay withheld,
         // so a shared reader's "disk low" is the percentage rule only.
         health: view.health ?? null,
+        // Desktop view & control (FL-07) — DECIDED shared: the helper's trust is
+        // the "Reduced trust" label every surface shows (FR-17), and the `view`
+        // audience sees the Desktop tab and its reason (FR-27); the block holds
+        // display names and sizes and an 8-digit fingerprint prefix, never a
+        // hash, a path or a picture.
+        helperTrust: view.helperTrust ?? 'none',
+        desktop: view.desktop ?? null,
     };
 }
 
@@ -2723,6 +2874,8 @@ export const FLEET_SHARED_VIEW_FIELDS: readonly (keyof FleetNodeView)[] = [
     'providerPluginId',
     'cloud',
     'health',
+    'helperTrust',
+    'desktop',
 ];
 
 /**

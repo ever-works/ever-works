@@ -19,8 +19,11 @@ export const readCommand = new Command('read')
             json,
             { method: 'GET', path: `/fleet/sessions/${id}` },
             (session) => {
-                console.log(`${chalk.bold(session.title)}  ${session.state}  ${chalk.gray(session.id)}`);
-                if (typeof session.screen === 'string' && session.screen.length > 0) console.log(session.screen);
+                console.log(
+                    `${chalk.bold(session.title)}  ${session.state}  ${chalk.gray(session.id)}`,
+                );
+                if (typeof session.screen === 'string' && session.screen.length > 0)
+                    console.log(session.screen);
             },
         );
     });

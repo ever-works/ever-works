@@ -72,15 +72,21 @@ async function run<T>(call: () => Promise<T>): Promise<FleetCloudResult<T>> {
     }
 }
 
-export async function listFleetCloudProvidersAction(): Promise<FleetCloudResult<FleetCloudProvidersView>> {
+export async function listFleetCloudProvidersAction(): Promise<
+    FleetCloudResult<FleetCloudProvidersView>
+> {
     return run(() => fleetCloudAPI.providers());
 }
 
-export async function fleetCloudOptionsAction(pluginId: string): Promise<FleetCloudResult<FleetCloudOptionsView>> {
+export async function fleetCloudOptionsAction(
+    pluginId: string,
+): Promise<FleetCloudResult<FleetCloudOptionsView>> {
     return run(() => fleetCloudAPI.options(pluginId));
 }
 
-export async function listFleetCloudAction(): Promise<FleetCloudResult<FleetCloudListView & FleetCloudProvidersView>> {
+export async function listFleetCloudAction(): Promise<
+    FleetCloudResult<FleetCloudListView & FleetCloudProvidersView>
+> {
     return run(() => fleetCloudAPI.list());
 }
 
@@ -95,6 +101,10 @@ export async function createFleetCloudAction(
         acknowledgedPriceCents: request.acknowledgedPriceCents,
         ...(request.software ? { software: request.software } : {}),
         ...(request.confirm === true ? { confirm: true } : {}),
+        // P3 (FR-32): the overlay-VPN key, once, into the first-boot script; never stored.
+        ...(typeof request.vpnAuthKey === 'string' && request.vpnAuthKey.trim()
+            ? { vpnAuthKey: request.vpnAuthKey.trim() }
+            : {}),
     };
     return run(() => fleetCloudAPI.create(body));
 }
@@ -124,10 +134,14 @@ export async function setFleetCloudIdlePolicyAction(
     nodeId: string,
     policy: FleetCloudIdlePolicy,
 ): Promise<FleetCloudResult<FleetNodeView>> {
-    return run(() => fleetCloudAPI.setIdlePolicy(nodeId, { mode: policy.mode, afterHours: policy.afterHours }));
+    return run(() =>
+        fleetCloudAPI.setIdlePolicy(nodeId, { mode: policy.mode, afterHours: policy.afterHours }),
+    );
 }
 
 /** P2 (spec S6) — "Keep running": the idle window starts again now. */
-export async function keepFleetCloudRunningAction(nodeId: string): Promise<FleetCloudResult<FleetNodeView>> {
+export async function keepFleetCloudRunningAction(
+    nodeId: string,
+): Promise<FleetCloudResult<FleetNodeView>> {
     return run(() => fleetCloudAPI.keepRunning(nodeId));
 }

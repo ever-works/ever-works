@@ -40,7 +40,8 @@ export function runnerStoppedItems(
             ) {
                 continue;
             }
-            const since = toIso(runner.lastSeenAt ?? runner.installedAt) ?? context.now.toISOString();
+            const since =
+                toIso(runner.lastSeenAt ?? runner.installedAt) ?? context.now.toISOString();
             const minutes = Math.max(
                 FLEET_ACTIONS_RUNNER_STOPPED_AFTER_MIN,
                 Math.round((context.now.getTime() - Date.parse(since)) / 60_000),
@@ -52,7 +53,10 @@ export function runnerStoppedItems(
                 kind: 'runner-stopped',
                 title: `${runner.name} stopped`,
                 detail: `${runner.target} runner offline for ${minutes} min`,
-                action: { label: 'Start', route: `/fleet/computers/${node.id}?runner=${runner.id}` },
+                action: {
+                    label: 'Start',
+                    route: `/fleet/computers/${node.id}?runner=${runner.id}`,
+                },
                 since,
             });
         }
@@ -74,7 +78,10 @@ export class FleetActionsRunnersNeedsALookProducer implements NeedsALookProducer
         this.registry?.register(this);
     }
 
-    async produce(nodes: readonly FleetNodeView[], context: NeedsALookContext): Promise<NeedsALookItem[]> {
+    async produce(
+        nodes: readonly FleetNodeView[],
+        context: NeedsALookContext,
+    ): Promise<NeedsALookItem[]> {
         if (!config.fleet.isActionsRunnersEnabled() || nodes.length === 0) return [];
         const rows = await this.runners.listForNodes(nodes.map((node) => node.id));
         if (rows.length === 0) return [];

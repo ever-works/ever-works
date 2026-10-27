@@ -209,6 +209,8 @@ const sidebars: SidebarsConfig = {
 				'features/fleet-services-docker',
 				// What a computer serves, opened on it or previewed in your browser (FL-10).
 				'features/fleet-ports',
+				// A computer's whole desktop, live — watch, take control, re-watch the recordings (FL-07).
+				'features/fleet-desktop',
 				// Containers (and later Windows VMs) created on a computer of the Fleet (FL-16).
 				'features/fleet-virtual-computers',
 				'features/fleet-cloud-computers',
@@ -452,7 +454,8 @@ const sidebars: SidebarsConfig = {
 						'plugin-system/creating-content-extractor-plugin',
 						'plugin-system/creating-pipeline-plugin',
 						'plugin-system/creating-deployment-plugin',
-						'plugin-system/creating-data-source-plugin'
+						'plugin-system/creating-data-source-plugin',
+						'plugin-system/creating-machine-provider-plugin'
 					]
 				},
 				'plugin-system/built-in-plugins',

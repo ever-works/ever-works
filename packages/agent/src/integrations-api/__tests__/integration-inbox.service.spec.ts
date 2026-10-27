@@ -191,7 +191,10 @@ describe('IntegrationInboxService — merge approvals and relay provenance', () 
     it('decisionScopeOf: merge, individual (email draft, identity-file edit, escalation closure) or none', async () => {
         const cases: Array<[Record<string, unknown> | null | Error, string | null]> = [
             [{ id: 'p', actionType: 'merge_pull_request' }, 'merge'],
-            [{ id: 'p', actionType: 'send_message', payload: { kind: 'email-draft' } }, 'individual'],
+            [
+                { id: 'p', actionType: 'send_message', payload: { kind: 'email-draft' } },
+                'individual',
+            ],
             [{ id: 'p', actionType: 'other', payload: { kind: 'agent-file-edit' } }, 'individual'],
             [
                 { id: 'p', actionType: 'other', payload: { kind: 'agent-escalation-resolution' } },
@@ -209,7 +212,9 @@ describe('IntegrationInboxService — merge approvals and relay provenance', () 
             ).resolves.toBe(expected);
         }
         const { service, repo } = fake({ id: 'p', actionType: 'merge_pull_request' });
-        await expect(service.decisionScopeOf({ kind: 'question', proposalId: 'p' })).resolves.toBeNull();
+        await expect(
+            service.decisionScopeOf({ kind: 'question', proposalId: 'p' }),
+        ).resolves.toBeNull();
         await expect(
             service.decisionScopeOf({ kind: 'approval', proposalId: null }),
         ).resolves.toBeNull();

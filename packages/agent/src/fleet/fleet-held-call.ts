@@ -116,7 +116,18 @@ export function fleetHeldCallSummary(
 ): string {
     const who = agentName && agentName.trim().length > 0 ? agentName.trim() : 'An Agent';
     const action = argText(args, 'action', 'signal');
-    const object = argText(args, 'name', 'service', 'container', 'project', 'image', 'port', 'pid', 'path', 'title');
+    const object = argText(
+        args,
+        'name',
+        'service',
+        'container',
+        'project',
+        'image',
+        'port',
+        'pid',
+        'path',
+        'title',
+    );
     const verb = action ?? (entry.verb ? entry.verb.replace(/_/g, ' ') : 'act');
     const phrase = object ? `${verb} ${object}` : verb;
     return `${who} wants to ${phrase} (${entry.family})`.slice(0, 200);
@@ -168,7 +179,9 @@ export function isFleetHeldCallPayload(value: unknown): value is FleetHeldToolCa
  * Agent typed (`confirmName` in its arguments); without one the family answers
  * `confirmation_required` and nothing is deleted.
  */
-export function fleetHeldCallConfirmFields(payload: Pick<FleetHeldToolCallPayload, 'args'>): FleetConfirmArgs {
+export function fleetHeldCallConfirmFields(
+    payload: Pick<FleetHeldToolCallPayload, 'args'>,
+): FleetConfirmArgs {
     const out: FleetConfirmArgs = { confirm: true, acknowledgeBlastRadius: true };
     if (typeof payload.args.confirmName === 'string') out.confirmName = payload.args.confirmName;
     return out;
@@ -190,7 +203,12 @@ export function isFleetHeldCallStale(
 export function fleetHeldCallSubjectKey(
     payload: Pick<FleetHeldToolCallPayload, 'agentId' | 'tool' | 'args' | 'raisedAt'>,
 ): string {
-    const text = JSON.stringify([payload.agentId, payload.tool, payload.args, payload.raisedAt.slice(0, 13)]);
+    const text = JSON.stringify([
+        payload.agentId,
+        payload.tool,
+        payload.args,
+        payload.raisedAt.slice(0, 13),
+    ]);
     // FNV-1a — a stable, dependency-free digest; collisions only merge two proposals' de-duplication.
     let hash = 0x811c9dc5;
     for (let index = 0; index < text.length; index += 1) {

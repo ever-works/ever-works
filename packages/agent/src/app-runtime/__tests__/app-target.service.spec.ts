@@ -14,7 +14,10 @@ import { AppTargetService, parseSettings, runtimeStateOf } from '../app-target.s
 
 const KUBECONFIG = 'apiVersion: v1\nkind: Config\nclusters: []\n# sentinel-secret-7f3a\n';
 
-function harness(row: Record<string, unknown> | null = { target: 'none', targetSettings: {} }) {
+function harness(
+    row: Record<string, unknown> | null = { target: 'none', targetSettings: {} },
+    tier: unknown = new ConfigAppsTierPolicy({}),
+) {
     let state = row ? { ...row } : null;
     const states = {
         getOrCreate: jest.fn(async () => (state ? { ...state } : null)),
@@ -61,7 +64,7 @@ function harness(row: Record<string, unknown> | null = { target: 'none', targetS
         registry as never,
         settings as never,
         ops,
-        new ConfigAppsTierPolicy({}),
+        tier as never,
     );
     return { service, states, works, deployments, settings, ops, registry, k8s, work };
 }
@@ -168,6 +171,63 @@ describe('AppTargetService.putTarget / getTarget (PUT/GET app-target)', () => {
         expect(ops.dispatch).toHaveBeenCalledWith(
             expect.objectContaining({ op: 'prepare-namespace' }),
         );
+    });
+
+    it("judges choosing the managed tier like a deploy to it: the cap counts the owner's OTHER App Works", async () => {
+        const eligibility = jest.fn(async () => ({ eligible: false, reasons: ['capReached'] }));
+        const { service, states } = harness(undefined, { isOpen: () => true, eligibility });
+
+        const result = await service.putTarget('w-1', 'u-1', { target: 'ever-works-apps' });
+
+        // Without the Work id the per-owner cap is not evaluated at all (ports.ts `eligibility` opts).
+        expect(eligibility).toHaveBeenCalledWith('u-1', { workId: 'w-1' });
+        expect(result).toMatchObject({
+            ok: false,
+            refusal: {
+                httpStatus: 422,
+                code: 'APP_TARGET_REFUSED',
+                unmet: [{ code: 'managed_ineligible' }],
+            },
+        });
+        expect(states.patchRuntimeState).not.toHaveBeenCalled();
+    });
+
+    it('tells a free owner at the cap that a paid plan lifts it — on PUT and on GET (owner decision 2026-10-27)', async () => {
+        const eligibility = jest.fn(async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            max: 3,
+            paidPlanAllowsMore: true,
+        }));
+        const { service } = harness(undefined, { isOpen: () => true, eligibility });
+
+        const put = await service.putTarget('w-1', 'u-1', { target: 'ever-works-apps' });
+        expect(put).toMatchObject({
+            ok: false,
+            refusal: { unmet: [{ code: 'managed_ineligible', names: ['capReached'] }] },
+        });
+        expect((put as { refusal: { message: string } }).refusal.message).toContain(
+            'A paid plan allows more App Works on Ever Works Apps',
+        );
+
+        await expect(service.getTarget('w-1', 'u-1')).resolves.toMatchObject({
+            eligibility: {
+                managed: { eligible: false, reasons: ['capReached'], paidPlanAllowsMore: true },
+            },
+        });
+    });
+
+    it('a paid owner at the paid cap gets no upgrade hint (GET answers no paidPlanAllowsMore)', async () => {
+        const eligibility = jest.fn(async () => ({
+            eligible: false,
+            reasons: ['capReached'],
+            max: 10,
+        }));
+        const { service } = harness(undefined, { isOpen: () => true, eligibility });
+
+        const body = await service.getTarget('w-1', 'u-1');
+
+        expect(body.eligibility?.managed).toEqual({ eligible: false, reasons: ['capReached'] });
     });
 
     it('refuses the managed target while the tier is closed (422 APP_TARGET_REFUSED managed_disabled)', async () => {
@@ -433,7 +493,12 @@ describe('AppTargetService — works-security: cluster credential provenance and
 
     it('records who saved a kubeconfig, and whether they were the owner', async () => {
         const editor = harness({ target: 'your-cluster', targetSettings: { tls: 'none' } });
-        await editor.service.check('w-1', 'u-editor', { kubeconfig: KUBECONFIG }, { isOwner: false });
+        await editor.service.check(
+            'w-1',
+            'u-editor',
+            { kubeconfig: KUBECONFIG },
+            { isOwner: false },
+        );
         const editorPatch = editor.states.patchRuntimeState.mock.calls.at(-1)?.[1] as {
             target?: string;
             targetSettings: { tls?: string; clusterCredential: Record<string, unknown> };
@@ -483,7 +548,9 @@ describe('AppTargetService — works-security: cluster credential provenance and
     it("the owner's confirmation is recorded and satisfies the rule", async () => {
         const h = harness({
             target: 'your-cluster',
-            targetSettings: { clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false } },
+            targetSettings: {
+                clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false },
+            },
         });
         await expect(h.service.confirmClusterCredential('w-1', 'u-owner')).resolves.toBe(true);
         expect(h.states.patchRuntimeState.mock.calls.at(-1)?.[1]).toMatchObject({
@@ -528,7 +595,9 @@ describe('AppTargetService — works-security: cluster credential provenance and
 
     it('a supported shape (or a plugin without the check) is stored as before', async () => {
         const h = harness();
-        (h.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({ ok: true }));
+        (h.k8s as Record<string, unknown>).checkClusterCredentialShape = jest.fn(() => ({
+            ok: true,
+        }));
         await expect(
             h.service.check('w-1', 'u-1', { kubeconfig: KUBECONFIG }),
         ).resolves.toMatchObject({ ok: true });
@@ -536,9 +605,15 @@ describe('AppTargetService — works-security: cluster credential provenance and
     });
 
     it('pendingTargetChange names a target or namespace change and nothing else', async () => {
-        const h = harness({ target: 'your-cluster', targetSettings: { namespaceOverride: 'app-a' } });
+        const h = harness({
+            target: 'your-cluster',
+            targetSettings: { namespaceOverride: 'app-a' },
+        });
         await expect(
-            h.service.pendingTargetChange('w-1', { target: 'your-cluster', settings: { tls: 'none' } }),
+            h.service.pendingTargetChange('w-1', {
+                target: 'your-cluster',
+                settings: { tls: 'none' },
+            }),
         ).resolves.toEqual({ targetChanges: false, namespaceChanges: false });
         await expect(
             h.service.pendingTargetChange('w-1', {
@@ -566,7 +641,9 @@ describe('AppTargetService — works-security: cluster credential provenance and
     it('putTarget keeps the credential provenance (the settings parser never accepts it)', async () => {
         const h = harness({
             target: 'your-cluster',
-            targetSettings: { clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false } },
+            targetSettings: {
+                clusterCredential: { savedByUserId: 'u-editor', savedByOwner: false },
+            },
         });
         await h.service.putTarget('w-1', 'u-editor', {
             target: 'your-cluster',

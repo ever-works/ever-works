@@ -62,7 +62,10 @@ export type FleetReachActionResult<T> =
     | { success: true; data: T; error: null; code: null }
     | { success: false; data: null; error: string; code: string | null };
 
-async function reach<T>(run: () => Promise<T>, fallback: string): Promise<FleetReachActionResult<T>> {
+async function reach<T>(
+    run: () => Promise<T>,
+    fallback: string,
+): Promise<FleetReachActionResult<T>> {
     await ensureAuth();
     try {
         const data = await run();

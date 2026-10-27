@@ -228,6 +228,42 @@ export class UpdateFleetNodeDto {
     @IsOptional()
     @IsBoolean()
     previewProfileEnabled?: boolean;
+
+    /**
+     * Desktop view & control (FL-07 P3, spec §5.9, FR-48) — record a
+     * watch-only Desktop view of this computer too (a view under control is
+     * always recorded). Owner only; audited `node.policy.change`.
+     */
+    @ApiProperty({
+        required: false,
+        description:
+            'Desktop view & control — also record Desktop views of this computer that are only watched (views under control are always recorded). Owner only.',
+    })
+    // `null` is not "absent": it is refused here, before any field of the PATCH is written.
+    @ValidateIf((body: { recordWatchSessions?: unknown }) => body.recordWatchSessions !== undefined)
+    @IsBoolean()
+    recordWatchSessions?: boolean;
+
+    /**
+     * Desktop view & control (FL-07 P3, FR-52) — how many days a recording of
+     * this computer is kept after its view ended, 1–90 (default 14). Owner
+     * only; audited `node.policy.change`. Applies to recordings that stop
+     * from now on.
+     */
+    @ApiProperty({
+        required: false,
+        minimum: 1,
+        maximum: 90,
+        description:
+            'Desktop view & control — days a recording of this computer is kept after its view ended (1–90, default 14). Applies to recordings that stop from now on. Owner only.',
+    })
+    @ValidateIf(
+        (body: { recordingRetentionDays?: unknown }) => body.recordingRetentionDays !== undefined,
+    )
+    @IsInt()
+    @Min(1)
+    @Max(90)
+    recordingRetentionDays?: number;
 }
 
 /**
@@ -697,7 +733,8 @@ export class FleetNodeSelfDescriptionDto {
         required: false,
         maxLength: 128,
         example: 'a1b2c3d4e5f60718',
-        description: 'Opaque hash of the network the primary interface is on (never an address). --manage only.',
+        description:
+            'Opaque hash of the network the primary interface is on (never an address). --manage only.',
     })
     @IsOptional()
     @IsString()
@@ -754,6 +791,79 @@ export class FleetNodeSelfDescriptionDto {
     @IsString()
     @MaxLength(64)
     timeZone?: string;
+
+    /**
+     * Desktop view & control (FL-07, CONTRACTS §1.1, R-8) — the native screen
+     * helper's trust: `none` · `hash-pinned` · `signed`. Only a bounded string
+     * here: `FleetService` normalises it (`normalizeFleetHelperTrust`, anything
+     * unknown reads `none`), so a newer node's level never 400s the beat.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: 32,
+        example: 'hash-pinned',
+        description:
+            "The screen helper's trust on this machine: none, hash-pinned (reduced trust) or signed.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    helperTrust?: string;
+
+    /**
+     * Desktop view & control (FL-07) — the screen helper's state. Only
+     * `@IsObject()`, for the reason `health` is: the service keeps the known
+     * fields within their bounds (`normalizeFleetHelperStatus`) and drops the
+     * rest; it never carries a hash.
+     */
+    @ApiProperty({
+        required: false,
+        type: Object,
+        description:
+            'The screen helper: trust, present, admitted, version, an 8-digit fingerprint prefix, the last verification. Unknown or malformed values are dropped, never rejected.',
+    })
+    @IsOptional()
+    @IsObject()
+    helper?: Record<string, unknown>;
+
+    /** Desktop view & control (FL-07) — the displays the helper enumerated (at most 64 entries reach the service). */
+    @ApiProperty({
+        required: false,
+        type: [Object],
+        description:
+            'The displays: id, name, width, height, scale, primary, virtual. Unknown or malformed entries are dropped.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(64)
+    displays?: Record<string, unknown>[];
+
+    /** Desktop view & control (FL-07, FR-3, FR-4) — why the Desktop source is unavailable here; unknown reasons are dropped. */
+    @ApiProperty({
+        required: false,
+        type: [String],
+        example: ['helper-unadmitted'],
+        description:
+            'Why the Desktop source is unavailable on this machine right now (empty when it is available).',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(64)
+    @IsString({ each: true })
+    @MaxLength(64, { each: true })
+    desktopReasons?: string[];
+
+    /** Desktop view & control (FL-07, FR-16, FR-19, U3) — the helper admission events the node holds (audited once per id). */
+    @ApiProperty({
+        required: false,
+        type: [Object],
+        description:
+            'Screen helper admission events (admit, revoke, verify-failed), newest last. Each id is audited once.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(64)
+    helperEvents?: Record<string, unknown>[];
 }
 
 /**

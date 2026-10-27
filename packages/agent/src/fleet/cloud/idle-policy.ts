@@ -52,7 +52,8 @@ const HOUR_MS = 60 * 60 * 1000;
 export function isIdleNow(evidence: Omit<CloudIdleEvidence, 'nowMs' | 'nodeId'>): boolean {
     const { meta } = evidence;
     if (evidence.status === 'enrolling') return false;
-    if (meta.powerState !== 'running' || meta.pending !== null || meta.phase === 'failed') return false;
+    if (meta.powerState !== 'running' || meta.pending !== null || meta.phase === 'failed')
+        return false;
     if (evidence.busySessions > 0 || evidence.activeJobs > 0) return false;
     // Every sample flat. A sample with no CPU figure is no evidence either way.
     return evidence.cpuSamples.every((cpu) => cpu === null || cpu < FLEET_CLOUD_IDLE_CPU_PERCENT);
@@ -64,11 +65,18 @@ export function evaluateCloudIdle(evidence: CloudIdleEvidence): CloudIdleDecisio
     }
     const { meta, nowMs } = evidence;
     const opened = meta.idleSince ? Date.parse(meta.idleSince) : NaN;
-    const idleSince = Number.isFinite(opened) && opened <= nowMs ? meta.idleSince! : new Date(nowMs).toISOString();
+    const idleSince =
+        Number.isFinite(opened) && opened <= nowMs
+            ? meta.idleSince!
+            : new Date(nowMs).toISOString();
     const windowReached = nowMs - Date.parse(idleSince) >= meta.idlePolicy.afterHours * HOUR_MS;
     const attentionKey = fleetCloudIdleAttentionKey(evidence.nodeId, idleSince);
     let act: CloudIdleDecision['act'] = 'none';
-    if (windowReached && meta.idlePolicy.mode !== 'nothing' && meta.idleNotifiedKey !== attentionKey) {
+    if (
+        windowReached &&
+        meta.idlePolicy.mode !== 'nothing' &&
+        meta.idleNotifiedKey !== attentionKey
+    ) {
         act = meta.idlePolicy.mode === 'power-off' ? 'power-off' : 'tell-me';
     }
     return { idleSince, windowReached, act, attentionKey };

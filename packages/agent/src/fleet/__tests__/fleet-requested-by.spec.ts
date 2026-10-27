@@ -35,7 +35,10 @@ describe('fleet requestedBy', () => {
     });
 
     it('survives audit redaction', () => {
-        const redacted = redactAuditDetails({ requestedBy: 'agent:a1', decisionId: 'd1' }) as Record<string, unknown>;
+        const redacted = redactAuditDetails({
+            requestedBy: 'agent:a1',
+            decisionId: 'd1',
+        }) as Record<string, unknown>;
         expect(redacted.requestedBy).toBe('agent:a1');
         expect(redacted.decisionId).toBe('d1');
     });

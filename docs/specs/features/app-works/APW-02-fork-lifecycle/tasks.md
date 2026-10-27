@@ -675,7 +675,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
 
 ## P1.10 — Audit-pass additions (2026-09-17): automation, completion and closed sets
 
-- [ ] **T46. The workflow-change hold on the sync path (FR-60, FR-61 — ACC-02-24).**
+- [x] **T46. The workflow-change hold on the sync path (FR-60, FR-61 — ACC-02-24).** _(Release built 2026-10-27, #2912: owner-only, signed-in session, bound to the exact held head.)_
       **Create** `packages/agent/src/app-works/upstream-workflow-diff.ts` — a pure
       `workflowChanges(compareFiles): { paths: string[]; truncated: boolean }` over the compare result, matching
       `.github/workflows/**` at any depth (case-insensitive) and capping the reported paths at 100.
@@ -703,7 +703,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       **Done when**: the four specs are green and no test path can push a workflow-carrying range without the
       confirmation.
 
-- [ ] **T47. Merged sync pull request finishes the sync (FR-62 — ACC-02-26).**
+- [x] **T47. Merged sync pull request finishes the sync (FR-62 — ACC-02-26).** _(2026-10-27, #2912; the check lives on `AppUpstreamStateService.checkSyncPullRequest`.)_
       **Modify** `packages/agent/src/entities/work-upstream-state.entity.ts` (T12), the migration (T13) and
       `packages/agent/src/database/repositories/work-upstream-state.repository.ts` (T14) — one new nullable
       `syncPullRequestCheckedAt: Date` column and `claimSyncPullRequestChecks(nowMs, minIntervalMs, limit)`
@@ -729,7 +729,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       **Done when**: the three specs are green and the Upstream card no longer shows "Not synced yet" after a merged
       sync pull request.
 
-- [ ] **T48. Private-copy divergence and sync through a plugin capability (FR-63 — ACC-02-27).**
+- [x] **T48. Private-copy divergence and sync through a plugin capability (FR-63 — ACC-02-27).** _(2026-10-27, #2913; the move pins the checked sha instead of reusing `createRepositoryCopy`.)_
       **Modify** `packages/plugin/src/contracts/capabilities/git-provider.app-forks.ts` (T9) and
       `packages/plugin/src/contracts/capabilities/git-provider.interface.ts` (T10) — add the optional
       `getRepositoryCopyDivergence?`: it takes the source and target coordinates plus `maxCommits`, and returns
@@ -754,7 +754,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       **Done when**: `git grep -n "isomorphic-git" packages/agent/src/app-works` returns nothing and the three
       specs are green.
 
-- [ ] **T49. Sync settings come from the App spec (FR-64 — ACC-02-28).**
+- [x] **T49. Sync settings come from the App spec (FR-64 — ACC-02-28).** _(Listener 2026-10-27, #2912.)_
       **Modify** `packages/agent/src/app-works/upstream-schedule.ts` (T26) — read every field from APW-03's
       effective spec through `AppSpecService.getEffectiveSpec(workId, branch)`; `enabled: false` ⇒ `nextSyncAt`
       stays `null` and the dispatcher never selects the row (manual **Sync now** still works), with
@@ -847,7 +847,7 @@ maxDuration: 1_200 })`, the `template-customization.task.ts` preamble, `sleep` v
       `packages/agent/src/template-catalog/template-catalog.service.spec.ts` (the `forkTemplateForUser` caller)
       passes unchanged.
 
-- [ ] **T53. The Upstream sync appears in the Schedules view (FR-32 — ACC-E2E-05).**
+- [x] **T53. The Upstream sync appears in the Schedules view (FR-32 — ACC-E2E-05).** _(2026-10-27, lane aw-loops: read-only; Run now answers `managedOnWork` and the row links to the Upstream tab, where Sync now lives.)_
       ACC-E2E-05 asserts that "the Schedules view lists the Upstream sync with the spec's cron expression", and no
       task in any epic put it there: this epic runs sync from its own dispatcher (`app-upstream-sync-dispatcher`,
       §6.6) and the existing Schedules surface aggregates **seven** sources — recurring Tasks, Agent heartbeats,

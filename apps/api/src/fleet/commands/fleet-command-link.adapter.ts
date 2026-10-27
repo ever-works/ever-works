@@ -189,7 +189,11 @@ export class FleetCommandLinkAdapter implements FleetCommandNodePort {
                 },
             });
             channel
-                .request('command.read', { runId: input.runId }, { timeoutMs: FLEET_COMMAND_CANCEL_TIMEOUT_MS })
+                .request(
+                    'command.read',
+                    { runId: input.runId },
+                    { timeoutMs: FLEET_COMMAND_CANCEL_TIMEOUT_MS },
+                )
                 .then((reply) => {
                     if ('error' in reply) done(new FleetCommandException(reply.error));
                     else if ('result' in reply) {
@@ -210,7 +214,8 @@ export class FleetCommandLinkAdapter implements FleetCommandNodePort {
             },
             binary: (kind, payload) => {
                 if (kind === FLEET_LINK_FRAME_KINDS.DATA) sink.data(payload);
-                else if (kind === FLEET_LINK_FRAME_KINDS.EXIT) sink.exit(decodeFleetLinkExit(payload));
+                else if (kind === FLEET_LINK_FRAME_KINDS.EXIT)
+                    sink.exit(decodeFleetLinkExit(payload));
             },
             close: (reason, hint) => sink.closed(reason, hint),
             resume: () => sink.resumed?.(),

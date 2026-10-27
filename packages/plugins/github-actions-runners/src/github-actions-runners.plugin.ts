@@ -23,6 +23,29 @@ export const ORG_RUNNERS_PERMISSION = 'Self-hosted runners: Read and write';
 export const REPO_RUNNERS_PERMISSION = 'Administration: Read and write';
 
 /**
+ * The plugin's settings (P2, plan §7): only `watchedTargets`, the person's own
+ * list of repositories and organisations the Actions jobs panel watches
+ * (`repo:owner/name` · `org:login`, at most 20) — non-secret, user scope.
+ * Empty means "every target I have runners for". Never a token.
+ */
+export const githubActionsRunnersSettingsSchema = {
+	type: 'object',
+	properties: {
+		watchedTargets: {
+			type: 'array',
+			title: 'Watched repositories and organisations',
+			description:
+				'What the Actions jobs panel watches, as repo:owner/name or org:login. Empty: every repository and organisation you have runners for.',
+			items: { type: 'string', maxLength: 210 },
+			maxItems: 20,
+			default: [],
+			'x-scope': 'user'
+		}
+	},
+	additionalProperties: false
+} as JsonSchema;
+
+/**
  * `github-actions-runners` — the first-party `actions-runners` provider
  * (FL-18, CONTRACTS R-14): GitHub's self-hosted runner API through the Ever
  * Works GitHub App.
@@ -30,8 +53,8 @@ export const REPO_RUNNERS_PERMISSION = 'Administration: Read and write';
  * What it does, and nothing else: every method calls GitHub's REST API with
  * the short-lived installation token the platform minted for that call
  * (narrowed to the one permission it needs), and maps the answer. It holds no
- * credential between calls, has no settings, opens no connection on load and
- * never logs a token. Installing and running the runner is the node's work.
+ * credential between calls, has no credential setting (only the person's watched
+ * list, P2), opens no connection on load and never logs a token. Installing and running the runner is the node's work.
  */
 export class GitHubActionsRunnersPlugin implements IActionsRunnersPlugin {
 	readonly id = GITHUB_ACTIONS_RUNNERS_PLUGIN_ID;
@@ -40,8 +63,10 @@ export class GitHubActionsRunnersPlugin implements IActionsRunnersPlugin {
 	readonly category: PluginCategory = 'integration';
 	readonly capabilities = ['actions-runners'] as const;
 	readonly providerName = GITHUB_ACTIONS_RUNNERS_PLUGIN_ID;
-	readonly configurationMode = 'admin-only' as const;
-	readonly settingsSchema: JsonSchema = { type: 'object', properties: {}, additionalProperties: false };
+	// `hybrid` since P2: the one setting is the person's own watched list (plan §7); there is
+	// still no credential, no admin setting and nothing a person must fill in.
+	readonly configurationMode = 'hybrid' as const;
+	readonly settingsSchema: JsonSchema = githubActionsRunnersSettingsSchema;
 
 	private readonly api: GitHubRunnersApi;
 
@@ -75,7 +100,11 @@ export class GitHubActionsRunnersPlugin implements IActionsRunnersPlugin {
 		return this.api.mintRemoveToken(target, token);
 	}
 
-	listRunners(target: ActionsRunnerTarget, token: string, options?: { etag?: string | null }): Promise<ActionsRunnersPage> {
+	listRunners(
+		target: ActionsRunnerTarget,
+		token: string,
+		options?: { etag?: string | null }
+	): Promise<ActionsRunnersPage> {
 		return this.api.listRunners(target, token, options);
 	}
 

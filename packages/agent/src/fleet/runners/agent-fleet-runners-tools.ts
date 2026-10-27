@@ -43,13 +43,17 @@ export const FLEET_RUNNERS_TOOL_ANNOTATIONS: Readonly<
     fleet_runners_install: { destructive: true, confirmationClass: 'confirm' },
     fleet_runners_action: { destructive: true, confirmationClass: 'plain | confirm' },
     fleet_runners_remove: { destructive: true, confirmationClass: 'confirm-destructive' },
+    // P2.
+    fleet_runners_jobs: { readOnly: true },
+    fleet_runners_cancel_run: { destructive: true, confirmationClass: 'confirm' },
 };
 
 /** What a held act stores so a person's approval can run exactly it (no model-authored free text). */
 export interface FleetRunnersActionProposalPayload {
     kind: typeof FLEET_RUNNERS_ACTION_PROPOSAL_KIND;
-    verb: 'install' | 'stop' | 'restart' | 'remove';
+    verb: 'install' | 'stop' | 'restart' | 'reinstall' | 'remove' | 'cancel-run';
     agentId: string;
+    /** The computer (empty for `cancel-run`, which is about a repository's workflow run). */
     nodeId: string;
     /** stop / restart / remove: the runner. */
     runnerId?: string;
@@ -62,7 +66,10 @@ type ToolError = { error: FleetLinkError };
 function toolError(error: unknown): ToolError {
     const known = readFleetMachineError(error);
     return {
-        error: known ?? { code: 'internal', hint: error instanceof Error ? error.message.slice(0, 200) : 'failed' },
+        error: known ?? {
+            code: 'internal',
+            hint: error instanceof Error ? error.message.slice(0, 200) : 'failed',
+        },
     };
 }
 
@@ -73,7 +80,9 @@ function invalid(field: string, hint: string): ToolError {
 function stringList(value: unknown, max: number): string[] | null {
     if (value === undefined || value === null) return [];
     if (!Array.isArray(value)) return null;
-    const out = value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim());
+    const out = value
+        .filter((entry): entry is string => typeof entry === 'string')
+        .map((entry) => entry.trim());
     return out.length === value.length ? out.slice(0, max) : null;
 }
 
@@ -82,14 +91,19 @@ export function buildFleetRunnersTools(args: {
     userId: string;
     agentId: string;
     runId: string | null;
-    service: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'>;
+    service: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'> &
+        // P2: the Actions jobs read and Cancel workflow run, offered when the binding carries them.
+        Partial<Pick<FleetActionsRunnersService, 'actionsJobs' | 'cancelRun'>>;
     /** The approval seam for held acts; null = held acts are refused (fail closed). */
     proposals: AgentProposalToolSource | null;
 }): TaskToolDescriptor[] {
     const caller = { kind: 'agent' as const, agentId: args.agentId, ownerUserId: args.userId };
     const out: TaskToolDescriptor[] = [];
 
-    const hold = async (payload: Omit<FleetRunnersActionProposalPayload, 'kind' | 'agentId'>, title: string) => {
+    const hold = async (
+        payload: Omit<FleetRunnersActionProposalPayload, 'kind' | 'agentId'>,
+        title: string,
+    ) => {
         if (!args.proposals) {
             return {
                 error: {
@@ -141,7 +155,8 @@ export function buildFleetRunnersTools(args: {
         invoke: async (raw) => {
             const a = (raw ?? {}) as { nodeId?: unknown };
             try {
-                if (typeof a.nodeId === 'string' && a.nodeId) return await args.service.list(caller, a.nodeId);
+                if (typeof a.nodeId === 'string' && a.nodeId)
+                    return await args.service.list(caller, a.nodeId);
                 return { computers: await args.service.listAll(caller) };
             } catch (error) {
                 return toolError(error);
@@ -158,24 +173,46 @@ export function buildFleetRunnersTools(args: {
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 scope: { type: 'string', description: 'repo or org.' },
-                target: { type: 'string', description: 'owner/repo (scope repo) or the organisation (scope org).' },
+                target: {
+                    type: 'string',
+                    description: 'owner/repo (scope repo) or the organisation (scope org).',
+                },
                 count: { type: 'number', description: '1–16 (default 1).' },
-                names: { type: 'array', items: { type: 'string' }, description: 'Optional: one name per runner (default <computer>-<n>).' },
-                labels: { type: 'array', items: { type: 'string' }, description: 'Optional: extra labels (GitHub adds self-hosted, the OS and the architecture).' },
+                names: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional: one name per runner (default <computer>-<n>).',
+                },
+                labels: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description:
+                        'Optional: extra labels (GitHub adds self-hosted, the OS and the architecture).',
+                },
             },
             required: ['nodeId', 'scope', 'target'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (!isFleetActionsRunnerScope(a.scope)) return invalid('scope', 'scope must be repo or org');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (!isFleetActionsRunnerScope(a.scope))
+                return invalid('scope', 'scope must be repo or org');
             if (!isFleetActionsRunnerTarget(a.scope, a.target)) {
-                return invalid('target', a.scope === 'org' ? 'target must be an organisation' : 'target must be owner/repo');
+                return invalid(
+                    'target',
+                    a.scope === 'org'
+                        ? 'target must be an organisation'
+                        : 'target must be owner/repo',
+                );
             }
             const count = clampFleetActionsRunnerCount(a.count ?? 1);
             const names = stringList(a.names, 16);
             if (names === null || names.some((name) => !isFleetActionsRunnerName(name))) {
-                return invalid('names', 'names must be runner names (letters, digits, dots, dashes, underscores)');
+                return invalid(
+                    'names',
+                    'names must be runner names (letters, digits, dots, dashes, underscores)',
+                );
             }
             const labels = stringList(a.labels, 20);
             if (labels === null) return invalid('labels', 'labels must be a list of strings');
@@ -190,7 +227,9 @@ export function buildFleetRunnersTools(args: {
                 // Without `confirm`: the whole chain runs and answers with the summary.
                 await args.service.install(caller, a.nodeId, { ...input, fields: {} });
                 // Not reachable: an install always needs `confirm`. Belt: never report success without it.
-                return { error: { code: 'internal' as const, hint: 'the install was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the install was not confirmed' },
+                };
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
@@ -205,22 +244,30 @@ export function buildFleetRunnersTools(args: {
     out.push({
         name: 'fleet_runners_action',
         description:
-            'Start, stop or restart one Actions runner on one of the owner’s computers. Start runs at once; a stop or a restart is held for the owner’s approval (a stopped runner takes no jobs until started; a job in progress finishes first).',
+            'Start, stop, restart or reinstall one Actions runner on one of the owner’s computers. Start runs at once; a stop, a restart or a reinstall (GitHub’s current build, the same name and labels) is held for the owner’s approval (a stopped runner takes no jobs until started; a job in progress finishes first).',
         parameters: {
             type: 'object',
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 runnerId: { type: 'string', description: 'The runner (from fleet_runners_list).' },
-                action: { type: 'string', description: 'start, stop or restart.' },
+                action: { type: 'string', description: 'start, stop, restart or reinstall.' },
             },
             required: ['nodeId', 'runnerId', 'action'],
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (typeof a.runnerId !== 'string' || !a.runnerId) return invalid('runnerId', 'runnerId is required');
-            if (!isFleetActionsRunnerControlAction(a.action) || (a.action !== 'start' && a.action !== 'stop' && a.action !== 'restart')) {
-                return invalid('action', 'action must be start, stop or restart');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (typeof a.runnerId !== 'string' || !a.runnerId)
+                return invalid('runnerId', 'runnerId is required');
+            if (
+                !isFleetActionsRunnerControlAction(a.action) ||
+                (a.action !== 'start' &&
+                    a.action !== 'stop' &&
+                    a.action !== 'restart' &&
+                    a.action !== 'reinstall')
+            ) {
+                return invalid('action', 'action must be start, stop, restart or reinstall');
             }
             const action = a.action;
             try {
@@ -229,8 +276,13 @@ export function buildFleetRunnersTools(args: {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
                 return hold(
-                    { verb: action === 'restart' ? 'restart' : 'stop', nodeId: a.nodeId, runnerId: a.runnerId, args: {} },
-                    summary || `${action === 'restart' ? 'Restart' : 'Stop'} an Actions runner`,
+                    {
+                        verb: action === 'start' ? 'stop' : action,
+                        nodeId: a.nodeId,
+                        runnerId: a.runnerId,
+                        args: {},
+                    },
+                    summary || `${action[0].toUpperCase()}${action.slice(1)} an Actions runner`,
                 );
             }
         },
@@ -251,23 +303,131 @@ export function buildFleetRunnersTools(args: {
         },
         invoke: async (raw) => {
             const a = (raw ?? {}) as Record<string, unknown>;
-            if (typeof a.nodeId !== 'string' || !a.nodeId) return invalid('nodeId', 'nodeId is required');
-            if (typeof a.runnerId !== 'string' || !a.runnerId) return invalid('runnerId', 'runnerId is required');
-            if (!isFleetActionsRunnerName(a.name)) return invalid('name', 'the name is not a runner name');
+            if (typeof a.nodeId !== 'string' || !a.nodeId)
+                return invalid('nodeId', 'nodeId is required');
+            if (typeof a.runnerId !== 'string' || !a.runnerId)
+                return invalid('runnerId', 'runnerId is required');
+            if (!isFleetActionsRunnerName(a.name))
+                return invalid('name', 'the name is not a runner name');
             try {
                 // Without `confirmName`: the chain runs (busy, permission, kill switch) and answers with the summary.
                 await args.service.control(caller, a.nodeId, a.runnerId, 'remove', {});
-                return { error: { code: 'internal' as const, hint: 'the remove was not confirmed' } };
+                return {
+                    error: { code: 'internal' as const, hint: 'the remove was not confirmed' },
+                };
             } catch (error) {
                 const summary = confirmationSummary(error);
                 if (summary === null) return toolError(error);
                 return hold(
-                    { verb: 'remove', nodeId: a.nodeId, runnerId: a.runnerId, args: { name: a.name } },
+                    {
+                        verb: 'remove',
+                        nodeId: a.nodeId,
+                        runnerId: a.runnerId,
+                        args: { name: a.name },
+                    },
                     summary || `Remove ${a.name}`,
                 );
             }
         },
     } as TaskToolDescriptor);
+
+    // ── P2 (FR-20 – FR-23): the Actions jobs read and Cancel workflow run ──
+    if (args.service.actionsJobs) {
+        const jobs = args.service.actionsJobs.bind(args.service);
+        out.push({
+            name: 'fleet_runners_jobs',
+            description:
+                'The queued and running GitHub Actions jobs that target self-hosted runners in the repositories and organisations the owner watches, each queued one with why none of the owner’s runners takes it (the only matching runner is offline · no runner has a label · no runner is registered for the repository · all matching runners are busy), and how many runners are busy. Read-only.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    targets: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description:
+                            'Optional: owner/repo or org names to read instead of the watched list.',
+                    },
+                },
+                required: [],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as { targets?: unknown };
+                const list = stringList(a.targets, 20);
+                if (list === null)
+                    return invalid(
+                        'targets',
+                        'targets must be a list of owner/repo or organisation names',
+                    );
+                const targets = list.map((entry) => ({
+                    scope: entry.includes('/') ? 'repo' : 'org',
+                    target: entry,
+                }));
+                try {
+                    return await jobs(caller, targets.length > 0 ? targets : null);
+                } catch (error) {
+                    return toolError(error);
+                }
+            },
+        } as TaskToolDescriptor);
+    }
+
+    if (args.service.cancelRun) {
+        const cancelRun = args.service.cancelRun.bind(args.service);
+        out.push({
+            name: 'fleet_runners_cancel_run',
+            description:
+                'Cancel a whole GitHub Actions workflow run of one of the owner’s repositories (every job in it stops; it cannot be undone). Never runs on the Agent’s say-so: once checked, it is held for the owner’s approval with the run and the repository named.',
+            parameters: {
+                type: 'object',
+                properties: {
+                    repository: { type: 'string', description: 'owner/repo.' },
+                    runId: {
+                        type: 'number',
+                        description: 'The workflow run id (from fleet_runners_jobs).',
+                    },
+                    runNumber: {
+                        type: 'number',
+                        description: 'Optional: the run number, for the confirmation sentence.',
+                    },
+                },
+                required: ['repository', 'runId'],
+            },
+            invoke: async (raw) => {
+                const a = (raw ?? {}) as Record<string, unknown>;
+                if (!isFleetActionsRunnerTarget('repo', a.repository))
+                    return invalid('repository', 'repository must be owner/repo');
+                const runId = typeof a.runId === 'number' ? a.runId : Number(a.runId);
+                if (!Number.isSafeInteger(runId) || runId <= 0)
+                    return invalid('runId', 'runId must be a workflow run id');
+                const runNumber =
+                    typeof a.runNumber === 'number' && Number.isSafeInteger(a.runNumber)
+                        ? a.runNumber
+                        : null;
+                try {
+                    await cancelRun(caller, {
+                        repository: a.repository as string,
+                        runId,
+                        runNumber,
+                        fields: {},
+                    });
+                    return {
+                        error: { code: 'internal' as const, hint: 'the cancel was not confirmed' },
+                    };
+                } catch (error) {
+                    const summary = confirmationSummary(error);
+                    if (summary === null) return toolError(error);
+                    return hold(
+                        {
+                            verb: 'cancel-run',
+                            nodeId: '',
+                            args: { repository: a.repository, runId, runNumber },
+                        },
+                        summary || `Cancel workflow run ${runId} of ${String(a.repository)}`,
+                    );
+                }
+            },
+        } as TaskToolDescriptor);
+    }
 
     return out;
 }

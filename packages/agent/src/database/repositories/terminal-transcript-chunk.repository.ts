@@ -131,7 +131,9 @@ export class TerminalTranscriptChunkRepository {
      * `uq_terminal_transcript_chunks_session_seq` — so a re-sent flush writes
      * once and never throws.
      */
-    async appendSessionMany(chunks: ReadonlyArray<TerminalTranscriptSessionChunkWrite>): Promise<number> {
+    async appendSessionMany(
+        chunks: ReadonlyArray<TerminalTranscriptSessionChunkWrite>,
+    ): Promise<number> {
         if (chunks.length === 0) {
             return 0;
         }
@@ -183,9 +185,15 @@ export class TerminalTranscriptChunkRepository {
             .addSelect('MIN(chunk.createdAt)', 'firstAt')
             .addSelect('MAX(chunk.createdAt)', 'lastAt')
             .where('chunk.fleetSessionId = :fleetSessionId', { fleetSessionId })
-            .getRawOne<{ count: string | number; maxSeq: string | number | null; firstAt: unknown; lastAt: unknown }>();
+            .getRawOne<{
+                count: string | number;
+                maxSeq: string | number | null;
+                firstAt: unknown;
+                lastAt: unknown;
+            }>();
         const count = Number(row?.count ?? 0) || 0;
-        const maxSeq = row?.maxSeq === null || row?.maxSeq === undefined ? null : Number(row.maxSeq);
+        const maxSeq =
+            row?.maxSeq === null || row?.maxSeq === undefined ? null : Number(row.maxSeq);
         const toDate = (value: unknown): Date | null => {
             if (value === null || value === undefined) return null;
             const at = value instanceof Date ? value : new Date(String(value));

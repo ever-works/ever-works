@@ -56,7 +56,8 @@ export function fleetSessionScheduleLabels(input: {
     checkoutId?: string | null;
 }): string[] {
     const labels = [FLEET_SESSION_SCHEDULE_LABEL, `${PROVIDER_PREFIX}${input.provider}`];
-    if (input.checkoutId && UUID.test(input.checkoutId)) labels.push(`${CHECKOUT_PREFIX}${input.checkoutId.toLowerCase()}`);
+    if (input.checkoutId && UUID.test(input.checkoutId))
+        labels.push(`${CHECKOUT_PREFIX}${input.checkoutId.toLowerCase()}`);
     return labels;
 }
 

@@ -91,7 +91,9 @@ export default async function FleetComputersPage({
                 openAddKind={isFleetEnrollableNodeKind(addKind) ? addKind : null}
             />
             {/* Virtual computers (FL-16): "Add computer ▾ › New virtual computer…" lands here. */}
-            {addKind === 'virtual' && isFleetVirtualEnabled() ? <NewVirtualComputerLauncher /> : null}
+            {addKind === 'virtual' && isFleetVirtualEnabled() ? (
+                <NewVirtualComputerLauncher />
+            ) : null}
             {/* Cloud computers (FL-17): "Add computer ▾ › New cloud computer…" lands here. */}
             {addKind === 'cloud' && isFleetCloudEnabled() ? <NewCloudComputerLauncher /> : null}
         </FleetHubFrame>

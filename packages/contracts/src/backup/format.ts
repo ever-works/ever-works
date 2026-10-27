@@ -524,7 +524,13 @@ export const BACKUP_DEFAULT_LIMITS = Object.freeze({
 
 /** The archive filename, `everworks-backup-<slug>-<YYYY-MM-DD>-<shortId>.zip`. */
 export function buildBackupArchiveFilename(slug: string, isoDate: string, shortId: string): string {
-	const safeSlug = slug.replace(/[^a-zA-Z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'workspace';
+	const dashed = slug.replace(/[^a-zA-Z0-9-]+/g, '-');
+	// Index scans, not `/^-+|-+$/g` (polynomial on long dash runs, CodeQL js/polynomial-redos).
+	let start = 0;
+	while (start < dashed.length && dashed[start] === '-') start += 1;
+	let end = dashed.length;
+	while (end > start && dashed[end - 1] === '-') end -= 1;
+	const safeSlug = dashed.slice(start, end) || 'workspace';
 	return `everworks-backup-${safeSlug}-${isoDate.slice(0, 10)}-${shortId}.zip`;
 }
 

@@ -101,6 +101,8 @@ export class FleetPortTunnelsController {
 
     private withOpenUrl(tunnel: FleetPortTunnelView, userId: string): FleetPortTunnelOpenResponse {
         const handoff = this.tokens.mintHandoff(tunnel.id, userId);
-        return handoff ? { tunnel, openUrl: `${tunnel.url}?t=${encodeURIComponent(handoff)}` } : { tunnel };
+        return handoff
+            ? { tunnel, openUrl: `${tunnel.url}?t=${encodeURIComponent(handoff)}` }
+            : { tunnel };
     }
 }

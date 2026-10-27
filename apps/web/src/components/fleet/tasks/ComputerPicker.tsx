@@ -33,9 +33,16 @@ export function ComputerPicker({
 
     if (loading) {
         return (
-            <div className="space-y-2" aria-busy="true" data-testid="fleet-handoff-computers-loading">
+            <div
+                className="space-y-2"
+                aria-busy="true"
+                data-testid="fleet-handoff-computers-loading"
+            >
                 {[0, 1, 2].map((row) => (
-                    <div key={row} className="h-10 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark animate-pulse" />
+                    <div
+                        key={row}
+                        className="h-10 rounded-md bg-surface-secondary dark:bg-surface-secondary-dark animate-pulse"
+                    />
                 ))}
             </div>
         );
@@ -77,7 +84,9 @@ export function ComputerPicker({
                             onClick={() => row.selectable && onSelect(row.nodeId)}
                             className={cn(
                                 'w-full rounded-md border px-3 py-2 text-left text-sm',
-                                selected ? 'border-primary bg-primary/5' : 'border-border dark:border-border-dark',
+                                selected
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-border dark:border-border-dark',
                                 !row.selectable && 'opacity-60 cursor-not-allowed',
                             )}
                             data-testid="fleet-handoff-computer"
@@ -92,7 +101,9 @@ export function ComputerPicker({
                                     )}
                                     aria-hidden="true"
                                 />
-                                <span className="font-medium text-text dark:text-text-dark">{row.name}</span>
+                                <span className="font-medium text-text dark:text-text-dark">
+                                    {row.name}
+                                </span>
                                 <span className="text-xs text-text-muted dark:text-text-muted-dark">
                                     {row.online ? t('dialog.online') : t('dialog.offlineShort')}
                                     {osLabel ? ` · ${osLabel}` : ''}
@@ -104,12 +115,20 @@ export function ComputerPicker({
                                     </span>
                                 )}
                                 {!row.selectable && row.reason && (
-                                    <span className="ml-auto text-xs text-warning" data-testid="fleet-handoff-reason">
-                                        {t(`reasons.${HANDOFF_REASON_KEYS[row.reason]}` as Parameters<typeof t>[0], {
-                                            agent: agent?.name ?? '',
-                                            node: row.name,
-                                            cli: agent ? tProviders(cliKey(agent.cli)) : '',
-                                        })}
+                                    <span
+                                        className="ml-auto text-xs text-warning"
+                                        data-testid="fleet-handoff-reason"
+                                    >
+                                        {t(
+                                            `reasons.${HANDOFF_REASON_KEYS[row.reason]}` as Parameters<
+                                                typeof t
+                                            >[0],
+                                            {
+                                                agent: agent?.name ?? '',
+                                                node: row.name,
+                                                cli: agent ? tProviders(cliKey(agent.cli)) : '',
+                                            },
+                                        )}
                                     </span>
                                 )}
                             </span>
@@ -123,7 +142,10 @@ export function ComputerPicker({
                 })}
             </div>
             {pinned && agent && (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="fleet-handoff-pin-note">
+                <p
+                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid="fleet-handoff-pin-note"
+                >
                     {t('dialog.pinNote', { agent: agent.name, node: pinned.name })}
                 </p>
             )}

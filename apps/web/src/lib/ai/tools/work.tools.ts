@@ -247,7 +247,7 @@ export const createWorkWithAITool = tool({
             .optional()
             .describe('Deploy provider ID from checkDeployConnection'),
         providers: z
-            .record(z.string())
+            .record(z.string(), z.string())
             .optional()
             .describe(
                 'User-chosen providers from listAvailablePipelines (e.g., { pipeline: "sim-ai", ai: "openrouter" })',

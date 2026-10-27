@@ -19,11 +19,15 @@ import { mayBeHost } from './virtual.shared';
  * build-01 can create computers on it"). The dialog itself greys the host when
  * it cannot serve the chosen system right now (offline, management off, …).
  */
-export default function NewVirtualComputerButton({ node, allowed = true }: FleetComputerActionProps) {
+export default function NewVirtualComputerButton({
+    node,
+    allowed = true,
+}: FleetComputerActionProps) {
     const t = useTranslations('fleet.virtual');
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    if (!mayBeHost(node) || !(node.capabilities ?? []).includes(FLEET_DOCKER_CAPABILITY)) return null;
+    if (!mayBeHost(node) || !(node.capabilities ?? []).includes(FLEET_DOCKER_CAPABILITY))
+        return null;
     return (
         <>
             <Button

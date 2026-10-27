@@ -59,7 +59,10 @@ export class FleetCloudSweepCronService {
             },
             {
                 ttlMs: 30 * 60 * 1000,
-                onLocked: () => this.logger.debug('Skipping fleet-cloud-reconcile: another instance holds the lock'),
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping fleet-cloud-reconcile: another instance holds the lock',
+                    ),
             },
         );
     }
@@ -84,7 +87,10 @@ export class FleetCloudSweepCronService {
             },
             {
                 ttlMs: 50 * 1000,
-                onLocked: () => this.logger.debug('Skipping fleet-cloud-bootstrap-watch: another instance holds the lock'),
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping fleet-cloud-bootstrap-watch: another instance holds the lock',
+                    ),
             },
         );
     }
@@ -104,7 +110,10 @@ export class FleetCloudSweepCronService {
             },
             {
                 ttlMs: 8 * 60 * 1000,
-                onLocked: () => this.logger.debug('Skipping fleet-cloud-usage: another instance holds the lock'),
+                onLocked: () =>
+                    this.logger.debug(
+                        'Skipping fleet-cloud-usage: another instance holds the lock',
+                    ),
             },
         );
     }
@@ -118,7 +127,9 @@ export class FleetCloudSweepCronService {
                 try {
                     const summary = await this.sweeps.evaluateIdle();
                     if (summary.acted > 0) {
-                        this.logger.log(`fleet-cloud-idle pass: ${summary.machines} machine(s), ${summary.acted} acted on`);
+                        this.logger.log(
+                            `fleet-cloud-idle pass: ${summary.machines} machine(s), ${summary.acted} acted on`,
+                        );
                     }
                 } catch (error) {
                     const stack = error instanceof Error ? error.stack : String(error);
@@ -127,7 +138,8 @@ export class FleetCloudSweepCronService {
             },
             {
                 ttlMs: 8 * 60 * 1000,
-                onLocked: () => this.logger.debug('Skipping fleet-cloud-idle: another instance holds the lock'),
+                onLocked: () =>
+                    this.logger.debug('Skipping fleet-cloud-idle: another instance holds the lock'),
             },
         );
     }

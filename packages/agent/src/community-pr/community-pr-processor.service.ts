@@ -15,6 +15,7 @@ import { GenerateStatusType } from '../entities/types';
 import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
 import { assertNotRepositoryWork, isRepositoryWork } from '../works/repository-work-guard';
+import { assertNotAppWork, isAppWork } from '../works/app-work-guard';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
@@ -316,6 +317,14 @@ export class CommunityPrProcessorService {
                 );
                 continue;
             }
+            // APW-01 T10 (lane aw-safety) — pull requests on an App Work's repository are code
+            // changes (the evolve loop's), never community submissions to triage and close.
+            if (isAppWork(work)) {
+                this.logger.debug(
+                    `Skipping community PR processing for App Work ${work.id} (kind app)`,
+                );
+                continue;
+            }
             try {
                 const state: CommunityPrState = work.communityPrState || {
                     processedPrNumbers: [],
@@ -344,6 +353,7 @@ export class CommunityPrProcessorService {
         triggeredBy: CommunityPrTriggerSource = 'api',
     ): Promise<number> {
         assertNotRepositoryWork(work, 'community pull-request processing');
+        assertNotAppWork(work, 'community pull-request processing');
         const lockResult = await this.taskLockService.runExclusive(
             this.workLockKey(work.id),
             async () => {

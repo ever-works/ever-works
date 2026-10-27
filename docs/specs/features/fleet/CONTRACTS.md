@@ -191,6 +191,51 @@ overwrites the platform's resolved `pr` while the branch is unchanged; audit nam
 
 ---
 
+**Revision 23 (2026-10-26)** — FL-07 P1 (lane log `docs/internal/fleet/lanes/FL-07.md`): the `desktop` family's
+Desktop source answers `desktop.started { display, displays, fellBack, quality }` (node → platform, once, right after
+`channel.ready`) before its first `FRAME` (§3.3); `fleet_nodes.desktopFacts` (simple-json, FL-07 slot 00, beside
+`helperTrust`) stores what the heartbeat's `helper`, `displays` and `desktopReasons` said and the admission event ids
+already audited (§4.1); the eight desktop reasons are their own union (`FLEET_DESKTOP_REASONS`), leaving
+`COMPUTER_UNWATCHABLE_REASONS` unchanged for the browser source; CONTRACTS §7's `node.desktop.openUrl` is written
+`node.desktop.open-url` when it lands (the audit vocabulary is lowercase kebab) — not in P1.
+
+**Revision 24 (2026-10-27)** — FL-07 P2 control (lane log decisions 18–26): a Desktop view is a `computer_sessions`
+row (`source: 'desktop'`, `agentId` null, `userId` = the computer's owner, `openedByUserId` = the viewer; slot
+`1796070100000` adds R-9's columns plus `controlDriverAt` — when a driver socket of the view last attached or proved alive,
+on any replica, which the disconnect grace reads — and relaxes `agentId`, forward-only on `down`), so AW-11's caps and its ONE control
+lock per computer cover both sources; control on a view is `GET|POST|DELETE …/desktop/views/:viewId/control` and
+`POST …/control/{handover,keep,extend}` answering `FleetDesktopControlResult { state, attach }` (a take and a request
+need `confirm: true`, class `confirm`; a `driver` grant only to the view holding the lock, with channel params `mode: 'controlling'` and
+`controlledBy`); the machine half is the owner's on-machine permission (`ever-works-node helper control allow|deny`,
+`helper-control.json`, bound to one admission) reported inside the heartbeat's `helper` as `control: allowed |
+not-allowed` and `inputReasons[]` (`FLEET_DESKTOP_CONTROL_REASONS`; absent reads as not allowed), audited
+`node.helper.control-allow|deny` from `helperEvents`; node → controlling viewer `desktop.inputRefused { code }`
+(`FLEET_DESKTOP_INPUT_REFUSED_CODES`, a code only); a controlling channel refuses `desktop.setDisplay` (a display switch
+is the audited `PATCH`); the helper wire gains `inputResult` (0x87) and `hello.inputReasons` (absent: `input-unavailable`);
+the blocked shortcuts are refused with the modifiers a channel HOLDS, not only the ones a frame declares
+(`FleetDesktopModifierTracker`), and text is refused while Ctrl, Alt or the system key is held; FL-02's viewer
+observer `inbound` hook also receives the frame kind (byte 4), never the payload. Shapes in
+`packages/contracts/src/fleet/fleet-desktop-control.types.ts`.
+
+**Revision 25 (2026-10-27)** — FL-07 P2.C recordings (lane log decisions 29–32): a Desktop view's recording rides its
+`computer_sessions` row (`recordingRef` = the storage key of the recording's index object, never shown; `recorded`,
+`recordingBytes`, `recordingDurationMs`, `recordingExpiresAt`, `recordingStoppedReason`, `recordingSkippedReason`);
+chunks are `EWR1` containers of the view's `FRAME` / `TILES` frames (`FleetDesktopRecordingEntry`, ≤ 1 keyframe a
+second); routes `GET …/desktop/recordings`, `GET …/recordings/:viewId`, `GET …/recordings/:viewId/chunks/:seq`
+(`application/octet-stream`, `attachment`, `nosniff`), `DELETE …/recordings/:viewId { confirm }` (class `confirm`; the computer's owner only; `busy` while the view is live);
+`FleetDesktopViewView.recording { state: recording | off | failed, reason }`; the `computer-recording-gc` cron
+(`FLEET_DESKTOP_RECORDING_GC_CRON`); FL-02's viewer observer gains `nodeBinary(viewer, kind, payload)`. Shapes in
+`packages/contracts/src/fleet/fleet-desktop-recording.types.ts`.
+
+**Revision 26 (2026-10-27)** — FL-07 P3 (lane log decisions 34–36): a helper policy record of `level: signed` carries
+`signer` (a macOS Team ID or a Windows certificate subject, matched exactly against the node version's manifest
+target `signer` — a signer the running version no longer publishes is refused) and is verified by its OS signature
+before every start, never by its hash (macOS: the Developer ID code requirement of the Team ID; Windows: Authenticode
+`Valid` under a machine root); the heartbeat's
+`helper.signedAvailable?: true` says the node version publishes a signed build the machine does not run;
+`PATCH /api/fleet/nodes/:id` accepts `recordWatchSessions` (boolean) and `recordingRetentionDays` (integer 1–90),
+owner only, audited `node.policy.change` with `{ family: desktop, setting, from, to }`.
+
 ## 0. Resolutions (R-1 … R-41)
 
 Rulings that settle questions more than one epic would otherwise answer differently.
@@ -258,16 +303,16 @@ optional) so the node can show an upgrade hint before `FLEET_MIN_NODE_VERSION` b
 
 All other heartbeat payload additions are optional fields (old nodes omit them):
 
-| Field                                                                                         | Owner | Notes                                                                                             |
-| --------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------- |
-| `consents`                                                                                    | FL-02 | above                                                                                             |
-| `selfUpdateFailedAt` (ISO time)                                                               | FL-02 | last failed opt-in auto-update                                                                    |
-| `health` (§4.5 snapshot shape)                                                                | FL-03 | latest sample                                                                                     |
-| `macAddress`, `lanId`                                                                         | FL-03 | wake                                                                                              |
-| `timeZone` (IANA)                                                                             | FL-13 | schedules                                                                                         |
-| `helperTrust`                                                                                 | FL-07 | R-8                                                                                               |
+| Field                                                                                         | Owner | Notes                                                                                              |
+| --------------------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------- |
+| `consents`                                                                                    | FL-02 | above                                                                                              |
+| `selfUpdateFailedAt` (ISO time)                                                               | FL-02 | last failed opt-in auto-update                                                                     |
+| `health` (§4.5 snapshot shape)                                                                | FL-03 | latest sample                                                                                      |
+| `macAddress`, `lanId`                                                                         | FL-03 | wake                                                                                               |
+| `timeZone` (IANA)                                                                             | FL-13 | schedules                                                                                          |
+| `helperTrust`                                                                                 | FL-07 | R-8                                                                                                |
 | `daemon { state, reason?, sessions, storage?, hooks? }`                                       | FL-04 | session daemon health (`state`: `running · stopped · failed`; `storage`: `ok · failing`, spec U15) |
-| `helper { trust, version?, verifiedAt? }`, `displays[]`, `desktopReasons[]`, `helperEvents[]` | FL-07 | native helper state, display list, why the Desktop source is unavailable, recent admission events |
+| `helper { trust, version?, verifiedAt? }`, `displays[]`, `desktopReasons[]`, `helperEvents[]` | FL-07 | native helper state, display list, why the Desktop source is unavailable, recent admission events  |
 
 ### 1.2 Capability tags (advertised by the node; `cap:` requirements on jobs — existing mechanism)
 
@@ -394,17 +439,17 @@ state-changing requests, leave processes running), `link.resume`, and `link.drai
 
 ### 3.3 Channel families and their request vocabulary
 
-| Family     | Opens with                                                                                   | Messages (JSON on the channel)                                                                                                                                                                                                                                        | Consent                      |
-| ---------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| `session`  | `{ sessionId, mode: 'viewer'\|'driver', kind?: 'owner'\|'agent' }`                            | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`, `session.screen`; platform→node (channel 0): `session.ack { sessionIds }`; node→platform (channel 0): `session.list { sessions[], daemon }`, `session.event` (optional `reason`, e.g. on `exited`), `session.status`, `session.attention`; node→viewer on the channel: `session.notice` (`paused · resumed · drain · slow-viewer · size · replay`) | work (Agent) / manage (owner) |
-| `desktop`  | `{ source: 'desktop'\|'browser', display?, profile?: 'agent'\|'preview', viewId, quality? }` | `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`, `desktop.openUrl`, `desktop.mode`; node→platform `desktop.stats`, `desktop.displayChanged`; input via `INPUT`                                                                         | attend                       |
-| `logs`     | `{ source, path?, unit?, container?, lines, sources?[] }`                                    | `logs.read`, `logs.follow`, `logs.pause`, `logs.resume`, `logs.earlier`; node→platform `logs.initial-done`, `logs.earlier-done`, `logs.notice`. `logs.sources` is a `machine` verb (a list needs no open channel)                                                     | manage                       |
-| `machine`  | (one per link, lazily)                                                                       | `services.list\|action`, `docker.*`, `compose.*`, `processes.list\|signal`, `ports.list\|open\|preview`, `checkouts.list\|create\|delete\|sync\|changes`, `git.identity\|setIdentity`, `health.now`, `wake.send`, `vm.*`, `runner.*`                                  | manage (see §2.1 for family) |
-| `files`    | `{ root, path }`                                                                             | `files.list`, `files.stat`, `files.pack` (DATA out), `files.unpack` (DATA in), `files.delete`                                                                                                                                                                         | manage                       |
-| `command`  | `{ commandId, nodeId, runId }`                                                               | `command.run` → `DATA`/`EXIT`, `command.cancel`; node→platform `command.output` (head/tail on finish), `command.truncated`, `command.timeout`                                                                                                                         | manage                       |
-| `schedule` | (one per link)                                                                               | `schedule.sync { generation, definitions[] }` (the reply carries the applied `generation`; pause/resume re-send the full set), `schedule.runs { since }`, `schedule.runNow`                                                                                           | manage                       |
-| `tunnel`   | `{ tunnelId, port }`                                                                         | HTTP request/response bodies as `DATA` with a `JSON` envelope per request                                                                                                                                                                                             | manage                       |
-| `clip`     | `{ viewId }`                                                                                 | `CLIP` frames                                                                                                                                                                                                                                                         | attend                       |
+| Family     | Opens with                                                                                   | Messages (JSON on the channel)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Consent                       |
+| ---------- | -------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `session`  | `{ sessionId, mode: 'viewer'\|'driver', kind?: 'owner'\|'agent' }`                           | platform→node: `session.start`, `session.attach`, `session.input` (driver), `session.resize`, `session.end`, `session.rename`, `session.answer`, `session.restart`, `session.screen`; platform→node (channel 0): `session.ack { sessionIds }`; node→platform (channel 0): `session.list { sessions[], daemon }`, `session.event` (optional `reason`, e.g. on `exited`), `session.status`, `session.attention`; node→viewer on the channel: `session.notice` (`paused · resumed · drain · slow-viewer · size · replay`) | work (Agent) / manage (owner) |
+| `desktop`  | `{ source: 'desktop'\|'browser', display?, profile?: 'agent'\|'preview', viewId, quality? }` | `desktop.quality`, `desktop.refresh`, `desktop.displays`, `desktop.setDisplay`, `desktop.openUrl`, `desktop.mode`; node→platform `desktop.started`, `desktop.stats`, `desktop.displayChanged`; input via `INPUT`                                                                                                                                                                                                                                                                                                       | attend                        |
+| `logs`     | `{ source, path?, unit?, container?, lines, sources?[] }`                                    | `logs.read`, `logs.follow`, `logs.pause`, `logs.resume`, `logs.earlier`; node→platform `logs.initial-done`, `logs.earlier-done`, `logs.notice`. `logs.sources` is a `machine` verb (a list needs no open channel)                                                                                                                                                                                                                                                                                                      | manage                        |
+| `machine`  | (one per link, lazily)                                                                       | `services.list\|action`, `docker.*`, `compose.*`, `processes.list\|signal`, `ports.list\|open\|preview`, `checkouts.list\|create\|delete\|sync\|changes`, `git.identity\|setIdentity`, `health.now`, `wake.send`, `vm.*`, `runner.*`                                                                                                                                                                                                                                                                                   | manage (see §2.1 for family)  |
+| `files`    | `{ root, path }`                                                                             | `files.list`, `files.stat`, `files.pack` (DATA out), `files.unpack` (DATA in), `files.delete`                                                                                                                                                                                                                                                                                                                                                                                                                          | manage                        |
+| `command`  | `{ commandId, nodeId, runId }`                                                               | `command.run` → `DATA`/`EXIT`, `command.cancel`; node→platform `command.output` (head/tail on finish), `command.truncated`, `command.timeout`                                                                                                                                                                                                                                                                                                                                                                          | manage                        |
+| `schedule` | (one per link)                                                                               | `schedule.sync { generation, definitions[] }` (the reply carries the applied `generation`; pause/resume re-send the full set), `schedule.runs { since }`, `schedule.runNow`                                                                                                                                                                                                                                                                                                                                            | manage                        |
+| `tunnel`   | `{ tunnelId, port }`                                                                         | HTTP request/response bodies as `DATA` with a `JSON` envelope per request                                                                                                                                                                                                                                                                                                                                                                                                                                              | manage                        |
+| `clip`     | `{ viewId }`                                                                                 | `CLIP` frames                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | attend                        |
 
 Every request carries `requestId`; every reply carries `requestId` and either a result or
 `{ error: { code, hint, details } }` (§8). Long operations reply immediately with
@@ -482,25 +527,26 @@ allowed values validated in code, as existing fleet columns are.
 
 ### 4.1 `FleetNode` — additions only
 
-| Column                  | Type                                        | Notes                                                                                          | Slot  |
-| ----------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----- |
-| `consents`              | jsonb `{ work, attend, manage, usageScan }` | from heartbeat                                                                                 | FL-02 |
-| `previewProfileEnabled` | boolean                                     | R-3                                                                                            | FL-02 |
-| `controlPolicyFamilies` | jsonb (family → audience)                   | §2.1; `controlPolicy` stays as the `desktop` mirror                                            | FL-01 |
-| `isFavorite`            | boolean                                     | per owner                                                                                      | FL-01 |
-| `health`                | jsonb null                                  | latest sample (§4.5) for cheap listing                                                         | FL-03 |
-| `macAddress`, `lanId`   | text null                                   | for wake; `lanId` identifies the network a sibling shares                                      | FL-03 |
-| `lastWakeAttemptAt`     | timestamptz null                            |                                                                                                | FL-03 |
-| `helperTrust`           | enum `none · hash-pinned · signed`          | R-8                                                                                            | FL-07 |
-| `timeZone`              | text null (IANA)                            | from heartbeat; schedules show both zones                                                      | FL-13 |
-| `origin`                | enum `enrolled · virtual · cloud`           | default `enrolled`                                                                             | FL-16 |
-| `hostNodeId`            | uuid null → `FleetNode`                     | virtual computers                                                                              | FL-16 |
-| `virtualKind`           | enum null `vm · container`                  |                                                                                                | FL-16 |
-| `providerPluginId`      | text null                                   | cloud computers                                                                                | FL-17 |
-| `providerMachineRef`    | text null                                   | provider's own id                                                                              | FL-17 |
-| `providerMeta`          | jsonb null                                  | region, size, hourly rate, created at, power timeline, idle policy, cost snapshot (no secrets) | FL-17 |
-| `virtualMeta`           | jsonb null                                  | system, image, CPUs, memory, disk (survives job-body purge)                                    | FL-16 |
-| `sessionDaemon`         | simple-json null                            | the session daemon block of the latest beat (§1.1), for the computer page and the start gate  | FL-04 |
+| Column                  | Type                                        | Notes                                                                                                        | Slot  |
+| ----------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----- |
+| `consents`              | jsonb `{ work, attend, manage, usageScan }` | from heartbeat                                                                                               | FL-02 |
+| `previewProfileEnabled` | boolean                                     | R-3                                                                                                          | FL-02 |
+| `controlPolicyFamilies` | jsonb (family → audience)                   | §2.1; `controlPolicy` stays as the `desktop` mirror                                                          | FL-01 |
+| `isFavorite`            | boolean                                     | per owner                                                                                                    | FL-01 |
+| `health`                | jsonb null                                  | latest sample (§4.5) for cheap listing                                                                       | FL-03 |
+| `macAddress`, `lanId`   | text null                                   | for wake; `lanId` identifies the network a sibling shares                                                    | FL-03 |
+| `lastWakeAttemptAt`     | timestamptz null                            |                                                                                                              | FL-03 |
+| `helperTrust`           | enum `none · hash-pinned · signed`          | R-8                                                                                                          | FL-07 |
+| `desktopFacts`          | jsonb null                                  | the last heartbeat's `helper`, `displays`, `desktopReasons` and the audited `helperEvents` ids (revision 23) | FL-07 |
+| `timeZone`              | text null (IANA)                            | from heartbeat; schedules show both zones                                                                    | FL-13 |
+| `origin`                | enum `enrolled · virtual · cloud`           | default `enrolled`                                                                                           | FL-16 |
+| `hostNodeId`            | uuid null → `FleetNode`                     | virtual computers                                                                                            | FL-16 |
+| `virtualKind`           | enum null `vm · container`                  |                                                                                                              | FL-16 |
+| `providerPluginId`      | text null                                   | cloud computers                                                                                              | FL-17 |
+| `providerMachineRef`    | text null                                   | provider's own id                                                                                            | FL-17 |
+| `providerMeta`          | jsonb null                                  | region, size, hourly rate, created at, power timeline, idle policy, cost snapshot (no secrets)               | FL-17 |
+| `virtualMeta`           | jsonb null                                  | system, image, CPUs, memory, disk (survives job-body purge)                                                  | FL-16 |
+| `sessionDaemon`         | simple-json null                            | the session daemon block of the latest beat (§1.1), for the computer page and the start gate                 | FL-04 |
 
 ### 4.2 `FleetSession` (new, table `fleet_sessions`, FL-04 slot 00; FL-05 slot 00 adds the last five rows)
 

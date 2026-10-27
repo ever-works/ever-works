@@ -66,7 +66,10 @@ export type HealthRefreshState = 'idle' | 'refreshing' | 'done' | 'failed';
 const HEARTBEAT_INTERVAL_MS = 60_000;
 
 /** Seconds until the next automatic check, from the last beat; null once it is due. */
-export function secondsToNextCheck(lastHeartbeatAt: string | null | undefined, now: number): number | null {
+export function secondsToNextCheck(
+    lastHeartbeatAt: string | null | undefined,
+    now: number,
+): number | null {
     const at = typeof lastHeartbeatAt === 'string' ? Date.parse(lastHeartbeatAt) : Number.NaN;
     if (!Number.isFinite(at)) return null;
     const left = Math.ceil((at + HEARTBEAT_INTERVAL_MS - now) / 1000);
@@ -242,7 +245,8 @@ export function HealthMetrics({
     const nextCheck = secondsToNextCheck(node.lastHeartbeatAt, now);
     const refreshReason = (() => {
         if (refreshState === 'refreshing') return t('refreshing');
-        if (refreshState === 'failed' && refreshError) return t('refreshFailed', { hint: refreshError });
+        if (refreshState === 'failed' && refreshError)
+            return t('refreshFailed', { hint: refreshError });
         if (refreshState === 'done') return t('refreshDone');
         if (!refresh) {
             // An API older than Refresh now: the reason it always gave.
@@ -426,7 +430,9 @@ export function HealthMetrics({
                     data-testid="fleet-health-refresh"
                     data-state={refreshState}
                 >
-                    {refreshState === 'failed' && canRefresh ? t('refreshTryAgain') : t('refreshNow')}
+                    {refreshState === 'failed' && canRefresh
+                        ? t('refreshTryAgain')
+                        : t('refreshNow')}
                 </Button>
                 <span
                     id={refreshReasonId}

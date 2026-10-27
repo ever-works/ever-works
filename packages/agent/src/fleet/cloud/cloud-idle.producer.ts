@@ -31,19 +31,44 @@ import { NeedsALookService } from '../needs-a-look/needs-a-look.service';
  *  - **powered off by policy** — "fra-nina was powered off after 2 h idle —
  *    it still bills while off", with Power on… (Destroy… is on the page).
  *
- * The id carries the window start, so one window is one item (FR-27). Computed
+ * The id carries the window start, so one window is one item (FR-27).
+ *
+ * P3 (spec FR-30, U7) adds **unclaimed** — a machine carrying this
+ * deployment's tags that reconciliation adopted because no row knew it:
+ * "Unclaimed machine at <provider> — tagged ever-works", with Destroy…. Computed
  * on read from the Cloud block every view already carries; owner-only facts
  * are none (prices and states are shared, spec S10). Registers itself into
  * FL-01's registry at module init.
  */
-export function cloudIdleItems(nodes: readonly FleetNodeView[], context: Pick<NeedsALookContext, 'now'>): NeedsALookItem[] {
+export function cloudIdleItems(
+    nodes: readonly FleetNodeView[],
+    context: Pick<NeedsALookContext, 'now'>,
+): NeedsALookItem[] {
     const items: NeedsALookItem[] = [];
     const nowMs = context.now.getTime();
     for (const node of nodes) {
         const cloud = node.cloud;
         if (!cloud) continue;
         const route = `/fleet/computers/${encodeURIComponent(node.id)}?tab=overview`;
-        const rate = formatFleetCloudMoney(cloud.hourlyRateCents, { currency: cloud.currency, perHour: true });
+        const rate = formatFleetCloudMoney(cloud.hourlyRateCents, {
+            currency: cloud.currency,
+            perHour: true,
+        });
+        if (cloud.unclaimedAt && cloud.powerState !== 'gone') {
+            // P3 (FR-30, U7): a machine of this deployment no computer here created.
+            const billing = cloud.hourlyRateCents > 0 ? ` and bills about ${rate}/h` : '';
+            items.push({
+                id: `cloud-idle:${node.id}:unclaimed`,
+                nodeId: node.id,
+                severity: 'warn',
+                kind: 'cloud-idle',
+                title: `Unclaimed machine at ${cloud.providerName} — tagged ever-works`,
+                detail: `${node.name} carries this Ever Works' tags, but no computer here created it${billing}. Destroy it to stop the bill, or check it at ${cloud.providerName}.`,
+                action: { label: 'Destroy…', route: `${route}&cloud=destroy` },
+                since: cloud.unclaimedAt,
+            });
+            continue;
+        }
         if (cloud.powerState === 'gone') {
             items.push({
                 id: `cloud-idle:${node.id}:gone`,
@@ -64,7 +89,9 @@ export function cloudIdleItems(nodes: readonly FleetNodeView[], context: Pick<Ne
                 severity: 'warn',
                 kind: 'cloud-idle',
                 title: `${node.name} could not be created`,
-                detail: cloud.error ?? `${cloud.providerName} refused the create. Nothing bills; remove it and try again.`,
+                detail:
+                    cloud.error ??
+                    `${cloud.providerName} refused the create. Nothing bills; remove it and try again.`,
                 action: { label: 'Open', route },
                 since: cloud.phaseAt,
             });
@@ -72,7 +99,8 @@ export function cloudIdleItems(nodes: readonly FleetNodeView[], context: Pick<Ne
         }
         if (
             cloud.poweredOffByPolicyAt &&
-            ((cloud.powerState === 'off' && cloud.pending === null) || cloud.pending === 'powering-off')
+            ((cloud.powerState === 'off' && cloud.pending === null) ||
+                cloud.pending === 'powering-off')
         ) {
             const hours = cloud.idlePolicy.afterHours;
             items.push({
@@ -92,12 +120,16 @@ export function cloudIdleItems(nodes: readonly FleetNodeView[], context: Pick<Ne
             continue;
         }
         if (cloud.idleWindowReached && cloud.idleSince && cloud.pending === null) {
-            const hours = fleetCloudIdleHours(cloud.idleSince, nowMs) ?? cloud.idlePolicy.afterHours;
+            const hours =
+                fleetCloudIdleHours(cloud.idleSince, nowMs) ?? cloud.idlePolicy.afterHours;
             const sinceMs = Date.parse(cloud.idleSince);
             const whileIdle = Number.isFinite(sinceMs)
-                ? formatFleetCloudMoney((Math.max(0, nowMs - sinceMs) / 3_600_000) * cloud.cost.hourlyCents, {
-                      currency: cloud.currency,
-                  })
+                ? formatFleetCloudMoney(
+                      (Math.max(0, nowMs - sinceMs) / 3_600_000) * cloud.cost.hourlyCents,
+                      {
+                          currency: cloud.currency,
+                      },
+                  )
                 : null;
             items.push({
                 id: `cloud-idle:${node.id}:idle:${cloud.idleSince}`,

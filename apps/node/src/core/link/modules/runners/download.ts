@@ -44,7 +44,10 @@ export function assertRunnerDownloadFor(
 	if (typeof download.sha256 !== 'string' || !/^[0-9a-f]{64}$/i.test(download.sha256)) {
 		throw new RunnerHostError('the runner build carries no checksum; nothing was downloaded');
 	}
-	if (typeof download.filename !== 'string' || !/^actions-runner-[A-Za-z0-9._-]+\.(?:tar\.gz|zip)$/.test(download.filename)) {
+	if (
+		typeof download.filename !== 'string' ||
+		!/^actions-runner-[A-Za-z0-9._-]+\.(?:tar\.gz|zip)$/.test(download.filename)
+	) {
 		throw new RunnerHostError('the runner build has an unexpected file name; nothing was downloaded');
 	}
 	const ours = fleetActionsRunnerPlatformOf(platform, arch);
@@ -109,7 +112,12 @@ export async function downloadRunnerArchive(
 }
 
 /** The extraction argv: `tar -xzf` on Linux and macOS; Windows' own bsdtar (which reads zip) on Windows. */
-export function extractArgs(platform: string, archive: string, into: string, env: NodeJS.ProcessEnv = process.env): { command: string; args: string[] } {
+export function extractArgs(
+	platform: string,
+	archive: string,
+	into: string,
+	env: NodeJS.ProcessEnv = process.env
+): { command: string; args: string[] } {
 	if (platform === 'win32') {
 		const systemRoot = env.SystemRoot || env.SYSTEMROOT || 'C:\\Windows';
 		return { command: `${systemRoot}\\System32\\tar.exe`, args: ['-xf', archive, '-C', into] };
@@ -132,5 +140,6 @@ export async function extractRunnerArchive(
 	const result = await deps.exec({ command, args, timeoutMs: EXTRACT_TIMEOUT_MS });
 	if (options.keepArchive !== true) await rm(archive, { force: true }).catch(() => undefined);
 	if (result.spawnError) throw new RunnerHostError('tar was not found on this computer; nothing was installed');
-	if (result.code !== 0) throw new RunnerHostError(`could not extract the runner: ${firstOutputLine(result, 'tar failed')}`);
+	if (result.code !== 0)
+		throw new RunnerHostError(`could not extract the runner: ${firstOutputLine(result, 'tar failed')}`);
 }

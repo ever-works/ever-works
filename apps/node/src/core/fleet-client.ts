@@ -151,7 +151,12 @@ export function normalizeApiUrl(raw: string): string {
 }
 
 export function joinUrl(base: string, path: string): string {
-	return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+	// Index scans, not `/\/+$/` (polynomial on many inner slashes, CodeQL js/polynomial-redos).
+	let end = base.length;
+	while (end > 0 && base[end - 1] === '/') end -= 1;
+	let start = 0;
+	while (start < path.length && path[start] === '/') start += 1;
+	return `${base.slice(0, end)}/${path.slice(start)}`;
 }
 
 /** Local pre-flight so an obviously malformed credential never leaves the machine. */
@@ -487,6 +492,23 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	// Schedules on computers (FL-13): the machine's time zone, validated by `describeSelf`.
 	if (typeof source.timeZone === 'string') {
 		out.timeZone = source.timeZone;
+	}
+	// Desktop view & control (FL-07): the five desktop fields, already
+	// normalised by `describeSelf`; copied as is. Heartbeat-only in practice.
+	if (typeof source.helperTrust === 'string') {
+		out.helperTrust = source.helperTrust;
+	}
+	if (source.helper !== undefined) {
+		out.helper = source.helper;
+	}
+	if (Array.isArray(source.displays)) {
+		out.displays = source.displays;
+	}
+	if (Array.isArray(source.desktopReasons)) {
+		out.desktopReasons = source.desktopReasons;
+	}
+	if (Array.isArray(source.helperEvents)) {
+		out.helperEvents = source.helperEvents;
 	}
 	return out;
 }

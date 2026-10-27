@@ -3,7 +3,11 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Plus, Trash2 } from 'lucide-react';
-import { FLEET_RUN_RESTART_POLICIES, type FleetRunRequest, type FleetRunRestartPolicy } from '@ever-works/contracts';
+import {
+    FLEET_RUN_RESTART_POLICIES,
+    type FleetRunRequest,
+    type FleetRunRestartPolicy,
+} from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -102,7 +106,13 @@ export function RunContainerDialog({
                                     aria-label={t('hostPort')}
                                     value={port.host}
                                     onChange={(event) =>
-                                        update({ ports: form.ports.map((row, at) => (at === index ? { ...row, host: event.target.value } : row)) })
+                                        update({
+                                            ports: form.ports.map((row, at) =>
+                                                at === index
+                                                    ? { ...row, host: event.target.value }
+                                                    : row,
+                                            ),
+                                        })
                                     }
                                 />
                                 <span aria-hidden>→</span>
@@ -112,22 +122,52 @@ export function RunContainerDialog({
                                     aria-label={t('containerPort')}
                                     value={port.container}
                                     onChange={(event) =>
-                                        update({ ports: form.ports.map((row, at) => (at === index ? { ...row, container: event.target.value } : row)) })
+                                        update({
+                                            ports: form.ports.map((row, at) =>
+                                                at === index
+                                                    ? { ...row, container: event.target.value }
+                                                    : row,
+                                            ),
+                                        })
                                     }
                                 />
-                                <Button type="button" variant="ghost" size="sm" aria-label={t('removeRow')} onClick={() => update({ ports: form.ports.filter((_, at) => at !== index) })}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={t('removeRow')}
+                                    onClick={() =>
+                                        update({
+                                            ports: form.ports.filter((_, at) => at !== index),
+                                        })
+                                    }
+                                >
                                     <Trash2 className="h-4 w-4" aria-hidden />
                                 </Button>
                             </div>
                         ))}
-                        <Button type="button" variant="ghost" size="sm" onClick={() => update({ ports: [...form.ports, { host: '', container: '', proto: 'tcp' }] })}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                                update({
+                                    ports: [
+                                        ...form.ports,
+                                        { host: '', container: '', proto: 'tcp' },
+                                    ],
+                                })
+                            }
+                        >
                             <Plus className="h-4 w-4" aria-hidden /> {t('addPort')}
                         </Button>
                     </fieldset>
 
                     <fieldset className="space-y-1 text-sm">
                         <legend>{t('env')}</legend>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('envNote')}</p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('envNote')}
+                        </p>
                         {form.env.map((variable, index) => (
                             <div key={index} className="flex items-center gap-2">
                                 <input
@@ -136,7 +176,13 @@ export function RunContainerDialog({
                                     value={variable.name}
                                     spellCheck={false}
                                     onChange={(event) =>
-                                        update({ env: form.env.map((row, at) => (at === index ? { ...row, name: event.target.value } : row)) })
+                                        update({
+                                            env: form.env.map((row, at) =>
+                                                at === index
+                                                    ? { ...row, name: event.target.value }
+                                                    : row,
+                                            ),
+                                        })
                                     }
                                 />
                                 <input
@@ -146,23 +192,44 @@ export function RunContainerDialog({
                                     aria-label={t('envValue')}
                                     value={variable.value}
                                     onChange={(event) =>
-                                        update({ env: form.env.map((row, at) => (at === index ? { ...row, value: event.target.value } : row)) })
+                                        update({
+                                            env: form.env.map((row, at) =>
+                                                at === index
+                                                    ? { ...row, value: event.target.value }
+                                                    : row,
+                                            ),
+                                        })
                                     }
                                     data-testid="fleet-docker-run-env-value"
                                 />
-                                <Button type="button" variant="ghost" size="sm" aria-label={t('removeRow')} onClick={() => update({ env: form.env.filter((_, at) => at !== index) })}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={t('removeRow')}
+                                    onClick={() =>
+                                        update({ env: form.env.filter((_, at) => at !== index) })
+                                    }
+                                >
                                     <Trash2 className="h-4 w-4" aria-hidden />
                                 </Button>
                             </div>
                         ))}
-                        <Button type="button" variant="ghost" size="sm" onClick={() => update({ env: [...form.env, { name: '', value: '' }] })}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => update({ env: [...form.env, { name: '', value: '' }] })}
+                        >
                             <Plus className="h-4 w-4" aria-hidden /> {t('addEnv')}
                         </Button>
                     </fieldset>
 
                     <fieldset className="space-y-1 text-sm">
                         <legend>{t('volumes')}</legend>
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('volumesNote', { name: machine })}</p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('volumesNote', { name: machine })}
+                        </p>
                         {form.volumes.map((volume, index) => (
                             <div key={index} className="flex items-center gap-2">
                                 <input
@@ -172,7 +239,13 @@ export function RunContainerDialog({
                                     value={volume.source}
                                     spellCheck={false}
                                     onChange={(event) =>
-                                        update({ volumes: form.volumes.map((row, at) => (at === index ? { ...row, source: event.target.value } : row)) })
+                                        update({
+                                            volumes: form.volumes.map((row, at) =>
+                                                at === index
+                                                    ? { ...row, source: event.target.value }
+                                                    : row,
+                                            ),
+                                        })
                                     }
                                 />
                                 <span aria-hidden>→</span>
@@ -183,7 +256,13 @@ export function RunContainerDialog({
                                     value={volume.target}
                                     spellCheck={false}
                                     onChange={(event) =>
-                                        update({ volumes: form.volumes.map((row, at) => (at === index ? { ...row, target: event.target.value } : row)) })
+                                        update({
+                                            volumes: form.volumes.map((row, at) =>
+                                                at === index
+                                                    ? { ...row, target: event.target.value }
+                                                    : row,
+                                            ),
+                                        })
                                     }
                                 />
                                 <label className="flex items-center gap-1 text-xs">
@@ -191,17 +270,45 @@ export function RunContainerDialog({
                                         type="checkbox"
                                         checked={volume.readOnly}
                                         onChange={(event) =>
-                                            update({ volumes: form.volumes.map((row, at) => (at === index ? { ...row, readOnly: event.target.checked } : row)) })
+                                            update({
+                                                volumes: form.volumes.map((row, at) =>
+                                                    at === index
+                                                        ? { ...row, readOnly: event.target.checked }
+                                                        : row,
+                                                ),
+                                            })
                                         }
                                     />
                                     {t('readOnly')}
                                 </label>
-                                <Button type="button" variant="ghost" size="sm" aria-label={t('removeRow')} onClick={() => update({ volumes: form.volumes.filter((_, at) => at !== index) })}>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    aria-label={t('removeRow')}
+                                    onClick={() =>
+                                        update({
+                                            volumes: form.volumes.filter((_, at) => at !== index),
+                                        })
+                                    }
+                                >
                                     <Trash2 className="h-4 w-4" aria-hidden />
                                 </Button>
                             </div>
                         ))}
-                        <Button type="button" variant="ghost" size="sm" onClick={() => update({ volumes: [...form.volumes, { source: '', target: '', readOnly: false }] })}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                                update({
+                                    volumes: [
+                                        ...form.volumes,
+                                        { source: '', target: '', readOnly: false },
+                                    ],
+                                })
+                            }
+                        >
                             <Plus className="h-4 w-4" aria-hidden /> {t('addVolume')}
                         </Button>
                     </fieldset>
@@ -211,7 +318,9 @@ export function RunContainerDialog({
                         <select
                             className={FIELD}
                             value={form.restart}
-                            onChange={(event) => update({ restart: event.target.value as FleetRunRestartPolicy })}
+                            onChange={(event) =>
+                                update({ restart: event.target.value as FleetRunRestartPolicy })
+                            }
                         >
                             {FLEET_RUN_RESTART_POLICIES.map((policy) => (
                                 <option key={policy} value={policy}>
@@ -232,13 +341,22 @@ export function RunContainerDialog({
 
                     {built.ok ? (
                         <div className="space-y-1">
-                            <span className="text-xs uppercase text-text-muted dark:text-text-muted-dark">{t('preview')}</span>
-                            <code className="block break-all rounded bg-surface-secondary dark:bg-surface-secondary-dark p-2 font-mono text-xs" data-testid="fleet-docker-run-preview">
+                            <span className="text-xs uppercase text-text-muted dark:text-text-muted-dark">
+                                {t('preview')}
+                            </span>
+                            <code
+                                className="block break-all rounded bg-surface-secondary dark:bg-surface-secondary-dark p-2 font-mono text-xs"
+                                data-testid="fleet-docker-run-preview"
+                            >
                                 {built.preview}
                             </code>
                         </div>
                     ) : form.image.trim() ? (
-                        <p role="alert" className="text-sm text-danger" data-testid="fleet-docker-run-invalid">
+                        <p
+                            role="alert"
+                            className="text-sm text-danger"
+                            data-testid="fleet-docker-run-invalid"
+                        >
                             {built.hint}
                         </p>
                     ) : null}
@@ -247,7 +365,13 @@ export function RunContainerDialog({
                         <Button type="button" variant="secondary" onClick={onClose}>
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" variant="primary" disabled={!built.ok} loading={pending} data-testid="fleet-docker-run-confirm">
+                        <Button
+                            type="submit"
+                            variant="primary"
+                            disabled={!built.ok}
+                            loading={pending}
+                            data-testid="fleet-docker-run-confirm"
+                        >
                             {t('run')}
                         </Button>
                     </DialogFooter>
