@@ -18,6 +18,8 @@ import { WorkUpstreamPrSetting } from '../entities/work-upstream-pr-setting.enti
 import { UpstreamPrSuggestion } from '../entities/upstream-pr-suggestion.entity';
 import { UpstreamPullRequestRepository } from '../database/repositories/upstream-pull-request.repository';
 import { UpstreamPullRequestRecordService } from './upstream-pull-request-record.service';
+import { UpstreamEligibilityService } from './upstream-eligibility.service';
+import { AppSpecModule } from '../app-spec/app-spec.module';
 
 /**
  * APW-09 (Upstream pull requests) — the epic's agent-side module, and the home
@@ -133,6 +135,10 @@ import { UpstreamPullRequestRecordService } from './upstream-pull-request-record
             UpstreamPrSuggestion,
         ]),
         ActivityLogModule,
+        // APW-09 T9 — `AppSpecService` for the opt-in and `maxOpen` (G15). A leaf: it imports
+        // only `DatabaseModule`, `FacadesModule` and `ActivityLogModule`, none of which imports
+        // this module.
+        AppSpecModule,
     ],
     providers: [
         UpstreamCredentialStateStore,
@@ -143,6 +149,8 @@ import { UpstreamPullRequestRecordService } from './upstream-pull-request-record
         // APW-09 T7/T35 (lane aw-upstream-prs) — the record and its one writer.
         UpstreamPullRequestRepository,
         UpstreamPullRequestRecordService,
+        // APW-09 T8/T9 — eligibility and the FR-26 / FR-39 limits.
+        UpstreamEligibilityService,
         {
             provide: UPSTREAM_CREDENTIAL_STORE,
             useExisting: UpstreamCredentialStateStore,
@@ -156,6 +164,7 @@ import { UpstreamPullRequestRecordService } from './upstream-pull-request-record
         UPSTREAM_CREDENTIAL_STORE,
         UpstreamPullRequestRepository,
         UpstreamPullRequestRecordService,
+        UpstreamEligibilityService,
     ],
 })
 export class UpstreamPullRequestsModule {}

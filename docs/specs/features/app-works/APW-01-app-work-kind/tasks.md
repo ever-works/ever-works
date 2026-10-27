@@ -471,7 +471,7 @@ Works arrives with the App runtime.' }` **before** `getPluginAndTokenAndSettings
       400 before any row (quick-create carries no mode).
       **Done when**: the OpenAPI JSON shows the new response codes.
 
-- [ ] **T19 (parallel with T18). MCP parity.**
+- [x] **T19 (parallel with T18). MCP parity.** _(2026-10-27, lane B1 #2960: `inspect_app_source` + 31 more App Works entries, `apps/mcp/test/whitelist-app-works.spec.ts`. Open: the `create_work` field assertion against the generated OpenAPI document.)_
       **Modify** `apps/mcp/src/openapi-tools/whitelist.ts` — add `inspect_app_source` with
       `annotations: { readOnlyHint: true }` in the Works block; update the block's count comment.
       **Test**: **create** `apps/mcp/test/whitelist-app-works.spec.ts` (sibling of
@@ -620,7 +620,7 @@ Works arrives with the App runtime.' }` **before** `getPluginAndTokenAndSettings
       **Done when**: an App Work page shows the relation line and no Items/Generator/Comparisons surface, and both
       generator routes refuse an App Work even when opened by URL.
 
-- [ ] **T25. Chat tool.**
+- [x] **T25. Chat tool.** _(2026-10-27, lane B1 #2960; spec `work.tools.app.unit.spec.ts`.)_
       **Modify** `apps/web/src/lib/ai/tools/work.tools.ts` — `workKindEnum` + `'app'` with its description;
       `createWorkManual` gains `repositoryMode`, `targetOwner`, `confirmed`; returns `ConfirmationRequired`
       for `kind === 'app'` unless `confirmed === true`, naming the repository to be created or the repository a setup
@@ -790,7 +790,7 @@ Works arrives with the App runtime.' }` **before** `getPluginAndTokenAndSettings
       **Done when**: the spec is green, `WORK_KINDS` is unchanged, and a grep over the import path shows `'app'` is
       never assigned to `kind`.
 
-- [ ] **T42. Blueprint parity across every client (FR-56).**
+- [ ] **T42. Blueprint parity across every client (FR-56).** _(2026-10-27, lane B1 #2960: the chat half is done — the card names the matched Blueprint and no `blueprintId` is sent. Open: the `docs/features/app-works.md` paragraph, the MCP `create_work` `appEnv` assertion and the fake-catalog create spec.)_
       **Modify** `apps/web/src/lib/ai/tools/work.tools.ts` — for `kind === 'app'` the confirmation calls the
       read-only `inspectAppSource` first and appends "with the {name} App Blueprint" when a Blueprint matched, so a
       Blueprint is never applied unseen; the tool passes neither a guessed nor a stale `blueprintId`.
@@ -850,7 +850,7 @@ _Refines spec FR-9 (all organizations) and adds the P2 items in [plan §11](./pl
       **Done when**: an inspect over a 150-organization fixture makes at most 15 provider calls and returns
       `scanIncomplete: true`.
 
-- [ ] **T32 (parallel with T31). `inspectAppSource` chat tool.**
+- [x] **T32 (parallel with T31). `inspectAppSource` chat tool.** _(2026-10-27, lane B1 #2960.)_
       **Modify** `apps/web/src/lib/ai/tools/work.tools.ts` — read-only tool returning modes, reasons,
       default mode and owners (no URL echo beyond `fullName`).
       **Test**: extend `apps/web/src/lib/ai/tools/tool-selection.unit.spec.ts` (picks it for "can I fork
