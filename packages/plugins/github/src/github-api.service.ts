@@ -3324,6 +3324,12 @@ export class GitHubApiService {
 				// rewritten. Nothing is pushed — the caller decides what that means.
 				return { outcome: 'not_fast_forward', pushedSha: null };
 			}
+			// Present is not reachable: the copy's own base history can hold an upstream
+			// commit the upstream branch no longer contains. Only a `headSha` that is an
+			// ancestor of (or equal to) the fetched upstream head is upstream's history.
+			if (!(await this.isAncestorOrSelf(ops, dir, input.headSha, upstreamHead))) {
+				return { outcome: 'not_fast_forward', pushedSha: null };
+			}
 
 			await ops.writeBranchRef(dir, COPY_SYNC_LOCAL_BRANCH, input.headSha);
 			try {
@@ -3346,6 +3352,22 @@ export class GitHubApiService {
 			throw toGitProviderError(err);
 		} finally {
 			await removeCopySyncDirectory(ops, dir);
+		}
+	}
+
+	/**
+	 * Whether `oid` is `head` or one of its ancestors — their merge base is `oid`
+	 * itself (compared case-insensitively). A merge base that cannot be computed
+	 * proves nothing, so it answers `false`: the move then refuses rather than
+	 * pushing a commit it could not place in upstream's history.
+	 */
+	private async isAncestorOrSelf(ops: CopySyncOperations, dir: string, oid: string, head: string): Promise<boolean> {
+		if (oid.toLowerCase() === head.toLowerCase()) return true;
+		try {
+			const base = await ops.findMergeBase(dir, [oid, head]);
+			return typeof base === 'string' && base.toLowerCase() === oid.toLowerCase();
+		} catch {
+			return false;
 		}
 	}
 

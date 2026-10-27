@@ -119,64 +119,118 @@ export async function countCommitRange(
 	}
 
 	let count = 0;
-	const everyQueuedIsExcluded = (): boolean => queue.every((node) => (node.flags & EXCLUDE) !== 0);
+	// Commits reachable only from `include` that were reached once the count stood
+	// at the cap: neither counted nor expanded, but kept, because an exclusion still
+	// on its way can undo an earlier count (clock skew) and bring the total back
+	// under the cap — and then these are the next commits to count.
+	const held: Node[] = [];
 
-	while (queue.length > 0 && !everyQueuedIsExcluded()) {
-		const node = queue.shift() as Node;
-		node.queued = false;
+	const uncount = (node: Node): void => {
+		if (node.counted) {
+			// Clock skew: counted before the exclusion reached it. Undo it.
+			node.counted = false;
+			count -= 1;
+		}
+	};
+	const stillHeld = (): Node[] => held.filter((node) => (node.flags & EXCLUDE) === 0);
 
-		if ((node.flags & EXCLUDE) !== 0) {
-			if (node.counted) {
-				// Clock skew: counted before the exclusion reached it. Undo it.
-				node.counted = false;
-				count -= 1;
+	const walk = async (): Promise<void> => {
+		while (queue.length > 0) {
+			const saturated = count >= limit;
+			if (queue.every((node) => (node.flags & EXCLUDE) !== 0)) {
+				// Only exclusions are left. Unsaturated, the range is complete. At the cap,
+				// an exclusion can still repair a count only while it is not older than
+				// every commit held back — the same frontier rule, applied to them.
+				if (!saturated) return;
+				const open = stillHeld();
+				if (open.length === 0) return;
+				const oldestHeld = Math.min(...open.map((node) => node.timestamp));
+				if (queue[0].timestamp < oldestHeld) return;
+			}
+
+			const node = queue.shift() as Node;
+			node.queued = false;
+
+			if ((node.flags & EXCLUDE) !== 0) {
+				uncount(node);
+				for (const parentOid of node.parents) {
+					const parent = await nodeOf(parentOid);
+					if ((parent.flags & EXCLUDE) === 0) {
+						parent.flags |= EXCLUDE;
+						enqueue(parent);
+					}
+				}
+				continue;
+			}
+
+			if (saturated) {
+				// At the cap: hold it back, read nothing below it.
+				held.push(node);
+				continue;
+			}
+
+			if (!node.counted) {
+				node.counted = true;
+				count += 1;
 			}
 			for (const parentOid of node.parents) {
 				const parent = await nodeOf(parentOid);
+				if ((parent.flags & INCLUDE) === 0 && (parent.flags & EXCLUDE) === 0) {
+					parent.flags |= INCLUDE;
+					enqueue(parent);
+				}
+			}
+		}
+	};
+
+	/**
+	 * Exclusions still queued can reach commits counted under skew: propagate them
+	 * through the commits already read (no new reads) so the answer is exact rather
+	 * than an over-count. Answers the excluded commits whose parents were never read
+	 * — the frontier a resumed walk must pick up again.
+	 */
+	const repairWithKnownCommits = (): Node[] => {
+		const frontier: Node[] = [];
+		while (queue.length > 0) {
+			const node = queue.shift() as Node;
+			node.queued = false;
+			if ((node.flags & EXCLUDE) === 0) {
+				held.push(node);
+				continue;
+			}
+			uncount(node);
+			let unread = false;
+			for (const parentOid of node.parents) {
+				const parent = nodes.get(parentOid);
+				if (!parent) {
+					unread = true;
+					continue;
+				}
 				if ((parent.flags & EXCLUDE) === 0) {
 					parent.flags |= EXCLUDE;
 					enqueue(parent);
 				}
 			}
+			if (unread) frontier.push(node);
+		}
+		return frontier;
+	};
+
+	for (;;) {
+		await walk();
+		const frontier = repairWithKnownCommits();
+		const open = stillHeld();
+		if (count < limit && open.length > 0) {
+			// A repair brought the total back under the cap: the held commits are the
+			// next to count, and the exclusion frontier walks on beside them.
+			held.length = 0;
+			for (const node of frontier) enqueue(node);
+			for (const node of open) enqueue(node);
 			continue;
 		}
-
-		if (!node.counted) {
-			node.counted = true;
-			count += 1;
-			if (count >= limit) {
-				return { count: limit, capped: true };
-			}
+		if (count >= limit && (count > 0 || open.length > 0)) {
+			return { count: limit, capped: true };
 		}
-		for (const parentOid of node.parents) {
-			const parent = await nodeOf(parentOid);
-			if ((parent.flags & INCLUDE) === 0 && (parent.flags & EXCLUDE) === 0) {
-				parent.flags |= INCLUDE;
-				enqueue(parent);
-			}
-		}
+		return { count: Math.max(0, count), capped: false };
 	}
-
-	// Exclusions still queued can reach commits counted under skew; drain them so
-	// the answer is exact rather than an over-count.
-	while (queue.length > 0) {
-		const node = queue.shift() as Node;
-		node.queued = false;
-		if ((node.flags & EXCLUDE) === 0) continue;
-		if (node.counted) {
-			node.counted = false;
-			count -= 1;
-		}
-		for (const parentOid of node.parents) {
-			const parent = nodes.get(parentOid);
-			// Only commits the walk already knows can carry a count to undo; an
-			// unread parent below the frontier was never counted.
-			if (parent && (parent.flags & EXCLUDE) === 0) {
-				parent.flags |= EXCLUDE;
-				enqueue(parent);
-			}
-		}
-	}
-
-	return { count: Math.max(0, count), capped: false };
 }

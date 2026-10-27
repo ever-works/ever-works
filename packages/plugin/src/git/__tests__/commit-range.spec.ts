@@ -92,6 +92,35 @@ describe('countCommitRange', () => {
 		await expect(countCommitRange(read, 'up', 'copy', 100)).resolves.toEqual({ count: 1, capped: false });
 	});
 
+	it('does not report a cap reached only by a count that clock skew later undoes', async () => {
+		// up(10) -> x2(2) -> x1(1), and copy(1) -> x2: the range up..copy is just `up`.
+		// With a cap of 2 the walk counts `up` and then x2 before the exclusion from `copy`
+		// reaches x2 — reaching the cap must not end the walk before that exclusion lands.
+		const graph: Graph = {
+			x1: { parents: [], t: 1 },
+			x2: { parents: ['x1'], t: 2 },
+			copy: { parents: ['x2'], t: 1 },
+			up: { parents: ['x2'], t: 10 }
+		};
+		const { read } = reader(graph);
+		await expect(countCommitRange(read, 'up', 'copy', 2)).resolves.toEqual({ count: 1, capped: false });
+		await expect(countCommitRange(read, 'up', 'copy', 1)).resolves.toEqual({ count: 1, capped: true });
+	});
+
+	it('counts on past a repaired cap when more commits are really in the range', async () => {
+		// up(10) -> a(9) -> x2(2) -> x1(1), copy(1) -> x2: the range is {up, a}.
+		const graph: Graph = {
+			x1: { parents: [], t: 1 },
+			x2: { parents: ['x1'], t: 2 },
+			a: { parents: ['x2'], t: 9 },
+			copy: { parents: ['x2'], t: 1 },
+			up: { parents: ['a'], t: 10 }
+		};
+		const { read } = reader(graph);
+		await expect(countCommitRange(read, 'up', 'copy', 3)).resolves.toEqual({ count: 2, capped: false });
+		await expect(countCommitRange(read, 'up', 'copy', 2)).resolves.toEqual({ count: 2, capped: true });
+	});
+
 	it('caps the count and says so — never a smaller number', async () => {
 		const { read, reads } = reader(chain('c', 50));
 		await expect(countCommitRange(read, 'c50', 'zzz-unrelated', 10)).rejects.toThrow('missing zzz-unrelated');

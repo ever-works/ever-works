@@ -111,6 +111,7 @@ function createDouble(
 	options: {
 		hasCommit?: boolean;
 		fetchHead?: string | null;
+		mergeBase?: (oids: readonly [string, string]) => Promise<string | null>;
 		push?: (request: Record<string, unknown>) => Promise<void>;
 		omit?: string[];
 	} = {}
@@ -136,7 +137,9 @@ function createDouble(
 		}),
 		resolveRef: vi.fn(async () => COPY_HEAD),
 		hasCommit: vi.fn(async () => options.hasCommit ?? true),
-		findMergeBase: vi.fn(async () => 'f'.repeat(40)),
+		findMergeBase: vi.fn(async (_dir: string, oids: readonly [string, string]) =>
+			options.mergeBase ? options.mergeBase(oids) : oids.includes(CHECKED_SHA) ? CHECKED_SHA : 'f'.repeat(40)
+		),
 		countCommitsBetween: vi.fn(async (_dir: string, range: GitCommitRangeOptions) => {
 			calls.count.push(range);
 			return range.include === UPSTREAM_HEAD ? behind : ahead;
@@ -373,6 +376,47 @@ describe('GitHubApiService.moveRepositoryCopyBranch (APW-02 T48)', () => {
 		});
 		expect(double.calls.writeBranchRef).toHaveLength(0);
 		expect(double.calls.push).toHaveLength(0);
+	});
+
+	it('answers not_fast_forward when the checked sha is present but no longer upstream history', async () => {
+		// The copy's own base history still holds the commit, so it EXISTS locally — but the
+		// fetched upstream head no longer descends from it (upstream rewrote its branch).
+		const double = createDouble({ hasCommit: true, mergeBase: async () => 'e'.repeat(40) });
+		await expect(svc.moveRepositoryCopyBranch(moveInput(), TOKEN, undefined, double.ops)).resolves.toEqual({
+			outcome: 'not_fast_forward',
+			pushedSha: null
+		});
+		expect(double.ops.findMergeBase).toHaveBeenCalledWith(DIR, [CHECKED_SHA, UPSTREAM_HEAD]);
+		expect(double.calls.writeBranchRef).toHaveLength(0);
+		expect(double.calls.push).toHaveLength(0);
+		expect(double.calls.removeWorkingCopy).toEqual([DIR]);
+	});
+
+	it('accepts the ancestry check case-insensitively, and refuses when it cannot be computed', async () => {
+		const upper = createDouble({ mergeBase: async () => CHECKED_SHA.toUpperCase() });
+		await expect(svc.moveRepositoryCopyBranch(moveInput(), TOKEN, undefined, upper.ops)).resolves.toEqual({
+			outcome: 'moved',
+			pushedSha: CHECKED_SHA
+		});
+		const broken = createDouble({
+			mergeBase: async () => {
+				throw new Error('could not read object');
+			}
+		});
+		await expect(svc.moveRepositoryCopyBranch(moveInput(), TOKEN, undefined, broken.ops)).resolves.toEqual({
+			outcome: 'not_fast_forward',
+			pushedSha: null
+		});
+		expect(broken.calls.push).toHaveLength(0);
+	});
+
+	it('pushes when the checked sha IS the fetched upstream head, without a merge-base read', async () => {
+		const double = createDouble({ fetchHead: CHECKED_SHA });
+		await expect(svc.moveRepositoryCopyBranch(moveInput(), TOKEN, undefined, double.ops)).resolves.toEqual({
+			outcome: 'moved',
+			pushedSha: CHECKED_SHA
+		});
+		expect(double.ops.findMergeBase).not.toHaveBeenCalled();
 	});
 
 	it('classifies any other push failure as the contract error and still removes the working copy', async () => {
