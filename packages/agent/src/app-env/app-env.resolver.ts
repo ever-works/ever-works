@@ -898,6 +898,41 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
         return values;
     }
 
+    /**
+     * APW-06 §9.3 (lane aw-builds-bindings, 2026-10-27) — the dependency egress HOSTS of one App
+     * Work, for the health poll's every-10th re-resolution (`APP_HEALTH_EGRESS_SOURCE`).
+     *
+     * The same destinations {@link resolveRuntime} returns as `egress` — the ready rows of the
+     * external providers, read off their stored outputs by the same rule — but WITHOUT the stored
+     * env context a full resolution assembles: no env value is read, generated or decrypted, only
+     * the dependency rows and their outputs envelopes (R-10's round trip is the env, not these).
+     * Hosts only; ports and every other output stay here.
+     *
+     * `null` when the question cannot be answered — no dependency store in this process, a row
+     * read that failed, or a target it cannot judge (`none`, absent, unknown) — and never `[]`
+     * standing in for "unknown" (`AppHealthEgressSource`'s contract). The managed tier answers
+     * `[]`: its destinations are the zone's business (§4.11), exactly as in a full resolution.
+     */
+    async resolveEgressHosts(workId: string, target?: string | null): Promise<string[] | null> {
+        if (!workId || !this.dependencyRows) return null;
+        if (target === 'ever-works-apps') return [];
+        if (target !== 'your-cluster') return null;
+
+        let rows: WorkAppDependency[];
+        try {
+            rows = await this.dependencyRows.find({ where: { workId } });
+        } catch (error) {
+            this.logger.warn(
+                `App env: the dependency rows of work ${workId} could not be read for its egress hosts (${describeError(error)}).`,
+            );
+            return null;
+        }
+
+        return collectEgressDestinations(target, this.dependencyFactsOf(rows)).map(
+            (destination) => destination.host,
+        );
+    }
+
     /* ---------------------------------------------------------------------- *
      * Reading the world
      * ---------------------------------------------------------------------- */
@@ -1108,6 +1143,14 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
             return facts;
         }
 
+        return this.dependencyFactsOf(rows, facts);
+    }
+
+    /** The live rows as facts — `kept`/`deleted` rows are not the App's any more. */
+    private dependencyFactsOf(
+        rows: readonly WorkAppDependency[],
+        facts = new Map<AppDependencyKind, AppEnvDependencyFact>(),
+    ): Map<AppDependencyKind, AppEnvDependencyFact> {
         for (const row of rows) {
             if (!row?.kind) continue;
             if (row.status === 'kept' || row.status === 'deleted') continue;
@@ -1736,28 +1779,7 @@ export class AppEnvResolver implements AppEnvResolvedFingerprints {
      * the managed target, where no output is read at all.
      */
     private collectEgress(scope: ResolutionScope): AppEnvEgressDestination[] {
-        // The managed tier's destinations are the zone's business (§4.11) —
-        // unchanged now that its rows are read for the lite tier.
-        if (scope.target === 'ever-works-apps') return [];
-        const byHost = new Map<string, Set<number>>();
-
-        for (const fact of scope.dependencyFacts.values()) {
-            if (fact.status !== 'ready') continue;
-            if (!isExternalProvider(fact.providerId)) continue;
-
-            const destination = externalDestination(fact);
-            if (!destination) continue;
-            const ports = byHost.get(destination.host) ?? new Set<number>();
-            for (const port of destination.ports) ports.add(port);
-            byHost.set(destination.host, ports);
-        }
-
-        return [...byHost.entries()]
-            .map(([host, ports]) => ({
-                host,
-                ports: [...ports].sort((left, right) => left - right),
-            }))
-            .sort((left, right) => (left.host < right.host ? -1 : left.host > right.host ? 1 : 0));
+        return collectEgressDestinations(scope.target, scope.dependencyFacts);
     }
 
     /** The generate-if-absent pass, once per resolve, only when one is bound. */
@@ -1888,6 +1910,39 @@ export function buildServiceOutputs(
                 secure: 'false',
             };
     }
+}
+
+/**
+ * The external destinations of a set of dependency facts — one rule for a full resolution's
+ * `egress` and for the health poll's {@link AppEnvResolver.resolveEgressHosts}, so the two cannot
+ * drift. Sorted by host, ports ascending and de-duplicated.
+ */
+function collectEgressDestinations(
+    target: AppDeployTarget | string,
+    facts: ReadonlyMap<AppDependencyKind, AppEnvDependencyFact>,
+): AppEnvEgressDestination[] {
+    // The managed tier's destinations are the zone's business (§4.11) —
+    // unchanged now that its rows are read for the lite tier.
+    if (target === 'ever-works-apps') return [];
+    const byHost = new Map<string, Set<number>>();
+
+    for (const fact of facts.values()) {
+        if (fact.status !== 'ready') continue;
+        if (!isExternalProvider(fact.providerId)) continue;
+
+        const destination = externalDestination(fact);
+        if (!destination) continue;
+        const ports = byHost.get(destination.host) ?? new Set<number>();
+        for (const port of destination.ports) ports.add(port);
+        byHost.set(destination.host, ports);
+    }
+
+    return [...byHost.entries()]
+        .map(([host, ports]) => ({
+            host,
+            ports: [...ports].sort((left, right) => left - right),
+        }))
+        .sort((left, right) => (left.host < right.host ? -1 : left.host > right.host ? 1 : 0));
 }
 
 /** Is this row's provider one of the three external ones? (plan §4.10) */

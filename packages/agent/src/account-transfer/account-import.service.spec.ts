@@ -706,6 +706,67 @@ describe('AccountImportService', () => {
             expect('providerRepositoryEnabled' in patch).toBe(false);
         });
 
+        // APW-11 FR-19 — `appLauncherExposed` is a member-editable Work setting
+        // and the third place of the transfer whitelist (types → export →
+        // import create + overwrite). Before this, an explicit choice was
+        // silently reset to the kind default by every transfer.
+        it('round-trips an explicit appLauncherExposed on create, including false', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+            mocks.workRepository.create.mockResolvedValue({ id: 'w-new', slug: 'a' });
+
+            await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', kind: 'directory', appLauncherExposed: true })]),
+                [],
+            );
+            expect(mocks.workRepository.create.mock.calls[0][0].appLauncherExposed).toBe(true);
+
+            mocks.workRepository.create.mockClear();
+            await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', kind: 'directory', appLauncherExposed: false })]),
+                [],
+            );
+            expect(mocks.workRepository.create.mock.calls[0][0].appLauncherExposed).toBe(false);
+        });
+
+        it('overwrites with an explicit null (kind default), leaves it alone when absent, drops a bogus value', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            const existing = { id: 'w-existing', slug: 'a', getRepoOwner: () => 'octocat' };
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(existing);
+
+            await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', appLauncherExposed: null })]),
+                [{ slug: 'a', strategy: 'overwrite' }],
+            );
+            // `null` is a real state, not "unset": it must replace an explicit
+            // choice on the existing Work.
+            expect(mocks.workRepository.update.mock.calls[0][1]).toHaveProperty(
+                'appLauncherExposed',
+                null,
+            );
+
+            // Old export (no field) → the existing Work's choice is untouched.
+            mocks.workRepository.update.mockClear();
+            await service.applyImport('user-1', makePayload([makeWork({ slug: 'a' })]), [
+                { slug: 'a', strategy: 'overwrite' },
+            ]);
+            expect('appLauncherExposed' in mocks.workRepository.update.mock.calls[0][1]).toBe(false);
+
+            // Tampered payload → dropped, never coerced into a boolean.
+            mocks.workRepository.update.mockClear();
+            await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', appLauncherExposed: 'yes' as never })]),
+                [{ slug: 'a', strategy: 'overwrite' }],
+            );
+            expect('appLauncherExposed' in mocks.workRepository.update.mock.calls[0][1]).toBe(false);
+        });
+
         it('round-trips quality-gate fields (checkDefaults / checksPolicy / maxGateAttempts) on create', async () => {
             const { service, mocks } = makeService();
             mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
