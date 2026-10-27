@@ -174,6 +174,8 @@ describe('activity-log.types', () => {
             // lane aw-deps-api).
             ['APP_ENV', 'app_env'],
             ['APP_DEPENDENCY', 'app_dependency'],
+            // APW-09 T6 — the upstream pull request family (`app.upstream_pr.*`).
+            ['APP_UPSTREAM_PR', 'app_upstream_pr'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -512,7 +514,11 @@ describe('activity-log.types', () => {
             //    Configure / Retry / Delete data rows and the Deploy-triggered
             //    transient retry), with its `feed-kind.ts` row in the same change
             //    -> 220. Nothing existing moves.
-            expect(literals).toHaveLength(220);
+            // +1 app_health (APW-06 T29, lane aw-safety) landed without a recount, so develop
+            //    read 221 against 220; recounted here -> 221.
+            // +1 app_upstream_pr (APW-09 T6, lane aw-upstream-prs — the upstream pull request
+            //    family), with its `feed-kind.ts` row in the same change -> 222. Nothing existing moves.
+            expect(literals).toHaveLength(222);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

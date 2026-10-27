@@ -75,6 +75,10 @@ import {
     type AppLicenseService as AppLicenseGateReader,
 } from '@ever-works/agent/app-runtime';
 import { APP_DEPENDENCIES_SERVICE } from '@ever-works/agent/app-runtime';
+import {
+    APP_HEALTH_EGRESS_SOURCE,
+    type AppHealthEgressSource,
+} from '@ever-works/agent/app-runtime';
 // Lane aw-deploy-3 (2026-10-17) — APW-07's service, composed HERE so the worker's preconditions
 // enforce dependency readiness and the orchestrator's `remove` can order the dependency deletion.
 import {
@@ -267,6 +271,10 @@ import { createRemoteProxy } from '../remote-proxy';
  *   the internal channel; with `app-dependency-provision.task.ts`'s module, it waits on that design.
  * - `APP_HEALTH_EGRESS_SOURCE` — the narrow adapter `app-health.service.ts` names is unwritten, and
  *   `APP_RUNTIME_ENV_SOURCE` here is still the fail-closed default above.
+ *   **Bound 2026-10-27 (lane aw-builds-bindings)** to `workerAppHealthEgressSource` below: one
+ *   member, `resolveEgressHosts`, over the API's `AppEnvRuntimeSource.resolveEgressHosts` (the
+ *   same `APP_RUNTIME_ENV_SOURCE` proxy), which reads the dependency rows' outputs in the API and
+ *   answers hosts only — no env value crosses for it.
  *
  * **APW-06 T70's three classes and T27's service are provided below** (added 2026-09-18):
  * `AppClusterOpRouter` plus the `AppLifecycleOpsService` and `AppSmokeService` it and the
@@ -561,6 +569,14 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'AppEnvRuntimeSource'),
             inject: [TriggerInternalApiClient],
+        },
+        // APW-06 §9.3 (lane aw-builds-bindings, 2026-10-27): the health poll's every-10th egress
+        // re-resolution. A ONE-member adapter over the env source proxy above, so the health
+        // service can reach `resolveEgressHosts` and nothing else of that proxy.
+        {
+            provide: APP_HEALTH_EGRESS_SOURCE,
+            useFactory: (envSource: unknown) => workerAppHealthEgressSource(envSource),
+            inject: [APP_RUNTIME_ENV_SOURCE],
         },
         // T28: the relay re-emits a catalogued `app.*` event in the API (names and ids only).
         {
@@ -858,3 +874,32 @@ export function appClusterWorkerRefusal(): { code: string; message: string } | n
     ],
 })
 export class TriggerAppRuntimeModule {}
+
+/**
+ * APW-06 §9.3 (lane aw-builds-bindings, 2026-10-27) — `APP_HEALTH_EGRESS_SOURCE` in the isolated
+ * worker: exactly `resolveEgressHosts`, forwarded to the API's
+ * `AppEnvRuntimeSource.resolveEgressHosts` through the `APP_RUNTIME_ENV_SOURCE` proxy. Any failure
+ * of the internal channel is `null` ("cannot be answered"), never `[]`, so a transport error is
+ * never read as "no egress hosts" and cannot dispatch a reconcile on its own.
+ */
+export function workerAppHealthEgressSource(envSource: unknown): AppHealthEgressSource {
+    return {
+        resolveEgressHosts: async (workId: string, target?: string | null) => {
+            const source = envSource as {
+                resolveEgressHosts?: (
+                    workId: string,
+                    target?: string | null,
+                ) => Promise<readonly string[] | null | undefined>;
+            } | null;
+            if (!source || typeof source.resolveEgressHosts !== 'function') return null;
+            try {
+                const hosts = await source.resolveEgressHosts(workId, target ?? null);
+                return Array.isArray(hosts)
+                    ? hosts.filter((host): host is string => typeof host === 'string')
+                    : null;
+            } catch {
+                return null;
+            }
+        },
+    };
+}
