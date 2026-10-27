@@ -40,8 +40,10 @@ vi.mock('@trigger.dev/sdk', () => ({
 
 vi.mock('@ever-works/agent/app-works', () => ({
     APP_UPSTREAM_LICENSE_SERVICE: Symbol.for('test:APP_UPSTREAM_LICENSE_SERVICE'),
+    APP_UPSTREAM_PRIVATE_COPY_PORT: Symbol.for('test:APP_UPSTREAM_PRIVATE_COPY_PORT'),
     APP_UPSTREAM_SYNC_SPEC_SOURCE: Symbol.for('test:APP_UPSTREAM_SYNC_SPEC_SOURCE'),
     AppActionsHygieneService: class AppActionsHygieneService {},
+    AppUpstreamPrivateCopyAdapter: class AppUpstreamPrivateCopyAdapter {},
     AppUpstreamStateService: class AppUpstreamStateService {},
     AppUpstreamSyncService: class AppUpstreamSyncService {},
 }));
@@ -90,8 +92,10 @@ vi.mock('../../../trigger/worker/utils/worker-context.utils', () => ({
 
 import {
     APP_UPSTREAM_LICENSE_SERVICE,
+    APP_UPSTREAM_PRIVATE_COPY_PORT,
     APP_UPSTREAM_SYNC_SPEC_SOURCE,
     AppActionsHygieneService,
+    AppUpstreamPrivateCopyAdapter,
     AppUpstreamStateService,
     AppUpstreamSyncService,
 } from '@ever-works/agent/app-works';
@@ -261,6 +265,13 @@ describe('app-upstream-sync (APW-02 T33)', () => {
         it('provides the sync service and its hygiene collaborator locally', () => {
             expect(providers()).toEqual(
                 expect.arrayContaining([AppUpstreamSyncService, AppActionsHygieneService]),
+            );
+        });
+
+        it('binds the private copy capability to its local adapter (APW-02 T48, FR-63)', () => {
+            expect(providers()).toEqual(expect.arrayContaining([AppUpstreamPrivateCopyAdapter]));
+            expect(binding(APP_UPSTREAM_PRIVATE_COPY_PORT)?.useExisting).toBe(
+                AppUpstreamPrivateCopyAdapter,
             );
         });
     });
