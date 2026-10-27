@@ -367,4 +367,72 @@ describe('InstallRunnersDialog', () => {
         await screen.findByTestId('fleet-runners-install-summary');
         expect(permission).not.toHaveBeenCalled();
     });
+
+    // ─── P3 (FR-27): container-isolated runners ─────────────────────────────
+
+    it('offers Container-isolated on a Linux computer that lists it, with the daemon opt-in unticked', async () => {
+        options.mockResolvedValue({
+            ok: true,
+            data: opts({ os: 'linux', modes: ['service', 'docker'] }),
+        });
+        install.mockResolvedValue({
+            ok: true,
+            data: { runnerIds: ['r1'], operationId: 'j1', jobId: 'j1' },
+        });
+        open();
+        expect(await screen.findByTestId('fleet-runners-install-mode-service')).toBeChecked();
+        expect(
+            screen.getByText('Container-isolated — each runner in its own container'),
+        ).toBeInTheDocument();
+        // Not shown until the container mode is chosen.
+        expect(screen.queryByTestId('fleet-runners-install-share-daemon')).toBeNull();
+        fireEvent.click(screen.getByTestId('fleet-runners-install-mode-docker'));
+        const share = screen.getByTestId('fleet-runners-install-share-daemon');
+        expect(share).not.toBeChecked();
+        expect(screen.getByText('Share the Docker daemon (runs as root)')).toBeInTheDocument();
+        expect(screen.getByText(/can control every container on build-01/)).toBeInTheDocument();
+        expect(screen.getByTestId('fleet-runners-install-summary')).toHaveTextContent(
+            'Installs 1 Actions runner for acme/api on build-01 each in its own container.',
+        );
+        fireEvent.click(screen.getByTestId('fleet-runners-install-submit'));
+        await waitFor(() =>
+            expect(install).toHaveBeenCalledWith(
+                'n1',
+                expect.objectContaining({
+                    mode: 'docker',
+                    shareDockerDaemon: false,
+                    confirm: true,
+                }),
+            ),
+        );
+    });
+
+    it('sends the daemon opt-in as ticked', async () => {
+        options.mockResolvedValue({
+            ok: true,
+            data: opts({ os: 'linux', modes: ['service', 'docker'] }),
+        });
+        install.mockResolvedValue({
+            ok: true,
+            data: { runnerIds: ['r1'], operationId: 'j1', jobId: 'j1' },
+        });
+        open();
+        fireEvent.click(await screen.findByTestId('fleet-runners-install-mode-docker'));
+        fireEvent.click(screen.getByTestId('fleet-runners-install-share-daemon'));
+        expect(screen.getByTestId('fleet-runners-install-share-daemon')).toBeChecked();
+        fireEvent.click(screen.getByTestId('fleet-runners-install-submit'));
+        await waitFor(() =>
+            expect(install).toHaveBeenCalledWith(
+                'n1',
+                expect.objectContaining({ mode: 'docker', shareDockerDaemon: true }),
+            ),
+        );
+    });
+
+    it('never offers the container mode on a computer that does not list it', async () => {
+        options.mockResolvedValue({ ok: true, data: opts({ os: 'linux', modes: ['service'] }) });
+        open();
+        expect(await screen.findByTestId('fleet-runners-install-mode-service')).toBeChecked();
+        expect(screen.queryByTestId('fleet-runners-install-mode-docker')).toBeNull();
+    });
 });

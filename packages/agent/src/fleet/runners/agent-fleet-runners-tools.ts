@@ -51,7 +51,7 @@ export const FLEET_RUNNERS_TOOL_ANNOTATIONS: Readonly<
 /** What a held act stores so a person's approval can run exactly it (no model-authored free text). */
 export interface FleetRunnersActionProposalPayload {
     kind: typeof FLEET_RUNNERS_ACTION_PROPOSAL_KIND;
-    verb: 'install' | 'stop' | 'restart' | 'remove' | 'cancel-run';
+    verb: 'install' | 'stop' | 'restart' | 'reinstall' | 'remove' | 'cancel-run';
     agentId: string;
     /** The computer (empty for `cancel-run`, which is about a repository's workflow run). */
     nodeId: string;
@@ -244,13 +244,13 @@ export function buildFleetRunnersTools(args: {
     out.push({
         name: 'fleet_runners_action',
         description:
-            'Start, stop or restart one Actions runner on one of the owner’s computers. Start runs at once; a stop or a restart is held for the owner’s approval (a stopped runner takes no jobs until started; a job in progress finishes first).',
+            'Start, stop, restart or reinstall one Actions runner on one of the owner’s computers. Start runs at once; a stop, a restart or a reinstall (GitHub’s current build, the same name and labels) is held for the owner’s approval (a stopped runner takes no jobs until started; a job in progress finishes first).',
         parameters: {
             type: 'object',
             properties: {
                 nodeId: { type: 'string', description: 'The computer (Fleet node id).' },
                 runnerId: { type: 'string', description: 'The runner (from fleet_runners_list).' },
-                action: { type: 'string', description: 'start, stop or restart.' },
+                action: { type: 'string', description: 'start, stop, restart or reinstall.' },
             },
             required: ['nodeId', 'runnerId', 'action'],
         },
@@ -262,9 +262,12 @@ export function buildFleetRunnersTools(args: {
                 return invalid('runnerId', 'runnerId is required');
             if (
                 !isFleetActionsRunnerControlAction(a.action) ||
-                (a.action !== 'start' && a.action !== 'stop' && a.action !== 'restart')
+                (a.action !== 'start' &&
+                    a.action !== 'stop' &&
+                    a.action !== 'restart' &&
+                    a.action !== 'reinstall')
             ) {
-                return invalid('action', 'action must be start, stop or restart');
+                return invalid('action', 'action must be start, stop, restart or reinstall');
             }
             const action = a.action;
             try {
@@ -274,12 +277,12 @@ export function buildFleetRunnersTools(args: {
                 if (summary === null) return toolError(error);
                 return hold(
                     {
-                        verb: action === 'restart' ? 'restart' : 'stop',
+                        verb: action === 'start' ? 'stop' : action,
                         nodeId: a.nodeId,
                         runnerId: a.runnerId,
                         args: {},
                     },
-                    summary || `${action === 'restart' ? 'Restart' : 'Stop'} an Actions runner`,
+                    summary || `${action[0].toUpperCase()}${action.slice(1)} an Actions runner`,
                 );
             }
         },

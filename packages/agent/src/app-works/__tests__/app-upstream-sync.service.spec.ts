@@ -13,6 +13,7 @@ import {
     ProviderCallBudget,
     type AppUpstreamSyncDeps,
     type AppUpstreamSyncRunResult,
+    workflowReleaseCovers,
 } from '../app-upstream-sync.service';
 import { computeNextUpstreamSync, upstreamSyncJitterMs } from '../upstream-schedule';
 
@@ -2711,5 +2712,333 @@ describe('AppUpstreamSyncService — the workflow hold (FR-60, FR-61, ACC-02-24)
             SHA_B,
         ]);
         expectNothingMoved(harness);
+    });
+});
+
+/**
+ * APW-02 T46 (2026-10-27) — the owner's "Sync anyway". The release lives on the ROW
+ * (`workflowRelease`), written only by the state service behind the API's
+ * owner-and-session gate; the run honours it for the exact head released and only
+ * while the compare shows no protected path the owner was not shown.
+ */
+describe('AppUpstreamSyncService — the owner release of a held workflow change (T46)', () => {
+    const BEHIND_AND_AHEAD = () => ({
+        aheadBy: 1,
+        behindBy: 2,
+        upstreamHeadSha: SHA_B,
+        forkHeadSha: SHA_A,
+    });
+    const WORKFLOW = '.github/workflows/release.yml';
+
+    function release(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+        return {
+            headSha: SHA_B,
+            paths: [WORKFLOW],
+            pathCount: 1,
+            complete: true,
+            releasedByUserId: USER_ID,
+            releasedAt: '2026-01-04T12:00:00.000Z',
+            ...overrides,
+        };
+    }
+
+    function syncBranchMoves(harness: Harness): unknown[][] {
+        return [
+            ...harness.calls.updateBranchRef.filter((args) => args[2] === APP_UPSTREAM_SYNC_BRANCH),
+            ...harness.calls.createBranchFromSha.filter(
+                (args) => args[2] === APP_UPSTREAM_SYNC_BRANCH,
+            ),
+        ];
+    }
+
+    it('records the held range on the row (head + paths, never content) and moves nothing', async () => {
+        const harness = makeHarness({
+            handlers: {
+                getForkDivergence: BEHIND_AND_AHEAD,
+                getCompareDiff: () => compareOf(['src/app.ts', WORKFLOW]),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.reason).toBe('held_for_workflow_review');
+        expect(syncBranchMoves(harness)).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+        expect(rowPatch(harness).workflowHold).toEqual({
+            headSha: SHA_B,
+            paths: [WORKFLOW],
+            pathCount: 1,
+            complete: true,
+            heldAt: new Date(NOW).toISOString(),
+        });
+    });
+
+    it('syncs the released head through the pull request path, once, and audits the use', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowRelease: release(), workflowHold: { headSha: SHA_B } }),
+            handlers: {
+                getForkDivergence: BEHIND_AND_AHEAD,
+                getCompareDiff: () => compareOf(['src/app.ts', WORKFLOW]),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.result).toBe('pull_request_opened');
+        expect(syncBranchMoves(harness)).toHaveLength(1);
+        expect(harness.calls.createPullRequest).toHaveLength(1);
+        // The hold record is cleared with the run's row patch.
+        expect(rowPatch(harness).workflowHold).toBeNull();
+        const used = harness.activity.log.mock.calls
+            .map((call) => call[0] as Record<string, unknown>)
+            .filter((entry) => entry.action === 'app.upstream.workflow_release_used');
+        expect(used).toHaveLength(1);
+        expect(used[0].details).toMatchObject({
+            upstreamHeadSha: SHA_B,
+            paths: [WORKFLOW],
+            releasedByUserId: USER_ID,
+        });
+        // A released range moved the sync branch: hygiene runs to switch the new workflows off.
+        expect(harness.hygiene.apply).toHaveBeenCalledTimes(1);
+    });
+
+    it('never fast-forwards a behind-only fork on a release: the pull request carries it', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowRelease: release() }),
+            handlers: {
+                getForkDivergence: () => ({
+                    aheadBy: 0,
+                    behindBy: 2,
+                    upstreamHeadSha: SHA_B,
+                    forkHeadSha: SHA_A,
+                }),
+                getCompareDiff: () => compareOf([WORKFLOW]),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.result).toBe('pull_request_opened');
+        expect(trackedBranchMoves(harness)).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(1);
+    });
+
+    it('holds again when upstream moved past the released head', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowRelease: release({ headSha: SHA_A }) }),
+            handlers: {
+                getForkDivergence: BEHIND_AND_AHEAD,
+                getCompareDiff: () => compareOf([WORKFLOW]),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.reason).toBe('held_for_workflow_review');
+        expect(syncBranchMoves(harness)).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+    });
+
+    it('holds again when the same head now shows a protected path the owner was not shown', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowRelease: release() }),
+            handlers: {
+                getForkDivergence: BEHIND_AND_AHEAD,
+                getCompareDiff: () => compareOf([WORKFLOW, '.github/actions/setup/action.yml']),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.reason).toBe('held_for_workflow_review');
+        expect(syncBranchMoves(harness)).toHaveLength(0);
+    });
+
+    it('never fast-forwards on a release that names no owner', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowRelease: release({ releasedByUserId: '' }) }),
+            handlers: {
+                getForkDivergence: () => ({
+                    aheadBy: 0,
+                    behindBy: 2,
+                    upstreamHeadSha: SHA_B,
+                    forkHeadSha: SHA_A,
+                }),
+                getCompareDiff: () => compareOf([WORKFLOW]),
+            },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.reason).toBe('held_for_workflow_review');
+        expect(trackedBranchMoves(harness)).toHaveLength(0);
+    });
+
+    it('clears a stale hold record when a later range is clean', async () => {
+        const harness = makeHarness({
+            row: makeRow({ workflowHold: { headSha: SHA_A, paths: [WORKFLOW] } }),
+            handlers: { getForkDivergence: BEHIND_AND_AHEAD },
+        });
+
+        const result = await runSync(harness);
+
+        expect(result.result).toBe('pull_request_opened');
+        expect(rowPatch(harness).workflowHold).toBeNull();
+    });
+});
+
+describe('workflowReleaseCovers (T46, pure)', () => {
+    const base = {
+        headSha: SHA_B,
+        paths: ['.github/workflows/a.yml'],
+        pathCount: 1,
+        complete: true,
+        releasedByUserId: USER_ID,
+        releasedAt: '2026-01-04T12:00:00.000Z',
+    };
+    const changes = (paths: string[], complete = true) => ({
+        paths,
+        pathCount: paths.length,
+        complete,
+    });
+
+    it('covers the exact head with a subset of the released paths', () => {
+        expect(workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/a.yml']))).toBe(true);
+        expect(workflowReleaseCovers(base, SHA_B.toUpperCase(), changes([]))).toBe(true);
+    });
+
+    it('refuses another head, a new path, more paths than counted, or an incomplete compare', () => {
+        expect(workflowReleaseCovers(base, SHA_A, changes(['.github/workflows/a.yml']))).toBe(false);
+        expect(workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/b.yml']))).toBe(false);
+        expect(
+            workflowReleaseCovers(base, SHA_B, {
+                paths: ['.github/workflows/a.yml'],
+                pathCount: 2,
+                complete: true,
+            }),
+        ).toBe(false);
+        expect(workflowReleaseCovers(base, SHA_B, changes(['.github/workflows/a.yml'], false))).toBe(
+            false,
+        );
+    });
+
+    it('lets a release made on an incomplete compare cover that same head only', () => {
+        const unproven = { ...base, complete: false, paths: [], pathCount: 0 };
+        expect(workflowReleaseCovers(unproven, SHA_B, changes(['x/.github/workflows/z.yml'], false))).toBe(
+            true,
+        );
+        expect(workflowReleaseCovers(unproven, SHA_A, changes([], false))).toBe(false);
+    });
+
+    it('refuses no release, an empty head, and a release without an owner', () => {
+        expect(workflowReleaseCovers(null, SHA_B, changes([]))).toBe(false);
+        expect(workflowReleaseCovers(base, '', changes([]))).toBe(false);
+        expect(workflowReleaseCovers({ ...base, releasedByUserId: '' }, SHA_B, changes([]))).toBe(
+            false,
+        );
+    });
+});
+
+/**
+ * APW-02 T47 (FR-62, ACC-02-26) — `trigger: 'merged'` runs the finish path, not the
+ * compare-and-open path, and a second dispatch changes nothing.
+ */
+describe('AppUpstreamSyncService — a merged sync pull request finishes the sync (T47)', () => {
+    const MERGED = () => ({
+        number: 7,
+        state: 'merged',
+        merged: true,
+        mergeable: null,
+        headSha: SHA_C,
+        ciState: 'unknown',
+        checks: [],
+    });
+
+    it('records the merged head, clears the pull request and runs licence + hygiene once', async () => {
+        const harness = makeHarness({
+            row: makeRow({
+                syncPullRequestNumber: 7,
+                syncPullRequestUrl: 'https://github.com/me/widgets/pull/7',
+                lastSyncResult: 'pull_request_opened',
+                lastSyncCommitCount: 4,
+                lastSyncedUpstreamSha: SHA_B,
+            }),
+            handlers: { getPullRequestStatus: MERGED },
+        });
+
+        const result = await runSync(harness, { trigger: 'merged' });
+
+        // The finish path makes no compare and moves no ref.
+        expect(harness.calls.getForkDivergence).toHaveLength(0);
+        expect(harness.calls.getCompareDiff).toHaveLength(0);
+        expect(harness.calls.updateBranchRef).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+        const finished = finishInput(harness);
+        expect(finished).toMatchObject({
+            result: 'up_to_date',
+            reason: 'pull_request_merged',
+            commits: 4,
+            toSha: SHA_C,
+            pullRequestNumber: null,
+            pullRequestUrl: null,
+            trackedBranchChanged: true,
+        });
+        expect(harness.licenses.request).toHaveBeenCalledTimes(1);
+        expect(harness.licenses.request).toHaveBeenCalledWith(WORK_ID, 'upstream_merged');
+        expect(harness.hygiene.apply).toHaveBeenCalledTimes(1);
+        expect(result.outcome).toBe('settled');
+    });
+
+    it('is a no-op when no sync pull request is on record (the second dispatch)', async () => {
+        const harness = makeHarness({
+            row: makeRow({
+                syncPullRequestNumber: null,
+                lastSyncResult: 'up_to_date',
+                lastSyncReason: 'pull_request_merged',
+                lastSyncedUpstreamSha: SHA_C,
+            }),
+            handlers: { getPullRequestStatus: MERGED },
+        });
+
+        await runSync(harness, { trigger: 'merged' });
+
+        // Nothing left to finish: no pull request read, no second licence request or
+        // hygiene pass, no ref moved — the dispatch is an ordinary (up-to-date) run.
+        expect(harness.calls.getPullRequestStatus).toHaveLength(0);
+        expect(harness.calls.updateBranchRef).toHaveLength(0);
+        expect(harness.calls.createPullRequest).toHaveLength(0);
+        expect(finishInput(harness)).toMatchObject({
+            result: 'up_to_date',
+            trackedBranchChanged: false,
+        });
+        expect(harness.licenses.request).not.toHaveBeenCalled();
+        expect(harness.hygiene.apply).not.toHaveBeenCalled();
+    });
+
+    it('changes nothing when the pull request is not merged after all', async () => {
+        const harness = makeHarness({
+            row: makeRow({ syncPullRequestNumber: 7, lastSyncResult: 'pull_request_opened' }),
+        });
+
+        await runSync(harness, { trigger: 'merged' });
+
+        expect(finishInput(harness)).toMatchObject({
+            result: 'pull_request_opened',
+            pullRequestNumber: 7,
+            trackedBranchChanged: false,
+        });
+        expect(harness.hygiene.apply).not.toHaveBeenCalled();
+    });
+
+    it('finishes even when the spec turned the scheduled sync off', async () => {
+        const harness = makeHarness({
+            spec: { upstreamSync: { enabled: false } },
+            row: makeRow({ syncPullRequestNumber: 7 }),
+            handlers: { getPullRequestStatus: MERGED },
+        });
+
+        await runSync(harness, { trigger: 'merged' });
+
+        expect(finishInput(harness).reason).toBe('pull_request_merged');
     });
 });

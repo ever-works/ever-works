@@ -120,7 +120,9 @@ export type UpstreamResultLineKey =
     | 'resultLicenseChanged'
     | 'resultLicenseChangedNoSpdx'
     | 'resultConflict'
-    | 'resultFailed';
+    | 'resultFailed'
+    // APW-02 T47 — a merged sync pull request finished the sync.
+    | 'resultPullRequestMerged';
 
 /** One line of result copy, plus the link that belongs to it (spec §6.1). */
 export interface UpstreamResultLine {
@@ -166,6 +168,11 @@ export function upstreamResultLine(sync: AppUpstreamSyncView | null): UpstreamRe
         return licenseSpdx
             ? { key: 'resultLicenseChanged', values: { spdx: licenseSpdx }, pullRequestUrl }
             : { key: 'resultLicenseChangedNoSpdx', pullRequestUrl };
+    }
+
+    // T47 (FR-62): the finish run records `up_to_date` with this reason — say what happened.
+    if (sync.lastReason === 'pull_request_merged') {
+        return { key: 'resultPullRequestMerged', values: { count: commitCount } };
     }
 
     switch (sync.lastResult) {
@@ -223,6 +230,26 @@ export function formatLastSynced(when: string, now: number): string {
     return formatUpstreamAge(when, now);
 }
 
+/**
+ * APW-02 T46 — the refusal codes of a held workflow change, mapped to their copy leaves
+ * (`workflowHold.*`). The API's own codes travel unchanged; `ownerRequired` is the shared
+ * App Works owner gate's code and `owner_required` the service's defence-in-depth one.
+ */
+export const UPSTREAM_WORKFLOW_REFUSAL_KEYS = {
+    workflow_confirmation_required: 'workflowHold.confirmationRequired',
+    workflow_hold_changed: 'workflowHold.changed',
+    no_workflow_hold: 'workflowHold.noHold',
+    ownerRequired: 'workflowHold.ownerRequired',
+    owner_required: 'workflowHold.ownerRequired',
+} as const;
+
+/** Whether a refusal code is one of {@link UPSTREAM_WORKFLOW_REFUSAL_KEYS}. */
+export function isUpstreamWorkflowRefusal(
+    code: string | undefined,
+): code is keyof typeof UPSTREAM_WORKFLOW_REFUSAL_KEYS {
+    return typeof code === 'string' && code in UPSTREAM_WORKFLOW_REFUSAL_KEYS;
+}
+
 export interface AppUpstreamCardProps {
     workId: string;
     variant: AppUpstreamCardVariant;
@@ -238,6 +265,10 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
     const [optimisticRunning, setOptimisticRunning] = useState(false);
     const [failure, setFailure] = useState<AppUpstreamActionResult | null>(null);
     const [showWorkflows, setShowWorkflows] = useState(false);
+    // APW-02 T46 — the held-workflow row: the path list toggle and the two-step "Sync anyway".
+    const [showHeldPaths, setShowHeldPaths] = useState(false);
+    const [confirmingRelease, setConfirmingRelease] = useState(false);
+    const [releasing, setReleasing] = useState(false);
     const polls = useRef(0);
 
     // A `revalidatePath` from either action re-renders the page with a fresh
@@ -306,6 +337,31 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
         }
     };
 
+    /**
+     * T46 — **Sync anyway**, after the explicit confirm step. Sends the held head the owner
+     * is looking at, so a hold that moved to a newer upstream head meanwhile is refused
+     * `409 workflow_hold_changed` rather than released by this click.
+     */
+    const onSyncAnyway = async (headSha: string) => {
+        setFailure(null);
+        setReleasing(true);
+
+        try {
+            const result = await syncUpstreamAction(workId, {
+                confirmWorkflowChanges: true,
+                workflowHeadSha: headSha,
+            });
+            if (result.success) {
+                setConfirmingRelease(false);
+                setOptimisticRunning(true);
+            } else {
+                setFailure(result);
+            }
+        } finally {
+            setReleasing(false);
+        }
+    };
+
     const onTryAgain = async () => {
         setFailure(null);
         setRetrying(true);
@@ -330,6 +386,8 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
     const retryAt =
         typeof failure?.details?.retryAt === 'string' ? (failure.details.retryAt as string) : null;
     const disabledCount = actions?.disabled.length ?? 0;
+    const workflowHold = sync?.workflowHold ?? null;
+    const workflowRelease = sync?.workflowRelease ?? null;
 
     return (
         <section
@@ -462,12 +520,122 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
                     </div>
                 )}
 
+                {workflowHold && (
+                    <div
+                        data-testid="app-upstream-workflow-hold"
+                        className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-sm space-y-1.5"
+                    >
+                        <p className="font-medium text-text dark:text-text-dark">
+                            {workflowHold.complete
+                                ? t('workflowHold.title', { count: workflowHold.pathCount })
+                                : t('workflowHold.incomplete')}
+                        </p>
+                        <p className="text-text-secondary dark:text-text-secondary-dark">
+                            {t('workflowHold.explain')}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
+                            {workflowHold.compareUrl && (
+                                <a
+                                    data-testid="app-upstream-workflow-hold-review"
+                                    href={workflowHold.compareUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium text-primary dark:text-gray-100 hover:underline"
+                                >
+                                    {t('workflowHold.review')} ↗
+                                </a>
+                            )}
+                            {workflowHold.paths.length > 0 && (
+                                <button
+                                    type="button"
+                                    data-testid="app-upstream-workflow-hold-paths-toggle"
+                                    onClick={() => setShowHeldPaths((value) => !value)}
+                                    className="font-medium text-primary dark:text-gray-100 underline hover:no-underline"
+                                >
+                                    {showHeldPaths ? t('workflowsHide') : t('workflowsShow')}
+                                </button>
+                            )}
+                            {workflowHold.canRelease && !confirmingRelease && (
+                                <button
+                                    type="button"
+                                    data-testid="app-upstream-sync-anyway"
+                                    onClick={() => setConfirmingRelease(true)}
+                                    disabled={pending || running || releasing}
+                                    className="px-3 py-1 rounded-md text-sm font-medium border border-amber-400 dark:border-amber-600 hover:bg-amber-100 dark:hover:bg-amber-900/40 disabled:opacity-60"
+                                >
+                                    {t('workflowHold.syncAnyway')}
+                                </button>
+                            )}
+                        </div>
+                        {showHeldPaths && (
+                            <ul
+                                className="space-y-0.5 text-xs"
+                                data-testid="app-upstream-workflow-hold-paths"
+                            >
+                                {workflowHold.paths.map((path) => (
+                                    <li key={path} className="font-mono">
+                                        {path}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        {workflowHold.canRelease && confirmingRelease && (
+                            <div
+                                data-testid="app-upstream-sync-anyway-confirm"
+                                role="alertdialog"
+                                aria-label={t('workflowHold.syncAnyway')}
+                                className="flex flex-wrap items-center gap-2"
+                            >
+                                <span className="text-text dark:text-text-dark">
+                                    {t('workflowHold.confirm')}
+                                </span>
+                                <button
+                                    type="button"
+                                    data-testid="app-upstream-sync-anyway-confirm-yes"
+                                    onClick={() => void onSyncAnyway(workflowHold.headSha)}
+                                    disabled={releasing}
+                                    className="px-3 py-1 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60"
+                                >
+                                    {t('workflowHold.confirmYes')}
+                                </button>
+                                <button
+                                    type="button"
+                                    data-testid="app-upstream-sync-anyway-cancel"
+                                    onClick={() => setConfirmingRelease(false)}
+                                    disabled={releasing}
+                                    className="px-3 py-1 rounded-md text-sm font-medium border border-card-border dark:border-border-secondary-dark disabled:opacity-60"
+                                >
+                                    {t('workflowHold.cancel')}
+                                </button>
+                            </div>
+                        )}
+                        {!workflowHold.canRelease && (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('workflowHold.ownerOnly')}
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {workflowRelease && !workflowHold && (
+                    <p
+                        data-testid="app-upstream-workflow-released"
+                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                    >
+                        {t('workflowHold.released', {
+                            ago: formatLastSynced(workflowRelease.releasedAt, now),
+                        })}
+                    </p>
+                )}
+
                 {failure && (
                     <p
                         data-testid="app-upstream-failure"
                         className="text-sm text-red-600 dark:text-red-400"
                     >
-                        {failure.code === 'sync_in_progress'
+                        {isUpstreamWorkflowRefusal(failure.code)
+                            ? t(UPSTREAM_WORKFLOW_REFUSAL_KEYS[failure.code])
+                            : failure.code === 'sync_in_progress'
                             ? t('alreadyRunning')
                             : failure.code === 'sync_limit_reached'
                               ? t('syncLimitReached', {

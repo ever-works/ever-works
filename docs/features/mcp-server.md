@@ -24,7 +24,7 @@ Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible cli
 The MCP server is a standalone NestJS application in `apps/mcp/` that:
 
 1. **Fetches** the Ever Works API's OpenAPI spec at startup
-2. **Filters** endpoints through a curated whitelist of 205 operations
+2. **Filters** endpoints through a curated whitelist of 208 operations
 3. **Converts** OpenAPI schemas to MCP tool definitions automatically
 4. **Proxies** tool calls to the API using your API key
 
@@ -148,9 +148,9 @@ Add the MCP server to your project's `.mcp.json`:
 > the Agent tools and `ever-works fleet …`: the same confirmation fields, the same typed refusals. See
 > [Fleet tools for Agents, the MCP server and the CLI](./fleet-agent-tools.md).
 
-The MCP server exposes 205 tools from the OpenAPI whitelist, organized by domain below. The tables cover the main domains; the fleet machine tools (computers, sessions, checkouts, logs, commands, schedules, ports, files, virtual and cloud computers, Actions runners, usage) follow the fleet tool catalogue in `packages/contracts/src/fleet/fleet-tools.types.ts`. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
+The MCP server exposes 208 tools from the OpenAPI whitelist, organized by domain below. The tables cover the main domains; the fleet machine tools (computers, sessions, checkouts, logs, commands, schedules, ports, files, virtual and cloud computers, Actions runners, usage) follow the fleet tool catalogue in `packages/contracts/src/fleet/fleet-tools.types.ts`. Each one's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
 
-Seven more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the five `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`), `register_work` and `ping`. A connected client therefore sees **134 tools** in all. There is deliberately no `kb.unlock`: a lock is how the owner keeps agents off a document, so unlocking is a person's decision (works-security lane 3a, 2026-10-18); a person unlocks in the app, the API or the CLI. Every `kb.*` result is fenced as untrusted data.
+Seven more tools are hand-written rather than derived from the spec and so are not in the whitelist or the tables below: the five `kb.*` Knowledge Base tools (`kb.list`, `kb.get`, `kb.create`, `kb.update`, `kb.lock`), `register_work` and `ping`. A connected client therefore sees **215 tools** in all. There is deliberately no `kb.unlock`: a lock is how the owner keeps agents off a document, so unlocking is a person's decision (works-security lane 3a, 2026-10-18); a person unlocks in the app, the API or the CLI. Every `kb.*` result is fenced as untrusted data.
 
 ### Human-in-the-loop gates are not tools
 

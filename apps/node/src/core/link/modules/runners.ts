@@ -1,11 +1,13 @@
 import {
 	FLEET_ACTIONS_RUNNER_CAPABILITY,
+	FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY,
 	FLEET_ACTIONS_RUNNER_LIST_VERB,
 	FLEET_ACTIONS_RUNNER_STATUS_VERB,
 	makeFleetLinkError,
 	type FleetActionsRunnerListResult,
 	type FleetActionsRunnerNodeFact
 } from '@ever-works/contracts';
+import { dockerRunnerState, runnerContainerName } from './runners/docker';
 import type { RunnerHostDeps } from './runners/host';
 import { runnerServiceManagerFor, runnerServiceState, serviceNameOf } from './runners/service';
 import { MachineVerbError, type NodeModule } from './registry';
@@ -23,6 +25,8 @@ import { MachineVerbError, type NodeModule } from './registry';
  *    `ever-works.json`), with what its service manager says about it, its
  *    version and its GitHub id (the refresh merges this with GitHub's view,
  *    FR-13);
+ *  - tag `actions-runner-docker` (P3, FR-27) beside it on Linux when the node's
+ *    user reaches a Docker daemon: this node runs Docker-isolated runners;
  *  - `runner.status { runnerId }` — one runner.
  *
  * Reads only: installing, starting, stopping, restarting and removing a runner
@@ -46,7 +50,10 @@ export async function listActionsRunners(deps: RunnersModuleDeps): Promise<Fleet
 	const full = deps as RunnerHostDeps;
 	const runners: FleetActionsRunnerNodeFact[] = [];
 	for (const meta of await deps.state.list()) {
-		const serviceState = await runnerServiceState(full, meta).catch(() => 'unknown' as const);
+		const docker = meta.mode === 'docker';
+		const serviceState = docker
+			? await dockerRunnerState(deps, meta.runnerId).catch(() => 'unknown' as const)
+			: await runnerServiceState(full, meta).catch(() => 'unknown' as const);
 		runners.push({
 			runnerId: meta.runnerId,
 			name: meta.name,
@@ -54,7 +61,9 @@ export async function listActionsRunners(deps: RunnersModuleDeps): Promise<Fleet
 			target: meta.target,
 			mode: meta.mode,
 			serviceState,
-			serviceUnit: (await serviceNameOf(full, meta).catch(() => null)) ?? meta.serviceUnit,
+			serviceUnit: docker
+				? runnerContainerName(meta.runnerId)
+				: ((await serviceNameOf(full, meta).catch(() => null)) ?? meta.serviceUnit),
 			runnerVersion: meta.runnerVersion,
 			githubRunnerId: await deps.state.githubRunnerId(meta.name).catch(() => null),
 			configured: meta.configured
@@ -68,10 +77,15 @@ const RUNNER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 export function createRunnersModule(deps: RunnersModuleDeps): NodeModule {
 	return {
 		id: 'runners',
-		tags: (environment) =>
-			environment.consents.work && canHostActionsRunners(environment.platform, deps.hasSystemd())
-				? [FLEET_ACTIONS_RUNNER_CAPABILITY]
-				: [],
+		tags: (environment) => {
+			if (!environment.consents.work || !canHostActionsRunners(environment.platform, deps.hasSystemd()))
+				return [];
+			const tags = [FLEET_ACTIONS_RUNNER_CAPABILITY];
+			// P3 (FR-27): Docker-isolated runners — Linux, a Docker daemon this user reaches.
+			if (environment.platform === 'linux' && deps.hasDocker?.() === true)
+				tags.push(FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY);
+			return tags;
+		},
 		machineVerbs: {
 			[FLEET_ACTIONS_RUNNER_LIST_VERB]: {
 				stateChanging: false,

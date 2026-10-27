@@ -24,6 +24,7 @@ import { DataRepository } from '../generators/data-generator/data-repository';
 import type { CheckItemHealthResponseDto } from '../items-generator/dto';
 import { CACHE_MANAGER, type Cache } from '../cache';
 import { assertNotRepositoryWork } from '../works/repository-work-guard';
+import { assertNotAppWork } from '../works/app-work-guard';
 
 type HealthCheckTrigger = 'manual' | 'schedule';
 
@@ -115,6 +116,8 @@ export class ItemHealthService {
         // The check clones the data repository and commits health metadata
         // back into it — neither has a place in a wrapped code repository.
         assertNotRepositoryWork(work, 'item source validation');
+        // APW-01 T10 (lane aw-safety) — an App Work has no items to validate.
+        assertNotAppWork(work, 'item source validation');
         const cacheKey = this.buildManualCheckCacheKey(workId, itemSlug);
         const cachedResult = await this.cacheManager?.get<CheckItemHealthResponseDto>(cacheKey);
         if (cachedResult) {

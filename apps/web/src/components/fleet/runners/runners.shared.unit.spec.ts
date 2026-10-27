@@ -44,6 +44,11 @@ import {
     runnerActDialog,
     runnerLabelChips,
     runnerModesFor,
+    runnerReinstallAvailability,
+    runnerReinstallDialog,
+    runnerReinstallPlacement,
+    runnerUpdateAvailable,
+    RUNNER_DOCKER_SHIPPED,
     runnerStatus,
     runnersInstallHref,
     runnersThatFit,
@@ -278,8 +283,10 @@ describe('the Install dialog (spec §5.1)', () => {
         expect(runnerModesFor('windows', ['service'])).toEqual(['service']);
     });
 
-    it('never offers the container mode in P1, and only on Linux hosts that advertise it once shipped', () => {
-        expect(runnerModesFor('linux', ['service', 'docker'])).toEqual(['service']);
+    it('offers the container mode only on Linux hosts that advertise it, and only while the gate is on', () => {
+        // P3 shipped it (FR-27): on by default; with the gate off it is never offered.
+        expect(runnerModesFor('linux', ['service', 'docker'])).toEqual(['service', 'docker']);
+        expect(runnerModesFor('linux', ['service', 'docker'], false)).toEqual(['service']);
         expect(runnerModesFor('linux', ['service', 'docker'], true)).toEqual(['service', 'docker']);
         expect(runnerModesFor('darwin', ['service', 'docker'], true)).toEqual(['service']);
         expect(runnerModesFor('linux', [])).toEqual([]);
@@ -576,5 +583,95 @@ describe('Actions jobs — the watched list (FR-21)', () => {
     it('names the watched list', () => {
         expect(watchedTargetsText([api, web])).toBe('acme/api, acme/web');
         expect(watchedTargetsText([])).toBe('');
+    });
+});
+
+/** Container-isolated runners and versions (FL-18 P3, spec FR-27, FR-28, T-27, T-28). */
+describe('P3 — the container mode (FR-27)', () => {
+    it('is shipped, offered on Linux only when the server lists it, never on Windows or macOS', () => {
+        expect(RUNNER_DOCKER_SHIPPED).toBe(true);
+        expect(runnerModesFor('linux', ['service', 'docker'])).toEqual(['service', 'docker']);
+        expect(runnerModesFor('linux', ['service'])).toEqual(['service']);
+        expect(runnerModesFor('win32', ['service', 'docker'])).toEqual(['service']);
+        expect(runnerModesFor('windows', ['service', 'docker'])).toEqual(['service']);
+        expect(runnerModesFor('darwin', ['service', 'docker'])).toEqual(['service']);
+    });
+
+    it('sends the daemon opt-in only with the container mode, exactly as ticked', () => {
+        const base = {
+            targetKey: 'repo:acme/api',
+            count: 1,
+            names: ['build-01-1'],
+            labelsText: '',
+        };
+        expect(installRequestFrom({ ...base, mode: 'docker' }, target(), [])).toMatchObject({
+            mode: 'docker',
+            shareDockerDaemon: false,
+        });
+        expect(
+            installRequestFrom({ ...base, mode: 'docker', shareDockerDaemon: true }, target(), []),
+        ).toMatchObject({ mode: 'docker', shareDockerDaemon: true });
+        expect(
+            installRequestFrom({ ...base, mode: 'service', shareDockerDaemon: true }, target(), []),
+        ).not.toHaveProperty('shareDockerDaemon');
+    });
+});
+
+describe('P3 — versions and Reinstall (FR-28)', () => {
+    it('shows "Update available" only for a newer build', () => {
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.321.0', updateAvailable: '2.322.0' })),
+        ).toBe('2.322.0');
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.322.0', updateAvailable: '2.322.0' })),
+        ).toBeNull();
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.330.0', updateAvailable: '2.322.0' })),
+        ).toBeNull();
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: '2.321.0', updateAvailable: null })),
+        ).toBeNull();
+        expect(runnerUpdateAvailable(runner({ runnerVersion: '2.321.0' }))).toBeNull();
+        // The installed version unknown: the API's word stands.
+        expect(
+            runnerUpdateAvailable(runner({ runnerVersion: null, updateAvailable: '2.322.0' })),
+        ).toBe('2.322.0');
+    });
+
+    it('offers Reinstall for idle, offline, stopped and failed runners only', () => {
+        const offered = FLEET_ACTIONS_RUNNER_STATES.filter(
+            (state) => runnerReinstallAvailability(runner({ state })) === 'enabled',
+        );
+        expect(offered).toEqual(['idle', 'offline', 'stopped', 'failed']);
+        expect(runnerReinstallAvailability(runner({ state: 'idle', phase: 'removing' }))).toBe(
+            'hidden',
+        );
+        expect(runnerReinstallAvailability(runner({ state: 'working' }))).toBe('hidden');
+        expect(
+            runnerReinstallAvailability(runner({ state: 'installing', phase: 'verifying' })),
+        ).toBe('hidden');
+    });
+
+    it('is the failed row’s Retry, in the row when an update is available, else in the ⋯ menu', () => {
+        expect(runnerReinstallPlacement(runner({ state: 'failed' }))).toBe('retry');
+        expect(
+            runnerReinstallPlacement(
+                runner({ state: 'idle', runnerVersion: '2.321.0', updateAvailable: '2.322.0' }),
+            ),
+        ).toBe('inline');
+        expect(runnerReinstallPlacement(runner({ state: 'idle' }))).toBe('menu');
+    });
+
+    it('confirms Reinstall with the contracts’ sentence, naming the newer build', () => {
+        expect(
+            runnerReinstallDialog(runner({ runnerVersion: '2.321.0', updateAvailable: '2.322.0' })),
+        ).toEqual({
+            class: 'confirm',
+            title: 'Reinstall build-01-1 with runner 2.322.0?',
+            body: 'It is deregistered, downloaded again, verified and registered with the same name and labels.',
+        });
+        expect(runnerReinstallDialog(runner({ updateAvailable: null })).title).toBe(
+            'Reinstall build-01-1?',
+        );
     });
 });

@@ -561,6 +561,71 @@ describe('AccountImportService', () => {
             expect(result.errors).toEqual(['Cannot rename "a" to "b" - slug already exists']);
         });
 
+        // ── APW-01 T41 (FR-54, lane aw-safety 2026-10-26) — ACC-01-23 ─────────────────────
+        it('creates nothing for an entry that claims kind app, and lists it as skipped', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+
+            const result = await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'cal', kind: 'app' })]),
+                [],
+            );
+
+            expect(mocks.workRepository.create).not.toHaveBeenCalled();
+            expect(result.worksCreated).toBe(0);
+            expect(result.worksSkipped).toBe(1);
+            expect(result.warnings.join(' ')).toContain('app_kind_not_importable');
+        });
+
+        it('leaves an existing Work untouched when the overwrite entry claims kind app', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue({ id: 'w-1', kind: 'repo' });
+
+            const result = await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', kind: 'app' })]),
+                [{ slug: 'a', strategy: 'overwrite' }] as never,
+            );
+
+            expect(mocks.workRepository.update).not.toHaveBeenCalled();
+            expect(result.worksSkipped).toBe(1);
+        });
+
+        it('never overwrites an existing App Work — a repo entry leaves it app', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue({ id: 'w-1', kind: 'app' });
+
+            const result = await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', kind: 'repo' })]),
+                [{ slug: 'a', strategy: 'overwrite' }] as never,
+            );
+
+            expect(mocks.workRepository.update).not.toHaveBeenCalled();
+            expect(result.worksSkipped).toBe(1);
+            expect(result.warnings.join(' ')).toContain('app_kind_not_importable');
+        });
+
+        it('still imports every other kind exactly as before', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+            mocks.workRepository.create.mockResolvedValue({ id: 'w-new', slug: 'b' });
+
+            const result = await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'b', kind: 'directory' })]),
+                [],
+            );
+
+            expect(result.worksCreated).toBe(1);
+            expect(mocks.workRepository.create.mock.calls[0][0].kind).toBe('directory');
+        });
+
         it('creates a NEW work when no existing row is found, defaulting owner to user.username', async () => {
             const { service, mocks } = makeService();
             mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });

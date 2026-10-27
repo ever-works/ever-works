@@ -1399,6 +1399,86 @@ const CLOUD_EXPORTS = [
 	'fleetCloudDestroySummary'
 ] as const;
 
+// Desktop view & control (FL-07): three NEW modules, each a group here and a row in the witness table.
+const DESKTOP_EXPORTS = [
+	'FLEET_SCREEN_SOURCES',
+	'isFleetScreenSource',
+	'FLEET_SCREEN_DESKTOP_CAPABILITY',
+	'FLEET_HELPER_SCREEN_CAPABILITY',
+	'FLEET_SCREEN_BROWSER_CAPABILITY',
+	'FLEET_HELPER_TRUST_LEVELS',
+	'isFleetHelperTrust',
+	'normalizeFleetHelperTrust',
+	'FLEET_HELPER_TRUST_MAX_LENGTH',
+	'FLEET_DESKTOP_REASONS',
+	'isFleetDesktopReason',
+	'FLEET_DESKTOP_WATCH_REASONS',
+	'FLEET_DESKTOP_MAX_REASONS',
+	'normalizeFleetDesktopReasons',
+	'FLEET_DESKTOP_REASON_FIXES',
+	'fleetDesktopReasonHint',
+	'FLEET_DESKTOP_BLOCKERS',
+	'isFleetDesktopBlocker',
+	'FLEET_DESKTOP_BLOCKER_CODES',
+	'resolveFleetDesktopBlocker',
+	'FLEET_DISPLAY_ID_MAX_LENGTH',
+	'FLEET_DISPLAY_NAME_MAX_LENGTH',
+	'FLEET_DESKTOP_MAX_DISPLAYS',
+	'FLEET_DISPLAY_MIN_SCALE',
+	'FLEET_DISPLAY_MAX_SCALE',
+	'isFleetDisplayId',
+	'normalizeFleetDisplay',
+	'normalizeFleetDisplays',
+	'pickFleetDisplay',
+	'FLEET_HELPER_FINGERPRINT_PREFIX_LENGTH',
+	'FLEET_HELPER_VERSION_MAX_LENGTH',
+	'normalizeFleetHelperStatus',
+	'isFleetDesktopQuality',
+	'isFleetDesktopViewId',
+	'FLEET_DESKTOP_VIEWS_PER_NODE',
+	'FLEET_DESKTOP_VIEWS_PER_ORGANIZATION',
+	'FLEET_DESKTOP_VIEW_CEILING_MS',
+	'FLEET_DESKTOP_OPEN_RATE_LIMIT',
+	'FLEET_DESKTOP_TILE_SIZE',
+	'FLEET_DESKTOP_MAX_PUBLISH_BYTES',
+	'FLEET_DESKTOP_DISPLAY_CHANGE_MS',
+	'FLEET_DESKTOP_RELEASE_ALL_MS',
+	'FLEET_DESKTOP_MESSAGES',
+	'readFleetDesktopSourceParams',
+	'fleetDesktopWatermark',
+	'FLEET_DESKTOP_MAX_DIMENSION'
+] as const;
+
+const DESKTOP_TILES_EXPORTS = [
+	'FLEET_DESKTOP_TILES_HEADER_BYTES',
+	'FLEET_DESKTOP_TILE_HEADER_BYTES',
+	'FLEET_DESKTOP_MAX_TILES',
+	'encodeDesktopTiles',
+	'decodeDesktopTiles'
+] as const;
+
+const HELPER_EXPORTS = [
+	'FLEET_HELPER_TARGETS',
+	'isFleetHelperTarget',
+	'fleetHelperTarget',
+	'fleetHelperFileName',
+	'isFleetSha256Hex',
+	'fleetHelperFingerprintPrefix',
+	'formatFleetHelperFingerprint',
+	'FLEET_HELPER_ADMIT_WORD',
+	'parseFleetHelperManifest',
+	'fleetHelperManifestPublishes',
+	'FLEET_HELPER_ADMISSION_LEVELS',
+	'parseFleetHelperPolicyRecord',
+	'FLEET_HELPER_EVENT_KINDS',
+	'isFleetHelperEventKind',
+	'FLEET_HELPER_MAX_EVENTS',
+	'normalizeFleetHelperEvent',
+	'normalizeFleetHelperEvents',
+	'fleetHelperEventAuditAction',
+	'FLEET_HELPER_SEEN_EVENT_IDS'
+] as const;
+
 /** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
 const ACTIONS_RUNNERS_EXPORTS = [
 	'FLEET_ACTIONS_RUNNER_CAPABILITY',
@@ -1463,7 +1543,13 @@ const ACTIONS_RUNNERS_EXPORTS = [
 	'diagnoseFleetActionsJob',
 	'isFleetActionsJobUnassignable',
 	'normalizeFleetActionsWatchedTargets',
-	'fleetActionsJobItemId'
+	'fleetActionsJobItemId',
+	// P3 (Docker-isolated runners, versions).
+	'FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY',
+	'FLEET_ACTIONS_RUNNER_DOWNLOADS_CACHE_MS',
+	'compareFleetActionsRunnerVersions',
+	'fleetActionsRunnerUpdateAvailable',
+	'FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL'
 ] as const;
 
 /** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
@@ -1570,6 +1656,9 @@ const ALL_EXPORTS = [
 	...TASK_HANDOFF_EXPORTS,
 	...VIRTUAL_EXPORTS,
 	...CLOUD_EXPORTS,
+	...DESKTOP_EXPORTS,
+	...DESKTOP_TILES_EXPORTS,
+	...HELPER_EXPORTS,
 	...USAGE_EXPORTS,
 	...MODEL_LIST_PRICES_EXPORTS,
 	...CLOUD_P2_EXPORTS,
@@ -2055,6 +2144,38 @@ const FUNCTION_EXPORTS = [
 	'fleetCloudCreateSummary',
 	'fleetCloudPowerOffSummary',
 	'fleetCloudDestroySummary',
+	'isFleetScreenSource',
+	'isFleetHelperTrust',
+	'normalizeFleetHelperTrust',
+	'isFleetDesktopReason',
+	'normalizeFleetDesktopReasons',
+	'fleetDesktopReasonHint',
+	'isFleetDesktopBlocker',
+	'resolveFleetDesktopBlocker',
+	'isFleetDisplayId',
+	'normalizeFleetDisplay',
+	'normalizeFleetDisplays',
+	'pickFleetDisplay',
+	'normalizeFleetHelperStatus',
+	'isFleetDesktopQuality',
+	'isFleetDesktopViewId',
+	'readFleetDesktopSourceParams',
+	'fleetDesktopWatermark',
+	'encodeDesktopTiles',
+	'decodeDesktopTiles',
+	'isFleetHelperTarget',
+	'fleetHelperTarget',
+	'fleetHelperFileName',
+	'isFleetSha256Hex',
+	'fleetHelperFingerprintPrefix',
+	'formatFleetHelperFingerprint',
+	'parseFleetHelperManifest',
+	'fleetHelperManifestPublishes',
+	'parseFleetHelperPolicyRecord',
+	'isFleetHelperEventKind',
+	'normalizeFleetHelperEvent',
+	'normalizeFleetHelperEvents',
+	'fleetHelperEventAuditAction',
 	'isFleetUsageProvider',
 	'isFleetUsagePeriodDays',
 	'fleetUsageOptInHint',
@@ -2113,7 +2234,9 @@ const FUNCTION_EXPORTS = [
 	'diagnoseFleetActionsJob',
 	'isFleetActionsJobUnassignable',
 	'normalizeFleetActionsWatchedTargets',
-	'fleetActionsJobItemId'
+	'fleetActionsJobItemId',
+	'compareFleetActionsRunnerVersions',
+	'fleetActionsRunnerUpdateAvailable'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -2128,7 +2251,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1175 runtime symbols', () => {
+	it('exposes exactly these 1357 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2231,7 +2354,10 @@ describe('fleet barrel', () => {
 		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
 		// → +11 with FL-18 P2 (Actions jobs): same module.
 		// → +4 with FL-17 P3 (site tag, reconcile requester), same module (`CLOUD_P3_EXPORTS`).
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4);
+		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
+		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
+		// → +5 with FL-18 P3 (Docker-isolated runners, versions): same module.
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 2 + 52 + 11 + 4 + 70 + 5);
 	});
 
 	it.each([
@@ -2275,6 +2401,9 @@ describe('fleet barrel', () => {
 		['fleet-task-handoff.types.js', 'FLEET_HANDOFF_REASONS'],
 		['fleet-virtual.types.js', 'FLEET_NODE_ORIGINS'],
 		['fleet-cloud.types.js', 'FLEET_CLOUD_MAX_PER_OWNER'],
+		['fleet-desktop.types.js', 'FLEET_DESKTOP_REASONS'],
+		['fleet-desktop-tiles.codec.js', 'encodeDesktopTiles'],
+		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS'],
 		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
 		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES'],
 		['fleet-actions-runners.types.js', 'FLEET_ACTIONS_RUNNER_CAPABILITY']

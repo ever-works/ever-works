@@ -2208,7 +2208,13 @@ export interface AppUpstreamActionResult {
  * revalidated — a person who lands back on the Overview must not read a cached
  * card that predates their own click.
  */
-export async function syncUpstreamAction(workId: string): Promise<AppUpstreamActionResult> {
+export async function syncUpstreamAction(
+    workId: string,
+    // APW-02 T46 — optional: the owner's "Sync anyway" for a held workflow change. The API
+    // admits it only from the Work owner's signed-in session; this action forwards the two
+    // fields and nothing else.
+    options?: { confirmWorkflowChanges?: boolean; workflowHeadSha?: string },
+): Promise<AppUpstreamActionResult> {
     // Security: verify authentication at the server-action boundary before
     // proxying a mutation — UI gating alone is not a security boundary.
     const user = await getAuthFromCookie();
@@ -2217,7 +2223,19 @@ export async function syncUpstreamAction(workId: string): Promise<AppUpstreamAct
     }
 
     try {
-        const result = await workAPI.syncUpstream(workId);
+        let result: Awaited<ReturnType<typeof workAPI.syncUpstream>>;
+        if (options?.confirmWorkflowChanges === true) {
+            const body: { confirmWorkflowChanges: true; workflowHeadSha?: string } = {
+                confirmWorkflowChanges: true,
+            };
+            if (typeof options.workflowHeadSha === 'string' && options.workflowHeadSha) {
+                body.workflowHeadSha = options.workflowHeadSha;
+            }
+            result = await workAPI.syncUpstream(workId, body);
+        } else {
+            // Exactly the call every caller made before T46.
+            result = await workAPI.syncUpstream(workId);
+        }
 
         revalidatePath(ROUTES.DASHBOARD_WORK(workId));
         revalidatePath(ROUTES.DASHBOARD_WORK_UPSTREAM(workId));

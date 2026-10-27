@@ -203,11 +203,10 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         reason: "§9.8's ports module is its single provider and is unwritten; the worker binds the fail-closed default meanwhile.",
         source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:107-125 (APW-06 T73, APW-06/tasks.md:1271-1276)',
     },
-    {
-        key: 'AppDeployRequestModule | AppHostsService | APP_HOSTS_REBUILD_REQUESTER',
-        reason: "APW-05's rebuild requester is unwritten (the hosts service is provided in the API since C43, lane aw-deploy-2).",
-        source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
-    },
+    // `AppDeployRequestModule | AppHostsService | APP_HOSTS_REBUILD_REQUESTER` left this list on
+    // 2026-10-26 (lane aw-safety): `AppDeployRequestModule` binds it to `appHostsRebuildRequester`
+    // over APW-05's `AppBuildsService.requestRebuild` (lazy), so a primary-domain change under the
+    // `rebuild` policy requests a Build instead of answering `rebuild_unavailable`.
     // `AppEnvModule | AppEnvService | APP_ENV_ACTIVITY` left this list on 2026-10-18 (lane
     // aw-env-smtp): `AppEnvModule` binds it to `AppEnvActivityService` (APW-07 T26), so every env
     // change through `PUT /api/works/:id/app-env` writes its `app_env` Activity row.
@@ -226,11 +225,9 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         reason: 'Provisional: the swap is `AppRuntimeFacadeService`, which is worker-only by design.',
         source: 'packages/agent/src/app-env/app-env.service.ts:299-311 (APW-06); app-works-port-dormancy.spec.ts:59-60',
     },
-    {
-        key: 'AppLauncherModule[agent] | AppLauncherService | APP_PUBLISHED_HOSTS',
-        reason: "APW-06's `AppHostsService` binds it and its stores are unbound; unbound, the FR-16 order applies.",
-        source: 'packages/agent/src/app-launcher/managed-host-root.resolver.ts:117-130 (APW-06 T26)',
-    },
+    // `AppLauncherModule[agent] | AppLauncherService | APP_PUBLISHED_HOSTS` left this list on
+    // 2026-10-26 (lane aw-safety): the `@Global()` `AppRuntimePortsModule` binds it to
+    // `AppHostsService.primary` (lazy), so an App Work's launcher tile is its published address.
     // `AppLauncherModule[agent] | AppLauncherService | APP_SPEC_DISPLAY_NAMES` left this list
     // on 2026-10-17: the agent AppLauncherModule now binds it over the real WorkAppSpecState rows.
     {
@@ -344,8 +341,8 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
     },
     {
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
-        reason: "APW-05's rebuild requester is unwritten.",
-        source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05)',
+        reason: "Bound in the API since 2026-10-26 (lane aw-safety, `appHostsRebuildRequester` in `AppDeployRequestModule`); the worker never requests a rebuild — a primary-domain change is an API request — so it stays unbound here rather than opening a rebuild RPC.",
+        source: 'packages/agent/src/app-runtime/app-hosts.service.ts:142 (owned by APW-05); packages/agent/src/app-runtime/app-hosts-rebuild.requester.ts',
     },
 ];
 

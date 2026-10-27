@@ -71,7 +71,12 @@ export interface HeartbeatCapableClient {
  * it talks to a platform older than itself.
  */
 const OPTIONAL_DESCRIPTION_FIELD_TIERS = [
-	// NEWEST first. Schedules on computers (FL-13): the machine's IANA time
+	// NEWEST first. Desktop view & control (FL-07): the screen helper's trust and
+	// state, the displays, the desktop reasons and the admission events — one
+	// tier (they reached `develop` together, after FL-13's time zone): a platform
+	// that predates the Desktop source costs exactly these five.
+	['helperTrust', 'helper', 'displays', 'desktopReasons', 'helperEvents'],
+	// Schedules on computers (FL-13): the machine's IANA time
 	// zone. Its own tier, newest of all (it reached `develop` after FL-03's
 	// wake pair): a platform that predates schedules costs exactly this field.
 	['timeZone'],
@@ -488,6 +493,9 @@ function describeStrippedTiers(tiers: number): string {
 	}
 	if (dropped.has('timeZone')) {
 		return "Platform rejected the time zone; it predates schedules on computers. Still reporting everything else; schedules show this computer's times in UTC until this node restarts.";
+	}
+	if (dropped.has('helperTrust')) {
+		return 'Platform rejected the screen helper fields; it predates the Desktop source. Still reporting everything else; the desktop stays unavailable in Fleet until this node restarts.';
 	}
 	return 'Platform rejected the hardware address and network identity; it predates Wake-on-LAN. Still reporting everything else; this computer cannot be woken from Fleet until this node restarts.';
 }

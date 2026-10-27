@@ -55,6 +55,7 @@ import {
     assertNotRepositoryWork,
     assertRepositoryRole,
 } from '@src/works/repository-work-guard';
+import { assertNotAppWork } from '@src/works/app-work-guard';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkMemoryService } from './work-memory.service';
 import { normalizeGeneratorError } from './utils/error.utils';
@@ -1842,6 +1843,8 @@ Only include image URLs that are absolute URLs (starting with http).`;
      */
     private ensureNotRepositoryWork(work: Work, action = 'content generation'): void {
         assertNotRepositoryWork(work, action);
+        // APW-01 T10 (lane aw-safety) — an App Work's repository is application code.
+        assertNotAppWork(work, action);
     }
 
     private resolveContext(context?: GenerationTriggerContext): GenerationTriggerContext {

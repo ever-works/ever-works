@@ -24,6 +24,7 @@ import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 import { sanitizePrompt } from '../utils/sanitize.util';
 import { normalizeCreateWorkKind, type Work, type WorkKind } from '../entities/work.entity';
 import {
+    isAppWorkKind,
     WORK_CHECKS_POLICIES,
     WORK_EXTERNAL_REF_KINDS,
     WORK_EXTERNAL_REFS_MAX_PER_KIND,
@@ -66,7 +67,23 @@ function normalizeImportedWorkKind(value: unknown): WorkKind | undefined {
     }
     const raw = value.trim().toLowerCase();
     const recognized = raw === 'landing' || (WORK_KINDS as readonly string[]).includes(raw);
-    return recognized ? normalizeCreateWorkKind(value) : undefined;
+    const normalized = recognized ? normalizeCreateWorkKind(value) : undefined;
+    // APW-01 T41 (FR-54, lane aw-safety 2026-10-26): `app` is never applied by an import — an App
+    // Work is only ever created through its own create path (fork / private copy / link, the
+    // runtime target, the App spec), and an archive cannot carry any of that. `importWork` skips
+    // an entry that claims the kind before it reaches this function's result.
+    return normalized === APP_WORK_KIND ? undefined : normalized;
+}
+
+/** APW-01 T41 — the kind an import may neither create nor convert to or from. */
+const APP_WORK_KIND = 'app';
+
+/** APW-01 T41 — the per-entry skip reason the import report carries (FR-54). */
+export const APP_KIND_NOT_IMPORTABLE = 'app_kind_not_importable';
+
+/** `true` when an exported entry claims `kind: 'app'` (raw value, before any normalization). */
+function claimsAppWorkKind(value: unknown): boolean {
+    return typeof value === 'string' && value.trim().toLowerCase() === APP_WORK_KIND;
 }
 
 /**
@@ -680,6 +697,20 @@ export class AccountImportService {
             owner: dir.owner || user.username,
             slug,
         });
+
+        // APW-01 T41 (FR-54, lane aw-safety 2026-10-26) — an import never creates an App Work and
+        // never converts one: an entry that claims `kind: 'app'` creates nothing, and an existing
+        // App Work is never overwritten by an archive (its kind, its deploy provider and its
+        // runtime choice are the App's own). Either way the entry is reported as skipped, and no
+        // other entry's import changes.
+        if (claimsAppWorkKind(dir.kind) || (existing && isAppWorkKind(existing.kind))) {
+            result.worksSkipped++;
+            result.warnings.push(
+                `${APP_KIND_NOT_IMPORTABLE}: "${dir.slug}" was skipped — an import neither creates ` +
+                    'nor changes an App Work.',
+            );
+            return;
+        }
 
         if (existing) {
             const resolution = resolutionMap.get(dir.slug);

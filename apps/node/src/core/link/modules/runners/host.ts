@@ -111,6 +111,13 @@ export interface RunnerHostDeps {
 	logger?: Logger;
 	/** This node's own name, for the sentences a refusal carries ("… on build-01"). */
 	nodeName: string;
+	/**
+	 * P3 (FR-27): whether this machine can run Docker-isolated runners — Linux with a
+	 * Docker daemon the node's user reaches. Absent: never.
+	 */
+	hasDocker?: () => boolean;
+	/** P3: `uid:gid` of the node's user, which a runner's container runs as. Absent / null: refused. */
+	uidGid?: () => string | null;
 }
 
 /** A runner step that failed: the message is the first line a person reads (spec U4–U6). */

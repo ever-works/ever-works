@@ -1141,7 +1141,15 @@ export class OidcIdentityPlugin implements IPlugin, IIdentityProviderPlugin {
 			},
 			{ fetchImpl: this.fetchImpl, now: this.now }
 		);
-		if (!result.ok) throw new IdentityTokenRejectedError('providerUnavailable');
+		if (!result.ok) {
+			// APW-12 C28 (lane aw-safety, 2026-10-26): the provider REFUSED the grant — the code
+			// expired, was already redeemed, or belongs to another client. That is the member's stale
+			// sign-in, not an outage, so it has its own code (the API answers it as an expired
+			// sign-in, not `503 providerUnavailable`). Every other failure keeps the coarse code.
+			throw new IdentityTokenRejectedError(
+				result.oauthError === 'invalid_grant' ? 'invalidGrant' : 'providerUnavailable'
+			);
+		}
 
 		const idToken = idTokenOf(result.body);
 		// A 200 without an `id_token` is not a token we may refuse by its claims: it

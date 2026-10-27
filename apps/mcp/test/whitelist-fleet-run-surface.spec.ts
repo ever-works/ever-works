@@ -196,7 +196,13 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_cloud_destroy: 'destructive: destroys a cloud computer',
 	fleet_cloud_idle_policy: 'decides when a cloud computer is powered off (spend)',
 	// FL-20 usage & cost: a person's model spend across their computers.
-	fleet_usage_get: "a person's model usage and cost across their computers"
+	fleet_usage_get: "a person's model usage and cost across their computers",
+	// FL-18 P2 Actions jobs: a person's CI across their repositories, and cancelling it.
+	fleet_runners_jobs: "a person's queued and running CI jobs across their repositories",
+	fleet_runners_cancel_run: "cancels a whole workflow run of a person's repository",
+	// FL-07 desktop view & control: the `desktop` family (watching and controlling a person's
+	// screen) is never reachable with a run token — not even the read of its displays.
+	fleet_desktop_displays: "the displays of a person's computer (the desktop view family)"
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

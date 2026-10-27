@@ -5581,7 +5581,24 @@
                     "openOnGitHub": "Abrir en GitHub",
                     "enableBuildWorkflow": "Activar el flujo de trabajo de compilación"
                 },
-                "editAccessRequired": "Necesitas acceso de edición a este Trabajo de App para hacer eso."
+                "editAccessRequired": "Necesitas acceso de edición a este Trabajo de App para hacer eso.",
+                "resultPullRequestMerged": "{count, plural, =1 {Sync pull request merged (1 commit)} other {Sync pull request merged (# commits)}}",
+                "workflowHold": {
+                    "title": "Upstream changed {count, plural, =1 {1 workflow file} other {# workflow files}}. Nothing was synced.",
+                    "incomplete": "Upstream's changes are too large to check every file for workflow changes. Nothing was synced.",
+                    "explain": "Syncing lets these workflows run in this repository with its secrets. Review the changes first.",
+                    "review": "Review the changes",
+                    "syncAnyway": "Sync anyway",
+                    "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
+                    "confirmYes": "Yes, sync anyway",
+                    "cancel": "Cancel",
+                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
+                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "changed": "Upstream moved since you reviewed it. Review the new changes first.",
+                    "noHold": "No upstream workflow change is waiting for review.",
+                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                }
             },
             "settings": {
                 "tabs": {
@@ -7200,6 +7217,16 @@
                     "deployableOther": "Compilación desplegable: {sha}",
                     "noDeployable": "Aún no hay ninguna compilación desplegable",
                     "open": "Abrir Compilaciones"
+                }
+            },
+            "appsTierEligibility": {
+                "reasons": {
+                    "emailUnverified": "Verify the email address of your account first.",
+                    "planRequired": "Ever Works Apps needs a paid plan.",
+                    "ownerQuarantined": "An App of this account is quarantined.",
+                    "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
+                    "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
+                    "unknown": "Not eligible ({reason})."
                 }
             },
             "appDeploy": {

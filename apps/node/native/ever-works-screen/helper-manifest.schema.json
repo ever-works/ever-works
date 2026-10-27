@@ -1,0 +1,36 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.works/schemas/fleet/helper-manifest.v1.json",
+	"title": "Ever Works screen helper manifest",
+	"description": "The fingerprints of the screen helper builds a node package accepts (apps/node/helper-manifest.json, FL-07 FR-21). Read by contracts parseFleetHelperManifest.",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["schemaVersion", "version", "targets"],
+	"properties": {
+		"schemaVersion": { "const": 1 },
+		"version": { "type": "string", "pattern": "^[A-Za-z0-9.+_-]{1,32}$" },
+		"targets": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"darwin-arm64": { "$ref": "#/$defs/target" },
+				"darwin-x64": { "$ref": "#/$defs/target" },
+				"win32-x64": { "$ref": "#/$defs/target" },
+				"linux-x64": { "$ref": "#/$defs/target" }
+			}
+		}
+	},
+	"$defs": {
+		"target": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["sha256", "url"],
+			"properties": {
+				"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+				"url": { "type": "string", "pattern": "^https://" },
+				"signedSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+				"signer": { "type": "string", "minLength": 1, "maxLength": 200 }
+			}
+		}
+	}
+}

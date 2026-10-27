@@ -7589,7 +7589,24 @@
                     "openOnGitHub": "Open on GitHub",
                     "enableBuildWorkflow": "Enable the build workflow"
                 },
-                "editAccessRequired": "You need edit access to this App Work to do that."
+                "editAccessRequired": "You need edit access to this App Work to do that.",
+                "resultPullRequestMerged": "{count, plural, =1 {Sync pull request merged (1 commit)} other {Sync pull request merged (# commits)}}",
+                "workflowHold": {
+                    "title": "Upstream changed {count, plural, =1 {1 workflow file} other {# workflow files}}. Nothing was synced.",
+                    "incomplete": "Upstream's changes are too large to check every file for workflow changes. Nothing was synced.",
+                    "explain": "Syncing lets these workflows run in this repository with its secrets. Review the changes first.",
+                    "review": "Review the changes",
+                    "syncAnyway": "Sync anyway",
+                    "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
+                    "confirmYes": "Yes, sync anyway",
+                    "cancel": "Cancel",
+                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
+                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "changed": "Upstream moved since you reviewed it. Review the new changes first.",
+                    "noHold": "No upstream workflow change is waiting for review.",
+                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                }
             },
             "appDependencies": {
                 "status": {
@@ -9289,6 +9306,16 @@
                     "deployableOther": "Deployable build: {sha}",
                     "noDeployable": "No deployable build yet",
                     "open": "Open Builds"
+                }
+            },
+            "appsTierEligibility": {
+                "reasons": {
+                    "emailUnverified": "Verify the email address of your account first.",
+                    "planRequired": "Ever Works Apps needs a paid plan.",
+                    "ownerQuarantined": "An App of this account is quarantined.",
+                    "capReached": "This account already runs as many Apps on Ever Works Apps as it may.",
+                    "eligibilityUnavailable": "Eligibility could not be checked right now; try again in a few minutes.",
+                    "unknown": "Not eligible ({reason})."
                 }
             },
             "appDeploy": {
@@ -15721,6 +15748,104 @@
                 "cancel": "Cancel",
                 "paste": "Paste",
                 "failed": "The paste failed"
+            },
+            "checking": "Looking at the desktop of {name}…",
+            "watch": "Watch the desktop",
+            "opening": "Opening…",
+            "watchHint": "Shows the whole screen of {name} — every window, the system bars and the pointer. Watching pauses nothing on {name} and spends no credits.",
+            "connecting": "Waking up the view… Asking {name} for a picture.",
+            "stalled": "Stream stalled — waiting for a fresh picture",
+            "ended": "The stream stopped. The computer may be busy or asleep.",
+            "reconnect": "Reconnect",
+            "refresh": "Refresh the picture",
+            "end": "End view",
+            "live": "LIVE",
+            "strip": "{name} · Desktop · Display {index} of {count} · {quality}",
+            "noCredits": "This view spends no credits.",
+            "bandwidth": "Bandwidth used: {amount}",
+            "status": {
+                "watching": "Watching — nothing on {name} is paused."
+            },
+            "quality": {
+                "label": "Quality",
+                "sharp": "Sharp",
+                "smooth": "Smooth",
+                "steady": "Steady"
+            },
+            "displays": {
+                "label": "Display",
+                "option": "Display {index} · {name} · {size}",
+                "primary": "primary",
+                "virtual": "virtual",
+                "remembered": "Remembered for you on {name}.",
+                "fellBack": "The display you chose went away — showing {current}."
+            },
+            "helper": {
+                "reducedTrust": "Reduced trust — the screen helper on {name} is hash-pinned, not signed.",
+                "fingerprint": "Fingerprint {prefix}…",
+                "unpublished": "It is a build its owner approved themselves."
+            },
+            "stage": {
+                "label": "Desktop of {name}, watching"
+            },
+            "errors": {
+                "generic": "The desktop could not be shown. Try again in a moment."
+            },
+            "unavailable": {
+                "killSwitch": {
+                    "title": "All computers are stopped",
+                    "body": "The fleet-wide stop is on. Clear it under Settings → Fleet to show desktops again."
+                },
+                "kindUnsupported": {
+                    "title": "Not available on this kind of computer yet",
+                    "body": "The desktop app cannot show its screen here yet."
+                },
+                "offline": {
+                    "title": "{name} is offline",
+                    "body": "Last heard from {lastSeen}."
+                },
+                "consentMissing": {
+                    "title": "Live viewing is switched off on {name}",
+                    "body": "Start the node with --attend on {name}. Run this on {name}:"
+                },
+                "permissionDenied": {
+                    "title": "Only the owner of {name} can see its screen",
+                    "body": "Ask them to allow organization members: desktop."
+                },
+                "waylandUnsupported": {
+                    "title": "{name} is on Wayland",
+                    "body": "Desktop view needs an X11 session; Wayland is not supported yet."
+                },
+                "helperMissing": {
+                    "title": "{name} cannot show its desktop yet",
+                    "body": "The screen helper is not installed on it. Run this on {name}:"
+                },
+                "helperUnadmitted": {
+                    "title": "The screen helper is waiting for your approval on {name}",
+                    "body": "Approve it on {name} itself. Run this there:"
+                },
+                "helperUntrusted": {
+                    "title": "The screen helper on {name} has changed since you approved it",
+                    "body": "Nothing starts until you approve it again. Check it on {name}:"
+                },
+                "noDisplaySession": {
+                    "title": "Nobody is signed in on {name}",
+                    "body": "Sign in there to show its desktop."
+                },
+                "permissionScreenRecording": {
+                    "title": "{name} has not allowed screen recording",
+                    "body": "It must be allowed on {name} itself. A hash-pinned helper asks again after each update."
+                },
+                "linkUnavailable": {
+                    "title": "{name} is not connected right now",
+                    "body": "It reconnects on its own; try again in a moment."
+                },
+                "settingsOn": "On {name}: {path} → allow ever-works-screen.",
+                "browserStill": "You can still watch the Agent's browser on this computer.",
+                "copy": "Copy",
+                "copied": "Copied",
+                "tryAgain": "Try again",
+                "never": "never"
             }
         },
         "cloud": {
@@ -16036,7 +16161,8 @@
                 "logs": "Logs",
                 "logsOf": "Logs of {name}",
                 "openJob": "Open job on GitHub",
-                "openOnGitHub": "Open on GitHub"
+                "openOnGitHub": "Open on GitHub",
+                "updateAvailable": "Update available: {version}"
             },
             "actions": {
                 "start": "Start",
@@ -16100,7 +16226,8 @@
                 "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
                 "failed": "The runners could not be installed.",
                 "choose": "Choose a repository or organisation",
-                "checkingPermission": "Checking the GitHub App’s permission on {target}…"
+                "checkingPermission": "Checking the GitHub App’s permission on {target}…",
+                "shareWarning": "Ticked, these runners can control every container on {name} and run anything as root there. Leave it unticked unless your jobs need it."
             },
             "palette": {
                 "install": "Install Actions runners on {name}",
@@ -16177,6 +16304,13 @@
                 "checkAgain": "Check again",
                 "checking": "Checking…",
                 "useRepository": "Use a repository instead"
+            },
+            "reinstall": {
+                "button": "Reinstall…",
+                "retry": "Retry",
+                "confirm": "Reinstall",
+                "reinstalling": "Reinstalling {name}…",
+                "failed": "The runner could not be reinstalled."
             }
         }
     }

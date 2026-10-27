@@ -116,21 +116,21 @@ dialog, Ever Works checks it first; when it is missing, the dialog names the exa
 
 ## Agents, MCP and the API
 
-| Tool                       | What it does                                                              | Confirmation                       |
-| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------- |
-| `fleet_runners_list`       | The runners on one computer, or on all of them                            | read-only                          |
-| `fleet_runners_install`    | Install 1–16 runners for a repository or organisation                     | `confirm: true`                    |
-| `fleet_runners_action`     | Start, stop or restart one runner                                         | `confirm: true` for stop / restart |
-| `fleet_runners_remove`     | Remove one runner (deregister, uninstall, delete its folder)              | `confirmName` = its name           |
-| `fleet_runners_jobs`       | The Actions jobs of the watched targets, each with why no runner takes it | read-only                          |
-| `fleet_runners_cancel_run` | Cancel a whole workflow run of one of your repositories                   | `confirm: true`                    |
+| Tool                       | What it does                                                              | Confirmation                                   |
+| -------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------- |
+| `fleet_runners_list`       | The runners on one computer, or on all of them                            | read-only                                      |
+| `fleet_runners_install`    | Install 1–16 runners for a repository or organisation                     | `confirm: true`                                |
+| `fleet_runners_action`     | Start, stop, restart or reinstall one runner                              | `confirm: true` for stop / restart / reinstall |
+| `fleet_runners_remove`     | Remove one runner (deregister, uninstall, delete its folder)              | `confirmName` = its name                       |
+| `fleet_runners_jobs`       | The Actions jobs of the watched targets, each with why no runner takes it | read-only                                      |
+| `fleet_runners_cancel_run` | Cancel a whole workflow run of one of your repositories                   | `confirm: true`                                |
 
 An Agent's install, stop, restart, remove and cancel are held for your approval; the same names are the MCP tools. The routes:
 
 - `GET /api/fleet/runners` — every runner you may see, per computer
 - `GET /api/fleet/nodes/:id/runners` · `GET /api/fleet/nodes/:id/runners/options`
 - `POST /api/fleet/nodes/:id/runners` — install (`202`)
-- `POST /api/fleet/nodes/:id/runners/:runnerId/start|stop|restart|remove` (`202`)
+- `POST /api/fleet/nodes/:id/runners/:runnerId/start|stop|restart|reinstall|remove` (`202`)
 - `GET /api/fleet/runners/jobs` · `PUT /api/fleet/runners/jobs/watched` · `POST /api/fleet/runners/jobs/cancel` (`202`) ·
   `GET /api/fleet/runners/jobs/permission?scope=org&target=acme`
 
@@ -144,6 +144,35 @@ Every act writes one `fleet_audit` row per runner (`node.runner.install`, `node.
 
 Each call uses a short-lived installation token narrowed to the one permission it needs.
 
-## Coming next
+## Container-isolated runners
 
-- Docker-isolated runners on Linux, runner version updates, and `ever-works fleet runners` in the CLI.
+On a Linux computer whose node reaches a Docker daemon, the Install dialog also offers **Container-isolated — each
+runner in its own container**. The runner is still GitHub's build the node downloaded and verified against GitHub's
+checksum; it runs inside GitHub's own runner image (pinned to its digest the first time the computer pulls it), as the
+node's own user, with only its folder mounted, and Docker restarts it if it stops. Registration happens in a throw-away
+container that receives the one-time token through its environment and is then removed.
+
+The host's Docker daemon is **not** available inside the container unless you tick **Share the Docker daemon (runs as
+root)** — with it ticked, the runners can control every container on that computer and run anything there as root.
+Windows computers never offer this mode.
+
+## Versions and Reinstall
+
+Each runner shows its runner version. When GitHub publishes a newer build for that computer, the row says **Update
+available: 2.322.0**. Updating is your act, never automatic: **Reinstall…** (also the **Retry** of a failed runner)
+deregisters the runner, downloads and verifies GitHub's current build, and registers it again with the same name,
+labels and mode. It is refused while the runner is running a job.
+
+## From a shell
+
+```bash
+ever-works fleet runners list [--on build-01]
+ever-works fleet runners jobs [--targets acme/api,acme]
+ever-works fleet runners install build-01 --repo acme/api [--count 2] [--labels gpu] --yes
+ever-works fleet runners stop|start|restart|reinstall build-01 build-01-1 --yes
+ever-works fleet runners remove build-01 build-01-1 --confirm-name build-01-1
+ever-works fleet runners cancel-run acme/api 4822 --yes
+```
+
+Every verb takes `--json` and exits `0` / `1` / `2`; without `--yes` (or `--confirm-name`) it shows the confirmation
+sentence and asks on a terminal.

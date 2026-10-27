@@ -738,6 +738,16 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
+	// Desktop view & control (1) — `apps/api/src/fleet/desktop/fleet-desktop.controller.ts`
+	// (FL-07, CONTRACTS §11.3). A read only: a computer's displays. Opening a live view, its
+	// socket and the screenshot are not MCP tools. Dark (404) unless FLEET_DESKTOP_ENABLED.
+	{
+		method: 'GET',
+		path: '/api/fleet/nodes/{id}/desktop/displays',
+		toolName: 'fleet_desktop_displays',
+		annotations: { readOnlyHint: true }
+	},
+
 	// Sessions on computers (5) — FL-04 P2, `apps/api/src/fleet/sessions/fleet-sessions.controller.ts`
 	// (dark unless FLEET_SESSIONS_ENABLED). A person's sessions on their computers: list, read, start,
 	// rename, end (CONTRACTS §2.2 class `confirm`: without `confirm: true` the API answers
@@ -1051,7 +1061,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/fleet/nodes/{id}/runners/{runnerId}/{action}',
 		toolName: 'fleet_runners_action',
 		description:
-			'Start, stop or restart one Actions runner ({action} = start | stop | restart; stop and restart need `confirm: true`). Remove is fleet_runners_remove.',
+			'Start, stop, restart or reinstall one Actions runner ({action} = start | stop | restart | reinstall; stop, restart and reinstall need `confirm: true`; reinstall takes GitHub’s current build with the same name and labels). Remove is fleet_runners_remove.',
 		annotations: { destructiveHint: true }
 	},
 	{

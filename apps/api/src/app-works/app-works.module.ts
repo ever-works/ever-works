@@ -14,6 +14,7 @@ import {
 } from '@ever-works/agent/app-works';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AppUpstreamController } from './app-upstream.controller';
+import { AppSpecAppliedUpstreamListener } from './app-spec-applied.listener';
 import { AppLicenseRegistryCronService } from '../app-license/app-license-registry-cron.service';
 import { DistributedTaskLockService } from '@ever-works/agent/cache';
 import { WorkOwnershipService } from '@ever-works/agent/services';
@@ -188,6 +189,10 @@ import { AppWorkDeletionController } from './app-work-deletion.controller';
         // Its per-tick lease (the cache module is not global; provided locally, as the agent
         // `AppWorksModule` and `AppSpecModule` do).
         DistributedTaskLockService,
+        // APW-02 T49 (FR-64) — `app.spec.applied` recomputes the upstream sync schedule and
+        // the next slot. Its two collaborators: `WorkUpstreamStateRepository` (DatabaseModule)
+        // and `AppSpecService` (AppSpecModule), both imported above.
+        AppSpecAppliedUpstreamListener,
         // APW-06 T59's owner check, provided locally over `DatabaseModule`'s two repositories (the
         // `AppBuildsModule` precedent) — importing `WorkModule` here would close a cycle.
         WorkOwnershipService,
