@@ -912,6 +912,7 @@ export class AppBlueprintUpgradeService {
                 blueprintId,
                 latest,
                 limit - summary.notices,
+                { excludeNotified: true },
             );
             for (const candidate of candidates) {
                 summary.scanned += 1;

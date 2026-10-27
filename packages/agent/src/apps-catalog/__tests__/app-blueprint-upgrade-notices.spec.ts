@@ -26,10 +26,21 @@ function statesFake(rows: Row[]) {
         listFollowedBlueprintIds: jest.fn(async () =>
             [...new Set(rows.map((row) => row.blueprintId))].sort(),
         ),
-        findUpgradeCandidates: jest.fn(async (id: string, version: string, limit: number) =>
-            rows
-                .filter((row) => row.blueprintId === id && row.blueprintVersion !== version)
-                .slice(0, limit),
+        findUpgradeCandidates: jest.fn(
+            async (
+                id: string,
+                version: string,
+                limit: number,
+                options?: { excludeNotified?: boolean },
+            ) =>
+                rows
+                    .filter((row) => row.blueprintId === id && row.blueprintVersion !== version)
+                    // `excludeNotified` — the rows already told about this version are skipped.
+                    .filter(
+                        (row) =>
+                            !options?.excludeNotified || row.blueprintLatestVersion !== version,
+                    )
+                    .slice(0, limit),
         ),
         markUpgradeAvailable: jest.fn(async (workId: string, version: string) => {
             const row = rows.find((candidate) => candidate.workId === workId)!;

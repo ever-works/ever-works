@@ -783,20 +783,28 @@ export class WorkAppSpecStateRepository {
         blueprintId: string,
         version: string,
         limit: number = WORK_APP_SPEC_STATE_SCAN_MAX,
+        // APW-03 T30 (lane aw-blueprints) — the notice fan-out skips the rows it already
+        // told about this version, so a capped run moves on to the next rows instead of
+        // re-reading the same first `limit` forever. Absent ⇒ the original query.
+        options: { excludeNotified?: boolean } = {},
     ): Promise<WorkAppSpecState[]> {
         const take = this.batchSize(limit);
         if (!blueprintId || take === 0) {
             return [];
         }
 
-        return this.repository
+        const query = this.repository
             .createQueryBuilder('state')
             .where('state.blueprintId = :blueprintId', { blueprintId })
             .andWhere('state.blueprintVersion IS NOT NULL')
-            .andWhere('state.blueprintVersion <> :version', { version })
-            .orderBy('state.id', 'ASC')
-            .take(take)
-            .getMany();
+            .andWhere('state.blueprintVersion <> :version', { version });
+        if (options.excludeNotified) {
+            query.andWhere(
+                '(state.blueprintLatestVersion IS NULL OR state.blueprintLatestVersion <> :version)',
+                { version },
+            );
+        }
+        return query.orderBy('state.id', 'ASC').take(take).getMany();
     }
 
     /**
