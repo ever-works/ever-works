@@ -16365,6 +16365,7 @@
                     "docker": "container-isolated"
                 },
                 "sourceGithub": "as GitHub reports it",
+                "acceptPermission": "The Ever Works GitHub App lacks “{permission}” here. Accept the App’s updated permissions on GitHub (installation settings → “Review request” → “Accept new permissions”), then Reinstall.",
                 "sourceNode": "as {name} reports it",
                 "job": "“{job}”",
                 "jobRun": "“{job}” run #{run}",
@@ -16440,6 +16441,7 @@
                 "failed": "The runners could not be installed.",
                 "choose": "Choose a repository or organisation",
                 "checkingPermission": "Checking the GitHub App’s permission on {target}…",
+                "repoPermissionHint": "Repository runners need the Ever Works GitHub App to have “Administration: Read and write” on the repository. If its installation predates that permission, accept the App’s updated permissions on GitHub first: installation settings → “Review request” → “Accept new permissions”.",
                 "shareWarning": "Ticked, these runners can control every container on {name} and run anything as root there. Leave it unticked unless your jobs need it."
             },
             "palette": {
@@ -16516,7 +16518,9 @@
                 "grant": "Grant access",
                 "checkAgain": "Check again",
                 "checking": "Checking…",
-                "useRepository": "Use a repository instead"
+                "useRepository": "Use a repository instead",
+                "accept": "What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, check that “{permission}” is listed, then press “Accept new permissions”. No request there? The App does not ask for that permission yet: whoever manages the App adds it under “Permissions & events” first.",
+                "acceptUnnamed": "What to accept: in the Ever Works GitHub App’s installation settings on GitHub, press “Review request”, then “Accept new permissions”. No request there? The App does not ask for that permission yet: whoever manages the App adds it under “Permissions & events” first."
             },
             "reinstall": {
                 "button": "Reinstall…",

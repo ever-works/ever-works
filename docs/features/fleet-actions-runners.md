@@ -144,6 +144,17 @@ Every act writes one `fleet_audit` row per runner (`node.runner.install`, `node.
 
 Each call uses a short-lived installation token narrowed to the one permission it needs.
 
+The Ever Works GitHub App asks for both by default (from 2026-10-27). An installation made before that sees a
+permission request on GitHub, and until it is accepted the runner steps that need it say which permission is
+missing. **What to accept:** open the App's installation settings on GitHub (the **Grant access** link the
+Install dialog shows, or **Settings → GitHub Apps → Ever Works → Configure**), press **Review request**, check that
+the permission is listed, and press **Accept new permissions**. A repository target is only checked when its
+registration token is minted, so the Install dialog says up front what a repository needs, and a runner that
+failed for this reason says what to accept, then **Reinstall** it.
+
+The jobs panel reads with **Actions: Read-only** and **Cancel workflow run** needs **Actions: Read and write**;
+runner installs need neither.
+
 ## Container-isolated runners
 
 On a Linux computer whose node reaches a Docker daemon, the Install dialog also offers **Container-isolated — each

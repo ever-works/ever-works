@@ -43,6 +43,7 @@ import {
     runnerActAvailability,
     runnerActDialog,
     runnerLabelChips,
+    runnerMissingAppPermission,
     runnerModesFor,
     runnerReinstallAvailability,
     runnerReinstallDialog,
@@ -673,5 +674,51 @@ describe('P3 — versions and Reinstall (FR-28)', () => {
         expect(runnerReinstallDialog(runner({ updateAvailable: null })).title).toBe(
             'Reinstall build-01-1?',
         );
+    });
+});
+
+/** FL-18 A16 (owner decision 2026-10-27) — a failed runner names the App permission to accept. */
+describe('runnerMissingAppPermission', () => {
+    const failed = (lastError: string | null, state: 'failed' | 'idle' = 'failed') => ({
+        state,
+        lastError,
+    });
+
+    it('reads the repository permission out of the facade refusal the node recorded', () => {
+        expect(
+            runnerMissingAppPermission(
+                failed(
+                    'the registration token could not be fetched: the Ever Works GitHub App on acme needs "Administration: Read and write"',
+                ),
+            ),
+        ).toBe('Administration: Read and write');
+    });
+
+    it('reads the organisation permission, with typographic quotes too', () => {
+        expect(
+            runnerMissingAppPermission(
+                failed(
+                    'the Ever Works GitHub App on acme needs “Self-hosted runners: Read and write”',
+                ),
+            ),
+        ).toBe('Self-hosted runners: Read and write');
+    });
+
+    it('answers null for any other failure, a runner that did not fail, or no error', () => {
+        expect(
+            runnerMissingAppPermission(failed('checksum mismatch for actions-runner.tar.gz')),
+        ).toBeNull();
+        expect(
+            runnerMissingAppPermission(failed('something needs "Administration: Read and write"')),
+        ).toBeNull();
+        expect(
+            runnerMissingAppPermission(
+                failed(
+                    'the Ever Works GitHub App on acme needs "Administration: Read and write"',
+                    'idle',
+                ),
+            ),
+        ).toBeNull();
+        expect(runnerMissingAppPermission(failed(null))).toBeNull();
     });
 });

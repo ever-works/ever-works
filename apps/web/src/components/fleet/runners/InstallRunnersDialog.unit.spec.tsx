@@ -368,6 +368,16 @@ describe('InstallRunnersDialog', () => {
         expect(permission).not.toHaveBeenCalled();
     });
 
+    it('says up front what a repository target needs from the App and what to accept (FL-18 A16)', async () => {
+        options.mockResolvedValue({ ok: true, data: opts() });
+        open();
+        expect(
+            await screen.findByTestId('fleet-runners-install-repo-permission'),
+        ).toHaveTextContent(
+            'Repository runners need the Ever Works GitHub App to have “Administration: Read and write” on the repository. If its installation predates that permission, accept the App’s updated permissions on GitHub first: installation settings → “Review request” → “Accept new permissions”.',
+        );
+    });
+
     // ─── P3 (FR-27): container-isolated runners ─────────────────────────────
 
     it('offers Container-isolated on a Linux computer that lists it, with the daemon opt-in unticked', async () => {
