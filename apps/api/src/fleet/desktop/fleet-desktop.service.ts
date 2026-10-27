@@ -8,6 +8,8 @@ import {
     FleetKillSwitchService,
     FleetNodeRepository,
     fleetNodeDesktopViewOf,
+    type FleetDesktopAgentCaller,
+    type FleetDesktopReaderPort,
     type FleetNode,
 } from '@ever-works/agent/fleet';
 import {
@@ -92,7 +94,9 @@ interface DesktopViewRecord {
 }
 
 @Injectable()
-export class FleetDesktopService implements OnApplicationBootstrap, FleetLinkViewerObserver {
+export class FleetDesktopService
+    implements OnApplicationBootstrap, FleetLinkViewerObserver, FleetDesktopReaderPort
+{
     private readonly logger = new Logger(FleetDesktopService.name);
     private readonly views = new Map<string, DesktopViewRecord>();
 
@@ -155,6 +159,11 @@ export class FleetDesktopService implements OnApplicationBootstrap, FleetLinkVie
             });
         }
         return fleetNodeDesktopViewOf(node)?.displays ?? [];
+    }
+
+    /** The Agent's read (`fleet_desktop_displays`): the same list, as the Agent's owner (R-25). */
+    readDisplays(caller: FleetDesktopAgentCaller, nodeId: string): Promise<FleetDisplayView[]> {
+        return this.displays(caller.ownerUserId, nodeId);
     }
 
     // ─── Views ──────────────────────────────────────────────────────────────

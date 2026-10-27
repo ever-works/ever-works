@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ComputerModule as AgentComputerModule } from '@ever-works/agent/computer';
-import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
+import { FLEET_DESKTOP_READER, FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
 import { FleetDesktopController } from './fleet-desktop.controller';
 import { FleetDesktopEnabledGuard } from './fleet-desktop-enabled.guard';
@@ -20,16 +20,22 @@ import { FleetDesktopService } from './fleet-desktop.service';
  * `ComputerSessionRepository` (the browser views the caps count too).
  * `FleetLinkService`, `FleetLinkAttachService` and
  * `FleetLinkViewerGatewayService` come from the global `FleetLinkApiModule`.
+ *
+ * `@Global()` for the reason `FleetLogsApiModule` gives: the api-side
+ * `AgentsModule` reaches {@link FLEET_DESKTOP_READER} (the Agent's
+ * `fleet_desktop_displays` read) without importing this module.
  */
+@Global()
 @Module({
     imports: [AgentFleetModule, AgentComputerModule],
     controllers: [FleetDesktopController],
     providers: [
         FleetDesktopService,
+        { provide: FLEET_DESKTOP_READER, useExisting: FleetDesktopService },
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetDesktopEnabledGuard,
     ],
-    exports: [FleetDesktopService],
+    exports: [FleetDesktopService, FLEET_DESKTOP_READER],
 })
 export class FleetDesktopApiModule {}
