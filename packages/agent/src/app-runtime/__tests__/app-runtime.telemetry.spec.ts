@@ -97,7 +97,7 @@ describe('AppRuntimeTelemetryListener (APW-06 T55)', () => {
         expectClean(target.sent);
     });
 
-    it('counts smoke checks and job outcomes without naming any', () => {
+    it('counts failed smoke checks and job outcomes without naming any', () => {
         const target = sink();
         const listener = new AppRuntimeTelemetryListener(target);
 
@@ -106,10 +106,10 @@ describe('AppRuntimeTelemetryListener (APW-06 T55)', () => {
         listener.onJobFailed({ ...base, names: ['migrate'], code: 'failed' });
 
         expect(target.sent.map((entry) => [entry.event, entry.properties])).toEqual([
-            ['app_smoke_outcome', { outcome: 'failed', classification: null, checks: 2 }],
+            ['app_smoke_outcome', { outcome: 'failed', classification: null, failedChecks: 2 }],
             [
                 'app_smoke_outcome',
-                { outcome: 'passed', classification: 'smoke_warnings', checks: 2 },
+                { outcome: 'passed', classification: 'smoke_warnings', failedChecks: 2 },
             ],
             ['app_job_outcome', { outcome: 'failed' }],
         ]);

@@ -159,7 +159,8 @@ export class AppRuntimeTelemetryListener {
                 outcome,
                 // `smoke_warnings` is the one code a smoke event carries (warnings only, nothing failed).
                 classification: code(payload?.code),
-                checks: count(payload?.names),
+                // The event's `names` are the FAILED checks (in-cluster and public), so this counts those.
+                failedChecks: count(payload?.names),
             },
             payload,
         );
