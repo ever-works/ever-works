@@ -2,6 +2,7 @@ import { scanForSecrets, type AppSpec } from '@ever-works/contracts';
 import type { GitDiffFile } from '@ever-works/plugin';
 
 import { diffGuardedSpecBlocks } from '../app-spec/app-spec-guarded-blocks';
+import { TASK_ORIGIN_APP_PROVISIONING } from '../entities/task-origin';
 
 /**
  * APW-04 T10 / T57 (FR-28, FR-29, FR-30 — ACC-04-07, ACC-04-08, ACC-04-09,
@@ -74,6 +75,17 @@ export const APP_PROVISIONING_MAX_LISTED = 10;
 
 /** Longest path text this guard will consider (anything longer is refused). */
 const MAX_PATH_LENGTH = 1024;
+
+/**
+ * `TASK_ORIGIN_APP_PROVISIONING` when `origin` is exactly it, else `null` — for a
+ * caller (the agent git tools) that must pass the origin on only for a
+ * provisioning Task and must not import the entity graph to compare it.
+ */
+export function appProvisioningTaskOrigin(
+    origin: unknown,
+): typeof TASK_ORIGIN_APP_PROVISIONING | null {
+    return origin === TASK_ORIGIN_APP_PROVISIONING ? TASK_ORIGIN_APP_PROVISIONING : null;
+}
 
 /** Default-safe: only an explicit `false` turns the provisioning output guard off. */
 export function appProvisioningOutputGuardEnforced(

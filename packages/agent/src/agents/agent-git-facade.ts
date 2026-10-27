@@ -47,6 +47,13 @@ export interface AgentCommitToRepoInput {
      * to a feature branch and open a pull request instead.
      */
     branch?: string;
+    /**
+     * APW-04 T10 — the Task the calling run executes, set by the PLATFORM from the
+     * run context (`AgentToolService`), never by the model's arguments. The adapter
+     * reads that Task's server-written `origin`: an App provisioning Task may write
+     * only `.works/works.yml` and `.works/overlay/**`. Absent outside a Task run.
+     */
+    taskId?: string;
 }
 
 export interface AgentCommitToRepoResult {
@@ -80,6 +87,13 @@ export interface AgentOpenPullRequestInput {
      */
     base?: string;
     draft?: boolean;
+    /**
+     * APW-04 T10 — the Task the calling run executes, set by the PLATFORM from the
+     * run context (`AgentToolService`), never by the model's arguments. The adapter
+     * reads that Task's server-written `origin`: an App provisioning Task may write
+     * only `.works/works.yml` and `.works/overlay/**`. Absent outside a Task run.
+     */
+    taskId?: string;
 }
 
 export interface AgentOpenPullRequestResult {

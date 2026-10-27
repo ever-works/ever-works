@@ -342,6 +342,12 @@ export class AgentToolService {
             editsThisRunByFile: Set<string>;
             missionId?: string;
             /**
+             * APW-04 T10 — the Task this run executes, as the run service set it (never
+             * the model). The git tools hand it to the adapter, which holds an App
+             * provisioning Task's writes to `.works/works.yml` / `.works/overlay/**`.
+             */
+            taskId?: string;
+            /**
              * Works-security (2026-10-18) — the run is a Conversation reply its Agent's
              * OWNER started. Only `request_app_change` reads it (an agent acting on its
              * own files a change held for the owner). Absent = not an owner chat turn.
@@ -424,7 +430,7 @@ export class AgentToolService {
         // the model receives an actionable response instead of a missing
         // tool. Work-scoped Agents pass through to the adapter.
         if (agent.permissions?.canCommitToRepo && this.git) {
-            tools.push(this.buildCommitToRepoTool(agent));
+            tools.push(this.buildCommitToRepoTool(agent, runContext.taskId));
         }
 
         // Phase 16.7 — openPullRequest. Permission chain enforced at the
@@ -433,7 +439,7 @@ export class AgentToolService {
         // commit permission grant. We still gate the descriptor on the
         // granular flag.
         if (agent.permissions?.canOpenPullRequests && this.git) {
-            tools.push(this.buildOpenPullRequestTool(agent));
+            tools.push(this.buildOpenPullRequestTool(agent, runContext.taskId));
         }
 
         // Phase 16.10 — plugin pass-through tools (searchWeb /
@@ -1722,6 +1728,8 @@ export class AgentToolService {
 
     private buildCommitToRepoTool(
         agent: Agent,
+        /** APW-04 T10 — the run's Task (server-set); absent outside a Task run. */
+        taskId?: string,
     ): AgentToolDescriptor<
         { message: string; files?: { path: string; body: string }[]; branch?: string },
         AgentCommitToRepoResult
@@ -1775,6 +1783,7 @@ export class AgentToolService {
                         message: args.message,
                         files: args.files,
                         branch: args.branch,
+                        ...(taskId ? { taskId } : {}),
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };
@@ -1785,6 +1794,8 @@ export class AgentToolService {
 
     private buildOpenPullRequestTool(
         agent: Agent,
+        /** APW-04 T10 — the run's Task (server-set); absent outside a Task run. */
+        taskId?: string,
     ): AgentToolDescriptor<
         { title: string; body: string; head: string; base?: string; draft?: boolean },
         AgentOpenPullRequestResult
@@ -1847,6 +1858,7 @@ export class AgentToolService {
                         head: args.head,
                         base: args.base,
                         draft: args.draft,
+                        ...(taskId ? { taskId } : {}),
                     });
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };
