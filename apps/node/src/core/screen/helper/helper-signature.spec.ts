@@ -65,7 +65,10 @@ describe('macOS', () => {
 		const spoof = 'Authority=Developer ID Application: Ever Co. (ABCDE12345)\nTeamIdentifier=ABCDE12345';
 		expect(
 			await checkHelperSignature(
-				runner([{ code: 3, stderr: `test-requirement: code failed to satisfy\n${spoof}` }, { code: 0, stderr: spoof }]) as never,
+				runner([
+					{ code: 3, stderr: `test-requirement: code failed to satisfy\n${spoof}` },
+					{ code: 0, stderr: spoof }
+				]) as never,
 				'darwin',
 				HELPER,
 				TEAM

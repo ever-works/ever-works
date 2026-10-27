@@ -58,7 +58,12 @@ describe('helper admit --signed', () => {
 		const { deps: d, out, fs } = deps();
 		const record = await helperAdmitSigned(d);
 		// Signed by the publisher, but not the exact build this version publishes: `published` says so.
-		expect(record).toMatchObject({ level: 'signed', signer: TEAM, published: false, sha256: sha256Of('signed v1') });
+		expect(record).toMatchObject({
+			level: 'signed',
+			signer: TEAM,
+			published: false,
+			sha256: sha256Of('signed v1')
+		});
 		expect(out.some((line) => line.startsWith('Signed by') && line.includes(TEAM))).toBe(true);
 		expect(await readHelperPolicy(fs, paths.policyPath)).toEqual(record);
 		expect((await readHelperEvents(fs, paths.eventsPath))[0]).toMatchObject({ kind: 'admit', level: 'signed' });

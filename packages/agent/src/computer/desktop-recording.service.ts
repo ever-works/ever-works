@@ -475,7 +475,8 @@ export class DesktopRecordingService implements BeforeApplicationShutdown {
         const durationMs = Math.max(0, endedAt.getTime() - live.startedAtMs);
         // The computer's retention as it is NOW: a value changed during the view applies to it (FL-07 P3).
         const node = await this.nodes.findById(live.nodeId).catch(() => null);
-        if (node) live.retentionDays = fleetDesktopRecordingRetentionDays(node.recordingRetentionDays);
+        if (node)
+            live.retentionDays = fleetDesktopRecordingRetentionDays(node.recordingRetentionDays);
         const patch: Partial<ComputerSession> = {
             recordingDurationMs: durationMs,
             recordingBytes: live.storedBytes,

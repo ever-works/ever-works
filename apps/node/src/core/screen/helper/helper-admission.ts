@@ -222,7 +222,9 @@ export async function helperAdmitSigned(
 	const sha256 = await deps.fs.sha256(path);
 	if (!isFleetSha256Hex(sha256)) throw new HelperAdmissionError('The helper could not be fingerprinted.');
 	if (sha256 !== before) {
-		throw new HelperAdmissionError('The helper changed while its signature was being checked. Nothing was approved.');
+		throw new HelperAdmissionError(
+			'The helper changed while its signature was being checked. Nothing was approved.'
+		);
 	}
 	// `published`: these exact bytes are the build this node version publishes (a newer signed build is not, yet).
 	const published = Boolean(target && deps.manifest.targets[target]?.sha256 === sha256);

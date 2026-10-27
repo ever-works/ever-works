@@ -257,7 +257,9 @@ export class UpdateFleetNodeDto {
         description:
             'Desktop view & control — days a recording of this computer is kept after its view ended (1–90, default 14). Applies to recordings that stop from now on. Owner only.',
     })
-    @ValidateIf((body: { recordingRetentionDays?: unknown }) => body.recordingRetentionDays !== undefined)
+    @ValidateIf(
+        (body: { recordingRetentionDays?: unknown }) => body.recordingRetentionDays !== undefined,
+    )
     @IsInt()
     @Min(1)
     @Max(90)
