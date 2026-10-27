@@ -92,7 +92,11 @@ export class FleetActionsRunnersProposalListener {
                 );
                 return;
             }
-            if (payload.verb === 'stop' || payload.verb === 'restart') {
+            if (
+                payload.verb === 'stop' ||
+                payload.verb === 'restart' ||
+                payload.verb === 'reinstall'
+            ) {
                 await this.runners.control(caller, payload.nodeId, payload.runnerId, payload.verb, {
                     confirm: true,
                 });

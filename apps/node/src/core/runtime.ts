@@ -1331,6 +1331,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					return runnerElevated;
 				},
 				hasSystemd: () => io.environment.platform === 'linux' && existsSync('/run/systemd/system'),
+				// FL-18 P3: Docker-isolated runners — Linux with a Docker daemon socket this user reaches.
+				hasDocker: () => io.environment.platform === 'linux' && existsSync('/var/run/docker.sock'),
+				uidGid: () =>
+					typeof process.getuid === 'function' && typeof process.getgid === 'function'
+						? `${process.getuid()}:${process.getgid()}`
+						: null,
 				fetch: globalThis.fetch.bind(globalThis),
 				sleep: abortableSleep,
 				now: io.now ?? Date.now,
