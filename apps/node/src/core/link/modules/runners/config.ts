@@ -61,7 +61,8 @@ export function runnerScriptCommand(
 /** `config` argv for a registration — never a token (spec FR-7). */
 export function runnerConfigArgs(input: RunnerConfigInput): string[] {
 	if (!isFleetActionsRunnerName(input.name)) throw new RunnerHostError('not a runner name', 'invalid');
-	if (!/^https:\/\/github\.com\/[A-Za-z0-9._/-]+$/.test(input.url)) throw new RunnerHostError('not a GitHub URL', 'invalid');
+	if (!/^https:\/\/github\.com\/[A-Za-z0-9._/-]+$/.test(input.url))
+		throw new RunnerHostError('not a GitHub URL', 'invalid');
 	const labels = input.labels.filter((label) => isFleetActionsRunnerLabel(label));
 	const args = ['--unattended', '--url', input.url, '--name', input.name, '--work', '_work'];
 	if (labels.length > 0) args.push('--labels', labels.join(','));
@@ -95,7 +96,8 @@ export async function configureRunner(
 		env: { [RUNNER_TOKEN_ENV]: token, RUNNER_ALLOW_RUNASROOT: '1' },
 		timeoutMs: CONFIG_TIMEOUT_MS
 	});
-	if (result.spawnError) throw new RunnerHostError('the runner could not be started to register; nothing was registered');
+	if (result.spawnError)
+		throw new RunnerHostError('the runner could not be started to register; nothing was registered');
 	if (result.timedOut) throw new RunnerHostError('registering the runner took too long');
 	if (result.code !== 0) {
 		if (looksLikeMissingTokenInput(result)) {
@@ -108,7 +110,12 @@ export async function configureRunner(
 }
 
 /** Run `config remove` with the remove token (environment only). */
-export async function deregisterRunner(exec: RunnerExec, platform: string, dir: string, token: string): Promise<boolean> {
+export async function deregisterRunner(
+	exec: RunnerExec,
+	platform: string,
+	dir: string,
+	token: string
+): Promise<boolean> {
 	const { command, args } = runnerScriptCommand(platform, dir, 'config', runnerRemoveArgs());
 	const result = await exec({
 		command,

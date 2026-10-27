@@ -32,12 +32,17 @@ export class FleetActionsRunnerRepository {
     /** The runners still on one computer, by name. */
     async listForNode(nodeId: string): Promise<FleetActionsRunner[]> {
         if (typeof nodeId !== 'string' || !UUID.test(nodeId)) return [];
-        return this.repository.find({ where: { nodeId, removedAt: IsNull() }, order: { name: 'ASC' } });
+        return this.repository.find({
+            where: { nodeId, removedAt: IsNull() },
+            order: { name: 'ASC' },
+        });
     }
 
     /** The runners still on any of these computers (one batched read for a hub page). */
     async listForNodes(nodeIds: readonly string[]): Promise<FleetActionsRunner[]> {
-        const wanted = [...new Set(nodeIds.filter((id) => typeof id === 'string' && UUID.test(id)))];
+        const wanted = [
+            ...new Set(nodeIds.filter((id) => typeof id === 'string' && UUID.test(id))),
+        ];
         if (wanted.length === 0) return [];
         return this.repository.find({
             where: { nodeId: In(wanted), removedAt: IsNull() },
@@ -48,7 +53,10 @@ export class FleetActionsRunnerRepository {
     /** Every listed runner of one owner (the poll's and the jobs panel's read). */
     async listForOwner(ownerUserId: string): Promise<FleetActionsRunner[]> {
         if (typeof ownerUserId !== 'string' || !UUID.test(ownerUserId)) return [];
-        return this.repository.find({ where: { ownerUserId, removedAt: IsNull() }, order: { name: 'ASC' } });
+        return this.repository.find({
+            where: { ownerUserId, removedAt: IsNull() },
+            order: { name: 'ASC' },
+        });
     }
 
     /** The owners with at least one listed runner (the off-page poll's fan-out). */
@@ -75,7 +83,10 @@ export class FleetActionsRunnerRepository {
 
     async update(id: string, patch: Partial<FleetActionsRunner>): Promise<void> {
         if (!UUID.test(id)) return;
-        await this.repository.update({ id }, patch as Parameters<Repository<FleetActionsRunner>['update']>[1]);
+        await this.repository.update(
+            { id },
+            patch as Parameters<Repository<FleetActionsRunner>['update']>[1],
+        );
     }
 
     /** Hard delete (an install that never produced anything is taken back). */
@@ -86,16 +97,25 @@ export class FleetActionsRunnerRepository {
 
     /** Removed rows past their 30 days (the audit trail keeps the history). */
     async purgeRemovedBefore(cutoff: Date): Promise<number> {
-        const result = await this.repository.delete({ removedAt: LessThan(cutoff), state: 'removed' });
+        const result = await this.repository.delete({
+            removedAt: LessThan(cutoff),
+            state: 'removed',
+        });
         return result.affected ?? 0;
     }
 
     /** Listed rows of a node that are not in `keepIds` — for a reconcile that names the node's set. */
-    async listForNodeExcept(nodeId: string, keepIds: readonly string[]): Promise<FleetActionsRunner[]> {
+    async listForNodeExcept(
+        nodeId: string,
+        keepIds: readonly string[],
+    ): Promise<FleetActionsRunner[]> {
         if (!UUID.test(nodeId)) return [];
         const keep = keepIds.filter((id) => UUID.test(id));
         return this.repository.find({
-            where: keep.length > 0 ? { nodeId, removedAt: IsNull(), id: Not(In(keep)) } : { nodeId, removedAt: IsNull() },
+            where:
+                keep.length > 0
+                    ? { nodeId, removedAt: IsNull(), id: Not(In(keep)) }
+                    : { nodeId, removedAt: IsNull() },
         });
     }
 }

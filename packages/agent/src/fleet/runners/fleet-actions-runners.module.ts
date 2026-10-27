@@ -4,6 +4,7 @@ import { config } from '../../config';
 import { FleetActionsRunner } from '../../entities/fleet-actions-runner.entity';
 import { FacadesModule } from '../../facades/facades.module';
 import { FleetModule } from '../fleet.module';
+import { FleetActionsJobsNeedsALookProducer } from './fleet-actions-jobs-needs-a-look.producer';
 import { FleetActionsRunnerRepository } from './fleet-actions-runner.repository';
 import { FleetActionsRunnersNeedsALookProducer } from './fleet-actions-runners-needs-a-look.producer';
 import { FleetActionsRunnersProposalListener } from './fleet-actions-runners-proposal.listener';
@@ -49,8 +50,14 @@ export class FleetActionsRunnersPollService {
         FleetActionsRunnersService,
         FleetActionsRunnersPollService,
         FleetActionsRunnersNeedsALookProducer,
+        // P2 (FR-24): `job-unassignable`, read from the jobs the panel / poll last fetched.
+        FleetActionsJobsNeedsALookProducer,
         FleetActionsRunnersProposalListener,
     ],
-    exports: [FleetActionsRunnerRepository, FleetActionsRunnersService, FleetActionsRunnersPollService],
+    exports: [
+        FleetActionsRunnerRepository,
+        FleetActionsRunnersService,
+        FleetActionsRunnersPollService,
+    ],
 })
 export class FleetActionsRunnersModule {}

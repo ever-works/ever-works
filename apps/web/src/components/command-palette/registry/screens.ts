@@ -26,7 +26,7 @@ import {
     Workflow,
 } from 'lucide-react';
 import { FLEET_ACTIONS_RUNNER_CAPABILITY } from '@ever-works/contracts';
-import { runnersInstallHref } from '@/components/fleet/runners/runners.shared';
+import { actionsJobsHref, runnersInstallHref } from '@/components/fleet/runners/runners.shared';
 import { ROUTES } from '@/lib/constants';
 import { getWorkIdFromPath } from '@/lib/utils/work-route';
 import type { PaletteScreen, PaletteTranslator } from './types';
@@ -578,6 +578,24 @@ export function fleetRunnersScreens(
                 t('fleet.runners.palette.install', { name: computer.name }),
             breadcrumb: fleet,
         }));
+}
+
+/**
+ * Actions jobs (FL-18 P2, spec §5.7) — "Actions jobs": the hub's Overview at
+ * its Actions jobs panel (a panel, not a tab or a route, CONTRACTS R-37). Only
+ * while `FLEET_ACTIONS_RUNNERS_ENABLED` is on.
+ */
+export function fleetActionsJobsScreens(enabled: boolean): PaletteScreen[] {
+    if (!enabled) return [];
+    return [
+        {
+            id: 'fleet.runners.jobs',
+            href: actionsJobsHref(),
+            icon: Workflow,
+            title: (t: PaletteTranslator) => t('fleet.runners.palette.jobs'),
+            breadcrumb: fleet,
+        },
+    ];
 }
 
 /** What decides which screens exist beyond the fixed list. */

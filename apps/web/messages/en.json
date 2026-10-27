@@ -9585,6 +9585,58 @@
                         "undeclaredName": "The App spec doesn't declare this name.",
                         "specUnavailable": "This app has no usable App spec yet.",
                         "failed": "The value couldn't be saved. Try again."
+                    },
+                    "import": {
+                        "open": "Import .env",
+                        "title": "Import a .env file",
+                        "description": "Paste the contents of a .env file, or pick one. Only names the App spec declares are imported, and generated values are never overwritten. Values are sent once and never shown again.",
+                        "pasteLabel": "Contents",
+                        "fileLabel": "Or pick a file:",
+                        "preview": "Preview changes",
+                        "import": "{count, plural, =0 {Nothing to import} one {Import # change} other {Import # changes}}",
+                        "cancel": "Cancel",
+                        "imported": "{count, plural, =0 {Nothing changed} one {# value imported} other {# values imported}}",
+                        "failed": "Couldn't import: {reason}",
+                        "summary": "{add} new · {replace} replaced · {remove} removed · {refused} refused",
+                        "undeclared": "The App spec doesn't declare {names}. Remove those lines to import the rest.",
+                        "line": "line {line}",
+                        "actions": {
+                            "add": "will be added",
+                            "replace": "will replace the stored value",
+                            "remove": "will remove the stored value",
+                            "skipped": "skipped",
+                            "refused": "refused"
+                        },
+                        "refusals": {
+                            "undeclaredName": "Some lines name values the App spec doesn't declare. Remove them and try again.",
+                            "specUnavailable": "This app has no usable App spec yet.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so values can't be saved.",
+                            "storeUnavailable": "The environment store isn't available right now. Nothing was changed.",
+                            "tooLarge": "This file is larger than 1 MiB.",
+                            "tooMany": "This file has more lines than allowed.",
+                            "forbidden": "You need edit access to this App to import values.",
+                            "invalid": "This isn't a .env file Ever Works can read."
+                        }
+                    },
+                    "rotate": {
+                        "open": "Rotate",
+                        "aria": "Rotate {name}",
+                        "title": "Rotate {name}?",
+                        "description": "Ever Works generates a fresh value. The app uses it from its next Deployment.",
+                        "warning": "Data the app encrypted or signed with the current value may become unreadable, and sessions or tokens made with it stop working. This can't be undone.",
+                        "typeToConfirm": "Type {name} to confirm",
+                        "confirm": "Rotate",
+                        "cancel": "Cancel",
+                        "rotated": "{name} rotated.",
+                        "failed": "Couldn't rotate: {reason}",
+                        "refusals": {
+                            "mismatch": "The name you typed doesn't match.",
+                            "notGenerated": "This value isn't generated, so it can't be rotated.",
+                            "generatorUnavailable": "This value's generator isn't available on this installation.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation.",
+                            "rateLimited": "Too many rotations. Try again later.",
+                            "forbidden": "You need edit access to this App to rotate values."
+                        }
                     }
                 },
                 "dependencies": {
@@ -9618,7 +9670,34 @@
                         "requested": "Deleting the {kind} data.",
                         "failed": "The data couldn't be deleted. {reason}"
                     },
-                    "deleteDataOwnerOnly": "Only the Work owner can delete this data."
+                    "deleteDataOwnerOnly": "Only the Work owner can delete this data.",
+                    "configure": {
+                        "open": "Configure",
+                        "aria": "Configure {kind}",
+                        "title": "Configure {kind}",
+                        "description": "Choose where it runs and give its settings. Secret settings are sent once and never shown again.",
+                        "provider": "Provider",
+                        "size": "Volume size (GiB)",
+                        "sizeHint": "Leave empty to use the default size.",
+                        "sizeGrowOnly": "Currently {size} GiB. A volume can only grow.",
+                        "sizeTooSmall": "The size must be a whole number of at least {size} GiB.",
+                        "required": "required",
+                        "stored": "A value is set.",
+                        "secretStored": "A value is stored. Type a new one to replace it, or leave this empty to keep it.",
+                        "save": "Save and provision",
+                        "cancel": "Cancel",
+                        "saved": "{kind}: settings saved. A new provisioning attempt is scheduled.",
+                        "failed": "Couldn't save: {reason}",
+                        "refusals": {
+                            "providerNotSupported": "That provider can't serve this dependency here.",
+                            "sizeShrink": "A volume can't be made smaller.",
+                            "secureStorageUnavailable": "Secure storage isn't configured on this installation, so settings can't be saved.",
+                            "notDeclared": "The App spec doesn't declare this dependency.",
+                            "forbidden": "You need edit access to this App to configure dependencies.",
+                            "invalid": "Check the settings and try again.",
+                            "leaseHeld": "This dependency is being provisioned right now. Try again in a moment."
+                        }
+                    }
                 },
                 "ownerRequired": "Only the Work owner can do this.",
                 "ownerConfirmCluster": "Another member saved this cluster connection, so the Work owner has to deploy once to confirm it.",
@@ -16029,10 +16108,85 @@
                 "cancel": "Cancel",
                 "submit": "{count, plural, one {Install # runner} other {Install # runners}}",
                 "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
-                "failed": "The runners could not be installed."
+                "failed": "The runners could not be installed.",
+                "choose": "Choose a repository or organisation",
+                "checkingPermission": "Checking the GitHub App’s permission on {target}…"
             },
             "palette": {
-                "install": "Install Actions runners on {name}"
+                "install": "Install Actions runners on {name}",
+                "jobs": "Actions jobs"
+            },
+            "jobs": {
+                "title": "Actions jobs",
+                "counts": "{queued} queued · {running} running",
+                "busy": "{busy} of {total, plural, one {# runner} other {# runners}} busy",
+                "listLabel": "Queued and running Actions jobs",
+                "loading": "Loading Actions jobs…",
+                "loadFailed": "The Actions jobs could not be read.",
+                "lastKnown": "Last known jobs — {reason}",
+                "checked": "checked {time}",
+                "notChecked": "not checked yet",
+                "rateLimited": "GitHub is rate-limiting; next check {time}",
+                "rateLimitedWait": "GitHub is rate-limiting; the next check waits until it allows one",
+                "killSwitch": "All computers are stopped — runners keep running; installing and cancelling are paused.",
+                "empty": "No queued or running jobs on your runners",
+                "watching": "watching {targets}",
+                "watchingNone": "not watching any repository or organisation yet",
+                "watchingDefault": "(the default: every repository and organisation your runners are registered for)",
+                "change": "Change",
+                "unreadable": "Could not read {target}: {reason}",
+                "grantAccess": "Grant access",
+                "highlightGone": "That workflow run is no longer queued or running.",
+                "run": "#{number}",
+                "queued": "queued {duration}",
+                "queuedNow": "queued",
+                "running": "running {duration}",
+                "runningNow": "running",
+                "noRunner": "no runner can take it",
+                "openJob": "Open job on GitHub",
+                "cancel": "Cancel workflow run…",
+                "cancelConfirm": "Cancel workflow run",
+                "cancelPaused": "Paused while all computers are stopped",
+                "cancelling": "Cancelling workflow run #{number} of {repository}…",
+                "cancellingNoNumber": "Cancelling the workflow run of {repository}…",
+                "cancelFailed": "The workflow run could not be cancelled.",
+                "watched": {
+                    "title": "Watched repositories and organisations",
+                    "description": "The Actions jobs panel lists the queued and running jobs of these that target your self-hosted runners.",
+                    "defaultNote": "Nothing saved yet: the panel watches every repository and organisation your runners are registered for.",
+                    "empty": "Nothing in the list.",
+                    "add": "Add",
+                    "addLabel": "Add a repository or organisation",
+                    "choose": "Choose…",
+                    "repository": "repository",
+                    "organisation": "organisation",
+                    "remove": "Stop watching {target}",
+                    "limit": "At most {max} repositories and organisations.",
+                    "noneAvailable": "Your GitHub App does not cover a repository or organisation yet.",
+                    "openAppSettings": "Open GitHub App settings",
+                    "save": "Save",
+                    "useDefault": "Use the default",
+                    "cancel": "Cancel",
+                    "saved": "Saved the watched list.",
+                    "failed": "The watched list could not be saved."
+                }
+            },
+            "diagnosis": {
+                "offline": "the only matching runner is offline",
+                "missingLabel": "no runner has the label {label}",
+                "missingLabelUnnamed": "no runner has every label it asks for",
+                "wrongScope": "no runner is registered to {target}",
+                "waitingFor": "waiting for {runner}",
+                "waitingForAny": "waiting for a busy runner"
+            },
+            "grantAccess": {
+                "title": "Organisation runners need one more permission",
+                "body": "The Ever Works GitHub App on {account} needs “{permission}”. Grant it on GitHub, then come back and press Check again.",
+                "bodyUnnamed": "The Ever Works GitHub App on {account} needs one more permission. Grant it on GitHub, then come back and press Check again.",
+                "grant": "Grant access",
+                "checkAgain": "Check again",
+                "checking": "Checking…",
+                "useRepository": "Use a repository instead"
             }
         }
     }

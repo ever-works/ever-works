@@ -56,7 +56,11 @@ export function parseRunnerInstallPayload(job: FleetJobView): FleetRunnerInstall
 		throw new RunnerHostError('the job names an unexpected registration URL');
 	}
 	if (!isFleetActionsRunnerMode(raw.mode)) throw new RunnerHostError('the job names no run mode');
-	if (!Array.isArray(raw.runners) || raw.runners.length === 0 || raw.runners.length > FLEET_ACTIONS_RUNNERS_MAX_PER_NODE) {
+	if (
+		!Array.isArray(raw.runners) ||
+		raw.runners.length === 0 ||
+		raw.runners.length > FLEET_ACTIONS_RUNNERS_MAX_PER_NODE
+	) {
 		throw new RunnerHostError('the job names no runners');
 	}
 	const runners: FleetActionsRunnerInstallItem[] = [];
@@ -92,7 +96,9 @@ function firstLine(error: unknown): string {
 function failsEveryRunner(error: unknown): boolean {
 	return (
 		error instanceof RunnerHostError &&
-		(error.code === 'root_required' || error.code === 'unsupported_on_node' || /token could not be fetched|was cancelled/.test(error.message))
+		(error.code === 'root_required' ||
+			error.code === 'unsupported_on_node' ||
+			/token could not be fetched|was cancelled/.test(error.message))
 	);
 }
 
@@ -100,7 +106,10 @@ export function createRunnerInstallExecutor(deps: RunnerHostDeps) {
 	return async (job: FleetJobView, signal: AbortSignal): Promise<Record<string, unknown>> => {
 		const payload = parseRunnerInstallPayload(job);
 		if (payload.mode !== 'service') {
-			throw new RunnerHostError('Docker-isolated runners are not available on this computer yet', 'unsupported_on_node');
+			throw new RunnerHostError(
+				'Docker-isolated runners are not available on this computer yet',
+				'unsupported_on_node'
+			);
 		}
 		const download = assertRunnerDownloadFor(payload.download, deps.platform, deps.arch);
 		const runnerVersion = fleetActionsRunnerVersionOf(download.filename);
@@ -123,7 +132,10 @@ export function createRunnerInstallExecutor(deps: RunnerHostDeps) {
 				try {
 					const existing = await deps.state.readMeta(runner.name);
 					if (existing && existing.runnerId !== runner.runnerId) {
-						throw new RunnerHostError(`a runner named ${runner.name} already exists on ${deps.nodeName}`, 'invalid');
+						throw new RunnerHostError(
+							`a runner named ${runner.name} already exists on ${deps.nodeName}`,
+							'invalid'
+						);
 					}
 					let meta: RunnerMeta;
 					const dir = deps.state.dir(runner.name);
@@ -175,7 +187,11 @@ export function createRunnerInstallExecutor(deps: RunnerHostDeps) {
 					const serviceUnit = await installRunnerService(deps, dir, meta);
 					await reportRunner(deps, job, runner.runnerId, { phase: 'starting', serviceUnit });
 					const githubRunnerId = await deps.state.githubRunnerId(runner.name).catch(() => null);
-					meta = { ...meta, serviceUnit, installedAt: meta.installedAt ?? new Date(deps.now()).toISOString() };
+					meta = {
+						...meta,
+						serviceUnit,
+						installedAt: meta.installedAt ?? new Date(deps.now()).toISOString()
+					};
 					await deps.state.writeMeta(meta);
 					await reportRunner(deps, job, runner.runnerId, {
 						phase: 'done',

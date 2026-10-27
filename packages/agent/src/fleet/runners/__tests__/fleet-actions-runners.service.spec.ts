@@ -19,7 +19,8 @@ const SECRET_TOKEN = 'AAAAREGISTRATIONTOKENZZZZ';
 const DOWNLOAD = {
     os: 'linux',
     architecture: 'x64',
-    downloadUrl: 'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
+    downloadUrl:
+        'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
     filename: 'actions-runner-linux-x64-2.321.0.tar.gz',
     sha256: 'a'.repeat(64),
 };
@@ -32,7 +33,14 @@ interface Row {
     [key: string]: unknown;
 }
 
-function harness(opts: { stopped?: boolean; existing?: number; consents?: Record<string, boolean>; capabilities?: string[] } = {}) {
+function harness(
+    opts: {
+        stopped?: boolean;
+        existing?: number;
+        consents?: Record<string, boolean>;
+        capabilities?: string[];
+    } = {},
+) {
     const node = {
         id: NODE,
         userId: OWNER,
@@ -47,13 +55,24 @@ function harness(opts: { stopped?: boolean; existing?: number; consents?: Record
     const rows = new Map<string, Row>();
     for (let i = 0; i < (opts.existing ?? 0); i += 1) {
         const id = `00000000-0000-4000-8000-${String(900 + i).padStart(12, '0')}`;
-        rows.set(id, { id, nodeId: NODE, name: `old-${i}`, state: 'idle', ownerUserId: OWNER, scope: 'repo', target: 'acme/api', labels: [] });
+        rows.set(id, {
+            id,
+            nodeId: NODE,
+            name: `old-${i}`,
+            state: 'idle',
+            ownerUserId: OWNER,
+            scope: 'repo',
+            target: 'acme/api',
+            labels: [],
+        });
     }
     let seq = 0;
     const order: string[] = [];
     const runners = {
         findById: jest.fn(async (id: string) => rows.get(id) ?? null),
-        listForNode: jest.fn(async (nodeId: string) => [...rows.values()].filter((row) => row.nodeId === nodeId && row.state !== 'removed')),
+        listForNode: jest.fn(async (nodeId: string) =>
+            [...rows.values()].filter((row) => row.nodeId === nodeId && row.state !== 'removed'),
+        ),
         create: jest.fn(async (data: Partial<Row>) => {
             seq += 1;
             const id = `00000000-0000-4000-8000-${String(seq).padStart(12, '0')}`;
@@ -78,26 +97,64 @@ function harness(opts: { stopped?: boolean; existing?: number; consents?: Record
             order.push('job');
             enqueued.push(input);
             const id = `job-${enqueued.length}`;
-            jobRecords.set(id, { id, kind: input.kind, payload: input.payload, nodeId: NODE, status: 'leased' });
+            jobRecords.set(id, {
+                id,
+                kind: input.kind,
+                payload: input.payload,
+                nodeId: NODE,
+                status: 'leased',
+            });
             return { id };
         }),
-        authorizeRunSecretRequest: jest.fn(async (input: { nodeId: unknown; secret: unknown; jobId: string }) =>
-            input.secret === 'node-secret' && jobRecords.has(input.jobId) ? { jobId: input.jobId, userId: OWNER, nodeId: NODE } : null,
+        authorizeRunSecretRequest: jest.fn(
+            async (input: { nodeId: unknown; secret: unknown; jobId: string }) =>
+                input.secret === 'node-secret' && jobRecords.has(input.jobId)
+                    ? { jobId: input.jobId, userId: OWNER, nodeId: NODE }
+                    : null,
         ),
     };
     const jobRows = { findById: jest.fn(async (id: string) => jobRecords.get(id) ?? null) };
     const facade = {
-        listTargets: jest.fn(async () => [{ scope: 'repo', target: 'acme/api', accountLogin: 'acme', installationEntityId: 'inst-1' }]),
+        listTargets: jest.fn(async () => [
+            {
+                scope: 'repo',
+                target: 'acme/api',
+                accountLogin: 'acme',
+                installationEntityId: 'inst-1',
+            },
+        ]),
         resolveTarget: jest.fn(async (_u: string, scope: string, target: string) => {
             if (target !== 'acme/api') {
-                throw new ActionsRunnersFacadeError('install the Ever Works GitHub App on it first', 'resolveTarget', 'not-covered');
+                throw new ActionsRunnersFacadeError(
+                    'install the Ever Works GitHub App on it first',
+                    'resolveTarget',
+                    'not-covered',
+                );
             }
-            return { scope, target, installationId: 1, installationEntityId: 'inst-1', accountLogin: 'acme', repositoryIds: [7] };
+            return {
+                scope,
+                target,
+                installationId: 1,
+                installationEntityId: 'inst-1',
+                accountLogin: 'acme',
+                repositoryIds: [7],
+            };
         }),
         listDownloads: jest.fn(async () => [DOWNLOAD]),
-        listRunners: jest.fn(async () => ({ runners: [], etag: null, notModified: false, rateLimitedUntil: null })),
-        mintRegistrationToken: jest.fn(async () => ({ token: SECRET_TOKEN, expiresAt: '2026-10-26T11:00:00Z' })),
-        mintRemoveToken: jest.fn(async () => ({ token: SECRET_TOKEN, expiresAt: '2026-10-26T11:00:00Z' })),
+        listRunners: jest.fn(async () => ({
+            runners: [],
+            etag: null,
+            notModified: false,
+            rateLimitedUntil: null,
+        })),
+        mintRegistrationToken: jest.fn(async () => ({
+            token: SECRET_TOKEN,
+            expiresAt: '2026-10-26T11:00:00Z',
+        })),
+        mintRemoveToken: jest.fn(async () => ({
+            token: SECRET_TOKEN,
+            expiresAt: '2026-10-26T11:00:00Z',
+        })),
         deleteRunner: jest.fn(async () => undefined),
     };
     const audit = { tryRecord: jest.fn(async () => true) };
@@ -117,7 +174,11 @@ function harness(opts: { stopped?: boolean; existing?: number; consents?: Record
 }
 
 const caller = { kind: 'user' as const, userId: OWNER };
-const install = { target: { scope: 'repo' as const, target: 'acme/api' }, count: 2, labels: ['gpu'] };
+const install = {
+    target: { scope: 'repo' as const, target: 'acme/api' },
+    count: 2,
+    labels: ['gpu'],
+};
 
 async function refusal(promise: Promise<unknown>) {
     try {
@@ -159,14 +220,29 @@ describe('FleetActionsRunnersService (FL-18 P1)', () => {
 
     it('writes the rows first, then ONE job pinned by capability, whose payload carries the download and never a token', async () => {
         const { service, enqueued, order, rows, audit } = harness();
-        const result = await service.install(caller, NODE, { ...install, fields: { confirm: true } });
+        const result = await service.install(caller, NODE, {
+            ...install,
+            fields: { confirm: true },
+        });
         expect(order).toEqual(['row', 'row', 'job']);
         expect(result.runnerIds).toHaveLength(2);
         expect(enqueued).toHaveLength(1);
-        expect(enqueued[0]).toMatchObject({ kind: 'runner-install', requiredCapabilities: ['actions-runner'] });
+        expect(enqueued[0]).toMatchObject({
+            kind: 'runner-install',
+            requiredCapabilities: ['actions-runner'],
+        });
         const payload = enqueued[0].payload as Record<string, unknown>;
-        expect(payload).toMatchObject({ nodeId: NODE, target: 'acme/api', url: 'https://github.com/acme/api', mode: 'service', download: DOWNLOAD });
-        expect((payload.runners as Array<{ name: string }>).map((entry) => entry.name)).toEqual(['build-01-1', 'build-01-2']);
+        expect(payload).toMatchObject({
+            nodeId: NODE,
+            target: 'acme/api',
+            url: 'https://github.com/acme/api',
+            mode: 'service',
+            download: DOWNLOAD,
+        });
+        expect((payload.runners as Array<{ name: string }>).map((entry) => entry.name)).toEqual([
+            'build-01-1',
+            'build-01-2',
+        ]);
         expect(JSON.stringify(payload)).not.toMatch(/token/i);
         expect([...rows.values()].every((row) => row.state === 'installing')).toBe(true);
         expect(audit.tryRecord).toHaveBeenCalledTimes(2);
@@ -174,18 +250,36 @@ describe('FleetActionsRunnersService (FL-18 P1)', () => {
     });
 
     it('refuses in gate order: kill switch, consent, service manager, limit', async () => {
-        expect((await refusal(harness({ stopped: true }).service.install(caller, NODE, install))).code).toBe('kill_switch');
-        expect((await refusal(harness({ consents: { work: false } }).service.install(caller, NODE, install))).code).toBe('consent_missing');
-        expect((await refusal(harness({ capabilities: ['os:linux'] }).service.install(caller, NODE, install))).code).toBe(
-            'unsupported_on_node',
-        );
-        expect((await refusal(harness({ existing: 15 }).service.install(caller, NODE, install))).code).toBe('limit_exceeded');
+        expect(
+            (await refusal(harness({ stopped: true }).service.install(caller, NODE, install))).code,
+        ).toBe('kill_switch');
+        expect(
+            (
+                await refusal(
+                    harness({ consents: { work: false } }).service.install(caller, NODE, install),
+                )
+            ).code,
+        ).toBe('consent_missing');
+        expect(
+            (
+                await refusal(
+                    harness({ capabilities: ['os:linux'] }).service.install(caller, NODE, install),
+                )
+            ).code,
+        ).toBe('unsupported_on_node');
+        expect(
+            (await refusal(harness({ existing: 15 }).service.install(caller, NODE, install))).code,
+        ).toBe('limit_exceeded');
     });
 
     it('refuses a target no installation of the caller covers (U7)', async () => {
         const { service } = harness();
         const refused = await refusal(
-            service.install(caller, NODE, { ...install, target: { scope: 'repo', target: 'other/repo' }, fields: { confirm: true } }),
+            service.install(caller, NODE, {
+                ...install,
+                target: { scope: 'repo', target: 'other/repo' },
+                fields: { confirm: true },
+            }),
         );
         expect(refused.code).toBe('permission_denied');
     });
@@ -194,7 +288,13 @@ describe('FleetActionsRunnersService (FL-18 P1)', () => {
         const { service, rows } = harness({ existing: 1 });
         const [row] = [...rows.values()];
         rows.set(row.id, { ...row, state: 'working', currentJob: { name: 'test · ubuntu' } });
-        expect((await refusal(service.control(caller, NODE, row.id, 'remove', { confirmName: row.name }))).code).toBe('busy');
+        expect(
+            (
+                await refusal(
+                    service.control(caller, NODE, row.id, 'remove', { confirmName: row.name }),
+                )
+            ).code,
+        ).toBe('busy');
         rows.set(row.id, { ...row, state: 'idle' });
         const refused = await refusal(service.control(caller, NODE, row.id, 'remove', {}));
         expect(refused.code).toBe('confirmation_required');
@@ -214,38 +314,89 @@ describe('FleetActionsRunnersService (FL-18 P1)', () => {
 
     it('mints the registration token only for the node holding the install job of THIS runner', async () => {
         const { service, rows } = harness();
-        const { runnerIds, jobId } = await service.install(caller, NODE, { ...install, fields: { confirm: true } });
-        const ok = await service.mintRunnerToken(runnerIds[0], { nodeId: NODE, secret: 'node-secret', jobId, kind: 'register' });
-        expect(ok).toEqual({ token: SECRET_TOKEN, expiresAt: '2026-10-26T11:00:00Z', replace: false });
+        const { runnerIds, jobId } = await service.install(caller, NODE, {
+            ...install,
+            fields: { confirm: true },
+        });
+        const ok = await service.mintRunnerToken(runnerIds[0], {
+            nodeId: NODE,
+            secret: 'node-secret',
+            jobId,
+            kind: 'register',
+        });
+        expect(ok).toEqual({
+            token: SECRET_TOKEN,
+            expiresAt: '2026-10-26T11:00:00Z',
+            replace: false,
+        });
         expect(rows.get(runnerIds[0])?.phase).toBe('registering');
-        expect(await service.mintRunnerToken(runnerIds[0], { nodeId: NODE, secret: 'wrong', jobId, kind: 'register' })).toBeNull();
+        expect(
+            await service.mintRunnerToken(runnerIds[0], {
+                nodeId: NODE,
+                secret: 'wrong',
+                jobId,
+                kind: 'register',
+            }),
+        ).toBeNull();
         // An install job never hands out a remove token.
-        expect(await service.mintRunnerToken(runnerIds[0], { nodeId: NODE, secret: 'node-secret', jobId, kind: 'remove' })).toBeNull();
+        expect(
+            await service.mintRunnerToken(runnerIds[0], {
+                nodeId: NODE,
+                secret: 'node-secret',
+                jobId,
+                kind: 'remove',
+            }),
+        ).toBeNull();
         // A runner the job does not name.
         expect(
-            await service.mintRunnerToken('00000000-0000-4000-8000-000000000999', { nodeId: NODE, secret: 'node-secret', jobId, kind: 'register' }),
+            await service.mintRunnerToken('00000000-0000-4000-8000-000000000999', {
+                nodeId: NODE,
+                secret: 'node-secret',
+                jobId,
+                kind: 'register',
+            }),
         ).toBeNull();
     });
 
     it('refuses the token while the kill switch holds (U14)', async () => {
         const h = harness();
-        const { runnerIds, jobId } = await h.service.install(caller, NODE, { ...install, fields: { confirm: true } });
+        const { runnerIds, jobId } = await h.service.install(caller, NODE, {
+            ...install,
+            fields: { confirm: true },
+        });
         h.killSwitch.isStopped.mockResolvedValue(true);
-        const refused = await refusal(h.service.mintRunnerToken(runnerIds[0], { nodeId: NODE, secret: 'node-secret', jobId, kind: 'register' }));
+        const refused = await refusal(
+            h.service.mintRunnerToken(runnerIds[0], {
+                nodeId: NODE,
+                secret: 'node-secret',
+                jobId,
+                kind: 'register',
+            }),
+        );
         expect(refused.code).toBe('kill_switch');
         expect(h.facade.mintRegistrationToken).not.toHaveBeenCalled();
     });
 
     it('refuses a name GitHub lists for another runner (U10) and marks the row failed', async () => {
         const h = harness();
-        const { runnerIds, jobId } = await h.service.install(caller, NODE, { ...install, fields: { confirm: true } });
+        const { runnerIds, jobId } = await h.service.install(caller, NODE, {
+            ...install,
+            fields: { confirm: true },
+        });
         h.facade.listRunners.mockResolvedValueOnce({
             runners: [{ id: 99, name: 'build-01-1', status: 'online', busy: false, labels: [] }],
             etag: null,
             notModified: false,
             rateLimitedUntil: null,
         } as never);
-        const refused = await refusal(h.service.mintRunnerToken(runnerIds[0], { nodeId: NODE, secret: 'node-secret', jobId, kind: 'register' }));
+        const refused = await refusal(
+            h.service.mintRunnerToken(runnerIds[0], {
+                nodeId: NODE,
+                secret: 'node-secret',
+                jobId,
+                kind: 'register',
+            }),
+        );
         expect(refused.code).toBe('invalid');
         expect(h.rows.get(runnerIds[0])?.state).toBe('failed');
     });
@@ -254,15 +405,30 @@ describe('FleetActionsRunnersService (FL-18 P1)', () => {
         const h = harness({ existing: 1 });
         const [row] = [...h.rows.values()];
         h.rows.set(row.id, { ...row, githubRunnerId: 42 });
-        const { jobId } = await h.service.control(caller, NODE, row.id, 'remove', { confirmName: row.name });
-        expect(await h.service.reportProgress(row.id, { nodeId: NODE, secret: 'node-secret', jobId, state: 'removed', deregistered: false })).toBe(
-            true,
-        );
+        const { jobId } = await h.service.control(caller, NODE, row.id, 'remove', {
+            confirmName: row.name,
+        });
+        expect(
+            await h.service.reportProgress(row.id, {
+                nodeId: NODE,
+                secret: 'node-secret',
+                jobId,
+                state: 'removed',
+                deregistered: false,
+            }),
+        ).toBe(true);
         expect(h.rows.get(row.id)?.state).toBe('removed');
-        expect(h.facade.deleteRunner).toHaveBeenCalledWith(OWNER, expect.objectContaining({ target: 'acme/api' }), 42);
+        expect(h.facade.deleteRunner).toHaveBeenCalledWith(
+            OWNER,
+            expect.objectContaining({ target: 'acme/api' }),
+            42,
+        );
 
         const fresh = harness();
-        const installed = await fresh.service.install(caller, NODE, { ...install, fields: { confirm: true } });
+        const installed = await fresh.service.install(caller, NODE, {
+            ...install,
+            fields: { confirm: true },
+        });
         await fresh.service.reportProgress(installed.runnerIds[0], {
             nodeId: NODE,
             secret: 'node-secret',
@@ -271,7 +437,11 @@ describe('FleetActionsRunnersService (FL-18 P1)', () => {
             state: 'idle',
             githubRunnerId: 77,
         });
-        expect(fresh.rows.get(installed.runnerIds[0])).toMatchObject({ state: 'idle', phase: null, githubRunnerId: 77 });
+        expect(fresh.rows.get(installed.runnerIds[0])).toMatchObject({
+            state: 'idle',
+            phase: null,
+            githubRunnerId: 77,
+        });
         expect(fresh.facade.deleteRunner).not.toHaveBeenCalled();
     });
 });

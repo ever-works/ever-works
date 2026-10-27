@@ -135,7 +135,9 @@ export async function reportRunner(
 	try {
 		await deps.client().reportRunnerProgress(runnerId, job.id, value, job.leaseGeneration);
 	} catch (error) {
-		deps.logger?.warn(`runner ${runnerId}: progress not delivered (${error instanceof Error ? error.message : String(error)})`);
+		deps.logger?.warn(
+			`runner ${runnerId}: progress not delivered (${error instanceof Error ? error.message : String(error)})`
+		);
 	}
 }
 
@@ -183,7 +185,10 @@ export async function fetchRunnerToken(
 			if (error instanceof RunnerHostError) throw error;
 			const kindOf = (error as { kind?: unknown })?.kind;
 			if (kindOf === 'invalid-request') {
-				throw new RunnerHostError('GitHub already has a runner with this name for another machine; choose another name', 'invalid');
+				throw new RunnerHostError(
+					'GitHub already has a runner with this name for another machine; choose another name',
+					'invalid'
+				);
 			}
 			if (typeof kindOf !== 'string' || !RETRYABLE_TOKEN_FAILURES.has(kindOf) || deps.now() >= deadline) {
 				throw new RunnerHostError(

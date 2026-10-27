@@ -151,7 +151,9 @@ export function parseRunnerMeta(raw: string): RunnerMeta | null {
 		name: value.name,
 		scope: value.scope,
 		target: value.target,
-		labels: Array.isArray(value.labels) ? value.labels.filter((label): label is string => typeof label === 'string') : [],
+		labels: Array.isArray(value.labels)
+			? value.labels.filter((label): label is string => typeof label === 'string')
+			: [],
 		mode: isFleetActionsRunnerMode(value.mode) ? value.mode : 'service',
 		runnerVersion: typeof value.runnerVersion === 'string' ? value.runnerVersion : null,
 		sha256: typeof value.sha256 === 'string' ? value.sha256 : null,

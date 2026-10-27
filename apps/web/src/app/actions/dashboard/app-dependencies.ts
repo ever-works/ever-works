@@ -104,3 +104,44 @@ export async function deleteAppDependencyDataAction(
         return failure('delete the App dependency data', error);
     }
 }
+
+/**
+ * Lane aw-ops (APW-07 T29) — **Configure** one dependency: the provider, its prompted settings and
+ * the volume size. The settings are write-only — sent once, encrypted by the API, never returned —
+ * so nothing here logs or echoes them. A smaller size than provisioned is the API's refusal.
+ */
+const configureSchema = z
+    .object({
+        providerId: z.string().trim().min(1).max(120).optional(),
+        config: z.record(z.string().min(1).max(120), z.string().max(8192)).optional(),
+        sizeGiB: z.number().int().min(1).max(10_000).optional(),
+    })
+    .strict()
+    .refine(
+        (input) =>
+            input.providerId !== undefined ||
+            (input.config !== undefined && Object.keys(input.config).length > 0) ||
+            input.sizeGiB !== undefined,
+    );
+
+export async function configureAppDependencyAction(
+    workId: string,
+    kind: string,
+    input: { providerId?: string; config?: Record<string, string>; sizeGiB?: number },
+): Promise<AppDependencyActionResult<AppDependencyWriteResponse>> {
+    const user = await getAuthFromCookie();
+    if (!user) return unauthorized();
+    if (!workIdSchema.safeParse(workId).success) return invalid('invalid_work_id');
+    const parsedKind = kindSchema.safeParse(kind);
+    if (!parsedKind.success) return invalid('dependencyNotDeclared');
+    const parsed = configureSchema.safeParse(input ?? {});
+    if (!parsed.success) return invalid('invalidBody');
+    try {
+        return {
+            success: true,
+            data: await appDependenciesAPI.configure(workId, parsedKind.data, parsed.data),
+        };
+    } catch (error) {
+        return failure('configure the App dependency', error);
+    }
+}
