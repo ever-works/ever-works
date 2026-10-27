@@ -16219,7 +16219,8 @@
                 "logs": "Logs",
                 "logsOf": "Logs of {name}",
                 "openJob": "Open job on GitHub",
-                "openOnGitHub": "Open on GitHub"
+                "openOnGitHub": "Open on GitHub",
+                "updateAvailable": "Update available: {version}"
             },
             "actions": {
                 "start": "Start",
@@ -16283,7 +16284,8 @@
                 "started": "{count, plural, one {Installing # runner…} other {Installing # runners…}}",
                 "failed": "The runners could not be installed.",
                 "choose": "Choose a repository or organisation",
-                "checkingPermission": "Checking the GitHub App’s permission on {target}…"
+                "checkingPermission": "Checking the GitHub App’s permission on {target}…",
+                "shareWarning": "Ticked, these runners can control every container on {name} and run anything as root there. Leave it unticked unless your jobs need it."
             },
             "palette": {
                 "install": "Install Actions runners on {name}",
@@ -16360,6 +16362,13 @@
                 "checkAgain": "Check again",
                 "checking": "Checking…",
                 "useRepository": "Use a repository instead"
+            },
+            "reinstall": {
+                "button": "Reinstall…",
+                "retry": "Retry",
+                "confirm": "Reinstall",
+                "reinstalling": "Reinstalling {name}…",
+                "failed": "The runner could not be reinstalled."
             }
         }
     }

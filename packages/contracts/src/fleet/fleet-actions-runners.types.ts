@@ -1027,6 +1027,52 @@ export function fleetActionsJobItemId(repository: string, jobId: number): string
 	return `fleet-actions-job:${repository.toLowerCase()}:${jobId}:unassignable`;
 }
 
+// ─── Docker-isolated runners and versions (P3, spec FR-27, FR-28) ──────────
+
+/**
+ * The capability tag a node advertises when it can run Docker-isolated runners
+ * (P3): `--work`, Linux, a Docker daemon it can reach, and a node new enough to
+ * have the container executor. Docker-mode jobs require it beside
+ * {@link FLEET_ACTIONS_RUNNER_CAPABILITY}.
+ */
+export const FLEET_ACTIONS_RUNNER_DOCKER_CAPABILITY = 'actions-runner-docker';
+
+/** How long the platform keeps GitHub's runner-build list for the "Update available" note. */
+export const FLEET_ACTIONS_RUNNER_DOWNLOADS_CACHE_MS = 60 * 60_000;
+
+/** Compare two runner versions (`2.321.0`); a version that is not one sorts first. */
+export function compareFleetActionsRunnerVersions(a: string | null | undefined, b: string | null | undefined): number {
+	const parse = (value: string | null | undefined): number[] | null => {
+		const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(value ?? '');
+		return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+	};
+	const left = parse(a);
+	const right = parse(b);
+	if (!left && !right) return 0;
+	if (!left) return -1;
+	if (!right) return 1;
+	for (let i = 0; i < 3; i += 1) {
+		if (left[i] !== right[i]) return left[i] < right[i] ? -1 : 1;
+	}
+	return 0;
+}
+
+/**
+ * The "Update available" version (FR-28): GitHub's newest build for the runner's
+ * platform when it is newer than the installed one, else null. Updating is the
+ * owner's act (Reinstall), never automatic.
+ */
+export function fleetActionsRunnerUpdateAvailable(
+	installed: string | null | undefined,
+	latest: string | null | undefined
+): string | null {
+	if (!installed || !latest) return null;
+	return compareFleetActionsRunnerVersions(latest, installed) > 0 ? latest : null;
+}
+
+/** The labelled opt-in of a Docker-isolated runner (FR-27): the host's Docker daemon, which runs as root. */
+export const FLEET_ACTIONS_RUNNER_SHARE_DOCKER_LABEL = 'Share the Docker daemon (runs as root)';
+
 /** The FL-08 log source id of a runner's newest diagnostic log (FR-18). */
 export function fleetActionsRunnerLogSourceId(name: string): string {
 	return `runner:${name}`;

@@ -95,6 +95,8 @@ export * from './worker-context';
 export * from './app-runtime-deletion.service';
 // Lane aw-safety (2026-10-26) — the API's guarded APP_WORK_DELETION_COMPLETION (built by apps/api's ports module).
 export * from './app-work-deletion-completion.service';
+// Lane aw-safety (2026-10-26) — APW-05's rebuild behind `APP_HOSTS_REBUILD_REQUESTER`.
+export * from './app-hosts-rebuild.requester';
 export * from './app-verification-target.service';
 export * from './app-license-gate';
 export * from './app-deploy-preconditions.service';
