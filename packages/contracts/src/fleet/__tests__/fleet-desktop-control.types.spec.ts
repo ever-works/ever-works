@@ -125,6 +125,13 @@ describe('the machine half on the wire', () => {
 		expect(normalizeFleetHelperStatus({ ...base, control: 'yes' })).not.toHaveProperty('control');
 	});
 
+	it('carries signedAvailable only as a literal true (P3, T-44)', () => {
+		const base = { trust: 'hash-pinned', present: true, admitted: true };
+		expect(normalizeFleetHelperStatus({ ...base, signedAvailable: true })).toMatchObject({ signedAvailable: true });
+		expect(normalizeFleetHelperStatus({ ...base, signedAvailable: 'yes' })).not.toHaveProperty('signedAvailable');
+		expect(normalizeFleetHelperStatus(base)).not.toHaveProperty('signedAvailable');
+	});
+
 	it('audits the owner allowing or withdrawing control on the machine', () => {
 		expect(fleetHelperEventAuditAction('control-allow')).toBe('node.helper.control-allow');
 		expect(fleetHelperEventAuditAction('control-deny')).toBe('node.helper.control-deny');

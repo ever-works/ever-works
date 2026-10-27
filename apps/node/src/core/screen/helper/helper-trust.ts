@@ -12,6 +12,7 @@ import {
 	type FleetHelperPolicyRecord,
 	type FleetHelperTrust
 } from '@ever-works/contracts';
+import type { HelperSignatureCheck } from './helper-signature';
 
 /**
  * Desktop view & control (FL-07, FR-14, R-8, U2, U3) — the helper's admission
@@ -183,14 +184,17 @@ export type HelperVerification =
  *   - no record: `helper-unadmitted` when a helper is installed, else `helper-missing`;
  *   - a record whose file is gone: `helper-missing`;
  *   - a record whose file hashes differently: `helper-untrusted`;
- *   - a `signed` record: `helper-untrusted` until signed verification ships (P3) —
- *     never silently accepted as hash-pinned;
- *   - otherwise `hash-pinned`.
+ *   - a `signed` record (P3): the file's OS-verified signature must name the
+ *     signer the record holds (an update by the same publisher keeps its
+ *     approval, FR-58); without a signature checker (Linux, an older caller)
+ *     it is `helper-untrusted` — never silently accepted as hash-pinned;
+ *   - otherwise `hash-pinned`: the file's SHA-256 must equal the admitted one.
  */
 export async function verifyHelper(
 	fs: HelperFs,
 	paths: Pick<HelperPaths, 'policyPath' | 'installPath'>,
-	now: () => number = () => Date.now()
+	now: () => number = () => Date.now(),
+	checkSignature?: HelperSignatureChecker
 ): Promise<HelperVerification> {
 	const record = await readHelperPolicy(fs, paths.policyPath);
 	if (!record) {
@@ -211,11 +215,29 @@ export async function verifyHelper(
 	} catch {
 		return { ok: false, reason: 'helper-missing', record, present: false };
 	}
+	if (record.level === 'signed') {
+		if (!checkSignature || !record.signer) return { ok: false, reason: 'helper-untrusted', record, present: true };
+		const signature = await checkSignature(record.path, record.signer, sha256).catch(() => null);
+		if (!signature?.ok || signature.signer !== record.signer) {
+			return { ok: false, reason: 'helper-untrusted', record, present: true };
+		}
+		return { ok: true, trust: 'signed', record, sha256, verifiedAt: new Date(now()).toISOString() };
+	}
 	if (sha256 !== record.sha256 || record.level !== 'hash-pinned') {
 		return { ok: false, reason: 'helper-untrusted', record, present: true };
 	}
 	return { ok: true, trust: 'hash-pinned', record, sha256, verifiedAt: new Date(now()).toISOString() };
 }
+
+/**
+ * Check a file's OS signature against an expected signer (`checkHelperSignature`, bound to a runner).
+ * `sha256`: the bytes being checked, when the caller hashed them (a cache may key on it).
+ */
+export type HelperSignatureChecker = (
+	path: string,
+	expectedSigner: string,
+	sha256?: string
+) => Promise<HelperSignatureCheck>;
 
 /** Read the event log (newest last); unreadable reads as empty. */
 export async function readHelperEvents(fs: HelperFs, eventsPath: string): Promise<FleetHelperEvent[]> {
