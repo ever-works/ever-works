@@ -73,20 +73,28 @@ const importTask = async () => {
     vi.resetModules();
     schedulesTaskMock.mockReset();
     const mod = await import('../tasks/trigger/computer-recording-gc.task');
-    const cfg = schedulesTaskMock.mock.calls[schedulesTaskMock.mock.calls.length - 1][0] as ScheduleConfig;
+    const cfg = schedulesTaskMock.mock.calls[
+        schedulesTaskMock.mock.calls.length - 1
+    ][0] as ScheduleConfig;
     return { cfg, mod };
 };
 
 describe('computerRecordingGcTask', () => {
     let sweepExpired: ReturnType<typeof vi.fn>;
-    let appContext: { useLogger: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> };
+    let appContext: {
+        useLogger: ReturnType<typeof vi.fn>;
+        get: ReturnType<typeof vi.fn>;
+        close: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
         sweepExpired = vi.fn().mockResolvedValue({ deleted: 2, failed: 1 });
         appContext = {
             useLogger: vi.fn(),
-            get: vi.fn((token: unknown) => (token === StubDesktopRecordingService ? { sweepExpired } : undefined)),
+            get: vi.fn((token: unknown) =>
+                token === StubDesktopRecordingService ? { sweepExpired } : undefined,
+            ),
             close: vi.fn().mockResolvedValue(undefined),
         };
         createApplicationContextMock.mockResolvedValue(appContext);

@@ -11,11 +11,14 @@ export const GET = bffProxy<RouteContext>(async ({ headers }, ctx) => {
     const { id, viewId, seq } = await ctx.params;
     if (!isUuid(id) || !isUuid(viewId) || !/^\d{1,6}$/.test(seq)) return invalidIdResponse();
     headers.set('Accept', 'application/octet-stream');
-    const upstream = await fetch(fleetApiUrl(`/nodes/${id}/desktop/recordings/${viewId}/chunks/${seq}`), {
-        method: 'GET',
-        headers,
-        cache: 'no-store',
-    });
+    const upstream = await fetch(
+        fleetApiUrl(`/nodes/${id}/desktop/recordings/${viewId}/chunks/${seq}`),
+        {
+            method: 'GET',
+            headers,
+            cache: 'no-store',
+        },
+    );
     if (!upstream.ok) {
         const text = await upstream.text().catch(() => '');
         return new Response(text, {

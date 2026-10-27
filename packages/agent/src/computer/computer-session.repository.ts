@@ -153,7 +153,11 @@ export class ComputerSessionRepository {
     /** Desktop recordings past their expiry (the retention sweep). */
     async findExpiredDesktopRecordings(now: Date, take = 100): Promise<ComputerSession[]> {
         return this.repository.find({
-            where: { source: 'desktop', recordingRef: Not(IsNull()), recordingExpiresAt: LessThan(now) },
+            where: {
+                source: 'desktop',
+                recordingRef: Not(IsNull()),
+                recordingExpiresAt: LessThan(now),
+            },
             order: { recordingExpiresAt: 'ASC' },
             take,
         });

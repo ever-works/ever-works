@@ -1,7 +1,13 @@
-import { decodeDesktopRecordingChunk, FLEET_DESKTOP_RECORDING_MAX_BYTES } from '@ever-works/contracts';
+import {
+    decodeDesktopRecordingChunk,
+    FLEET_DESKTOP_RECORDING_MAX_BYTES,
+} from '@ever-works/contracts';
 import type { ComputerSession } from '../../entities/computer-session.entity';
 import type { ComputerSessionRepository } from '../computer-session.repository';
-import { DesktopRecordingService, type DesktopRecordingStoragePort } from '../desktop-recording.service';
+import {
+    DesktopRecordingService,
+    type DesktopRecordingStoragePort,
+} from '../desktop-recording.service';
 
 /**
  * Desktop view & control (FL-07 P2.C, T-38 … T-40, FR-48 … FR-55) — the
@@ -20,7 +26,11 @@ const tiles = new Uint8Array([1, 2, 3, 4]);
 function memoryStorage() {
     const objects = new Map<string, Buffer>();
     let next = 0;
-    const storage: DesktopRecordingStoragePort & { objects: Map<string, Buffer>; failPuts: boolean; failDeletes: boolean } = {
+    const storage: DesktopRecordingStoragePort & {
+        objects: Map<string, Buffer>;
+        failPuts: boolean;
+        failDeletes: boolean;
+    } = {
         providerName: 'memory',
         objects,
         failPuts: false,
@@ -61,16 +71,25 @@ function setup(options: { storage?: boolean; retentionDays?: number } = {}) {
         setRecording: jest.fn(async (_id: string, patch: Partial<ComputerSession>) => {
             Object.assign(row, patch);
         }),
-        findDesktopRecordingsForNode: jest.fn(async () => (row.recordingRef ? [row as ComputerSession] : [])),
+        findDesktopRecordingsForNode: jest.fn(async () =>
+            row.recordingRef ? [row as ComputerSession] : [],
+        ),
         findExpiredDesktopRecordings: jest.fn(async (now: Date) =>
-            row.recordingRef && row.recordingExpiresAt && row.recordingExpiresAt < now ? [row as ComputerSession] : [],
+            row.recordingRef && row.recordingExpiresAt && row.recordingExpiresAt < now
+                ? [row as ComputerSession]
+                : [],
         ),
     };
     const audit = { tryRecord: jest.fn(async () => true) };
     const storage = options.storage === false ? null : memoryStorage();
     const service = new DesktopRecordingService(
         sessions as unknown as ComputerSessionRepository,
-        { findById: jest.fn(async () => ({ id: NODE, recordingRetentionDays: options.retentionDays ?? 14 })) } as never,
+        {
+            findById: jest.fn(async () => ({
+                id: NODE,
+                recordingRetentionDays: options.retentionDays ?? 14,
+            })),
+        } as never,
         audit as never,
         storage,
     );
@@ -85,7 +104,13 @@ function setup(options: { storage?: boolean; retentionDays?: number } = {}) {
             clock += ms;
         },
         start: () =>
-            service.start({ viewId: VIEW, nodeId: NODE, ownerUserId: OWNER, actorUserId: OWNER, trigger: 'control' }),
+            service.start({
+                viewId: VIEW,
+                nodeId: NODE,
+                ownerUserId: OWNER,
+                actorUserId: OWNER,
+                trigger: 'control',
+            }),
     };
 }
 
@@ -109,7 +134,9 @@ describe('DesktopRecordingService — writing', () => {
             const bytes = storage!.objects.get(key)!;
             return bytes[0] === 0x45 && bytes[1] === 0x57;
         })!;
-        const entries = decodeDesktopRecordingChunk(new Uint8Array(storage!.objects.get(chunkKey)!));
+        const entries = decodeDesktopRecordingChunk(
+            new Uint8Array(storage!.objects.get(chunkKey)!),
+        );
         expect(entries?.map((entry) => [entry.tMs, entry.kind])).toEqual([
             [0, 20],
             [0, 23],
@@ -125,10 +152,14 @@ describe('DesktopRecordingService — writing', () => {
         service.push(VIEW, 20, jpegFrame);
         await service.stop(VIEW, 'view-ended');
         expect(row).toMatchObject({ recorded: true, recordingStoppedReason: 'view-ended' });
-        const index = JSON.parse(storage!.objects.get(row.recordingRef as string)!.toString('utf8'));
+        const index = JSON.parse(
+            storage!.objects.get(row.recordingRef as string)!.toString('utf8'),
+        );
         expect(index.chunks.map((chunk: { seq: number }) => chunk.seq)).toEqual([0, 1]);
         // Only the last index object is kept.
-        const indexes = [...storage!.objects.values()].filter((bytes) => bytes.toString('utf8').startsWith('{'));
+        const indexes = [...storage!.objects.values()].filter((bytes) =>
+            bytes.toString('utf8').startsWith('{'),
+        );
         expect(indexes).toHaveLength(1);
     });
 
@@ -176,8 +207,14 @@ describe('DesktopRecordingService — writing', () => {
         await new Promise((resolve) => setImmediate(resolve));
         await new Promise((resolve) => setImmediate(resolve));
         expect(service.isRecording(VIEW)).toBe(false);
-        expect(row).toMatchObject({ recordingStoppedReason: 'storage-failed', recordingSkippedReason: 'storage-unavailable' });
-        expect(actions(audit)).toEqual(['node.desktop.recording.start', 'node.desktop.recording.stop']);
+        expect(row).toMatchObject({
+            recordingStoppedReason: 'storage-failed',
+            recordingSkippedReason: 'storage-unavailable',
+        });
+        expect(actions(audit)).toEqual([
+            'node.desktop.recording.start',
+            'node.desktop.recording.stop',
+        ]);
     });
 
     it('records nothing without a storage plugin, and says so on the row', async () => {
@@ -194,7 +231,12 @@ describe('DesktopRecordingService — reading and deleting', () => {
         service.push(VIEW, 20, jpegFrame);
         await service.stop(VIEW, 'view-ended');
         const [listed] = await service.list(NODE, 'studio');
-        expect(listed).toMatchObject({ viewId: VIEW, nodeName: 'studio', storage: 'memory', stoppedReason: 'view-ended' });
+        expect(listed).toMatchObject({
+            viewId: VIEW,
+            nodeName: 'studio',
+            storage: 'memory',
+            stoppedReason: 'view-ended',
+        });
         const read = await service.read(VIEW, NODE, 'studio');
         expect(read?.chunks).toEqual([{ seq: 0, startMs: 0, endMs: 0, bytes: expect.any(Number) }]);
         expect(JSON.stringify(read)).not.toContain('obj-');

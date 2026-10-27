@@ -122,7 +122,10 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
     const [inputNotice, setInputNotice] = useState<string | null>(null);
     const nowMs = useNow(1_000);
     /** P2.C (FR-55): whether the view is being recorded right now, read every few seconds. */
-    const [recordingState, setRecordingState] = useState<{ state: string; reason: string | null } | null>(null);
+    const [recordingState, setRecordingState] = useState<{
+        state: string;
+        reason: string | null;
+    } | null>(null);
 
     const load = useCallback(async () => {
         const result = await desktopClient.availability(node.id);
@@ -475,7 +478,8 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
                     browserSourceAvailable={availability.browserSourceAvailable}
                     onRetry={() => void load()}
                 />
-                {availability.blocker !== 'permission-denied' && availability.blocker !== 'kind-unsupported' ? (
+                {availability.blocker !== 'permission-denied' &&
+                availability.blocker !== 'kind-unsupported' ? (
                     <DesktopRecordings nodeId={node.id} nodeName={name} />
                 ) : null}
             </div>
@@ -503,7 +507,10 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
                 {phase === 'live' ? (
                     <span className="flex items-center gap-2">
                         {recordingState?.state === 'recording' ? (
-                            <span className="font-semibold text-red-600" data-testid="desktop-recording">
+                            <span
+                                className="font-semibold text-red-600"
+                                data-testid="desktop-recording"
+                            >
                                 ◉ {t('recordings.on')}
                             </span>
                         ) : null}
@@ -694,7 +701,11 @@ export default function DesktopTab({ node }: FleetComputerTabProps) {
                 </footer>
             ) : null}
             {recordingState?.state === 'failed' ? (
-                <p className="text-xs text-amber-700" role="status" data-testid="desktop-recording-failed">
+                <p
+                    className="text-xs text-amber-700"
+                    role="status"
+                    data-testid="desktop-recording-failed"
+                >
                     {t('recordings.failed')}
                 </p>
             ) : null}

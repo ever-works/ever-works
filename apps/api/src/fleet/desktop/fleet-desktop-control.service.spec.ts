@@ -631,7 +631,10 @@ describe('recordings (P2.C, FR-48 … FR-55)', () => {
             isRecording: jest.fn((viewId: string) => live.has(viewId)),
             failureOf: jest.fn(() => null),
             list: jest.fn(async () => []),
-            read: jest.fn(async (viewId: string) => ({ viewId, startedAt: '2026-10-27T09:00:00.000Z' })),
+            read: jest.fn(async (viewId: string) => ({
+                viewId,
+                startedAt: '2026-10-27T09:00:00.000Z',
+            })),
             chunk: jest.fn(async () => new Uint8Array([0x45, 0x57, 0x52, 0x31])),
             remove: jest.fn(async () => true),
         };
@@ -645,11 +648,17 @@ describe('recordings (P2.C, FR-48 … FR-55)', () => {
         expect(recording.start).toHaveBeenCalledWith(
             expect.objectContaining({ viewId: opened.view.viewId, trigger: 'control' }),
         );
-        const driver = handle(opened.view.viewId, 'driver', { source: 'desktop', mode: 'controlling' });
+        const driver = handle(opened.view.viewId, 'driver', {
+            source: 'desktop',
+            mode: 'controlling',
+        });
         service.nodeBinary(driver, 20, new Uint8Array([1]));
         service.nodeBinary(driver, 10, new Uint8Array([1]));
         expect(recording.push).toHaveBeenCalledTimes(1);
-        expect(service.viewFor(OWNER, NODE_ID, opened.view.viewId).recording).toEqual({ state: 'recording', reason: null });
+        expect(service.viewFor(OWNER, NODE_ID, opened.view.viewId).recording).toEqual({
+            state: 'recording',
+            reason: null,
+        });
     });
 
     it('never records a watching view unless the owner opted in', async () => {
@@ -693,15 +702,19 @@ describe('recordings (P2.C, FR-48 … FR-55)', () => {
         const recording = recordingDouble();
         const { service } = build({ recording: recording as never });
         const viewId = '00000000-0000-4000-8000-0000000000aa';
-        expect(await refusal(service.deleteRecording(OWNER, NODE_ID, viewId, false))).toMatchObject({
-            code: 'confirmation_required',
-            details: { class: 'confirm' },
-        });
+        expect(await refusal(service.deleteRecording(OWNER, NODE_ID, viewId, false))).toMatchObject(
+            {
+                code: 'confirmation_required',
+                details: { class: 'confirm' },
+            },
+        );
         expect(recording.remove).not.toHaveBeenCalled();
         await service.deleteRecording(OWNER, NODE_ID, viewId, true);
         expect(recording.remove).toHaveBeenCalledWith(viewId, OWNER);
         const access = (service as unknown as { access: { canAct: jest.Mock } }).access;
         access.canAct.mockImplementationOnce(async () => false);
-        expect(await refusal(service.recordings(OWNER, NODE_ID))).toMatchObject({ code: 'permission_denied' });
+        expect(await refusal(service.recordings(OWNER, NODE_ID))).toMatchObject({
+            code: 'permission_denied',
+        });
     });
 });

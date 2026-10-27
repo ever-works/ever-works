@@ -38,7 +38,9 @@ export const computerRecordingGcTask = schedules.task({
                 const svc = appContext.get(DesktopRecordingService);
                 const summary = await svc.sweepExpired();
                 if (summary.deleted > 0 || summary.failed > 0) {
-                    logger.info('computer-recording-gc pruned expired desktop recordings', { ...summary });
+                    logger.info('computer-recording-gc pruned expired desktop recordings', {
+                        ...summary,
+                    });
                 }
                 return { status: 'completed' as const, ...summary };
             },

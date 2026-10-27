@@ -627,7 +627,11 @@ export class FleetDesktopService
     }
 
     /** One recording with its chunks (never a storage key). */
-    async recordingFor(userId: string, nodeId: string, viewId: string): Promise<FleetDesktopRecordingView> {
+    async recordingFor(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+    ): Promise<FleetDesktopRecordingView> {
         const node = await this.recordingNode(userId, nodeId);
         const view = await this.requireRecording().read(viewId, node.id, node.name);
         if (!view) throw this.recordingGone();
@@ -635,7 +639,12 @@ export class FleetDesktopService
     }
 
     /** One chunk's bytes (the player paints them; served `attachment` + `nosniff`). */
-    async recordingChunk(userId: string, nodeId: string, viewId: string, seq: number): Promise<Uint8Array> {
+    async recordingChunk(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+        seq: number,
+    ): Promise<Uint8Array> {
         const node = await this.recordingNode(userId, nodeId);
         const bytes = await this.requireRecording().chunk(viewId, node.id, seq);
         if (!bytes) throw this.recordingGone();
@@ -643,7 +652,12 @@ export class FleetDesktopService
     }
 
     /** "Delete now" (class `confirm`, audited `node.desktop.recording.delete`): objects first, the row second. */
-    async deleteRecording(userId: string, nodeId: string, viewId: string, confirm: boolean): Promise<void> {
+    async deleteRecording(
+        userId: string,
+        nodeId: string,
+        viewId: string,
+        confirm: boolean,
+    ): Promise<void> {
         const node = await this.recordingNode(userId, nodeId);
         const recording = this.requireRecording();
         const view = await recording.read(viewId, node.id, node.name);
@@ -659,7 +673,10 @@ export class FleetDesktopService
             );
         }
         if (!(await recording.remove(viewId, userId))) {
-            throw fleetLinkError('operation_failed', 'the recording could not be deleted from storage — try again');
+            throw fleetLinkError(
+                'operation_failed',
+                'the recording could not be deleted from storage — try again',
+            );
         }
     }
 
@@ -675,13 +692,19 @@ export class FleetDesktopService
 
     private requireRecording(): DesktopRecordingService {
         if (!this.recording) {
-            throw fleetLinkError('unsupported_on_node', 'recordings are not available on this platform yet');
+            throw fleetLinkError(
+                'unsupported_on_node',
+                'recordings are not available on this platform yet',
+            );
         }
         return this.recording;
     }
 
     private recordingGone(): FleetLinkException {
-        return fleetLinkError('not_found', 'this recording is gone — it may have expired or been deleted');
+        return fleetLinkError(
+            'not_found',
+            'this recording is gone — it may have expired or been deleted',
+        );
     }
 
     // ─── Screenshot (the read-only Agent tool's read) ───────────────────────
@@ -844,7 +867,11 @@ export class FleetDesktopService
         if (!record) return;
         record.sockets = Math.max(0, record.sockets - 1);
         record.lastGrantAt = this.now();
-        if (record.sockets === 0 && this.recording?.isRecording(record.viewId) && !record.recordingTimer) {
+        if (
+            record.sockets === 0 &&
+            this.recording?.isRecording(record.viewId) &&
+            !record.recordingTimer
+        ) {
             record.recordingTimer = setTimeout(() => {
                 record.recordingTimer = null;
                 if (record.sockets > 0) return;
@@ -928,7 +955,8 @@ export class FleetDesktopService
         const recording = this.recording;
         if (!recording || !record.persisted || recording.isRecording(record.viewId)) return;
         try {
-            let trigger: FleetDesktopRecordingTrigger | null = mode === 'control' ? 'control' : null;
+            let trigger: FleetDesktopRecordingTrigger | null =
+                mode === 'control' ? 'control' : null;
             if (!trigger) {
                 const node = await this.nodes.findById(record.nodeId);
                 if (node?.recordWatchSessions === true) trigger = 'watch-opt-in';

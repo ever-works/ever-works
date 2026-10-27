@@ -39,7 +39,10 @@ export const FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MAX = 90;
 export function fleetDesktopRecordingRetentionDays(value: unknown): number {
 	const days = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : NaN;
 	if (!Number.isFinite(days)) return FLEET_DESKTOP_RECORDING_RETENTION_DAYS_DEFAULT;
-	return Math.min(FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MAX, Math.max(FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MIN, days));
+	return Math.min(
+		FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MAX,
+		Math.max(FLEET_DESKTOP_RECORDING_RETENTION_DAYS_MIN, days)
+	);
 }
 
 /** The nightly retention sweep (`computer-recording-gc`, 03:23 UTC — off the hour, clear of its neighbours). */

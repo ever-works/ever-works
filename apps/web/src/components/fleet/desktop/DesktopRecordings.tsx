@@ -45,19 +45,32 @@ export function DesktopRecordings({ nodeId, nodeName }: { nodeId: string; nodeNa
     if (items === null) return null;
 
     return (
-        <section className="flex flex-col gap-2 text-sm" aria-label={t('title', { name: nodeName })} data-testid="desktop-recordings">
+        <section
+            className="flex flex-col gap-2 text-sm"
+            aria-label={t('title', { name: nodeName })}
+            data-testid="desktop-recordings"
+        >
             <h3 className="font-medium">{t('title', { name: nodeName })}</h3>
             {error ? <p className="text-xs text-muted-foreground">{error}</p> : null}
-            {items.length === 0 && !error ? <p className="text-xs text-muted-foreground">{t('none')}</p> : null}
+            {items.length === 0 && !error ? (
+                <p className="text-xs text-muted-foreground">{t('none')}</p>
+            ) : null}
             <ul className="flex flex-col gap-1">
                 {items.map((item) => (
-                    <li key={item.viewId} className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1">
+                    <li
+                        key={item.viewId}
+                        className="flex flex-wrap items-center gap-2 rounded-md border border-border px-2 py-1"
+                    >
                         <span>{new Date(item.startedAt).toLocaleString()}</span>
-                        <span className="text-muted-foreground">{formatRecordingTime(item.durationMs)}</span>
+                        <span className="text-muted-foreground">
+                            {formatRecordingTime(item.durationMs)}
+                        </span>
                         <span className="text-muted-foreground">{formatFileBytes(item.bytes)}</span>
                         {item.expiresAt ? (
                             <span className="text-xs text-muted-foreground">
-                                {t('expires', { date: new Date(item.expiresAt).toLocaleDateString() })}
+                                {t('expires', {
+                                    date: new Date(item.expiresAt).toLocaleDateString(),
+                                })}
                             </span>
                         ) : null}
                         <Button
@@ -119,7 +132,10 @@ export function DesktopRecordingPlayer({
                 return;
             }
             setRecording(result.data);
-            const painter = new DesktopPainter({ canvas: () => canvasRef.current, requestKeyframe: () => undefined });
+            const painter = new DesktopPainter({
+                canvas: () => canvasRef.current,
+                requestKeyframe: () => undefined,
+            });
             const playback = new DesktopRecordingPlayback(
                 result.data.chunks ?? [],
                 (seq) => desktopClient.recordingChunk(nodeId, viewId, seq),
@@ -176,9 +192,16 @@ export function DesktopRecordingPlayer({
     if (!recording) return <p className="text-sm text-muted-foreground">{t('loading')}</p>;
 
     return (
-        <div className="flex flex-col gap-2 rounded-lg border border-border p-2" data-testid="desktop-recording-player">
+        <div
+            className="flex flex-col gap-2 rounded-lg border border-border p-2"
+            data-testid="desktop-recording-player"
+        >
             <div className="relative overflow-hidden rounded-md bg-black">
-                <canvas ref={canvasRef} className="mx-auto block h-auto max-w-full" aria-label={t('player', { name: nodeName })} />
+                <canvas
+                    ref={canvasRef}
+                    className="mx-auto block h-auto max-w-full"
+                    aria-label={t('player', { name: nodeName })}
+                />
                 <span className="pointer-events-none absolute bottom-2 right-3 text-[10px] font-semibold uppercase tracking-wide text-white/70">
                     {t('watermark', { name: nodeName })}
                 </span>
@@ -205,12 +228,26 @@ export function DesktopRecordingPlayer({
                     aria-label={playing ? t('pause') : t('play')}
                     onClick={() => setPlaying((value) => !value)}
                 >
-                    {playing ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
+                    {playing ? (
+                        <Pause className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                        <Play className="h-4 w-4" aria-hidden="true" />
+                    )}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => void seek(position - 10_000)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void seek(position - 10_000)}
+                >
                     {t('back10')}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => void seek(position - 1_000)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void seek(position - 1_000)}
+                >
                     {t('back1')}
                 </Button>
                 <input
@@ -223,10 +260,20 @@ export function DesktopRecordingPlayer({
                     onChange={(event) => void seek(Number(event.target.value))}
                     className="min-w-[8rem] flex-1"
                 />
-                <Button type="button" size="sm" variant="ghost" onClick={() => void seek(position + 1_000)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void seek(position + 1_000)}
+                >
                     {t('forward1')}
                 </Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => void seek(position + 10_000)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void seek(position + 10_000)}
+                >
                     {t('forward10')}
                 </Button>
                 <span className="text-xs tabular-nums text-muted-foreground">
@@ -239,25 +286,50 @@ export function DesktopRecordingPlayer({
                     quality: recording.quality,
                     storage: recording.storage,
                     size: formatFileBytes(recording.bytes),
-                    date: recording.expiresAt ? new Date(recording.expiresAt).toLocaleDateString() : t('never'),
+                    date: recording.expiresAt
+                        ? new Date(recording.expiresAt).toLocaleDateString()
+                        : t('never'),
                 })}
             </p>
-            {recording.spans.length > 0 ? <p className="text-xs text-muted-foreground">{t('spans')}</p> : null}
+            {recording.spans.length > 0 ? (
+                <p className="text-xs text-muted-foreground">{t('spans')}</p>
+            ) : null}
             {confirming ? (
-                <div role="alertdialog" aria-label={t('deleteTitle', { name: nodeName })} className="rounded-md border border-border p-2">
+                <div
+                    role="alertdialog"
+                    aria-label={t('deleteTitle', { name: nodeName })}
+                    className="rounded-md border border-border p-2"
+                >
                     <p className="font-medium">{t('deleteTitle', { name: nodeName })}</p>
                     <p className="text-xs text-muted-foreground">{t('deleteBody')}</p>
                     <div className="mt-2 flex gap-2">
-                        <Button type="button" size="sm" variant="danger" disabled={busy} onClick={() => void remove()}>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="danger"
+                            disabled={busy}
+                            onClick={() => void remove()}
+                        >
                             {t('deleteYes')}
                         </Button>
-                        <Button type="button" size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setConfirming(false)}
+                        >
                             {t('deleteNo')}
                         </Button>
                     </div>
                 </div>
             ) : (
-                <Button type="button" size="sm" variant="ghost" className="self-start" onClick={() => setConfirming(true)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="self-start"
+                    onClick={() => setConfirming(true)}
+                >
                     <Trash2 className="mr-1 h-4 w-4" aria-hidden="true" />
                     {t('delete')}
                 </Button>

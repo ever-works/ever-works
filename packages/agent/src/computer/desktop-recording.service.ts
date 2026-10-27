@@ -123,7 +123,9 @@ export class DesktopRecordingService implements OnApplicationShutdown {
         private readonly sessions: ComputerSessionRepository,
         private readonly nodes: FleetNodeRepository,
         @Optional() private readonly audit?: FleetAuditService,
-        @Optional() @Inject(DESKTOP_RECORDING_STORAGE) private readonly storage?: DesktopRecordingStoragePort | null,
+        @Optional()
+        @Inject(DESKTOP_RECORDING_STORAGE)
+        private readonly storage?: DesktopRecordingStoragePort | null,
     ) {}
 
     /** The wall clock (a method, so a spec can move it). */
@@ -196,12 +198,18 @@ export class DesktopRecordingService implements OnApplicationShutdown {
             flushing: Promise.resolve(),
             stopped: false,
         };
-        if (now - live.startedAtMs >= FLEET_DESKTOP_RECORDING_MAX_MS || storedBytes >= FLEET_DESKTOP_RECORDING_MAX_BYTES) {
+        if (
+            now - live.startedAtMs >= FLEET_DESKTOP_RECORDING_MAX_MS ||
+            storedBytes >= FLEET_DESKTOP_RECORDING_MAX_BYTES
+        ) {
             return false;
         }
         this.live.set(input.viewId, live);
         this.failures.delete(input.viewId);
-        await this.recordAudit('node.desktop.recording.start', live, { outcome: 'started', trigger: input.trigger });
+        await this.recordAudit('node.desktop.recording.start', live, {
+            outcome: 'started',
+            trigger: input.trigger,
+        });
         return true;
     }
 
@@ -231,12 +239,18 @@ export class DesktopRecordingService implements OnApplicationShutdown {
         } else {
             return;
         }
-        if (live.storedBytes + live.bufferedBytes + payload.byteLength + 9 > FLEET_DESKTOP_RECORDING_MAX_BYTES) {
+        if (
+            live.storedBytes + live.bufferedBytes + payload.byteLength + 9 >
+            FLEET_DESKTOP_RECORDING_MAX_BYTES
+        ) {
             void this.stop(viewId, 'size-cap');
             return;
         }
         // A minute of pictures is one chunk: this picture starts the next one.
-        if (live.entries.length > 0 && now - live.chunkStartMs >= FLEET_DESKTOP_RECORDING_CHUNK_MS) {
+        if (
+            live.entries.length > 0 &&
+            now - live.chunkStartMs >= FLEET_DESKTOP_RECORDING_CHUNK_MS
+        ) {
             this.queueFlush(live);
         }
         if (live.entries.length === 0) live.chunkStartMs = now;
@@ -296,9 +310,14 @@ export class DesktopRecordingService implements OnApplicationShutdown {
     }
 
     /** One recording with its chunk list (keys never leave the platform). */
-    async read(viewId: string, nodeId: string, nodeName: string): Promise<FleetDesktopRecordingView | null> {
+    async read(
+        viewId: string,
+        nodeId: string,
+        nodeName: string,
+    ): Promise<FleetDesktopRecordingView | null> {
         const row = await this.sessions.findById(viewId);
-        if (!row || row.nodeId !== nodeId || row.source !== 'desktop' || !row.recordingRef) return null;
+        if (!row || row.nodeId !== nodeId || row.source !== 'desktop' || !row.recordingRef)
+            return null;
         const index = await this.readIndex(row.recordingRef);
         return this.viewOf(row, nodeName, index);
     }
@@ -306,7 +325,14 @@ export class DesktopRecordingService implements OnApplicationShutdown {
     /** One chunk's bytes, or null. */
     async chunk(viewId: string, nodeId: string, seq: number): Promise<Uint8Array | null> {
         const row = await this.sessions.findById(viewId);
-        if (!row || row.nodeId !== nodeId || row.source !== 'desktop' || !row.recordingRef || !this.storage) return null;
+        if (
+            !row ||
+            row.nodeId !== nodeId ||
+            row.source !== 'desktop' ||
+            !row.recordingRef ||
+            !this.storage
+        )
+            return null;
         const index = await this.readIndex(row.recordingRef);
         const entry = index?.chunks.find((chunk) => chunk.seq === seq);
         if (!entry) return null;
@@ -359,7 +385,10 @@ export class DesktopRecordingService implements OnApplicationShutdown {
      * is deleted on read. Returns what it did.
      */
     async sweepExpired(): Promise<{ deleted: number; failed: number }> {
-        const rows = await this.sessions.findExpiredDesktopRecordings(new Date(this.now()), DESKTOP_RECORDING_SWEEP_BATCH);
+        const rows = await this.sessions.findExpiredDesktopRecordings(
+            new Date(this.now()),
+            DESKTOP_RECORDING_SWEEP_BATCH,
+        );
         let deleted = 0;
         let failed = 0;
         for (const row of rows) {
@@ -423,7 +452,8 @@ export class DesktopRecordingService implements OnApplicationShutdown {
                 recordingDurationMs: Math.max(0, endMs),
                 recorded: true,
             });
-            if (previous && previous !== written.key) await storage.deleteObject(previous).catch(() => undefined);
+            if (previous && previous !== written.key)
+                await storage.deleteObject(previous).catch(() => undefined);
         } catch (error) {
             await this.failed(live, message(error));
         }
@@ -451,7 +481,9 @@ export class DesktopRecordingService implements OnApplicationShutdown {
     }
 
     private async markSkipped(viewId: string, reason: string): Promise<void> {
-        await this.sessions.setRecording(viewId, { recordingSkippedReason: reason }).catch(() => undefined);
+        await this.sessions
+            .setRecording(viewId, { recordingSkippedReason: reason })
+            .catch(() => undefined);
     }
 
     private async readIndex(key: string): Promise<RecordingIndex | null> {
@@ -459,7 +491,11 @@ export class DesktopRecordingService implements OnApplicationShutdown {
         try {
             const { buffer } = await this.storage.getObject(key);
             const value = JSON.parse(buffer.toString('utf8')) as Partial<RecordingIndex>;
-            if (value?.schemaVersion !== 1 || !Array.isArray(value.chunks) || typeof value.startedAt !== 'string') {
+            if (
+                value?.schemaVersion !== 1 ||
+                !Array.isArray(value.chunks) ||
+                typeof value.startedAt !== 'string'
+            ) {
                 return null;
             }
             const chunks = value.chunks.filter(
@@ -497,8 +533,14 @@ export class DesktopRecordingService implements OnApplicationShutdown {
         }
     }
 
-    private viewOf(row: ComputerSession, nodeName: string, index: RecordingIndex | null): FleetDesktopRecordingView {
-        const startedAtMs = index ? Date.parse(index.startedAt) : new Date(row.startedAt ?? row.createdAt).getTime();
+    private viewOf(
+        row: ComputerSession,
+        nodeName: string,
+        index: RecordingIndex | null,
+    ): FleetDesktopRecordingView {
+        const startedAtMs = index
+            ? Date.parse(index.startedAt)
+            : new Date(row.startedAt ?? row.createdAt).getTime();
         const view: FleetDesktopRecordingView = {
             viewId: row.id,
             nodeId: row.nodeId,
@@ -508,12 +550,18 @@ export class DesktopRecordingService implements OnApplicationShutdown {
             quality: row.quality,
             openedByUserId: row.openedByUserId,
             trigger: index?.trigger ?? 'control',
-            startedAt: new Date(Number.isFinite(startedAtMs) ? startedAtMs : Date.now()).toISOString(),
+            startedAt: new Date(
+                Number.isFinite(startedAtMs) ? startedAtMs : Date.now(),
+            ).toISOString(),
             endedAt: row.endedAt ? new Date(row.endedAt).toISOString() : null,
             durationMs: Number(row.recordingDurationMs ?? 0) || 0,
             bytes: Number(row.recordingBytes ?? 0) || 0,
-            expiresAt: row.recordingExpiresAt ? new Date(row.recordingExpiresAt).toISOString() : null,
-            stoppedReason: isFleetDesktopRecordingStopReason(row.recordingStoppedReason) ? row.recordingStoppedReason : null,
+            expiresAt: row.recordingExpiresAt
+                ? new Date(row.recordingExpiresAt).toISOString()
+                : null,
+            stoppedReason: isFleetDesktopRecordingStopReason(row.recordingStoppedReason)
+                ? row.recordingStoppedReason
+                : null,
             storage: this.storage?.providerName ?? 'none',
             spans: (row.controlSpans ?? []).map((span) => ({
                 userId: span.userId,

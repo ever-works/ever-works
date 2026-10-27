@@ -287,7 +287,10 @@ export class FleetDesktopController {
     // ─── Recordings (P2.C) ─────────────────────────────────────────────────
 
     @Get('nodes/:id/desktop/recordings')
-    @ApiOperation({ summary: "This computer's desktop recordings (people in its desktop audience): when, how long, how big, until when." })
+    @ApiOperation({
+        summary:
+            "This computer's desktop recordings (people in its desktop audience): when, how long, how big, until when.",
+    })
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     recordings(
         @CurrentUser() auth: AuthenticatedUser,
@@ -297,7 +300,9 @@ export class FleetDesktopController {
     }
 
     @Get('nodes/:id/desktop/recordings/:viewId')
-    @ApiOperation({ summary: 'One desktop recording with its chunks and control spans (for the player).' })
+    @ApiOperation({
+        summary: 'One desktop recording with its chunks and control spans (for the player).',
+    })
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     recording(
         @CurrentUser() auth: AuthenticatedUser,
@@ -308,7 +313,9 @@ export class FleetDesktopController {
     }
 
     @Get('nodes/:id/desktop/recordings/:viewId/chunks/:seq')
-    @ApiOperation({ summary: 'One chunk of a desktop recording (an EWR1 container the player paints).' })
+    @ApiOperation({
+        summary: 'One chunk of a desktop recording (an EWR1 container the player paints).',
+    })
     @Header('X-Content-Type-Options', 'nosniff')
     @Header('Cache-Control', 'private, no-store')
     @Throttle({ long: { limit: 600, ttl: 60_000 } })
@@ -327,7 +334,10 @@ export class FleetDesktopController {
     }
 
     @Delete('nodes/:id/desktop/recordings/:viewId')
-    @ApiOperation({ summary: 'Delete a desktop recording now (confirm: true; audited). It cannot be brought back.' })
+    @ApiOperation({
+        summary:
+            'Delete a desktop recording now (confirm: true; audited). It cannot be brought back.',
+    })
     @HttpCode(HttpStatus.NO_CONTENT)
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
     deleteRecording(

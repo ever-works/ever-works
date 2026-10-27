@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { encodeComputerFrame, encodeDesktopRecordingChunk, encodeDesktopTiles } from '@ever-works/contracts';
+import {
+    encodeComputerFrame,
+    encodeDesktopRecordingChunk,
+    encodeDesktopTiles,
+} from '@ever-works/contracts';
 import {
     DesktopRecordingPlayback,
     eventsToShow,
@@ -27,7 +31,11 @@ function frame(width = 64): Uint8Array {
 }
 
 function tiles(): Uint8Array {
-    return encodeDesktopTiles({ width: 64, height: 64, tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg }] })!;
+    return encodeDesktopTiles({
+        width: 64,
+        height: 64,
+        tiles: [{ x: 0, y: 0, w: 64, h: 64, data: jpeg }],
+    })!;
 }
 
 function chunk(entries: Array<[number, 20 | 23]>): Uint8Array {
@@ -51,7 +59,12 @@ function canvas() {
 
 describe('recording events', () => {
     it('decodes keyframes and tiles, skipping what does not read', () => {
-        const events = recordingEventsOf(chunk([[0, 20], [500, 23]]));
+        const events = recordingEventsOf(
+            chunk([
+                [0, 20],
+                [500, 23],
+            ]),
+        );
         expect(events.map((event) => [event.tMs, event.kind])).toEqual([
             [0, 'frame'],
             [500, 'tiles'],
@@ -60,7 +73,15 @@ describe('recording events', () => {
     });
 
     it('shows a time from the keyframe at or before it', () => {
-        const events = recordingEventsOf(chunk([[0, 20], [400, 23], [1_000, 20], [1_200, 23], [1_600, 23]]));
+        const events = recordingEventsOf(
+            chunk([
+                [0, 20],
+                [400, 23],
+                [1_000, 20],
+                [1_200, 23],
+                [1_600, 23],
+            ]),
+        );
         expect(eventsToShow(events, 1_300).map((event) => event.tMs)).toEqual([1_000, 1_200]);
         expect(eventsToShow(events, 999).map((event) => event.tMs)).toEqual([0, 400]);
         expect(eventsToShow(events, -1)).toEqual([]);
@@ -75,7 +96,16 @@ describe('recording events', () => {
 describe('DesktopRecordingPlayback', () => {
     it('fetches chunks only as far as playback needs, then plays forward', async () => {
         const fetched: number[] = [];
-        const chunks = [chunk([[0, 20], [30_000, 23]]), chunk([[60_000, 20], [61_000, 23]])];
+        const chunks = [
+            chunk([
+                [0, 20],
+                [30_000, 23],
+            ]),
+            chunk([
+                [60_000, 20],
+                [61_000, 23],
+            ]),
+        ];
         const target = canvas();
         const playback = new DesktopRecordingPlayback(
             [
@@ -101,7 +131,12 @@ describe('DesktopRecordingPlayback', () => {
         const target = canvas();
         const playback = new DesktopRecordingPlayback(
             [{ seq: 0, startMs: 0, endMs: 2_000, bytes: 1 }],
-            async () => chunk([[0, 20], [500, 23], [2_000, 20]]),
+            async () =>
+                chunk([
+                    [0, 20],
+                    [500, 23],
+                    [2_000, 20],
+                ]),
             target,
         );
         await playback.seek(2_000);
