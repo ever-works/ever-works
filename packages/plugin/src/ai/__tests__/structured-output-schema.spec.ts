@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
+import { toJsonSchema } from '@langchain/core/utils/json_schema';
 import { AiOperations } from '../ai-operations';
 import {
 	findOptionalWithoutNullable,
@@ -12,9 +13,10 @@ import {
  *
  * Under zod 3 the zod schema went to LangChain, and OpenAI's zod-3 helper both
  * converted it and refused `.optional()`-without-`.nullable()` properties before
- * any request. On zod 4 our pinned LangChain loses every `.describe()` and strips
+ * any request. On zod 4, LangChain 0.3 / 0.6 lost every `.describe()` and stripped
  * `.transform()`s from the caller's schema in place, so `askJson` converts the
- * schema itself. These tests pin the zod-3 behaviour that conversion must keep.
+ * schema itself (and still does on LangChain 1.x). These tests pin the zod-3
+ * behaviour that conversion must keep.
  */
 
 describe('findOptionalWithoutNullable — same verdicts as the zod-3 helper', () => {
@@ -68,7 +70,7 @@ describe('findOptionalWithoutNullable — same verdicts as the zod-3 helper', ()
 	});
 });
 
-describe('usesJsonSchemaResponseFormat — mirrors @langchain/openai 0.6 method selection', () => {
+describe('usesJsonSchemaResponseFormat — mirrors @langchain/openai method selection', () => {
 	it.each([
 		['gpt-4o-mini', true],
 		['claude-sonnet-4', true],
@@ -120,6 +122,15 @@ describe('toStructuredOutputJsonSchema', () => {
 		const withTransform = z.object({ a: z.string().transform((s) => s.length) });
 		toStructuredOutputJsonSchema(withTransform, true);
 		expect(withTransform.parse({ a: 'xyz' })).toEqual({ a: 3 });
+	});
+
+	it('is plain JSON Schema that LangChain sends as is', () => {
+		// zod 4.6 puts a hidden `~standard` back-reference on `toJSONSchema`'s root.
+		// LangChain 1.x converts anything carrying it again, from zod, which undoes
+		// the normalization above. The result must not carry it.
+		const json = toStructuredOutputJsonSchema(schema, true);
+		expect(Object.getOwnPropertyNames(json)).not.toContain('~standard');
+		expect(toJsonSchema(json)).toBe(json);
 	});
 });
 
@@ -189,6 +200,9 @@ describe('AiOperations.askJson structured output (zod 4)', () => {
 		expect(format?.json_schema?.strict).toBe(true);
 		expect(format?.json_schema?.name).toBe('extract');
 		expect(format?.json_schema?.schema.properties.name.description).toBe('The canonical name');
+		// OpenAI strict mode rejects an object that is not closed.
+		expect(format?.json_schema?.schema.additionalProperties).toBe(false);
+		expect(format?.json_schema?.schema.$schema).toBeUndefined();
 		// The caller's schema keeps its transform after the call.
 		expect(schema.parse({ name: 'x', size: 'xy' })).toEqual({ name: 'x', size: 2, kind: 'tool' });
 	});

@@ -111,8 +111,8 @@ packages/plugins/my-ai/
 	},
 	"dependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"@langchain/openai": "^0.6.17",
-		"@langchain/core": "^0.3.80"
+		"@langchain/openai": "^1.7.1",
+		"@langchain/core": "^1.3.0"
 	},
 	"devDependencies": {
 		"tsup": "^8.0.0",

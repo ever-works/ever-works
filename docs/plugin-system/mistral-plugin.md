@@ -215,8 +215,8 @@ To verify actual API connectivity, use `isAvailable()` with a valid API key, whi
 | Package              | Version   | Purpose                              |
 | -------------------- | --------- | ------------------------------------ |
 | `@ever-works/plugin` | workspace | Plugin contracts and base classes    |
-| `@langchain/openai`  | ^0.6.17   | LangChain OpenAI-compatible provider |
-| `@langchain/core`    | ^0.3.80   | LangChain core abstractions          |
+| `@langchain/openai`  | ^1.7.1    | LangChain OpenAI-compatible provider |
+| `@langchain/core`    | ^1.3.0    | LangChain core abstractions          |
 
 ## Getting Started
 
