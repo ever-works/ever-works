@@ -150,8 +150,16 @@ pub fn is_blocked(code: &str, modifiers: u32) -> bool {
 }
 
 /// Picture pixels → the display's injection space (FR-38). None for a nonsense picture size.
-pub fn map_point(rect: DisplayRect, x: f64, y: f64, picture_width: f64, picture_height: f64) -> Option<(f64, f64)> {
-    if !(picture_width >= 1.0 && picture_height >= 1.0) || !x.is_finite() || !y.is_finite() {
+pub fn map_point(
+    rect: DisplayRect,
+    x: f64,
+    y: f64,
+    picture_width: f64,
+    picture_height: f64,
+) -> Option<(f64, f64)> {
+    // Written so a NaN anywhere refuses the point (`NaN >= 1.0` is false).
+    let usable = picture_width >= 1.0 && picture_height >= 1.0 && x.is_finite() && y.is_finite();
+    if !usable {
         return None;
     }
     let px = x.clamp(0.0, picture_width - 1.0) / picture_width;
@@ -184,10 +192,24 @@ fn button_of(name: Option<&str>) -> Option<Button> {
 }
 
 impl InputState {
-    pub fn apply(&mut self, injector: &mut dyn Injector, rect: DisplayRect, frame: &InputFrame) -> InputOutcome {
+    pub fn apply(
+        &mut self,
+        injector: &mut dyn Injector,
+        rect: DisplayRect,
+        frame: &InputFrame,
+    ) -> InputOutcome {
         let result = match frame {
-            InputFrame::Pointer { action, x, y, button, picture_width, picture_height, .. } => {
-                let Some((dx, dy)) = map_point(rect, *x, *y, *picture_width, *picture_height) else {
+            InputFrame::Pointer {
+                action,
+                x,
+                y,
+                button,
+                picture_width,
+                picture_height,
+                ..
+            } => {
+                let Some((dx, dy)) = map_point(rect, *x, *y, *picture_width, *picture_height)
+                else {
                     return InputOutcome::Refused("picture size".into());
                 };
                 let moved = injector.move_to(dx, dy);
@@ -204,14 +226,29 @@ impl InputState {
                     _ => Err("pointer action".into()),
                 }
             }
-            InputFrame::Scroll { x, y, dx, dy, picture_width, picture_height } => {
-                let Some((px, py)) = map_point(rect, *x, *y, *picture_width, *picture_height) else {
+            InputFrame::Scroll {
+                x,
+                y,
+                dx,
+                dy,
+                picture_width,
+                picture_height,
+            } => {
+                let Some((px, py)) = map_point(rect, *x, *y, *picture_width, *picture_height)
+                else {
                     return InputOutcome::Refused("picture size".into());
                 };
                 let clamp = |v: f64| v.clamp(-10_000.0, 10_000.0).round() as i32;
-                injector.move_to(px, py).and_then(|_| injector.scroll(clamp(*dx), clamp(*dy)))
+                injector
+                    .move_to(px, py)
+                    .and_then(|_| injector.scroll(clamp(*dx), clamp(*dy)))
             }
-            InputFrame::Key { action, code, modifiers, .. } => {
+            InputFrame::Key {
+                action,
+                code,
+                modifiers,
+                ..
+            } => {
                 // FR-37: the declared bits are never trusted alone — a shortcut split across
                 // presses (Ctrl down, then V with no declared modifier) is refused too.
                 if is_blocked(code, *modifiers | self.held_modifiers()) {
@@ -247,7 +284,10 @@ impl InputState {
 
     /// The modifier bits of the keys this helper is holding down for the controller.
     fn held_modifiers(&self) -> u32 {
-        self.keys.iter().map(|code| modifier_of(code)).fold(0, |bits, bit| bits | bit)
+        self.keys
+            .iter()
+            .map(|code| modifier_of(code))
+            .fold(0, |bits, bit| bits | bit)
     }
 
     /// Release every key and button pressed on the controller's behalf (FR-39). Never fails half-way.
@@ -281,7 +321,8 @@ mod tests {
             Ok(())
         }
         fn button(&mut self, button: Button, down: bool) -> Result<(), String> {
-            self.events.push(format!("{button:?} {}", if down { "down" } else { "up" }));
+            self.events
+                .push(format!("{button:?} {}", if down { "down" } else { "up" }));
             Ok(())
         }
         fn scroll(&mut self, dx: i32, dy: i32) -> Result<(), String> {
@@ -289,7 +330,8 @@ mod tests {
             Ok(())
         }
         fn key(&mut self, code: &str, down: bool) -> Result<(), String> {
-            self.events.push(format!("{code} {}", if down { "down" } else { "up" }));
+            self.events
+                .push(format!("{code} {}", if down { "down" } else { "up" }));
             Ok(())
         }
         fn text(&mut self, text: &str) -> Result<(), String> {
@@ -298,7 +340,12 @@ mod tests {
         }
     }
 
-    const RETINA: DisplayRect = DisplayRect { x: 0.0, y: 0.0, width: 1512.0, height: 982.0 };
+    const RETINA: DisplayRect = DisplayRect {
+        x: 0.0,
+        y: 0.0,
+        width: 1512.0,
+        height: 982.0,
+    };
 
     fn frame(json: &str) -> InputFrame {
         serde_json::from_str(json).unwrap()
@@ -307,10 +354,24 @@ mod tests {
     #[test]
     fn maps_picture_pixels_onto_the_display() {
         // A 1280-wide picture of a 1512-point display: the middle stays the middle.
-        assert_eq!(map_point(RETINA, 640.0, 415.5, 1280.0, 831.0), Some((756.0, 491.0)));
-        let second = DisplayRect { x: 1920.0, y: 0.0, width: 2560.0, height: 1440.0 };
-        assert_eq!(map_point(second, 0.0, 0.0, 1280.0, 720.0), Some((1920.0, 0.0)));
-        assert_eq!(map_point(second, 5000.0, -3.0, 1280.0, 720.0).map(|(x, _)| x < 1920.0 + 2560.0), Some(true));
+        assert_eq!(
+            map_point(RETINA, 640.0, 415.5, 1280.0, 831.0),
+            Some((756.0, 491.0))
+        );
+        let second = DisplayRect {
+            x: 1920.0,
+            y: 0.0,
+            width: 2560.0,
+            height: 1440.0,
+        };
+        assert_eq!(
+            map_point(second, 0.0, 0.0, 1280.0, 720.0),
+            Some((1920.0, 0.0))
+        );
+        assert_eq!(
+            map_point(second, 5000.0, -3.0, 1280.0, 720.0).map(|(x, _)| x < 1920.0 + 2560.0),
+            Some(true)
+        );
         assert_eq!(map_point(second, 1.0, 1.0, 0.0, 720.0), None);
     }
 
@@ -319,12 +380,22 @@ mod tests {
         let mut state = InputState::default();
         let mut recorder = Recorder::default();
         let copy = frame(r#"{"kind":"key","action":"down","code":"KeyC","key":"c","modifiers":2}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &copy), InputOutcome::Blocked);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &copy),
+            InputOutcome::Blocked
+        );
         let super_key = frame(r#"{"kind":"key","action":"down","code":"MetaLeft","modifiers":0}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &super_key), InputOutcome::Blocked);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &super_key),
+            InputOutcome::Blocked
+        );
         assert!(recorder.events.is_empty());
-        let plain = frame(r#"{"kind":"key","action":"down","code":"KeyC","key":"c","modifiers":0}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &plain), InputOutcome::Injected);
+        let plain =
+            frame(r#"{"kind":"key","action":"down","code":"KeyC","key":"c","modifiers":0}"#);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &plain),
+            InputOutcome::Injected
+        );
     }
 
     #[test]
@@ -332,14 +403,29 @@ mod tests {
         let mut state = InputState::default();
         let mut recorder = Recorder::default();
         let ctrl = frame(r#"{"kind":"key","action":"down","code":"ControlLeft","modifiers":0}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &ctrl), InputOutcome::Injected);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &ctrl),
+            InputOutcome::Injected
+        );
         let paste = frame(r#"{"kind":"key","action":"down","code":"KeyV","modifiers":0}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &paste), InputOutcome::Blocked);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &paste),
+            InputOutcome::Blocked
+        );
         let tab = frame(r#"{"kind":"text","text":"\t"}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &tab), InputOutcome::Blocked);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &tab),
+            InputOutcome::Blocked
+        );
         let up = frame(r#"{"kind":"key","action":"up","code":"ControlLeft","modifiers":0}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &up), InputOutcome::Injected);
-        assert_eq!(state.apply(&mut recorder, RETINA, &paste), InputOutcome::Injected);
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &up),
+            InputOutcome::Injected
+        );
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &paste),
+            InputOutcome::Injected
+        );
         assert_eq!(modifier_of("ShiftRight"), MOD_SHIFT);
     }
 
@@ -352,7 +438,10 @@ mod tests {
             r#"{"kind":"key","action":"down","code":"KeyA","modifiers":8}"#,
             r#"{"kind":"pointer","action":"down","x":10,"y":10,"button":"left","pictureWidth":100,"pictureHeight":100}"#,
         ] {
-            assert_eq!(state.apply(&mut recorder, RETINA, &frame(json)), InputOutcome::Injected);
+            assert_eq!(
+                state.apply(&mut recorder, RETINA, &frame(json)),
+                InputOutcome::Injected
+            );
         }
         assert_eq!(state.pressed(), 3);
         recorder.events.clear();
@@ -367,8 +456,13 @@ mod tests {
     fn scroll_moves_then_wheels_with_clamped_deltas() {
         let mut state = InputState::default();
         let mut recorder = Recorder::default();
-        let wheel = frame(r#"{"kind":"scroll","x":50,"y":50,"dx":0,"dy":99999,"pictureWidth":100,"pictureHeight":100}"#);
-        assert_eq!(state.apply(&mut recorder, RETINA, &wheel), InputOutcome::Injected);
+        let wheel = frame(
+            r#"{"kind":"scroll","x":50,"y":50,"dx":0,"dy":99999,"pictureWidth":100,"pictureHeight":100}"#,
+        );
+        assert_eq!(
+            state.apply(&mut recorder, RETINA, &wheel),
+            InputOutcome::Injected
+        );
         assert_eq!(recorder.events.last().unwrap(), "scroll 0,10000");
     }
 

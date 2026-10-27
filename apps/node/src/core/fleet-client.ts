@@ -151,7 +151,12 @@ export function normalizeApiUrl(raw: string): string {
 }
 
 export function joinUrl(base: string, path: string): string {
-	return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+	// Index scans, not `/\/+$/` (polynomial on many inner slashes, CodeQL js/polynomial-redos).
+	let end = base.length;
+	while (end > 0 && base[end - 1] === '/') end -= 1;
+	let start = 0;
+	while (start < path.length && path[start] === '/') start += 1;
+	return `${base.slice(0, end)}/${path.slice(start)}`;
 }
 
 /** Local pre-flight so an obviously malformed credential never leaves the machine. */

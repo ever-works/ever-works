@@ -47,8 +47,10 @@ import {
 	verifyHelper,
 	type HelperFs,
 	type HelperPaths,
+	type HelperSignatureChecker,
 	type HelperVerification
 } from './helper/helper-trust';
+import type { HelperSignatureCheck } from './helper/helper-signature';
 
 /**
  * Desktop view & control (FL-07, plan §6.1) — the node's host for the native
@@ -84,6 +86,9 @@ export const HELPER_START_TIMEOUT_MS = 5_000;
 export const HELPER_PROBE_EVERY_MS = 5 * 60_000;
 /** While a stream runs, the admission record is re-read this often (FR-19: revoke stops it within 2 s). */
 export const HELPER_POLICY_WATCH_MS = 1_000;
+
+/** P3: a good signature check of the same bytes stands this long for heartbeats (never for a start). */
+export const HELPER_SIGNATURE_MEMO_MS = 10 * 60_000;
 /** Unexpected helper exits tolerated per window before opens are refused for the rest of it. */
 export const HELPER_CRASH_LIMIT = 3;
 export const HELPER_CRASH_WINDOW_MS = 60_000;
@@ -157,6 +162,10 @@ export interface DesktopHelperHostOptions {
 	now?: () => number;
 	/** Most streams at once (default: the per-computer view cap). */
 	maxStreams?: number;
+	/** P3: verifies a `signed` admission by its OS signature (absent: a signed record is untrusted). */
+	checkSignature?: HelperSignatureChecker;
+	/** P3: this node version publishes a signed build for this machine (the helper note offers it). */
+	signedAvailable?: boolean;
 }
 
 interface Waiter<T> {
@@ -177,6 +186,8 @@ export class DesktopHelperHost {
 	/** P2: the owner's on-machine permission for control, for the current admission (re-read with it). */
 	private controlAllowed = false;
 	private readonly now: () => number;
+	/** P3: the last good signature check of these exact bytes (heartbeats only — a start always checks afresh). */
+	private signatureMemo: { key: string; at: number; check: HelperSignatureCheck } | null = null;
 
 	constructor(private readonly options: DesktopHelperHostOptions) {
 		this.now = options.now ?? (() => Date.now());
@@ -185,14 +196,21 @@ export class DesktopHelperHost {
 	/** Re-verify the helper and, when admitted and stale, re-probe its facts. Never throws. */
 	async refresh(): Promise<void> {
 		try {
-			const verification = await verifyHelper(this.options.fs, this.options.paths, this.now);
+			// A probe STARTS the helper: that beat checks the signature afresh, like any start (FR-14).
+			const probeDue = this.streams.size === 0 && this.now() - this.lastProbeAt >= HELPER_PROBE_EVERY_MS;
+			const verification = await verifyHelper(
+				this.options.fs,
+				this.options.paths,
+				this.now,
+				probeDue ? this.options.checkSignature : this.heartbeatChecker()
+			);
 			await this.noteVerification(verification);
 			await this.readControl(verification.ok ? verification.record : null);
 			if (!verification.ok) {
 				this.hello = null;
 				return;
 			}
-			if (this.streams.size === 0 && this.now() - this.lastProbeAt >= HELPER_PROBE_EVERY_MS) {
+			if (probeDue) {
 				await this.probe(verification);
 			}
 		} catch (error) {
@@ -260,6 +278,7 @@ export class DesktopHelperHost {
 				verifiedAt: verification?.ok ? verification.verifiedAt : null,
 				published: record ? record.published : null,
 				control: verification?.ok && this.controlAllowed ? 'allowed' : 'not-allowed',
+				...(this.options.signedAvailable === true && trust !== 'signed' ? { signedAvailable: true } : {}),
 				inputReasons: [...(this.hello?.inputReasons ?? [])]
 			},
 			displays: this.hello?.displays ?? [],
@@ -284,7 +303,12 @@ export class DesktopHelperHost {
 		this.crashes = this.crashes.filter((at) => nowMs - at < HELPER_CRASH_WINDOW_MS);
 		if (this.crashes.length >= HELPER_CRASH_LIMIT) return { ok: false, refusal: { kind: 'crashing' } };
 		// FR-14: verified immediately before this start, every time.
-		const verification = await verifyHelper(this.options.fs, this.options.paths, this.now);
+		const verification = await verifyHelper(
+			this.options.fs,
+			this.options.paths,
+			this.now,
+			this.options.checkSignature
+		);
 		await this.noteVerification(verification);
 		if (!verification.ok) return { ok: false, refusal: { kind: 'reason', reason: verification.reason } };
 		if (request.controlling) {
@@ -378,6 +402,33 @@ export class DesktopHelperHost {
 		if (this.watchTimer) return;
 		this.watchTimer = setInterval(() => void this.watchPolicy(), HELPER_POLICY_WATCH_MS);
 		this.watchTimer.unref?.();
+	}
+
+	/**
+	 * P3: the signature check for a heartbeat's re-verification — the OS tool
+	 * (a PowerShell or two `codesign` runs) at most every
+	 * {@link HELPER_SIGNATURE_MEMO_MS} for the same bytes and signer. A start
+	 * never uses it: it checks afresh (FR-14).
+	 */
+	private heartbeatChecker(): HelperSignatureChecker | undefined {
+		const check = this.options.checkSignature;
+		if (!check) return undefined;
+		return async (path, expectedSigner, sha256) => {
+			const key = sha256 ? `${path}|${expectedSigner}|${sha256}` : null;
+			const memo = this.signatureMemo;
+			if (key && memo && memo.key === key && this.now() - memo.at < HELPER_SIGNATURE_MEMO_MS) return memo.check;
+			const result = await check(path, expectedSigner, sha256);
+			// Remembered only when the bytes the OS judged are still the bytes hashed before it.
+			let unchanged = false;
+			if (key && result.ok) {
+				unchanged = await this.options.fs.sha256(path).then(
+					(after) => after === sha256,
+					() => false
+				);
+			}
+			this.signatureMemo = key && result.ok && unchanged ? { key, at: this.now(), check: result } : null;
+			return result;
+		};
 	}
 
 	/** FR-19: the record gone or replaced ends every stream at once; control withdrawn ends every control. */

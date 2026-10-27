@@ -1,4 +1,7 @@
 import type { FleetJobKind } from '@ever-works/contracts';
+import { fleetHelperTarget } from '@ever-works/contracts';
+import { BAKED_HELPER_MANIFEST } from './screen/helper/helper-manifest';
+import { nodeHelperSignatureChecker } from './screen/helper/helper-signature';
 import { describeApiBase, resolveApiBase } from './api-base';
 import { PlatformAuthClient, type SignInWithEverIdOptions } from './auth-client';
 import {
@@ -1226,7 +1229,17 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					platform: io.environment.platform,
 					env: options.env ?? process.env,
 					...(options.screenHelperSpawner ? { spawner: options.screenHelperSpawner } : {}),
-					logger: io.logger
+					logger: io.logger,
+					// P3 (T-43): a `signed` admission is verified by its OS signature, for the signer this version publishes.
+					...signatureCheckerOption(
+						nodeHelperSignatureChecker(
+							io.runner,
+							io.environment.platform,
+							io.environment.arch,
+							BAKED_HELPER_MANIFEST
+						)
+					),
+					signedAvailable: bakedSignedHelperAvailable(io.environment.platform, io.environment.arch)
 				})
 			: null;
 	if (desktopHelper) void desktopHelper.refresh();
@@ -2329,4 +2342,15 @@ export function installShutdownHandlers(signals: SignalSource, shutdown: () => P
 	};
 	signals.on('SIGINT', handler);
 	signals.on('SIGTERM', handler);
+}
+
+/** FL-07 P3: the host option for a signature checker, present only when the OS has one. */
+function signatureCheckerOption<T>(checker: T | undefined): { checkSignature?: T } {
+	return checker ? { checkSignature: checker } : {};
+}
+
+/** FL-07 P3 (T-44): does this node version publish a SIGNED screen helper for this machine? */
+function bakedSignedHelperAvailable(platform: string, arch: string): boolean {
+	const target = fleetHelperTarget(platform, arch);
+	return Boolean(target && BAKED_HELPER_MANIFEST.targets[target]?.signer);
 }

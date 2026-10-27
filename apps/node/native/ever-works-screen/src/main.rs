@@ -41,10 +41,10 @@ use std::time::{Duration, Instant};
 use serde_json::{Value, json};
 
 use capture::{Capturer, Display};
-use input::{InputFrame, InputOutcome, InputState, Injector};
+use input::{Injector, InputFrame, InputOutcome, InputState};
 use protocol::{
-    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED, MSG_TILES,
-    PROTOCOL_VERSION, StartRequest, StreamSettings,
+    Command, MSG_DISPLAYS, MSG_ERROR, MSG_FRAME, MSG_HELLO, MSG_INPUT_RESULT, MSG_STARTED,
+    MSG_TILES, PROTOCOL_VERSION, StartRequest, StreamSettings,
 };
 use tiles::RgbFrame;
 
@@ -227,10 +227,10 @@ fn run() -> io::Result<()> {
 
 impl<W: Write> Helper<W> {
     fn refresh_displays(&mut self) {
-        if let Some(capturer) = self.capturer.as_mut() {
-            if let Ok(displays) = capturer.displays() {
-                self.displays = displays;
-            }
+        if let Some(capturer) = self.capturer.as_mut()
+            && let Ok(displays) = capturer.displays()
+        {
+            self.displays = displays;
         }
     }
 
@@ -315,8 +315,10 @@ impl<W: Write> Helper<W> {
     }
 
     fn input_result(&mut self, outcome: &str, code: &str) -> io::Result<()> {
-        self.out
-            .json(MSG_INPUT_RESULT, &json!({ "outcome": outcome, "code": code }))
+        self.out.json(
+            MSG_INPUT_RESULT,
+            &json!({ "outcome": outcome, "code": code }),
+        )
     }
 
     /// Let go of everything pressed on the controller's behalf. Never fails.
@@ -367,8 +369,15 @@ impl<W: Write> Helper<W> {
         if !self.displays.iter().any(|display| display.id == id) {
             self.refresh_displays();
         }
-        let Some(display) = self.displays.iter().find(|display| display.id == id).cloned() else {
-            return self.out.error("unknown-display", "that display is not attached");
+        let Some(display) = self
+            .displays
+            .iter()
+            .find(|display| display.id == id)
+            .cloned()
+        else {
+            return self
+                .out
+                .error("unknown-display", "that display is not attached");
         };
         if let Some(session) = self.session.as_mut() {
             session.display = display.id.clone();
@@ -398,18 +407,21 @@ impl<W: Write> Helper<W> {
         self.displays = current;
         let mut fallback: Option<Display> = None;
         let mut lost_everything = false;
-        if let Some(session) = self.session.as_mut() {
-            if !self.displays.iter().any(|display| display.id == session.display) {
-                match self.displays.first() {
-                    Some(primary) => {
-                        session.display = primary.id.clone();
-                        session.previous = None;
-                        session.force_keyframe = true;
-                        session.next_at = Instant::now();
-                        fallback = Some(primary.clone());
-                    }
-                    None => lost_everything = true,
+        if let Some(session) = self.session.as_mut()
+            && !self
+                .displays
+                .iter()
+                .any(|display| display.id == session.display)
+        {
+            match self.displays.first() {
+                Some(primary) => {
+                    session.display = primary.id.clone();
+                    session.previous = None;
+                    session.force_keyframe = true;
+                    session.next_at = Instant::now();
+                    fallback = Some(primary.clone());
                 }
+                None => lost_everything = true,
             }
         }
         if lost_everything {
@@ -426,7 +438,8 @@ impl<W: Write> Helper<W> {
     /// Take one picture and publish what changed: a keyframe when one is due, else the tiles.
     fn publish(&mut self) -> io::Result<()> {
         let now = Instant::now();
-        let (Some(session), Some(capturer)) = (self.session.as_mut(), self.capturer.as_mut()) else {
+        let (Some(session), Some(capturer)) = (self.session.as_mut(), self.capturer.as_mut())
+        else {
             return Ok(());
         };
         session.next_at = now + session.frame_interval();
@@ -468,21 +481,21 @@ impl<W: Write> Helper<W> {
             if changed.is_empty() {
                 return Ok(());
             }
-            if !tiles::mostly_changed(changed.len(), picture.width, picture.height) {
-                if let Ok(payloads) = tiles::tiles_payloads(
+            if !tiles::mostly_changed(changed.len(), picture.width, picture.height)
+                && let Ok(payloads) = tiles::tiles_payloads(
                     &picture,
                     &changed,
                     session.settings.quality,
                     tiles::MAX_PUBLISH_BYTES,
-                ) {
-                    for payload in &payloads {
-                        self.out.bytes(MSG_TILES, payload)?;
-                    }
-                    session.previous = Some(picture);
-                    return Ok(());
+                )
+            {
+                for payload in &payloads {
+                    self.out.bytes(MSG_TILES, payload)?;
                 }
-                // A tile that would not fit falls through to a keyframe.
+                session.previous = Some(picture);
+                return Ok(());
             }
+            // Mostly changed, or a tile that would not fit: fall through to a keyframe.
         }
         match tiles::frame_payload(&picture, session.settings.quality, tiles::MAX_PUBLISH_BYTES) {
             Ok(payload) => {

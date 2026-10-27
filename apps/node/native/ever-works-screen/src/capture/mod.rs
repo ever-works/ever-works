@@ -23,7 +23,11 @@ mod x11;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PixelLayout {
     Bgra,
+    /// Produced by the macOS backend only (CoreGraphics big-endian, alpha last).
+    #[cfg_attr(not(any(target_os = "macos", test)), allow(dead_code))]
     Rgba,
+    /// Produced by the macOS backend only (CoreGraphics big-endian, alpha first).
+    #[cfg_attr(not(any(target_os = "macos", test)), allow(dead_code))]
     Argb,
 }
 
@@ -128,7 +132,9 @@ pub fn linux_session_reasons(
     wayland_display: Option<&str>,
 ) -> Vec<&'static str> {
     let session = session_type.unwrap_or("").trim().to_ascii_lowercase();
-    let has_display = display.map(|value| !value.trim().is_empty()).unwrap_or(false);
+    let has_display = display
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false);
     let has_wayland = wayland_display
         .map(|value| !value.trim().is_empty())
         .unwrap_or(false);
@@ -142,7 +148,11 @@ pub fn linux_session_reasons(
 }
 
 /// A display id the contracts accept (`[A-Za-z0-9._:-]{1,64}`), from whatever the OS calls it.
+/// (macOS builds its ids from the CoreGraphics display number and does not need it.)
+#[cfg_attr(all(target_os = "macos", not(test)), allow(dead_code))]
 pub fn sanitize_id(raw: &str) -> String {
+    // Windows names a monitor `\\.\DISPLAY1`: the device-namespace prefix is not part of the id.
+    let raw = raw.strip_prefix(r"\\.\").unwrap_or(raw);
     let cleaned: String = raw
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | ':' | '-'))
@@ -230,7 +240,8 @@ pub fn blend_cursor(
             ];
             for (offset, source) in channels {
                 let destination = image.data[p + offset] as u32;
-                image.data[p + offset] = (source + (destination * inverse + 127) / 255).min(255) as u8;
+                image.data[p + offset] =
+                    (source + (destination * inverse + 127) / 255).min(255) as u8;
             }
         }
     }
@@ -274,7 +285,11 @@ mod tests {
     fn sanitizes_and_dedupes_ids() {
         assert_eq!(sanitize_id(r"\\.\DISPLAY1"), "DISPLAY1");
         assert_eq!(sanitize_id("???"), "display");
-        let mut list = vec![display("DP-1", false), display("DP-1", false), display("DP-1", true)];
+        let mut list = vec![
+            display("DP-1", false),
+            display("DP-1", false),
+            display("DP-1", true),
+        ];
         dedupe_ids(&mut list);
         let ids: Vec<&str> = list.iter().map(|d| d.id.as_str()).collect();
         assert_eq!(ids, vec!["DP-1", "DP-1-2", "DP-1-3"]);
@@ -282,7 +297,11 @@ mod tests {
 
     #[test]
     fn orders_the_primary_first() {
-        let ordered = order_displays(vec![display("a", false), display("b", true), display("c", true)]);
+        let ordered = order_displays(vec![
+            display("a", false),
+            display("b", true),
+            display("c", true),
+        ]);
         let ids: Vec<&str> = ordered.iter().map(|d| d.id.as_str()).collect();
         assert_eq!(ids, vec!["b", "a", "c"]);
         assert_eq!(ordered.iter().filter(|d| d.primary).count(), 1);

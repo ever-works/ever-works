@@ -14,8 +14,8 @@ use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, ImageOrder, Windo
 use x11rb::rust_connection::RustConnection;
 
 use super::{
-    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, blend_cursor, dedupe_ids, linux_session_reasons,
-    order_displays, sanitize_id,
+    Capturer, Display, DisplayRect, Opened, PixelLayout, RawImage, blend_cursor, dedupe_ids,
+    linux_session_reasons, order_displays, sanitize_id,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -38,8 +38,11 @@ pub fn open() -> Opened {
     let session_type = std::env::var("XDG_SESSION_TYPE").ok();
     let display = std::env::var("DISPLAY").ok();
     let wayland = std::env::var("WAYLAND_DISPLAY").ok();
-    let reasons =
-        linux_session_reasons(session_type.as_deref(), display.as_deref(), wayland.as_deref());
+    let reasons = linux_session_reasons(
+        session_type.as_deref(),
+        display.as_deref(),
+        wayland.as_deref(),
+    );
     if !reasons.is_empty() {
         return Opened {
             capturer: None,
@@ -53,7 +56,10 @@ pub fn open() -> Opened {
         };
     };
     let (root, screen_size) = match conn.setup().roots.get(screen_num) {
-        Some(screen) => (screen.root, (screen.width_in_pixels, screen.height_in_pixels)),
+        Some(screen) => (
+            screen.root,
+            (screen.width_in_pixels, screen.height_in_pixels),
+        ),
         None => {
             return Opened {
                 capturer: None,
@@ -178,7 +184,15 @@ impl Capturer for X11Capturer {
             .ok_or_else(|| "unknown display".to_string())?;
         let reply = self
             .conn
-            .get_image(ImageFormat::Z_PIXMAP, self.root, rect.x, rect.y, rect.w, rect.h, !0)
+            .get_image(
+                ImageFormat::Z_PIXMAP,
+                self.root,
+                rect.x,
+                rect.y,
+                rect.w,
+                rect.h,
+                !0,
+            )
             .map_err(|error| error.to_string())?
             .reply()
             .map_err(|error| error.to_string())?;
@@ -206,22 +220,22 @@ impl Capturer for X11Capturer {
             layout: PixelLayout::Bgra,
             data: reply.data,
         };
-        if self.cursor {
-            if let Some(cursor) = self
+        // The cursor image is asked for only when XFixes 5 was announced.
+        if self.cursor
+            && let Some(cursor) = self
                 .conn
                 .xfixes_get_cursor_image()
                 .ok()
                 .and_then(|cookie| cookie.reply().ok())
-            {
-                blend_cursor(
-                    &mut image,
-                    &cursor.cursor_image,
-                    cursor.width as u32,
-                    cursor.height as u32,
-                    cursor.x as i64 - cursor.xhot as i64 - rect.x as i64,
-                    cursor.y as i64 - cursor.yhot as i64 - rect.y as i64,
-                );
-            }
+        {
+            blend_cursor(
+                &mut image,
+                &cursor.cursor_image,
+                cursor.width as u32,
+                cursor.height as u32,
+                cursor.x as i64 - cursor.xhot as i64 - rect.x as i64,
+                cursor.y as i64 - cursor.yhot as i64 - rect.y as i64,
+            );
         }
         Ok(image)
     }

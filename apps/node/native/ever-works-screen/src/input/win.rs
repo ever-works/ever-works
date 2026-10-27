@@ -7,9 +7,10 @@
 use std::mem::size_of;
 
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP,
-    KEYEVENTF_UNICODE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
-    MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, SendInput,
+    INPUT, INPUT_0, INPUT_KEYBOARD, INPUT_MOUSE, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
+    KEYEVENTF_KEYUP, KEYEVENTF_UNICODE, MOUSEEVENTF_HWHEEL, MOUSEEVENTF_LEFTDOWN,
+    MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN,
+    MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, SendInput,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::SetCursorPos;
 
@@ -26,7 +27,13 @@ pub fn open() -> Result<Box<dyn Injector>, &'static str> {
 }
 
 fn send(inputs: &[INPUT]) -> Result<(), String> {
-    let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), size_of::<INPUT>() as i32) };
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            size_of::<INPUT>() as i32,
+        )
+    };
     if sent as usize == inputs.len() {
         Ok(())
     } else {
@@ -68,7 +75,11 @@ fn keyboard(vk: u16, scan: u16, flags: u32) -> INPUT {
 impl Injector for SendInputInjector {
     fn move_to(&mut self, x: f64, y: f64) -> Result<(), String> {
         let ok = unsafe { SetCursorPos(x.round() as i32, y.round() as i32) };
-        if ok == 0 { Err("the pointer could not be moved".into()) } else { Ok(()) }
+        if ok == 0 {
+            Err("the pointer could not be moved".into())
+        } else {
+            Ok(())
+        }
     }
 
     fn button(&mut self, button: Button, down: bool) -> Result<(), String> {
@@ -80,29 +91,33 @@ impl Injector for SendInputInjector {
             (Button::Right, true) => MOUSEEVENTF_RIGHTDOWN,
             (Button::Right, false) => MOUSEEVENTF_RIGHTUP,
         };
-        send(&[mouse(flags as u32, 0)])
+        send(&[mouse(flags, 0)])
     }
 
     fn scroll(&mut self, dx: i32, dy: i32) -> Result<(), String> {
         // Browser deltas are pixels (≈100 per notch); Windows wants notches of 120, up positive.
         let mut inputs = Vec::new();
         if dy != 0 {
-            inputs.push(mouse(MOUSEEVENTF_WHEEL as u32, -dy * WHEEL_DELTA / 100));
+            inputs.push(mouse(MOUSEEVENTF_WHEEL, -dy * WHEEL_DELTA / 100));
         }
         if dx != 0 {
-            inputs.push(mouse(MOUSEEVENTF_HWHEEL as u32, dx * WHEEL_DELTA / 100));
+            inputs.push(mouse(MOUSEEVENTF_HWHEEL, dx * WHEEL_DELTA / 100));
         }
-        if inputs.is_empty() { Ok(()) } else { send(&inputs) }
+        if inputs.is_empty() {
+            Ok(())
+        } else {
+            send(&inputs)
+        }
     }
 
     fn key(&mut self, code: &str, down: bool) -> Result<(), String> {
         let (vk, extended) = windows_vk(code).ok_or_else(|| format!("no key {code}"))?;
         let mut flags = 0u32;
         if extended {
-            flags |= KEYEVENTF_EXTENDEDKEY as u32;
+            flags |= KEYEVENTF_EXTENDEDKEY;
         }
         if !down {
-            flags |= KEYEVENTF_KEYUP as u32;
+            flags |= KEYEVENTF_KEYUP;
         }
         send(&[keyboard(vk, 0, flags)])
     }
@@ -110,9 +125,13 @@ impl Injector for SendInputInjector {
     fn text(&mut self, text: &str) -> Result<(), String> {
         let mut inputs = Vec::new();
         for unit in text.encode_utf16() {
-            inputs.push(keyboard(0, unit, KEYEVENTF_UNICODE as u32));
-            inputs.push(keyboard(0, unit, (KEYEVENTF_UNICODE | KEYEVENTF_KEYUP) as u32));
+            inputs.push(keyboard(0, unit, KEYEVENTF_UNICODE));
+            inputs.push(keyboard(0, unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP));
         }
-        if inputs.is_empty() { Ok(()) } else { send(&inputs) }
+        if inputs.is_empty() {
+            Ok(())
+        } else {
+            send(&inputs)
+        }
     }
 }
