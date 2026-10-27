@@ -3,7 +3,10 @@
  *
  * Why this file exists: under zod 3, `askJson` handed the zod schema straight to
  * LangChain's `withStructuredOutput`, which converted it with OpenAI's own zod-3
- * helper. With zod 4 that is no longer safe on our pinned LangChain (0.3 / 0.6):
+ * helper. With zod 4 that stopped being safe on LangChain 0.3 / 0.6; the reasons
+ * below were measured there. On LangChain 1.x the client-side refusal (third
+ * point) still has no LangChain equivalent, and the request shape pinned here is
+ * the one the fallback logic was built around, so `askJson` keeps converting:
  *
  * - its zod-4 path converts with the zod copy LangChain bundles, whose metadata
  *   registry is not ours, so every `.describe()` (the field-by-field extraction
@@ -29,9 +32,10 @@ export type StructuredOutputJsonSchema = Record<string, unknown>;
 export const STRUCTURED_OUTPUT_NAME = 'extract';
 
 /**
- * Mirrors `ChatOpenAI._getStructuredOutputMethod` (@langchain/openai 0.6) for a call
- * without an explicit `method`: every model uses the `json_schema` response format
- * except `gpt-3*`, `gpt-4-*` and `gpt-4`, which use function calling.
+ * Mirrors `BaseChatOpenAI._getStructuredOutputMethod` (@langchain/openai 0.6 and
+ * 1.x, unchanged) for a call without an explicit `method`: every model uses the
+ * `json_schema` response format except `gpt-3*`, `gpt-4-*` and `gpt-4`, which use
+ * function calling.
  */
 export function usesJsonSchemaResponseFormat(model: string): boolean {
 	return !(model.startsWith('gpt-3') || model.startsWith('gpt-4-') || model === 'gpt-4');
@@ -169,7 +173,15 @@ function normalizeObjects(node: unknown, strict: boolean): void {
  * become `{}` instead of failing the call.
  */
 export function toStructuredOutputJsonSchema(schema: ZodType, strict: boolean): StructuredOutputJsonSchema {
-	const jsonSchema = z.toJSONSchema(schema, {
+	// The spread is load-bearing. zod 4.6 hangs a non-enumerable `~standard`
+	// (Standard JSON Schema) property on the root of `toJSONSchema`'s result that
+	// points back at the zod schema. LangChain 1.x treats any object carrying it as
+	// a schema to convert, and regenerates the JSON Schema from zod, which throws
+	// away everything below: `additionalProperties: false` goes (OpenAI strict mode
+	// rejects the request), `$schema` comes back, and LangChain also starts
+	// validating the answer with the caller's schema, so its transforms run twice.
+	// Copying the own enumerable keys leaves that back-reference behind.
+	const { ...jsonSchema } = z.toJSONSchema(schema, {
 		target: 'draft-07',
 		io: 'input',
 		unrepresentable: 'any'
