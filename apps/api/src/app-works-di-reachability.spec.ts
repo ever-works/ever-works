@@ -193,16 +193,14 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
         reason: 'Worker-only by design: its swap, `AppRuntimeFacadeService`, refuses outside the isolated worker and no dependency provider is dialled from the API (FR-5); unbound, a cluster call reports `mayRemain`.',
         source: 'packages/agent/src/app-dependencies/app-dependencies.service.ts:310-331; packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:22-30',
     },
-    {
-        key: 'AppDependenciesModule | AppDependenciesService | APP_RUNTIME_EVENT_SINK',
-        reason: "§9.8's ports module binds it (to the API's EventEmitter2) and is unwritten.",
-        source: 'packages/agent/src/app-runtime/ports.ts:278-287; APW-06 T73 (APW-06/tasks.md:1271-1276)',
-    },
-    {
-        key: 'AppDependenciesModule | AppDependenciesService | APP_RUNTIME_TARGET',
-        reason: "§9.8's ports module is its single provider and is unwritten; the worker binds the fail-closed default meanwhile.",
-        source: 'packages/tasks/src/trigger/worker/modules/trigger-app-runtime.module.ts:107-125 (APW-06 T73, APW-06/tasks.md:1271-1276)',
-    },
+    // `AppDependenciesModule | AppDependenciesService | APP_RUNTIME_EVENT_SINK` and
+    // `AppDependenciesModule | AppDependenciesService | APP_RUNTIME_TARGET` left this list on
+    // 2026-10-27 (lane aw-builds-bindings): the `@Global()` `AppRuntimePortsModule` (§9.8) binds the
+    // sink to `AppRuntimeEventRelayService` over the API's `EventEmitter2` (the same catalogue and
+    // forbidden-key check a relayed worker event meets, so a dependency event becomes an
+    // `app_dependency` Activity row) and the target to §9.6's `UnavailableRuntimeTarget`
+    // answering `cluster_unreachable` (the API never dials a cluster; only the isolated worker
+    // provisions a dependency).
     // `AppDeployRequestModule | AppHostsService | APP_HOSTS_REBUILD_REQUESTER` left this list on
     // 2026-10-26 (lane aw-safety): `AppDeployRequestModule` binds it to `appHostsRebuildRequester`
     // over APW-05's `AppBuildsService.requestRebuild` (lazy), so a primary-domain change under the
@@ -210,11 +208,9 @@ const EXPECTED_UNBOUND: readonly Expected[] = [
     // `AppEnvModule | AppEnvService | APP_ENV_ACTIVITY` left this list on 2026-10-18 (lane
     // aw-env-smtp): `AppEnvModule` binds it to `AppEnvActivityService` (APW-07 T26), so every env
     // change through `PUT /api/works/:id/app-env` writes its `app_env` Activity row.
-    {
-        key: 'AppEnvModule | AppEnvService | APP_ENV_ACTOR_NAMES',
-        reason: 'Provisional: the swap is `useExisting: WorkMemberService`, which has no `nameOf` yet.',
-        source: 'packages/agent/src/app-env/app-env.service.ts:246-260 (owned by APW-01)',
-    },
+    // `AppEnvModule | AppEnvService | APP_ENV_ACTOR_NAMES` left this list on 2026-10-27 (lane
+    // aw-builds-bindings): `AppEnvModule` binds it to `appEnvActorNames` (a lazy read over the Work,
+    // its members and the users — the owner's or a member's display name, never an email).
     {
         key: 'AppEnvModule | AppEnvService | APP_ENV_BUILD_FINGERPRINTS',
         reason: 'Provisional: the swap target (`WorkBuildService`) does not exist; FR-24 build flag reads the resolver meanwhile.',
@@ -310,11 +306,6 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
     },
     {
-        key: 'AppDependencyProvisionWorkerModule :: APP_HEALTH_EGRESS_SOURCE',
-        reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_HEALTH_EGRESS_SOURCE` row for the reason.",
-        source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
-    },
-    {
         key: 'AppDependencyProvisionWorkerModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: "Not this task's own gap: since A0.10 (lane aw-deploy-2) the dependency worker imports `TriggerAppRuntimeModule` for T20's facade and the worker context, and walks its graph — see the `TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER` row for the reason.",
         source: 'packages/tasks/src/tasks/trigger/app-dependency-provision.task.ts:112 (A0.10, the TriggerAppRuntimeModule import)',
@@ -332,11 +323,11 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
         reason: 'Deliberately unbound — decision B1 (2026-10-17): inside the isolated worker §5.1 step 1 is answered by the run itself (the lock-holding `deploymentId`, `AppDeployPreconditionsService.evaluate`), so the gate is not consulted for a dequeued Deployment and a lock-less one still meets `worker_not_isolated`.',
         source: 'docs/specs/features/app-works/APW-06-app-runtime/tasks.md:1228-1232 (APW-06 T71 status (a), decision B1); packages/agent/src/app-runtime/app-deploy-preconditions.service.ts:428-461',
     },
-    {
-        key: 'TriggerAppRuntimeModule :: APP_HEALTH_EGRESS_SOURCE',
-        reason: "The narrow adapter over APW-07's source is unwritten (the port is marked provisional where it is declared).",
-        source: 'packages/agent/src/app-runtime/app-health.service.ts:722-736',
-    },
+    // `TriggerAppRuntimeModule :: APP_HEALTH_EGRESS_SOURCE` and
+    // `AppDependencyProvisionWorkerModule :: APP_HEALTH_EGRESS_SOURCE` left this list on
+    // 2026-10-27 (lane aw-builds-bindings): the worker binds it to `workerAppHealthEgressSource`, a
+    // one-member adapter over the API's `AppEnvRuntimeSource.resolveEgressHosts` (hosts only, read
+    // off the dependency rows' outputs in the API; `null` when it cannot be answered).
     {
         key: 'TriggerAppRuntimeModule :: APP_HOSTS_REBUILD_REQUESTER',
         reason: 'Bound in the API since 2026-10-26 (lane aw-safety, `appHostsRebuildRequester` in `AppDeployRequestModule`); the worker never requests a rebuild — a primary-domain change is an API request — so it stays unbound here rather than opening a rebuild RPC.',

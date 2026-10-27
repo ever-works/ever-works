@@ -794,6 +794,8 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...deps.io,
 		environment: { ...deps.io.environment, modelCli: modelCli.paths, modelCliNotes: modelCli.notes }
 	};
+	/** Stops the management lane when the worker host quarantines (set once the lanes exist). */
+	let haltManagementLane: (() => void) | null = null;
 	const runtime = createNodeRuntime(config, io, {
 		workerEnabled,
 		startPaused,
@@ -806,6 +808,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		// started (`ever-works-node policy` run meanwhile), and a quarantine must
 		// record `unsafe` without reverting anything else in it.
 		persistUnsafe: async (unsafe) => {
+			// The quarantine disables ALL leasing on this machine: the management lane runs
+			// machine-level jobs (runners, virtual computers, usage scans) and stops with it.
+			haltManagementLane?.();
 			const current =
 				(await loadConfig(deps.fs, deps.configPath, {
 					secrets: deps.secrets ?? null,
@@ -927,6 +932,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// Fleet node link (FL-02, CONTRACTS R-34): the management lane, present only
 	// when a kind registered for it has its consent on (none in FL-02).
 	const managementWorker = runtime.management?.worker ?? null;
+	haltManagementLane = managementWorker
+		? () => {
+				void managementWorker.stop();
+			}
+		: null;
 	selfUpdate = new SelfUpdateController({
 		enabled: autoUpdate,
 		currentVersion: deps.io.version,
@@ -1002,7 +1012,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					: 'Live view enabled — terminal only: no browser was found here to show a screen'
 			);
 		}
-		if (managementWorker) {
+		if (managementWorker && worker?.getState().state === 'unsafe') {
+			deps.out(
+				'Management lane held — the worker host is QUARANTINED, which disables every lease on this machine. Clear it first: `ever-works-node clear-quarantine --confirm-process-tree-stopped`.'
+			);
+		} else if (managementWorker) {
 			await managementWorker.start();
 			deps.out(
 				`Management lane enabled — leasing [${(runtime.management?.kinds ?? []).join(', ')}] one at a time, outside --concurrency`

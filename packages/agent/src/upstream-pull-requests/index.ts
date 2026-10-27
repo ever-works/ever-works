@@ -69,4 +69,10 @@ export * from './upstream-credential.service';
 export * from './upstream-credential.store';
 export * from './upstream-contribution-budget.service';
 export * from './upstream-pull-request-open.service';
+// T7/T35 (lane aw-upstream-prs) — the record's one writer and the API's row view.
+export * from './upstream-pull-request-record.service';
+// T8/T9 (lane aw-upstream-prs) — the FR-26 / FR-39 limits and eligibility.
+export * from './upstream-rate-limits';
+export * from './upstream-eligibility.rules';
+export * from './upstream-eligibility.service';
 export * from './upstream-pull-requests.module';

@@ -329,6 +329,17 @@ const ENTITY_SECRET_COLUMNS: Readonly<Record<string, readonly string[]>> = Objec
     // set and none of their values — which is what spec FR-18.4 promises and
     // what makes the archive useful for "which keys do I have to re-enter?".
     ModelAccount: Object.freeze(['credentials']),
+    // APW-07 T45 (R-25). An App's env values and its managed dependencies'
+    // config and connection outputs, each an `enc::v1::` envelope at rest.
+    // The `/encrypted$/i` shape rule above already covers all three names;
+    // they are listed here as well because the task that classified the
+    // tables names them, and because a rename of either column away from the
+    // `*Encrypted` shape must not quietly start exporting a database
+    // password. `WorkAppEnvValue.name`, `origin`, and every dependency kind,
+    // status and backup state export as stored — which is what tells an
+    // owner which values a fresh App has to be given again.
+    WorkAppEnvValue: Object.freeze(['valueEncrypted']),
+    WorkAppDependency: Object.freeze(['configEncrypted', 'outputsEncrypted']),
 });
 
 /**
@@ -461,6 +472,45 @@ const ENTITY_DROPPED_COLUMNS: Readonly<Record<string, readonly string[]>> = Obje
     // it. Kept pending review; see `KNOWN_STALE_COLUMN_RULES` in
     // `redaction.spec.ts`.
     UsageLedgerEntry: Object.freeze(['providerMeterId', 'providerEventId']),
+    // APW-05 T45 (R-25). `buildInputsHash` is a sha256 over the (name,
+    // fingerprint) pairs of the build values a preparation synced — derived
+    // from fingerprints of secret values, meaningless outside this workspace,
+    // and the one column of a Build an owner has no use for. The global
+    // `BACKUP_BENIGN_COLUMNS` entry for it still stands (it is not a secret);
+    // the drop is the classification T45 decided for both tables.
+    WorkBuild: Object.freeze(['buildInputsHash']),
+    WorkBuildPreparation: Object.freeze(['buildInputsHash']),
+    // APW-07 T45 (R-25). A value's length is never shown anywhere in the
+    // product (plan §3.1), so the archive does not publish it beside the
+    // `{ wasSet }` that replaces the value itself.
+    WorkAppEnvValue: Object.freeze(['valueBytes']),
+    // APW-04 T47 (R-25). Four columns the entity marks "never on the wire" or
+    // clears once read. The archive does not publish what the product refuses
+    // to show (the `WebhookDelivery.payload` rule above):
+    //  - `suggestionBundle` — the scrubbed repository bundle (≤ 256 KB) a
+    //    Blueprint suggestion carries to the platform's reviewers; a free-form
+    //    bag of the member's files whose scrub is best-effort.
+    //  - `suggestionUpstream` — the upstream that suggestion was made for.
+    //  - `lastRunOutput` — the last agent session's raw output block
+    //    (≤ 512 KB), cleared once the output guard has read it; agent output
+    //    is where an echoed environment ends up.
+    //  - `verificationNamespace` — the ephemeral namespace a verification held
+    //    on the cluster target; plumbing, gone when the run ends.
+    // The run itself — trigger, status, steps, attempts, PR, budgets — still
+    // exports, which is the record an owner reads.
+    WorkAppProvisioning: Object.freeze([
+        'suggestionBundle',
+        'suggestionUpstream',
+        'lastRunOutput',
+        'verificationNamespace',
+    ]),
+    // FL-20 — `FleetSession.tokens` is the session's usage roll-up
+    // (`FleetSessionUsage`: per-model token COUNTS, cents, model names,
+    // timestamps). It is derived: `FleetUsageReconcilerService` recomputes it
+    // from the session's `fleet_usage_samples` on every report, so an archive
+    // copy would be stale bytes. The archive does not export `FleetSession`
+    // today; this records the decision for the day it does.
+    FleetSession: Object.freeze(['tokens']),
 });
 
 /**
@@ -527,6 +577,16 @@ export const BACKUP_BENIGN_COLUMNS: Readonly<Record<string, string>> = Object.fr
     // exactly its job: a new `*credential*`-shaped column has to be decided, not
     // inherited. The reason below is read off the column's own docstring
     // (`work-upstream-state.entity.ts:307-322`), not inferred from the name.
+    // FL-20 usage samples and FL-11 checkouts. The guard fired on these when the
+    // tables landed: `*Tokens` here are model token COUNTS (`bigint`), and
+    // `remoteHadCredential` is a flag that a credential was stripped.
+    inputTokens:
+        'A model token count (FL-20 usage sample, `bigint`) — how much a request used, not a credential.',
+    outputTokens: 'A model token count (FL-20 usage sample, `bigint`).',
+    cacheReadTokens: 'A model token count (FL-20 usage sample, `bigint`).',
+    cacheWriteTokens: 'A model token count (FL-20 usage sample, `bigint`).',
+    remoteHadCredential:
+        'A boolean on a Fleet checkout: the remote URL the member gave carried a credential that the checkout service STRIPPED before the row was written (spec FR-5, U12). It records that something was removed; the value is never stored.',
     credentialMemberUserId:
         'A USER ID, not a credential: the member whose connection is the credential of record for this App Work’s background jobs once a handover has been recorded (NULL = no handover, and the creator `Work.userId` is used instead). It addresses a member the archive already carries in full; the connection it points at is stored elsewhere and is dropped or redacted there by its own rule.',
 });
@@ -576,6 +636,29 @@ export const BACKUP_BENIGN_ENTITY_COLUMNS: Readonly<
             'The \u00a75.5 check results: `{ inCluster: CheckResult[], public: CheckResult[], hairpin?, classification?, observedAt }`. `CheckResult` has seven fields and six of them are ours, the App spec\u2019s or the transport\u2019s \u2014 a check name and a `failedExpectation` that both come from the spec the member wrote, a pass/fail/skip enum, an HTTP status, a latency, and a closed classification enum. **The residual is `found`**: it is a substring of the member\u2019s OWN application\u2019s HTTP response, capped at 200 characters and secret-scrubbed by the plugin that produced it (`app-deployment.types.ts:427`). The cap and the scrub are the guarantee, and the scrub is best-effort code we do not run ourselves \u2014 an application that prints an env value into an error page could put 200 characters of it here. Reviewed and accepted 2026-09-22 on the basis that the member owns both the application and the archive; re-challenge this entry if `found` ever grows past 200 characters or a plugin outside this repo starts producing it.',
         appRender:
             'The render facts: `{ phase, namespace, specCommitSha, envChecksum, jobResults[], warnings[], preconditions[], rollback?, cancelledBy?, supersededBy? }`. Plan \u00a77.1 states the rule at the column \u2014 *\u201cNever values or log text\u201d* \u2014 and every member is a platform-authored fact rather than an app-authored one: a phase enum, a namespace we compute, a commit sha, a checksum OF the env rather than the env, our own refusal codes, and row ids. `jobResults[]` carries a job\u2019s name, status and timestamps; the job\u2019s OUTPUT is deliberately not in it, which is the same line \u00a74.9\u2019s failure excerpts draw.',
+    }),
+    // APW-05 T45 (R-25) \u2014 the two `simple-json` bags on `work_builds`. Both are
+    // written by exactly one path: `AppBuildsService` copies them off the build
+    // plugin's `BuildSnapshot`, and the only build plugin is in this repository
+    // (`packages/plugins/github-actions-build`). No DTO declares either column.
+    // Re-challenge both if a build plugin from outside this repository is ever
+    // enabled, because the contract type is `Record<string, unknown>`.
+    WorkBuild: Object.freeze({
+        failureDetail:
+            'Names and numbers only (plan \u00a74.9, `app-build-failure-copy.ts`): `{ step?, total?, command?, names?, memory?, max? }` as the failure classifier parses them out of the run \u2014 a Dockerfile step index and count, the failing instruction capped at 120 characters (`failure-classifier.ts`), the NAMES of missing build values, and two memory integers. The one free-text member is that instruction, which is a line of the member\u2019s own Dockerfile in their own repository and which the Builds tab already shows them. The log excerpt is a separate column (`failureExcerpt`, a redacted `string[]`) and is not this bag.',
+        verificationResult:
+            'A verification run\u2019s outcome, `AppBuildVerificationResult` `{ componentsReady, jobs[], smoke[] }`. The result-artifact parser (`result-artifact.ts` `passRows`) keeps exactly `{ name, passed }` from each untrusted row and drops everything else, so what is stored is a boolean, job and smoke-check NAMES from the member\u2019s App spec, and pass/fail flags. No job output and no response body reaches it.',
+    }),
+    // APW-05 T45 (R-25) \u2014 T45 records "`repositoryBlock` carries no secret
+    // value"; this is that decision, with the writer that makes it true.
+    WorkBuildPreparation: Object.freeze({
+        repositoryBlock:
+            'One writer (`app-build-prepare.runner.ts`): `{ reason, detail, at }` where `reason` is a closed `AppBuildBlockedReason`, `at` an ISO timestamp, and `detail` the plugin\u2019s `blocked.detail`, typed `Record<string, string | number | string[]>` at the plugin contract and filled with fixed keys \u2014 `{ needed, max }` for a runner-class cap, `{ cause }` or the credential KIND and permission NAME a `workflowPermissionMissing` block needs for the member\u2019s fix. A kind and a permission name, never a credential.',
+    }),
+    // APW-07 T45 (R-25) \u2014 the dependency row's copy of its App spec block.
+    WorkAppDependency: Object.freeze({
+        declared:
+            'A verbatim copy of `spec.dependencies[kind]` from the VALIDATED effective App spec (`app-dependency-spec.source.ts`), so the next spec can be diffed against it. Every kind\u2019s block is a closed, schema-checked shape (`AppSpecPostgres`/`Redis`/`ObjectStorage`/`Smtp`: version enums, booleans, extension and bucket names) with no field that can hold a value, and the same block already exports inside `WorkAppSpecState.effectiveSpec` in `app-spec-states.jsonl`. It is a file in the member\u2019s own repository.',
     }),
 });
 

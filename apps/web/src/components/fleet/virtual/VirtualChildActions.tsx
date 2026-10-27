@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { FleetLinkError } from '@ever-works/contracts';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { Button } from '@/components/ui/button';
 import {
     destroyFleetVirtualAction,
@@ -148,7 +149,7 @@ export default function VirtualChildActions({ node, allowed = true }: FleetCompu
         startTransition(async () => {
             if (!viewerPort) return;
             try {
-                const response = await fetch(
+                const response = await browserApiFetch(
                     `/api/fleet/nodes/${encodeURIComponent(hostNodeId)}/ports/${viewerPort}/open`,
                     {
                         method: 'POST',

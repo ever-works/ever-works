@@ -728,8 +728,17 @@ export interface AppHealthOpDispatcher {
 
 /** APW-07's dependency egress hosts, as §9.3's every-10th poll re-resolves them. */
 export interface AppHealthEgressSource {
-    /** Hosts only. `null` when the question cannot be answered — never `[]` standing in for "none". */
-    resolveEgressHosts(workId: string): Promise<readonly string[] | null | undefined>;
+    /**
+     * Hosts only. `null` when the question cannot be answered — never `[]` standing in for "none".
+     *
+     * `target` (added 2026-10-27, lane aw-builds-bindings; optional, so an implementation written
+     * against the one-argument form still fits) is the polled row's §7.2 target — what decides
+     * whether the zone owns the destinations (`ever-works-apps` → none of ours).
+     */
+    resolveEgressHosts(
+        workId: string,
+        target?: string | null,
+    ): Promise<readonly string[] | null | undefined>;
 }
 
 /** DI token for {@link AppHealthEgressSource} — bound to APW-07's `AppRuntimeEnvSource` adapter. */
@@ -1509,7 +1518,7 @@ export class AppHealthService {
 
         let hosts: readonly string[] | null | undefined;
         try {
-            hosts = await this.egress.resolveEgressHosts(workId);
+            hosts = await this.egress.resolveEgressHosts(workId, row.target ?? null);
         } catch (error) {
             this.logger.warn(
                 `The dependency egress hosts of work ${workId} could not be re-resolved: ` +
