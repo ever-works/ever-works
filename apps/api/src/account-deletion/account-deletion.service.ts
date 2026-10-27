@@ -27,6 +27,7 @@ import { AccountDeletionRequestStore } from './account-deletion-request.store';
 import { AccountDeletionMailer } from './account-deletion.mailer';
 import { hashDeletionEmail, maskEmail } from './account-deletion.tokens';
 import { TENANT_CONTENT_OWNER_COLUMNS } from './account-deletion.inventory';
+import { getActiveStorageBackend } from '../uploads/storage-backend.factory';
 
 /** What happens to one workspace (Tenant) the account belongs to. */
 export type WorkspaceOutcome = 'workspace-deleted' | 'workspace-transferred' | 'account-removed';
@@ -510,7 +511,6 @@ export class AccountDeletionService {
 
     private async deleteFiles(userId: string): Promise<number> {
         try {
-            const { getActiveStorageBackend } = await import('../uploads/storage-backend.factory');
             const backend = (await getActiveStorageBackend()) as {
                 deleteAllByOwner?: (ownerId: string) => Promise<{ deleted: number }>;
             };
