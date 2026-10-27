@@ -5513,7 +5513,24 @@
                     "openOnGitHub": "GitHub에서 열기",
                     "enableBuildWorkflow": "빌드 워크플로 사용 설정"
                 },
-                "editAccessRequired": "이 작업을 하려면 이 App Work에 대한 편집 권한이 필요합니다."
+                "editAccessRequired": "이 작업을 하려면 이 App Work에 대한 편집 권한이 필요합니다.",
+                "resultPullRequestMerged": "{count, plural, =1 {Sync pull request merged (1 commit)} other {Sync pull request merged (# commits)}}",
+                "workflowHold": {
+                    "title": "Upstream changed {count, plural, =1 {1 workflow file} other {# workflow files}}. Nothing was synced.",
+                    "incomplete": "Upstream's changes are too large to check every file for workflow changes. Nothing was synced.",
+                    "explain": "Syncing lets these workflows run in this repository with its secrets. Review the changes first.",
+                    "review": "Review the changes",
+                    "syncAnyway": "Sync anyway",
+                    "confirm": "Sync anyway? These workflows can run with this repository's secrets.",
+                    "confirmYes": "Yes, sync anyway",
+                    "cancel": "Cancel",
+                    "ownerOnly": "Only the Work owner can accept upstream workflow changes.",
+                    "released": "The Work owner accepted these upstream workflow changes {ago}.",
+                    "confirmationRequired": "Upstream changed workflow files. The Work owner must review them before this App Work can sync.",
+                    "changed": "Upstream moved since you reviewed it. Review the new changes first.",
+                    "noHold": "No upstream workflow change is waiting for review.",
+                    "ownerRequired": "Only the Work owner can accept upstream workflow changes."
+                }
             },
             "settings": {
                 "tabs": {

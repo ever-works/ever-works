@@ -241,7 +241,80 @@ export interface AppUpstreamSyncView {
 	manualSyncsLeft: number;
 	rateLimitedUntil?: string;
 	rateLimitedPersistent: boolean;
+	/**
+	 * APW-02 T46 (FR-60/FR-61) — set while the last run held an upstream range
+	 * that changes workflow or action files (or could not prove it does not).
+	 * Optional and additive: absent ⇔ nothing is held.
+	 */
+	workflowHold?: AppUpstreamWorkflowHoldView;
+	/**
+	 * APW-02 T46 — the owner's recorded release of one held upstream head
+	 * ("Sync anyway"). Optional and additive: absent ⇔ no release on record.
+	 */
+	workflowRelease?: AppUpstreamWorkflowReleaseView;
 }
+
+/**
+ * APW-02 T46 (FR-60, FR-61, S29) — one held upstream range, as the Upstream
+ * card reports it.
+ *
+ * The range is pinned to `headSha`, the exact upstream commit the run checked:
+ * the owner releases THAT head, never "whatever upstream points at by the time
+ * the job runs".
+ */
+export interface AppUpstreamWorkflowHoldView {
+	/** The exact upstream commit the held range ends at. */
+	headSha: string;
+	/** The protected paths the range touches, first-seen order, at most {@link APP_UPSTREAM_WORKFLOW_HOLD_MAX_PATHS}. */
+	paths: string[];
+	/** How many distinct protected paths the range touches, before the cap. */
+	pathCount: number;
+	/** `false` ⇔ the compare could not prove the range free of workflow changes (truncated or unreadable). */
+	complete: boolean;
+	/** When the hold was recorded (ISO-8601). */
+	heldAt: string;
+	/** The provider's compare page for the held range — "Review the changes". */
+	compareUrl?: string;
+	/**
+	 * `true` ⇔ the caller is the Work's owner, the only person who may release a
+	 * hold. The API still refuses anyone else — and any API key, run token or
+	 * agent — whatever this says; it only decides whether the button is offered.
+	 */
+	canRelease: boolean;
+}
+
+/** APW-02 T46 — the recorded release of one held head (audited in the Activity feed). */
+export interface AppUpstreamWorkflowReleaseView {
+	/** The exact upstream commit the owner released. */
+	headSha: string;
+	/** When the owner released it (ISO-8601). */
+	releasedAt: string;
+	/** The owner who released it. */
+	releasedByUserId: string;
+}
+
+/**
+ * The body `POST /api/works/:id/upstream/sync` accepts (APW-02 T46). Both fields
+ * are optional: an empty body is **Sync now**, exactly as before.
+ */
+export interface AppUpstreamSyncRequest {
+	/**
+	 * `true` ⇒ the Work owner accepts the held range's workflow changes ("Sync
+	 * anyway"). Owner-only, from a signed-in session only — never a member, an
+	 * API key, a run token or an Agent.
+	 */
+	confirmWorkflowChanges?: boolean;
+	/**
+	 * The held head the owner reviewed. When sent, it must equal the hold on
+	 * record, or the request is refused `409 workflow_hold_changed` — so a hold
+	 * that moved to a newer upstream head after the owner looked is never
+	 * released by an old click.
+	 */
+	workflowHeadSha?: string;
+}
+
+/** At most this many held paths are stored and reported (T46: "capping the reported paths at 100"). */
+export const APP_UPSTREAM_WORKFLOW_HOLD_MAX_PATHS = 100;
 
 /** The Actions hygiene block of the Upstream response (plan.md:416-421). */
 export interface AppUpstreamActionsView {

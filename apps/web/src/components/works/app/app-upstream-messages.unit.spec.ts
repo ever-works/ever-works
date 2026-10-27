@@ -198,7 +198,11 @@ describe('Upstream messages — the whole block, in all 21 bundles (APW-02 T35)'
         // held to. 53 leaves under the tree (the landed 52 plus works-security's
         // `editAccessRequired`, 2026-10-18), plus the tab name and the three
         // Activity labels, is the landed block.
-        expect(APP_UPSTREAM_LEAVES).toHaveLength(53);
+        // APW-02 T46/T47 (2026-10-27) add 15 more: `resultPullRequestMerged` and the 14
+        // leaves of `workflowHold.*` (the held-workflow row and its "Sync anyway").
+        expect(APP_UPSTREAM_LEAVES).toHaveLength(68);
+        expect(APP_UPSTREAM_LEAVES).toContain('workflowHold.syncAnyway');
+        expect(APP_UPSTREAM_LEAVES).toContain('resultPullRequestMerged');
         expect(APP_UPSTREAM_LEAVES).toContain('title');
         expect(APP_UPSTREAM_LEAVES).toContain('editAccessRequired');
         expect(APP_UPSTREAM_LEAVES).toContain('warnings.upstreamArchived');
