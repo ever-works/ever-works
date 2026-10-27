@@ -145,7 +145,17 @@ export type FleetJobKind =
 	 * `FleetUsageReport`. Leased by the management lane under `--usage-scan`,
 	 * never by the work lane; requires the `usage-scan` tag.
 	 */
-	| 'usage-scan';
+	| 'usage-scan'
+	/**
+	 * Actions runners on computers (FL-18, CONTRACTS §12, R-34) — download,
+	 * verify, register and start one or more GitHub Actions runners as services
+	 * on the node the job is pinned to. The registration token is never in the
+	 * payload: the node asks for it when it is ready to register. Leased by the
+	 * node's management lane under `--work`, never by the work lane.
+	 */
+	| 'runner-install'
+	/** Actions runners (FL-18) — start / stop / restart / remove (and, phase 3, reinstall) one runner. */
+	| 'runner-control';
 
 /** Canonical job-kind list. */
 export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
@@ -156,7 +166,9 @@ export const FLEET_JOB_KINDS: readonly FleetJobKind[] = [
 	'agent-session',
 	'vm-create',
 	'vm-control',
-	'usage-scan'
+	'usage-scan',
+	'runner-install',
+	'runner-control'
 ];
 
 /**
@@ -187,7 +199,14 @@ export const FLEET_KVM_CAPABILITY = 'kvm';
  * consent each needs in {@link FLEET_MANAGEMENT_LANE_CONSENT}. With an empty
  * list no node starts the lane.
  */
-export const FLEET_MANAGEMENT_LANE_KINDS: readonly FleetJobKind[] = ['vm-create', 'vm-control', 'usage-scan'];
+export const FLEET_MANAGEMENT_LANE_KINDS: readonly FleetJobKind[] = [
+	'vm-create',
+	'vm-control',
+	'usage-scan',
+	// Actions runners on computers (FL-18): runner jobs are work (CONTRACTS §1.1).
+	'runner-install',
+	'runner-control'
+];
 
 /** The consent a management-lane kind needs on the node (CONTRACTS R-34). */
 export type FleetManagementLaneConsent = Extract<FleetConsentKey, 'manage' | 'work' | 'usageScan'>;
@@ -202,7 +221,10 @@ export const FLEET_MANAGEMENT_LANE_CONSENT: Readonly<Partial<Record<FleetJobKind
 	'vm-create': 'manage',
 	'vm-control': 'manage',
 	// Usage & cost on the fleet (FL-20): the transcript scan is its own consent (CONTRACTS §1.1).
-	'usage-scan': 'usageScan'
+	'usage-scan': 'usageScan',
+	// Actions runners on computers (FL-18): Actions runner jobs are the `work` consent (CONTRACTS §1.1, R-34).
+	'runner-install': 'work',
+	'runner-control': 'work'
 };
 
 /** The consent a management-lane kind needs (`manage` when the table names none). */
@@ -361,7 +383,13 @@ export const FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC: Readonly<Record<FleetJobKind,
 	// the kinds above it does NOT undercut the shortest existing default (the
 	// fallback an unknown kind fails closed to). A scan nobody leased is simply
 	// superseded: the dispatcher never enqueues a second while one is queued.
-	'usage-scan': 2 * 60 * 60
+	'usage-scan': 2 * 60 * 60,
+	// Actions runners on computers (FL-18). The plan proposed an hour for an
+	// install and ten minutes for a control; like FL-16's kinds they do NOT
+	// undercut the shortest existing default (the fallback an unknown kind fails
+	// closed to), so an older reader's answer for an unknown kind is unchanged.
+	'runner-install': 2 * 60 * 60,
+	'runner-control': 2 * 60 * 60
 });
 
 /** Floor/ceiling clamps applied to any operator-supplied queued max age. */

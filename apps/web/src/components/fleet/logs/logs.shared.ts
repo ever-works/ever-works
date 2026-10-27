@@ -345,7 +345,9 @@ export function logsDownloadName(computer: string, source: string, at: Date): st
     return `${safe(computer)}-${safe(source)}-${stamp}.log`;
 }
 
-/** The kinds a viewer header names (spec S5/S6: `acme-api · container · build-01`). */
-export function sourceKindKey(source: Pick<FleetLogSource, 'kind'>): 'system' | 'file' | 'container' | 'service' {
+/** The kinds a viewer header names (spec S5/S6: `acme-api · container · build-01`; FL-18: an Actions runner's log). */
+export function sourceKindKey(
+    source: Pick<FleetLogSource, 'kind'>,
+): 'system' | 'file' | 'container' | 'service' | 'runner' {
     return source.kind;
 }

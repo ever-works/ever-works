@@ -300,6 +300,20 @@ export type FleetAuditAction =
 	| 'node.cloud.power'
 	| 'node.cloud.destroy'
 	/**
+	 * Actions runners on computers (FL-18, CONTRACTS §7) — one row per runner
+	 * installed (and per start / stop / restart / remove), `family: 'machines'`,
+	 * the runner as `target`, `requestedBy`, `confirmationClass`, `outcome`, plus
+	 * the repository or organisation, labels, mode and runner version; never a
+	 * registration or remove token.
+	 */
+	| 'node.runner.install'
+	| 'node.runner.start'
+	| 'node.runner.stop'
+	| 'node.runner.restart'
+	| 'node.runner.remove'
+	/** A whole GitHub workflow run cancelled from the Actions jobs panel (P2, R-37) — the run as `target`. */
+	| 'node.runner.job.cancel'
+	/**
 	 * Desktop view & control (FL-07, CONTRACTS §7) — Desktop-source views only
 	 * (an Agent's browser view keeps writing the `computer.*` names, so nothing
 	 * is audited twice). Every row carries `family: 'desktop'`, the view id as
@@ -444,7 +458,13 @@ export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'node.desktop.recording.delete',
 	'node.helper.admit',
 	'node.helper.revoke',
-	'node.helper.verify-failed'
+	'node.helper.verify-failed',
+	'node.runner.install',
+	'node.runner.start',
+	'node.runner.stop',
+	'node.runner.restart',
+	'node.runner.remove',
+	'node.runner.job.cancel'
 ];
 
 /**

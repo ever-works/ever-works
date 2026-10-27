@@ -31,8 +31,17 @@ export interface PaletteFleetComputer {
  * enrolled computers only). A failed read leaves the rows out — the palette
  * never waits on it and never shows a stale list as fresh.
  */
-/** The tags that add per-computer palette rows (FL-09: Services, Docker, Processes on <name>; FL-11: Files on <name>). */
-const PALETTE_MACHINE_TAGS: readonly string[] = ['services', 'docker', 'processes', 'files'];
+/**
+ * The tags that add per-computer palette rows (FL-09: Services, Docker, Processes on <name>; FL-11: Files on <name>;
+ * FL-18: Install Actions runners on <name>).
+ */
+const PALETTE_MACHINE_TAGS: readonly string[] = [
+    'services',
+    'docker',
+    'processes',
+    'files',
+    'actions-runner',
+];
 
 export function useFleetPaletteComputers(open: boolean, enabled: boolean): PaletteFleetComputer[] {
     const [computers, setComputers] = useState<PaletteFleetComputer[]>([]);

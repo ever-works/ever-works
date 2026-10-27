@@ -78,5 +78,7 @@ export * from './virtual';
 export * from './cloud';
 // Usage & cost on the fleet (FL-20) — the transcript scan's reconciler, dispatcher, view and Agent tool.
 export * from './usage';
+// Actions runners on computers (FL-18).
+export * from './runners';
 // Desktop view & control (FL-07) — the desktop facts a heartbeat reports, and the helper admission audit.
 export * from './desktop';

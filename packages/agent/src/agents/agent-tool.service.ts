@@ -69,6 +69,7 @@ import { buildFleetMachineTools } from '../fleet/machine/agent-fleet-machine-too
 import { buildFleetVirtualTools } from '../fleet/virtual/agent-fleet-virtual-tools';
 import { buildFleetCloudTools } from '../fleet/cloud/agent-fleet-cloud-tools';
 import { buildFleetUsageTools } from '../fleet/usage/agent-fleet-usage-tools';
+import { buildFleetRunnersTools } from '../fleet/runners/agent-fleet-runners-tools';
 import { buildFleetSessionTools } from '../fleet/agent-fleet-session-tools';
 import { buildFleetTaskTools } from '../fleet/agent-fleet-task-tools';
 import { buildFleetCommandTools } from '../fleet/commands/agent-fleet-command-tools';
@@ -663,6 +664,23 @@ export class AgentToolService {
             if (fleet.usage) {
                 const usage = fleet.usage;
                 add('fleet-usage', () => buildFleetUsageTools({ userId: agent.userId, service: usage }));
+            }
+            // Actions runners (FL-18): list read-only; an install, a stop, a restart and a
+            // remove are held for the owner's approval (spec S8); a start runs at once.
+            if (fleet.runners) {
+                const runners = fleet.runners;
+                add('fleet-runners', () =>
+                    buildFleetRunnersTools({
+                        userId: agent.userId,
+                        agentId: agent.id,
+                        runId:
+                            runContext?.runId && runContext.runId !== 'no-run'
+                                ? runContext.runId
+                                : null,
+                        service: runners,
+                        proposals: sources.proposals ?? null,
+                    }),
+                );
             }
             // Computer health (FL-03): the read-only health tools, when bound.
             if (fleet.health) {

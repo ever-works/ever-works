@@ -135,6 +135,7 @@ import {
     FleetVirtualService,
     FleetCloudService,
     FleetUsageViewService,
+    FleetActionsRunnersService,
     FleetModule,
     FleetPortsService,
     FleetCheckoutService,
@@ -2204,6 +2205,11 @@ async function assertRealWriteTarget(
                 // APPENDED LAST (positional), optional: unbound (or FLEET_USAGE_SCAN_ENABLED
                 // off) the tool is not offered.
                 { token: FleetUsageViewService, optional: true },
+                // Actions runners on computers (FL-18) — backs `fleet_runners_*`. APPENDED
+                // LAST (positional), optional: unbound (or FLEET_ACTIONS_RUNNERS_ENABLED off)
+                // the tools are not offered; install / stop / restart / remove only ever file
+                // an approval.
+                { token: FleetActionsRunnersService, optional: true },
                 // Desktop view & control (FL-07) — backs the read-only `fleet_desktop_displays`.
                 // APPENDED LAST (positional), optional: unbound (or FLEET_DESKTOP_ENABLED off)
                 // the tool is not offered.
@@ -2251,6 +2257,7 @@ async function assertRealWriteTarget(
                 fleetPullRequests?: FleetPullRequestService | null,
                 fleetCloud?: FleetCloudService | null,
                 fleetUsage?: FleetUsageViewService | null,
+                fleetRunners?: FleetActionsRunnersService | null,
                 fleetDesktop?: FleetDesktopReaderPort | null,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
@@ -2298,6 +2305,7 @@ async function assertRealWriteTarget(
                         : {}),
                     ...(fleetVirtual && config.fleet.isVirtualEnabled() ? { virtual: fleetVirtual } : {}),
                     ...(fleetUsage && config.fleet.isUsageScanEnabled() ? { usage: fleetUsage } : {}),
+                    ...(fleetRunners && config.fleet.isActionsRunnersEnabled() ? { runners: fleetRunners } : {}),
                     ...(fleetWake && config.fleet.isNodeLinkEnabled() ? { wake: fleetWake } : {}),
                     ...(fleetSessionActions && config.fleet.isSessionsEnabled()
                         ? {

@@ -773,6 +773,8 @@ const LOGS_EXPORTS = [
 	'fleetLogSourceId',
 	'isFleetLogServiceKey',
 	'isFleetLogContainerKey',
+	// Actions runners on computers (FL-18, FR-18): the `runner:<name>` source key.
+	'isFleetLogRunnerKey',
 	'parseFleetLogSourceId',
 	'isFleetLogSourceId',
 	'FLEET_LOG_LEVELS',
@@ -1477,6 +1479,61 @@ const HELPER_EXPORTS = [
 	'FLEET_HELPER_SEEN_EVENT_IDS'
 ] as const;
 
+/** Actions runners on computers (FL-18): `fleet-actions-runners.types.ts`, a NEW module (one witness row below). */
+const ACTIONS_RUNNERS_EXPORTS = [
+	'FLEET_ACTIONS_RUNNER_CAPABILITY',
+	'FLEET_ACTIONS_RUNNERS_MAX_PER_NODE',
+	'FLEET_ACTIONS_RUNNER_STOPPED_AFTER_MIN',
+	'FLEET_ACTIONS_JOB_UNASSIGNABLE_AFTER_MIN',
+	'FLEET_ACTIONS_RUNNERS_OPEN_REFRESH_MS',
+	'FLEET_ACTIONS_RUNNERS_CLOSED_REFRESH_MS',
+	'FLEET_ACTIONS_RUNNERS_POLL_CRON',
+	'FLEET_ACTIONS_RUNNER_MAX_LABELS',
+	'FLEET_ACTIONS_RUNNER_SCOPES',
+	'isFleetActionsRunnerScope',
+	'FLEET_ACTIONS_RUNNER_MODES',
+	'isFleetActionsRunnerMode',
+	'FLEET_ACTIONS_RUNNER_STATES',
+	'isFleetActionsRunnerState',
+	'FLEET_ACTIONS_RUNNER_STATE_SOURCES',
+	'isFleetActionsRunnerStateSource',
+	'FLEET_ACTIONS_RUNNER_PHASES',
+	'isFleetActionsRunnerPhase',
+	'FLEET_ACTIONS_RUNNER_CONTROL_ACTIONS',
+	'isFleetActionsRunnerControlAction',
+	'FLEET_ACTIONS_RUNNER_ACTION_CLASS',
+	'FLEET_ACTIONS_RUNNER_AUDIT_ACTION',
+	'isFleetActionsRunnerName',
+	'isFleetActionsRunnerLabel',
+	'isFleetActionsRunnerTarget',
+	'fleetActionsRunnerRegistrationUrl',
+	'fleetActionsRunnerSettingsUrl',
+	'fleetActionsRunnerDefaultLabels',
+	'normalizeFleetActionsRunnerLabels',
+	'fleetActionsRunnerNameStem',
+	'fleetActionsRunnerDefaultNames',
+	'clampFleetActionsRunnerCount',
+	'fleetActionsRunnerModesFor',
+	'fleetActionsRunnerInstallSummary',
+	'fleetActionsRunnerStopSummary',
+	'fleetActionsRunnerRestartSummary',
+	'fleetActionsRunnerRemoveSummary',
+	'fleetActionsRunnerReinstallSummary',
+	'fleetActionsRunCancelSummary',
+	'FLEET_ACTIONS_RUNNER_HOST_REASONS',
+	'isFleetActionsRunnerHostReason',
+	'fleetActionsRunnerVersionOf',
+	'fleetActionsRunnerPlatformOf',
+	'pickFleetActionsRunnerDownload',
+	'FLEET_ACTIONS_RUNNER_DOWNLOAD_HOSTS',
+	'isFleetActionsRunnerDownloadUrl',
+	'FLEET_ACTIONS_RUNNER_LIST_VERB',
+	'FLEET_ACTIONS_RUNNER_STATUS_VERB',
+	'mergeFleetActionsRunnerState',
+	'isFleetActionsRunnerStopped',
+	'fleetActionsRunnerLogSourceId'
+] as const;
+
 /** Usage & cost on the fleet (FL-20) — `fleet-usage.types.ts` and `fleet-model-list-prices.types.ts`. */
 const USAGE_EXPORTS = [
 	'FLEET_USAGE_PROVIDERS',
@@ -1579,7 +1636,8 @@ const ALL_EXPORTS = [
 	...HELPER_EXPORTS,
 	...USAGE_EXPORTS,
 	...MODEL_LIST_PRICES_EXPORTS,
-	...CLOUD_P2_EXPORTS
+	...CLOUD_P2_EXPORTS,
+	...ACTIONS_RUNNERS_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -1798,6 +1856,7 @@ const FUNCTION_EXPORTS = [
 	'fleetLogSourceId',
 	'isFleetLogServiceKey',
 	'isFleetLogContainerKey',
+	'isFleetLogRunnerKey',
 	'parseFleetLogSourceId',
 	'isFleetLogSourceId',
 	'isFleetLogLevel',
@@ -2108,7 +2167,39 @@ const FUNCTION_EXPORTS = [
 	'formatFleetUsageCents',
 	'formatFleetUsageTokens',
 	'findModelListPriceEntry',
-	'priceModelTokensCents'
+	'priceModelTokensCents',
+	// Actions runners on computers (FL-18).
+	'isFleetActionsRunnerScope',
+	'isFleetActionsRunnerMode',
+	'isFleetActionsRunnerState',
+	'isFleetActionsRunnerStateSource',
+	'isFleetActionsRunnerPhase',
+	'isFleetActionsRunnerControlAction',
+	'isFleetActionsRunnerName',
+	'isFleetActionsRunnerLabel',
+	'isFleetActionsRunnerTarget',
+	'fleetActionsRunnerRegistrationUrl',
+	'fleetActionsRunnerSettingsUrl',
+	'fleetActionsRunnerDefaultLabels',
+	'normalizeFleetActionsRunnerLabels',
+	'fleetActionsRunnerNameStem',
+	'fleetActionsRunnerDefaultNames',
+	'clampFleetActionsRunnerCount',
+	'fleetActionsRunnerModesFor',
+	'fleetActionsRunnerInstallSummary',
+	'fleetActionsRunnerStopSummary',
+	'fleetActionsRunnerRestartSummary',
+	'fleetActionsRunnerRemoveSummary',
+	'fleetActionsRunnerReinstallSummary',
+	'fleetActionsRunCancelSummary',
+	'isFleetActionsRunnerHostReason',
+	'fleetActionsRunnerVersionOf',
+	'fleetActionsRunnerPlatformOf',
+	'pickFleetActionsRunnerDownload',
+	'isFleetActionsRunnerDownloadUrl',
+	'mergeFleetActionsRunnerState',
+	'isFleetActionsRunnerStopped',
+	'fleetActionsRunnerLogSourceId'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -2123,7 +2214,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 1288 runtime symbols', () => {
+	it('exposes exactly these 1340 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -2220,9 +2311,12 @@ describe('fleet barrel', () => {
 		// and three of `fleet-model-list-prices.types.ts` — two NEW modules, two rows below.
 		// → +5 with FL-17 P2 (idle policy, usage freshness), same module (`CLOUD_P2_EXPORTS`).
 		// → +1 with FL-20 P2 (`FLEET_USAGE_TASK_COSTS_MAX_IDS`).
+		// → +52 with FL-18 (Actions runners on computers): the fifty-one symbols of
+		// `fleet-actions-runners.types.ts` — a NEW module, one row below — and
+		// `isFleetLogRunnerKey` in `fleet-logs.types.ts`, an existing module.
 		// → +70 with desktop view & control (FL-07): three NEW modules (`fleet-desktop.types.ts`,
 		// `fleet-desktop-tiles.codec.ts`, `fleet-helper.types.ts`), each a group above and a row below.
-		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 70);
+		expect(Object.keys(fleet)).toHaveLength(1175 + 37 + 5 + 1 + 52 + 70);
 	});
 
 	it.each([
@@ -2270,7 +2364,8 @@ describe('fleet barrel', () => {
 		['fleet-desktop-tiles.codec.js', 'encodeDesktopTiles'],
 		['fleet-helper.types.js', 'FLEET_HELPER_TARGETS'],
 		['fleet-usage.types.js', 'FLEET_USAGE_SCAN_CAPABILITY'],
-		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES']
+		['fleet-model-list-prices.types.js', 'MODEL_TOKEN_CLASSES'],
+		['fleet-actions-runners.types.js', 'FLEET_ACTIONS_RUNNER_CAPABILITY']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

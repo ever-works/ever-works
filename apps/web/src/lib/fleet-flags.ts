@@ -84,6 +84,17 @@ export function isFleetUsageScanEnabled(): boolean {
 }
 
 /**
+ * Actions runners on computers (FL-18) — `FLEET_ACTIONS_RUNNERS_ENABLED`,
+ * matching `config.fleet.isActionsRunnersEnabled()` on the API. Default OFF; on
+ * only for the literal `'true'` and only with the hub on, because the Actions
+ * runners block, its Install dialog and "Install Actions runners on <computer>"
+ * in the palette all live on the hub's computer page.
+ */
+export function isFleetActionsRunnersEnabled(): boolean {
+    return isFleetHubEnabled() && process.env.FLEET_ACTIONS_RUNNERS_ENABLED === 'true';
+}
+
+/**
  * The per-epic Fleet flags of CONTRACTS §9, read on the server and passed
  * down to the hub so a tab whose epic shipped behind a flag can say "switched
  * off on this deployment" instead of rendering (spec U4). Every flag is

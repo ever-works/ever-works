@@ -151,7 +151,14 @@ const EVERY_ACTION: readonly FleetAuditAction[] = [
 	'node.desktop.recording.delete',
 	'node.helper.admit',
 	'node.helper.revoke',
-	'node.helper.verify-failed'
+	'node.helper.verify-failed',
+	// Actions runners on computers (FL-18, CONTRACTS §7).
+	'node.runner.install',
+	'node.runner.start',
+	'node.runner.stop',
+	'node.runner.restart',
+	'node.runner.remove',
+	'node.runner.job.cancel'
 ];
 
 /** The `varchar(64)` the column actually is (`fleet-audit.entity.ts`). */
