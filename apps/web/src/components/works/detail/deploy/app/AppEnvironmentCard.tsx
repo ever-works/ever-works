@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { KeyRound, Lock, Pencil, Plug } from 'lucide-react';
+import { FileUp, KeyRound, Lock, Pencil, Plug, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { getAppEnvAction } from '@/app/actions/dashboard/app-env';
@@ -15,6 +15,13 @@ import {
 } from '@/lib/api/app-env.types';
 import { cn } from '@/lib/utils/cn';
 import { AppEnvValueDialog } from './AppEnvValueDialog';
+import { AppEnvImportDialog } from './AppEnvImportDialog';
+import { AppEnvRotateDialog } from './AppEnvRotateDialog';
+
+/** Lane aw-ops — a generated value of the App spec's own (not a key pair's derived public half). */
+function isRotatable(entry: AppEnvVariableView): boolean {
+    return entry.source === 'generate' && entry.origin !== 'derived' && entry.set;
+}
 
 type CardState =
     | { kind: 'loading' }
@@ -44,6 +51,9 @@ export function AppEnvironmentCard({ workId, initialEnv = null }: AppEnvironment
         initialEnv ? { kind: 'ready', env: initialEnv } : { kind: 'loading' },
     );
     const [editing, setEditing] = useState<AppEnvVariableView | null>(null);
+    // Lane aw-ops (APW-07 T24/T28) — the `.env` import and the Rotate dialogs.
+    const [importing, setImporting] = useState(false);
+    const [rotating, setRotating] = useState<AppEnvVariableView | null>(null);
 
     const load = useCallback(async () => {
         try {
@@ -131,6 +141,19 @@ export function AppEnvironmentCard({ workId, initialEnv = null }: AppEnvironment
                         )}
                     </p>
                 </div>
+                {env.canEdit && env.secureStorage && env.entries.length > 0 && (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto"
+                        onClick={() => setImporting(true)}
+                        data-testid="app-env-import-open"
+                    >
+                        <FileUp className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                        {t('import.open')}
+                    </Button>
+                )}
             </div>
 
             {!env.secureStorage && (
@@ -156,9 +179,49 @@ export function AppEnvironmentCard({ workId, initialEnv = null }: AppEnvironment
                             entry={entry}
                             canEdit={env.canEdit && env.secureStorage}
                             onEdit={() => setEditing(entry)}
+                            onRotate={
+                                env.canEdit && env.secureStorage && isRotatable(entry)
+                                    ? () => setRotating(entry)
+                                    : undefined
+                            }
                         />
                     ))}
                 </ul>
+            )}
+
+            {importing && (
+                <AppEnvImportDialog
+                    workId={workId}
+                    onOpenChange={setImporting}
+                    onImported={(answer) => {
+                        setImporting(false);
+                        setState((previous) =>
+                            previous.kind === 'ready'
+                                ? { kind: 'ready', env: { ...previous.env, entries: answer.entries } }
+                                : previous,
+                        );
+                        void load();
+                    }}
+                />
+            )}
+
+            {rotating && (
+                <AppEnvRotateDialog
+                    workId={workId}
+                    entry={rotating}
+                    onOpenChange={(open) => {
+                        if (!open) setRotating(null);
+                    }}
+                    onRotated={(answer) => {
+                        setRotating(null);
+                        setState((previous) =>
+                            previous.kind === 'ready'
+                                ? { kind: 'ready', env: { ...previous.env, entries: answer.entries } }
+                                : previous,
+                        );
+                        void load();
+                    }}
+                />
             )}
 
             {editing && (
@@ -180,10 +243,13 @@ function EnvRow({
     entry,
     canEdit,
     onEdit,
+    onRotate,
 }: {
     entry: AppEnvVariableView;
     canEdit: boolean;
     onEdit: () => void;
+    /** Lane aw-ops — present only for a generated value the member may rotate. */
+    onRotate?: () => void;
 }) {
     const t = useTranslations('dashboard.workDetail.appDeploy.environment');
     const missing = entry.required && !entry.set;
@@ -259,6 +325,19 @@ function EnvRow({
                 >
                     <Pencil className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                     {entry.set ? t('edit') : t('setValue')}
+                </Button>
+            )}
+            {onRotate && (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={onRotate}
+                    data-testid="app-env-rotate-open"
+                    aria-label={t('rotate.aria', { name: entry.name })}
+                >
+                    <RefreshCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                    {t('rotate.open')}
                 </Button>
             )}
         </li>

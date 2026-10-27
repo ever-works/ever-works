@@ -13,11 +13,20 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FleetActionsRunnersService } from '@ever-works/agent/fleet';
-import type { FleetActionsRunnerProgressReport, FleetActionsRunnerTokenResponse } from '@ever-works/contracts';
+import type {
+    FleetActionsRunnerProgressReport,
+    FleetActionsRunnerTokenResponse,
+} from '@ever-works/contracts';
 import { Public } from '../../auth/decorators/public.decorator';
 import { FleetEnabledGuard } from '../guards/fleet-enabled.guard';
-import { FLEET_NODE_UNAUTHORIZED_MESSAGE, FleetNodeAuthGuard } from '../guards/fleet-node-auth.guard';
-import { FleetActionsRunnerProgressDto, FleetActionsRunnerTokenDto } from './dto/fleet-actions-runners.dto';
+import {
+    FLEET_NODE_UNAUTHORIZED_MESSAGE,
+    FleetNodeAuthGuard,
+} from '../guards/fleet-node-auth.guard';
+import {
+    FleetActionsRunnerProgressDto,
+    FleetActionsRunnerTokenDto,
+} from './dto/fleet-actions-runners.dto';
 import { FleetActionsRunnersEnabledGuard } from './fleet-actions-runners-enabled.guard';
 
 /**

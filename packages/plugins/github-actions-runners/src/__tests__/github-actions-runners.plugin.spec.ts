@@ -47,7 +47,8 @@ describe('GitHubActionsRunnersPlugin', () => {
 					{
 						os: 'linux',
 						architecture: 'x64',
-						download_url: 'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
+						download_url:
+							'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
 						filename: 'actions-runner-linux-x64-2.321.0.tar.gz',
 						sha256_checksum: 'A'.repeat(64)
 					},
@@ -60,7 +61,8 @@ describe('GitHubActionsRunnersPlugin', () => {
 			{
 				os: 'linux',
 				architecture: 'x64',
-				downloadUrl: 'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
+				downloadUrl:
+					'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
 				filename: 'actions-runner-linux-x64-2.321.0.tar.gz',
 				sha256: 'a'.repeat(64)
 			}
@@ -71,10 +73,19 @@ describe('GitHubActionsRunnersPlugin', () => {
 
 	it('mints registration and remove tokens on the target scope', async () => {
 		const { plugin } = fakeGitHub({
-			'POST /orgs/acme/actions/runners/registration-token': { status: 201, body: { token: 'REG', expires_at: '2026-10-21T11:00:00Z' } },
-			'POST /repos/acme/api/actions/runners/remove-token': { status: 201, body: { token: 'REM', expires_at: null } }
+			'POST /orgs/acme/actions/runners/registration-token': {
+				status: 201,
+				body: { token: 'REG', expires_at: '2026-10-21T11:00:00Z' }
+			},
+			'POST /repos/acme/api/actions/runners/remove-token': {
+				status: 201,
+				body: { token: 'REM', expires_at: null }
+			}
 		});
-		expect(await plugin.mintRegistrationToken(org, TOKEN)).toEqual({ token: 'REG', expiresAt: '2026-10-21T11:00:00Z' });
+		expect(await plugin.mintRegistrationToken(org, TOKEN)).toEqual({
+			token: 'REG',
+			expiresAt: '2026-10-21T11:00:00Z'
+		});
 		expect(await plugin.mintRemoveToken(repo, TOKEN)).toEqual({ token: 'REM', expiresAt: null });
 	});
 
@@ -85,12 +96,23 @@ describe('GitHubActionsRunnersPlugin', () => {
 				headers: { etag: 'W/"abc"', 'x-ratelimit-remaining': '4999' },
 				body: {
 					total_count: 1,
-					runners: [{ id: 7, name: 'build-01-1', os: 'Linux', status: 'online', busy: true, labels: [{ name: 'self-hosted' }, { name: 'gpu' }] }]
+					runners: [
+						{
+							id: 7,
+							name: 'build-01-1',
+							os: 'Linux',
+							status: 'online',
+							busy: true,
+							labels: [{ name: 'self-hosted' }, { name: 'gpu' }]
+						}
+					]
 				}
 			}
 		});
 		const page = await plugin.listRunners(repo, TOKEN, { etag: 'W/"old"' });
-		expect(page.runners).toEqual([{ id: 7, name: 'build-01-1', os: 'Linux', status: 'online', busy: true, labels: ['self-hosted', 'gpu'] }]);
+		expect(page.runners).toEqual([
+			{ id: 7, name: 'build-01-1', os: 'Linux', status: 'online', busy: true, labels: ['self-hosted', 'gpu'] }
+		]);
 		expect(page.etag).toBe('W/"abc"');
 		expect(page.rateLimitRemaining).toBe(4999);
 		expect(calls[0].headers['If-None-Match']).toBe('W/"old"');
@@ -110,7 +132,10 @@ describe('GitHubActionsRunnersPlugin', () => {
 				headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '1798000000' },
 				body: { message: 'API rate limit exceeded' }
 			},
-			'GET /orgs/acme/actions/runners': { status: 403, body: { message: 'Resource not accessible by integration' } }
+			'GET /orgs/acme/actions/runners': {
+				status: 403,
+				body: { message: 'Resource not accessible by integration' }
+			}
 		});
 		await expect(plugin.listRunners(repo, TOKEN)).rejects.toMatchObject({
 			name: 'ActionsRunnersApiError',
@@ -121,14 +146,20 @@ describe('GitHubActionsRunnersPlugin', () => {
 	});
 
 	it('treats an already-deleted runner as deleted and cancels a whole workflow run', async () => {
-		const { plugin, calls } = fakeGitHub({ 'POST /repos/acme/api/actions/runs/4822/cancel': { status: 202, body: {} } });
+		const { plugin, calls } = fakeGitHub({
+			'POST /repos/acme/api/actions/runs/4822/cancel': { status: 202, body: {} }
+		});
 		await expect(plugin.deleteRunner(repo, 7, TOKEN)).resolves.toBeUndefined();
 		await expect(plugin.cancelRun('acme/api', 4822, TOKEN)).resolves.toBeUndefined();
-		expect(calls.map((call) => `${call.method} ${call.url}`)).toContain('POST https://api.github.test/repos/acme/api/actions/runs/4822/cancel');
+		expect(calls.map((call) => `${call.method} ${call.url}`)).toContain(
+			'POST https://api.github.test/repos/acme/api/actions/runs/4822/cancel'
+		);
 	});
 
 	it('never puts the token anywhere but the Authorization header', async () => {
-		const { plugin, calls } = fakeGitHub({ 'GET /repos/acme/api/actions/runners': { status: 500, body: { message: 'boom' } } });
+		const { plugin, calls } = fakeGitHub({
+			'GET /repos/acme/api/actions/runners': { status: 500, body: { message: 'boom' } }
+		});
 		const error = await plugin.listRunners(repo, TOKEN).catch((caught: Error) => caught);
 		expect(String((error as Error).message)).not.toContain(TOKEN);
 		expect(calls.every((call) => !call.url.includes(TOKEN))).toBe(true);
@@ -138,7 +169,9 @@ describe('GitHubActionsRunnersPlugin', () => {
 describe('rateLimitedUntilOf', () => {
 	it('reads retry-after first, then the reset header', () => {
 		const now = Date.parse('2026-10-21T10:00:00Z');
-		expect(rateLimitedUntilOf(new Response(null, { status: 429, headers: { 'retry-after': '30' } }), now)).toBe('2026-10-21T10:00:30.000Z');
+		expect(rateLimitedUntilOf(new Response(null, { status: 429, headers: { 'retry-after': '30' } }), now)).toBe(
+			'2026-10-21T10:00:30.000Z'
+		);
 		expect(rateLimitedUntilOf(new Response(null, { status: 200 }), now)).toBeNull();
 		expect(rateLimitedUntilOf(new Response(null, { status: 403 }), now)).toBeNull();
 	});

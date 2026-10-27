@@ -40,7 +40,8 @@ export interface RunnerControlRequest {
 /** The `runner-control` payload off the job, validated on the machine. */
 export function parseRunnerControlPayload(job: FleetJobView): RunnerControlRequest {
 	const raw = (job.payload ?? {}) as Record<string, unknown>;
-	if (typeof raw.runnerId !== 'string' || !RUNNER_ID.test(raw.runnerId)) throw new RunnerHostError('the job names no runner');
+	if (typeof raw.runnerId !== 'string' || !RUNNER_ID.test(raw.runnerId))
+		throw new RunnerHostError('the job names no runner');
 	if (!isFleetActionsRunnerName(raw.name)) throw new RunnerHostError('the job names a runner that is not valid');
 	if (!isFleetActionsRunnerControlAction(raw.action)) throw new RunnerHostError('the job names no known act');
 	return { runnerId: raw.runnerId.toLowerCase(), name: raw.name, action: raw.action };
@@ -60,7 +61,10 @@ export function createRunnerControlExecutor(deps: RunnerHostDeps) {
 				case 'stop':
 				case 'restart': {
 					if (!meta) {
-						await reportRunner(deps, job, runnerId, { state: 'offline', error: `${name} is not on ${deps.nodeName}` });
+						await reportRunner(deps, job, runnerId, {
+							state: 'offline',
+							error: `${name} is not on ${deps.nodeName}`
+						});
 						throw new RunnerHostError(`${name} is not on ${deps.nodeName}; remove it and install it again`);
 					}
 					await controlRunnerService(deps, dir, meta, action);
@@ -76,8 +80,11 @@ export function createRunnerControlExecutor(deps: RunnerHostDeps) {
 						// Linux / macOS: the runner refuses to deregister while its service is installed.
 						if (!windows) await uninstallRunnerService(deps, dir, meta);
 						if (meta.configured) {
-							const minted = await fetchRunnerToken(deps, job, runnerId, 'remove', signal).catch(() => null);
-							if (minted) deregistered = await deregisterRunner(deps.exec, deps.platform, dir, minted.token);
+							const minted = await fetchRunnerToken(deps, job, runnerId, 'remove', signal).catch(
+								() => null
+							);
+							if (minted)
+								deregistered = await deregisterRunner(deps.exec, deps.platform, dir, minted.token);
 						}
 						// Windows: `config remove` took the service with it; take back one it left.
 						if (windows) await uninstallRunnerService(deps, dir, meta);
@@ -87,7 +94,10 @@ export function createRunnerControlExecutor(deps: RunnerHostDeps) {
 					return { runnerId, state: 'removed', deregistered };
 				}
 				case 'reinstall':
-					throw new RunnerHostError('reinstalling a runner is not available on this computer yet', 'unsupported_on_node');
+					throw new RunnerHostError(
+						'reinstalling a runner is not available on this computer yet',
+						'unsupported_on_node'
+					);
 			}
 			throw new RunnerHostError('the job names no known act');
 		} catch (error) {

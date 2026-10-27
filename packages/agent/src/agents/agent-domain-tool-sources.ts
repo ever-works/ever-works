@@ -150,7 +150,9 @@ export interface AgentFleetToolSource {
      * Actions runners on computers (FL-18) — backs `fleet_runners_*`. Optional:
      * unbound (or `FLEET_ACTIONS_RUNNERS_ENABLED` off), those tools are simply not offered.
      */
-    runners?: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'>;
+    runners?: Pick<FleetActionsRunnersService, 'list' | 'listAll' | 'install' | 'control'> &
+        // P2: `fleet_runners_jobs` / `fleet_runners_cancel_run` are offered when the binding carries them.
+        Partial<Pick<FleetActionsRunnersService, 'actionsJobs' | 'cancelRun'>>;
     machine?: Pick<
         FleetMachineActionsService,
         | 'listServices'

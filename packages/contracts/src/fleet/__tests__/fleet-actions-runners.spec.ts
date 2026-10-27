@@ -64,19 +64,22 @@ describe('install requests', () => {
 	});
 
 	it('offers Service wherever a service manager exists, and Docker only on Linux with Docker once shipped', () => {
-		expect(fleetActionsRunnerModesFor({ os: 'win32', hasServiceManager: true, hasDocker: true, dockerShipped: true })).toEqual([
+		expect(
+			fleetActionsRunnerModesFor({ os: 'win32', hasServiceManager: true, hasDocker: true, dockerShipped: true })
+		).toEqual(['service']);
+		expect(fleetActionsRunnerModesFor({ os: 'linux', hasServiceManager: true, hasDocker: true })).toEqual([
 			'service'
 		]);
-		expect(fleetActionsRunnerModesFor({ os: 'linux', hasServiceManager: true, hasDocker: true })).toEqual(['service']);
-		expect(fleetActionsRunnerModesFor({ os: 'linux', hasServiceManager: true, hasDocker: true, dockerShipped: true })).toEqual([
-			'service',
-			'docker'
-		]);
+		expect(
+			fleetActionsRunnerModesFor({ os: 'linux', hasServiceManager: true, hasDocker: true, dockerShipped: true })
+		).toEqual(['service', 'docker']);
 		expect(fleetActionsRunnerModesFor({ os: 'linux', hasServiceManager: false, hasDocker: false })).toEqual([]);
 	});
 
 	it('says target, count, mode, computer and that no credits are spent (FR-30)', () => {
-		expect(fleetActionsRunnerInstallSummary({ count: 2, target: 'acme/api', mode: 'service', computer: 'build-01' })).toBe(
+		expect(
+			fleetActionsRunnerInstallSummary({ count: 2, target: 'acme/api', mode: 'service', computer: 'build-01' })
+		).toBe(
 			'Installs 2 Actions runners for acme/api on build-01 as services. They run CI jobs on that computer; no credits are spent.'
 		);
 		expect(FLEET_ACTIONS_RUNNER_ACTION_CLASS.remove).toBe('confirm-destructive');
@@ -86,8 +89,22 @@ describe('install requests', () => {
 
 describe('downloads', () => {
 	const downloads = [
-		{ os: 'linux', architecture: 'x64', downloadUrl: 'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz', filename: 'actions-runner-linux-x64-2.321.0.tar.gz', sha256: 'a'.repeat(64) },
-		{ os: 'win', architecture: 'x64', downloadUrl: 'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-win-x64-2.321.0.zip', filename: 'actions-runner-win-x64-2.321.0.zip', sha256: 'b'.repeat(64) }
+		{
+			os: 'linux',
+			architecture: 'x64',
+			downloadUrl:
+				'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz',
+			filename: 'actions-runner-linux-x64-2.321.0.tar.gz',
+			sha256: 'a'.repeat(64)
+		},
+		{
+			os: 'win',
+			architecture: 'x64',
+			downloadUrl:
+				'https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-win-x64-2.321.0.zip',
+			filename: 'actions-runner-win-x64-2.321.0.zip',
+			sha256: 'b'.repeat(64)
+		}
 	];
 
 	it('picks the build for the node and reads its version', () => {
@@ -98,10 +115,18 @@ describe('downloads', () => {
 
 	it('accepts only GitHub release assets of the runner', () => {
 		expect(isFleetActionsRunnerDownloadUrl(downloads[0].downloadUrl)).toBe(true);
-		expect(isFleetActionsRunnerDownloadUrl('http://github.com/actions/runner/releases/download/x.tar.gz')).toBe(false);
-		expect(isFleetActionsRunnerDownloadUrl('https://evil.example/actions/runner/releases/download/x.tar.gz')).toBe(false);
-		expect(isFleetActionsRunnerDownloadUrl('https://github.com/someone/runner/releases/download/x.tar.gz')).toBe(false);
-		expect(isFleetActionsRunnerDownloadUrl('https://user:pw@github.com/actions/runner/releases/download/x')).toBe(false);
+		expect(isFleetActionsRunnerDownloadUrl('http://github.com/actions/runner/releases/download/x.tar.gz')).toBe(
+			false
+		);
+		expect(isFleetActionsRunnerDownloadUrl('https://evil.example/actions/runner/releases/download/x.tar.gz')).toBe(
+			false
+		);
+		expect(isFleetActionsRunnerDownloadUrl('https://github.com/someone/runner/releases/download/x.tar.gz')).toBe(
+			false
+		);
+		expect(isFleetActionsRunnerDownloadUrl('https://user:pw@github.com/actions/runner/releases/download/x')).toBe(
+			false
+		);
 	});
 });
 
@@ -122,25 +147,54 @@ describe('mergeFleetActionsRunnerState (FR-13, FR-17)', () => {
 	const base = { state: 'idle' as const, stoppedByOwner: false, nodeName: 'build-01' };
 
 	it('lets GitHub win when it was read', () => {
-		expect(mergeFleetActionsRunnerState({ ...base, github: { id: 7, name: 'x', status: 'online', busy: true } }).state).toBe('working');
-		expect(mergeFleetActionsRunnerState({ ...base, github: { id: 7, name: 'x', status: 'online', busy: false }, node: fact({ serviceState: 'stopped' }) }).state).toBe('idle');
-		expect(mergeFleetActionsRunnerState({ ...base, github: { id: 7, name: 'x', status: 'offline', busy: false } }).state).toBe('offline');
-		expect(mergeFleetActionsRunnerState({ ...base, stoppedByOwner: true, github: { id: 7, name: 'x', status: 'offline', busy: false } }).state).toBe('stopped');
+		expect(
+			mergeFleetActionsRunnerState({ ...base, github: { id: 7, name: 'x', status: 'online', busy: true } }).state
+		).toBe('working');
+		expect(
+			mergeFleetActionsRunnerState({
+				...base,
+				github: { id: 7, name: 'x', status: 'online', busy: false },
+				node: fact({ serviceState: 'stopped' })
+			}).state
+		).toBe('idle');
+		expect(
+			mergeFleetActionsRunnerState({ ...base, github: { id: 7, name: 'x', status: 'offline', busy: false } })
+				.state
+		).toBe('offline');
+		expect(
+			mergeFleetActionsRunnerState({
+				...base,
+				stoppedByOwner: true,
+				github: { id: 7, name: 'x', status: 'offline', busy: false }
+			}).state
+		).toBe('stopped');
 	});
 
 	it('names a disagreement instead of hiding it', () => {
 		const onlyNode = mergeFleetActionsRunnerState({ ...base, githubMissing: true, node: fact() });
 		expect(onlyNode.state).toBe('unknown');
 		expect(onlyNode.discrepancy).toBe('build-01 has it, GitHub does not list it');
-		const onlyGithub = mergeFleetActionsRunnerState({ ...base, github: { id: 7, name: 'x', status: 'online', busy: false }, nodeMissing: true });
+		const onlyGithub = mergeFleetActionsRunnerState({
+			...base,
+			github: { id: 7, name: 'x', status: 'online', busy: false },
+			nodeMissing: true
+		});
 		expect(onlyGithub.state).toBe('unknown');
 		expect(onlyGithub.discrepancy).toBe('GitHub lists it, build-01 does not');
 	});
 
 	it('falls back to the node service without GitHub, and leaves installs and failures alone', () => {
 		expect(mergeFleetActionsRunnerState({ ...base, state: 'working', node: fact() }).state).toBe('working');
-		expect(mergeFleetActionsRunnerState({ ...base, node: fact({ serviceState: 'stopped' }) }).state).toBe('offline');
-		expect(mergeFleetActionsRunnerState({ ...base, state: 'installing', github: { id: 7, name: 'x', status: 'online', busy: false } }).state).toBe('installing');
+		expect(mergeFleetActionsRunnerState({ ...base, node: fact({ serviceState: 'stopped' }) }).state).toBe(
+			'offline'
+		);
+		expect(
+			mergeFleetActionsRunnerState({
+				...base,
+				state: 'installing',
+				github: { id: 7, name: 'x', status: 'online', busy: false }
+			}).state
+		).toBe('installing');
 		expect(mergeFleetActionsRunnerState({ ...base, state: 'failed', node: fact() }).state).toBe('failed');
 		expect(mergeFleetActionsRunnerState({ ...base }).state).toBe('idle');
 	});
@@ -152,9 +206,15 @@ describe('isFleetActionsRunnerStopped (FR-19, U12)', () => {
 		const input = { state: 'offline' as const, stoppedByOwner: false, nodeOnline: true, installedAt: null, now };
 		expect(isFleetActionsRunnerStopped({ ...input, lastSeenAt: '2026-10-21T09:54:00Z' })).toBe(true);
 		expect(isFleetActionsRunnerStopped({ ...input, lastSeenAt: '2026-10-21T09:57:00Z' })).toBe(false);
-		expect(isFleetActionsRunnerStopped({ ...input, stoppedByOwner: true, lastSeenAt: '2026-10-21T09:00:00Z' })).toBe(false);
-		expect(isFleetActionsRunnerStopped({ ...input, nodeOnline: false, lastSeenAt: '2026-10-21T09:00:00Z' })).toBe(false);
-		expect(isFleetActionsRunnerStopped({ ...input, state: 'stopped', lastSeenAt: '2026-10-21T09:00:00Z' })).toBe(false);
+		expect(
+			isFleetActionsRunnerStopped({ ...input, stoppedByOwner: true, lastSeenAt: '2026-10-21T09:00:00Z' })
+		).toBe(false);
+		expect(isFleetActionsRunnerStopped({ ...input, nodeOnline: false, lastSeenAt: '2026-10-21T09:00:00Z' })).toBe(
+			false
+		);
+		expect(isFleetActionsRunnerStopped({ ...input, state: 'stopped', lastSeenAt: '2026-10-21T09:00:00Z' })).toBe(
+			false
+		);
 	});
 });
 

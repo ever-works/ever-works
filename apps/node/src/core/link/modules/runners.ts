@@ -82,11 +82,14 @@ export function createRunnersModule(deps: RunnersModuleDeps): NodeModule {
 				run: async (context) => {
 					const runnerId = context.params.runnerId;
 					if (typeof runnerId !== 'string' || !RUNNER_ID.test(runnerId)) {
-						throw new MachineVerbError(makeFleetLinkError('invalid', 'runnerId must be an Actions runner id'));
+						throw new MachineVerbError(
+							makeFleetLinkError('invalid', 'runnerId must be an Actions runner id')
+						);
 					}
 					const listed = await listActionsRunners(deps);
 					const fact = listed.runners.find((runner) => runner.runnerId === runnerId.toLowerCase());
-					if (!fact) throw new MachineVerbError(makeFleetLinkError('not_found', 'no such Actions runner here'));
+					if (!fact)
+						throw new MachineVerbError(makeFleetLinkError('not_found', 'no such Actions runner here'));
 					return fact;
 				}
 			}
