@@ -176,7 +176,8 @@ export class AppBuildRunDiscoveryService {
             this.telemetry?.track(APP_BUILD_TELEMETRY_EVENTS.runsDiscovered, {
                 recorded: summary.runsRecorded,
                 notModified:
-                    summary.worksNotModified > 0 && summary.worksNotModified === summary.worksChecked,
+                    summary.worksNotModified > 0 &&
+                    summary.worksNotModified === summary.worksChecked,
                 source: 'poll',
             });
         }

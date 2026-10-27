@@ -21,9 +21,7 @@ import type { AppEnvActorNames } from './app-env.service';
 /** The reads this adapter makes, as narrow views (structural, so a spec passes plain objects). */
 export interface AppEnvActorNameSources {
     works(): { findById(id: string): Promise<{ userId?: string | null } | null> } | undefined;
-    members():
-        | { findMember(workId: string, userId: string): Promise<unknown | null> }
-        | undefined;
+    members(): { findMember(workId: string, userId: string): Promise<unknown | null> } | undefined;
     users():
         | {
               findById(

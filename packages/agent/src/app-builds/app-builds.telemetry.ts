@@ -102,7 +102,11 @@ export interface AppBuildTelemetryPayloads {
     app_build_pull_token_validated: { result: AppBuildPullTokenValidationResult };
     app_build_sweep_tick: { observed: number; lost: number; verifySecretsRemoved: number };
     app_build_checks_written: { count: number; advisory: number; checksOnly: boolean };
-    app_build_runs_discovered: { recorded: number; notModified: boolean; source: AppBuildRunSource };
+    app_build_runs_discovered: {
+        recorded: number;
+        notModified: boolean;
+        source: AppBuildRunSource;
+    };
     app_build_webhook: { state: Exclude<AppBuildWebhookState, 'none'> };
     app_build_dispatch_fallback: { job: 'prepare' | 'watch' };
 }
@@ -222,7 +226,9 @@ export class AppBuildsTelemetryListener {
     }
 
     @OnEvent('app.build.failed', { async: true })
-    async onFailed(event: { payload?: AppBuildEventPayload } | AppBuildEventPayload): Promise<void> {
+    async onFailed(
+        event: { payload?: AppBuildEventPayload } | AppBuildEventPayload,
+    ): Promise<void> {
         await this.terminal(event);
     }
 
@@ -272,7 +278,8 @@ function payloadOf(
 ): AppBuildEventPayload | null {
     if (!event || typeof event !== 'object') return null;
     const wrapped = (event as { payload?: AppBuildEventPayload }).payload;
-    const payload = wrapped && typeof wrapped === 'object' ? wrapped : (event as AppBuildEventPayload);
+    const payload =
+        wrapped && typeof wrapped === 'object' ? wrapped : (event as AppBuildEventPayload);
     return typeof payload?.buildId === 'string' && typeof payload?.status === 'string'
         ? payload
         : null;

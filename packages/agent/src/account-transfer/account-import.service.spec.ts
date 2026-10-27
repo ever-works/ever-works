@@ -726,7 +726,9 @@ describe('AccountImportService', () => {
             mocks.workRepository.create.mockClear();
             await service.applyImport(
                 'user-1',
-                makePayload([makeWork({ slug: 'a', kind: 'directory', appLauncherExposed: false })]),
+                makePayload([
+                    makeWork({ slug: 'a', kind: 'directory', appLauncherExposed: false }),
+                ]),
                 [],
             );
             expect(mocks.workRepository.create.mock.calls[0][0].appLauncherExposed).toBe(false);
@@ -755,7 +757,9 @@ describe('AccountImportService', () => {
             await service.applyImport('user-1', makePayload([makeWork({ slug: 'a' })]), [
                 { slug: 'a', strategy: 'overwrite' },
             ]);
-            expect('appLauncherExposed' in mocks.workRepository.update.mock.calls[0][1]).toBe(false);
+            expect('appLauncherExposed' in mocks.workRepository.update.mock.calls[0][1]).toBe(
+                false,
+            );
 
             // Tampered payload → dropped, never coerced into a boolean.
             mocks.workRepository.update.mockClear();
@@ -764,7 +768,9 @@ describe('AccountImportService', () => {
                 makePayload([makeWork({ slug: 'a', appLauncherExposed: 'yes' as never })]),
                 [{ slug: 'a', strategy: 'overwrite' }],
             );
-            expect('appLauncherExposed' in mocks.workRepository.update.mock.calls[0][1]).toBe(false);
+            expect('appLauncherExposed' in mocks.workRepository.update.mock.calls[0][1]).toBe(
+                false,
+            );
         });
 
         it('round-trips quality-gate fields (checkDefaults / checksPolicy / maxGateAttempts) on create', async () => {

@@ -42,7 +42,11 @@ const DEFAULTS = {
 };
 
 function renderDialog(
-    props: Partial<{ publicRepository: boolean; canEdit: boolean; onOpenChange: (open: boolean) => void }> = {},
+    props: Partial<{
+        publicRepository: boolean;
+        canEdit: boolean;
+        onOpenChange: (open: boolean) => void;
+    }> = {},
 ) {
     return render(
         <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">

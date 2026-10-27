@@ -49,10 +49,7 @@ export interface AppBuildSettingsDialogProps {
     canEdit: boolean;
 }
 
-type LoadState =
-    | { kind: 'loading' }
-    | { kind: 'ready' }
-    | { kind: 'error' };
+type LoadState = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error' };
 
 function toNumber(value: string): number | null {
     const trimmed = value.trim();
@@ -91,9 +88,13 @@ export function AppBuildSettingsDialog({
             const settings = result.data.settings;
             setValues(settings);
             setMemoryText(
-                settings.largerRunnerMemoryGiB === null ? '' : String(settings.largerRunnerMemoryGiB),
+                settings.largerRunnerMemoryGiB === null
+                    ? ''
+                    : String(settings.largerRunnerMemoryGiB),
             );
-            setVcpuText(settings.largerRunnerVcpu === null ? '' : String(settings.largerRunnerVcpu));
+            setVcpuText(
+                settings.largerRunnerVcpu === null ? '' : String(settings.largerRunnerVcpu),
+            );
             setLoad({ kind: 'ready' });
         });
         return () => {
@@ -175,7 +176,9 @@ export function AppBuildSettingsDialog({
                                 onChange={(event) => set('largerRunnerLabel', event.target.value)}
                                 maxLength={64}
                                 autoComplete="off"
-                                error={error === 'labelInvalid' ? t('errors.labelInvalid') : undefined}
+                                error={
+                                    error === 'labelInvalid' ? t('errors.labelInvalid') : undefined
+                                }
                                 data-testid="app-build-settings-runner-label"
                             />
                             <div className="grid grid-cols-2 gap-3">
@@ -239,7 +242,9 @@ export function AppBuildSettingsDialog({
                         <div>
                             <Switch
                                 checked={values.allowBuildValuesOnPullRequests}
-                                onChange={(checked) => set('allowBuildValuesOnPullRequests', checked)}
+                                onChange={(checked) =>
+                                    set('allowBuildValuesOnPullRequests', checked)
+                                }
                                 disabled={disabled}
                                 label={t('allowBuildValuesOnPullRequests')}
                                 helperText={t('allowBuildValuesOnPullRequestsHelp')}

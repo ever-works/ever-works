@@ -28,7 +28,10 @@ describe('normalizeAppBuildSettings', () => {
 
     it('ignores a value of the wrong type rather than coercing it', () => {
         expect(
-            normalizeAppBuildSettings({ allowBuildValuesOnPullRequests: 'yes', largerRunnerVcpu: -4 }),
+            normalizeAppBuildSettings({
+                allowBuildValuesOnPullRequests: 'yes',
+                largerRunnerVcpu: -4,
+            }),
         ).toMatchObject({ allowBuildValuesOnPullRequests: false, largerRunnerVcpu: null });
     });
 });
@@ -55,15 +58,24 @@ describe('appBuildSettingsPatch', () => {
     });
 
     it('sends attestations only for a public repository', () => {
-        const priv = appBuildSettingsPatch({ ...base, attestations: true }, { publicRepository: false });
-        const pub = appBuildSettingsPatch({ ...base, attestations: true }, { publicRepository: true });
+        const priv = appBuildSettingsPatch(
+            { ...base, attestations: true },
+            { publicRepository: false },
+        );
+        const pub = appBuildSettingsPatch(
+            { ...base, attestations: true },
+            { publicRepository: true },
+        );
         expect(priv.ok && 'attestations' in priv.settings).toBe(false);
         expect(pub.ok && pub.settings.attestations).toBe(true);
     });
 
     it('requires a memory with a label, inside the schema bounds', () => {
         expect(
-            appBuildSettingsPatch({ ...base, largerRunnerLabel: 'big' }, { publicRepository: false }),
+            appBuildSettingsPatch(
+                { ...base, largerRunnerLabel: 'big' },
+                { publicRepository: false },
+            ),
         ).toEqual({ ok: false, error: 'memoryRequired' });
         expect(
             appBuildSettingsPatch(
@@ -73,7 +85,12 @@ describe('appBuildSettingsPatch', () => {
         ).toEqual({ ok: false, error: 'memoryRange' });
         expect(
             appBuildSettingsPatch(
-                { ...base, largerRunnerLabel: 'big', largerRunnerMemoryGiB: 32, largerRunnerVcpu: 1 },
+                {
+                    ...base,
+                    largerRunnerLabel: 'big',
+                    largerRunnerMemoryGiB: 32,
+                    largerRunnerVcpu: 1,
+                },
                 { publicRepository: false },
             ),
         ).toEqual({ ok: false, error: 'vcpuRange' });
@@ -98,10 +115,9 @@ describe('appBuildSettingsPatch', () => {
     });
 
     it('never carries the pull token or any key outside the seven', () => {
-        const patch = appBuildSettingsPatch(
-            { ...base, pullToken: 'ghp_x' } as never,
-            { publicRepository: true },
-        );
+        const patch = appBuildSettingsPatch({ ...base, pullToken: 'ghp_x' } as never, {
+            publicRepository: true,
+        });
         expect(patch.ok && Object.keys(patch.settings).sort()).toEqual(
             [
                 'allowBuildValuesOnPullRequests',

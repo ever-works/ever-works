@@ -202,7 +202,9 @@ describe('Builds telemetry (APW-05 T38)', () => {
                 },
             } as never);
 
-            await listener.onCancelled({ payload: { ...payload, status: 'cancelled', failureClass: null } });
+            await listener.onCancelled({
+                payload: { ...payload, status: 'cancelled', failureClass: null },
+            });
 
             expect(target.sent[0].properties).toEqual({
                 status: 'cancelled',
@@ -239,15 +241,27 @@ describe('Builds telemetry (APW-05 T38)', () => {
 
         /** Two checks whose names and commands must never reach the sink. */
         const checks = [
-            { name: 'lint-and-test', command: 'pnpm test --ci', required: true, timeoutSeconds: 600 },
-            { name: 'acme/secret-widgets', command: 'npm run e2e', required: false, timeoutSeconds: 600 },
+            {
+                name: 'lint-and-test',
+                command: 'pnpm test --ci',
+                required: true,
+                timeoutSeconds: 600,
+            },
+            {
+                name: 'acme/secret-widgets',
+                command: 'npm run e2e',
+                required: false,
+                timeoutSeconds: 600,
+            },
         ];
 
         it('counts the checks a committed workflow carries, and names none of them', () => {
             const target = sink();
-            (runnerWith(target) as unknown as {
-                emitDeliveryTelemetry(result: unknown, input: unknown): void;
-            }).emitDeliveryTelemetry(
+            (
+                runnerWith(target) as unknown as {
+                    emitDeliveryTelemetry(result: unknown, input: unknown): void;
+                }
+            ).emitDeliveryTelemetry(
                 { workflow: { state: 'committed' } },
                 { checks, checksOnly: false },
             );

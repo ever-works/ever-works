@@ -5,7 +5,10 @@ import { appEnvActorNames, type AppEnvActorNameSources } from '../app-env-actor-
  * Only the Work's owner or a member is named, by display name or username, never by email.
  */
 describe('appEnvActorNames', () => {
-    const users: Record<string, { displayName?: string | null; username?: string | null; email?: string }> = {
+    const users: Record<
+        string,
+        { displayName?: string | null; username?: string | null; email?: string }
+    > = {
         owner: { displayName: 'Maya', username: 'maya', email: 'maya@example.invalid' },
         member: { displayName: null, username: 'sam', email: 'sam@example.invalid' },
         stranger: { displayName: 'Eve', username: 'eve', email: 'eve@example.invalid' },
@@ -17,7 +20,9 @@ describe('appEnvActorNames', () => {
             works: () => ({ findById: async (id) => (id === 'w1' ? { userId: 'owner' } : null) }),
             members: () => ({
                 findMember: async (workId, userId) =>
-                    workId === 'w1' && (userId === 'member' || userId === 'blank') ? { userId } : null,
+                    workId === 'w1' && (userId === 'member' || userId === 'blank')
+                        ? { userId }
+                        : null,
             }),
             users: () => ({ findById: async (id) => users[id] ?? null }),
             ...over,
