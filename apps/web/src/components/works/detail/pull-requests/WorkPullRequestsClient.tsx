@@ -8,6 +8,7 @@ import { listWorkPullRequestsAction } from '@/app/actions/works/pull-requests';
 import type { PullRequestView, WorkRepoPullRequestsView } from '@/lib/api/pull-requests';
 import { PullRequestReviewPill, PullRequestStatePill } from './pull-request-pills';
 import { PullRequestDiffPanel } from './PullRequestDiffPanel';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 /**
  * Wave 7 feature h — the Work "Pull requests" tab.
@@ -170,6 +171,8 @@ export function WorkPullRequestsClient({
                                 };
                                 const isSelected = sameSelection(selected, selection);
                                 const reviewCount = repo.reviewCounts?.[String(pr.number)] ?? 0;
+                                // C-12: the provider's URL is linked only as plain `https:`.
+                                const prHref = safeHttpsUrl(pr.url);
                                 return (
                                     <li key={pr.number} data-testid="pull-request-row">
                                         <div className="flex flex-wrap items-center gap-2 p-3">
@@ -210,21 +213,23 @@ export function WorkPullRequestsClient({
                                                         : t('pills.notReviewed')
                                                 }
                                             />
-                                            <a
-                                                href={pr.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-text-muted hover:text-text dark:text-text-muted-dark/70 dark:hover:text-text-dark"
-                                                aria-label={t('openExternal', {
-                                                    number: pr.number,
-                                                })}
-                                                data-testid={`pull-request-external-${pr.number}`}
-                                            >
-                                                <ExternalLink
-                                                    className="h-4 w-4"
-                                                    aria-hidden="true"
-                                                />
-                                            </a>
+                                            {prHref ? (
+                                                <a
+                                                    href={prHref}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-text-muted hover:text-text dark:text-text-muted-dark/70 dark:hover:text-text-dark"
+                                                    aria-label={t('openExternal', {
+                                                        number: pr.number,
+                                                    })}
+                                                    data-testid={`pull-request-external-${pr.number}`}
+                                                >
+                                                    <ExternalLink
+                                                        className="h-4 w-4"
+                                                        aria-hidden="true"
+                                                    />
+                                                </a>
+                                            ) : null}
                                         </div>
                                         {isSelected ? (
                                             <div className="border-t border-border dark:border-border-dark bg-card/30 dark:bg-card-primary-dark/20 p-3">

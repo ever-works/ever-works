@@ -2,6 +2,7 @@ import type { RuntimeEnvironmentData } from '@ever-works/plugin';
 import { normalizeRuntimePackageList, isValidAllowedHost } from '@ever-works/plugin';
 
 import type { ManagedEnvironmentNetworking } from '../types.js';
+import { resolveEnvVarNetworking } from './managed-agents-client.js';
 
 /**
  * Environments — how a platform-resolved runtime Environment
@@ -30,10 +31,20 @@ import type { ManagedEnvironmentNetworking } from '../types.js';
  * `undefined` when no Environment is present, which tells the client to
  * keep its historical env-var fallback path byte-for-byte.
  *
- * `allow_mcp_servers` is pinned to `false`: an Environment models egress
- * for the sandbox itself, and the platform has no UI for authorising MCP
- * servers inside a managed session, so the restrictive value is the only
- * one an Environment can honestly claim.
+ * Fails closed (Ever Works #109). The carrier crosses an RPC boundary in some
+ * deployments, so it is read as untrusted input rather than as the type says:
+ *
+ *  - `networkingMode` other than exactly `'limited'` / `'unrestricted'` (a
+ *    tampered or legacy carrier, or a mode this build does not know) does NOT
+ *    widen to `unrestricted`: it falls back to the operator's env-var policy
+ *    ({@link resolveEnvVarNetworking}), the same policy a run with no
+ *    Environment gets.
+ *  - `allow_package_managers` is granted only by an explicit
+ *    `allowPackageManagers: true`; a missing or non-boolean value denies.
+ *  - `allow_mcp_servers` is carried from the Environment's
+ *    `allowMcpServers`, again only on an explicit `true`. The platform writes
+ *    no such field today (the Environments UI has no MCP-server control), so
+ *    every managed session keeps MCP servers off until one does.
  */
 export function resolveEnvironmentNetworking(
 	runtimeEnvironment: RuntimeEnvironmentData | undefined
@@ -42,17 +53,25 @@ export function resolveEnvironmentNetworking(
 		return undefined;
 	}
 
-	if (runtimeEnvironment.networkingMode === 'limited') {
+	// Compared as an unknown value: the declared union is what the platform
+	// writes, not a guarantee about what arrived.
+	const mode: unknown = runtimeEnvironment.networkingMode;
+
+	if (mode === 'limited') {
 		const hosts = (runtimeEnvironment.allowedHosts ?? []).filter((host) => isValidAllowedHost(host));
 		return {
 			type: 'limited',
 			allowed_hosts: hosts,
-			allow_package_managers: runtimeEnvironment.allowPackageManagers !== false,
-			allow_mcp_servers: false
+			allow_package_managers: runtimeEnvironment.allowPackageManagers === true,
+			allow_mcp_servers: runtimeEnvironment.allowMcpServers === true
 		};
 	}
 
-	return { type: 'unrestricted' };
+	if (mode === 'unrestricted') {
+		return { type: 'unrestricted' };
+	}
+
+	return resolveEnvVarNetworking();
 }
 
 /**
@@ -77,7 +96,11 @@ export function buildPackageBootstrapPrompt(runtimeEnvironment: RuntimeEnvironme
 	// registries unreachable, so an install prompt could only ever burn a
 	// session turn and fail. Skip the bootstrap entirely rather than ask
 	// the agent to run commands the environment forbids.
-	if (runtimeEnvironment.networkingMode === 'limited' && runtimeEnvironment.allowPackageManagers === false) {
+	// Decided from the policy the session actually gets, so the two cannot
+	// disagree: a missing flag or an unrecognised mode that resolves to a
+	// limited policy without package managers skips the bootstrap too.
+	const networking = resolveEnvironmentNetworking(runtimeEnvironment);
+	if (networking?.type === 'limited' && !networking.allow_package_managers) {
 		return null;
 	}
 

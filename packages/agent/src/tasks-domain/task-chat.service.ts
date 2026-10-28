@@ -185,6 +185,7 @@ export class TaskChatService {
         await this.logActivity({
             userId,
             taskId: task.id,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_COMMENTED,
             details: {
                 messageId: row.id,
@@ -663,9 +664,17 @@ export class TaskChatService {
         assertNoSecrets(body, 'task.chat.body');
     }
 
+    /**
+     * Write a Task-chat Activity row in the TASK's workspace (`ownershipScopeOf(task)`),
+     * not the request's (C-2): a comment posted by the worker through the remote proxy —
+     * the repeat-conflict comment on an upstream-conflict Task — carries no request
+     * workspace, so the stamping subscriber would write null/null and the row would be
+     * missing from an org-scoped Work's feed. See `TasksService.logActivity`.
+     */
     private async logActivity(args: {
         userId: string;
         taskId: string;
+        scope: OwnershipScope;
         actionType: ActivityActionType;
         details?: Record<string, unknown>;
     }): Promise<void> {
@@ -675,6 +684,8 @@ export class TaskChatService {
             // `resourceType`/`resourceId` + renamed SUCCESS → COMPLETED.
             await this.activityLog.log({
                 userId: args.userId,
+                tenantId: args.scope.tenantId,
+                organizationId: args.scope.organizationId,
                 action: args.actionType,
                 actionType: args.actionType,
                 status: ActivityStatus.COMPLETED,

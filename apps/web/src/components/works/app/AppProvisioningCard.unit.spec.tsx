@@ -116,6 +116,24 @@ describe('AppProvisioningCard', () => {
         );
     });
 
+    // C-12 (stored XSS): the provisioning Task's `prUrl` is written by the agent run, so
+    // only a plain `https:` URL becomes the "Open pull request" link.
+    it.each([
+        'javascript:alert(1)',
+        'data:text/html,<script>alert(1)</script>',
+        'vbscript:msgbox(1)',
+        'https://user:pw@evil.invalid/pull/1',
+    ])('shows no pull request link for a hostile prUrl %j', (prUrl) => {
+        const { container } = renderCard(state({ active: task({ prUrl }) }));
+        expect(screen.getByTestId('app-provisioning-task-link')).toBeTruthy();
+        expect(screen.queryByTestId('app-provisioning-pr-link')).toBeNull();
+        for (const anchor of container.querySelectorAll('a')) {
+            const href = anchor.getAttribute('href') ?? '';
+            expect(href).not.toMatch(/^\s*(javascript|data|vbscript):/i);
+            expect(href).not.toContain('evil.invalid');
+        }
+    });
+
     it('a viewer sees the state and no action (ACC-04-32)', () => {
         renderCard(state({ canEdit: false }));
         expect(screen.getByTestId('app-provisioning-headline')).toBeTruthy();

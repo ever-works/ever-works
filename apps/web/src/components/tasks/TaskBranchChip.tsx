@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils/cn';
 import type { Task, TaskBranchState } from '@/lib/api/tasks';
+import { safePrUrl } from './TaskPrPill';
 
 /**
  * Wave 2 M7 — compact branch chip for Task kanban cards.
@@ -35,6 +36,8 @@ export function TaskBranchChip({ task }: { task: Task }) {
 
     const tone = (task.branchState && STATE_TONES[task.branchState]) || FALLBACK_TONE;
     const showPr = task.branchState === 'pr-open' && task.prNumber != null;
+    // C-12: agent / provider-written, so only a plain `https:` URL becomes a link.
+    const prHref = safePrUrl(task.prUrl);
 
     return (
         <span
@@ -47,9 +50,9 @@ export function TaskBranchChip({ task }: { task: Task }) {
         >
             <span className="truncate">⎇ {branchShortName(task.branchRef)}</span>
             {showPr &&
-                (task.prUrl ? (
+                (prHref ? (
                     <a
-                        href={task.prUrl}
+                        href={prHref}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
