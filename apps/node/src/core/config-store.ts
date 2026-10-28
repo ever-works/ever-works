@@ -118,6 +118,45 @@ export function supportsAtomicWrites(fs: StateFileSystem): fs is StateFileSystem
 }
 
 /**
+ * True when the operating system REFUSED the atomic path rather than the
+ * write failing outright: the temp file could not be created beside the
+ * target (a directory the account may not add files to), or the rename kept
+ * failing after its retries (on Windows, another process holding the target
+ * open: `MoveFileExW` cannot replace an open file). Writing in place, as the
+ * node always did, can still succeed then. A full disk or an I/O error is
+ * not this, and is reported as it is.
+ */
+function isAtomicPathRefused(error: unknown): boolean {
+	const code = error && typeof error === 'object' ? (error as { code?: string }).code : undefined;
+	return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
+}
+
+/**
+ * Replace `filePath` atomically; if the OS refuses the atomic path (see
+ * {@link isAtomicPathRefused}), rewrite it in place the way the node always
+ * did, and say so through `onFallback`. That is the previous behaviour as the
+ * worst case, not a new failure: a `pause` must not start failing because a
+ * backup agent holds the config open. Resolves `'atomic'` or `'in-place'`.
+ */
+async function replaceOrRewrite(
+	fs: StateFileSystem & AtomicFileOps,
+	filePath: string,
+	content: string,
+	options: Pick<ReplaceFileOptions, 'platform' | 'tighten'>,
+	onFallback?: (error: unknown) => void
+): Promise<'atomic' | 'in-place'> {
+	try {
+		await replaceFileAtomically(fs, filePath, content, options);
+		return 'atomic';
+	} catch (error) {
+		if (!isAtomicPathRefused(error)) throw error;
+		onFallback?.(error);
+		await fs.writeFile(filePath, content);
+		return 'in-place';
+	}
+}
+
+/**
  * Write one of the node's state files (the lifecycle, link and self-update
  * records beside the config): atomically when the filesystem can, so a
  * kill mid-write leaves the previous record whole instead of a torn one.
@@ -134,7 +173,7 @@ export async function writeStateFile(
 		await fs.writeFile(filePath, content);
 		return;
 	}
-	await replaceFileAtomically(fs, filePath, content, options);
+	await replaceOrRewrite(fs, filePath, content, options);
 }
 
 /** The last-good copy of the config, refreshed on every successful save. */
@@ -474,12 +513,29 @@ export async function saveConfig(
 	// ever lands in an owner-only file; the rename then carries that
 	// protection over to the config (see `atomic-state-file.ts`).
 	let ownerOnly = false;
-	await replaceFileAtomically(fs, filePath, content, {
-		platform: options.platform,
-		tighten: async (tempPath) => {
-			ownerOnly = await restrictConfigFile(fs, tempPath, { ...restrictOptions, displayPath: filePath });
+	const written = await replaceOrRewrite(
+		fs,
+		filePath,
+		content,
+		{
+			platform: options.platform,
+			tighten: async (tempPath) => {
+				ownerOnly = await restrictConfigFile(fs, tempPath, { ...restrictOptions, displayPath: filePath });
+			}
+		},
+		(error) => {
+			const detail = error instanceof Error ? error.message : String(error);
+			options.logger?.warn(
+				`Could not replace the node config ${filePath} atomically (${options.logger.redact(
+					detail
+				)} — another program may be holding it open); rewrote it in place instead.`
+			);
 		}
-	});
+	);
+	if (written === 'in-place') {
+		// The previous behaviour exactly: the existing file, tightened after the write.
+		ownerOnly = await restrictConfigFile(fs, filePath, restrictOptions);
+	}
 	await refreshBackup(fs, filePath, content, {
 		platform: options.platform,
 		secretOnDisk,

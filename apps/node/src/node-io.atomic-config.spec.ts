@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { configBackupPath, loadConfig, saveConfig, type ConfigFileSystem } from './core/config-store';
+import { createLogger, type LogEntry } from './core/logger';
 import { createHelperFs } from './core/screen/helper/helper-trust';
 import { clampResourceLimits, DEFAULT_HEARTBEAT_INTERVAL_MS, type NodeConfig } from './core/types';
 import { createConfigFileSystem, windowsAclUser } from './node-io';
@@ -90,14 +91,21 @@ describe('createConfigFileSystem — atomic config writes on a real disk', () =>
 
 	it('is not blocked by a reader holding the config open', async () => {
 		const fs = createConfigFileSystem();
+		const entries: LogEntry[] = [];
+		const logger = createLogger({ sink: (entry) => entries.push(entry) });
 		await saveConfig(fs, configPath, config(), { platform: process.platform });
 		const reader = await fsp.open(configPath, 'r');
 		try {
-			await saveConfig(fs, configPath, config({ paused: true }), { platform: process.platform });
+			await saveConfig(fs, configPath, config({ paused: true }), { platform: process.platform, logger });
 		} finally {
 			await reader.close();
 		}
 		await expect(loadConfig(fs, configPath)).resolves.toMatchObject({ paused: true });
+		// POSIX renames over an open file; Windows cannot (MoveFileExW refuses an
+		// open target), so after the bounded retry it rewrites in place as before.
+		const fellBack = entries.some((entry) => entry.level === 'warn' && /rewrote it in place/.test(entry.message));
+		expect(fellBack).toBe(process.platform === 'win32');
+		expect((await fsp.readdir(dir)).sort()).toEqual(['node-config.json', 'node-config.json.bak']);
 	});
 
 	it('writes content only into a file that already exists — never creating one around it', async () => {
@@ -158,12 +166,21 @@ describe('createConfigFileSystem — atomic config writes on a real disk', () =>
 			const ownerOnly = (entries: string[]) =>
 				entries.length > 0 && entries.every((entry) => owner(entry) && !entry.includes('(I)'));
 
-			// Control: a plain new file here is NOT owner-only (it inherits the
-			// directory's ACL, or gets the token's default DACL: SYSTEM,
-			// Administrators), so the check below can tell the difference.
+			// The case the ordering exists for: a directory whose inheritable ACL
+			// would hand every new file to BUILTIN\Users. (A plain temp dir may pass
+			// nothing down, and a file then gets the creator's default DACL as
+			// EXPLICIT entries, which `/inheritance:r` does not strip: that is the
+			// pre-existing `restrict` contract, not what this spec is about.)
+			execFileSync(
+				'icacls',
+				[dir, '/inheritance:r', '/grant:r', `${user}:(OI)(CI)(F)`, '*S-1-5-32-545:(OI)(CI)(RX)'],
+				{ windowsHide: true, stdio: 'ignore' }
+			);
+			// Control: a plain new file here is readable by Users, so the check can tell.
 			const control = path.join(dir, 'control.txt');
 			await fsp.writeFile(control, 'x');
 			expect(ownerOnly(aclEntries(control)), aclEntries(control).join(' | ')).toBe(false);
+			expect(aclEntries(control).some((entry) => entry.includes('(I)'))).toBe(true);
 			await fsp.rm(control);
 
 			const real = createConfigFileSystem();

@@ -153,6 +153,45 @@ describe('saveConfig writes atomically (2026-10-28: a kill mid-write left a 0-by
 		expect(h.ops.map((op) => op.op)).toEqual(['mkdir', 'writeInPlace', 'restrict']);
 		await expect(loadConfig(h.fs, CONFIG)).resolves.toMatchObject({ secret: OLD_SECRET });
 	});
+
+	it('when Windows keeps refusing the rename (the config held open), rewrites in place as before, and says so', async () => {
+		const h = killableDisk({ [CONFIG]: serialized(config()) }, { now: () => NOW });
+		// More refusals than the bounded retry allows, for the config only.
+		h.failRenames(...Array.from({ length: 9 }, () => 'EPERM'));
+		const { logger, entries } = capturingLogger();
+
+		await saveConfig(h.fs, CONFIG, config({ secret: NEW_SECRET }), { platform: 'win32', logger });
+
+		expect(h.files.get(CONFIG)).toContain(NEW_SECRET);
+		// The temp file never outlives the attempt; the fallback is the old order:
+		// the existing (owner-only) file is rewritten, then tightened again.
+		const inPlace = h.ops.findIndex((op) => op.op === 'writeInPlace' && op.path === CONFIG);
+		expect(inPlace).toBeGreaterThan(-1);
+		expect(h.ops.slice(inPlace + 1)).toContainEqual({ op: 'restrict', path: CONFIG });
+		expect(h.acl.get(CONFIG)).toBe('owner-only');
+		expect(h.files.get(BACKUP)).toBe(h.files.get(CONFIG));
+		expect(h.temps()).toEqual([]);
+		expect(entries.some((entry) => entry.level === 'warn' && /rewrote it in place/.test(entry.message))).toBe(true);
+	}, 10_000);
+
+	it('does not fall back for a failure that is not a refusal: a full disk leaves the old config and rejects', async () => {
+		const old = serialized(config());
+		const h = killableDisk({ [CONFIG]: old }, { now: () => NOW });
+		const fs = {
+			...h.fs,
+			writeExistingFile: async () => {
+				throw Object.assign(new Error('ENOSPC: no space left on device'), { code: 'ENOSPC' });
+			}
+		};
+
+		await expect(
+			saveConfig(fs, CONFIG, config({ secret: NEW_SECRET }), { platform: 'win32' })
+		).rejects.toMatchObject({ code: 'ENOSPC' });
+
+		expect(h.files.get(CONFIG)).toBe(old);
+		expect(h.ops.some((op) => op.op === 'writeInPlace')).toBe(false);
+		expect(h.temps()).toEqual([]);
+	});
 });
 
 describe('loadConfig and stray temp files', () => {
