@@ -24,7 +24,7 @@ Counted from each package's `everworks.plugin.category` field.
 | `job-runtime`           | 6     | `job-runtime-bullmq`, `job-runtime-inngest`, `job-runtime-node`, `job-runtime-pgboss`, `job-runtime-temporal`, `job-runtime-trigger`                                                                                                    |
 | `content-extractor`     | 6     | `jina`, `local-content-extractor`, `notion-extractor`, `officecli-extractor`, `pdf-extractor`, `scrapfly`                                                                                                                               |
 | `notification-channel`  | 5     | `discord-channel`, `novu-channel`, `slack-channel`, `telegram-channel`, `whatsapp-channel`                                                                                                                                              |
-| `email-provider`        | 5     | `mailchimp-transactional`, `mailgun`, `postmark`, `resend`, `sendgrid`                                                                                                                                                                  |
+| `email-provider`        | 6     | `ever-email-router`, `mailchimp-transactional`, `mailgun`, `postmark`, `resend`, `sendgrid`                                                                                                                                             |
 | `storage`               | 4     | `aws-s3`, `github-storage`, `local-fs`, `minio`                                                                                                                                                                                         |
 | `metrics`               | 4     | `custom-http-metrics`, `google-analytics-metrics`, `posthog-metrics`, `stripe-metrics`                                                                                                                                                  |
 | `vector-store`          | 2     | `pgvector`, `qdrant`                                                                                                                                                                                                                    |
@@ -1330,6 +1330,7 @@ Email-provider plugins implement `email-outbound` and, where the vendor supports
 | `mailchimp-transactional` | `email-outbound`                  | Official `@mailchimp/mailchimp_transactional` SDK (Mandrill) |
 | `mailgun`                 | `email-outbound`, `email-inbound` | Official `mailgun.js` SDK + signed inbound routes            |
 | `postmark`                | `email-outbound`, `email-inbound` | Postmark Server API + Inbound Streams webhook parser         |
+| `ever-email-router`       | `email-inbound`                   | Shared Cloudflare router for `@ever.email`, HMAC-signed JSON |
 
 **Settings by provider:**
 
@@ -1349,15 +1350,17 @@ Email-provider plugins implement `email-outbound` and, where the vendor supports
 | `postmark`                | `defaultSenderDomain`  | No       | No     | —                             | Default `From` domain                                       |
 | `postmark`                | `inboundWebhookSecret` | Inbound  | Yes    | `POSTMARK_INBOUND_SECRET`     | Basic-Auth secret for inbound; unset refuses inbound        |
 | `postmark`                | `inboundStreamId`      | No       | No     | —                             | Specific inbound stream id                                  |
+| `ever-email-router`       | `inboundWebhookSecret` | Yes      | Yes    | `EVER_EMAIL_ROUTER_SECRET`    | Admin-only router HMAC secret (≥ 24 chars); unset refuses   |
 
 **Inbound webhook URLs** (register these in the provider's dashboard):
 
-| Provider | Purpose         | URL                                                |
-| -------- | --------------- | -------------------------------------------------- |
-| Postmark | Inbound email   | `https://<your-domain>/api/email/inbound/postmark` |
-| Postmark | Delivery events | `https://<your-domain>/api/email/events/postmark`  |
+| Provider          | Purpose         | URL                                                         |
+| ----------------- | --------------- | ----------------------------------------------------------- |
+| Postmark          | Inbound email   | `https://<your-domain>/api/email/inbound/postmark`          |
+| Postmark          | Delivery events | `https://<your-domain>/api/email/events/postmark`           |
+| Ever Email Router | Inbound email   | `https://<your-domain>/api/email/inbound/ever-email-router` |
 
-Inbound and delivery-event webhooks are **refused (`401`) when no secret is configured** — an unsigned webhook cannot be told apart from a forgery. Only `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (that exact string, for a local stack with no public webhook URL) accepts them unsigned. Postmark sends the secret as HTTP Basic auth (username `postmark`, password = the secret): embed it in the inbound URL (`https://postmark:<secret>@<your-domain>/api/email/inbound/postmark`) and enter it as the webhook's **Basic auth credentials** for the delivery-event URL. Delivery events are verified with the admin/env-scope secret, since an event names no recipient. Postmark surfaces `Delivery`, `Bounce`, `SpamComplaint`, `Open` and `Click` events. Mailgun verifies inbound with `HMAC(signingKey, timestamp + token)` compared in constant time and decodes both JSON and form-urlencoded webhook bodies. Resend inbound is not supported yet — Resend's inbound product is still in private beta.
+Inbound and delivery-event webhooks are **refused (`401`) when no secret is configured** — an unsigned webhook cannot be told apart from a forgery. For Postmark and Mailgun only, `EMAIL_INBOUND_ALLOW_UNSIGNED=true` (that exact string, for a local stack with no public webhook URL) accepts them unsigned; the Ever Email Router has no such opt-out and always requires a signed request and a secret of at least 24 characters. Postmark sends the secret as HTTP Basic auth (username `postmark`, password = the secret): embed it in the inbound URL (`https://postmark:<secret>@<your-domain>/api/email/inbound/postmark`) and enter it as the webhook's **Basic auth credentials** for the delivery-event URL. Delivery events are verified with the admin/env-scope secret, since an event names no recipient. Postmark surfaces `Delivery`, `Bounce`, `SpamComplaint`, `Open` and `Click` events. Mailgun verifies inbound with `HMAC(signingKey, timestamp + token)` compared in constant time and decodes both JSON and form-urlencoded webhook bodies. Resend inbound is not supported yet — Resend's inbound product is still in private beta. The **Ever Email Router** (`ever-email-router`, inbound only) receives mail for the `EVER_EMAIL_DOMAIN` domain (default `ever.email`) from the shared Cloudflare Worker: it verifies `x-ever-email-signature` (`HMAC-SHA256(secret, "<t>.<raw body>")`, 300 s window), binds on the envelope recipient, and — the only provider that opts in (`inboundAck: 'counts'`) — answers `202 {"accepted","duplicates","dropped"}` so the router can tell a taken message from "no such mailbox here". Its addresses must be on `EVER_EMAIL_DOMAIN` (default `ever.email`) with one owner per deployment — the plugin declares this as its `inboundAddressPolicy`, which the platform enforces when an address is registered; see `packages/plugins/ever-email-router/README.md`.
 
 ## Notification Channels
 

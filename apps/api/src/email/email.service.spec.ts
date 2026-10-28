@@ -32,8 +32,13 @@ jest.mock('./templates/render', () => ({
     listTemplates: jest.fn(() => []),
 }));
 
-import { NotFoundException } from '@nestjs/common';
-import { EmailService } from './email.service';
+import {
+    BadRequestException,
+    ConflictException,
+    NotFoundException,
+    ServiceUnavailableException,
+} from '@nestjs/common';
+import { EmailService, EXCLUSIVE_ADDRESS_TAKEN } from './email.service';
 
 /**
  * EmailService — security-scoped behaviour around `sendMessage`.
@@ -191,7 +196,8 @@ describe('EmailService verification-token expiry', () => {
             addresses as never,
             {} as never,
             {} as never,
-            {} as never,
+            // A provider with no address policy (every plugin but the router).
+            { inboundAddressPolicy: jest.fn().mockResolvedValue(null) } as never,
             {} as never,
         );
     });
@@ -869,5 +875,279 @@ describe('EmailService.listAddresses (EW-P4-3)', () => {
             service.listAddresses('user-1', 'outbound', { includeDisabled: true }),
         ).resolves.toHaveLength(2);
         expect(addresses.findAllByUser).toHaveBeenCalledWith('user-1', 'outbound');
+    });
+});
+
+/**
+ * Address policies (`IEmailInboundPlugin.inboundAddressPolicy`, e.g. the Ever
+ * Email Router's): the service asks the facade for the provider plugin's
+ * policy and enforces it — domain (400), lower-cased storage, and for an
+ * `exclusive` policy one owner per mailbox (409). The plugin is never named
+ * here: these specs use a FAKE plugin with a fake policy. A plugin with no
+ * policy is registered exactly as before.
+ */
+describe('EmailService — provider address policy (inboundAddressPolicy)', () => {
+    const POLICY_PLUGIN = 'fake-routed-plugin';
+    let addresses: {
+        save: jest.Mock;
+        delete: jest.Mock;
+        update: jest.Mock;
+        findByIdForUser: jest.Mock;
+        findEnabledInboundByAddress: jest.Mock;
+    };
+    let emailFacade: { inboundAddressPolicy: jest.Mock };
+    let policy: { domain: string; exclusive: boolean } | null;
+    let service: EmailService;
+
+    const create = (
+        address: string,
+        direction: 'inbound' | 'outbound' | 'both' = 'inbound',
+        pluginId = POLICY_PLUGIN,
+    ) => ({ address, direction, pluginId, providerSettings: {} });
+
+    beforeEach(() => {
+        policy = { domain: 'ever.email', exclusive: true };
+        addresses = {
+            save: jest.fn().mockImplementation(async (row) => ({
+                id: 'new-row',
+                createdAt: new Date('2026-10-27T10:00:00Z'),
+                ...row,
+            })),
+            delete: jest.fn().mockResolvedValue(undefined),
+            update: jest.fn().mockResolvedValue(undefined),
+            findByIdForUser: jest.fn(),
+            findEnabledInboundByAddress: jest.fn().mockResolvedValue([]),
+        };
+        emailFacade = {
+            inboundAddressPolicy: jest.fn(async (pluginId: string) =>
+                pluginId === POLICY_PLUGIN ? policy : null,
+            ),
+        };
+        service = new EmailService(
+            addresses as never,
+            {} as never,
+            {} as never,
+            emailFacade as never,
+            {} as never,
+        );
+    });
+
+    describe('createAddress', () => {
+        it('asks the facade for the plugin policy and registers a free mailbox, stored lower-cased', async () => {
+            addresses.findEnabledInboundByAddress
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([{ id: 'new-row', userId: 'user-1' }]);
+
+            const row = await service.createAddress('user-1', create(' Agent.Smith@Ever.Email '));
+
+            expect(emailFacade.inboundAddressPolicy).toHaveBeenCalledWith(POLICY_PLUGIN);
+            expect(row.address).toBe('agent.smith@ever.email');
+            expect(addresses.save).toHaveBeenCalledWith(
+                expect.objectContaining({ address: 'agent.smith@ever.email' }),
+            );
+            expect(addresses.findEnabledInboundByAddress).toHaveBeenCalledWith(
+                'agent.smith@ever.email',
+            );
+            expect(addresses.delete).not.toHaveBeenCalled();
+        });
+
+        it('refuses a mailbox outside the policy domain (400), saving nothing', async () => {
+            await expect(
+                service.createAddress('user-1', create('agent@example.com')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.createAddress('user-1', create('agent@sub.ever.email')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+
+        it('takes the domain from the plugin policy', async () => {
+            policy = { domain: 'mail.example.org', exclusive: true };
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.createAddress('user-1', create('agent@Mail.Example.org')),
+            ).resolves.toMatchObject({ address: 'agent@mail.example.org' });
+        });
+
+        it('refuses (409) a mailbox another account already holds with the same plugin', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2', pluginId: POLICY_PLUGIN },
+            ]);
+
+            const attempt = service.createAddress('user-1', create('agent@ever.email'));
+
+            await expect(attempt).rejects.toBeInstanceOf(ConflictException);
+            await expect(attempt).rejects.toThrow(EXCLUSIVE_ADDRESS_TAKEN);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+
+        it('refuses (409) a mailbox another account squats with another plugin', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'squat', userId: 'user-2', pluginId: 'postmark' },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email', 'both')),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+
+        it('does not count the caller own rows as a conflict', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'mine', userId: 'user-1', pluginId: POLICY_PLUGIN },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email', 'both')),
+            ).resolves.toMatchObject({ id: 'new-row' });
+        });
+
+        it('loses a concurrent registration: an older row of another account is kept, this one deleted (409)', async () => {
+            addresses.findEnabledInboundByAddress
+                .mockResolvedValueOnce([]) // the check before saving saw nobody
+                .mockResolvedValueOnce([
+                    { id: 'theirs', userId: 'user-2' },
+                    { id: 'new-row', userId: 'user-1' },
+                ]);
+
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email')),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.delete).toHaveBeenCalledWith('new-row', 'user-1');
+        });
+
+        it('wins a concurrent registration when its row is the older one', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValueOnce([]).mockResolvedValueOnce([
+                { id: 'new-row', userId: 'user-1' },
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email')),
+            ).resolves.toMatchObject({ id: 'new-row' });
+            expect(addresses.delete).not.toHaveBeenCalled();
+        });
+
+        it('checks only the domain of an outbound-only row', async () => {
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email', 'outbound')),
+            ).resolves.toMatchObject({ direction: 'outbound' });
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+            await expect(
+                service.createAddress('user-1', create('agent@example.com', 'outbound')),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('a non-exclusive policy checks the domain and lower-cases, but never looks for other owners', async () => {
+            policy = { domain: 'ever.email', exclusive: false };
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.createAddress('user-1', create('Agent@Ever.Email')),
+            ).resolves.toMatchObject({ address: 'agent@ever.email' });
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+        });
+
+        it('leaves a plugin without a policy exactly as before (any domain, address as typed, no lookup)', async () => {
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2', pluginId: 'postmark' },
+            ]);
+
+            const row = await service.createAddress(
+                'user-1',
+                create('Agent@Ever.Email', 'inbound', 'postmark'),
+            );
+
+            expect(emailFacade.inboundAddressPolicy).toHaveBeenCalledWith('postmark');
+            expect(row.address).toBe('Agent@Ever.Email');
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+            expect(addresses.delete).not.toHaveBeenCalled();
+        });
+
+        it('fails closed (503) when the plugin cannot be loaded to read its policy, saving nothing', async () => {
+            emailFacade.inboundAddressPolicy.mockRejectedValueOnce(
+                new ServiceUnavailableException(
+                    'Inbound email plugin fake-routed-plugin is unavailable',
+                ),
+            );
+
+            await expect(
+                service.createAddress('user-1', create('agent@ever.email')),
+            ).rejects.toBeInstanceOf(ServiceUnavailableException);
+            expect(addresses.save).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('updateAddress', () => {
+        const disabledAt = new Date('2026-10-20T00:00:00Z');
+        const policyRow = {
+            id: 'row-1',
+            userId: 'user-1',
+            address: 'agent@ever.email',
+            direction: 'inbound',
+            pluginId: POLICY_PLUGIN,
+            disabledAt,
+        };
+
+        it('refuses (409) re-enabling a mailbox another account took meanwhile', async () => {
+            addresses.findByIdForUser.mockResolvedValue(policyRow);
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.updateAddress('user-1', 'row-1', { disabled: false }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.update).not.toHaveBeenCalled();
+        });
+
+        it('re-enables a mailbox that is free', async () => {
+            addresses.findByIdForUser.mockResolvedValue(policyRow);
+
+            await service.updateAddress('user-1', 'row-1', { disabled: false });
+
+            expect(emailFacade.inboundAddressPolicy).toHaveBeenCalledWith(POLICY_PLUGIN);
+            expect(addresses.update).toHaveBeenCalledTimes(1);
+            expect(addresses.update).toHaveBeenCalledWith('row-1', { disabledAt: null });
+        });
+
+        it('puts the row back to disabled when another account took the mailbox during the re-enable', async () => {
+            addresses.findByIdForUser.mockResolvedValue(policyRow);
+            addresses.findEnabledInboundByAddress.mockResolvedValueOnce([]).mockResolvedValueOnce([
+                { id: 'row-1', userId: 'user-1' },
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await expect(
+                service.updateAddress('user-1', 'row-1', { disabled: false }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(addresses.update).toHaveBeenLastCalledWith('row-1', { disabledAt });
+        });
+
+        it('does not ask for a policy on any other update (disable, settings)', async () => {
+            addresses.findByIdForUser.mockResolvedValue({ ...policyRow, disabledAt: null });
+
+            await service.updateAddress('user-1', 'row-1', { disabled: true });
+            await service.updateAddress('user-1', 'row-1', { providerSettings: { a: 1 } });
+
+            expect(emailFacade.inboundAddressPolicy).not.toHaveBeenCalled();
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+        });
+
+        it('leaves re-enabling a row of a plugin without a policy unchecked', async () => {
+            addresses.findByIdForUser.mockResolvedValue({ ...policyRow, pluginId: 'postmark' });
+            addresses.findEnabledInboundByAddress.mockResolvedValue([
+                { id: 'theirs', userId: 'user-2' },
+            ]);
+
+            await service.updateAddress('user-1', 'row-1', { disabled: false });
+
+            expect(addresses.findEnabledInboundByAddress).not.toHaveBeenCalled();
+            expect(addresses.update).toHaveBeenCalledWith('row-1', { disabledAt: null });
+        });
     });
 });

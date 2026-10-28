@@ -207,7 +207,11 @@ describe('Upstream messages — the whole block, in all 21 bundles (APW-02 T35)'
         expect(APP_UPSTREAM_LEAVES).toContain('editAccessRequired');
         expect(APP_UPSTREAM_LEAVES).toContain('warnings.upstreamArchived');
         expect(APP_UPSTREAM_LEAVES).toContain('readiness.waitingForSetupPr');
-        expect(treeAt(EN, 'dashboard.workDetail.upstream')).toEqual({ tabName: 'Upstream' });
+        // APW-09 added the `refusals` (4bf6b2872) and `pullRequests` (c88b061c5) blocks beside
+        // the tab name, in all 21 bundles; of `upstream`, this spec owns only `tabName`.
+        const upstream = treeAt(EN, 'dashboard.workDetail.upstream');
+        expect(Object.keys(upstream).sort()).toEqual(['pullRequests', 'refusals', 'tabName']);
+        expect(upstream.tabName).toBe('Upstream');
     });
 
     for (const locale of locales) {

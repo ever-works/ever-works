@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// `Button` (27f8af736) imports the locale-aware Link, whose `next-intl/navigation`
+// loads `next/navigation`: not an ES module outside Next. Mocking `next-intl` alone leaves
+// that path, so this file never loaded.
+vi.mock('@/i18n/navigation', () => ({ Link: () => null }));
+
 import { readDeletePreview } from './DeleteCheckoutDialog';
 import { checkoutActionState, checkoutRowActions } from './checkouts.shared';
 
