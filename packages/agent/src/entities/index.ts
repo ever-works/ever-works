@@ -288,3 +288,5 @@ export * from './plugin-event-cursor.entity';
 export * from './external-record-link.entity';
 export * from './integration-idempotency-key.entity';
 export * from './_record-visibility';
+// Self-serve account deletion — email-link token + PII-free audit record.
+export * from './account-deletion-request.entity';
