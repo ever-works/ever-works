@@ -223,6 +223,8 @@ import { DomainEventRelayState } from '../entities/domain-event-relay-state.enti
 import { PluginEventCursor } from '../entities/plugin-event-cursor.entity';
 import { ExternalRecordLink } from '../entities/external-record-link.entity';
 import { IntegrationIdempotencyKey } from '../entities/integration-idempotency-key.entity';
+// Self-serve account deletion — email-link tokens + the audit record.
+import { AccountDeletionRequest } from '../entities/account-deletion-request.entity';
 
 import {
     PluginEntity,
@@ -588,4 +590,7 @@ export const ENTITIES = [
     // `Idempotency-Key` response store.
     ExternalRecordLink,
     IntegrationIdempotencyKey,
+    // Self-serve account deletion — the email-link token and, once the
+    // deletion completes, the PII-free audit record (hashed email + counts).
+    AccountDeletionRequest,
 ];

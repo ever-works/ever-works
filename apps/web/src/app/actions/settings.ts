@@ -195,6 +195,11 @@ export async function updateNotificationPreferences(preferences: {
 }
 
 // Danger Zone Actions
+/**
+ * @deprecated The Danger Zone now calls `deleteMyAccount` in
+ * `./account-deletion` (typed email confirmation, real deletion). Kept,
+ * unchanged, for any caller that still imports it.
+ */
 export async function deleteAccount() {
     const t = await getTranslations('actions.settings.danger');
 

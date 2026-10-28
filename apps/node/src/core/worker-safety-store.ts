@@ -110,6 +110,12 @@ export function createConfigWorkerSafetyGate(
 			} catch (error) {
 				// Never remove it here. A retry must observe the already-created
 				// marker and stay blocked until an operator verifies and clears it.
+				//
+				// Boot-probe retry: the real `restrict` already retried a TIMED-OUT `icacls`
+				// (growing deadlines, bounded) before rejecting, so reaching this
+				// line means either a genuine refusal or a timeout on every
+				// attempt. Both still fail closed; the message says which (a
+				// timeout's reads `probe timed out: …`).
 				throw prerequisite(`worker safety marker is not proven owner-only: ${detail(error)}`);
 			}
 

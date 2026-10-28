@@ -189,6 +189,16 @@ export function LoginClient({
 
             {everIdNotice && <EverIdSignedOutNotice message={everIdNotice} />}
 
+            {searchParams.get('accountDeleted') === '1' && (
+                <div
+                    className="mb-4 rounded-lg border border-success/20 bg-success/10 px-4 py-3 text-sm text-text dark:text-text-dark"
+                    data-testid="login-account-deleted-notice"
+                    role="status"
+                >
+                    {t('accountDeleted')}
+                </div>
+            )}
+
             {magicLinkEnabled && (
                 <div
                     role="tablist"
@@ -409,6 +419,19 @@ export function LoginClient({
                     </p>
                 </form>
             )}
+
+            {/* Self-serve deletion for someone who cannot (or would rather not) sign in.
+                A full page load on purpose: the deletion pages run without analytics. */}
+            <p className="mt-6 text-center text-xs text-text-secondary dark:text-text-secondary-dark">
+                {t('deleteAccount.text')}{' '}
+                <a
+                    href={ROUTES.DELETE_ACCOUNT}
+                    className="text-text-secondary dark:text-text-secondary-dark underline hover:text-primary"
+                    data-testid="login-delete-account-link"
+                >
+                    {t('deleteAccount.link')}
+                </a>
+            </p>
         </AuthLayout>
     );
 }

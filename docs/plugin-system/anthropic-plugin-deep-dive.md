@@ -37,10 +37,10 @@ On `onLoad`, the plugin creates an `AiOperations` instance configured with `prov
 ```typescript
 interface AnthropicSettings {
 	apiKey: string; // Anthropic API key (x-secret, user-scoped, required)
-	defaultModel: string; // Default model (default: 'claude-sonnet-4-5-20250514')
+	defaultModel: string; // Default model (default: 'claude-opus-5-5')
 	simpleModel: string; // Simple tasks model (default: 'claude-haiku-4-5-20251001')
 	mediumModel: string; // Standard tasks model (default: 'claude-sonnet-4-5-20250929')
-	complexModel: string; // Complex tasks model (default: 'claude-sonnet-4-5-20250514')
+	complexModel: string; // Complex tasks model (default: 'claude-opus-5-5')
 	baseUrl: string; // Custom API endpoint (default: 'https://api.anthropic.com/v1/', hidden)
 	temperature: number; // Response randomness, 0-2 (default: 0.7, hidden)
 	maxTokens: number; // Max response length (default: 4096, hidden)
@@ -95,8 +95,8 @@ The inherited `resolveConfig()` method resolves the appropriate Claude model for
 
 - **Simple tier**: `claude-haiku-4-5-20251001` -- optimized for speed; handles tags, short descriptions, quick classifications.
 - **Medium tier**: `claude-sonnet-4-5-20250929` -- balanced speed and quality; handles listings, summaries, content reformatting.
-- **Complex tier**: `claude-sonnet-4-5-20250514` -- highest quality; handles full page generation and multi-step analysis.
-- **Default**: `claude-sonnet-4-5-20250514` -- fallback for unspecified tiers.
+- **Complex tier**: `claude-opus-5-5` -- highest quality; handles full page generation and multi-step analysis.
+- **Default**: `claude-opus-5-5` -- fallback for unspecified tiers.
 
 ### No Embedding Support
 
@@ -123,7 +123,7 @@ const response = await anthropicPlugin.createChatCompletion({
 		{ role: 'system', content: 'You are a work content writer.' },
 		{ role: 'user', content: 'Write a detailed description for Acme Corp.' }
 	],
-	settings: { apiKey: userApiKey, defaultModel: 'claude-sonnet-4-5-20250514' }
+	settings: { apiKey: userApiKey, defaultModel: 'claude-opus-5-5' }
 });
 
 // Streaming chat completion

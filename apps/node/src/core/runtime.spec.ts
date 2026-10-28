@@ -140,6 +140,25 @@ describe('buildSelfDescriptionTelemetry — pinned CLI versions (node lifecycle,
 		await expect(telemetry.cliVersion?.()).resolves.toBe('gemini 0.9.1');
 		await expect(telemetry.cliVersions?.()).resolves.toEqual([]);
 	});
+
+	it('boot-probe retry: a CLI whose PATH lookup timed out at startup is reported as probe-timed-out, not left out like a missing one', async () => {
+		const run = vi.fn(async (command: string, args: string[]) =>
+			command === '/usr/bin/codex' && args[0] === '--version'
+				? { code: 0, stdout: 'codex-cli 0.48.0', stderr: '' }
+				: { code: 127, stdout: '', stderr: '' }
+		);
+		const deps = {
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run },
+			environment: {
+				...environment,
+				modelCli: { 'claude-code': null, codex: '/usr/bin/codex' },
+				modelCliTimedOut: ['claude-code']
+			}
+		};
+		const telemetry = buildSelfDescriptionTelemetry(deps, new ModelCliCompatibilityProbe({ runner: deps.runner }));
+		await expect(telemetry.cliVersions?.()).resolves.toEqual(['codex 0.48.0', 'claude-code probe-timed-out']);
+	});
 });
 
 describe('enrollNode — no field an older platform would 400 (review, slice AR)', () => {

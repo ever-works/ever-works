@@ -10,9 +10,9 @@ import {
 	createSecretStore,
 	createWakeSender,
 	createResourceProbe,
-	currentEnvironment,
 	defaultConfigPath,
 	isExecutableFile,
+	probeEnvironment,
 	readNetworkInterfaces,
 	resolveEntryPath,
 	restrictFileToOwnerWindows,
@@ -28,14 +28,28 @@ import { NODE_APP_VERSION } from './version';
  * which is driven by fakes in the test suite.
  */
 
-function buildDeps(): CliDeps {
+async function buildDeps(): Promise<CliDeps> {
 	const logger = createLogger();
 	const runner = createCommandRunner();
+	// Boot-probe retry: each retry of a timed-out boot probe is said on STDERR. The PATH
+	// lookups run before any command does, so on a busy machine a `--json`
+	// command's stdout must not start with a warning; the outcome itself (a
+	// "probe timed out" note, a quarantine reason) still goes through `logger`.
+	const bootProbeLogger = createLogger({
+		sink: (entry) =>
+			process.stderr.write(
+				`[${new Date(entry.at).toISOString()}] ${entry.level.toUpperCase()} ${entry.message}\n`
+			)
+	});
+	// Boot-probe retry: the model-CLI PATH lookups retry while a busy machine times them
+	// out, and one that timed out on every attempt is reported as such rather
+	// than as "not found on PATH".
+	const environment = await probeEnvironment({ runner, logger: bootProbeLogger });
 	return {
 		io: {
 			fetchFn: systemFetch,
 			runner,
-			environment: currentEnvironment(),
+			environment,
 			logger,
 			version: NODE_APP_VERSION,
 			userAgent: `ever-works-node/${NODE_APP_VERSION}`,
@@ -53,7 +67,9 @@ function buildDeps(): CliDeps {
 			network: readNetworkInterfaces,
 			wakeSender: createWakeSender()
 		},
-		fs: createConfigFileSystem(),
+		// Boot-probe retry: the owner-only ACL (the worker-safety marker's boot-time proof,
+		// the config file's tightening) retries a timed-out `icacls`, and says so.
+		fs: createConfigFileSystem({ runner, logger: bootProbeLogger }),
 		configPath: defaultConfigPath(),
 		platform: process.platform,
 		// Null when this host has no keychain — `resolveSecretStore`
@@ -97,7 +113,7 @@ async function readTypedLine(prompt: string): Promise<string | null> {
 }
 
 async function main(): Promise<void> {
-	const code = await runCli(process.argv.slice(2), buildDeps());
+	const code = await runCli(process.argv.slice(2), await buildDeps());
 	process.exitCode = code;
 }
 

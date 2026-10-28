@@ -98,6 +98,76 @@ describe('AnthropicPlugin', () => {
 		});
 	});
 
+	/**
+	 * The default model must be an id the Claude API accepts. It used to be
+	 * `claude-sonnet-4-5-20250514`, which never existed (Sonnet 4.5's snapshot is
+	 * `-20250929`; `-20250514` is the Sonnet 4 date), so every unsaved config and
+	 * every validation run that fell back to the default failed.
+	 *
+	 * The list below is the set of ACTIVE Claude API model ids, copied from the
+	 * vendor's model docs on 2026-10-28:
+	 *   https://platform.claude.com/docs/en/about-claude/models/overview
+	 *   https://platform.claude.com/docs/en/about-claude/model-deprecations
+	 * Deprecated and retired ids are left out on purpose. Update it from those
+	 * pages, never from memory.
+	 */
+	describe('default model', () => {
+		const VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS = [
+			'claude-fable-5-1',
+			'claude-fable-5',
+			'claude-opus-5-5',
+			'claude-opus-5',
+			'claude-opus-4-8',
+			'claude-opus-4-7',
+			'claude-opus-4-6',
+			'claude-opus-4-5-20251101',
+			'claude-sonnet-5-5',
+			'claude-sonnet-5',
+			'claude-sonnet-4-6',
+			'claude-haiku-5-5',
+			'claude-haiku-4-5-20251001'
+		];
+
+		const context = (): PluginContext =>
+			({
+				pluginId: 'anthropic',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			}) as unknown as PluginContext;
+
+		const schemaDefault = (key: string): string =>
+			(plugin.settingsSchema.properties![key] as { default: string }).default;
+
+		it('is a model id the Claude API accepts, in the settings schema', () => {
+			expect(VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS).toContain(schemaDefault('defaultModel'));
+			expect(VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS).toContain(schemaDefault('complexModel'));
+		});
+
+		it('is the same id in the settings schema, the onLoad bootstrap and getDefaultModelId()', async () => {
+			await plugin.onLoad(context());
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			const bootstrapModel = (MockAiOperations.mock.calls[0][0] as { model: string }).model;
+			const aiOpsInstance = MockAiOperations.mock.results[0].value;
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'sk-ant-test' });
+			const validatedModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			expect(bootstrapModel).toBe(schemaDefault('defaultModel'));
+			expect(validatedModel).toBe(schemaDefault('defaultModel'));
+			expect(VERIFIED_ACTIVE_CLAUDE_API_MODEL_IDS).toContain(validatedModel);
+		});
+
+		it('never falls back to the id that does not exist', async () => {
+			await plugin.onLoad(context());
+			const props = plugin.settingsSchema.properties!;
+			for (const [key, prop] of Object.entries(props)) {
+				expect((prop as { default?: unknown }).default, key).not.toBe('claude-sonnet-4-5-20250514');
+			}
+		});
+	});
+
 	describe('lifecycle hooks', () => {
 		const createMockContext = (): PluginContext =>
 			({
