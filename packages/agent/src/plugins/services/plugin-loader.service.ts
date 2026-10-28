@@ -430,13 +430,19 @@ export class PluginLoaderService {
         const direct = named.find(usable);
         if (direct) return direct;
 
+        // Any other exported plugin class, then instance — but only one that IS
+        // this plugin (`id` = the manifest's): an entry may also export a base
+        // or helper plugin class, which must not be registered under this id.
         for (const check of [
             (value: unknown) => this.classValidator.isPluginClass(value),
             (value: unknown) => this.classValidator.isPlugin(value),
         ]) {
             for (const scope of scopes) {
                 for (const key of Object.keys(scope)) {
-                    if (key !== 'default' && check(scope[key])) return scope[key];
+                    const value = scope[key];
+                    if (key !== 'default' && check(value) && this.exportedPluginId(value) === pluginId) {
+                        return value;
+                    }
                 }
             }
         }
@@ -444,6 +450,18 @@ export class PluginLoaderService {
         // Nothing usable: the caller reports a present default as "not a valid
         // plugin", and its absence as "no plugin class found", as before.
         return module.default;
+    }
+
+    /** The `id` of an exported plugin instance, or of a probe instance of an exported plugin class. */
+    private exportedPluginId(value: unknown): unknown {
+        try {
+            const plugin = this.classValidator.isPluginClass(value)
+                ? new (value as new () => IPlugin)()
+                : (value as IPlugin);
+            return plugin?.id;
+        } catch {
+            return undefined;
+        }
     }
 
     /**

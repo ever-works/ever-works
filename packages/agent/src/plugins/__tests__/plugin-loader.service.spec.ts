@@ -1314,6 +1314,32 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
             expect(plugin?.id).toBe('with-default');
         });
 
+        it('picks the exported plugin class whose id is the manifest id, not a sibling exported first', async () => {
+            // No default and no <Pascal>/<Pascal>Plugin export: the scan decides.
+            const dir = writeModule(
+                'scan-target',
+                pluginClass('BaseHelper', 'base-helper') +
+                    pluginClass('TheRealOne', 'scan-target') +
+                    'exports.BaseHelper = BaseHelper;\n' +
+                    'exports.TheRealOne = TheRealOne;\n',
+            );
+            await makeLoader();
+
+            const plugin = await load(dir, 'scan-target');
+
+            expect(plugin?.id).toBe('scan-target');
+        });
+
+        it('refuses a module whose only plugin classes are some other plugin', async () => {
+            const dir = writeModule(
+                'wanted',
+                pluginClass('SomeoneElse', 'someone-else') + 'exports.SomeoneElse = SomeoneElse;\n',
+            );
+            await makeLoader();
+
+            await expect(load(dir, 'wanted')).resolves.toBeNull();
+        });
+
         it('answers null for a module that exports no plugin', async () => {
             const dir = writeModule('no-plugin', 'exports.helper = () => 1;\nexports.LIMIT = 2;\n');
             await makeLoader();
