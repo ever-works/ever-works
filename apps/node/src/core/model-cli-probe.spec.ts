@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { MODEL_CLI_ENV_OVERRIDES, resolveModelCliPaths, type ModelCliProbeIo } from './model-cli-probe';
+import {
+	MODEL_CLI_ENV_OVERRIDES,
+	probeModelCliPaths,
+	resolveModelCliPaths,
+	type ModelCliProbeIo,
+	type PathSearchResult
+} from './model-cli-probe';
 
 /**
  * Which model CLIs a node advertises — and therefore which it will spawn.
@@ -120,5 +126,95 @@ describe('resolveModelCliPaths — pinned paths are held to the launchability ru
 		});
 		expect(out.paths.codex).toBeNull();
 		expect(out.notes[1]).toContain('not an executable file');
+	});
+});
+
+/**
+ * Boot-probe retry — on a busy PC the PATH lookup timed out and the node reported an
+ * INSTALLED claude as "not found on PATH". The async probe keeps the two
+ * apart: a timed-out lookup is unknown, never missing.
+ */
+describe('probeModelCliPaths — a timed-out lookup is not "not found" (boot-probe retry)', () => {
+	const TIMEOUT_DETAIL =
+		'probe timed out: PATH lookup (where claude) did not finish in 4 attempts (deadlines 5 s, 10 s, 20 s, 30 s)';
+
+	function asyncIo(results: Record<string, PathSearchResult>, over: Partial<ModelCliProbeIo> = {}) {
+		const searched: string[] = [];
+		const value: ModelCliProbeIo = {
+			env: {},
+			platform: 'win32',
+			fileExists: () => false,
+			searchPath: async (command) => {
+				searched.push(command);
+				return results[command] ?? { status: 'not-found' };
+			},
+			...over
+		};
+		return { io: value, searched };
+	}
+
+	it('reports a timed-out lookup as "probe timed out", with nothing advertised', async () => {
+		const { io: probeIo } = asyncIo({
+			claude: { status: 'timed-out', detail: TIMEOUT_DETAIL },
+			codex: { status: 'not-found' }
+		});
+		const out = await probeModelCliPaths(probeIo);
+
+		expect(out.paths).toEqual({ 'claude-code': null, codex: null });
+		expect(out.timedOut).toEqual(['claude-code']);
+		expect(out.notes[0]).toMatch(/^claude-code: probe timed out: PATH lookup \(where claude\)/);
+		expect(out.notes[0]).not.toContain('not found on PATH');
+		// A real miss still reads exactly as before.
+		expect(out.notes[1]).toBe('codex: not found on PATH');
+	});
+
+	it('resolves a lookup that answered after its retries exactly like the sync resolver', async () => {
+		const { io: probeIo } = asyncIo({
+			claude: { status: 'found', hits: ['C:\\npm\\claude', 'C:\\npm\\claude.cmd'] }
+		});
+		const out = await probeModelCliPaths(probeIo);
+		expect(out.paths['claude-code']).toBe('C:\\npm\\claude.cmd');
+		expect(out.notes[0]).toBe('claude-code: C:\\npm\\claude.cmd (PATH)');
+		expect(out.timedOut).toEqual([]);
+	});
+
+	it('never searches PATH for a pinned CLI, and runs the remaining lookups concurrently', async () => {
+		let inFlight = 0;
+		let peak = 0;
+		const searched: string[] = [];
+		const out = await probeModelCliPaths({
+			env: { [MODEL_CLI_ENV_OVERRIDES.codex]: 'C:\\tools\\codex.exe' },
+			platform: 'win32',
+			fileExists: (path) => path === 'C:\\tools\\codex.exe',
+			searchPath: async (command) => {
+				searched.push(command);
+				inFlight += 1;
+				peak = Math.max(peak, inFlight);
+				await new Promise((resolve) => setImmediate(resolve));
+				inFlight -= 1;
+				return { status: 'not-found' };
+			}
+		});
+		expect(searched).toEqual(['claude']);
+		expect(out.paths.codex).toBe('C:\\tools\\codex.exe');
+
+		peak = 0;
+		await probeModelCliPaths({
+			env: {},
+			platform: 'linux',
+			fileExists: () => false,
+			searchPath: async () => {
+				inFlight += 1;
+				peak = Math.max(peak, inFlight);
+				await new Promise((resolve) => setImmediate(resolve));
+				inFlight -= 1;
+				return { status: 'not-found' };
+			}
+		});
+		expect(peak).toBe(2);
+	});
+
+	it('keeps the synchronous resolver unchanged: no timeouts it could ever see', () => {
+		expect(resolveModelCliPaths(io({ hits: { claude: ['/usr/bin/claude'] } })).timedOut).toEqual([]);
 	});
 });

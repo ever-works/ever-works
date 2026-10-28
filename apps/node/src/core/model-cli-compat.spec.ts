@@ -446,6 +446,35 @@ describe('what the heartbeat reports', () => {
 		expect(describeCliVersions(results)).toEqual(['claude-code 2.1.3', 'codex unknown']);
 	});
 
+	it('boot-probe retry: a --version the runner KILLED at its deadline reads "probe-timed-out", not "unknown"', async () => {
+		const probe = new ModelCliCompatibilityProbe({
+			runner: {
+				run: async (_command, args) =>
+					args[0] === '--version'
+						? { code: 1, stdout: '', stderr: '', timedOut: true }
+						: { code: 0, stdout: CLAUDE_HELP, stderr: '' }
+			}
+		});
+		const timedOut = await probe.probe('claude-code', '/opt/claude');
+		expect(timedOut).toMatchObject({ version: null, versionTimedOut: true });
+
+		// A binary that ANSWERED without a version is still just "unknown".
+		const silent = await new ModelCliCompatibilityProbe({
+			runner: { run: async () => ({ code: 0, stdout: 'no version here', stderr: '' }) }
+		}).probe('codex', '/opt/codex');
+		expect(silent.versionTimedOut).toBeUndefined();
+
+		expect(describeCliVersions([timedOut, silent])).toEqual(['claude-code probe-timed-out', 'codex unknown']);
+	});
+
+	it('boot-probe retry: a CLI whose startup PATH lookup timed out is listed as probe-timed-out; a missing one is not listed', () => {
+		const pinned = [judgeModelCliHelp('codex', '/b', '0.48.0', CODEX_EXEC_HELP)];
+		expect(describeCliVersions(pinned, ['claude-code'])).toEqual(['codex 0.48.0', 'claude-code probe-timed-out']);
+		// Never twice for one provider, and nothing for a CLI that is simply absent.
+		expect(describeCliVersions(pinned, ['codex'])).toEqual(['codex 0.48.0']);
+		expect(describeCliVersions([], [])).toEqual([]);
+	});
+
 	it('the legacy single cliVersion comes from the PINNED binary, in its old shape', () => {
 		expect(
 			primaryPinnedCliVersion([

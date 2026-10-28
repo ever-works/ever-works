@@ -11,7 +11,16 @@ import { resolveConfigPath, type ConfigFileSystem } from './core/config-store';
 import type { FetchLike } from './core/fleet-client';
 import type { Logger } from './core/logger';
 import { keychainDisabledByEnv, resolveSecretStore, type SecretStore } from './core/secret-store';
-import { resolveModelCliPaths } from './core/model-cli-probe';
+import {
+	OWNER_ONLY_ACL_RETRY_POLICY,
+	PATH_LOOKUP_RETRY_POLICY,
+	ProbeTimedOutError,
+	describeProbeTimeout,
+	formatSeconds,
+	retryWhileTimedOut,
+	type BootRetryPolicy
+} from './core/boot-retry';
+import { probeModelCliPaths, resolveModelCliPaths, type PathSearchResult } from './core/model-cli-probe';
 import type { ResourceProbe, ResourceSample } from './core/resource-limits';
 import type { DiskProbeIo, DiskVolumeReading } from './core/telemetry-probe';
 import type { HealthProbeIo } from './core/health-probe';
@@ -192,10 +201,8 @@ export function createCommandRunner(): CommandRunner {
  * the current user alone.
  */
 export function restrictFileToOwnerWindows(filePath: string): void {
-	const user = process.env.USERDOMAIN
-		? `${process.env.USERDOMAIN}\\${process.env.USERNAME ?? ''}`
-		: (process.env.USERNAME ?? '');
-	if (!user.trim() || user.trim() === '\\') {
+	const user = windowsAclUser(process.env);
+	if (!user) {
 		throw new Error('Cannot determine the current Windows user to grant the config file to');
 	}
 	const icacls = planProbeSpawn('icacls', currentProbeSpawnDeps());
@@ -205,6 +212,126 @@ export function restrictFileToOwnerWindows(filePath: string): void {
 		timeout: 10_000,
 		...(icacls ? { cwd: icacls.cwd, env: icacls.env } : {})
 	});
+}
+
+/** `DOMAIN\user` (or `user`) the owner-only ACLs grant to; null when the environment cannot say. */
+export function windowsAclUser(env: NodeJS.ProcessEnv): string | null {
+	const user = env.USERDOMAIN ? `${env.USERDOMAIN}\\${env.USERNAME ?? ''}` : (env.USERNAME ?? '');
+	return !user.trim() || user.trim() === '\\' ? null : user;
+}
+
+/** What the retrying boot probes need besides the command runner. Every field is injectable for specs. */
+export interface BootProbeDeps {
+	/** Spawns the probe; defaults to {@link createCommandRunner}. Its `timedOut` is what tells a timeout from an answer. */
+	runner?: CommandRunner;
+	env?: NodeJS.ProcessEnv;
+	platform?: NodeJS.Platform | string;
+	logger?: Pick<Logger, 'warn'>;
+	sleep?: (ms: number) => Promise<void>;
+	policy?: BootRetryPolicy;
+}
+
+/**
+ * The owner-only ACL of {@link restrictFileToOwnerWindows}, applied
+ * asynchronously and RETRIED while `icacls` times out (boot-probe retry).
+ *
+ * This is what the worker-safety marker's boot-time proof and the config
+ * file's tightening go through. The ACL itself is unchanged —
+ * `/inheritance:r` + `/grant:r <user>:(F)`, idempotent, so re-applying it
+ * after a killed attempt is safe. What changed is what a missed deadline
+ * means: it is retried under {@link OWNER_ONLY_ACL_RETRY_POLICY} (growing
+ * deadlines, short pauses, at most 107 s), and only when every attempt
+ * timed out does this reject — with a {@link ProbeTimedOutError} whose
+ * message says "probe timed out", so the quarantine it causes says so too.
+ *
+ * An `icacls` that ANSWERS with a failure (a non-zero exit, a spawn error)
+ * rejects at once, on that attempt, exactly as before: the caller fails
+ * closed on it and nothing is retried.
+ */
+export async function restrictFileToOwnerWindowsWithRetry(filePath: string, deps: BootProbeDeps = {}): Promise<void> {
+	const user = windowsAclUser(deps.env ?? process.env);
+	if (!user) {
+		throw new Error('Cannot determine the current Windows user to grant the config file to');
+	}
+	const runner = deps.runner ?? createCommandRunner();
+	const outcome = await retryWhileTimedOut<void>(
+		async (timeoutMs) => {
+			const result = await runner.run('icacls', [filePath, '/inheritance:r', '/grant:r', `${user}:(F)`], {
+				timeoutMs
+			});
+			if (result.timedOut) return { timedOut: true };
+			if (result.spawnError) throw new Error(`icacls could not be started (${result.spawnError})`);
+			if (result.code !== 0) {
+				const said = firstLine(result.stderr) || firstLine(result.stdout);
+				throw new Error(`icacls exited ${result.code ?? 'without a status'}${said ? `: ${said}` : ''}`);
+			}
+			return { timedOut: false, value: undefined };
+		},
+		{
+			policy: deps.policy ?? OWNER_ONLY_ACL_RETRY_POLICY,
+			...(deps.sleep ? { sleep: deps.sleep } : {}),
+			onRetry: (event) =>
+				deps.logger?.warn(
+					`Owner-only ACL (icacls) on ${filePath} timed out after ${formatSeconds(event.timedOutAfterMs)} ` +
+						`(attempt ${event.attempt}/${event.attempts}) — the machine is busy; retrying in ` +
+						`${formatSeconds(event.waitMs)} with a ${formatSeconds(event.nextTimeoutMs)} deadline`
+				)
+		}
+	);
+	if (outcome.timedOut) throw new ProbeTimedOutError('owner-only ACL (icacls)', outcome.deadlinesMs);
+}
+
+/**
+ * Look a bare command up on PATH, telling the three answers apart (boot-probe retry):
+ * found (every hit, `where` / `which` order), not found (the lookup ran and
+ * said so — or could not run at all, as before), and TIMED OUT (every
+ * attempt under {@link PATH_LOOKUP_RETRY_POLICY} was killed at its
+ * deadline). The old {@link lookupAllOnPath} folds the third into the
+ * second, which is how an installed CLI was reported "not found on PATH" on
+ * a busy machine.
+ */
+export async function searchPathWithRetry(command: string, deps: BootProbeDeps = {}): Promise<PathSearchResult> {
+	const runner = deps.runner ?? createCommandRunner();
+	const lookup = (deps.platform ?? process.platform) === 'win32' ? 'where' : 'which';
+	const outcome = await retryWhileTimedOut<PathSearchResult>(
+		async (timeoutMs) => {
+			const result = await runner.run(lookup, [command], { timeoutMs });
+			if (result.timedOut) return { timedOut: true };
+			const hits =
+				result.code === 0
+					? String(result.stdout ?? '')
+							.split(/\r?\n/)
+							.map((line) => line.trim())
+							.filter((line) => line.length > 0)
+					: [];
+			return { timedOut: false, value: hits.length > 0 ? { status: 'found', hits } : { status: 'not-found' } };
+		},
+		{
+			policy: deps.policy ?? PATH_LOOKUP_RETRY_POLICY,
+			...(deps.sleep ? { sleep: deps.sleep } : {}),
+			onRetry: (event) =>
+				deps.logger?.warn(
+					`PATH lookup (${lookup} ${command}) timed out after ${formatSeconds(event.timedOutAfterMs)} ` +
+						`(attempt ${event.attempt}/${event.attempts}) — the machine is busy; retrying in ` +
+						`${formatSeconds(event.waitMs)} with a ${formatSeconds(event.nextTimeoutMs)} deadline`
+				)
+		}
+	);
+	return outcome.timedOut
+		? {
+				status: 'timed-out',
+				detail: describeProbeTimeout(`PATH lookup (${lookup} ${command})`, outcome.deadlinesMs)
+			}
+		: outcome.value;
+}
+
+function firstLine(text: string | undefined): string {
+	return (
+		String(text ?? '')
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.find((line) => line.length > 0) ?? ''
+	).slice(0, 200);
 }
 
 /**
@@ -242,7 +369,12 @@ export function restrictDirectoryToOwnerWindows(dirPath: string): Promise<void> 
 	});
 }
 
-export function createConfigFileSystem(): ConfigFileSystem {
+/**
+ * The real config filesystem. `bootProbes` reaches the Windows owner-only
+ * ACL, which now retries a timed-out `icacls` (boot-probe retry) — pass the node's
+ * logger so each retry is said, not silent.
+ */
+export function createConfigFileSystem(bootProbes: BootProbeDeps = {}): ConfigFileSystem {
 	return {
 		readFile: async (filePath) => {
 			try {
@@ -279,9 +411,7 @@ export function createConfigFileSystem(): ConfigFileSystem {
 		remove: async (filePath) => {
 			await fsp.rm(filePath, { force: true });
 		},
-		restrict: async (filePath) => {
-			restrictFileToOwnerWindows(filePath);
-		},
+		restrict: (filePath) => restrictFileToOwnerWindowsWithRetry(filePath, bootProbes),
 		dirname: (filePath) => path.dirname(filePath)
 	};
 }
@@ -371,8 +501,9 @@ export function lookupAllOnPath(command: string): string[] {
  * pure and keeps the `browser` tag and the `browser-check` executor
  * pointed at the same binary.
  */
-export function currentEnvironment(): CapabilityEnvironment {
-	const environment = readEnvironment(
+/** Host facts plus the browser this machine would launch: everything but the model CLIs. */
+function hostEnvironment(): CapabilityEnvironment {
+	return readEnvironment(
 		{
 			platform: process.platform,
 			arch: process.arch,
@@ -382,6 +513,10 @@ export function currentEnvironment(): CapabilityEnvironment {
 		resolveBrowserPath,
 		{ fileExists: isExecutableFile, lookupOnPath }
 	);
+}
+
+export function currentEnvironment(): CapabilityEnvironment {
+	const environment = hostEnvironment();
 	// Agent execution v2 — the model CLIs this machine can drive, resolved
 	// once here for the same reason the browser is: the tag and the
 	// executor must point at the same binary.
@@ -393,6 +528,28 @@ export function currentEnvironment(): CapabilityEnvironment {
 	});
 	environment.modelCli = modelCli.paths;
 	environment.modelCliNotes = modelCli.notes;
+	return environment;
+}
+
+/**
+ * {@link currentEnvironment}, with the model-CLI PATH lookups RETRIED while
+ * they time out (boot-probe retry) and run concurrently: a CLI whose lookup timed out
+ * on every attempt is reported as such (`modelCliTimedOut`, a "probe timed
+ * out" note, a `<provider> probe-timed-out` entry on the heartbeat) rather
+ * than as "not found on PATH". The `ever-works-node` binary uses this; the
+ * synchronous {@link currentEnvironment} stays for embedders that need it.
+ */
+export async function probeEnvironment(deps: BootProbeDeps = {}): Promise<CapabilityEnvironment> {
+	const environment = hostEnvironment();
+	const modelCli = await probeModelCliPaths({
+		env: process.env,
+		platform: process.platform,
+		fileExists: isExecutableFile,
+		searchPath: (command) => searchPathWithRetry(command, { platform: process.platform, ...deps })
+	});
+	environment.modelCli = modelCli.paths;
+	environment.modelCliNotes = modelCli.notes;
+	if (modelCli.timedOut.length > 0) environment.modelCliTimedOut = [...modelCli.timedOut];
 	return environment;
 }
 

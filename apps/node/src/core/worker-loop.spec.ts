@@ -8,6 +8,7 @@ import type { FleetJobView } from '@ever-works/contracts';
 import { FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON, FLEET_JOB_STALE_LEASE_REASON } from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation } from '@ever-works/local-workspace-plugin';
 import {
+	DEFAULT_SAFETY_PREPARATION_STOP_TIMEOUT_MS,
 	isSuspendGap,
 	LEASE_TERMINATION_SAFETY_MS,
 	nextBackoffMs,
@@ -1205,6 +1206,86 @@ describe('WorkerLoop', () => {
 			lastError: expect.stringMatching(/lease poll.*did not settle/i)
 		});
 		expect(release).not.toHaveBeenCalled();
+	});
+
+	/**
+	 * Boot-probe retry: the boot safety check now retries a timed-out owner-only ACL for
+	 * up to ~107 s, asynchronously. A stop landing in that window used to give
+	 * up after the 5 s lease-poll drain, leaving the marker behind — and that
+	 * marker quarantines every later start, the exact outcome the retry exists
+	 * to prevent.
+	 */
+	describe('a stop during the boot safety check (boot-probe retry)', () => {
+		const flush = async (): Promise<void> => {
+			for (let i = 0; i < 20; i += 1) await new Promise((resolve) => setImmediate(resolve));
+		};
+		const slowGate = () => {
+			const acquisition = deferred<{ kind: 'acquired'; sessionId: string }>();
+			const release = vi.fn(async () => undefined);
+			return {
+				acquisition,
+				release,
+				gate: {
+					acquire: vi.fn(() => acquisition.promise),
+					release,
+					inspect: vi.fn(async () => null),
+					clear: vi.fn(async () => undefined)
+				}
+			};
+		};
+		const idleClient = () => {
+			const lease = vi.fn(async () => [] as FleetJobView[]);
+			const client: JobLeaseCapableClient = {
+				heartbeat: vi.fn(async () => null),
+				complete: vi.fn(async () => true),
+				lease
+			};
+			return { client, lease };
+		};
+
+		it('waits for the check past the lease-poll drain and releases the marker it finished proving', async () => {
+			const { acquisition, release, gate } = slowGate();
+			const { client, lease } = idleClient();
+			const scheduler = clockScheduler(Date.parse('2026-10-28T08:00:00.000Z'));
+			const loop = new WorkerLoop({ client, scheduler, safetyGate: gate });
+
+			const starting = loop.start();
+			const stopping = loop.stop();
+			// A minute in: far past the 5 s lease-poll drain, while icacls is
+			// still being retried on a busy machine.
+			scheduler.advanceTo(scheduler.now() + 60_000);
+			await flush();
+			expect(loop.getState().state).not.toBe('unsafe');
+
+			acquisition.resolve({ kind: 'acquired', sessionId: 'session-slow-acl' });
+			await stopping;
+			await starting;
+
+			expect(loop.getState().state).toBe('stopped');
+			expect(release).toHaveBeenCalledWith('session-slow-acl');
+			expect(lease).not.toHaveBeenCalled();
+		});
+
+		it('stays bounded: a check that never finishes fails closed with its own reason and keeps the marker', async () => {
+			expect(DEFAULT_SAFETY_PREPARATION_STOP_TIMEOUT_MS).toBe(137_000);
+			const { release, gate } = slowGate();
+			const { client } = idleClient();
+			const scheduler = clockScheduler(Date.parse('2026-10-28T08:00:00.000Z'));
+			const loop = new WorkerLoop({ client, scheduler, leasePollDrainTimeoutMs: 25, safetyGate: gate });
+
+			void loop.start();
+			const stopping = loop.stop();
+			scheduler.advanceTo(scheduler.now() + DEFAULT_SAFETY_PREPARATION_STOP_TIMEOUT_MS);
+			await flush();
+			scheduler.advanceTo(scheduler.now() + 25);
+			await stopping;
+
+			expect(loop.getState()).toMatchObject({
+				state: 'unsafe',
+				lastError: expect.stringMatching(/safety check did not finish within 137 s of the stop/i)
+			});
+			expect(release).not.toHaveBeenCalled();
+		});
 	});
 
 	it('awaits a rejected scheduled lease poll before releasing its marker', async () => {

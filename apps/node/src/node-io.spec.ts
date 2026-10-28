@@ -1,5 +1,15 @@
-import { describe, expect, it } from 'vitest';
-import { createCommandRunner, planProbeSpawn, windowsSystemRoot, type ProbeSpawnDeps } from './node-io';
+import { describe, expect, it, vi } from 'vitest';
+import { isProbeTimedOut, ProbeTimedOutError } from './core/boot-retry';
+import type { CommandRunner } from './core/capabilities';
+import {
+	createCommandRunner,
+	planProbeSpawn,
+	restrictFileToOwnerWindowsWithRetry,
+	searchPathWithRetry,
+	windowsAclUser,
+	windowsSystemRoot,
+	type ProbeSpawnDeps
+} from './node-io';
 
 /**
  * works-security finding 4 (node 0.2.7): the Windows probes ran `powershell`
@@ -97,5 +107,156 @@ describe('createCommandRunner', () => {
 			timeoutMs: 20_000
 		});
 		expect(result.code).not.toBe(0);
+	});
+
+	/**
+	 * Boot-probe retry: every retry decision hinges on `timedOut`, so it is
+	 * pinned against REAL children here, not just scripted in the fakes. A
+	 * child killed at the runner's deadline is a timeout; one that exits with
+	 * a status — however fast or slow — is an answer.
+	 */
+	describe('timedOut, against a real child process', () => {
+		// On Windows the bare name goes through cmd.exe, which needs the script quoted.
+		const script = (code: string) => (process.platform === 'win32' ? `"${code}"` : code);
+
+		it('is true when the runner killed the child at its deadline', async () => {
+			const result = await createCommandRunner().run('node', ['-e', script('setTimeout(function(){},3000)')], {
+				timeoutMs: 300
+			});
+			expect(result.timedOut).toBe(true);
+		});
+
+		it('is false when the child answered with a failing status', async () => {
+			const result = await createCommandRunner().run('node', ['-e', script('process.exit(5)')], {
+				timeoutMs: 20_000
+			});
+			expect(result).toMatchObject({ code: 5, timedOut: false });
+		});
+	});
+});
+
+/**
+ * Boot-probe retry — the boot-time probes a busy PC used to answer wrongly. A runner
+ * result with `timedOut: true` is what `execFile` reports when it killed the
+ * child at its deadline; the fake below plays a slow machine with it.
+ */
+type RunResult = Awaited<ReturnType<CommandRunner['run']>>;
+const TIMED_OUT: RunResult = { code: 1, stdout: '', stderr: '', timedOut: true };
+
+function scriptedRunner(results: RunResult[]) {
+	const calls: Array<{ command: string; args: string[]; timeoutMs: number | undefined }> = [];
+	const runner: CommandRunner = {
+		run: vi.fn(async (command: string, args: string[], options?: { timeoutMs?: number }) => {
+			calls.push({ command, args, timeoutMs: options?.timeoutMs });
+			const next = results.shift();
+			if (!next) throw new Error('spawned more often than scripted');
+			return next;
+		})
+	};
+	return { runner, calls };
+}
+
+const noWait = async (): Promise<void> => undefined;
+const OWNER_ENV = { USERDOMAIN: 'EVERDESK1', USERNAME: 'owner' };
+const MARKER = 'C:\\Users\\owner\\AppData\\Roaming\\ever-works-node\\node-config.json.worker-session';
+
+describe('restrictFileToOwnerWindowsWithRetry (boot-probe retry)', () => {
+	it('retries a timed-out icacls with a growing deadline and succeeds — the same ACL every time', async () => {
+		const { runner, calls } = scriptedRunner([
+			TIMED_OUT,
+			TIMED_OUT,
+			{ code: 0, stdout: 'Successfully processed 1 files', stderr: '' }
+		]);
+		const warn = vi.fn();
+
+		await expect(
+			restrictFileToOwnerWindowsWithRetry(MARKER, { runner, env: OWNER_ENV, sleep: noWait, logger: { warn } })
+		).resolves.toBeUndefined();
+
+		expect(calls.map((call) => call.timeoutMs)).toEqual([10_000, 20_000, 30_000]);
+		for (const call of calls) {
+			expect(call).toMatchObject({
+				command: 'icacls',
+				args: [MARKER, '/inheritance:r', '/grant:r', 'EVERDESK1\\owner:(F)']
+			});
+		}
+		expect(warn).toHaveBeenCalledTimes(2);
+		expect(warn.mock.calls[0]?.[0]).toMatch(
+			/timed out after 10 s \(attempt 1\/4\).*retrying in 1 s with a 20 s deadline/
+		);
+	});
+
+	it('fails at once, without a retry, when icacls ANSWERS with a refusal', async () => {
+		const { runner, calls } = scriptedRunner([{ code: 5, stdout: '', stderr: 'Access is denied.\r\n' }]);
+
+		const failure = restrictFileToOwnerWindowsWithRetry(MARKER, { runner, env: OWNER_ENV, sleep: noWait });
+		await expect(failure).rejects.toThrow('icacls exited 5: Access is denied.');
+		await failure.catch((error) => expect(isProbeTimedOut(error)).toBe(false));
+		expect(calls).toHaveLength(1);
+	});
+
+	it('fails at once when icacls cannot be started at all', async () => {
+		const { runner, calls } = scriptedRunner([{ code: 1, stdout: '', stderr: '', spawnError: 'ENOENT' }]);
+		await expect(
+			restrictFileToOwnerWindowsWithRetry(MARKER, { runner, env: OWNER_ENV, sleep: noWait })
+		).rejects.toThrow(/could not be started \(ENOENT\)/);
+		expect(calls).toHaveLength(1);
+	});
+
+	it('reports "probe timed out" — not a refusal — when every attempt timed out', async () => {
+		const { runner, calls } = scriptedRunner([TIMED_OUT, TIMED_OUT, TIMED_OUT, TIMED_OUT]);
+
+		const failure = restrictFileToOwnerWindowsWithRetry(MARKER, { runner, env: OWNER_ENV, sleep: noWait });
+		await expect(failure).rejects.toBeInstanceOf(ProbeTimedOutError);
+		await expect(failure).rejects.toThrow(
+			/^probe timed out: owner-only ACL \(icacls\) did not finish in 4 attempts/
+		);
+		expect(calls.map((call) => call.timeoutMs)).toEqual([10_000, 20_000, 30_000, 40_000]);
+	});
+
+	it('refuses before spawning when the Windows user is unknown', async () => {
+		const { runner, calls } = scriptedRunner([]);
+		await expect(restrictFileToOwnerWindowsWithRetry(MARKER, { runner, env: {}, sleep: noWait })).rejects.toThrow(
+			/Cannot determine the current Windows user/
+		);
+		expect(calls).toHaveLength(0);
+		expect(windowsAclUser({ USERNAME: 'solo' })).toBe('solo');
+		expect(windowsAclUser({ USERDOMAIN: 'D', USERNAME: '' })).toBe('D\\');
+		expect(windowsAclUser({ USERNAME: '  ' })).toBeNull();
+	});
+});
+
+describe('searchPathWithRetry (boot-probe retry)', () => {
+	it('retries a timed-out lookup and returns every hit', async () => {
+		const { runner, calls } = scriptedRunner([
+			TIMED_OUT,
+			{ code: 0, stdout: 'C:\\npm\\claude\r\nC:\\npm\\claude.cmd\r\n', stderr: '' }
+		]);
+		await expect(searchPathWithRetry('claude', { runner, platform: 'win32', sleep: noWait })).resolves.toEqual({
+			status: 'found',
+			hits: ['C:\\npm\\claude', 'C:\\npm\\claude.cmd']
+		});
+		expect(calls.map((call) => [call.command, call.timeoutMs])).toEqual([
+			['where', 5_000],
+			['where', 10_000]
+		]);
+	});
+
+	it('believes "not found" at once', async () => {
+		const { runner, calls } = scriptedRunner([{ code: 1, stdout: '', stderr: 'INFO: Could not find files' }]);
+		await expect(searchPathWithRetry('codex', { runner, platform: 'linux', sleep: noWait })).resolves.toEqual({
+			status: 'not-found'
+		});
+		expect(calls).toEqual([{ command: 'which', args: ['codex'], timeoutMs: 5_000 }]);
+	});
+
+	it('says timed out — never not found — when every attempt timed out', async () => {
+		const { runner, calls } = scriptedRunner([TIMED_OUT, TIMED_OUT, TIMED_OUT, TIMED_OUT]);
+		const result = await searchPathWithRetry('claude', { runner, platform: 'win32', sleep: noWait });
+		expect(result).toMatchObject({ status: 'timed-out' });
+		expect(result.status === 'timed-out' && result.detail).toMatch(
+			/^probe timed out: PATH lookup \(where claude\) did not finish in 4 attempts \(deadlines 5 s, 10 s, 20 s, 30 s\)/
+		);
+		expect(calls).toHaveLength(4);
 	});
 });
