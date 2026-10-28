@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { expectPluginNotBound } from './helpers/notification-channels';
 
 /**
  * Notification CHANNELS × EVENT-TYPES × PER-EVENT SUBSCRIPTIONS — MULTI-STEP
@@ -81,10 +82,11 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   - FULL ISOLATION: every test registers its OWN fresh user(s) via
  *     registerUserViaAPI (unique email per call); no module-scope await/clock.
  *     Ids asserted via toContain/not.toContain, never exact global counts.
- *   - Pure API-contract (no LLM/mail/Redis) → keyless-CI safe. No channel-delivery
- *     plugin is enabled, so :id/test is a truthful failure (a positive status is
- *     tolerated). Anonymous probes use an EMPTY-storageState context so the shared
- *     auth cookie is not inherited.
+ *   - Pure API-contract (no LLM/mail/Redis) → keyless-CI safe. Channels default to
+ *     pluginId 'slack', which names NO channel plugin (the bound one is
+ *     'slack-channel'), so :id/test is a truthful, network-free failure. Anonymous
+ *     probes use an EMPTY-storageState context so the shared auth cookie is not
+ *     inherited.
  */
 
 const TIMEOUT = 30_000;
@@ -658,23 +660,14 @@ test.describe('Notification channels × events × subscriptions — multi-step i
             (await subscribe(request, token, 'git_auth_expired', ['in-app', ch.id])).status(),
         ).toBe(200);
 
-        // Test-send returns the send result DIRECTLY (201). CI enables no channel
-        // plugin → truthful 'failed'; a positive status is tolerated.
+        // Test-send returns the send result DIRECTLY (201). 'slack' names no channel
+        // plugin, so the facade resolves nothing and fails truthfully, naming the id.
         const testRes = await request.post(`${CHANNELS}/${ch.id}/test`, {
             headers: authedHeaders(token),
             timeout: TIMEOUT,
         });
         expect(testRes.status()).toBe(201);
-        const body = await testRes.json();
-        expect(typeof body.status).toBe('string');
-        if (body.status === 'failed') {
-            expect(typeof body.error).toBe('string');
-            expect(String(body.error).toLowerCase()).toMatch(
-                /plugin|disabled|not found|materialize/,
-            );
-        } else {
-            expect(['delivered', 'queued', 'sent', 'accepted']).toContain(body.status);
-        }
+        expectPluginNotBound(await testRes.json(), 'slack');
 
         // The subscription is unaffected by the test-send.
         expect(subFor(await getPrefs(request, token), 'git_auth_expired')!.channelIds).toEqual([

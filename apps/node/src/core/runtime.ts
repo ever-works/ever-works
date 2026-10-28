@@ -1705,18 +1705,28 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		if (options.persistLinkState) {
 			const persist = options.persistLinkState;
 			let lastKey = '';
+			// QUEUED, like the lifecycle record's writes: each write is an atomic
+			// replace now, so whichever finishes LAST wins. Two transitions in
+			// quick succession must therefore land in the order they happened,
+			// or a stalled older write could replace the newer record.
+			let writes: Promise<void> = Promise.resolve();
 			link.onChange((state) => {
 				// One write per phase or generation change, not per byte counted.
 				const key = `${state.phase}|${state.linkGeneration ?? ''}|${state.detail ?? ''}`;
 				if (key === lastKey) return;
 				lastKey = key;
-				void Promise.resolve()
-					.then(() => persist(toNodeLinkRecord(consents, state, io.now ? io.now() : Date.now())))
-					.catch((error: unknown) =>
-						io.logger.warn(
-							`Could not record the node link state: ${error instanceof Error ? error.message : String(error)}`
-						)
-					);
+				const record = toNodeLinkRecord(consents, state, io.now ? io.now() : Date.now());
+				writes = writes
+					.then(() => persist(record))
+					.catch((error: unknown) => {
+						try {
+							io.logger.warn(
+								`Could not record the node link state: ${error instanceof Error ? error.message : String(error)}`
+							);
+						} catch {
+							// A failing log sink must not wedge the queue: later writes still run.
+						}
+					});
 			});
 		}
 	}

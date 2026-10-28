@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { CONFIG_FILE_MODE, type ConfigFileSystem } from './config-store';
+import { publishFileExclusively } from './atomic-state-file';
+import { CONFIG_FILE_MODE, supportsAtomicWrites, type ConfigFileSystem } from './config-store';
 
 const MARKER_VERSION = 1;
 
@@ -88,7 +89,7 @@ export function createConfigWorkerSafetyGate(
 				since: new Date(now()).toISOString()
 			};
 			try {
-				await fs.createFileExclusive(markerPath, `${JSON.stringify(marker)}\n`);
+				await publishMarker(fs, markerPath, `${JSON.stringify(marker)}\n`, options.platform);
 			} catch (error) {
 				// Exclusive creation may have made the final directory entry and
 				// then crashed mid-write. Any resulting bytes (including zero) are
@@ -146,6 +147,59 @@ export function createConfigWorkerSafetyGate(
 			}
 		}
 	};
+}
+
+/**
+ * Arm the marker COMPLETE or not at all (2026-10-28).
+ *
+ * It is armed before the first lease, so a kill while it is being written
+ * means no work ran. Created in place, such a kill left an empty or torn
+ * marker, which reads (correctly, since nothing can tell it apart from a
+ * damaged one) as a quarantine an operator has to clear. So the marker is
+ * staged in a flushed temp file and hard-linked into place: a link, unlike
+ * a rename, refuses an existing target, so two workers racing still agree
+ * on one owner (the loser sees `EEXIST` and reads the winner's marker).
+ *
+ * A filesystem that refuses the hard link (FAT, some network shares) falls
+ * back to the exclusive in-place create, which keeps the fail-closed
+ * behaviour above for its rare torn write.
+ */
+async function publishMarker(
+	fs: ConfigFileSystem,
+	markerPath: string,
+	content: string,
+	platform: string | undefined
+): Promise<void> {
+	const link = fs.link;
+	if (supportsAtomicWrites(fs) && typeof link === 'function') {
+		// Only a refusal of the LINK itself falls back. A failure while staging
+		// the temp file (disk full, I/O error) is reported as it is: retrying it
+		// as an in-place create is exactly the torn write this avoids.
+		let linkError: unknown = null;
+		const ops = {
+			...fs,
+			link: async (existing: string, newPath: string): Promise<void> => {
+				try {
+					await link(existing, newPath);
+				} catch (error) {
+					linkError = error;
+					throw error;
+				}
+			}
+		};
+		try {
+			await publishFileExclusively(ops, markerPath, content, { platform });
+			return;
+		} catch (error) {
+			if (error !== linkError || errorCode(error) === 'EEXIST') throw error;
+		}
+	}
+	// Still exclusive: a marker that appeared meanwhile makes this reject with EEXIST.
+	await fs.createFileExclusive!(markerPath, content);
+}
+
+function errorCode(error: unknown): string | undefined {
+	return error && typeof error === 'object' ? (error as { code?: string }).code : undefined;
 }
 
 function parseMarker(raw: string): WorkerSessionMarker | null {

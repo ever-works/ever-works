@@ -652,7 +652,9 @@ describe('ever-works-node unenroll', () => {
 		expect(await runCli(['unenroll'], h.deps)).toBe(EXIT_OK);
 
 		expect(calls).toEqual(['https://api.ever.works/api/fleet/unenroll']);
-		expect(h.removed).toEqual([CONFIG_PATH]);
+		// The last-good copy goes first, so a crash between the two never leaves
+		// a missing config beside a recoverable copy of it.
+		expect(h.removed).toEqual([`${CONFIG_PATH}.bak`, CONFIG_PATH]);
 		expect(h.files.has(CONFIG_PATH)).toBe(false);
 		expect(h.output()).toContain('The registration and the local credential are both gone');
 	});
