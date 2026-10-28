@@ -34,7 +34,10 @@ export function AccountDeletionSummary({ preview }: { preview: AccountDeletionPr
                     data-testid={`account-deletion-workspace-${account.outcome}`}
                 >
                     <p className="text-sm font-semibold text-text dark:text-text-dark">
-                        {t('workspaceTitle', { name: account.workspace, role: t(`roles.${account.role}`) })}
+                        {t('workspaceTitle', {
+                            name: account.workspace,
+                            role: t(`roles.${account.role}`),
+                        })}
                     </p>
                     {account.organizations.length > 0 && (
                         <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
@@ -65,7 +68,9 @@ export function AccountDeletionSummary({ preview }: { preview: AccountDeletionPr
             )}
 
             <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-1">
-                <p className="text-sm font-semibold text-text dark:text-text-dark">{t('keptTitle')}</p>
+                <p className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('keptTitle')}
+                </p>
                 <ul className="text-xs text-text-secondary dark:text-text-secondary-dark list-disc pl-5 space-y-1">
                     <li>{t('kept.invoices')}</li>
                     <li>{t('kept.audit')}</li>

@@ -112,7 +112,10 @@ export function DeleteAccountConfirmClient() {
         return (
             <AuthLayout title={t('title')} subtitle={t('loading')}>
                 <ThemeToggle variant="fixed" />
-                <div className="flex justify-center py-8" data-testid="delete-account-confirm-loading">
+                <div
+                    className="flex justify-center py-8"
+                    data-testid="delete-account-confirm-loading"
+                >
                     <div className="animate-pulse text-sm text-text-secondary dark:text-text-secondary-dark">
                         {t('loading')}
                     </div>
@@ -146,9 +149,14 @@ export function DeleteAccountConfirmClient() {
                 <div className="space-y-4" data-testid="delete-account-confirm-deleted">
                     <div className="bg-success/10 border border-success/20 rounded-lg p-5 text-sm text-text dark:text-text-dark space-y-2">
                         <p>{t('deletedMessage')}</p>
-                        <p className="text-text-secondary dark:text-text-secondary-dark">{t('deletedKept')}</p>
+                        <p className="text-text-secondary dark:text-text-secondary-dark">
+                            {t('deletedKept')}
+                        </p>
                     </div>
-                    <a href={ROUTES.AUTH_REGISTER} className="text-sm text-primary hover:text-primary-hover font-medium">
+                    <a
+                        href={ROUTES.AUTH_REGISTER}
+                        className="text-sm text-primary hover:text-primary-hover font-medium"
+                    >
                         {t('goodbyeLink')}
                     </a>
                 </div>
@@ -170,7 +178,10 @@ export function DeleteAccountConfirmClient() {
                 )}
 
                 {error && (
-                    <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm" role="alert">
+                    <div
+                        className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm"
+                        role="alert"
+                    >
                         {error}
                     </div>
                 )}
@@ -200,7 +211,10 @@ export function DeleteAccountConfirmClient() {
                 </Button>
 
                 <div className="text-center">
-                    <a href={ROUTES.AUTH_LOGIN} className="text-sm text-primary hover:text-primary-hover">
+                    <a
+                        href={ROUTES.AUTH_LOGIN}
+                        className="text-sm text-primary hover:text-primary-hover"
+                    >
                         {t('keepAccount')}
                     </a>
                 </div>

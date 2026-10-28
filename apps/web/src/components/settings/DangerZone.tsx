@@ -140,7 +140,11 @@ export function DangerZone({ user }: DangerZoneProps) {
                                             <li>{t('delete.confirmItems.3')}</li>
                                             <li>{t('delete.confirmItems.4')}</li>
                                         </ul>
-                                        {previewError && <p className="text-xs text-danger mt-2">{previewError}</p>}
+                                        {previewError && (
+                                            <p className="text-xs text-danger mt-2">
+                                                {previewError}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 

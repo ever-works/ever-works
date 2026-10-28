@@ -10,7 +10,9 @@ import {
     type AccountDeletionResult,
 } from '@/lib/api/account-deletion';
 
-type ActionResult<T> = { success: true; data: T } | { success: false; error: string; gone?: boolean };
+type ActionResult<T> =
+    | { success: true; data: T }
+    | { success: false; error: string; gone?: boolean };
 
 /**
  * Self-serve account deletion — server actions for the public email-link
@@ -22,10 +24,10 @@ type ActionResult<T> = { success: true; data: T } | { success: false; error: str
 
 /** Public: ask for a deletion link. Always reports success, whatever the address. */
 export async function requestAccountDeletion(email: string): Promise<ActionResult<null>> {
-    const t = await getTranslations('auth.deleteAccount.request.errors');
+    const t = await getTranslations('auth.deleteAccount');
     const trimmed = (email ?? '').trim();
     if (!trimmed || trimmed.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-        return { success: false, error: t('invalidEmail') };
+        return { success: false, error: t('request.errors.invalidEmail') };
     }
     try {
         await accountDeletionAPI.request(trimmed, withAppUrl(ROUTES.DELETE_ACCOUNT_CONFIRM));
@@ -33,15 +35,17 @@ export async function requestAccountDeletion(email: string): Promise<ActionResul
         // 429 (too many requests from this address) is the only answer that
         // differs, and it says nothing about whether the account exists.
         if (error instanceof ApiResponseError && error.statusCode === 429) {
-            return { success: false, error: t('tooManyRequests') };
+            return { success: false, error: t('request.errors.tooManyRequests') };
         }
-        return { success: false, error: t('failed') };
+        return { success: false, error: t('request.errors.failed') };
     }
     return { success: true, data: null };
 }
 
 /** Public: what a link would delete. Does not use the link. */
-export async function verifyAccountDeletion(token: string): Promise<ActionResult<AccountDeletionPreview>> {
+export async function verifyAccountDeletion(
+    token: string,
+): Promise<ActionResult<AccountDeletionPreview>> {
     try {
         return { success: true, data: await accountDeletionAPI.verify(token) };
     } catch (error) {
@@ -50,7 +54,9 @@ export async function verifyAccountDeletion(token: string): Promise<ActionResult
 }
 
 /** Public: use the link and delete the account. */
-export async function confirmAccountDeletion(token: string): Promise<ActionResult<AccountDeletionResult>> {
+export async function confirmAccountDeletion(
+    token: string,
+): Promise<ActionResult<AccountDeletionResult>> {
     try {
         const result = await accountDeletionAPI.confirm(token);
         // If this browser happened to be signed in to the deleted account,
@@ -73,7 +79,9 @@ export async function getMyAccountDeletionPreview(): Promise<ActionResult<Accoun
 }
 
 /** Signed in: delete this account, then sign this browser out. */
-export async function deleteMyAccount(confirmEmail: string): Promise<ActionResult<AccountDeletionResult>> {
+export async function deleteMyAccount(
+    confirmEmail: string,
+): Promise<ActionResult<AccountDeletionResult>> {
     const t = await getTranslations('dashboard.dangerZone.messages');
     if (process.env.ACCOUNT_DELETION_DISABLED === 'true') {
         // Operator kill switch (e.g. a public demo instance).
@@ -114,7 +122,10 @@ async function linkErrorMessages(): Promise<LinkErrorMessages> {
     };
 }
 
-function linkError(error: unknown, messages: LinkErrorMessages): { success: false; error: string; gone?: boolean } {
+function linkError(
+    error: unknown,
+    messages: LinkErrorMessages,
+): { success: false; error: string; gone?: boolean } {
     if (error instanceof ApiResponseError) {
         if (error.statusCode === 410) {
             return { success: false, error: messages.linkInvalid, gone: true };

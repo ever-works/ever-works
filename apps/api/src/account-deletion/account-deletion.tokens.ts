@@ -54,12 +54,17 @@ export function emailLogRef(email: string): string {
  * `ACCOUNT_DELETION_TOKEN_TTL_MINUTES`, clamped to 5..60; 30 when unset or
  * malformed.
  */
-export function resolveDeletionTokenTtlMinutes(raw: string | undefined = process.env.ACCOUNT_DELETION_TOKEN_TTL_MINUTES): number {
+export function resolveDeletionTokenTtlMinutes(
+    raw: string | undefined = process.env.ACCOUNT_DELETION_TOKEN_TTL_MINUTES,
+): number {
     if (raw === undefined || raw.trim() === '' || !/^\d+$/.test(raw.trim())) {
         return ACCOUNT_DELETION_DEFAULT_TTL_MINUTES;
     }
     const parsed = Number.parseInt(raw.trim(), 10);
-    return Math.min(ACCOUNT_DELETION_MAX_TTL_MINUTES, Math.max(ACCOUNT_DELETION_MIN_TTL_MINUTES, parsed));
+    return Math.min(
+        ACCOUNT_DELETION_MAX_TTL_MINUTES,
+        Math.max(ACCOUNT_DELETION_MIN_TTL_MINUTES, parsed),
+    );
 }
 
 /**

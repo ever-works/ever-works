@@ -1,7 +1,9 @@
 // The deletion service reaches the Work, billing and storage layers through
 // optional providers; their barrels pull the whole API graph (better-auth's
 // ESM included) into a unit test. Stand-ins keep these specs about this module.
-jest.mock('@ever-works/agent/services', () => ({ WorkLifecycleService: class WorkLifecycleService {} }));
+jest.mock('@ever-works/agent/services', () => ({
+    WorkLifecycleService: class WorkLifecycleService {},
+}));
 jest.mock('@ever-works/agent/subscriptions', () => ({
     BillingService: class BillingService {},
     PaygService: class PaygService {},
@@ -91,7 +93,9 @@ describe('AccountDeletionService.preview', () => {
         const service = setup({
             users: [{ id: 'alice', email: 'alice@example.com', tenantId: 'ta', createdAt: t0 }],
             tenants: [{ id: 'ta', ownerUserId: 'alice', displayName: 'alice' }],
-            organizations: [{ id: 'oa', tenantId: 'ta', displayName: 'Acme', slug: 'acme', createdAt: t0 }],
+            organizations: [
+                { id: 'oa', tenantId: 'ta', displayName: 'Acme', slug: 'acme', createdAt: t0 },
+            ],
             works: [
                 { id: 'w1', userId: 'alice', tenantId: 'ta' },
                 { id: 'w2', userId: 'alice', tenantId: null },
@@ -118,13 +122,33 @@ describe('AccountDeletionService.preview', () => {
             users: [
                 { id: 'alice', email: 'alice@example.com', tenantId: 'ta', createdAt: t0 },
                 { id: 'bob', username: 'bob', tenantId: 'ta', createdAt: t1, isAnonymous: false },
-                { id: 'carol', username: 'carol', tenantId: 'ta', createdAt: t2, isAnonymous: false },
+                {
+                    id: 'carol',
+                    username: 'carol',
+                    tenantId: 'ta',
+                    createdAt: t2,
+                    isAnonymous: false,
+                },
             ],
             tenants: [{ id: 'ta', ownerUserId: 'alice', displayName: 'alice' }],
-            organizations: [{ id: 'oa', tenantId: 'ta', displayName: 'Acme', slug: 'acme', createdAt: t0 }],
+            organizations: [
+                { id: 'oa', tenantId: 'ta', displayName: 'Acme', slug: 'acme', createdAt: t0 },
+            ],
             members: [
-                { organizationId: 'oa', tenantId: 'ta', userId: 'bob', role: 'member', joinedAt: t1 },
-                { organizationId: 'oa', tenantId: 'ta', userId: 'carol', role: 'admin', joinedAt: t2 },
+                {
+                    organizationId: 'oa',
+                    tenantId: 'ta',
+                    userId: 'bob',
+                    role: 'member',
+                    joinedAt: t1,
+                },
+                {
+                    organizationId: 'oa',
+                    tenantId: 'ta',
+                    userId: 'carol',
+                    role: 'admin',
+                    joinedAt: t2,
+                },
             ],
             works: [
                 { id: 'w1', userId: 'alice', tenantId: 'ta' },
@@ -156,7 +180,15 @@ describe('AccountDeletionService.preview', () => {
                 { id: 'ob', tenantId: 'tb', displayName: 'Beta', slug: 'beta', createdAt: t0 },
                 { id: 'oc', tenantId: 'tb', displayName: 'Gamma', slug: 'gamma', createdAt: t1 },
             ],
-            members: [{ organizationId: 'ob', tenantId: 'tb', userId: 'alice', role: 'admin', joinedAt: t1 }],
+            members: [
+                {
+                    organizationId: 'ob',
+                    tenantId: 'tb',
+                    userId: 'alice',
+                    role: 'admin',
+                    joinedAt: t1,
+                },
+            ],
             works: [{ id: 'w1', userId: 'alice', tenantId: 'tb' }],
         });
         const preview = await service.preview('alice');

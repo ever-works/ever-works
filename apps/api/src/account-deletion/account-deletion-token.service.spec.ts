@@ -93,7 +93,11 @@ class MemoryStore extends AccountDeletionRequestStore {
     }
 }
 
-const JANE: DeletionLinkRecipient = { id: 'user-jane', email: 'jane@example.com', username: 'jane' };
+const JANE: DeletionLinkRecipient = {
+    id: 'user-jane',
+    email: 'jane@example.com',
+    username: 'jane',
+};
 
 function setup(options: { users?: DeletionLinkRecipient[]; sendFails?: boolean } = {}) {
     let now = new Date('2026-10-27T20:00:00.000Z');
@@ -158,7 +162,9 @@ describe('account-deletion token helpers', () => {
         const token = generateDeletionToken();
         expect(hashDeletionToken(token)).toMatch(/^[0-9a-f]{64}$/);
         expect(hashDeletionToken(token)).not.toContain(token);
-        expect(hashDeletionEmail('  Jane@Example.COM ')).toEqual(hashDeletionEmail('jane@example.com'));
+        expect(hashDeletionEmail('  Jane@Example.COM ')).toEqual(
+            hashDeletionEmail('jane@example.com'),
+        );
     });
 
     it('puts the token in the URL fragment, or inside an existing hash route', () => {
@@ -187,9 +193,15 @@ describe('AccountDeletionTokenService', () => {
     describe('enumeration-safe request', () => {
         it('answers the same thing for a known and an unknown address, before any lookup', () => {
             const { service, lookup, sender, scheduled } = setup();
-            expect(service.acceptRequest({ email: 'jane@example.com' })).toEqual({ status: 'accepted' });
-            expect(service.acceptRequest({ email: 'nobody@example.com' })).toEqual({ status: 'accepted' });
-            expect(service.acceptRequest({ email: 'not an email' })).toEqual({ status: 'accepted' });
+            expect(service.acceptRequest({ email: 'jane@example.com' })).toEqual({
+                status: 'accepted',
+            });
+            expect(service.acceptRequest({ email: 'nobody@example.com' })).toEqual({
+                status: 'accepted',
+            });
+            expect(service.acceptRequest({ email: 'not an email' })).toEqual({
+                status: 'accepted',
+            });
             // Nothing ran yet: the lookup and the send happen after the response.
             expect(lookup.findByEmail).not.toHaveBeenCalled();
             expect(sender.send).not.toHaveBeenCalled();
@@ -215,7 +227,9 @@ describe('AccountDeletionTokenService', () => {
             expect(row.emailHash).toBe(hashDeletionEmail('jane@example.com'));
             expect(JSON.stringify(row)).not.toContain(token);
             expect(JSON.stringify(row)).not.toContain('jane@example.com');
-            expect(sent[0].deleteUrl).toMatch(/^https:\/\/app\.ever\.works\/delete-account\/confirm#token=/);
+            expect(sent[0].deleteUrl).toMatch(
+                /^https:\/\/app\.ever\.works\/delete-account\/confirm#token=/,
+            );
         });
 
         it('drops the 4th request for one address within an hour, silently', async () => {
@@ -235,11 +249,15 @@ describe('AccountDeletionTokenService', () => {
 
         it('uses a caller callbackUrl only on an allowed host', () => {
             const { service } = setup();
-            expect(service.resolveConfirmUrl('https://ever.co/delete/confirm')).toBe('https://ever.co/delete/confirm');
+            expect(service.resolveConfirmUrl('https://ever.co/delete/confirm')).toBe(
+                'https://ever.co/delete/confirm',
+            );
             expect(service.resolveConfirmUrl('https://evil.example/steal')).toBe(
                 'https://app.ever.works/delete-account/confirm',
             );
-            expect(service.resolveConfirmUrl('javascript:alert(1)')).toBe('https://app.ever.works/delete-account/confirm');
+            expect(service.resolveConfirmUrl('javascript:alert(1)')).toBe(
+                'https://app.ever.works/delete-account/confirm',
+            );
         });
     });
 
@@ -290,7 +308,9 @@ describe('AccountDeletionTokenService', () => {
             await expect(service.inspect(generateDeletionToken())).rejects.toBeInstanceOf(
                 InvalidDeletionLinkError,
             );
-            await expect(service.inspect('../../etc')).rejects.toBeInstanceOf(InvalidDeletionLinkError);
+            await expect(service.inspect('../../etc')).rejects.toBeInstanceOf(
+                InvalidDeletionLinkError,
+            );
             await expect(service.claim(undefined)).rejects.toBeInstanceOf(InvalidDeletionLinkError);
         });
     });

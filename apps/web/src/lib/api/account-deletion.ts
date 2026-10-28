@@ -37,7 +37,8 @@ export interface AccountDeletionResult {
  */
 async function clientIpHeaders(): Promise<Record<string, string>> {
     const incoming = await headers();
-    const forwarded = incoming.get('x-forwarded-for')?.split(',')[0]?.trim() || incoming.get('x-real-ip')?.trim();
+    const forwarded =
+        incoming.get('x-forwarded-for')?.split(',')[0]?.trim() || incoming.get('x-real-ip')?.trim();
     return forwarded ? { 'X-Forwarded-For': forwarded } : {};
 }
 

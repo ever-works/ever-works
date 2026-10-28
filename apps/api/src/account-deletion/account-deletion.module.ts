@@ -38,7 +38,8 @@ export function resolveDeletionLinkUrls(env: NodeJS.ProcessEnv = process.env): D
         if (host) hosts.add(host);
     }
     return {
-        defaultConfirmUrl: env.ACCOUNT_DELETION_CONFIRM_URL?.trim() || `${web}/delete-account/confirm`,
+        defaultConfirmUrl:
+            env.ACCOUNT_DELETION_CONFIRM_URL?.trim() || `${web}/delete-account/confirm`,
         keepAccountUrl: `${web}/login`,
         allowedCallbackHosts: hosts,
     };

@@ -26,7 +26,10 @@ import { AUTH_PROVIDER } from '../auth/providers/auth-provider.constants';
 import { AccountDeletionRequestStore } from './account-deletion-request.store';
 import { AccountDeletionMailer } from './account-deletion.mailer';
 import { hashDeletionEmail, maskEmail } from './account-deletion.tokens';
-import { PERSONAL_ROWS_WITHOUT_FK, TENANT_CONTENT_OWNER_COLUMNS } from './account-deletion.inventory';
+import {
+    PERSONAL_ROWS_WITHOUT_FK,
+    TENANT_CONTENT_OWNER_COLUMNS,
+} from './account-deletion.inventory';
 import { getActiveStorageBackend } from '../uploads/storage-backend.factory';
 
 /** What happens to one workspace (Tenant) the account belongs to. */
@@ -205,7 +208,10 @@ export class AccountDeletionService {
                 .getRepository(OrganizationMember)
                 .count({ where: { userId: user.id } });
             const deletedPlans = plans.filter((p) => !p.successorId && p.owned);
-            summary.organizationsDeleted = deletedPlans.reduce((n, p) => n + p.organizations.length, 0);
+            summary.organizationsDeleted = deletedPlans.reduce(
+                (n, p) => n + p.organizations.length,
+                0,
+            );
             summary.workspaceDeleted = deletedPlans.length > 0;
 
             await this.dataSource.transaction(async (manager) => {
@@ -220,7 +226,8 @@ export class AccountDeletionService {
                 await manager.getRepository(User).delete({ id: user.id });
             });
         } catch (error) {
-            const code = error instanceof AccountDeletionFailedError ? error.code : 'deletion_failed';
+            const code =
+                error instanceof AccountDeletionFailedError ? error.code : 'deletion_failed';
             this.logger.error(
                 `account-deletion failed for ${user.id} at ${code}: ${
                     error instanceof Error ? error.message : String(error)
@@ -236,7 +243,11 @@ export class AccountDeletionService {
         await this.recordCompletion(trigger, email, summary, startedAt, completedAt);
         await this.store.clearUser(user.id).catch(() => undefined);
         if (email) {
-            await this.mailer.sendDeletedConfirmation({ to: email, deletedAt: completedAt, summary });
+            await this.mailer.sendDeletedConfirmation({
+                to: email,
+                deletedAt: completedAt,
+                summary,
+            });
         }
         this.logger.log(
             `account-deletion completed (${trigger.source}): works=${summary.worksDeleted} ` +
@@ -340,8 +351,12 @@ export class AccountDeletionService {
                   select: ['id', 'username'],
               })
             : null;
-        const memberOrgIds = new Set(roster.filter((r) => r.userId === user.id).map((r) => r.organizationId));
-        const visibleOrgs = owned ? organizations : organizations.filter((o) => memberOrgIds.has(o.id));
+        const memberOrgIds = new Set(
+            roster.filter((r) => r.userId === user.id).map((r) => r.organizationId),
+        );
+        const visibleOrgs = owned
+            ? organizations
+            : organizations.filter((o) => memberOrgIds.has(o.id));
 
         return {
             tenant,
@@ -435,7 +450,9 @@ export class AccountDeletionService {
         const successorId = plan.successorId as string;
         const manager = this.dataSource.manager;
         if (plan.owned) {
-            await manager.getRepository(Tenant).update({ id: plan.tenant.id }, { ownerUserId: successorId });
+            await manager
+                .getRepository(Tenant)
+                .update({ id: plan.tenant.id }, { ownerUserId: successorId });
         }
         const orgIds = (
             await manager.getRepository(Organization).find({
@@ -479,7 +496,9 @@ export class AccountDeletionService {
     private existingContentColumns(manager: EntityManager) {
         const present: typeof TENANT_CONTENT_OWNER_COLUMNS = [];
         for (const target of TENANT_CONTENT_OWNER_COLUMNS) {
-            const meta = manager.connection.entityMetadatas.find((m) => m.tableName === target.table);
+            const meta = manager.connection.entityMetadatas.find(
+                (m) => m.tableName === target.table,
+            );
             if (!meta) continue;
             const has = (name: string) => meta.columns.some((c) => c.databaseName === name);
             if (has(target.column) && has(target.scope)) {
@@ -502,7 +521,10 @@ export class AccountDeletionService {
             select: ['id', 'slug', 'tenantId', 'kind'],
         });
         const going = works.filter((w) => !(w.tenantId && keptTenants.has(w.tenantId)));
-        const lifecycle = getOptionalProvider<WorkLifecycleService>(this.moduleRef, WorkLifecycleService);
+        const lifecycle = getOptionalProvider<WorkLifecycleService>(
+            this.moduleRef,
+            WorkLifecycleService,
+        );
         if (lifecycle) {
             for (const work of going) {
                 try {
@@ -535,11 +557,17 @@ export class AccountDeletionService {
      * on is retried once the dependant is gone; a table that still refuses is
      * logged and left (its id points at nothing once the account is gone).
      */
-    private async deletePersonalRows(userId: string, keptTenantIds: string[], keptOrgIds: string[]): Promise<void> {
+    private async deletePersonalRows(
+        userId: string,
+        keptTenantIds: string[],
+        keptOrgIds: string[],
+    ): Promise<void> {
         const manager = this.dataSource.manager;
         const escape = (name: string) => manager.connection.driver.escape(name);
         let pending = PERSONAL_ROWS_WITHOUT_FK.filter((target) => {
-            const meta = manager.connection.entityMetadatas.find((m) => m.tableName === target.table);
+            const meta = manager.connection.entityMetadatas.find(
+                (m) => m.tableName === target.table,
+            );
             if (!meta) return false;
             const has = (name: string) => meta.columns.some((c) => c.databaseName === name);
             return has(target.column) && (!target.scope || has(target.scope));
@@ -553,18 +581,28 @@ export class AccountDeletionService {
                         .delete()
                         .from(target.table)
                         .where(escape(target.column) + ' = :userId', { userId });
-                    const kept = target.scope === 'tenantId' ? keptTenantIds : target.scope ? keptOrgIds : [];
+                    const kept =
+                        target.scope === 'tenantId'
+                            ? keptTenantIds
+                            : target.scope
+                              ? keptOrgIds
+                              : [];
                     if (target.scope && kept.length > 0) {
                         const col = escape(target.scope);
-                        qb.andWhere('(' + col + ' IS NULL OR ' + col + ' NOT IN (:...kept))', { kept });
+                        qb.andWhere('(' + col + ' IS NULL OR ' + col + ' NOT IN (:...kept))', {
+                            kept,
+                        });
                     }
                     await qb.execute();
                 } catch (error) {
                     failed.push(target);
                     if (pass === 1) {
                         this.logger.warn(
-                            'account-deletion: ' + target.table + ' rows could not be removed (' +
-                                (error instanceof Error ? error.name : 'error') + ')',
+                            'account-deletion: ' +
+                                target.table +
+                                ' rows could not be removed (' +
+                                (error instanceof Error ? error.name : 'error') +
+                                ')',
                         );
                     }
                 }
@@ -673,7 +711,11 @@ function planIsLive(profile: BillingProfile | null): boolean {
 function paygIsLive(profile: BillingProfile | null): boolean {
     if (!profile) return false;
     if (profile.paygEnabled) return true;
-    return !!profile.paygSubscriptionId && !!profile.paygStatus && !ENDED_STATUSES.has(profile.paygStatus);
+    return (
+        !!profile.paygSubscriptionId &&
+        !!profile.paygStatus &&
+        !ENDED_STATUSES.has(profile.paygStatus)
+    );
 }
 
 function isNothingToCancel(error: unknown): boolean {

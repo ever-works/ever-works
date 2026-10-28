@@ -39,13 +39,22 @@ export function DeleteAccountRequestForm() {
                 <ThemeToggle variant="fixed" />
                 <div className="space-y-6" data-testid="delete-account-request-sent">
                     <div className="bg-success/10 border border-success/20 rounded-lg p-5 space-y-2">
-                        <p className="text-sm text-text dark:text-text-dark">{t('successMessage', { email: sentTo })}</p>
-                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">{t('successExpiry')}</p>
+                        <p className="text-sm text-text dark:text-text-dark">
+                            {t('successMessage', { email: sentTo })}
+                        </p>
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                            {t('successExpiry')}
+                        </p>
                     </div>
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">{t('checkSpam')}</p>
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                        {t('checkSpam')}
+                    </p>
                     <div className="text-center">
                         {/* A full page load on purpose: these pages stay out of client-side analytics. */}
-                        <a href={ROUTES.AUTH_LOGIN} className="text-sm text-primary hover:text-primary-hover font-medium">
+                        <a
+                            href={ROUTES.AUTH_LOGIN}
+                            className="text-sm text-primary hover:text-primary-hover font-medium"
+                        >
                             {t('backToLogin')}
                         </a>
                     </div>
@@ -57,15 +66,24 @@ export function DeleteAccountRequestForm() {
     return (
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <ThemeToggle variant="fixed" />
-            <form onSubmit={handleSubmit} className="space-y-6" data-testid="delete-account-request-form">
+            <form
+                onSubmit={handleSubmit}
+                className="space-y-6"
+                data-testid="delete-account-request-form"
+            >
                 {error && (
-                    <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm" role="alert">
+                    <div
+                        className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm"
+                        role="alert"
+                    >
                         {error}
                     </div>
                 )}
 
                 <div className="rounded-lg border border-border dark:border-border-dark p-4 space-y-2 text-sm text-text-secondary dark:text-text-secondary-dark">
-                    <p className="font-medium text-text dark:text-text-dark">{t('whatHappensTitle')}</p>
+                    <p className="font-medium text-text dark:text-text-dark">
+                        {t('whatHappensTitle')}
+                    </p>
                     <ul className="list-disc pl-5 space-y-1">
                         <li>{t('whatHappens.0')}</li>
                         <li>{t('whatHappens.1')}</li>
@@ -85,13 +103,24 @@ export function DeleteAccountRequestForm() {
                     disabled={isPending}
                 />
 
-                <Button type="submit" variant="danger" disabled={isPending || !email} loading={isPending} fullWidth>
+                <Button
+                    type="submit"
+                    variant="danger"
+                    disabled={isPending || !email}
+                    loading={isPending}
+                    fullWidth
+                >
                     {isPending ? t('form.submitting') : t('form.submit')}
                 </Button>
 
                 <div className="text-center space-y-2">
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">{t('signedInHint')}</p>
-                    <a href={ROUTES.AUTH_LOGIN} className="text-sm text-primary hover:text-primary-hover transition-colors">
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                        {t('signedInHint')}
+                    </p>
+                    <a
+                        href={ROUTES.AUTH_LOGIN}
+                        className="text-sm text-primary hover:text-primary-hover transition-colors"
+                    >
                         {t('backToLogin')}
                     </a>
                 </div>

@@ -51,7 +51,12 @@ export interface DeletionRequestInput {
 }
 
 /** What the background issuance did — for tests and hashed logs only, never the HTTP response. */
-export type DeletionIssueOutcome = 'sent' | 'no-account' | 'rate-limited' | 'invalid' | 'send-failed';
+export type DeletionIssueOutcome =
+    | 'sent'
+    | 'no-account'
+    | 'rate-limited'
+    | 'invalid'
+    | 'send-failed';
 
 /** Raised for every unusable link: unknown, malformed, used, expired or revoked. */
 export class InvalidDeletionLinkError extends Error {
@@ -137,7 +142,10 @@ export class AccountDeletionTokenService {
         const now = this.now();
 
         const since = new Date(now.getTime() - 60 * 60 * 1000);
-        if ((await this.store.countIssuedSince(emailHash, since)) >= ACCOUNT_DELETION_MAX_REQUESTS_PER_EMAIL_PER_HOUR) {
+        if (
+            (await this.store.countIssuedSince(emailHash, since)) >=
+            ACCOUNT_DELETION_MAX_REQUESTS_PER_EMAIL_PER_HOUR
+        ) {
             return 'rate-limited';
         }
 

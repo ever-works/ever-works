@@ -26,7 +26,10 @@ export async function POST(request: NextRequest) {
     try {
         body = (await request.json()) as Body;
     } catch {
-        return NextResponse.json({ success: false, error: 'bad_request' }, { status: 400, headers: NO_STORE });
+        return NextResponse.json(
+            { success: false, error: 'bad_request' },
+            { status: 400, headers: NO_STORE },
+        );
     }
 
     const token = typeof body.token === 'string' ? body.token.slice(0, 256) : '';
@@ -42,7 +45,10 @@ export async function POST(request: NextRequest) {
             result = await confirmAccountDeletion(token);
             break;
         default:
-            return NextResponse.json({ success: false, error: 'bad_request' }, { status: 400, headers: NO_STORE });
+            return NextResponse.json(
+                { success: false, error: 'bad_request' },
+                { status: 400, headers: NO_STORE },
+            );
     }
     return NextResponse.json(result, { headers: NO_STORE });
 }

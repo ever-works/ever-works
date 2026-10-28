@@ -29,7 +29,10 @@ import {
     RequestAccountDeletionDto,
     VerifyAccountDeletionDto,
 } from './account-deletion.dto';
-import { ACCOUNT_DELETION_LINK_INVALID_MESSAGE, normaliseDeletionEmail } from './account-deletion.tokens';
+import {
+    ACCOUNT_DELETION_LINK_INVALID_MESSAGE,
+    normaliseDeletionEmail,
+} from './account-deletion.tokens';
 
 const linkGone = () => new GoneException({ message: ACCOUNT_DELETION_LINK_INVALID_MESSAGE });
 
@@ -163,9 +166,13 @@ export class AccountDeletionController {
     @ApiBearerAuth()
     @ApiOperation({
         summary: 'Delete the signed-in account',
-        description: 'Requires the account email typed as `confirmEmail`. Signs the account out everywhere.',
+        description:
+            'Requires the account email typed as `confirmEmail`. Signs the account out everywhere.',
     })
-    async deleteMe(@Request() req: { user: { userId: string; email?: string | null } }, @Body() dto: DeleteMyAccountDto) {
+    async deleteMe(
+        @Request() req: { user: { userId: string; email?: string | null } },
+        @Body() dto: DeleteMyAccountDto,
+    ) {
         const preview = await this.deletion.preview(req.user.userId);
         const email = await this.deletion.emailOf(req.user.userId);
         if (!email || normaliseDeletionEmail(dto.confirmEmail) !== normaliseDeletionEmail(email)) {
