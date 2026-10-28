@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ROUTES } from '@/lib/constants';
-import { confirmAccountDeletion, verifyAccountDeletion } from '@/app/actions/account-deletion';
+import { accountDeletionClient } from '@/lib/account-deletion-client';
 import type { AccountDeletionPreview } from '@/lib/api/account-deletion';
 import { AccountDeletionSummary } from '@/components/settings/AccountDeletionSummary';
 
@@ -28,7 +28,13 @@ function takeTokenFromFragment(): string | null {
     const token = new URLSearchParams(query).get('token');
     // Remove the token from the address bar and the session-history entry
     // before anything else on the page can read or report the URL.
-    window.history.replaceState(window.history.state, '', window.location.pathname + window.location.search);
+    //
+    // 🛑 `null`, not `window.history.state`: Next.js patches replaceState and
+    // only re-syncs its router's own URL when the state is NOT its internal
+    // one (`__NA`). Passing the current state through made the router keep
+    // the old URL — fragment included — and put `#token=…` back in the
+    // address bar after the next server action.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
     return token && token.length <= 256 ? token : null;
 }
 
@@ -47,21 +53,40 @@ export function DeleteAccountConfirmClient() {
     const started = useRef(false);
 
     useEffect(() => {
-        if (started.current) return; // React StrictMode runs mount effects twice in dev.
-        started.current = true;
-        const token = takeTokenFromFragment();
-        tokenRef.current = token;
-        if (!token) {
-            setState({ status: 'invalid', message: t('errors.missingToken') });
-            return;
+        const load = (token: string | null) => {
+            tokenRef.current = token;
+            setTyped('');
+            setError('');
+            if (!token) {
+                setState({ status: 'invalid', message: t('errors.missingToken') });
+                return;
+            }
+            setState({ status: 'loading' });
+            void accountDeletionClient.verify(token, t('errors.failed')).then((result) => {
+                // A newer link may have arrived meanwhile; only the current one may set the state.
+                if (tokenRef.current !== token) return;
+                setState(
+                    result.success
+                        ? { status: 'ready', preview: result.data }
+                        : { status: 'invalid', message: result.error },
+                );
+            });
+        };
+
+        // A second link opened in the same tab is a fragment-only navigation:
+        // no reload, no remount. Pick its token up the same way.
+        const onHashChange = () => {
+            const token = takeTokenFromFragment();
+            if (token) load(token);
+        };
+        window.addEventListener('hashchange', onHashChange);
+
+        if (!started.current) {
+            // React StrictMode runs mount effects twice in dev; read the fragment once.
+            started.current = true;
+            load(takeTokenFromFragment());
         }
-        void verifyAccountDeletion(token).then((result) => {
-            setState(
-                result.success
-                    ? { status: 'ready', preview: result.data }
-                    : { status: 'invalid', message: result.error },
-            );
-        });
+        return () => window.removeEventListener('hashchange', onHashChange);
     }, [t]);
 
     const handleDelete = () => {
@@ -69,7 +94,7 @@ export function DeleteAccountConfirmClient() {
         if (!token || typed.trim() !== CONFIRM_WORD) return;
         setError('');
         startTransition(async () => {
-            const result = await confirmAccountDeletion(token);
+            const result = await accountDeletionClient.confirm(token, t('errors.failed'));
             if (result.success) {
                 tokenRef.current = null;
                 setState({ status: 'deleted' });

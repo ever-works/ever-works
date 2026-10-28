@@ -234,6 +234,7 @@ export class AccountDeletionService {
 
         const completedAt = new Date();
         await this.recordCompletion(trigger, email, summary, startedAt, completedAt);
+        await this.store.clearUser(user.id).catch(() => undefined);
         if (email) {
             await this.mailer.sendDeletedConfirmation({ to: email, deletedAt: completedAt, summary });
         }

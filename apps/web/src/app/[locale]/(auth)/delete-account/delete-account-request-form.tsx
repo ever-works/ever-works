@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ROUTES } from '@/lib/constants';
-import { requestAccountDeletion } from '@/app/actions/account-deletion';
+import { accountDeletionClient } from '@/lib/account-deletion-client';
 
 /**
  * Step 1 of the email-link deletion: ask for the address. The answer is the
@@ -24,7 +24,7 @@ export function DeleteAccountRequestForm() {
         e.preventDefault();
         setError('');
         startTransition(async () => {
-            const response = await requestAccountDeletion(email);
+            const response = await accountDeletionClient.request(email, t('errors.failed'));
             if (!response.success) {
                 setError(response.error);
                 return;

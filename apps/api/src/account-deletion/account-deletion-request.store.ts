@@ -48,6 +48,8 @@ export abstract class AccountDeletionRequestStore {
      */
     abstract claim(tokenHash: string, now: Date): Promise<boolean>;
     abstract update(id: string, patch: AccountDeletionRequestPatch): Promise<void>;
+    /** Forget the account on every row (revoked / expired links too) once it is deleted. */
+    abstract clearUser(userId: string): Promise<void>;
 }
 
 @Injectable()
@@ -102,5 +104,9 @@ export class TypeormAccountDeletionRequestStore extends AccountDeletionRequestSt
 
     async update(id: string, patch: AccountDeletionRequestPatch): Promise<void> {
         await this.repository.update({ id }, patch);
+    }
+
+    async clearUser(userId: string): Promise<void> {
+        await this.repository.update({ userId }, { userId: null });
     }
 }

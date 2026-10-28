@@ -87,6 +87,10 @@ class MemoryStore extends AccountDeletionRequestStore {
         const row = this.rows.find((r) => r.id === id);
         if (row) Object.assign(row, patch);
     }
+
+    async clearUser(userId: string): Promise<void> {
+        for (const row of this.rows) if (row.userId === userId) row.userId = null;
+    }
 }
 
 const JANE: DeletionLinkRecipient = { id: 'user-jane', email: 'jane@example.com', username: 'jane' };

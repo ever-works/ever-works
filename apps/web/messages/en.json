@@ -392,7 +392,7 @@
                 "organizations": "Organizations: {names}",
                 "outcome": {
                     "workspaceDeleted": "You are its only member: the workspace, its organizations and all their content are deleted.",
-                    "workspaceTransferred": "{count, plural, one {# other person} other {# other people}} work here. The workspace and its content stay; {newOwner} becomes its owner. Only your own account and personal data are deleted.",
+                    "workspaceTransferred": "{count, plural, one {# other person works here} other {# other people work here}}. The workspace and its content stay; {newOwner} becomes its owner. Only your own account and personal data are deleted.",
                     "accountRemoved": "You leave this workspace. What you created there stays with it, handed to its owner; your membership and personal data are deleted."
                 },
                 "soleOwnerWarning": "You are the only owner. Ownership — and control of billing and members — passes to {newOwner}. If you would rather pick someone else, do that first.",
