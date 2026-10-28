@@ -993,6 +993,14 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const signalled = new Promise<void>((resolve) => {
 		requestShutdown = resolve;
 	});
+	// Boot-probe retry: the work lane's start can now spend up to ~2 minutes
+	// proving the safety marker owner-only (a busy machine's `icacls` is
+	// retried). A signal in that window stops the lane AT ONCE instead of after
+	// `startLanes()` returns: its first poll then leases nothing after the
+	// shutdown was asked for, and `WorkerLoop.stop()` waits the check out and
+	// releases the marker it proved, so the next start is not quarantined.
+	let shutdownSignalled = false;
+	let workerStarting = false;
 	if (deps.signals) {
 		installShutdownHandlers(deps.signals, () => {
 			deps.io.logger.info(
@@ -1000,6 +1008,8 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					? 'Shutdown signal received — stopping heartbeat and draining in-flight jobs'
 					: 'Shutdown signal received — stopping heartbeat'
 			);
+			shutdownSignalled = true;
+			if (workerStarting) void worker?.stop();
 			requestShutdown();
 		});
 	}
@@ -1015,8 +1025,16 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	let shuttingDown = false;
 	const startLanes = async (): Promise<void> => {
 		if (worker) {
-			await worker.start();
+			workerStarting = true;
+			try {
+				await worker.start();
+			} finally {
+				workerStarting = false;
+			}
 		}
+		// A signal that arrived while the work lane was starting stopped it;
+		// start nothing else — the shutdown below stops what is running.
+		if (shutdownSignalled) return;
 		if (attendedWorker) {
 			await attendedWorker.start();
 			deps.out(

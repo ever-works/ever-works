@@ -61,7 +61,8 @@ const environment: CapabilityEnvironment = {
 
 const probeRunner: CommandRunner = { run: async () => ({ code: 127, stdout: '', stderr: '' }) };
 
-type IcaclsMode = { slowAttempts: number } | 'refused' | 'hung';
+/** `held`: the first attempt does not answer until it resolves (a spawn that is still running). */
+type IcaclsMode = { slowAttempts: number; held?: Promise<void> } | 'refused' | 'hung';
 
 /** The scripted `icacls`: how a busy (or broken) PC answers. */
 function icacls(mode: IcaclsMode) {
@@ -72,6 +73,7 @@ function icacls(mode: IcaclsMode) {
 			if (command !== 'icacls') throw new Error(`unexpected spawn: ${command}`);
 			calls += 1;
 			deadlines.push(options?.timeoutMs ?? -1);
+			if (typeof mode === 'object' && mode.held && calls === 1) await mode.held;
 			if (mode === 'refused') return { code: 5, stdout: '', stderr: 'Access is denied.' };
 			if (mode === 'hung' || calls <= mode.slowAttempts) {
 				return { code: 1, stdout: '', stderr: '', timedOut: true };
@@ -127,6 +129,7 @@ function harness(
 	};
 
 	const timers: Array<() => void> = [];
+	const signalHandlers = new Map<string, () => void>();
 	let shutdown!: () => void;
 	const deps: CliDeps = {
 		io: {
@@ -147,6 +150,7 @@ function harness(
 		configPath: CONFIG_PATH,
 		platform: 'win32',
 		out: (line) => stdout.push(line),
+		signals: { on: (signal, handler) => void signalHandlers.set(signal, handler) },
 		waitForShutdown: () =>
 			new Promise<void>((resolve) => {
 				shutdown = resolve;
@@ -164,6 +168,11 @@ function harness(
 		leases: () => leaseCalls,
 		output: () => stdout.join('\n'),
 		logged: () => entries.map((entry) => entry.message).join('\n'),
+		flush,
+		start: () => runCli(options.argv ?? ['start', '--work'], deps),
+		/** A SIGTERM from the service manager. */
+		terminate: () => signalHandlers.get('SIGTERM')?.(),
+		finishShutdown: () => shutdown(),
 		/** Boot, let the lanes start, beat once more so the worker's state is reported, then stop. */
 		async bootAndStop(): Promise<{ code: number; lastBeat: Record<string, unknown> | undefined }> {
 			const run = runCli(options.argv ?? ['start', '--work'], deps);
@@ -279,5 +288,32 @@ describe('start --work when the model-CLI PATH lookup timed out at boot (boot-pr
 		expect(h.logged()).toMatch(/Model CLI — claude-code: probe timed out/);
 		expect(h.logged()).toContain('Model CLI — codex: C:/tools/codex.exe (pinned)');
 		expect(lastBeat?.cliVersions).toEqual(['codex unknown', 'claude-code probe-timed-out']);
+	});
+});
+
+describe('a shutdown signal while the boot safety check is still retrying (boot-probe retry)', () => {
+	it('stops the work lane at once: nothing is leased after the signal, and the proven marker is released', async () => {
+		let answer!: () => void;
+		const held = new Promise<void>((resolve) => {
+			answer = resolve;
+		});
+		// Attempt 1 is still running when the signal lands; it then times out,
+		// and attempt 2 proves the ACL.
+		const h = harness({ slowAttempts: 1, held });
+
+		const run = h.start();
+		await h.flush();
+		expect(h.acl.deadlines).toEqual([10_000]);
+		h.terminate();
+		answer();
+		await h.flush();
+		h.finishShutdown();
+
+		expect(await run).toBe(EXIT_OK);
+		expect(h.acl.deadlines).toEqual([10_000, 20_000]);
+		expect(h.leases()).toBe(0);
+		expect(h.output()).not.toContain('QUARANTINED');
+		// Released by the session that proved it: the next start is not quarantined.
+		expect(h.files.has(MARKER_PATH)).toBe(false);
 	});
 });
