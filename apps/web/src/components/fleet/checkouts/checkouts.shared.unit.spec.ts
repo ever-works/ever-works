@@ -56,12 +56,29 @@ describe('groupCheckoutsByRepository (FL-14 spec §5.1, S2)', () => {
             row({ id: 'c', repository: 'acme/web', path: '/home/nina/web' }),
             row({ id: 'd', repository: null, remoteUrl: null, path: '/home/nina/scratch' }),
         ]);
+        // Headings sort by label with `localeCompare` (e50fa422d), which ignores case: `acme/web`
+        // comes before `API`, and the unlinked heading is always last.
         expect(
             groups.map((group) => [group.kind, group.label, group.rows.length, group.computers]),
         ).toEqual([
-            ['work', 'API', 2, 2],
             ['repository', 'acme/web', 1, 1],
+            ['work', 'API', 2, 2],
             ['unlinked', null, 1, 1],
+        ]);
+    });
+
+    it('sorts headings by label regardless of case, and keeps the unlinked heading last', () => {
+        const groups = groupCheckoutsByRepository([
+            row({ id: 'u', repository: null, remoteUrl: null, path: '/home/nina/scratch' }),
+            row({ id: 'z', repository: 'acme/Zeta', path: '/home/nina/zeta' }),
+            row({ id: 'b', repository: 'acme/beta', path: '/home/nina/beta' }),
+            row({ id: 'a', repository: 'acme/Alpha', path: '/home/nina/alpha' }),
+        ]);
+        expect(groups.map((group) => group.label)).toEqual([
+            'acme/Alpha',
+            'acme/beta',
+            'acme/Zeta',
+            null,
         ]);
     });
 

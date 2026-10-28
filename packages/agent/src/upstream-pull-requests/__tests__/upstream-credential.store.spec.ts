@@ -8,9 +8,19 @@
 // across the module boundary. A handover never calls the git facade — the
 // service makes no provider call at all (FR-43) — so an empty shell is a
 // supported graph for it, and it was the only module shelled until 2026-09-26.
-jest.mock('../../facades/facades.module', () => ({
-    FacadesModule: class FacadesModule {},
-}));
+// Since 4199569aa (APW-09 T9) the module also imports `AppSpecModule`, whose
+// `AppSpecService` takes `GitFacadeService` NON-optionally — so the shell now
+// provides and exports a bare double of it. A handover still never reaches it.
+jest.mock('../../facades/facades.module', () => {
+    const { Module } = jest.requireActual('@nestjs/common');
+    const { GitFacadeService } = jest.requireActual('../../facades/git.facade');
+    class FacadesModule {}
+    Module({
+        providers: [{ provide: GitFacadeService, useValue: {} }],
+        exports: [GitFacadeService],
+    })(FacadesModule);
+    return { FacadesModule };
+});
 // Since 2026-09-26 `AppWorksModule` also imports `TasksDomainModule` (the conflict
 // Task its upstream state service files). That module's agents graph needs the real
 // facades — `WorkflowAiDecisionAdapter` takes `AiFacadeService` non-optionally — so

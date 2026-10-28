@@ -37,6 +37,10 @@ import { AppDependencyFacadeService } from '../app-dependency.facade';
 import { IdentityProviderFacadeService } from '../identity-provider.facade';
 // Anonymous usage statistics — the `stats-sink` facade.
 import { StatsSinkFacadeService } from '../stats-sink.facade';
+// c63f255e8 (FL-17) — the machine-provider facade (cloud computers).
+import { MachineProviderFacadeService } from '../machine-provider.facade';
+// 1d63f662a (FL-18) — the actions-runners facade (runners on computers).
+import { ActionsRunnersFacadeService } from '../actions-runners.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -92,6 +96,11 @@ describe('FacadesModule + barrel re-exports', () => {
         // Anonymous usage statistics — the one delivery plugin named by
         // EVER_WORKS_STATS_SINK; inert unless the statistics module calls it.
         StatsSinkFacadeService,
+        // c63f255e8 (FL-17, CONTRACTS R-15) — machine-provider facade, consumed by FleetCloudService.
+        MachineProviderFacadeService,
+        // 1d63f662a (FL-18, CONTRACTS R-14) — actions-runners facade, consumed by
+        // FleetActionsRunnersService.
+        ActionsRunnersFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -173,6 +182,8 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.AppDependencyFacadeService).toBe(AppDependencyFacadeService);
             expect(facadesBarrel.IdentityProviderFacadeService).toBe(IdentityProviderFacadeService);
             expect(facadesBarrel.StatsSinkFacadeService).toBe(StatsSinkFacadeService);
+            expect(facadesBarrel.MachineProviderFacadeService).toBe(MachineProviderFacadeService);
+            expect(facadesBarrel.ActionsRunnersFacadeService).toBe(ActionsRunnersFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -214,6 +225,10 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(typeof facadesBarrel.AppDependencyFacadeError).toBe('function');
             expect(typeof facadesBarrel.NoAppDependencyProviderError).toBe('function');
             expect(typeof facadesBarrel.AppDependencyProviderNotFoundError).toBe('function');
+            // c63f255e8 (FL-17) — machine-provider.
+            expect(typeof facadesBarrel.MachineProviderFacadeError).toBe('function');
+            // 1d63f662a (FL-18) — actions-runners.
+            expect(typeof facadesBarrel.ActionsRunnersFacadeError).toBe('function');
         });
 
         it('re-exports the shared FacadeError + base classes (NoProviderError / ProviderNotFoundError)', () => {
@@ -342,6 +357,18 @@ describe('FacadesModule + barrel re-exports', () => {
                     // package boundary into apps/api, so it must be barrel
                     // -exported, and therefore pinned here.
                     'TranscriptionNotConfiguredError',
+                    // c63f255e8 (FL-17) — the machine-provider facade and its error.
+                    // `MachineProviderSummary` is type-only and correctly absent.
+                    'MachineProviderFacadeError',
+                    'MachineProviderFacadeService',
+                    // 1d63f662a (FL-18) — the actions-runners facade, its error and the
+                    // three permission helpers (one permission per token, its plain-English
+                    // label, and the grant URL shown when the App lacks it).
+                    'ActionsRunnersFacadeError',
+                    'ActionsRunnersFacadeService',
+                    'actionsRunnersGrantUrl',
+                    'actionsRunnersPermissionLabel',
+                    'actionsRunnersPermissionsFor',
                 ].sort(),
             );
         });

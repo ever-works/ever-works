@@ -18,6 +18,8 @@ import {
     type EmailInboundMessage,
     type EmailDeliveryEvent,
     type EmailOptions,
+    type EmailInboundAckMode,
+    type EmailInboundAddressPolicy,
 } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
@@ -134,6 +136,13 @@ export interface AuthenticatedInboundEmail extends EmailInboundMessage {
      * is then authenticated at that scope only, and bound to no address.
      */
     readonly authenticatedRecipient: AgentInboundEmailRecipient | null;
+    /**
+     * How the webhook acknowledges this delivery: the loaded plugin's own
+     * `inboundAck` (read from the real instance, never the lazy proxy), or
+     * `received` when it declares none — so every plugin that did not opt in
+     * keeps the `{received:true}` answer.
+     */
+    readonly inboundAck: EmailInboundAckMode;
 }
 
 export interface EmailFacadeSendOptions extends FacadeOptions {
@@ -548,6 +557,9 @@ export class EmailFacadeService extends BaseFacadeService {
             authenticatedRecipient: recipient?.id
                 ? { emailAddressId: recipient.id, userId: recipient.userId }
                 : null,
+            // After the spread: only the plugin's declared member decides it,
+            // never a field its parsed message happens to carry.
+            inboundAck: plugin.inboundAck === 'counts' ? 'counts' : 'received',
         };
     }
 
@@ -769,12 +781,80 @@ export class EmailFacadeService extends BaseFacadeService {
                 pluginId,
             );
         }
-        const refuse = (reason: string): never => {
-            this.logger.warn(`${operation}: refusing the webhook for ${pluginId} — ${reason}`);
-            throw new ServiceUnavailableException(
-                `Inbound email plugin ${pluginId} is unavailable`,
-            );
+        return this.loadInboundInstance(registered, pluginId, operation, 'the webhook');
+    }
+
+    /**
+     * The address rules of the inbound plugin `pluginId` — its
+     * `inboundAddressPolicy` — read from the plugin's LOADED instance, like
+     * {@link getUsableInboundPlugin}: the lazy proxy answers a forwarding
+     * function for any member while cold, and a policy may be a getter over
+     * the environment. Asked by the API before an address is registered (or
+     * re-enabled) with that plugin; the plugin id is never named in core.
+     *
+     * - `null` when `pluginId` is no registered inbound plugin (outbound-only,
+     *   unknown, not installed) or declares no policy: the address is then
+     *   registered exactly as without this check.
+     * - A registered inbound plugin that cannot load (not `loaded`, its import
+     *   or onLoad failing) is refused with a 503, as its webhook would be: its
+     *   rules cannot be known, so they are never skipped. So is a policy with
+     *   no domain.
+     */
+    async inboundAddressPolicy(pluginId: string): Promise<EmailInboundAddressPolicy | null> {
+        const operation = 'inboundAddressPolicy';
+        const registered = this.registry
+            .getByCapability(PLUGIN_CAPABILITIES.EMAIL_INBOUND)
+            .find((p) => p.plugin.id === pluginId);
+        if (!registered) return null;
+        const plugin = await this.loadInboundInstance(
+            registered,
+            pluginId,
+            operation,
+            'the address',
+        );
+        const policy: unknown = plugin.inboundAddressPolicy;
+        if (policy === undefined || policy === null) return null;
+        const { domain, exclusive } = (typeof policy === 'object' ? policy : {}) as {
+            domain?: unknown;
+            exclusive?: unknown;
         };
+        if (typeof domain !== 'string' || !domain.trim()) {
+            this.refuseUnavailable(
+                pluginId,
+                operation,
+                'the address',
+                'its address policy names no domain',
+            );
+        }
+        return { domain: (domain as string).trim().toLowerCase(), exclusive: exclusive === true };
+    }
+
+    /** Refuse a request for an inbound plugin that cannot be used: 503, reason logged only. */
+    private refuseUnavailable(
+        pluginId: string,
+        operation: string,
+        subject: string,
+        reason: string,
+    ): never {
+        this.logger.warn(`${operation}: refusing ${subject} for ${pluginId} — ${reason}`);
+        throw new ServiceUnavailableException(`Inbound email plugin ${pluginId} is unavailable`);
+    }
+
+    /**
+     * Materialize a registered inbound plugin (see {@link getUsableInboundPlugin}):
+     * the real instance, or a 503 when it is not `loaded` or cannot load.
+     */
+    private async loadInboundInstance(
+        registered: ReturnType<PluginRegistryService['getByCapability']>[number],
+        pluginId: string,
+        operation: string,
+        subject: string,
+    ): Promise<IEmailInboundPlugin> {
+        const refuse = (reason: string): never =>
+            this.refuseUnavailable(pluginId, operation, subject, reason);
+        if (registered.state !== 'loaded') {
+            refuse(`it is in the "${registered.state}" state`);
+        }
         let real: unknown = registered.plugin;
         const lazy = registered.plugin as { __materialize?: () => Promise<IPlugin> };
         if (typeof lazy.__materialize === 'function') {

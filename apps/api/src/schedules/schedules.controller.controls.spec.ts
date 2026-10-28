@@ -46,8 +46,18 @@ describe('SchedulesController — run-now / pause / resume', () => {
     it('run-now delegates with the caller context and returns the result', async () => {
         const result = { kind: 'run', runIds: ['run-1'], nextRunAt: '2026-09-15T07:00:00.000Z' };
         const controls = { runNow: jest.fn().mockResolvedValue(result) };
-        await expect(build(controls).runNow(auth, SCHEDULE_ID)).resolves.toBe(result);
-        expect(controls.runNow).toHaveBeenCalledWith(context, SCHEDULE_ID);
+        await expect(build(controls).runNow(auth, SCHEDULE_ID, {})).resolves.toBe(result);
+        // 7191198c4 (FL-13 P1) — run-now takes the body's `confirm`; an empty body is no confirmation.
+        expect(controls.runNow).toHaveBeenCalledWith(context, SCHEDULE_ID, { confirm: false });
+    });
+
+    it('run-now forwards only a boolean true confirmation (FL-13)', async () => {
+        const controls = { runNow: jest.fn().mockResolvedValue({ kind: 'run', runIds: [] }) };
+        const controller = build(controls);
+        await controller.runNow(auth, SCHEDULE_ID, { confirm: true });
+        expect(controls.runNow).toHaveBeenLastCalledWith(context, SCHEDULE_ID, { confirm: true });
+        await controller.runNow(auth, SCHEDULE_ID, { confirm: 'yes' } as never);
+        expect(controls.runNow).toHaveBeenLastCalledWith(context, SCHEDULE_ID, { confirm: false });
     });
 
     it('run-now on a Mission tick returns the Mission link and no run id', async () => {
@@ -61,7 +71,7 @@ describe('SchedulesController — run-now / pause / resume', () => {
             ideasQueued: null,
         };
         const controls = { runNow: jest.fn().mockResolvedValue(result) };
-        const response = await build(controls).runNow(auth, 'mission_tick:x');
+        const response = await build(controls).runNow(auth, 'mission_tick:x', {});
         expect(response).toMatchObject({ kind: 'mission-tick', ownerLink: '/missions/x' });
         expect(response).not.toHaveProperty('runIds');
     });
@@ -105,7 +115,7 @@ describe('SchedulesController — run-now / pause / resume', () => {
             ),
         };
         const controller = build(controls);
-        await expect(controller.runNow(auth, SCHEDULE_ID)).rejects.toBeInstanceOf(
+        await expect(controller.runNow(auth, SCHEDULE_ID, {})).rejects.toBeInstanceOf(
             NotFoundException,
         );
         for (const code of [
@@ -114,7 +124,7 @@ describe('SchedulesController — run-now / pause / resume', () => {
             'SCHEDULE_OWNER_ARCHIVED',
         ]) {
             controls.runNow.mockRejectedValueOnce(new ConflictException({ code }));
-            const error = await controller.runNow(auth, SCHEDULE_ID).catch((err) => err);
+            const error = await controller.runNow(auth, SCHEDULE_ID, {}).catch((err) => err);
             expect(error.getResponse()).toMatchObject({ code });
         }
         const pauseError = await controller.pause(auth, SCHEDULE_ID, {}).catch((err) => err);
@@ -125,7 +135,7 @@ describe('SchedulesController — run-now / pause / resume', () => {
 
     it('answers 503 when the controls are not wired', async () => {
         const controller = build(undefined);
-        await expect(controller.runNow(auth, SCHEDULE_ID)).rejects.toBeInstanceOf(
+        await expect(controller.runNow(auth, SCHEDULE_ID, {})).rejects.toBeInstanceOf(
             ServiceUnavailableException,
         );
         await expect(controller.pause(auth, SCHEDULE_ID, {})).rejects.toBeInstanceOf(
