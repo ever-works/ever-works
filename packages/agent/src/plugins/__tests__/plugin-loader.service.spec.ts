@@ -1330,6 +1330,48 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
             expect(plugin?.id).toBe('scan-target');
         });
 
+        it('takes the exported instance carrying the manifest id over a sibling class, without constructing the sibling', async () => {
+            // Review (CodeRabbit): `OtherPlugin` + a lower-camel `targetPlugin`
+            // instance — the instance is the plugin, and the sibling class must
+            // not even be constructed to find that out.
+            const dir = writeModule(
+                'target-x',
+                'let otherBuilt = 0;\n' +
+                    'class OtherPlugin {\n' +
+                    '  constructor() { otherBuilt++; this.id = "other"; }\n' +
+                    '  async onLoad() {}\n  async onUnload() {}\n}\n' +
+                    'exports.OtherPlugin = OtherPlugin;\n' +
+                    'exports.targetPlugin = {\n' +
+                    '  id: "target-x", name: "Target", version: "1.2.0", category: "utility",\n' +
+                    '  capabilities: [], async onLoad() {}, async onUnload() {}\n};\n' +
+                    'exports.otherBuilt = () => otherBuilt;\n',
+            );
+            await makeLoader();
+
+            const plugin = await load(dir, 'target-x');
+
+            expect(plugin?.id).toBe('target-x');
+            expect(require(nodePath.join(dir, 'index.js')).otherBuilt()).toBe(0);
+        });
+
+        it('constructs a class found by the scan once, and returns that instance', async () => {
+            const dir = writeModule(
+                'count-me',
+                'let built = 0;\n' +
+                    'class Target {\n' +
+                    '  constructor() { built++; this.id = "count-me"; }\n' +
+                    '  async onLoad() {}\n  async onUnload() {}\n}\n' +
+                    'exports.Target = Target;\n' +
+                    'exports.built = () => built;\n',
+            );
+            await makeLoader();
+
+            const plugin = await load(dir, 'count-me');
+
+            expect(plugin?.id).toBe('count-me');
+            expect(require(nodePath.join(dir, 'index.js')).built()).toBe(1);
+        });
+
         it('refuses a module whose only plugin classes are some other plugin', async () => {
             const dir = writeModule(
                 'wanted',
