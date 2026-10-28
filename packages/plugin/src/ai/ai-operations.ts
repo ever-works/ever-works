@@ -55,6 +55,16 @@ import { isSafeWebhookUrl, safeFetchWithDnsPin } from '../helpers/ssrf-guard.js'
 /** The chat model, possibly with tools bound: what `invoke` and `stream` run on. */
 type ChatRunnable = Runnable<BaseLanguageModelInput, AIMessageChunk, ChatOpenAICompletionsCallOptions>;
 
+/**
+ * Whether a (lower-cased) provider error message names `param` as a quoted
+ * token. Providers quote it differently: most use single or double quotes,
+ * the Claude API uses backticks ("`temperature` is deprecated for this model."
+ * on Claude 4.7 and later models).
+ */
+function namesParam(msg: string, param: string): boolean {
+	return [`'${param}'`, `"${param}"`, `\`${param}\``].some((quoted) => msg.includes(quoted));
+}
+
 export interface AiOperationsConfig {
 	apiKey: string;
 	model: string;
@@ -352,11 +362,18 @@ export class AiOperations {
 
 		try {
 			const config = this.mergeConfig(configOverrides);
-			const llm = this.createChatModel(config, modelOverride ?? config.model);
+			const model = modelOverride ?? config.model;
 
 			let timeoutHandle: ReturnType<typeof setTimeout>;
 			await Promise.race([
-				llm.invoke([new HumanMessage('Respond with just "OK" to confirm you are working.')]).then((r) => {
+				// Same rejected-parameter retry as a real request, so a model
+				// that refuses a default parameter (e.g. `temperature` on
+				// Claude 4.7+) does not fail validation that real calls pass.
+				this.withParamRetry(model, (skip) =>
+					this.createChatModel(config, model, undefined, skip).invoke([
+						new HumanMessage('Respond with just "OK" to confirm you are working.')
+					])
+				).then((r) => {
 					clearTimeout(timeoutHandle);
 					return r;
 				}),
@@ -564,11 +581,11 @@ export class AiOperations {
 	private parseRejectedParam(error: unknown): string | undefined {
 		if (!(error instanceof Error)) return undefined;
 		const msg = error.message.toLowerCase();
-		if (msg.includes("'temperature'") || msg.includes('"temperature"')) return 'temperature';
-		if (msg.includes("'reasoning'") || msg.includes("'reasoning_effort'")) return 'reasoning';
+		if (namesParam(msg, 'temperature')) return 'temperature';
+		if (namesParam(msg, 'reasoning') || namesParam(msg, 'reasoning_effort')) return 'reasoning';
 		if (msg.includes('json_schema') || msg.includes('response_format') || msg.includes('structured output'))
 			return 'structured_output';
-		if (msg.includes("'tools'") || msg.includes('"tools"') || msg.includes('tool_choice')) return 'tools';
+		if (namesParam(msg, 'tools') || msg.includes('tool_choice')) return 'tools';
 		return undefined;
 	}
 

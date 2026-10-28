@@ -251,7 +251,7 @@ async function userEnable(
 // require only `apiKey`. We always include the extra required fields needed per plugin
 // so configureUserApiKey clears the user-level gate for EVERY category.
 const EXTRA_REQUIRED_USER_SETTINGS: Record<string, Record<string, unknown>> = {
-    [AI_ALT]: { defaultModel: 'claude-sonnet-4-5-20250514' },
+    [AI_ALT]: { defaultModel: 'claude-opus-5-5' },
 };
 
 /** Configure a plugin's user-level required settings (the gate for any work binding). */

@@ -44,10 +44,10 @@ graph TD
 | Setting        | Type     | Required | Default                         | Scope    | Widget         | Description                                          |
 | -------------- | -------- | -------- | ------------------------------- | -------- | -------------- | ---------------------------------------------------- |
 | `apiKey`       | `string` | Yes      | --                              | `user`   | --             | Anthropic API key. Secret.                           |
-| `defaultModel` | `string` | Yes      | `claude-sonnet-4-5-20250514`    | `global` | `model-select` | Default model for all AI tasks.                      |
+| `defaultModel` | `string` | Yes      | `claude-opus-5-5`               | `global` | `model-select` | Default model for all AI tasks.                      |
 | `simpleModel`  | `string` | No       | `claude-haiku-4-5-20251001`     | `global` | `model-select` | Model for tags, descriptions, classifications.       |
 | `mediumModel`  | `string` | No       | `claude-sonnet-4-5-20250929`    | `global` | `model-select` | Model for listings, summaries, reformatting.         |
-| `complexModel` | `string` | No       | `claude-sonnet-4-5-20250514`    | `global` | `model-select` | Model for full page generation, multi-step analysis. |
+| `complexModel` | `string` | No       | `claude-opus-5-5`               | `global` | `model-select` | Model for full page generation, multi-step analysis. |
 | `baseUrl`      | `string` | No       | `https://api.anthropic.com/v1/` | --       | --             | Custom API endpoint for proxies. Hidden.             |
 | `temperature`  | `number` | No       | `0.7`                           | --       | --             | Sampling temperature (0--2). Hidden.                 |
 | `maxTokens`    | `number` | No       | `4096`                          | --       | --             | Max tokens per response. Hidden.                     |
@@ -150,7 +150,7 @@ Tests the connection by calling `aiOps.testConnection()` with the resolved confi
 ```typescript
 this.aiOps = new AiOperations({
 	apiKey: '',
-	model: 'claude-sonnet-4-5-20250514',
+	model: 'claude-opus-5-5',
 	baseURL: 'https://api.anthropic.com/v1/',
 	temperature: 0.7,
 	maxTokens: 4096,
