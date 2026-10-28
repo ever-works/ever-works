@@ -127,6 +127,14 @@ export interface CapabilityEnvironment {
 	/** Startup log lines explaining each model-CLI decision. */
 	modelCliNotes?: string[];
 	/**
+	 * Model CLIs whose startup PATH lookup TIMED OUT on every attempt
+	 * (boot-probe retry): unknown, not missing. Their `modelCli` path is null (nothing
+	 * unproven is advertised or spawned), and the heartbeat reports each as
+	 * `"<provider> probe-timed-out"` in `cliVersions` so Fleet can tell a
+	 * busy machine from one without the CLI.
+	 */
+	modelCliTimedOut?: string[];
+	/**
 	 * Agent computers — the owner switched live viewing on for this machine
 	 * (`ever-works-node start --attend`). Process-scoped consent, like
 	 * `--work`: absent or false, the node advertises neither `attended` nor

@@ -35,6 +35,7 @@ import type { DiskProbeIo } from './telemetry-probe';
 import { applyNodeLimitCeiling, clampResourceLimits, type NodeLimitCeiling, type NodeResourceLimits } from './types';
 import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import type { WorkerSafetyGate } from './worker-safety-store';
+import { bootRetryBudgetMs, formatSeconds, OWNER_ONLY_ACL_RETRY_POLICY } from './boot-retry';
 
 /**
  * The node worker host: lease → execute → report, forever, until stopped.
@@ -149,6 +150,21 @@ export const PUBLISH_FENCE_MARGIN_MS = 60_000;
 
 /** Maximum shutdown wait for a lease transport that ignores cancellation. */
 export const DEFAULT_LEASE_POLL_DRAIN_TIMEOUT_MS = 5_000;
+
+/**
+ * Maximum shutdown wait for the boot safety check (boot-probe retry): the owner-only ACL
+ * retry budget ({@link OWNER_ONLY_ACL_RETRY_POLICY}, 107 s) plus 30 s for the
+ * marker's own reads and writes.
+ *
+ * A stop that lands while the check is still retrying a timed-out `icacls`
+ * waits for it instead of giving up after the 5 s lease-poll drain: the
+ * marker is already on disk, and only a check that FINISHES lets this
+ * session release it. Given up on, the marker would quarantine every later
+ * start — the very outcome the retry exists to prevent. The wait is bounded
+ * because every attempt carries its own deadline; past this bound the stop
+ * fails closed exactly like an undrained lease poll.
+ */
+export const DEFAULT_SAFETY_PREPARATION_STOP_TIMEOUT_MS = bootRetryBudgetMs(OWNER_ONLY_ACL_RETRY_POLICY) + 30_000;
 
 /**
  * How much later than armed a timer may fire before the gap is read as a
@@ -563,6 +579,11 @@ export interface WorkerLoopOptions {
 	/** Bound shutdown if a lease transport does not settle after abort. */
 	leasePollDrainTimeoutMs?: number;
 	/**
+	 * Bound shutdown while the boot safety check is still running (boot-probe retry).
+	 * Defaults to {@link DEFAULT_SAFETY_PREPARATION_STOP_TIMEOUT_MS}.
+	 */
+	safetyPreparationStopTimeoutMs?: number;
+	/**
 	 * Claim only these job kinds (sent on every lease). Absent = every kind.
 	 * The attended live-view lane leases `computer-session` alone.
 	 */
@@ -616,6 +637,7 @@ export class WorkerLoop {
 	private readonly now: () => number;
 	private readonly monotonicNow: () => number;
 	private readonly leasePollDrainTimeoutMs: number;
+	private readonly safetyPreparationStopTimeoutMs: number;
 	private readonly publishFenceMarginMs: number;
 	/** Fleet usage limits: provider → the throttle in force (expiry checked on read). */
 	private readonly modelThrottles = new Map<
@@ -628,6 +650,8 @@ export class WorkerLoop {
 	private paused = false;
 	private unsafe = false;
 	private safetySessionId: string | null = null;
+	/** The boot safety check while it is still running; null once it has settled (boot-probe retry). */
+	private safetyPreparation: Promise<void> | null = null;
 	private starting: Promise<void> | null = null;
 	private stopTask: Promise<void> | null = null;
 	private timer: unknown = null;
@@ -653,6 +677,10 @@ export class WorkerLoop {
 			Number.isFinite(options.leasePollDrainTimeoutMs) && (options.leasePollDrainTimeoutMs ?? 0) > 0
 				? Math.floor(options.leasePollDrainTimeoutMs!)
 				: DEFAULT_LEASE_POLL_DRAIN_TIMEOUT_MS;
+		this.safetyPreparationStopTimeoutMs =
+			Number.isFinite(options.safetyPreparationStopTimeoutMs) && (options.safetyPreparationStopTimeoutMs ?? 0) > 0
+				? Math.floor(options.safetyPreparationStopTimeoutMs!)
+				: DEFAULT_SAFETY_PREPARATION_STOP_TIMEOUT_MS;
 		// A publish needs room inside the lease, but never so much room that
 		// a short lease can never publish: at the 30s TTL floor a flat 60s
 		// margin would refuse every push forever, which trades a rare
@@ -874,7 +902,12 @@ export class WorkerLoop {
 		}
 		this.running = true;
 		this.stopping = false;
-		const starting = this.prepareSafety().then(() => this.tick());
+		const preparing = this.prepareSafety();
+		this.safetyPreparation = preparing;
+		void preparing.then(() => {
+			if (this.safetyPreparation === preparing) this.safetyPreparation = null;
+		});
+		const starting = preparing.then(() => this.tick());
 		this.starting = starting;
 		const clearStarting = (): void => {
 			if (this.starting === starting) this.starting = null;
@@ -908,9 +941,23 @@ export class WorkerLoop {
 		for (const controller of this.pollControllers) {
 			if (!controller.signal.aborted) controller.abort(new Error('Fleet worker is stopping'));
 		}
+		// Boot-probe retry: the boot safety check may still be retrying a timed-out
+		// owner-only ACL. Wait it out (bounded) before the poll drain, so a
+		// marker it finishes proving is released below instead of being left
+		// behind as a quarantine for every later start.
+		let safetyAbandoned = false;
+		const preparing = this.safetyPreparation;
+		if (preparing && !(await this.settlesWithin(preparing, this.safetyPreparationStopTimeoutMs))) {
+			safetyAbandoned = true;
+			this.markUnsafe(
+				`Worker safety check did not finish within ${formatSeconds(this.safetyPreparationStopTimeoutMs)} of the stop; ` +
+					'the durable worker-session marker remains active and requires explicit operator clearance'
+			);
+		}
 		const polls = new Set(this.activePolls);
 		if (this.starting) polls.add(this.starting);
-		if (!(await this.waitForPollDrain(polls))) {
+		// An abandoned safety check keeps its own, more precise, reason.
+		if (!(await this.waitForPollDrain(polls)) && !safetyAbandoned) {
 			this.markUnsafe(
 				`Outstanding lease poll did not settle within ${this.leasePollDrainTimeoutMs}ms after cancellation`
 			);
@@ -2071,6 +2118,11 @@ export class WorkerLoop {
 
 	private waitForPollDrain(polls: ReadonlySet<Promise<void>>): Promise<boolean> {
 		if (polls.size === 0) return Promise.resolve(true);
+		return this.settlesWithin(Promise.allSettled([...polls]), this.leasePollDrainTimeoutMs);
+	}
+
+	/** True when `work` settles (either way) within `timeoutMs` on this loop's scheduler. */
+	private settlesWithin(work: Promise<unknown>, timeoutMs: number): Promise<boolean> {
 		return new Promise((resolve) => {
 			let settled = false;
 			let timeout: unknown = null;
@@ -2080,8 +2132,11 @@ export class WorkerLoop {
 				if (timeout !== null) this.scheduler.clearTimeout(timeout);
 				resolve(drained);
 			};
-			timeout = this.scheduler.setTimeout(() => finish(false), this.leasePollDrainTimeoutMs);
-			void Promise.allSettled([...polls]).then(() => finish(true));
+			timeout = this.scheduler.setTimeout(() => finish(false), timeoutMs);
+			void work.then(
+				() => finish(true),
+				() => finish(true)
+			);
 		});
 	}
 

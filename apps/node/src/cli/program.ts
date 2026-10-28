@@ -13,7 +13,7 @@ import { createNativeScheduler } from '../core/link/modules/schedule/native-sche
 import { ScheduleHistory } from '../core/link/modules/schedule/schedule-history';
 import { ScheduleLoop } from '../core/link/modules/schedule/schedule-loop';
 import { ScheduleStore } from '../core/link/modules/schedule/schedule-store';
-import { describeSelf } from '../core/capabilities';
+import { describeSelf, type CapabilityEnvironment } from '../core/capabilities';
 import {
 	helperAdmit,
 	helperAdmitSigned,
@@ -28,7 +28,7 @@ import { BAKED_HELPER_MANIFEST } from '../core/screen/helper/helper-manifest';
 import { nodeHelperSignatureChecker } from '../core/screen/helper/helper-signature';
 import { createHelperFs, helperPathsFor, type HelperFs } from '../core/screen/helper/helper-trust';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
-import { resolveModelCliPaths } from '../core/model-cli-probe';
+import { resolveModelCliPaths, type ModelCliProbeResult } from '../core/model-cli-probe';
 import { FleetClientError } from '../core/fleet-client';
 import { untilHeartbeatAccepted } from '../core/heartbeat';
 import {
@@ -768,19 +768,27 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// resolve DISABLES that CLI rather than falling back to PATH.
 	const modelCli =
 		options.claudePath || options.codexPath
-			? resolveModelCliPaths(
-					{
-						env: {},
-						platform: deps.platform,
-						fileExists: deps.fileExists ?? (() => true),
-						lookupAllOnPath: () => []
-					},
-					{
-						'claude-code': options.claudePath ?? deps.io.environment.modelCli?.['claude-code'] ?? null,
-						codex: options.codexPath ?? deps.io.environment.modelCli?.codex ?? null
-					}
+			? keepStartupTimeouts(
+					resolveModelCliPaths(
+						{
+							env: {},
+							platform: deps.platform,
+							fileExists: deps.fileExists ?? (() => true),
+							lookupAllOnPath: () => []
+						},
+						{
+							'claude-code': options.claudePath ?? deps.io.environment.modelCli?.['claude-code'] ?? null,
+							codex: options.codexPath ?? deps.io.environment.modelCli?.codex ?? null
+						}
+					),
+					deps.io.environment,
+					{ 'claude-code': Boolean(options.claudePath), codex: Boolean(options.codexPath) }
 				)
-			: { paths: deps.io.environment.modelCli ?? {}, notes: deps.io.environment.modelCliNotes ?? [] };
+			: {
+					paths: deps.io.environment.modelCli ?? {},
+					notes: deps.io.environment.modelCliNotes ?? [],
+					timedOut: deps.io.environment.modelCliTimedOut ?? []
+				};
 	if (workerEnabled) {
 		for (const note of modelCli.notes) {
 			deps.io.logger.info(`Model CLI — ${note}`);
@@ -792,7 +800,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// offered jobs it cannot run.
 	const io: NodeIo = {
 		...deps.io,
-		environment: { ...deps.io.environment, modelCli: modelCli.paths, modelCliNotes: modelCli.notes }
+		environment: {
+			...deps.io.environment,
+			modelCli: modelCli.paths,
+			modelCliNotes: modelCli.notes,
+			modelCliTimedOut: [...modelCli.timedOut]
+		}
 	};
 	/** Stops the management lane when the worker host quarantines (set once the lanes exist). */
 	let haltManagementLane: (() => void) | null = null;
@@ -1190,6 +1203,31 @@ export async function startLanesAfterAcceptedHeartbeat(
 	} catch (error) {
 		return { started: false, failed: true, error };
 	}
+}
+
+/**
+ * `--claude-path` / `--codex-path` re-resolve the model CLIs from the
+ * startup answer, with no PATH of their own. A provider no flag re-pinned
+ * keeps its startup verdict (boot-probe retry): one whose PATH lookup TIMED OUT stays
+ * "probe timed out" — re-resolved without a lookup it would read "not found
+ * on PATH", which is exactly the false negative this retry exists to stop.
+ */
+export function keepStartupTimeouts(
+	resolved: ModelCliProbeResult,
+	startup: Pick<CapabilityEnvironment, 'modelCliNotes' | 'modelCliTimedOut'>,
+	flagged: Readonly<Record<'claude-code' | 'codex', boolean>>
+): ModelCliProbeResult {
+	const timedOut = (startup.modelCliTimedOut ?? []).filter(
+		(provider): provider is 'claude-code' | 'codex' =>
+			(provider === 'claude-code' || provider === 'codex') && !flagged[provider]
+	);
+	if (timedOut.length === 0) return resolved;
+	const notes = resolved.notes.map((note) => {
+		const provider = timedOut.find((candidate) => note.startsWith(`${candidate}: `));
+		if (!provider) return note;
+		return startup.modelCliNotes?.find((line) => line.startsWith(`${provider}: `)) ?? note;
+	});
+	return { ...resolved, notes, timedOut };
 }
 
 function describeError(error: unknown): string {

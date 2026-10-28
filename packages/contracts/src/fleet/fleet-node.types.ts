@@ -205,6 +205,13 @@ export interface FleetNodeSelfDescription {
 	 * `"<provider> unknown"` when the pinned binary did not answer
 	 * `--version`.
 	 *
+	 * `"<provider> probe-timed-out"` means the node could
+	 * not get an answer because its probe was killed at its deadline on a
+	 * busy machine: a pinned binary's `--version`, or the startup PATH
+	 * lookup itself, after its retries. It is unknown, NOT missing: a CLI
+	 * that is genuinely absent is never listed. Same field, same bounds; no
+	 * new wire shape.
+	 *
 	 * Distinct from {@link FleetNodeSelfDescription.cliVersion}, which a
 	 * daemon built before this field derived by scanning PATH for the first
 	 * of `claude` / `codex` / `gemini` / `opencode` — not necessarily the

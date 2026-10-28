@@ -26,7 +26,22 @@ export interface ModelCliProbeIo {
 	lookupAllOnPath?(command: string): string[];
 	/** Single-hit variant kept for callers that only have `which`. */
 	lookupOnPath?(command: string): string | null;
+	/**
+	 * The PATH lookup that can tell "timed out" from "not there" (boot-probe retry),
+	 * used by {@link probeModelCliPaths}. Absent, the probe falls back to the
+	 * synchronous lookups above, which cannot.
+	 */
+	searchPath?(command: string): Promise<PathSearchResult>;
 }
+
+/**
+ * One PATH lookup's answer. `timed-out` is NOT a negative: the lookup never
+ * finished (a busy machine), so whether the CLI is installed is unknown.
+ */
+export type PathSearchResult =
+	| { status: 'found'; hits: string[] }
+	| { status: 'not-found' }
+	| { status: 'timed-out'; detail: string };
 
 export const MODEL_CLI_ENV_OVERRIDES = {
 	'claude-code': 'EVER_WORKS_NODE_CLAUDE_PATH',
@@ -38,6 +53,8 @@ const MODEL_CLI_COMMANDS = {
 	codex: 'codex'
 } as const;
 
+type ModelCliProbeProvider = keyof typeof MODEL_CLI_COMMANDS;
+
 /** Windows launches `.cmd` / `.exe` shims; the extension-less npm shim is a bash script. */
 const WINDOWS_LAUNCHABLE = /\.(cmd|exe|bat)$/i;
 
@@ -45,16 +62,61 @@ export interface ModelCliProbeResult {
 	paths: ModelCliPaths;
 	/** One line per CLI explaining what was chosen (or why not), for the startup log. */
 	notes: string[];
+	/**
+	 * Providers whose PATH lookup TIMED OUT on every attempt (boot-probe retry): unknown,
+	 * not missing. Their path is null — nothing unproven is spawned or
+	 * advertised — but they are reported as "probe timed out", never as
+	 * "not found on PATH".
+	 */
+	timedOut: ModelCliProbeProvider[];
 }
 
-export function resolveModelCliPaths(
+type Overrides = Partial<Record<ModelCliProbeProvider, string | null | undefined>>;
+
+export function resolveModelCliPaths(io: ModelCliProbeIo, overrides: Overrides = {}): ModelCliProbeResult {
+	return assemble(io, overrides, (provider) => {
+		const hits = lookupHits(io, MODEL_CLI_COMMANDS[provider]);
+		return hits.length > 0 ? { status: 'found', hits } : { status: 'not-found' };
+	});
+}
+
+/**
+ * {@link resolveModelCliPaths} through `io.searchPath` (boot-probe retry): the PATH
+ * lookups run concurrently, each retried by the IO while it times out, and
+ * a lookup that timed out on every attempt is reported as timed out. Pins
+ * are decided exactly as in the synchronous resolver.
+ */
+export async function probeModelCliPaths(io: ModelCliProbeIo, overrides: Overrides = {}): Promise<ModelCliProbeResult> {
+	const providers = Object.keys(MODEL_CLI_COMMANDS) as ModelCliProbeProvider[];
+	const searches = new Map<ModelCliProbeProvider, PathSearchResult>();
+	await Promise.all(
+		providers
+			.filter((provider) => !pinnedPath(io, overrides, provider))
+			.map(async (provider) => {
+				const command = MODEL_CLI_COMMANDS[provider];
+				let result: PathSearchResult;
+				try {
+					result = io.searchPath ? await io.searchPath(command) : syncSearch(io, command);
+				} catch {
+					// A lookup that could not run at all reads as before: not found.
+					result = { status: 'not-found' };
+				}
+				searches.set(provider, result);
+			})
+	);
+	return assemble(io, overrides, (provider) => searches.get(provider) ?? { status: 'not-found' });
+}
+
+function assemble(
 	io: ModelCliProbeIo,
-	overrides: Partial<Record<keyof typeof MODEL_CLI_COMMANDS, string | null | undefined>> = {}
+	overrides: Overrides,
+	search: (provider: ModelCliProbeProvider) => PathSearchResult
 ): ModelCliProbeResult {
 	const paths: ModelCliPaths = {};
 	const notes: string[] = [];
-	for (const provider of Object.keys(MODEL_CLI_COMMANDS) as Array<keyof typeof MODEL_CLI_COMMANDS>) {
-		const pinned = (overrides[provider] ?? io.env[MODEL_CLI_ENV_OVERRIDES[provider]] ?? '').trim();
+	const timedOut: ModelCliProbeProvider[] = [];
+	for (const provider of Object.keys(MODEL_CLI_COMMANDS) as ModelCliProbeProvider[]) {
+		const pinned = pinnedPath(io, overrides, provider);
 		if (pinned) {
 			// A pin is held to the SAME launchability rule as a PATH hit: it
 			// must be a regular executable file, and on Windows a form
@@ -77,19 +139,42 @@ export function resolveModelCliPaths(
 			}
 			continue;
 		}
-		const found = pickLaunchable(io, MODEL_CLI_COMMANDS[provider]);
+		const result = search(provider);
+		if (result.status === 'timed-out') {
+			// Unknown, not missing: nothing unproven is advertised or spawned,
+			// and the operator is told the machine was too busy to say.
+			paths[provider] = null;
+			timedOut.push(provider);
+			notes.push(
+				`${provider}: ${result.detail} — not advertised by this process; restart the node once the machine is less busy`
+			);
+			continue;
+		}
+		const found = result.status === 'found' ? pickLaunchable(io, result.hits) : null;
 		paths[provider] = found;
 		notes.push(found ? `${provider}: ${found} (PATH)` : `${provider}: not found on PATH`);
 	}
-	return { paths, notes };
+	return { paths, notes, timedOut };
 }
 
-function pickLaunchable(io: ModelCliProbeIo, command: string): string | null {
-	const hits = io.lookupAllOnPath
+function pinnedPath(io: ModelCliProbeIo, overrides: Overrides, provider: ModelCliProbeProvider): string {
+	return (overrides[provider] ?? io.env[MODEL_CLI_ENV_OVERRIDES[provider]] ?? '').trim();
+}
+
+function lookupHits(io: ModelCliProbeIo, command: string): string[] {
+	return io.lookupAllOnPath
 		? io.lookupAllOnPath(command)
 		: io.lookupOnPath
 			? [io.lookupOnPath(command)].filter((hit): hit is string => typeof hit === 'string' && hit.length > 0)
 			: [];
+}
+
+function syncSearch(io: ModelCliProbeIo, command: string): PathSearchResult {
+	const hits = lookupHits(io, command);
+	return hits.length > 0 ? { status: 'found', hits } : { status: 'not-found' };
+}
+
+function pickLaunchable(io: ModelCliProbeIo, hits: readonly string[]): string | null {
 	if (hits.length === 0) return null;
 	if (io.platform === 'win32') {
 		const launchable = hits.find((hit) => WINDOWS_LAUNCHABLE.test(hit));
