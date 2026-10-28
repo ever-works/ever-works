@@ -1,3 +1,15 @@
+// The deletion service reaches the Work, billing and storage layers through
+// optional providers; their barrels pull the whole API graph (better-auth's
+// ESM included) into a unit test. Stand-ins keep these specs about this module.
+jest.mock('@ever-works/agent/services', () => ({ WorkLifecycleService: class WorkLifecycleService {} }));
+jest.mock('@ever-works/agent/subscriptions', () => ({
+    BillingService: class BillingService {},
+    PaygService: class PaygService {},
+    NoActiveSubscriptionError: class NoActiveSubscriptionError extends Error {},
+    BillingProviderNotConfiguredError: class BillingProviderNotConfiguredError extends Error {},
+}));
+jest.mock('../uploads/storage-backend.factory', () => ({ getActiveStorageBackend: jest.fn() }));
+
 import { ForbiddenException, GoneException, HttpException, NotFoundException } from '@nestjs/common';
 import { AccountDeletionController } from './account-deletion.controller';
 import { InvalidDeletionLinkError } from './account-deletion-token.service';

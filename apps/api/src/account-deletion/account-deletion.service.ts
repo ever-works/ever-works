@@ -21,7 +21,7 @@ import {
     NoActiveSubscriptionError,
     PaygService,
 } from '@ever-works/agent/subscriptions';
-import { AuthProvider } from '../auth/providers/auth-provider.abstract';
+import type { AuthProvider } from '../auth/providers/auth-provider.abstract';
 import { AUTH_PROVIDER } from '../auth/providers/auth-provider.constants';
 import { AccountDeletionRequestStore } from './account-deletion-request.store';
 import { AccountDeletionMailer } from './account-deletion.mailer';
