@@ -46,7 +46,11 @@ function aclEntries(filePath: string): string[] {
 	const name = path.basename(filePath);
 	return output
 		.split(/\r?\n/)
-		.map((line, index) => (index === 0 ? line.slice(line.lastIndexOf(name) + name.length) : line).trim())
+		.map((line, index) => {
+			if (index > 0) return line.trim();
+			const at = line.lastIndexOf(name);
+			return line.slice(at >= 0 ? at + name.length : filePath.length).trim();
+		})
 		.filter((line) => line.length > 0 && !/^Successfully processed/i.test(line));
 }
 

@@ -41,7 +41,8 @@ export interface KillableDisk {
 	failRenames(...codes: string[]): void;
 	/** The next links reject with these error codes, in order. */
 	failLinks(...codes: string[]): void;
-	failRestrict(error: Error | null): void;
+	/** Make `restrict` reject with `error` (for every path, or only those `when` accepts); null clears it. */
+	failRestrict(error: Error | null, when?: (path: string) => boolean): void;
 	/** Paths currently ending in `.tmp`. */
 	temps(): string[];
 }
@@ -69,7 +70,7 @@ export function killableDisk(initial: Record<string, string> = {}, options: Kill
 	const modes = new Map<string, number>();
 	const renameFailures: string[] = [];
 	const linkFailures: string[] = [];
-	let restrictFailure: Error | null = null;
+	let restrictFailure: { error: Error; when: (path: string) => boolean } | null = null;
 	let killPoint: KillPoint | null = null;
 	let killed = false;
 	for (const path of files.keys()) {
@@ -122,7 +123,7 @@ export function killableDisk(initial: Record<string, string> = {}, options: Kill
 			}),
 		restrict: (filePath) =>
 			step({ op: 'restrict', path: filePath }, () => {
-				if (restrictFailure) throw restrictFailure;
+				if (restrictFailure?.when(filePath)) throw restrictFailure.error;
 				acl.set(filePath, 'owner-only');
 			}),
 		remove: (filePath) =>
@@ -185,7 +186,7 @@ export function killableDisk(initial: Record<string, string> = {}, options: Kill
 		killAt: (point) => void (killPoint = point),
 		failRenames: (...codes) => void renameFailures.push(...codes),
 		failLinks: (...codes) => void linkFailures.push(...codes),
-		failRestrict: (error) => void (restrictFailure = error),
+		failRestrict: (error, when = () => true) => void (restrictFailure = error ? { error, when } : null),
 		temps: () => [...files.keys()].filter((path) => path.endsWith('.tmp'))
 	};
 }

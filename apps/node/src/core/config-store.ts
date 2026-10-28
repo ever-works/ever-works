@@ -127,8 +127,24 @@ export function supportsAtomicWrites(fs: StateFileSystem): fs is StateFileSystem
  * not this, and is reported as it is.
  */
 function isAtomicPathRefused(error: unknown): boolean {
+	if (error instanceof TempNotOwnerOnlyError) return true;
 	const code = error && typeof error === 'object' ? (error as { code?: string }).code : undefined;
 	return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
+}
+
+/**
+ * The staged temp file could not be proven owner-only, so it must not become
+ * the config: a fresh file carries the directory's inherited ACL, and renaming
+ * it over an existing owner-only config would WIDEN who can read it. Thrown
+ * from `tighten`, before any content reaches the temp file; the save then
+ * rewrites the existing file in place, which keeps its current ACL (the
+ * previous behaviour).
+ */
+class TempNotOwnerOnlyError extends Error {
+	constructor(tempPath: string) {
+		super(`the staged file ${tempPath} could not be made owner-only`);
+		this.name = 'TempNotOwnerOnlyError';
+	}
 }
 
 /**
@@ -511,7 +527,10 @@ export async function saveConfig(
 
 	// The temp file is tightened while still EMPTY, so the credential only
 	// ever lands in an owner-only file; the rename then carries that
-	// protection over to the config (see `atomic-state-file.ts`).
+	// protection over to the config (see `atomic-state-file.ts`). A temp file
+	// that cannot be PROVEN owner-only never becomes the config (it would
+	// replace an owner-only file with an inherited ACL): the save falls back to
+	// rewriting the existing file in place, which keeps its current ACL.
 	let ownerOnly = false;
 	const written = await replaceOrRewrite(
 		fs,
@@ -520,10 +539,15 @@ export async function saveConfig(
 		{
 			platform: options.platform,
 			tighten: async (tempPath) => {
-				ownerOnly = await restrictConfigFile(fs, tempPath, { ...restrictOptions, displayPath: filePath });
+				// Quiet: a failure here is reported once, by the in-place path below.
+				if (!(await restrictConfigFile(fs, tempPath, { platform: options.platform, secretOnDisk: false }))) {
+					throw new TempNotOwnerOnlyError(tempPath);
+				}
+				ownerOnly = true;
 			}
 		},
 		(error) => {
+			if (error instanceof TempNotOwnerOnlyError) return;
 			const detail = error instanceof Error ? error.message : String(error);
 			options.logger?.warn(
 				`Could not replace the node config ${filePath} atomically (${options.logger.redact(
@@ -533,12 +557,12 @@ export async function saveConfig(
 		}
 	);
 	if (written === 'in-place') {
-		// The previous behaviour exactly: the existing file, tightened after the write.
+		// The previous behaviour exactly: the existing file (with its current
+		// ACL) is rewritten, then tightened, loudly when that fails.
 		ownerOnly = await restrictConfigFile(fs, filePath, restrictOptions);
 	}
 	await refreshBackup(fs, filePath, content, {
 		platform: options.platform,
-		secretOnDisk,
 		ownerOnly,
 		...(options.logger ? { logger: options.logger } : {})
 	});
@@ -548,20 +572,21 @@ export async function saveConfig(
  * Write the last-good copy AFTER the config itself, so a kill between the two
  * leaves the newer config and an older copy, never the reverse.
  *
- * It gets the config's owner-only treatment, and it never widens anything:
- * when an inline credential could not be proven owner-only (the config's own
- * tightening failed and was reported), no second copy of it is made, and a
- * stale copy is removed so a later recovery cannot bring back an older
- * config. A copy that fails to write is removed for the same reason.
+ * It only ever exists owner-only, so it never widens anything. When the
+ * config itself could not be proven owner-only (its tightening failed and
+ * was reported), no copy is made, and a stale copy is removed so a later
+ * recovery cannot bring back an older config. A copy that cannot be made
+ * owner-only, or fails to write, is removed for the same reason. There is no
+ * in-place fallback for it.
  */
 async function refreshBackup(
 	fs: ConfigFileSystem & AtomicFileOps,
 	filePath: string,
 	content: string,
-	options: { platform?: string; secretOnDisk: boolean; ownerOnly: boolean; logger?: Logger }
+	options: { platform?: string; ownerOnly: boolean; logger?: Logger }
 ): Promise<void> {
 	const backupPath = configBackupPath(filePath);
-	if (options.secretOnDisk && !options.ownerOnly) {
+	if (!options.ownerOnly) {
 		await fs.remove(backupPath).catch(() => undefined);
 		return;
 	}
@@ -569,12 +594,7 @@ async function refreshBackup(
 		await replaceFileAtomically(fs, backupPath, content, {
 			platform: options.platform,
 			tighten: async (tempPath) => {
-				// Quiet: the config's own tightening already reported any trouble.
-				const tightened = await restrictConfigFile(fs, tempPath, {
-					platform: options.platform,
-					secretOnDisk: false
-				});
-				if (!tightened && options.secretOnDisk) {
+				if (!(await restrictConfigFile(fs, tempPath, { platform: options.platform, secretOnDisk: false }))) {
 					throw new Error('the copy could not be made owner-only');
 				}
 			}

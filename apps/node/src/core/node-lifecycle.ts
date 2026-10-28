@@ -251,11 +251,15 @@ export class NodeLifecycleTracker {
 				// unless a newer verdict is already queued behind this one,
 				// which will overwrite the file anyway.
 				if (this.lastPersisted === fingerprint) this.lastPersisted = null;
-				this.options.logger.warn(
-					`Could not record the platform's lifecycle verdict for \`status\` / \`doctor\`: ${
-						error instanceof Error ? error.message : String(error)
-					}`
-				);
+				try {
+					this.options.logger.warn(
+						`Could not record the platform's lifecycle verdict for \`status\` / \`doctor\`: ${
+							error instanceof Error ? error.message : String(error)
+						}`
+					);
+				} catch {
+					// A failing log sink must not wedge the queue: later writes still run.
+				}
 			});
 	}
 }

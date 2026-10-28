@@ -1718,11 +1718,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 				const record = toNodeLinkRecord(consents, state, io.now ? io.now() : Date.now());
 				writes = writes
 					.then(() => persist(record))
-					.catch((error: unknown) =>
-						io.logger.warn(
-							`Could not record the node link state: ${error instanceof Error ? error.message : String(error)}`
-						)
-					);
+					.catch((error: unknown) => {
+						try {
+							io.logger.warn(
+								`Could not record the node link state: ${error instanceof Error ? error.message : String(error)}`
+							);
+						} catch {
+							// A failing log sink must not wedge the queue: later writes still run.
+						}
+					});
 			});
 		}
 	}

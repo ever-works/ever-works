@@ -174,6 +174,39 @@ describe('saveConfig writes atomically (2026-10-28: a kill mid-write left a 0-by
 		expect(entries.some((entry) => entry.level === 'warn' && /rewrote it in place/.test(entry.message))).toBe(true);
 	}, 10_000);
 
+	it('never publishes a temp file it could not make owner-only over the config: the existing file is rewritten in place and keeps its ACL', async () => {
+		// An owner-only config, and an ACL step that fails (icacls refused).
+		// Renaming a fresh, inherited-ACL temp over the config would WIDEN who
+		// can read the credential; the old in-place write kept the file's ACL.
+		const h = killableDisk({ [CONFIG]: serialized(config()) }, { now: () => NOW });
+		h.failRestrict(new Error('icacls exited 5: Access is denied.'));
+		const { logger, entries } = capturingLogger();
+
+		await saveConfig(h.fs, CONFIG, config({ secret: NEW_SECRET }), { platform: 'win32', logger });
+
+		// The credential reached no temp file at all — only the existing config.
+		expect(secretWrites(h.ops, NEW_SECRET).map(({ op }) => [op.op, op.path])).toEqual([['writeInPlace', CONFIG]]);
+		expect(h.files.get(CONFIG)).toContain(NEW_SECRET);
+		expect(h.acl.get(CONFIG)).toBe('owner-only');
+		expect(h.temps()).toEqual([]);
+		// Reported once, loudly, naming the config.
+		expect(entries.filter((entry) => entry.level === 'warn' && entry.message.includes(CONFIG))).toHaveLength(1);
+	});
+
+	it('a transient ACL failure on the temp file alone still never publishes it, and the copy is skipped', async () => {
+		const h = killableDisk({ [CONFIG]: serialized(config()), [BACKUP]: serialized(config()) }, { now: () => NOW });
+		h.failRestrict(new Error('icacls timed out'), (path) => path.endsWith('.tmp'));
+
+		await saveConfig(h.fs, CONFIG, config({ secret: NEW_SECRET }), { platform: 'win32' });
+
+		expect(h.ops.some((op) => op.path.endsWith('.tmp') && op.content?.includes(NEW_SECRET))).toBe(false);
+		expect(h.acl.get(CONFIG)).toBe('owner-only');
+		expect(h.files.get(CONFIG)).toContain(NEW_SECRET);
+		// The copy could not be made owner-only either: removed, not left stale.
+		expect(h.files.has(BACKUP)).toBe(false);
+		expect(h.temps()).toEqual([]);
+	});
+
 	it('does not fall back for a failure that is not a refusal: a full disk leaves the old config and rejects', async () => {
 		const old = serialized(config());
 		const h = killableDisk({ [CONFIG]: old }, { now: () => NOW });
