@@ -501,8 +501,9 @@ export function lookupAllOnPath(command: string): string[] {
  * pure and keeps the `browser` tag and the `browser-check` executor
  * pointed at the same binary.
  */
-export function currentEnvironment(): CapabilityEnvironment {
-	const environment = readEnvironment(
+/** Host facts plus the browser this machine would launch: everything but the model CLIs. */
+function hostEnvironment(): CapabilityEnvironment {
+	return readEnvironment(
 		{
 			platform: process.platform,
 			arch: process.arch,
@@ -512,6 +513,10 @@ export function currentEnvironment(): CapabilityEnvironment {
 		resolveBrowserPath,
 		{ fileExists: isExecutableFile, lookupOnPath }
 	);
+}
+
+export function currentEnvironment(): CapabilityEnvironment {
+	const environment = hostEnvironment();
 	// Agent execution v2 — the model CLIs this machine can drive, resolved
 	// once here for the same reason the browser is: the tag and the
 	// executor must point at the same binary.
@@ -535,16 +540,7 @@ export function currentEnvironment(): CapabilityEnvironment {
  * synchronous {@link currentEnvironment} stays for embedders that need it.
  */
 export async function probeEnvironment(deps: BootProbeDeps = {}): Promise<CapabilityEnvironment> {
-	const environment = readEnvironment(
-		{
-			platform: process.platform,
-			arch: process.arch,
-			version: process.version,
-			env: process.env
-		},
-		resolveBrowserPath,
-		{ fileExists: isExecutableFile, lookupOnPath }
-	);
+	const environment = hostEnvironment();
 	const modelCli = await probeModelCliPaths({
 		env: process.env,
 		platform: process.platform,
