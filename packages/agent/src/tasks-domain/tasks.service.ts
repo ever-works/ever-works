@@ -1055,6 +1055,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId: created.id,
+            scope: ownershipScopeOf(created),
             actionType: ActivityActionType.TASK_CREATED,
             details: { slug: created.slug, title: created.title },
         });
@@ -1277,6 +1278,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId: id,
+            scope: ownershipScopeOf(refreshed),
             actionType: ActivityActionType.TASK_UPDATED,
             details: this.diffFor(task, refreshed),
         });
@@ -1303,6 +1305,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId: id,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_DELETED,
             details: { slug: task.slug },
         });
@@ -1661,6 +1664,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId: template.id,
+            scope: ownershipScopeOf(template),
             actionType: ActivityActionType.SCHEDULE_EXECUTED,
             details: {
                 source: 'run-now',
@@ -1704,6 +1708,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId: id,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_UPDATED,
             details: { scheduledAt: runAt.toISOString() },
         });
@@ -1716,11 +1721,12 @@ export class TasksService {
         id: string,
         ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        await this.getOne(userId, id, ownershipScope);
+        const task = await this.getOne(userId, id, ownershipScope);
         await this.updateTaskRow(id, { scheduledAt: null, scheduleClaimedAt: null });
         await this.logActivity({
             userId,
             taskId: id,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_UPDATED,
             details: { scheduledAt: null },
         });
@@ -1874,6 +1880,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_TRANSITIONED,
             details: {
                 action: 'run',
@@ -2005,6 +2012,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId: id,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_TRANSITIONED,
             details: { from, to, force: opts.force ?? false },
         });
@@ -2032,6 +2040,7 @@ export class TasksService {
             this.logActivity({
                 userId,
                 taskId: id,
+                scope: ownershipScopeOf(task),
                 actionType: ActivityActionType.TASK_TRANSITIONED,
                 details: { from: hop.from, to: hop.to, force: opts.force ?? false, mode: 'sync' },
             }),
@@ -2182,6 +2191,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_ASSIGNEE_ADDED,
             details: { assigneeType, assigneeId },
         });
@@ -2212,7 +2222,7 @@ export class TasksService {
         assigneeId: string,
         ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId, ownershipScope);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         const existing = this.domainEvents
             ? (await this.assignees.findByTaskId(taskId)).find((row) => row.id === assigneeId)
             : undefined;
@@ -2236,6 +2246,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_ASSIGNEE_REMOVED,
             details: { assigneeId },
         });
@@ -2306,7 +2317,7 @@ export class TasksService {
         blockedByTaskId: string,
         ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId, ownershipScope);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         if (taskId === blockedByTaskId) {
             throw new BadRequestException('Task cannot block itself.');
         }
@@ -2343,6 +2354,7 @@ export class TasksService {
         await this.logActivity({
             userId,
             taskId,
+            scope: ownershipScopeOf(task),
             actionType: ActivityActionType.TASK_BLOCKER_ADDED,
             details: { blockedByTaskId },
         });
@@ -2821,9 +2833,21 @@ export class TasksService {
         }
     }
 
+    /**
+     * Write one of the Task's own Activity rows.
+     *
+     * `scope` is the TASK's workspace (`ownershipScopeOf(task)`), never the request's
+     * (C-2). The feed is scope-filtered, and the API's stamping subscriber fills an
+     * unset `tenantId`/`organizationId` from the request — which is empty for a Task
+     * filed or moved by the worker through the remote proxy (an upstream-conflict
+     * Task, an agent run's transitions). Unstamped, such a row landed null/null and was
+     * missing from an org-scoped Work's feed. The Task's own columns are written
+     * explicitly, nulls included, so the subscriber cannot replace them.
+     */
     private async logActivity(args: {
         userId: string;
         taskId: string;
+        scope: OwnershipScope;
         actionType: ActivityActionType;
         details?: Record<string, unknown>;
     }): Promise<void> {
@@ -2833,6 +2857,8 @@ export class TasksService {
             // `resourceType`/`resourceId` + renamed SUCCESS → COMPLETED.
             await this.activityLog.log({
                 userId: args.userId,
+                tenantId: args.scope.tenantId,
+                organizationId: args.scope.organizationId,
                 action: args.actionType,
                 actionType: args.actionType,
                 status: ActivityStatus.COMPLETED,
