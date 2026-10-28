@@ -277,6 +277,9 @@ importers:
       ioredis:
         specifier: ^5.10.1
         version: 5.10.1
+      kysely:
+        specifier: ^0.28.17
+        version: 0.28.17
       multer:
         specifier: ^2.5.0
         version: 2.5.0
