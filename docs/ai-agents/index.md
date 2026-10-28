@@ -16,7 +16,7 @@ AI providers are managed through the [plugin system](/plugin-system). Each provi
 | Provider          | Plugin ID           | Default Model                               | Configuration              |
 | ----------------- | ------------------- | ------------------------------------------- | -------------------------- |
 | OpenAI            | `openai`            | `gpt-5.1`                                   | User API key               |
-| Anthropic         | `anthropic`         | `claude-sonnet-4-5-20250514`                | User API key               |
+| Anthropic         | `anthropic`         | `claude-opus-5-5`                           | User API key               |
 | Google Gemini     | `google`            | `models/gemini-2.5-flash`                   | User API key               |
 | Groq              | `groq`              | `meta-llama/llama-4-scout-17b-16e-instruct` | User API key               |
 | Mistral           | `mistral`           | `mistral-small-latest`                      | User API key               |

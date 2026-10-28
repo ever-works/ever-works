@@ -78,12 +78,15 @@ export class AiProviderRegistryService {
             displayName: 'Anthropic (Claude)',
             description: 'Anthropic Claude models (Claude 4.5, 3.5)',
             defaults: {
-                model: 'claude-3-5-sonnet-latest',
+                // Active Claude API id (the vendor's recommended starting model, checked
+                // 2026-10-28). The old default, claude-3-5-sonnet-latest, is retired.
+                model: 'claude-opus-5-5',
                 temperature: 0.7,
                 maxTokens: 8192,
             },
             requiresApiKey: true,
             models: [
+                'claude-opus-5-5',
                 'claude-opus-4-5-20251101',
                 'claude-sonnet-4.5',
                 'claude-haiku-4.5',

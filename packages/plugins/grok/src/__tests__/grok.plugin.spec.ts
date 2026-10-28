@@ -65,12 +65,51 @@ describe('GrokPlugin', () => {
 			expect(apiKeySchema['x-envVar']).toBe('XAI_API_KEY');
 		});
 
-		it('should default to grok-2-latest across model tiers', () => {
+		/**
+		 * Every tier used to default to `grok-2-latest`, an id the xAI API no
+		 * longer lists. The list below is the set of text model ids on the
+		 * vendor's models page on 2026-10-28:
+		 *   https://docs.x.ai/developers/models
+		 * minus `grok-4.20-multi-agent-0309`, which is not a Chat Completions
+		 * model (the API this plugin speaks), so it must never be a default.
+		 * Update it from that page, never from memory.
+		 */
+		const VERIFIED_XAI_TEXT_MODEL_IDS = [
+			'grok-4.7',
+			'grok-4.6',
+			'grok-4.5',
+			'grok-4.3',
+			'grok-4.20-0309-reasoning',
+			'grok-4.20-0309-non-reasoning',
+			'grok-build-0.1'
+		];
+
+		it('should default every model tier to an id the xAI API lists', () => {
 			const props = plugin.settingsSchema.properties!;
-			expect((props.defaultModel as { default: string }).default).toBe('grok-2-latest');
-			expect((props.simpleModel as { default: string }).default).toBe('grok-2-latest');
-			expect((props.mediumModel as { default: string }).default).toBe('grok-2-latest');
-			expect((props.complexModel as { default: string }).default).toBe('grok-2-latest');
+			for (const key of ['defaultModel', 'simpleModel', 'mediumModel', 'complexModel']) {
+				expect(VERIFIED_XAI_TEXT_MODEL_IDS, key).toContain((props[key] as { default: string }).default);
+			}
+		});
+
+		it('should use the same default in the settings schema, the onLoad bootstrap and getDefaultModelId()', async () => {
+			await plugin.onLoad({
+				pluginId: 'grok',
+				logger: { log: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+				getSettings: vi.fn().mockResolvedValue({})
+			} as unknown as PluginContext);
+			const MockAiOperations = AiOperations as unknown as ReturnType<typeof vi.fn>;
+			const bootstrapModel = (MockAiOperations.mock.calls[0][0] as { model: string }).model;
+			const aiOpsInstance = MockAiOperations.mock.results[0].value;
+
+			// No `defaultModel` in the settings: validateConnection falls back to
+			// getDefaultModelId(), the path every unsaved config takes.
+			await plugin.validateConnection({ apiKey: 'xai-test' });
+			const validatedModel = aiOpsInstance.testConnection.mock.calls[0][1];
+
+			const schemaDefault = (plugin.settingsSchema.properties!.defaultModel as { default: string }).default;
+			expect(bootstrapModel).toBe(schemaDefault);
+			expect(validatedModel).toBe(schemaDefault);
+			expect(VERIFIED_XAI_TEXT_MODEL_IDS).toContain(validatedModel);
 		});
 
 		it('should point baseUrl at the xAI API by default', () => {

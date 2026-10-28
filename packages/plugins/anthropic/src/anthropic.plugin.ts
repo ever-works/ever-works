@@ -16,6 +16,16 @@ import type {
 } from '@ever-works/plugin';
 
 /**
+ * The default model, also the complex tier's. `onLoad` and `getDefaultModelId()`
+ * read it too, so they cannot drift apart. Claude Opus 5.5 is the model the
+ * vendor's docs recommend starting with
+ * (https://platform.claude.com/docs/en/about-claude/models/overview, checked
+ * 2026-10-28). The old default, `claude-sonnet-4-5-20250514`, never existed.
+ * The simple and medium tiers keep their own ids.
+ */
+const DEFAULT_MODEL = 'claude-opus-5-5';
+
+/**
  * Anthropic AI provider plugin
  *
  * Provides AI capabilities through Anthropic's Claude API.
@@ -44,7 +54,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'claude-sonnet-4-5-20250514',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -68,7 +78,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'claude-sonnet-4-5-20250514',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -106,7 +116,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'claude-sonnet-4-5-20250514',
+			model: DEFAULT_MODEL,
 			baseURL: 'https://api.anthropic.com/v1/',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -158,7 +168,7 @@ export class AnthropicPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'claude-sonnet-4-5-20250514';
+		return DEFAULT_MODEL;
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

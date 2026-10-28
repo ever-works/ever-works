@@ -260,6 +260,8 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
      * (per the {@link IJobRuntimeProvider.bindToTenant} idempotency
      * contract). A new `credentialVersion` evicts and replaces the
      * previous entry — the cache size is bounded by tenant count.
+     * A BYO view whose tenant client failed to build is never stored,
+     * so the next bind retries the build (C-7).
      */
     private readonly tenantViews = new Map<string, IJobRuntimeProvider>();
 
@@ -285,6 +287,10 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
      *     member delegates to the singleton `TriggerService` (the
      *     platform project), and the stamp Proxy makes its `dispatchXxx`
      *     methods add the `tenant:<id>` tag and tenant concurrency key.
+     *     The fail-open BYO case is the one view that is not memoised:
+     *     each bind builds a new one and retries the tenant's client, so
+     *     a transient build failure does not pin the tenant to the
+     *     platform project until its credentials change.
      *
      * Everything else (`registerSchedules`, `startWorkerHost`, lifecycle)
      * delegates to this provider in both shapes.
@@ -314,6 +320,12 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
         const tenantClient: TriggerClient | null = tenantCredentials
             ? this.safeBuildTenantClient(snapshot, tenantCredentials)
             : null;
+        // C-7 — the snapshot carries BYO credentials but the tenant's client
+        // did not build, so this view runs on the platform's project. That
+        // view is NOT memoised (see the cache write below): memoising it kept
+        // every later job for the tenant on the platform's project until the
+        // credentials changed, even once the client could be built again.
+        const byoClientFellBack = tenantCredentials !== null && tenantClient === null;
 
         // EW-742 P3.2 T22 (stamping) — per-tenant dispatcher Proxy.
         //
@@ -477,8 +489,11 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
             // `bindToTenant` on a tenant view returns itself for
             // matching snapshots; mismatched snapshots return the
             // root provider's bind result (cache-replace semantics).
+            // A BYO fallback view never returns itself: the root
+            // retries the tenant's client build (C-7).
             bindToTenant(other: TenantCredentialSnapshot): IJobRuntimeProvider {
                 if (
+                    !byoClientFellBack &&
                     other.tenantId === snapshot.tenantId &&
                     other.credentialVersion === snapshot.credentialVersion
                 ) {
@@ -502,7 +517,11 @@ export class TriggerJobRuntimeProvider implements IJobRuntimeProvider {
                 this.tenantViews.delete(key);
             }
         }
-        this.tenantViews.set(cacheKey, view);
+        // C-7 — a fallback view is returned but not memoised, so the next
+        // bind for this snapshot tries the tenant's client again.
+        if (!byoClientFellBack) {
+            this.tenantViews.set(cacheKey, view);
+        }
         return view;
     }
 

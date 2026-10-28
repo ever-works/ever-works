@@ -97,9 +97,9 @@ The platform supports 11 LLM providers, all accessed through an OpenAI-compatibl
 
 - **OpenAI** — GPT-5.1, GPT-5-nano, GPT-4o-mini
 - **Google** — Gemini 2.5 Flash, Gemini 2.5 Pro
-- **Anthropic** — Claude Sonnet 4.5, Claude Haiku 4.5
+- **Anthropic** — Claude Opus 5.5, Claude Sonnet 4.5, Claude Haiku 4.5
 - **Groq** — Fast inference with open-weight models (`qwen/qwen3-32b` by default)
-- **Grok (xAI)** — `grok-2-latest` and the rest of the xAI catalog
+- **Grok (xAI)** — `grok-4.7` and the rest of the xAI catalog
 - **Mistral** — Mistral Small, Medium, Large
 - **OpenRouter** — Multi-provider gateway (400+ models)
 - **Ollama** — Local model inference
