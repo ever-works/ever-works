@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RuntimeEnvironmentData } from '@ever-works/plugin';
 
+import { resolveEnvVarNetworking } from './managed-agents-client.js';
 import { buildPackageBootstrapPrompt, resolveEnvironmentNetworking } from './runtime-environment.js';
 
 function makeEnvironment(overrides: Partial<RuntimeEnvironmentData> = {}): RuntimeEnvironmentData {
@@ -58,6 +59,85 @@ describe('resolveEnvironmentNetworking', () => {
 	});
 });
 
+/**
+ * Ever Works #109 — the resolver fails closed. The carrier crosses an RPC
+ * boundary in some deployments, so the declared types are not a guarantee:
+ * an unrecognised mode must not widen egress, and the two allow flags are
+ * granted only by an explicit `true`.
+ */
+describe('resolveEnvironmentNetworking — fails closed (#109)', () => {
+	/** A carrier as it might arrive over the wire, outside the declared types. */
+	const untyped = (fields: Record<string, unknown>): RuntimeEnvironmentData =>
+		({ ...makeEnvironment(), ...fields }) as unknown as RuntimeEnvironmentData;
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it.each(['open', 'LIMITED', '', 'none', null, undefined, 42])(
+		'an unrecognised networkingMode %j takes the operator env-var policy, not unrestricted',
+		(networkingMode) => {
+			vi.stubEnv('CLAUDE_MANAGED_AGENT_EGRESS_HOSTS', 'api.anthropic.com, github.com');
+
+			expect(resolveEnvironmentNetworking(untyped({ networkingMode }))).toEqual({
+				type: 'limited',
+				allowed_hosts: ['api.anthropic.com', 'github.com'],
+				allow_package_managers: false,
+				allow_mcp_servers: false
+			});
+		}
+	);
+
+	it('an unrecognised networkingMode with no env-var policy gets exactly what a run with no Environment gets', () => {
+		vi.stubEnv('CLAUDE_MANAGED_AGENT_EGRESS_HOSTS', '');
+
+		expect(resolveEnvironmentNetworking(untyped({ networkingMode: 'open' }))).toEqual(resolveEnvVarNetworking());
+	});
+
+	it.each([undefined, null, 'true', 1, {}])(
+		'a limited Environment denies package managers unless the flag is exactly true (got %j)',
+		(allowPackageManagers) => {
+			const networking = resolveEnvironmentNetworking(
+				untyped({ networkingMode: 'limited', allowedHosts: ['api.anthropic.com'], allowPackageManagers })
+			);
+			expect(networking).toMatchObject({ type: 'limited', allow_package_managers: false });
+		}
+	);
+
+	it('a limited Environment allows package managers on an explicit true', () => {
+		const networking = resolveEnvironmentNetworking(
+			makeEnvironment({
+				networkingMode: 'limited',
+				allowedHosts: ['api.anthropic.com'],
+				allowPackageManagers: true
+			})
+		);
+		expect(networking).toMatchObject({ type: 'limited', allow_package_managers: true });
+	});
+
+	it.each([undefined, null, 'true', 1, false])(
+		'a limited Environment denies MCP servers unless allowMcpServers is exactly true (got %j)',
+		(allowMcpServers) => {
+			const networking = resolveEnvironmentNetworking(
+				untyped({ networkingMode: 'limited', allowedHosts: ['api.anthropic.com'], allowMcpServers })
+			);
+			expect(networking).toMatchObject({ type: 'limited', allow_mcp_servers: false });
+		}
+	);
+
+	it("carries the Environment's explicit allowMcpServers: true", () => {
+		const networking = resolveEnvironmentNetworking(
+			makeEnvironment({ networkingMode: 'limited', allowedHosts: ['api.anthropic.com'], allowMcpServers: true })
+		);
+		expect(networking).toEqual({
+			type: 'limited',
+			allowed_hosts: ['api.anthropic.com'],
+			allow_package_managers: true,
+			allow_mcp_servers: true
+		});
+	});
+});
+
 describe('buildPackageBootstrapPrompt', () => {
 	it('returns null with no Environment or with empty package lists', () => {
 		expect(buildPackageBootstrapPrompt(undefined)).toBeNull();
@@ -100,6 +180,18 @@ describe('buildPackageBootstrapPrompt', () => {
 				})
 			)
 		).toBeNull();
+	});
+
+	it('returns null when a limited Environment carries no package-manager flag (deny by default)', () => {
+		const environment = {
+			...makeEnvironment({
+				networkingMode: 'limited',
+				allowedHosts: ['api.anthropic.com'],
+				pipPackages: ['requests']
+			}),
+			allowPackageManagers: undefined
+		} as unknown as RuntimeEnvironmentData;
+		expect(buildPackageBootstrapPrompt(environment)).toBeNull();
 	});
 
 	it('still installs under limited networking when package managers are allowed', () => {

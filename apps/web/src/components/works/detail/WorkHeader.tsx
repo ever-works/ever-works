@@ -16,6 +16,7 @@ import { WorkKindBadge } from '../shared/WorkKindBadge';
 import { AppSourceRelation } from '../app/AppSourceRelation';
 import type { AppSourceRelationSummary } from '@/lib/works/app-source-relation';
 import type { Agent } from '@/lib/api/agents';
+import { safeWebUrl } from '@/lib/utils/safe-link';
 
 interface WorkHeaderProps {
     work: Work;
@@ -61,10 +62,13 @@ export function WorkHeader({
         comparisonsIndex >= 0 && comparisonsIndex < pathSegments.length - 1
             ? pathSegments[comparisonsIndex + 1]
             : null;
-    const externalWebsiteUrl =
+    // C-12: `work.website` is what a deployment plugin reported, so it is linked
+    // only as an http(s) URL — on the comparison route and off it.
+    const externalWebsiteUrl = safeWebUrl(
         work.website && comparisonSlug
             ? buildPublicComparisonUrl(work.website, comparisonSlug)
-            : work.website;
+            : work.website,
+    );
 
     return (
         <div className="relative mb-6">

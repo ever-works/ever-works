@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { formatRepositorySizeKb } from '@/lib/work-kinds/app-source-reasons';
+import { safeWebUrl } from '@/lib/utils/safe-link';
 
 /** The preview shows the size line only above 100 MB (spec §6.2). */
 export const APP_PREVIEW_LARGE_REPOSITORY_KB = 100 * 1024;
@@ -44,7 +45,7 @@ export function AppSourcePreviewCard({ preview }: { preview: AppSourceInspectRes
         <div className="space-y-2" data-testid="app-work-preview">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                 <a
-                    href={repository.url}
+                    href={safeWebUrl(repository.url) ?? undefined}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="text-base font-semibold text-text dark:text-text-dark hover:underline"

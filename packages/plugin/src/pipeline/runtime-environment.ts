@@ -24,6 +24,13 @@ export interface RuntimeEnvironmentData {
 	/** Egress allow-list; only meaningful when `networkingMode === 'limited'`. */
 	readonly allowedHosts: readonly string[] | null;
 	readonly allowPackageManagers: boolean;
+	/**
+	 * Whether MCP servers may be reached from a managed sandbox session. Optional
+	 * and deny-by-default: a consumer grants it only on an explicit `true`. The
+	 * platform does not write it yet (the Environments UI has no MCP-server
+	 * control), so today every Environment denies.
+	 */
+	readonly allowMcpServers?: boolean;
 }
 
 /**

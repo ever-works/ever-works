@@ -25,6 +25,7 @@ import {
 import { WorkKindBadge } from '../../shared/WorkKindBadge';
 import { InfoPopover } from '@/components/ui/InfoPopover';
 import { formatGitProviderName } from '@/lib/utils/git-provider';
+import { safeWebUrl } from '@/lib/utils/safe-link';
 
 interface WorkInfoProps {
     work: Work;
@@ -162,9 +163,9 @@ export function WorkInfo({ work, config }: WorkInfoProps) {
             value: work.deployProvider ? (
                 <div className="flex items-center gap-2">
                     <span className="capitalize">{work.deployProvider}</span>
-                    {work.website && (
+                    {safeWebUrl(work.website) && (
                         <a
-                            href={work.website}
+                            href={safeWebUrl(work.website) ?? undefined}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-xs text-primary hover:text-primary-hover flex items-center gap-1"

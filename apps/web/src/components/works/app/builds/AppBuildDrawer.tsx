@@ -28,6 +28,7 @@ import {
 } from '@/lib/works/app-builds.shared';
 import { AppBuildStatusChip } from './AppBuildStatusChip';
 import { AppBuildBlockedNotice } from './AppBuildBlockedNotice';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 /**
  * APW-05 T27 — one Build's detail drawer and its failure panel (spec §6.2,
@@ -375,9 +376,9 @@ export function AppBuildDrawer({
                         </dl>
 
                         <div className="mt-4 flex flex-wrap justify-end gap-2">
-                            {view.logsUrl && (
+                            {safeHttpsUrl(view.logsUrl) && (
                                 <a
-                                    href={view.logsUrl}
+                                    href={safeHttpsUrl(view.logsUrl) ?? undefined}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm text-text hover:bg-surface dark:border-border-dark dark:text-text-dark dark:hover:bg-surface-dark"
