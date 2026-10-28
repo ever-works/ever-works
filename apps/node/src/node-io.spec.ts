@@ -108,6 +108,31 @@ describe('createCommandRunner', () => {
 		});
 		expect(result.code).not.toBe(0);
 	});
+
+	/**
+	 * Boot-probe retry: every retry decision hinges on `timedOut`, so it is
+	 * pinned against REAL children here, not just scripted in the fakes. A
+	 * child killed at the runner's deadline is a timeout; one that exits with
+	 * a status — however fast or slow — is an answer.
+	 */
+	describe('timedOut, against a real child process', () => {
+		// On Windows the bare name goes through cmd.exe, which needs the script quoted.
+		const script = (code: string) => (process.platform === 'win32' ? `"${code}"` : code);
+
+		it('is true when the runner killed the child at its deadline', async () => {
+			const result = await createCommandRunner().run('node', ['-e', script('setTimeout(function(){},3000)')], {
+				timeoutMs: 300
+			});
+			expect(result.timedOut).toBe(true);
+		});
+
+		it('is false when the child answered with a failing status', async () => {
+			const result = await createCommandRunner().run('node', ['-e', script('process.exit(5)')], {
+				timeoutMs: 20_000
+			});
+			expect(result).toMatchObject({ code: 5, timedOut: false });
+		});
+	});
 });
 
 /**

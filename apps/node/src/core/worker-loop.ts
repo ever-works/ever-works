@@ -904,9 +904,12 @@ export class WorkerLoop {
 		this.stopping = false;
 		const preparing = this.prepareSafety();
 		this.safetyPreparation = preparing;
-		void preparing.then(() => {
+		// Cleared on either outcome, so a rejection never surfaces as an
+		// unhandled one here (the caller of `start()` still sees it).
+		const clearPreparation = (): void => {
 			if (this.safetyPreparation === preparing) this.safetyPreparation = null;
-		});
+		};
+		void preparing.then(clearPreparation, clearPreparation);
 		const starting = preparing.then(() => this.tick());
 		this.starting = starting;
 		const clearStarting = (): void => {
