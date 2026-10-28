@@ -105,13 +105,13 @@ export function isTempFileFor(name: string, baseName: string): boolean {
 }
 
 function defaultTempTag(): string {
+	// Uniqueness only: the exclusive create, not the name, is what keeps two writers apart.
 	const pid = typeof process !== 'undefined' && typeof process.pid === 'number' ? process.pid : 0;
-	let hex = '';
-	while (hex.length < 12)
-		hex += Math.floor(Math.random() * 0x100000000)
+	const word = (): string =>
+		Math.floor(Math.random() * 0x1000000)
 			.toString(16)
-			.padStart(8, '0');
-	return `${pid}.${hex.slice(0, 12)}`;
+			.padStart(6, '0');
+	return `${pid}.${word()}${word()}`;
 }
 
 function defaultPlatform(): string {

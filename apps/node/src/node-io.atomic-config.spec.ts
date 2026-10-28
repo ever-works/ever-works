@@ -4,6 +4,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { configBackupPath, loadConfig, saveConfig, type ConfigFileSystem } from './core/config-store';
+import { createHelperFs } from './core/screen/helper/helper-trust';
 import { clampResourceLimits, DEFAULT_HEARTBEAT_INTERVAL_MS, type NodeConfig } from './core/types';
 import { createConfigFileSystem, windowsAclUser } from './node-io';
 
@@ -169,4 +170,30 @@ describe('createConfigFileSystem — atomic config writes on a real disk', () =>
 		},
 		60_000
 	);
+});
+
+describe('createHelperFs — the screen helper trust files on a real disk', () => {
+	it('replaces the policy and the helper binary atomically, leaving no temp file behind', async () => {
+		const restricted: string[] = [];
+		const fs = createHelperFs({ platform: process.platform, restrict: (file) => void restricted.push(file) });
+		const policy = path.join(dir, 'helper-policy.json');
+		const binary = path.join(dir, 'screen-helper', 'ever-works-screen');
+
+		await fs.writePrivate(policy, '{"v":1}');
+		await fs.writePrivate(policy, '{"v":2}');
+		await fs.writeExecutable(binary, new Uint8Array([1, 2, 3]));
+
+		expect(await fsp.readFile(policy, 'utf8')).toBe('{"v":2}');
+		expect([...(await fsp.readFile(binary))]).toEqual([1, 2, 3]);
+		expect((await fsp.readdir(dir)).sort()).toEqual(['helper-policy.json', 'screen-helper']);
+		expect(await fsp.readdir(path.join(dir, 'screen-helper'))).toEqual(['ever-works-screen']);
+		if (process.platform === 'win32') {
+			// The ACL went onto each temp file (renamed into place), never the target.
+			expect(restricted).toHaveLength(3);
+			expect(restricted.every((file) => file.endsWith('.tmp'))).toBe(true);
+		} else {
+			expect((await fsp.stat(policy)).mode & 0o777).toBe(0o600);
+			expect((await fsp.stat(binary)).mode & 0o777).toBe(0o755);
+		}
+	});
 });
