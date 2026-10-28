@@ -178,3 +178,38 @@ describe('canonical Organization workspace proxy', () => {
         },
     );
 });
+
+describe('self-serve account deletion pages', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it.each(['/delete-account', '/delete-account/confirm'])(
+        'serves %s signed out with no-store and no-referrer',
+        async (path) => {
+            getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: false, isExpired: false });
+            const response = await proxy(request(path, 'personal'));
+            expect(response.status).toBe(200);
+            expect(response.headers.get('Cache-Control')).toBe('no-store');
+            expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+        },
+    );
+
+    it('keeps the headers under a workspace prefix, behind the auth gate', async () => {
+        getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: true, isExpired: false });
+        const signedIn = await proxy(request('/org/acme/delete-account/confirm'));
+        expect(signedIn.headers.get('Cache-Control')).toBe('no-store');
+        expect(signedIn.headers.get('Referrer-Policy')).toBe('no-referrer');
+
+        getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: false, isExpired: false });
+        const signedOut = await proxy(request('/org/acme/delete-account/confirm'));
+        expect(signedOut.status).toBeGreaterThanOrEqual(300);
+        expect(signedOut.status).toBeLessThan(400);
+    });
+
+    it('leaves other pages with the default referrer policy', async () => {
+        getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: true, isExpired: false });
+        const response = await proxy(request('/missions'));
+        expect(response.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+    });
+});

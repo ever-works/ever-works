@@ -328,7 +328,12 @@ export default async function proxy(req: NextRequest) {
         return applySecurityHeaders(response);
     }
 
-    return applySecurityHeaders(intlResponse);
+    // A signed-in visitor can reach the deletion pages under a workspace
+    // prefix (`/org/<slug>/delete-account/...`), which is not a public route;
+    // the auth gate above stays, and the response still gets no-store /
+    // no-referrer.
+    const response = applySecurityHeaders(intlResponse);
+    return isAccountDeletionPage(pathname) ? applyAccountDeletionHeaders(response) : response;
 }
 
 export const config = {
