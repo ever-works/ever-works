@@ -95,7 +95,7 @@ describe('replaceFileAtomically', () => {
 	it('retries a busy rename with the bounded back-off, then succeeds', async () => {
 		const h = killableDisk({ [TARGET]: 'old' });
 		h.failRenames('EBUSY', 'EPERM', 'EACCES');
-		const sleep = vi.fn(async () => undefined);
+		const sleep = vi.fn(async (_ms: number) => undefined);
 
 		await replaceFileAtomically(ops(h), TARGET, 'new', { platform: 'win32', sleep });
 
@@ -107,7 +107,7 @@ describe('replaceFileAtomically', () => {
 	it('gives up after the last retry: the old file stays, the temp goes, the error surfaces', async () => {
 		const h = killableDisk({ [TARGET]: 'old' });
 		h.failRenames(...RENAME_RETRY_DELAYS_MS.map(() => 'EBUSY'), 'EBUSY');
-		const sleep = vi.fn(async () => undefined);
+		const sleep = vi.fn(async (_ms: number) => undefined);
 
 		await expect(replaceFileAtomically(ops(h), TARGET, 'new', { platform: 'win32', sleep })).rejects.toMatchObject({
 			code: 'EBUSY'
@@ -128,7 +128,7 @@ describe('replaceFileAtomically', () => {
 
 		const h = killableDisk({ [TARGET]: 'old' });
 		h.failRenames('EXDEV');
-		const sleep = vi.fn(async () => undefined);
+		const sleep = vi.fn(async (_ms: number) => undefined);
 		await expect(replaceFileAtomically(ops(h), TARGET, 'new', { platform: 'win32', sleep })).rejects.toMatchObject({
 			code: 'EXDEV'
 		});
