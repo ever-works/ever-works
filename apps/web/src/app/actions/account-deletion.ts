@@ -25,6 +25,10 @@ type ActionResult<T> =
 /** Public: ask for a deletion link. Always reports success, whatever the address. */
 export async function requestAccountDeletion(email: string): Promise<ActionResult<null>> {
     const t = await getTranslations('auth.deleteAccount');
+    if (process.env.ACCOUNT_DELETION_DISABLED === 'true') {
+        const legacy = await getTranslations('actions.settings.danger');
+        return { success: false, error: legacy('deleteDisabled') };
+    }
     const trimmed = (email ?? '').trim();
     if (!trimmed || trimmed.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
         return { success: false, error: t('request.errors.invalidEmail') };

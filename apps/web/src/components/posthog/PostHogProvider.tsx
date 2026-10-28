@@ -48,8 +48,11 @@ export const ANALYTICS_EXCLUDED_PATH_PREFIXES = ['/delete-account'] as const;
 
 export function isAnalyticsExcludedPath(pathname: string | null | undefined): boolean {
     if (!pathname) return false;
+    // A signed-in visitor can reach the same page under a workspace prefix
+    // (`/org/<slug>/delete-account/confirm`); match the page, not the prefix.
+    const path = pathname.replace(/^\/org\/[^/]+(?=\/|$)/, '') || '/';
     return ANALYTICS_EXCLUDED_PATH_PREFIXES.some(
-        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+        (prefix) => path === prefix || path.startsWith(`${prefix}/`),
     );
 }
 

@@ -48,7 +48,11 @@ export abstract class AccountDeletionRequestStore {
      */
     abstract claim(tokenHash: string, now: Date): Promise<boolean>;
     abstract update(id: string, patch: AccountDeletionRequestPatch): Promise<void>;
-    /** Forget the account on every row (revoked / expired links too) once it is deleted. */
+    /**
+     * Once the account is deleted: revoke its still-pending links (so a stale
+     * link cannot be claimed against nothing), then forget the account on
+     * every row.
+     */
     abstract clearUser(userId: string): Promise<void>;
 }
 
@@ -107,6 +111,7 @@ export class TypeormAccountDeletionRequestStore extends AccountDeletionRequestSt
     }
 
     async clearUser(userId: string): Promise<void> {
+        await this.repository.update({ userId, status: 'pending' }, { status: 'revoked' });
         await this.repository.update({ userId }, { userId: null });
     }
 }

@@ -131,7 +131,9 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
  * token travels in the URL fragment, which never reaches this function.
  */
 function isAccountDeletionPage(pathname: string): boolean {
-    return pathname === ROUTES.DELETE_ACCOUNT || pathname.startsWith(`${ROUTES.DELETE_ACCOUNT}/`);
+    // Also under a workspace prefix (`/org/<slug>/delete-account/...`).
+    const path = pathname.replace(/^\/org\/[^/]+(?=\/|$)/, '') || '/';
+    return path === ROUTES.DELETE_ACCOUNT || path.startsWith(`${ROUTES.DELETE_ACCOUNT}/`);
 }
 
 function applyAccountDeletionHeaders(response: NextResponse): NextResponse {

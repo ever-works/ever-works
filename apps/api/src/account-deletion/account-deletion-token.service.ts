@@ -232,7 +232,11 @@ export class AccountDeletionTokenService {
         } catch {
             return this.urls.defaultConfirmUrl;
         }
-        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        // The fragment carries a live token: a page served over plain http
+        // could be altered in transit and read it. `http:` is accepted only
+        // when the platform's own confirm page is http (local development).
+        const allowHttp = this.urls.defaultConfirmUrl.startsWith('http:');
+        if (parsed.protocol !== 'https:' && !(allowHttp && parsed.protocol === 'http:')) {
             return this.urls.defaultConfirmUrl;
         }
         if (parsed.username || parsed.password) {

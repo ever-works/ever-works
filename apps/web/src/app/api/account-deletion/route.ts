@@ -24,7 +24,12 @@ type Body = { op?: unknown; email?: unknown; token?: unknown };
 export async function POST(request: NextRequest) {
     let body: Body;
     try {
-        body = (await request.json()) as Body;
+        const parsed: unknown = await request.json();
+        // `null`, numbers, strings and arrays are valid JSON but not a request.
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new TypeError('not an object');
+        }
+        body = parsed as Body;
     } catch {
         return NextResponse.json(
             { success: false, error: 'bad_request' },

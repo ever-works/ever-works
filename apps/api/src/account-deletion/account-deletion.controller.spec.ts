@@ -104,6 +104,52 @@ describe('AccountDeletionController', () => {
         });
     });
 
+    it('an email-link failure tells the user to request a new link (the link is used up)', async () => {
+        const { controller, tokens, deletion } = setup();
+        tokens.claim.mockResolvedValue({ id: 'r1', userId: 'u1' });
+        deletion.execute.mockRejectedValueOnce(new AccountDeletionFailedError('deletion_failed'));
+        const error = await controller.confirm({ token: 't', confirm: true }).catch((e) => e);
+        expect((error as HttpException).getStatus()).toBe(409);
+        expect(((error as HttpException).getResponse() as { message: string }).message).toContain(
+            'request a new deletion link',
+        );
+    });
+
+    describe('ACCOUNT_DELETION_DISABLED=true', () => {
+        beforeEach(() => {
+            process.env.ACCOUNT_DELETION_DISABLED = 'true';
+        });
+        afterEach(() => {
+            delete process.env.ACCOUNT_DELETION_DISABLED;
+        });
+
+        it('request still answers 202 but issues nothing', () => {
+            const { controller, tokens } = setup();
+            expect(controller.request({ email: 'jane@example.com' })).toEqual({
+                status: 'accepted',
+            });
+            expect(tokens.acceptRequest).not.toHaveBeenCalled();
+        });
+
+        it('verify, confirm and the signed-in delete are refused before anything runs', async () => {
+            const { controller, tokens, deletion } = setup();
+            await expect(controller.verify({ token: 't' })).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            await expect(controller.confirm({ token: 't', confirm: true })).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            await expect(
+                controller.deleteMe(
+                    { user: { userId: 'u1' } },
+                    { confirmEmail: 'jane@example.com' },
+                ),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(tokens.claim).not.toHaveBeenCalled();
+            expect(deletion.execute).not.toHaveBeenCalled();
+        });
+    });
+
     it('a billing failure is a 409 with its code, not a 410', async () => {
         const { controller, tokens, deletion } = setup();
         tokens.claim.mockResolvedValue({ id: 'r1', userId: 'u1' });

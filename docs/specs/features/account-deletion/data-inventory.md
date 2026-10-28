@@ -10,13 +10,13 @@ Screenshots of a local run: `docs/pr-assets/account-deletion/`.
 ## Public URLs (deployed app) and the fan-out endpoint
 
 | What                                              | URL                                                                                                                                                                                |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Request form (public, signed out)                 | `https://app.ever.works/delete-account`                                                                                                                                            |
 | Confirm page (link target; token in the fragment) | `https://app.ever.works/delete-account/confirm#token=<43-char base64url>`                                                                                                          |
 | Signed-in delete                                  | `https://app.ever.works/settings/danger` (Settings → Danger Zone)                                                                                                                  |
 | **ever.co fan-out**                               | `POST https://api.ever.works/api/account-deletion/request` body `{"email":"…","callbackUrl":"https://app.ever.works/delete-account/confirm"}` → always `202 {"status":"accepted"}` |
 | Verify (confirm page uses it)                     | `POST https://api.ever.works/api/account-deletion/verify` `{token}` → 200 preview / 410                                                                                            |
-| Confirm                                           | `POST https://api.ever.works/api/account-deletion/confirm` `{token, confirm:true}` → `200 {"deleted":true,"accounts":1,"workspacesDeleted":0                                       | 1}` / 410 |
+| Confirm                                           | `POST https://api.ever.works/api/account-deletion/confirm` `{token, confirm:true}` → `200 {"deleted":true,"accounts":1,"workspacesDeleted":0 or 1}` / 410                          |
 
 Stage / dev: `app-stage.ever.works` + `api-stage.ever.works`, `app-dev.ever.works` + `api-dev.ever.works` (same paths).
 `callbackUrl` is optional; it is honoured only when its host is `WEB_URL`'s host or listed in the API's

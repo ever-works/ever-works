@@ -89,7 +89,11 @@ class MemoryStore extends AccountDeletionRequestStore {
     }
 
     async clearUser(userId: string): Promise<void> {
-        for (const row of this.rows) if (row.userId === userId) row.userId = null;
+        for (const row of this.rows) {
+            if (row.userId !== userId) continue;
+            if (row.status === 'pending') row.status = 'revoked';
+            row.userId = null;
+        }
     }
 }
 
@@ -258,6 +262,10 @@ describe('AccountDeletionTokenService', () => {
             expect(service.resolveConfirmUrl('javascript:alert(1)')).toBe(
                 'https://app.ever.works/delete-account/confirm',
             );
+            // An allowed host over plain http could be altered in transit and read the fragment.
+            expect(service.resolveConfirmUrl('http://ever.co/delete/confirm')).toBe(
+                'https://app.ever.works/delete-account/confirm',
+            );
         });
     });
 
@@ -301,6 +309,15 @@ describe('AccountDeletionTokenService', () => {
             const second = tokenFromLink(sent[1].deleteUrl);
             await expect(service.claim(first)).rejects.toBeInstanceOf(InvalidDeletionLinkError);
             await expect(service.claim(second)).resolves.toMatchObject({ status: 'consumed' });
+        });
+
+        it('a deleted account leaves no usable link behind', async () => {
+            const { service, store, sent, tokenFromLink } = setup();
+            await service.issue({ email: 'jane@example.com' });
+            const token = tokenFromLink(sent[0].deleteUrl);
+            await store.clearUser('user-jane');
+            expect(store.rows[0]).toMatchObject({ status: 'revoked', userId: null });
+            await expect(service.claim(token)).rejects.toBeInstanceOf(InvalidDeletionLinkError);
         });
 
         it('refuses unknown and malformed tokens identically', async () => {

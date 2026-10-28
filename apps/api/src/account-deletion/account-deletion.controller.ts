@@ -36,18 +36,46 @@ import {
 
 const linkGone = () => new GoneException({ message: ACCOUNT_DELETION_LINK_INVALID_MESSAGE });
 
-function deletionFailed(error: unknown): never {
+function deletionFailed(error: unknown, via: 'session' | 'email_link' = 'session'): never {
     const code = error instanceof AccountDeletionFailedError ? error.code : 'deletion_failed';
+    // The email link is used up by the attempt (the claim comes first), so
+    // "try again" must mean "request a new link" there.
+    const retry =
+        via === 'email_link'
+            ? 'Please request a new deletion link and try again.'
+            : 'Please try again';
     throw new HttpException(
         {
             message:
                 code === 'billing_cancel_failed'
-                    ? 'We could not cancel your subscription with the payment provider, so nothing was deleted. Please try again in a few minutes.'
-                    : 'The account could not be deleted. Please try again or contact support.',
+                    ? `We could not cancel your subscription with the payment provider, so nothing was deleted. ${
+                          via === 'email_link' ? retry : 'Please try again in a few minutes.'
+                      }`
+                    : `The account could not be deleted. ${
+                          via === 'email_link' ? retry : 'Please try again'
+                      } or contact support.`,
             code,
         },
         HttpStatus.CONFLICT,
     );
+}
+
+/**
+ * Operator kill switch (`ACCOUNT_DELETION_DISABLED=true`, e.g. a public demo
+ * instance): nothing is deleted through any route. `request` still answers its
+ * usual 202 but sends nothing, so it stays enumeration-safe.
+ */
+export function accountDeletionDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
+    return env.ACCOUNT_DELETION_DISABLED === 'true';
+}
+
+function refuseWhenDisabled(): void {
+    if (accountDeletionDisabled()) {
+        throw new ForbiddenException({
+            message: 'Account deletion is disabled on this instance.',
+            code: 'account_deletion_disabled',
+        });
+    }
 }
 
 /**
@@ -87,6 +115,9 @@ export class AccountDeletionController {
     })
     @ApiResponse({ status: 202, description: 'Accepted' })
     request(@Body() dto: RequestAccountDeletionDto) {
+        if (accountDeletionDisabled()) {
+            return { status: 'accepted' as const };
+        }
         return this.tokens.acceptRequest({ email: dto.email, callbackUrl: dto.callbackUrl });
     }
 
@@ -99,6 +130,7 @@ export class AccountDeletionController {
     @ApiResponse({ status: 200, description: 'What will be deleted' })
     @ApiResponse({ status: 410, description: 'Invalid, used, expired or revoked link' })
     async verify(@Body() dto: VerifyAccountDeletionDto) {
+        refuseWhenDisabled();
         let request;
         try {
             request = await this.tokens.inspect(dto.token);
@@ -125,6 +157,7 @@ export class AccountDeletionController {
     @ApiResponse({ status: 200, description: '{ deleted: true, accounts, workspacesDeleted }' })
     @ApiResponse({ status: 410, description: 'Invalid, used, expired or revoked link' })
     async confirm(@Body() dto: ConfirmAccountDeletionDto) {
+        refuseWhenDisabled();
         let request;
         try {
             request = await this.tokens.claim(dto.token);
@@ -145,7 +178,7 @@ export class AccountDeletionController {
             };
         } catch (error) {
             if (error instanceof NotFoundException) throw linkGone();
-            deletionFailed(error);
+            deletionFailed(error, 'email_link');
         }
     }
 
@@ -173,6 +206,7 @@ export class AccountDeletionController {
         @Request() req: { user: { userId: string; email?: string | null } },
         @Body() dto: DeleteMyAccountDto,
     ) {
+        refuseWhenDisabled();
         const preview = await this.deletion.preview(req.user.userId);
         const email = await this.deletion.emailOf(req.user.userId);
         if (!email || normaliseDeletionEmail(dto.confirmEmail) !== normaliseDeletionEmail(email)) {

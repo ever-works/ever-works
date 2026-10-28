@@ -190,3 +190,15 @@ describe('PostHogIdentify', () => {
         expect(resetSpy).not.toHaveBeenCalled();
     });
 });
+
+describe('isAnalyticsExcludedPath (self-serve account deletion pages)', () => {
+    it('excludes the deletion pages, with or without a workspace prefix', async () => {
+        const { isAnalyticsExcludedPath } = await import('./PostHogProvider');
+        expect(isAnalyticsExcludedPath('/delete-account')).toBe(true);
+        expect(isAnalyticsExcludedPath('/delete-account/confirm')).toBe(true);
+        expect(isAnalyticsExcludedPath('/org/acme/delete-account/confirm')).toBe(true);
+        expect(isAnalyticsExcludedPath('/delete-accounts')).toBe(false);
+        expect(isAnalyticsExcludedPath('/org/acme/dashboard')).toBe(false);
+        expect(isAnalyticsExcludedPath('/settings/danger')).toBe(false);
+    });
+});
