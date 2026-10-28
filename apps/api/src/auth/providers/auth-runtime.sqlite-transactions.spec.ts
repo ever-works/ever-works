@@ -149,7 +149,10 @@ describe('Better Auth on better-sqlite3 next to TypeORM transactions', () => {
         await dataSource.query(
             'CREATE TABLE "signup_accounts" ("id" varchar PRIMARY KEY, "userId" varchar NOT NULL)',
         );
-        relay = new DomainEventRelayService(dataSource, new DomainEventRetentionService(dataSource));
+        relay = new DomainEventRelayService(
+            dataSource,
+            new DomainEventRetentionService(dataSource),
+        );
         // Take the relay lease up front, so every later tick goes straight to its batch transaction.
         await expect(relay.tick()).resolves.toEqual({ leader: true, dispatched: 0 });
     });
@@ -171,7 +174,10 @@ describe('Better Auth on better-sqlite3 next to TypeORM transactions', () => {
         // the connection that created it, so a write through the dialect must be
         // visible to TypeORM.
         const { db } = kyselyAsBetterAuthBuildsIt(database);
-        await db.insertInto('signup_users').values({ id: 'u-1', email: 'one@example.com' }).execute();
+        await db
+            .insertInto('signup_users')
+            .values({ id: 'u-1', email: 'one@example.com' })
+            .execute();
         await expect(dataSource.query('SELECT "email" FROM "signup_users"')).resolves.toEqual([
             { email: 'one@example.com' },
         ]);
@@ -191,7 +197,9 @@ describe('Better Auth on better-sqlite3 next to TypeORM transactions', () => {
             dataSource.query('SELECT "email" FROM "signup_users" WHERE "id" = ?', [userId]),
         ).resolves.toEqual([{ email: 'straddle@example.com' }]);
         await expect(
-            dataSource.query('SELECT COUNT(*) AS "n" FROM "signup_accounts" WHERE "userId" = ?', [userId]),
+            dataSource.query('SELECT COUNT(*) AS "n" FROM "signup_accounts" WHERE "userId" = ?', [
+                userId,
+            ]),
         ).resolves.toEqual([{ n: 1 }]);
         expect(dataSource.createQueryRunner().isTransactionActive).toBe(false);
     });

@@ -50,14 +50,19 @@ import { getBcryptCost } from './bcrypt-cost';
  *     error-path `ROLLBACK` ends whichever sign-up is open at that moment.
  *
  * Better Auth 1.6 never opened a transaction here, so `transaction: false`
- * restores exactly its behaviour: each Better Auth write runs as one statement
- * on the shared connection, as every other write in the API does. The dialect
- * reuses TypeORM's connection, never a second one, because an in-memory
- * database exists only on the connection that created it. Postgres and MySQL
- * keep native transactions: Better Auth takes its own pooled connection for
- * each one, so TypeORM's state is never touched.
+ * restores exactly its behaviour: each Better Auth write is a single statement
+ * on the shared connection (inside a TypeORM transaction when one is open, like
+ * any other single statement on this driver), and Better Auth never issues
+ * `begin` / `commit` / `rollback`. The cost, the same as on 1.6: on SQLite a
+ * sign-up's user and credential-account inserts are not one atomic unit. The
+ * dialect reuses TypeORM's connection, never a second one, because an
+ * in-memory database exists only on the connection that created it. Postgres
+ * and MySQL keep native transactions: Better Auth takes its own pooled
+ * connection for each one, so TypeORM's state is never touched.
  */
-function getSqliteDatabase(connection: SqliteDialectConfig['database']): BetterAuthOptions['database'] {
+function getSqliteDatabase(
+    connection: SqliteDialectConfig['database'],
+): BetterAuthOptions['database'] {
     return {
         dialect: new SqliteDialect({ database: connection }),
         type: 'sqlite',
