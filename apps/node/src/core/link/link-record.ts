@@ -1,5 +1,5 @@
 import { normalizeFleetConsents, type FleetConsents } from '@ever-works/contracts';
-import type { ConfigFileSystem } from '../config-store';
+import { writeStateFile, type ConfigFileSystem, type StateFileSystem } from '../config-store';
 import type { NodeLinkPhase, NodeLinkState } from './link-client';
 
 /**
@@ -103,15 +103,15 @@ export async function readNodeLinkRecord(
 	}
 }
 
-/** Best-effort by contract: the caller logs a failure and carries on. */
+/** Atomic (2026-10-28), and best-effort by contract: the caller logs a failure and carries on. */
 export async function writeNodeLinkRecord(
-	fs: Pick<ConfigFileSystem, 'writeFile' | 'mkdir' | 'dirname'>,
+	fs: StateFileSystem & Pick<ConfigFileSystem, 'mkdir' | 'dirname'>,
 	configPath: string,
 	record: NodeLinkRecord
 ): Promise<void> {
 	const path = nodeLinkRecordPath(configPath);
 	await fs.mkdir(fs.dirname(path));
-	await fs.writeFile(path, `${JSON.stringify(record, null, 2)}\n`);
+	await writeStateFile(fs, path, `${JSON.stringify(record, null, 2)}\n`);
 }
 
 /** `work · manage`, or `none (enrolled only)`. */

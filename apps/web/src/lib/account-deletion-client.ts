@@ -14,6 +14,7 @@ async function post<T>(
     fallbackError: string,
 ): Promise<DeletionCallResult<T>> {
     try {
+        // eslint-disable-next-line no-restricted-syntax -- scope-free on purpose: the public, signed-out deletion pages act on an ACCOUNT (by emailed token), not a workspace, and have no workspace path for browserApiFetch to stamp.
         const response = await fetch('/api/account-deletion', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

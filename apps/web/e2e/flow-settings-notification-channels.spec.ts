@@ -1,6 +1,11 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import {
+    expectPluginNotBound,
+    expectProviderRejected,
+    type ChannelTestResult,
+} from './helpers/notification-channels';
 
 /**
  * Notification CHANNELS — settings CRUD + per-channel lifecycle + settings UI
@@ -34,8 +39,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *      (findByIdForUser) DIVERGENCE — a DISABLED channel disappears from the list
  *      yet is STILL a valid subscription target; disable→subscribe→re-enable.
  *   4. per-channel test-send provider-error matrix — telegram/discord/email all
- *      surface a TRUTHFUL, provider-specific failure in CI (no delivery plugin);
- *      foreign + deleted ids → 404.
+ *      surface a TRUTHFUL, provider-specific failure (fictitious targets, so the
+ *      bound plugins report the provider's rejection; `email` names no channel
+ *      plugin); foreign + deleted ids → 404.
  *   5. the PUBLIC provider delivery-event webhook (events/:pluginId) — reachable
  *      from an ANON context (no auth cookie), 202 { received, pluginId }, echoes
  *      the param, tolerant of repeats (throttle 600/60s).
@@ -69,10 +75,12 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *          in the DTO so it is immutable.
  *     DELETE /:id -> 204 (findOwnedOrThrow first; foreign/unknown → 404).
  *     POST   /:id/test -> 201 { status, error?, providerMessageId? } (DIRECT, not
- *        wrapped). CI enables NO channel-delivery plugin, so the truthful state is
- *        status:'failed' with a provider-specific error:
- *          telegram-channel → 'Failed to materialize plugin "telegram-channel"'
- *          email            → 'Notification channel plugin not found or disabled: email'
+ *        wrapped). The channel plugins are BOUND (the loader materializes them since
+ *        #2988) and the targets are fictitious, so the truthful state is
+ *        status:'failed', no providerMessageId, and a provider-specific error:
+ *          telegram-channel (malformed bot token) → 'Telegram sendMessage failed (404): Not Found'
+ *          discord-channel  (unknown webhook)     → 'Discord webhook failed (404): {…"Unknown Webhook"…}'
+ *          email            (not a channel plugin) → 'Notification channel plugin not found or disabled: email'
  *        foreign/unknown/deleted id → 404 "Channel not found".
  *     POST   events/:pluginId  @Public @Throttle(600/60s) -> 202
  *        { received:true, pluginId }. NO auth required; echoes the pluginId param.
@@ -97,8 +105,10 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *     for the UI-driven flow 6, and any channel it creates there is DELETED in a
  *     finally block so sibling UI specs see a clean settings page. Counts use
  *     toContain / not.toContain, never exact totals (shared in-memory DB).
- *   - No channel-delivery plugin is enabled in CI, so test-send is asserted as a
- *     truthful failure; a real 'delivered'/'queued' status is also tolerated.
+ *   - Every channel target is fictitious, so test-send is asserted as a truthful
+ *     failure with each provider's own reason; a 'delivered' status would be a
+ *     fabricated success. A well-formed target makes the plugin call the real
+ *     provider host, which needs outbound network from the API process.
  *   - next-dev LOCAL vs CI route divergence + hydration race: UI flow uses
  *     generous timeouts, retry-to-pass, and .or() branches.
  */
@@ -404,51 +414,49 @@ test.describe('Notification channels — settings CRUD + lifecycle + UI', () => 
         });
         const token = u.access_token;
 
-        // Three different providers, each with a DIFFERENT failure mode at send
-        // time because CI enables no channel-delivery plugin. We assert the
-        // truthful, provider-specific contract rather than pretending delivery.
+        // Three different providers, each with a DIFFERENT failure mode at send time.
+        // The targets are fictitious, so nothing can be delivered: the bound telegram and
+        // discord plugins call their provider and report its rejection, and `email` is not a
+        // channel plugin at all. We assert each truthful, provider-specific reason rather than
+        // pretending delivery.
         const cases: Array<{
             pluginId: string;
             name: string;
             targetConfig: Record<string, unknown>;
+            testSend: (r: ChannelTestResult) => void;
         }> = [
             {
                 pluginId: 'telegram-channel',
                 name: 'TG',
                 targetConfig: { botToken: 'x', chatId: '1' },
+                // A malformed bot token → Telegram answers 404 "Not Found".
+                testSend: (r) => expectProviderRejected(r, 'telegram-channel', 404),
             },
             {
                 pluginId: 'discord-channel',
                 name: 'DC',
                 targetConfig: { webhookUrl: 'https://discord.com/api/webhooks/1/a' },
+                // An unknown webhook id → Discord answers 404 (code 10015 "Unknown Webhook").
+                testSend: (r) => expectProviderRejected(r, 'discord-channel', 404),
             },
-            { pluginId: 'email', name: 'EM', targetConfig: { to: u.email } },
+            {
+                pluginId: 'email',
+                name: 'EM',
+                targetConfig: { to: u.email },
+                // No notification-channel plugin has the id `email`.
+                testSend: (r) => expectPluginNotBound(r, 'email'),
+            },
         ];
 
-        for (const c of cases) {
-            const ch = await createChannel(request, token, c);
+        for (const { testSend, ...data } of cases) {
+            const ch = await createChannel(request, token, data);
             const res = await request.post(`${API_BASE}/api/notification-channels/${ch.id}/test`, {
                 headers: authedHeaders(token),
                 timeout: TIMEOUT,
             });
             // The result is returned DIRECTLY (not wrapped). 201 created.
-            expect(res.status(), `test-send ${c.pluginId}`).toBe(201);
-            const body = await res.json();
-            expect(typeof body.status).toBe('string');
-            if (body.status === 'failed') {
-                // The error is provider-specific and mentions the pluginId or the
-                // "plugin not found / materialize / disabled" reason. Both probed
-                // wordings ('Failed to materialize plugin "telegram-channel"' and
-                // 'Notification channel plugin not found or disabled: email') are
-                // covered by this tolerant matcher.
-                expect(typeof body.error).toBe('string');
-                expect(body.error.toLowerCase(), `error for ${c.pluginId}: ${body.error}`).toMatch(
-                    /plugin|materialize|disabled|not found/,
-                );
-            } else {
-                // If some env DOES enable the channel plugin, a positive status is fine.
-                expect(['delivered', 'queued', 'sent', 'accepted']).toContain(body.status);
-            }
+            expect(res.status(), `test-send ${data.pluginId}`).toBe(201);
+            testSend(await res.json());
         }
 
         // A foreign/unknown channel id → scoped 404 (findOwnedOrThrow runs first).

@@ -26,6 +26,7 @@ import type { DiskProbeIo, DiskVolumeReading } from './core/telemetry-probe';
 import type { HealthProbeIo } from './core/health-probe';
 import type { WakeSender } from './core/link/modules/health';
 import type { NetworkInterfaceMap } from './core/network-identity';
+import { createNodeAtomicFileOps } from './core/node-atomic-file-ops';
 
 /**
  * Real IO adapters for the headless node.
@@ -375,6 +376,10 @@ export function restrictDirectoryToOwnerWindows(dirPath: string): Promise<void> 
  * logger so each retry is said, not silent.
  */
 export function createConfigFileSystem(bootProbes: BootProbeDeps = {}): ConfigFileSystem {
+	// The atomic-write primitives (2026-10-28: a kill mid-`writeFile` left a
+	// 0-byte config). `saveConfig` and every record beside the config replace
+	// their file through these instead of rewriting it in place.
+	const atomic = createNodeAtomicFileOps();
 	return {
 		readFile: async (filePath) => {
 			try {
@@ -412,7 +417,13 @@ export function createConfigFileSystem(bootProbes: BootProbeDeps = {}): ConfigFi
 			await fsp.rm(filePath, { force: true });
 		},
 		restrict: (filePath) => restrictFileToOwnerWindowsWithRetry(filePath, bootProbes),
-		dirname: (filePath) => path.dirname(filePath)
+		dirname: (filePath) => path.dirname(filePath),
+		writeExistingFile: atomic.writeExistingFile,
+		rename: atomic.rename,
+		link: atomic.link,
+		syncDirectory: atomic.syncDirectory,
+		readDirectory: atomic.readDirectory,
+		modifiedAtMs: atomic.modifiedAtMs
 	};
 }
 

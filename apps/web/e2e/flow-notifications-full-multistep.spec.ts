@@ -39,7 +39,9 @@
  *                          disabledAt:null, createdAt, updatedAt } }
  *     PATCH { disabled:true } → disabledAt stamped, DROPS from the active list;
  *            { disabled:false } → disabledAt:null, REAPPEARS
- *     POST :id/test → 201 { status, error? } (truthful; no provider → status:'failed', materialize error)
+ *     POST :id/test → 201 { status, error? } (truthful: the slack-channel plugin is bound and
+ *            refuses the default off-host webhook before any request → status:'failed' with its
+ *            validation error, no providerMessageId)
  *     validation → 400: missing name / non-object targetConfig / smuggled whitelisted field / pluginId>64
  *     foreign :id PATCH/DELETE/test → 404; malformed :id → 400; unknown-uuid → 404
  *   PREFERENCES:
@@ -63,6 +65,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 import { createTaskViaAPI, addTaskAssignee } from './helpers/agents-tasks';
+import { expectConfigRefused, SLACK_OFF_HOST_REFUSAL } from './helpers/notification-channels';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
@@ -534,10 +537,12 @@ test.describe('Notifications — channel enable/disable + test-send + validation
         expect((await listOn.json()).channels.map((c: Channel) => c.id)).toContain(channel.id);
     });
 
-    test('test-send returns a TRUTHFUL delivery result — no real provider is bound, so status is "failed" with a materialize error', async ({
+    test('test-send returns a TRUTHFUL delivery result — the bound slack plugin refuses the off-host webhook, so status is "failed" with its validation error and no provider message id', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
+        // createChannel's default target is `https://hooks.example/<stamp>`: stored verbatim
+        // at create, but not a Slack incoming-webhook URL.
         const channel = await createChannel(request, user.access_token, {
             name: `Test ${stamp()}`,
         });
@@ -545,17 +550,11 @@ test.describe('Notifications — channel enable/disable + test-send + validation
             headers: authedHeaders(user.access_token),
         });
         // POST with no @HttpCode → 201.
-        expect([200, 201]).toContain(res.status());
-        const result = await res.json();
-        // The result is the real delivery attempt, not a fabricated success.
-        expect(typeof result.status).toBe('string');
-        expect(result.status.length).toBeGreaterThan(0);
-        // In the keyless CI stack the slack-channel plugin can't be resolved,
-        // so the delivery fails truthfully with a plugin-availability error
-        // (message wording varies: "not found or disabled" / "materialize").
-        if (result.status === 'failed') {
-            expect(String(result.error)).toMatch(/materialize|not found|disabled|plugin/i);
-        }
+        expect(res.status()).toBe(201);
+        // The result is the real delivery attempt, not a fabricated success: the slack-channel
+        // plugin is bound and refuses a webhook URL outside hooks.slack.com before sending
+        // anything (its SSRF/host guard), so the send fails with the plugin's own reason.
+        expectConfigRefused(await res.json(), SLACK_OFF_HOST_REFUSAL);
     });
 
     test('CREATE validation → 400: missing name, non-object targetConfig, a smuggled whitelisted field, and an over-long pluginId', async ({

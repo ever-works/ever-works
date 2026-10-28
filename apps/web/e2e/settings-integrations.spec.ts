@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { expectNotDelivered } from './helpers/notification-channels';
 
 /**
  * Settings / Integrations — notification channels, the Work Agent
@@ -48,15 +49,17 @@ test.describe('Notification channels — API contract', () => {
         ).json();
         expect(list.channels.map((c: { id: string }) => c.id)).toContain(channel.id);
 
-        // Test send responds with a structured result (status may be "failed"
-        // locally when the channel plugin isn't enabled — pin the shape, not
-        // the outcome, so the assertion is environment-independent).
+        // Test send responds with a structured, truthful result. The webhook is
+        // fictitious, so it can never be delivered: whatever the provider (or the
+        // network) answers, the result is a failure with a reason and no provider
+        // message id. Not pinning the reason keeps this smoke network-independent;
+        // flow-settings-notification-channels.spec.ts pins Discord's own rejection.
         const tested = await request.post(
             `${API_BASE}/api/notification-channels/${channel.id}/test`,
             { headers },
         );
         expect([200, 201]).toContain(tested.status());
-        expect(typeof (await tested.json()).status).toBe('string');
+        expectNotDelivered(await tested.json(), 'discord-channel');
 
         const del = await request.delete(`${API_BASE}/api/notification-channels/${channel.id}`, {
             headers,
