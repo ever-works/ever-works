@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import { createHash } from 'crypto';
 import * as fs from 'fs/promises';
 import Handlebars from 'handlebars';
 import { Resend } from 'resend';
@@ -109,12 +108,13 @@ export class MailerService {
         options: { strict?: boolean; redactRecipient?: boolean } = {},
     ): Promise<void> {
         const provider = config.mail.provider();
-        // `redactRecipient` — flows whose logs must not carry the address in
-        // clear (self-serve account deletion) log a short SHA-256 handle of it.
+        // `redactRecipient` — flows whose logs must not carry the address at
+        // all (self-serve account deletion) log `[redacted]` instead. The
+        // caller keeps its own correlation handle if it needs one.
         const recipient = data.to
-            ? this.getDestination(data.to)
-                  .map((to) => (options.redactRecipient ? redactAddress(String(to)) : to))
-                  .join(', ')
+            ? options.redactRecipient
+                ? REDACTED_RECIPIENT
+                : this.getDestination(data.to).join(', ')
             : 'unknown';
 
         switch (provider) {
@@ -226,8 +226,5 @@ export class MailerService {
     }
 }
 
-/** `email#<first 12 hex of sha256(lower(address))>` — a log-safe handle for an address. */
-function redactAddress(address: string): string {
-    const digest = createHash('sha256').update(address.trim().toLowerCase(), 'utf8').digest('hex');
-    return `email#${digest.slice(0, 12)}`;
-}
+/** What the mail log shows instead of the address when the caller asks for `redactRecipient`. */
+const REDACTED_RECIPIENT = '[redacted]';

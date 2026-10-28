@@ -44,4 +44,4 @@ Carol is the only member of her workspace "Carol Studio".
   from one IP gave `202` then `429` (5 per minute per IP).
 - `/delete-account` and `/delete-account/confirm` send `Cache-Control: no-store` and `Referrer-Policy: no-referrer`,
   and include `<meta name="referrer" content="no-referrer">` and `noindex`. PostHog is not loaded on them. The API
-  log and the mail log show only `email#<sha256 prefix>`; the token appears nowhere in either log.
+  log shows the address only as a hash handle (`email#<sha256 prefix>`) and the mail log as `[redacted]`; the token appears nowhere in either log.

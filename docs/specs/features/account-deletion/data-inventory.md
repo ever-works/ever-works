@@ -77,4 +77,4 @@ UPDATE); 30-minute expiry (`ACCOUNT_DELETION_TOKEN_TTL_MINUTES`, 5..60); a new r
 deletion only (never a session); identical `202` for every address, lookup + send after the response; limits 5/min per
 IP and 3/hour per address (DB-counted, extras dropped silently); `Cache-Control: no-store`; `<meta name="referrer"
 content="no-referrer">` + `Referrer-Policy: no-referrer`; PostHog not started on `/delete-account*`; token and email
-never logged (mail log shows `email#<sha256 prefix>`).
+never logged (the mail log shows `to=[redacted]`; the deletion log a short hash handle `email#<sha256 prefix>`).
