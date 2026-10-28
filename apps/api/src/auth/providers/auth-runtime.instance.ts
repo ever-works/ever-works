@@ -7,6 +7,7 @@ import {
     getRequiredTermsDocuments,
 } from '../../terms/terms-acceptance.corpus';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { SqliteDialect, type SqliteDialectConfig } from 'kysely';
 import { DataSource } from 'typeorm';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { config, AuthProvider as RegistrationProvider } from '../../config/constants';
@@ -25,13 +26,63 @@ export {
 } from './bcrypt-cost';
 import { getBcryptCost } from './bcrypt-cost';
 
+/**
+ * What Better Auth gets as `database` on better-sqlite3: a Kysely dialect over
+ * TypeORM's own connection, with Better Auth's transactions turned off.
+ *
+ * TypeORM runs a better-sqlite3 DataSource on ONE connection, and it tracks
+ * that connection's transaction state (`isTransactionActive`,
+ * `transactionDepth`) on the one query runner every caller shares. Better
+ * Auth >= 1.7 wraps sign-up and other multi-write calls in a transaction
+ * whenever it is handed a raw better-sqlite3 handle, and issues its own
+ * `begin` / `commit` / `rollback` on that same connection, which TypeORM never
+ * sees. When a TypeORM transaction (the domain event relay's tick, any
+ * `save()`) starts while a sign-up's transaction is open:
+ *
+ *  1. TypeORM's `BEGIN TRANSACTION` fails ("cannot start a transaction within
+ *     a transaction");
+ *  2. TypeORM's error path then issues `ROLLBACK`, which ends the sign-up's
+ *     transaction, and leaves its own depth at -1;
+ *  3. the sign-up's commit finds no transaction and its rollback fails with
+ *     "cannot rollback - no transaction is active" (HTTP 500 on register);
+ *  4. every later TypeORM transaction in the process issues
+ *     `SAVEPOINT typeorm_-1` and fails with `near "-": syntax error`, and its
+ *     error-path `ROLLBACK` ends whichever sign-up is open at that moment.
+ *
+ * Better Auth 1.6 never opened a transaction here, so `transaction: false`
+ * restores exactly its behaviour: each Better Auth write is a single statement
+ * on the shared connection (inside a TypeORM transaction when one is open, like
+ * any other single statement on this driver), and Better Auth never issues
+ * `begin` / `commit` / `rollback`. The cost, the same as on 1.6: on SQLite a
+ * sign-up's user and credential-account inserts are not one atomic unit. The
+ * dialect reuses TypeORM's connection, never a second one, because an
+ * in-memory database exists only on the connection that created it. Postgres
+ * and MySQL keep native transactions: Better Auth takes its own pooled
+ * connection for each one, so TypeORM's state is never touched.
+ */
+function getSqliteDatabase(
+    connection: SqliteDialectConfig['database'],
+): BetterAuthOptions['database'] {
+    return {
+        dialect: new SqliteDialect({ database: connection }),
+        type: 'sqlite',
+        transaction: false,
+    };
+}
+
+/**
+ * The `database` option for Better Auth, taken from the initialized TypeORM
+ * driver so both share one database: the SQLite dialect above on
+ * better-sqlite3, the `pg` pool on Postgres, the `mysql2` pool on MySQL and
+ * MariaDB. Throws for any other driver, or one with no client yet.
+ */
 function getInitializedDatabaseClient(dataSource: DataSource): any {
     const driver = dataSource.driver as any;
 
     switch (dataSource.options.type) {
         case 'better-sqlite3':
             if (driver.databaseConnection) {
-                return driver.databaseConnection;
+                return getSqliteDatabase(driver.databaseConnection);
             }
             break;
         case 'postgres':
