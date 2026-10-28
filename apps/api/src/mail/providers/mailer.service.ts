@@ -103,9 +103,19 @@ export class MailerService {
      * if it sent. Without it the behaviour is unchanged for every existing
      * caller (an SMTP failure already throws; a Resend error is now logged).
      */
-    async sendMail(data: SendMailOptions, options: { strict?: boolean } = {}): Promise<void> {
+    async sendMail(
+        data: SendMailOptions,
+        options: { strict?: boolean; redactRecipient?: boolean } = {},
+    ): Promise<void> {
         const provider = config.mail.provider();
-        const recipient = data.to ? this.getDestination(data.to).join(', ') : 'unknown';
+        // `redactRecipient` — flows whose logs must not carry the address at
+        // all (self-serve account deletion) log `[redacted]` instead. The
+        // caller keeps its own correlation handle if it needs one.
+        const recipient = data.to
+            ? options.redactRecipient
+                ? REDACTED_RECIPIENT
+                : this.getDestination(data.to).join(', ')
+            : 'unknown';
 
         switch (provider) {
             case 'smtp':
@@ -119,7 +129,9 @@ export class MailerService {
                     this.logger.warn(
                         `Resend client not initialized (missing RESEND_APIKEY?), falling back to faker for to=${recipient}`,
                     );
-                    await this.fakerMailerService.sendMail(data);
+                    await this.fakerMailerService.sendMail(
+                        options.redactRecipient ? { ...data, to: recipient } : data,
+                    );
                     break;
                 }
 
@@ -160,7 +172,9 @@ export class MailerService {
 
             default:
                 this.logger.debug(`No mail provider configured, using faker for to=${recipient}`);
-                await this.fakerMailerService.sendMail(data);
+                await this.fakerMailerService.sendMail(
+                    options.redactRecipient ? { ...data, to: recipient } : data,
+                );
                 break;
         }
     }
@@ -211,3 +225,6 @@ export class MailerService {
         return '';
     }
 }
+
+/** What the mail log shows instead of the address when the caller asks for `redactRecipient`. */
+const REDACTED_RECIPIENT = '[redacted]';

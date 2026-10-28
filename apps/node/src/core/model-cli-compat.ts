@@ -145,6 +145,13 @@ export interface ModelCliCompatibility {
 	missingHardeningFlags: string[];
 	/** One line on why the answer is incomplete, or null. */
 	note: string | null;
+	/**
+	 * True when `--version` produced no version because the runner KILLED it
+	 * at its deadline (boot-probe retry) — a busy machine, not a binary that has no
+	 * version. Reported as `probe-timed-out` rather than `unknown`. Optional:
+	 * absent reads as false.
+	 */
+	versionTimedOut?: boolean;
 }
 
 /** File identity used as the cache key. */
@@ -292,11 +299,13 @@ export class ModelCliCompatibilityProbe {
 		executable: string
 	): Promise<{ result: ModelCliCompatibility; answered: boolean }> {
 		const command = this.commandFor(executable);
-		const versionOutput = await this.ask(command, ['--version']);
+		const versionAnswer = await this.ask(command, ['--version']);
+		const versionOutput = versionAnswer.text;
 		const version = versionOutput === null ? null : parseCliVersion(versionOutput);
-		const help = await this.ask(command, [...HELP_ARGS[provider]]);
+		const help = (await this.ask(command, [...HELP_ARGS[provider]])).text;
+		const judged = judgeModelCliHelp(provider, executable, version, help);
 		return {
-			result: judgeModelCliHelp(provider, executable, version, help),
+			result: versionAnswer.timedOut ? { ...judged, versionTimedOut: true } : judged,
 			// "Answered" = both invocations produced output. An UNRECOGNISED
 			// help text is still an answer — deterministic for that file — and
 			// re-asking every minute would learn nothing.
@@ -314,21 +323,24 @@ export class ModelCliCompatibilityProbe {
 			: executable;
 	}
 
-	/** stdout+stderr of one invocation, or null when it could not be run at all. */
-	private async ask(command: string, args: string[]): Promise<string | null> {
+	/**
+	 * stdout+stderr of one invocation (`text`), or null when it could not be
+	 * run at all; `timedOut` says the null came from the runner's deadline.
+	 */
+	private async ask(command: string, args: string[]): Promise<{ text: string | null; timedOut: boolean }> {
 		try {
 			const result = await this.options.runner.run(command, args);
 			// A run the runner had to KILL (its timeout) may have printed a
 			// banner or half a help page first. That is an INCOMPLETE answer:
 			// judged as one, it would be cached for as long as the file does not
 			// change, and the one-minute incomplete retry would never apply.
-			if (result.timedOut) return null;
+			if (result.timedOut) return { text: null, timedOut: true };
 			const text = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
 			// Help commands commonly exit non-zero on some CLIs; the TEXT is
 			// what is judged. A spawn failure with no output is "no answer".
-			return result.code === 0 || text.trim() ? text : null;
+			return { text: result.code === 0 || text.trim() ? text : null, timedOut: false };
 		} catch {
-			return null;
+			return { text: null, timedOut: false };
 		}
 	}
 }
@@ -397,14 +409,37 @@ export function isModelCliCompatible(compat: ModelCliCompatibility): boolean {
 }
 
 /**
- * The heartbeat's `cliVersions`: one `"<provider> <version>"` entry per
- * pinned binary, `"<provider> unknown"` when it did not answer `--version`.
- * Capped to the contract bounds so what the node shows is what Fleet stores.
+ * The `cliVersions` word for a CLI the node could not get an answer from
+ * because its probe TIMED OUT (boot-probe retry) — the `--version` of a pinned binary,
+ * or the startup PATH lookup itself. A busy machine, not a missing CLI and
+ * not a CLI without a version: a genuinely absent CLI is never listed, and
+ * one that answered without a version stays `unknown`.
  */
-export function describeCliVersions(results: readonly ModelCliCompatibility[]): string[] {
-	return results
-		.map((result) => `${result.provider} ${result.version ?? 'unknown'}`.slice(0, FLEET_MAX_CLI_VERSION_LENGTH))
-		.slice(0, FLEET_MAX_CLI_VERSIONS);
+export const CLI_VERSION_PROBE_TIMED_OUT = 'probe-timed-out';
+
+/**
+ * The heartbeat's `cliVersions`: one `"<provider> <version>"` entry per
+ * pinned binary, `"<provider> unknown"` when it did not answer `--version`,
+ * `"<provider> probe-timed-out"` when `--version` was killed at its deadline,
+ * and — after those — one `"<provider> probe-timed-out"` per provider whose
+ * startup PATH lookup timed out (`pathTimedOut`). Capped to the contract
+ * bounds so what the node shows is what Fleet stores.
+ */
+export function describeCliVersions(
+	results: readonly ModelCliCompatibility[],
+	pathTimedOut: readonly string[] = []
+): string[] {
+	const listed = new Set(results.map((result) => result.provider as string));
+	return [
+		...results.map((result) =>
+			`${result.provider} ${
+				result.version ?? (result.versionTimedOut ? CLI_VERSION_PROBE_TIMED_OUT : 'unknown')
+			}`.slice(0, FLEET_MAX_CLI_VERSION_LENGTH)
+		),
+		...pathTimedOut
+			.filter((provider) => typeof provider === 'string' && provider.length > 0 && !listed.has(provider))
+			.map((provider) => `${provider} ${CLI_VERSION_PROBE_TIMED_OUT}`.slice(0, FLEET_MAX_CLI_VERSION_LENGTH))
+	].slice(0, FLEET_MAX_CLI_VERSIONS);
 }
 
 /** The command name the legacy single `cliVersion` field has always used. */

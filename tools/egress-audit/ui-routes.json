@@ -198,6 +198,16 @@
 			"source": "router"
 		},
 		{
+			"path": "/:locale/delete-account",
+			"file": "apps/web/src/app/[locale]/(auth)/delete-account/page.tsx",
+			"source": "router"
+		},
+		{
+			"path": "/:locale/delete-account/confirm",
+			"file": "apps/web/src/app/[locale]/(auth)/delete-account/confirm/page.tsx",
+			"source": "router"
+		},
+		{
 			"path": "/:locale/email-address/verify/:token",
 			"file": "apps/web/src/app/[locale]/email-address/verify/[token]/page.tsx",
 			"source": "router"

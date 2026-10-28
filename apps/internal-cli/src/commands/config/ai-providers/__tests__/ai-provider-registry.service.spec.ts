@@ -71,6 +71,30 @@ describe('AiProviderRegistryService', () => {
             expect(service.getProvider('custom')?.models).toEqual([]);
         });
 
+        // The anthropic default used to be `claude-3-5-sonnet-latest`, which the
+        // Claude API retired on 2025-10-28, so `config` wrote a model every
+        // request then failed on. Active ids, from the vendor's docs on 2026-10-28:
+        // https://platform.claude.com/docs/en/about-claude/model-deprecations
+        it('anthropic defaults to an active Claude API model id that its own picker offers', () => {
+            const anthropic = service.getProvider('anthropic')!;
+            expect([
+                'claude-fable-5-1',
+                'claude-fable-5',
+                'claude-opus-5-5',
+                'claude-opus-5',
+                'claude-opus-4-8',
+                'claude-opus-4-7',
+                'claude-opus-4-6',
+                'claude-opus-4-5-20251101',
+                'claude-sonnet-5-5',
+                'claude-sonnet-5',
+                'claude-sonnet-4-6',
+                'claude-haiku-5-5',
+                'claude-haiku-4-5-20251001',
+            ]).toContain(anthropic.defaults.model);
+            expect(anthropic.models).toContain(anthropic.defaults.model);
+        });
+
         it('every non-custom provider has at least one model in its catalog', () => {
             for (const p of service.getAllProviders()) {
                 if (p.name === 'custom') continue;

@@ -127,6 +127,11 @@
                     "requestNewLink": "Send a new link",
                     "missingToken": "This magic link is missing a token. Request a new one to continue."
                 }
+            },
+            "accountDeleted": "Your account was deleted. We sent a confirmation to your email address.",
+            "deleteAccount": {
+                "text": "Want to delete your account?",
+                "link": "Request a deletion link"
             }
         },
         "forgotPassword": {
@@ -314,6 +319,92 @@
                 "retry": "Try again"
             },
             "pendingExpired": "That took too long. Start again."
+        },
+        "deleteAccount": {
+            "request": {
+                "title": "Delete your account",
+                "subtitle": "We will email you a link to confirm. Nothing is deleted until you open it and confirm.",
+                "whatHappensTitle": "How it works",
+                "whatHappens": [
+                    "Enter the email address of your account.",
+                    "Open the link we send you. It works once and expires in 30 minutes.",
+                    "Review what will be deleted, then confirm."
+                ],
+                "form": {
+                    "email": {
+                        "label": "Email address",
+                        "placeholder": "you@example.com"
+                    },
+                    "submit": "Email me a deletion link",
+                    "submitting": "Sending..."
+                },
+                "signedInHint": "Signed in? You can also delete your account from Settings → Danger Zone.",
+                "backToLogin": "Back to sign in",
+                "successTitle": "Check your inbox",
+                "successSubtitle": "Follow the link in the email to finish.",
+                "successMessage": "If an account exists for {email}, we sent it a link to delete the account.",
+                "successExpiry": "The link works once and expires in 30 minutes. Asking again replaces the previous link.",
+                "checkSpam": "Nothing arrived? Check your spam folder, or ask again in a few minutes.",
+                "errors": {
+                    "invalidEmail": "Enter a valid email address.",
+                    "tooManyRequests": "Too many requests. Please wait a minute and try again.",
+                    "failed": "We could not send the request. Please try again."
+                }
+            },
+            "confirm": {
+                "title": "Delete your account",
+                "subtitle": "Account {email}. Review what will be deleted, then confirm.",
+                "loading": "Checking your link...",
+                "invalidTitle": "This link can no longer be used",
+                "invalidSubtitle": "Deletion links work once and expire after 30 minutes.",
+                "requestNewLink": "Request a new link",
+                "deletedTitle": "Your account was deleted",
+                "deletedSubtitle": "Thank you for using Ever Works.",
+                "deletedMessage": "Your account and its personal data were deleted, and every session was signed out. We sent a confirmation to your email address.",
+                "deletedKept": "We keep only what we must: invoices with our payment provider and a record of this deletion that holds no name or email address in clear text.",
+                "goodbyeLink": "Create a new account",
+                "expiresAt": "This link expires at {time}.",
+                "typeToConfirm": "Type {word} to confirm",
+                "confirmButton": "Permanently delete my account",
+                "deleting": "Deleting...",
+                "keepAccount": "Keep my account",
+                "errors": {
+                    "missingToken": "This link is incomplete. Open the link from the email again, or request a new one.",
+                    "linkInvalid": "This link is invalid or has expired. Request a new one.",
+                    "tooManyRequests": "Too many attempts. Please wait a minute and try again.",
+                    "billingCancelFailed": "We could not cancel your subscription with the payment provider, so nothing was deleted. Please try again in a few minutes.",
+                    "failed": "The account could not be deleted. Please try again, or contact support."
+                }
+            },
+            "summary": {
+                "deletedTitle": "Permanently deleted",
+                "profile": "Your account, profile, sign-in methods and settings",
+                "works": "{count, plural, =0 {No Works} one {# Work and everything in it} other {# Works and everything in them}}",
+                "apiKeys": "{count, plural, =0 {No API keys} one {# API key} other {# API keys}}, and every session (you are signed out everywhere)",
+                "subscription": "Your subscription is canceled — no further charges",
+                "files": "Files you uploaded, notifications, preferences and activity history",
+                "workspaceTitle": "{name} — you are {role}",
+                "roles": {
+                    "OWNER": "the owner",
+                    "ADMIN": "an admin",
+                    "MEMBER": "a member"
+                },
+                "organizations": "Organizations: {names}",
+                "outcome": {
+                    "workspaceDeleted": "You are its only member: the workspace, its organizations and all their content are deleted.",
+                    "workspaceTransferred": "{count, plural, one {# other person works here} other {# other people work here}}. The workspace and its content stay; {newOwner} becomes its owner. Only your own account and personal data are deleted.",
+                    "accountRemoved": "You leave this workspace. What you created there stays with it, handed to its owner; your membership and personal data are deleted."
+                },
+                "soleOwnerWarning": "You are the only owner. Ownership — and control of billing and members — passes to {newOwner}. If you would rather pick someone else, do that first.",
+                "worksKept": "{count, plural, one {# Work you created stays} other {# Works you created stay}} with a workspace that is not deleted.",
+                "keptTitle": "Kept",
+                "kept": {
+                    "invoices": "Invoices and payment records, held by our payment provider as the law requires",
+                    "audit": "A record of this deletion: a one-way hash of your email address, the date and counts — no name, no address",
+                    "backups": "Encrypted backups, until they roll over",
+                    "repositories": "Git repositories in your own GitHub account — they are yours, on GitHub"
+                }
+            }
         }
     },
     "onboarding": {
@@ -9245,10 +9336,10 @@
                 "remaining": "Remaining",
                 "noBudget": "No monthly budget is set for this Work.",
                 "alert": {
-                    "none": "Within budget",
                     "75": "75% of the budget used",
                     "90": "90% of the budget used",
                     "100": "Budget reached",
+                    "none": "Within budget",
                     "overage": "Over budget (overage is allowed)"
                 }
             },
@@ -11585,13 +11676,17 @@
                 "confirmPlaceholder": "Enter your email",
                 "confirmButton": "Yes, Delete My Account",
                 "deleting": "Deleting...",
-                "cancel": "Cancel"
+                "cancel": "Cancel",
+                "emailLinkHint": "Prefer to confirm by email, or locked out?",
+                "emailLinkAction": "Get a deletion link by email"
             },
             "messages": {
                 "confirmEmail": "Please enter your email correctly to confirm",
                 "deleteSuccess": "Account deleted successfully",
                 "deleteFailed": "Failed to delete account",
-                "unexpectedError": "An unexpected error occurred"
+                "unexpectedError": "An unexpected error occurred",
+                "previewFailed": "Could not load what will be deleted. You can still delete the account.",
+                "billingCancelFailed": "We could not cancel your subscription with the payment provider, so nothing was deleted. Please try again in a few minutes."
             }
         },
         "aiChat": {
@@ -12888,7 +12983,8 @@
             "usage": "Usage & Credits",
             "resendVerification": "Resend Verification Email",
             "help": "Help",
-            "schedules": "Schedules"
+            "schedules": "Schedules",
+            "deleteAccount": "Delete your account"
         }
     },
     "api": {

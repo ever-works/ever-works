@@ -16,6 +16,14 @@ import type {
 } from '@ever-works/plugin';
 
 /**
+ * The model every tier defaults to. `onLoad` and `getDefaultModelId()` read it
+ * too, so the three cannot drift apart. xAI's models page
+ * (https://docs.x.ai/developers/models, checked 2026-10-28) recommends Grok 4.7
+ * for general use and no longer lists `grok-2-latest`, the old default.
+ */
+const DEFAULT_MODEL = 'grok-4.7';
+
+/**
  * Grok (xAI) AI provider plugin
  *
  * Provides AI capabilities through xAI's Grok models via their OpenAI-compatible API.
@@ -45,7 +53,7 @@ export class GrokPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Default Model',
 				description: 'Used for all AI tasks unless a tier-specific model is set',
-				default: 'grok-2-latest',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -53,7 +61,7 @@ export class GrokPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Simple Tasks Model',
 				description: 'Handles tags, short descriptions, and quick classifications',
-				default: 'grok-2-latest',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -61,7 +69,7 @@ export class GrokPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Standard Tasks Model',
 				description: 'Handles listings, summaries, and content reformatting',
-				default: 'grok-2-latest',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -69,7 +77,7 @@ export class GrokPlugin extends BaseAiProvider {
 				type: 'string',
 				title: 'Complex Tasks Model',
 				description: 'Handles full page generation and multi-step analysis',
-				default: 'grok-2-latest',
+				default: DEFAULT_MODEL,
 				'x-widget': 'model-select',
 				'x-scope': 'global'
 			},
@@ -104,7 +112,7 @@ export class GrokPlugin extends BaseAiProvider {
 		await super.onLoad(context);
 		this.aiOps = new AiOperations({
 			apiKey: '',
-			model: 'grok-2-latest',
+			model: DEFAULT_MODEL,
 			baseURL: 'https://api.x.ai/v1',
 			temperature: 0.7,
 			maxTokens: 4096,
@@ -156,7 +164,7 @@ export class GrokPlugin extends BaseAiProvider {
 	}
 
 	protected getDefaultModelId(): string {
-		return 'grok-2-latest';
+		return DEFAULT_MODEL;
 	}
 
 	async healthCheck(): Promise<PluginHealthCheck> {

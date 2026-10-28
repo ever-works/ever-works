@@ -124,6 +124,29 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
     return response;
 }
 
+/**
+ * Self-serve account deletion pages (`/delete-account`, `/delete-account/confirm`).
+ * Never cached anywhere, and they send no `Referer` (the page metadata also
+ * sets `<meta name="referrer" content="no-referrer">`). The confirm page's
+ * token travels in the URL fragment, which never reaches this function.
+ */
+/** The path without a leading `/org/<slug>` workspace prefix. */
+function withoutWorkspacePrefix(pathname: string): string {
+    return pathname.replace(/^\/org\/[^/]+(?=\/|$)/, '') || '/';
+}
+
+function isAccountDeletionPage(pathname: string): boolean {
+    // Also under a workspace prefix (`/org/<slug>/delete-account/...`).
+    const path = withoutWorkspacePrefix(pathname);
+    return path === ROUTES.DELETE_ACCOUNT || path.startsWith(`${ROUTES.DELETE_ACCOUNT}/`);
+}
+
+function applyAccountDeletionHeaders(response: NextResponse): NextResponse {
+    response.headers.set('Cache-Control', 'no-store');
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    return response;
+}
+
 function isPublicRoute(pathname: string): boolean {
     return PUBLIC_ROUTES.some((route) => {
         const matcher = match(route);
@@ -275,7 +298,8 @@ export default async function proxy(req: NextRequest) {
 
     // 3) Public routes need no auth check.
     if (isPublicRoute(pathname)) {
-        return applySecurityHeaders(intlResponse);
+        const response = applySecurityHeaders(intlResponse);
+        return isAccountDeletionPage(pathname) ? applyAccountDeletionHeaders(response) : response;
     }
 
     // 4) Static assets and API routes pass through. `isStaticAssetPath`
@@ -299,8 +323,14 @@ export default async function proxy(req: NextRequest) {
     // session cookie.
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated || auth.isExpired) {
-        const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
-        const response = NextResponse.redirect(loginUrl);
+        // A signed-out visit to a workspace-prefixed deletion page goes to the
+        // same, public, unprefixed page — not to /login. A redirect whose
+        // Location has no fragment keeps the visitor's fragment, so a deletion
+        // token in it would otherwise land on /login, where analytics run.
+        const target = isAccountDeletionPage(pathname)
+            ? new URL(withoutWorkspacePrefix(pathname), req.url)
+            : new URL(ROUTES.AUTH_LOGIN, req.url);
+        const response = NextResponse.redirect(target);
 
         if (req.cookies.has(AUTH_COOKIE_NAME)) {
             response.cookies.delete(AUTH_COOKIE_NAME);
@@ -309,7 +339,12 @@ export default async function proxy(req: NextRequest) {
         return applySecurityHeaders(response);
     }
 
-    return applySecurityHeaders(intlResponse);
+    // A signed-in visitor can reach the deletion pages under a workspace
+    // prefix (`/org/<slug>/delete-account/...`), which is not a public route;
+    // the auth gate above stays, and the response still gets no-store /
+    // no-referrer.
+    const response = applySecurityHeaders(intlResponse);
+    return isAccountDeletionPage(pathname) ? applyAccountDeletionHeaders(response) : response;
 }
 
 export const config = {

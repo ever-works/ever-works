@@ -146,6 +146,28 @@ describe('MailerService', () => {
             );
         });
 
+        it('logs [redacted] instead of the address when the caller asks for it', async () => {
+            const service = buildService();
+
+            await service.sendMail(
+                { to: 'private@test.example', subject: 'Account deletion' },
+                { redactRecipient: true },
+            );
+
+            // The message still goes to the real address…
+            expect(smtp.sendMail).toHaveBeenCalledWith(
+                expect.objectContaining({ to: 'private@test.example' }),
+            );
+            // …but no log line carries it.
+            expect(logSpy).toHaveBeenCalledWith(
+                'Sending email via SMTP to=[redacted] subject="Account deletion"',
+            );
+            expect(logSpy).toHaveBeenCalledWith('Email sent via SMTP to=[redacted]');
+            for (const call of logSpy.mock.calls) {
+                expect(String(call[0])).not.toContain('private@test.example');
+            }
+        });
+
         it('renders to=unknown when "to" is omitted', async () => {
             const service = buildService();
 

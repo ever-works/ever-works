@@ -127,10 +127,10 @@ Use Anthropic Claude models for content generation.
 | Setting        | Type   | Default                         | Description                          |
 | -------------- | ------ | ------------------------------- | ------------------------------------ |
 | `apiKey`       | string | —                               | Anthropic API key (required, secret) |
-| `defaultModel` | string | `claude-sonnet-4-5-20250514`    | Default model                        |
+| `defaultModel` | string | `claude-opus-5-5`               | Default model                        |
 | `simpleModel`  | string | `claude-haiku-4-5-20251001`     | Simple tasks model                   |
 | `mediumModel`  | string | `claude-sonnet-4-5-20250929`    | Standard tasks model                 |
-| `complexModel` | string | `claude-sonnet-4-5-20250514`    | Complex tasks model                  |
+| `complexModel` | string | `claude-opus-5-5`               | Complex tasks model                  |
 | `temperature`  | number | `0.7`                           | Response variability                 |
 | `maxTokens`    | number | `4096`                          | Max response length                  |
 | `baseUrl`      | string | `https://api.anthropic.com/v1/` | API endpoint                         |
@@ -193,10 +193,10 @@ Use xAI's Grok models through the OpenAI-compatible xAI API — 131,072-token co
 | Setting        | Type   | Default               | Description                                                             |
 | -------------- | ------ | --------------------- | ----------------------------------------------------------------------- |
 | `apiKey`       | string | —                     | xAI API key (required, secret, user-scoped; env fallback `XAI_API_KEY`) |
-| `defaultModel` | string | `grok-2-latest`       | Default model for all AI tasks (required)                               |
-| `simpleModel`  | string | `grok-2-latest`       | Tags, short descriptions, quick classifications                         |
-| `mediumModel`  | string | `grok-2-latest`       | Listings, summaries, content reformatting                               |
-| `complexModel` | string | `grok-2-latest`       | Full page generation and multi-step analysis                            |
+| `defaultModel` | string | `grok-4.7`            | Default model for all AI tasks (required)                               |
+| `simpleModel`  | string | `grok-4.7`            | Tags, short descriptions, quick classifications                         |
+| `mediumModel`  | string | `grok-4.7`            | Listings, summaries, content reformatting                               |
+| `complexModel` | string | `grok-4.7`            | Full page generation and multi-step analysis                            |
 | `baseUrl`      | string | `https://api.x.ai/v1` | API endpoint (advanced, hidden by default)                              |
 | `temperature`  | number | `0.7`                 | Response variability (0–2, hidden)                                      |
 | `maxTokens`    | number | `4096`                | Max response length (hidden)                                            |

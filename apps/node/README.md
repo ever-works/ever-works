@@ -270,6 +270,19 @@ A node advertises `claude-code` and/or `codex` when it resolved the executable a
    falling back to PATH — a run must never succeed on a binary the operator did not choose.
 2. Otherwise the first `claude` / `codex` on PATH (on Windows, the `.cmd` / `.exe` form).
 
+**A busy machine is not a missing CLI.** The PATH lookup is retried while it times out (4
+attempts, deadlines 5 / 10 / 20 / 30 s, pauses 1 / 2 / 4 s, at most 72 s, both CLIs at once). A
+lookup that times out on every attempt is logged as `claude-code: probe timed out: …`, never as
+`not found on PATH`, and the heartbeat lists it as `claude-code probe-timed-out` in `cliVersions`
+(a CLI that is genuinely absent is not listed). The CLI is not advertised by that process; restart
+the node once the machine is less busy. The same rule covers a pinned binary whose `--version` is
+killed at its deadline (`probe-timed-out` rather than `unknown`).
+
+The worker-safety marker's owner-only ACL (`icacls`) gets the same treatment: retried while it
+times out (deadlines 10 / 20 / 30 / 40 s, pauses 1 / 2 / 4 s, at most 107 s) before the worker
+quarantines. An `icacls` that **answers** with a failure still quarantines at once, exactly as
+before. A quarantine caused by timeouts says `probe timed out` in the reason Fleet shows.
+
 A `model-cli` job is only offered to nodes advertising the CLI it needs. On such a job the node:
 
 - provisions the Task worktree (bare cache + `git worktree`, per-Task binding, root-confined);

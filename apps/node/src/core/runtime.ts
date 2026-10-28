@@ -249,7 +249,11 @@ export function buildSelfDescriptionTelemetry(
 		modelIdentity: cacheProbe(() => detectModelIdentity(io.runner, io.environment.modelCli ?? {}))
 	};
 	if (cliCompat) {
-		telemetry.cliVersions = async () => describeCliVersions(await cliCompat.probeAll(pinned()));
+		// Boot-probe retry: a CLI whose startup PATH lookup timed out is listed as
+		// `<provider> probe-timed-out`, so Fleet tells a busy machine from
+		// one without the CLI (which is not listed at all).
+		telemetry.cliVersions = async () =>
+			describeCliVersions(await cliCompat.probeAll(pinned()), io.environment.modelCliTimedOut ?? []);
 	}
 	if (io.diskProbe) {
 		const probe = io.diskProbe;
