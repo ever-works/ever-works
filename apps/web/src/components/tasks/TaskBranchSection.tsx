@@ -22,6 +22,7 @@ import {
     updateTaskAction,
 } from '@/app/actions/tasks';
 import { activeGuardRefusal } from './task-guard-refusal';
+import { safePrUrl } from './TaskPrPill';
 
 /**
  * Wave 2 M7 — Task detail "Branch" cockpit.
@@ -94,6 +95,10 @@ function BranchPanel({ task }: { task: Task }) {
     const tone = (task.branchState && STATE_TONES[task.branchState]) || FALLBACK_TONE;
     const conflictPaths = task.conflictPaths ?? [];
     const guardRefusal = activeGuardRefusal(task);
+    // C-12: `prUrl` (and each linked entry's) is written from agent / provider data, so
+    // it is validated before it becomes a link — plain `https:`, no credentials — the
+    // way the board pill and the diff sheet already do. Anything else renders as text.
+    const prHref = safePrUrl(task.prUrl);
 
     const handleCopy = async () => {
         try {
@@ -267,16 +272,25 @@ function BranchPanel({ task }: { task: Task }) {
                     <div className="grid grid-cols-[5.5rem_1fr] items-start gap-3">
                         <dt className="text-xs text-text-muted pt-0.5">{t('pullRequest')}</dt>
                         <dd className="min-w-0">
-                            <a
-                                href={task.prUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                data-testid="task-branch-pr-link"
-                            >
-                                {task.prNumber != null ? `#${task.prNumber}` : t('openPr')}
-                                <ExternalLink className="w-3 h-3" />
-                            </a>
+                            {prHref ? (
+                                <a
+                                    href={prHref}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                    data-testid="task-branch-pr-link"
+                                >
+                                    {task.prNumber != null ? `#${task.prNumber}` : t('openPr')}
+                                    <ExternalLink className="w-3 h-3" />
+                                </a>
+                            ) : (
+                                <span
+                                    className="text-xs text-text dark:text-text-dark"
+                                    data-testid="task-branch-pr-text"
+                                >
+                                    {task.prNumber != null ? `#${task.prNumber}` : t('openPr')}
+                                </span>
+                            )}
                         </dd>
                     </div>
                 )}
@@ -301,6 +315,9 @@ function BranchPanel({ task }: { task: Task }) {
                                       ? t('linkedPrNeedsAttention')
                                       : null;
                                 const reason = alert && linked.error ? linked.error : null;
+                                const linkedHref = safePrUrl(linked.prUrl);
+                                const linkedLabel =
+                                    linked.prNumber != null ? `#${linked.prNumber}` : t('openPr');
                                 return (
                                     <div
                                         key={linked.repositoryId}
@@ -311,18 +328,23 @@ function BranchPanel({ task }: { task: Task }) {
                                             <span className="font-mono truncate text-text dark:text-text-dark">
                                                 {linked.repositoryId}
                                             </span>
-                                            {linked.prUrl ? (
+                                            {linkedHref ? (
                                                 <a
-                                                    href={linked.prUrl}
+                                                    href={linkedHref}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center gap-1 text-primary hover:underline shrink-0"
                                                 >
-                                                    {linked.prNumber != null
-                                                        ? `#${linked.prNumber}`
-                                                        : t('openPr')}
+                                                    {linkedLabel}
                                                     <ExternalLink className="w-3 h-3" />
                                                 </a>
+                                            ) : linked.prUrl ? (
+                                                <span
+                                                    className="shrink-0 text-text dark:text-text-dark"
+                                                    data-testid="task-linked-pr-text"
+                                                >
+                                                    {linkedLabel}
+                                                </span>
                                             ) : refused ? null : (
                                                 <span
                                                     className={`shrink-0 ${linked.state === 'failed' ? 'text-danger' : 'text-text-muted'}`}

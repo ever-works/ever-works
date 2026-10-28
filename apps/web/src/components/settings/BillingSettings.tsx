@@ -74,6 +74,7 @@ import {
     type SeatsState,
     type SubscriptionState,
 } from '@/lib/api/billing.shared';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 interface BillingSettingsProps {
     paymentsEnabled: boolean;
@@ -1365,9 +1366,11 @@ export function BillingSettings({
                                             )}
                                         </td>
                                         <td className="py-2 text-right">
-                                            {invoice.hostedUrl ? (
+                                            {safeHttpsUrl(invoice.hostedUrl) ? (
                                                 <a
-                                                    href={invoice.hostedUrl}
+                                                    href={
+                                                        safeHttpsUrl(invoice.hostedUrl) ?? undefined
+                                                    }
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-xs text-primary hover:underline"

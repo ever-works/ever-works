@@ -6,6 +6,7 @@ import { AlertTriangle, ExternalLink } from 'lucide-react';
 import type { FleetActionsJobView } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { formatWaited, jobDiagnosisLine } from './runners.shared';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 const LINK = 'inline-flex items-center gap-1 text-xs text-primary hover:underline';
 
@@ -121,9 +122,9 @@ export function ActionsJobRow({
                 </p>
             ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                {job.url ? (
+                {safeHttpsUrl(job.url) ? (
                     <a
-                        href={job.url}
+                        href={safeHttpsUrl(job.url) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={LINK}

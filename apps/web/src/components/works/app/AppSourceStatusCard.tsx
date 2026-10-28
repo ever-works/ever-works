@@ -10,6 +10,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 /** Poll every 5 s while the repository is being prepared … (APW-01 T24) */
 export const APP_SOURCE_PREPARING_POLL_MS = 5_000;
@@ -232,9 +233,10 @@ export function AppSourceStatusCard({
         }
     } else if (readinessState === 'waiting_for_setup_pr') {
         title = t('waitingForSetupPr');
-        actions = state.readiness.setupPullRequestUrl ? (
+        const setupPullRequestHref = safeHttpsUrl(state.readiness.setupPullRequestUrl);
+        actions = setupPullRequestHref ? (
             <a
-                href={state.readiness.setupPullRequestUrl}
+                href={setupPullRequestHref}
                 target="_blank"
                 rel="noreferrer noopener"
                 className="text-sm font-medium underline"

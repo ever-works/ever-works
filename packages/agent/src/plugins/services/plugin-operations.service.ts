@@ -1540,12 +1540,12 @@ export class PluginOperationsService {
      * accepted and never honoured, and `findActiveByCapability` could answer
      * it ahead of the real provider.
      *
-     * This guards those two paths only. Account import
-     * (account-import.service.ts) upserts an export's `activeCapabilities`
-     * straight into the repository, so it can still store such a binding, as
-     * can any row saved before this guard. Only `findActiveByCapability` (or
-     * the facade reading it) skipping supplementary rows would cover every
-     * write path.
+     * This guards those two paths only. Account import applies the same rule
+     * on its own (`AccountImportService.importableActiveCapabilities`, C-1):
+     * it drops such a binding with a warning instead of refusing the import.
+     * A row saved before these guards can still hold one; only
+     * `findActiveByCapability` (or the facade reading it) skipping
+     * supplementary rows would cover every row.
      *
      * The caller loads the plugin first: `supplementary` may be declared in
      * getManifest() only.

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils/cn';
 import { ExternalLink, Loader2 } from 'lucide-react';
 import { listWorkIngestedEventsAction } from '@/app/actions/works/pull-requests';
 import type { IngestedEventView } from '@/lib/api/ingested-events';
+import { safeWebUrl } from '@/lib/utils/safe-link';
 
 /**
  * Wave 8 feature j — per-Work **external activity**: the commits, PRs,
@@ -199,11 +200,12 @@ export function IngestedEventsPanel({
                             {/*
                              * `sourceUrl` is external content the connector
                              * copied from the source system — always
-                             * noopener/noreferrer, never rendered as HTML.
+                             * noopener/noreferrer, never rendered as HTML, and
+                             * linked only when it is an http(s) URL (C-12).
                              */}
-                            {event.sourceUrl ? (
+                            {safeWebUrl(event.sourceUrl) ? (
                                 <a
-                                    href={event.sourceUrl}
+                                    href={safeWebUrl(event.sourceUrl) ?? undefined}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-text-muted hover:text-text dark:text-text-muted-dark/70 dark:hover:text-text-dark"
