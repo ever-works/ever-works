@@ -12,6 +12,8 @@ import {
 	type FleetHelperPolicyRecord,
 	type FleetHelperTrust
 } from '@ever-works/contracts';
+import { replaceFileAtomically } from '../../atomic-state-file';
+import { createNodeAtomicFileOps } from '../../node-atomic-file-ops';
 import type { HelperSignatureCheck } from './helper-signature';
 
 /**
@@ -86,6 +88,12 @@ export function createHelperFs(options: {
 	restrict?: (path: string) => Promise<void> | void;
 }): HelperFs {
 	const paths = options.platform === 'win32' ? win32 : posix;
+	const atomic = createNodeAtomicFileOps(options.platform);
+	/** The final mode on POSIX; the owner-only ACL on Windows, when the host supplies one. */
+	const tightenTemp = async (temporary: string, mode: number): Promise<void> => {
+		if (options.platform !== 'win32') await fsp.chmod(temporary, mode);
+		else if (options.restrict) await options.restrict(temporary);
+	};
 	return {
 		async readText(path) {
 			try {
@@ -95,31 +103,22 @@ export function createHelperFs(options: {
 				throw error;
 			}
 		},
+		// Atomic and owner-only before any content lands (2026-10-28): the
+		// shared writer stages a same-directory temp, tightens it while it is
+		// still empty, fills and flushes it, then renames it over the target.
 		async writePrivate(path, content) {
 			await fsp.mkdir(paths.dirname(path), { recursive: true });
-			const temporary = `${path}.${randomUUID()}.tmp`;
-			await fsp.writeFile(temporary, content, { mode: HELPER_POLICY_FILE_MODE, flag: 'wx' });
-			try {
-				if (options.platform !== 'win32') await fsp.chmod(temporary, HELPER_POLICY_FILE_MODE);
-				else if (options.restrict) await options.restrict(temporary);
-				await fsp.rename(temporary, path);
-			} catch (error) {
-				await fsp.rm(temporary, { force: true }).catch(() => undefined);
-				throw error;
-			}
+			await replaceFileAtomically(atomic, path, content, {
+				platform: options.platform,
+				tighten: (temporary) => tightenTemp(temporary, HELPER_POLICY_FILE_MODE)
+			});
 		},
 		async writeExecutable(path, bytes) {
 			await fsp.mkdir(paths.dirname(path), { recursive: true });
-			const temporary = `${path}.${randomUUID()}.tmp`;
-			await fsp.writeFile(temporary, bytes, { mode: 0o700, flag: 'wx' });
-			try {
-				if (options.platform !== 'win32') await fsp.chmod(temporary, 0o755);
-				else if (options.restrict) await options.restrict(temporary);
-				await fsp.rename(temporary, path);
-			} catch (error) {
-				await fsp.rm(temporary, { force: true }).catch(() => undefined);
-				throw error;
-			}
+			await replaceFileAtomically(atomic, path, bytes, {
+				platform: options.platform,
+				tighten: (temporary) => tightenTemp(temporary, 0o755)
+			});
 		},
 		async remove(path) {
 			await fsp.rm(path, { force: true });

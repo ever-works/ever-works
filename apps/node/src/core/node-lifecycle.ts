@@ -1,5 +1,5 @@
 import { normalizeFleetNodeVersionFloor } from '@ever-works/contracts';
-import type { ConfigFileSystem } from './config-store';
+import { writeStateFile, type ConfigFileSystem, type StateFileSystem } from './config-store';
 import { readLimitCeiling } from './fleet-client';
 import type { Logger } from './logger';
 import type { NodeLimitCeiling } from './types';
@@ -90,15 +90,19 @@ export function parseNodeLifecycleRecord(raw: string | null): NodeLifecycleRecor
 	};
 }
 
-/** Write the record. Best-effort by contract: the caller logs a failure and carries on. */
+/**
+ * Write the record — atomically (2026-10-28), so a kill mid-write leaves the
+ * previous record rather than a torn one. Best-effort by contract: the
+ * caller logs a failure and carries on.
+ */
 export async function writeNodeLifecycleRecord(
-	fs: Pick<ConfigFileSystem, 'writeFile' | 'mkdir' | 'dirname'>,
+	fs: StateFileSystem & Pick<ConfigFileSystem, 'mkdir' | 'dirname'>,
 	configPath: string,
 	record: NodeLifecycleRecord
 ): Promise<void> {
 	const path = nodeLifecycleRecordPath(configPath);
 	await fs.mkdir(fs.dirname(path));
-	await fs.writeFile(path, `${JSON.stringify(record, null, 2)}\n`);
+	await writeStateFile(fs, path, `${JSON.stringify(record, null, 2)}\n`);
 }
 
 /** Anything that can be held: the work lane and the attended lane alike. */
@@ -247,11 +251,15 @@ export class NodeLifecycleTracker {
 				// unless a newer verdict is already queued behind this one,
 				// which will overwrite the file anyway.
 				if (this.lastPersisted === fingerprint) this.lastPersisted = null;
-				this.options.logger.warn(
-					`Could not record the platform's lifecycle verdict for \`status\` / \`doctor\`: ${
-						error instanceof Error ? error.message : String(error)
-					}`
-				);
+				try {
+					this.options.logger.warn(
+						`Could not record the platform's lifecycle verdict for \`status\` / \`doctor\`: ${
+							error instanceof Error ? error.message : String(error)
+						}`
+					);
+				} catch {
+					// A failing log sink must not wedge the queue: later writes still run.
+				}
 			});
 	}
 }

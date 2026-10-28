@@ -13,6 +13,7 @@ export * from './api-base';
 export * from './browser-probe';
 export * from './auth-client';
 export * from './capabilities';
+export * from './atomic-state-file';
 export * from './config-store';
 export * from './resource-limits';
 export * from './fleet-client';

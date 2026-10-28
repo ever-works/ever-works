@@ -6,7 +6,7 @@ import {
 	type FleetNodeSelfUpdateReport
 } from '@ever-works/contracts';
 import type { CommandRunner } from '../capabilities';
-import type { ConfigFileSystem } from '../config-store';
+import { writeStateFile, type ConfigFileSystem, type StateFileSystem } from '../config-store';
 import type { Logger } from '../logger';
 
 /**
@@ -194,12 +194,13 @@ export async function readSelfUpdateRecord(
 	}
 }
 
+/** Atomic (2026-10-28): a kill mid-write leaves the previous record, never a torn one. */
 export async function writeSelfUpdateRecord(
-	fs: Pick<ConfigFileSystem, 'writeFile'>,
+	fs: StateFileSystem,
 	configPath: string,
 	record: SelfUpdateRecord
 ): Promise<void> {
-	await fs.writeFile(selfUpdateRecordPath(configPath), `${JSON.stringify(record, null, 2)}\n`);
+	await writeStateFile(fs, selfUpdateRecordPath(configPath), `${JSON.stringify(record, null, 2)}\n`);
 }
 
 // ─── The controller ────────────────────────────────────────────────────────

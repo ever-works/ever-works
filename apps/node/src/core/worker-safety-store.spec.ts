@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { killableDisk, type DiskOp } from './__fixtures__/killable-disk';
 import type { ConfigFileSystem } from './config-store';
 import { createConfigWorkerSafetyGate, workerSafetyMarkerPath } from './worker-safety-store';
 
@@ -120,5 +121,86 @@ describe('config-backed worker safety gate', () => {
 		await expect(gate(h.fs, 'acl-session').acquire()).rejects.toThrow(/owner-only|ACL update failed/i);
 		expect(h.files.has(workerSafetyMarkerPath(CONFIG_PATH))).toBe(true);
 		await expect(gate(h.fs, 'retry-session').acquire()).resolves.toMatchObject({ kind: 'blocked' });
+	});
+});
+
+describe('the worker-session marker is published atomically (2026-10-28)', () => {
+	// The marker is armed before the first lease, so a kill while it is being
+	// written means no work ran. A half-written marker used to quarantine the
+	// node anyway (fail-closed on unreadable bytes) until an operator cleared
+	// it; now it is complete when it appears, or it is not there at all.
+	const markerContent = (op: DiskOp): boolean => op.content?.includes('session-killed') === true;
+
+	it('a kill while the marker is being written leaves NO marker, so the next start acquires', async () => {
+		const h = killableDisk();
+		h.killAt((op) => (markerContent(op) ? 'partial' : null));
+
+		void gate(h.fs, 'session-killed').acquire();
+		await vi.waitFor(() => expect(h.killed).toBe(true), { timeout: 500 });
+
+		expect(h.files.has(MARKER_PATH)).toBe(false);
+		const restarted = killableDisk({}, { files: h.files });
+		await expect(gate(restarted.fs, 'session-next').acquire()).resolves.toEqual({
+			kind: 'acquired',
+			sessionId: 'session-next'
+		});
+		expect(restarted.files.get(MARKER_PATH)).toContain('session-next');
+	});
+
+	it('links a complete, flushed temp file into place exclusively, then proves the marker owner-only', async () => {
+		const h = killableDisk();
+
+		await expect(gate(h.fs, 'session-first').acquire()).resolves.toEqual({
+			kind: 'acquired',
+			sessionId: 'session-first'
+		});
+
+		const ops = h.ops.filter((op) => op.op !== 'mkdir').map((op) => [op.op, op.to ?? op.path]);
+		const temp = h.ops.find((op) => op.op === 'create')!.path;
+		expect(temp.startsWith(`${MARKER_PATH}.`) && temp.endsWith('.tmp')).toBe(true);
+		expect(ops).toEqual([
+			['create', temp],
+			['write', temp],
+			['link', MARKER_PATH],
+			['remove', temp],
+			['restrict', MARKER_PATH]
+		]);
+		expect(h.files.get(MARKER_PATH)).toContain('session-first');
+		expect(h.acl.get(MARKER_PATH)).toBe('owner-only');
+		expect(h.temps()).toEqual([]);
+	});
+
+	it('a marker another worker published first blocks this one, and the temp is cleaned up', async () => {
+		const h = killableDisk();
+		await gate(h.fs, 'session-other').acquire();
+		// The race: this worker read "no marker" just before the other one linked it.
+		let firstRead = true;
+		const racing: ConfigFileSystem = {
+			...h.fs,
+			readFile: async (path) => {
+				if (firstRead && path === MARKER_PATH) {
+					firstRead = false;
+					return null;
+				}
+				return h.files.get(path) ?? null;
+			}
+		};
+
+		await expect(gate(racing, 'session-raced').acquire()).resolves.toMatchObject({ kind: 'blocked' });
+		expect(h.files.get(MARKER_PATH)).toContain('session-other');
+		expect(h.temps()).toEqual([]);
+	});
+
+	it('falls back to the direct exclusive create where hard links are unsupported', async () => {
+		const h = killableDisk();
+		h.failLinks('ENOTSUP');
+
+		await expect(gate(h.fs, 'session-fat').acquire()).resolves.toEqual({
+			kind: 'acquired',
+			sessionId: 'session-fat'
+		});
+		expect(h.files.get(MARKER_PATH)).toContain('session-fat');
+		expect(h.ops.some((op) => op.op === 'create' && op.path === MARKER_PATH)).toBe(true);
+		expect(h.temps()).toEqual([]);
 	});
 });
