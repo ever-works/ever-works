@@ -189,19 +189,22 @@ export class AiOperations {
 
 		const cacheKey = this.paramCacheKey(config, model);
 		const skip = new Set(this.rejectedParams.get(cacheKey));
+		// Same per-parameter retry as `withParamRetry`, around opening the
+		// stream (a request can be refused for `temperature`, then for a
+		// forced `tool_choice`).
 		let stream: AsyncIterable<AIMessageChunk>;
-		try {
-			const baseLlm = this.createChatModel(config, model, options, skip);
-			const llm = this.bindTools(baseLlm, options, skip);
-			stream = await llm.stream(messages);
-		} catch (error) {
-			const param = this.nextRejectedParam(error, skip);
-			if (!param) throw error;
-			skip.add(param);
-			this.rejectedParams.set(cacheKey, new Set(skip));
-			const baseLlm = this.createChatModel(config, model, options, skip);
-			const llm = this.bindTools(baseLlm, options, skip);
-			stream = await llm.stream(messages);
+		for (;;) {
+			try {
+				const baseLlm = this.createChatModel(config, model, options, skip);
+				const llm = this.bindTools(baseLlm, options, skip);
+				stream = await llm.stream(messages);
+				break;
+			} catch (error) {
+				const param = this.nextRejectedParam(error, skip);
+				if (!param) throw error;
+				skip.add(param);
+				this.rejectedParams.set(cacheKey, new Set(skip));
+			}
 		}
 
 		let hadToolCalls = false;

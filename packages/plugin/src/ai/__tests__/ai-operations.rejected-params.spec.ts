@@ -199,6 +199,49 @@ describe('AiOperations — a parameter the provider rejects in backticks', () =>
 			expect(response.choices[0].message.toolCalls?.[0].function.name).toBe('get_weather');
 		});
 
+		it('gets a stream through on the first call too (temperature, then the choice, refused)', async () => {
+			const sent: Sent[] = [];
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async (_url: unknown, init: { body: string }) => {
+					const body = JSON.parse(init.body) as Record<string, unknown>;
+					sent.push({ body });
+					const reject = (payload: unknown) =>
+						new Response(JSON.stringify(payload), {
+							status: 400,
+							headers: { 'content-type': 'application/json' }
+						});
+					if ('temperature' in body) return reject(TEMPERATURE_REJECTION);
+					if (body.tool_choice === 'required') return reject(TOOL_CHOICE_REJECTION);
+					const chunk = {
+						id: 'r1',
+						object: 'chat.completion.chunk',
+						created: 1,
+						model: 'claude-opus-5-5',
+						choices: [{ index: 0, delta: { role: 'assistant', content: 'streamed' }, finish_reason: null }]
+					};
+					return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, {
+						status: 200,
+						headers: { 'content-type': 'text/event-stream' }
+					});
+				})
+			);
+
+			let text = '';
+			for await (const chunk of anthropicOps().createStreamingChatCompletion({
+				messages: [{ role: 'user', content: 'weather?' }],
+				tools,
+				toolChoice: 'required'
+			})) {
+				text += chunk.choices[0]?.delta?.content ?? '';
+			}
+
+			expect(text).toBe('streamed');
+			const last = sent[sent.length - 1].body;
+			expect(last.tools).toEqual(tools);
+			expect(last).not.toHaveProperty('tool_choice');
+		});
+
 		it('still sends tool_choice "none" to that model afterwards', async () => {
 			const sent = stubProviderRejectingForcedChoice();
 			const ops = anthropicOps();
