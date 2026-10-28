@@ -2,9 +2,10 @@
 
 What Ever Works stores about a person and what self-serve account deletion
 (Settings → Danger Zone, or the email link at `/delete-account`) does to each
-kind of data. Code: `apps/api/src/account-deletion/`; the list of workspace
-content that is re-attributed instead of deleted is
-`apps/api/src/account-deletion/account-deletion.inventory.ts`.
+kind of data. Code: `apps/api/src/account-deletion/`; the lists of workspace
+content that is re-attributed instead of deleted, and of personal rows with no
+foreign key, are in `apps/api/src/account-deletion/account-deletion.inventory.ts`.
+Screenshots of a local run: `docs/pr-assets/account-deletion/`.
 
 ## Public URLs (deployed app) and the fan-out endpoint
 
@@ -37,7 +38,7 @@ Stage / dev: `app-stage.ever.works` + `api-stage.ever.works`, `app-dev.ever.work
 | Account, profile (username, display name, avatar, email, password hash, committer name/email, onboarding answers, inferred interests, preferences) | `users` | **Deleted** |
 | Sign-in methods (password credential, Google/GitHub/Ever ID links) | `account`, `external_identities` | **Deleted** (FK cascade) |
 | Sessions, refresh tokens | `session`, `refresh_tokens` | **Revoked + deleted** — signed out everywhere |
-| Personal API keys and integration keys the account created | `api_keys` | **Deleted** (stop working at once) |
+| Personal API keys and integration keys the account created | `api_keys` | **Deleted** (stop working at once; verified: old key → 401) |
 | Email verification / magic-link / reset tokens | columns on `users`, `verification` | **Deleted** |
 | Works the account created (personal, or in a workspace that is deleted) — items, categories, generation history, schedules, members, invitations, proposals, builds, agent runs | `works` + children | **Deleted.** The platform's own resources for them are released first (App runtime workloads + stored data, ever.works subdomain, local checkouts) |
 | Git repositories those Works created **in the user's own GitHub account** | GitHub | **Not touched** — they are the user's, on GitHub; delete them there |
@@ -48,6 +49,9 @@ Stage / dev: `app-stage.ever.works` + `api-stage.ever.works`, `app-dev.ever.work
 | Invitations the account sent / accepted | `organization_invitations`, `work_invitations` | Sent ones **deleted**; "accepted by" set to NULL |
 | AI conversations, notifications, notification channels + preferences, activity log, digest settings | `conversations`, `notifications`, `notification_channels`, `user_notification_*`, `activity_log` | **Deleted** (cascade) |
 | Third-party connections holding the user's credentials (MCP servers, Composio triggers) | `mcp_server_connections`, `composio_trigger_subscriptions` | **Deleted** (cascade) |
+| Settings and credentials that point at the account without a DB constraint: plugin settings, model accounts/policies, repository connections, GitHub App user link, terms acceptance, reader states, inbox items, onboarding checklists, workspace backups, workflows, environments, memory facts/folders, meetings, tool/autonomy grants | `user_plugins`, `model_accounts`, `model_policies`, `repo_connections`, `github_app_user_links`, `terms_acceptance`, … | **Deleted** explicitly (no FK cascade exists); inside a workspace that stays, workspace content (workflows, environments, model accounts, …) is **handed to the owner** instead |
+| Financial / audit trails naming the account only by id: credit ledger entries, licence purchases, fleet and runtime audit logs, domain events | `credit_ledger_entries`, `licence_purchases`, `fleet_audit`, … | **Kept** with the bare id, which points at nothing once the account is gone (pseudonymous) |
+| Computers registered to the Fleet by the account | `fleet_nodes` and its children | **Not removed in v1** (left with the bare id; follow-up) |
 | Uploaded files | storage backend (S3 / local / GitHub storage) + `user_uploads` | **Deleted** (`deleteAllByOwner`) + rows cascade |
 | Plan subscription | Stripe (via the billing provider seam), `billing_profiles` | **Canceled** (at period end — no further charges); a provider error stops the deletion so a subscription never outlives the account |
 | Pay-as-you-go metered subscription | Stripe | **Stopped now**, accrued usage invoiced |
@@ -55,6 +59,16 @@ Stage / dev: `app-stage.ever.works` + `api-stage.ever.works`, `app-dev.ever.work
 | Audit record of the deletion | `account_deletion_requests` | **Kept**: SHA-256 of the lower-cased email, source, timestamps, counts. No name, no clear email, no user id after completion |
 | Emails already delivered | recipients' mailboxes | Outside our control |
 | Encrypted database backups | backup store | Kept until they roll over |
+
+## Delete rules as found in the schema (local Postgres built from the entities)
+
+54 foreign keys reference `users.id`: 47 `ON DELETE CASCADE`, 7 `SET NULL` (`organization_invitations.acceptedByUserId`,
+`work_invitations.acceptedByUserId`, `work_members.invitedById`, `work_generation_history.userId`,
+`work_knowledge_documents.created_by_id` / `updated_by_id`, `work_knowledge_uploads.uploaded_by_id`), none `RESTRICT`,
+so nothing blocks the account row. The migrated (production) schema adds: `tenants.ownerUserId → users` CASCADE,
+`organizations.tenantId → tenants` CASCADE, `invoices`/`billing_profiles.userId → users` CASCADE, and Tier A/C
+`tenantId`/`organizationId` → SET NULL. About 95 more columns reference a user with no constraint at all; the
+personal ones are deleted explicitly (row above), the rest are kept as bare ids.
 
 ## Email-link security (as built)
 
