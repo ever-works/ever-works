@@ -1105,7 +1105,8 @@ export class AccountImportService {
      * `onLoad` failed, so an unusable plugin is not restored as a provider either.
      *
      * A malformed field (not an array of names) restores no binding, with a warning,
-     * rather than failing the whole plugin row.
+     * rather than failing the whole plugin row. A capability the plugin does not declare
+     * is dropped with a warning too, as `setActiveCapability` refuses it.
      */
     private async importableActiveCapabilities(
         dp: ExportedWorkPlugin,
@@ -1143,7 +1144,16 @@ export class AccountImportService {
             );
             return [];
         }
-        return requested;
+        // `setActiveCapability` also refuses a capability the plugin does not declare
+        // (an export from before the plugin dropped one, or a tampered file); so does this.
+        const declared = new Set<string>(registered.manifest.capabilities ?? []);
+        const undeclared = requested.filter((capability) => !declared.has(capability));
+        if (undeclared.length > 0) {
+            result.warnings.push(
+                `Work plugin "${dp.pluginId}" on work "${workSlug}" was imported without the active capabilities ${undeclared.map((capability) => `"${capability}"`).join(', ')}: the plugin does not declare them.`,
+            );
+        }
+        return requested.filter((capability) => declared.has(capability));
     }
 
     private async importWorkRepoData(

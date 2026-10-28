@@ -118,7 +118,7 @@ describe('AccountImportService', () => {
             get: jest.fn((pluginId: string) => ({
                 plugin: {},
                 state: 'loaded',
-                manifest: { id: pluginId, capabilities: [], supplementary: false },
+                manifest: { id: pluginId, capabilities: ['ai-provider'], supplementary: false },
             })),
         };
 
@@ -2011,6 +2011,22 @@ describe('AccountImportService', () => {
             expect(warningsAbout(result.warnings, 'local-content-extractor')[0]).toMatch(
                 /not a list of capability names/,
             );
+        });
+
+        it('drops a capability the plugin does not declare and keeps the declared one', async () => {
+            const result = await importWith(registryWith({ 'local-content-extractor': {} }), [
+                exported('local-content-extractor', {
+                    activeCapabilities: ['content-extractor', 'search'],
+                }),
+            ]);
+
+            expect(
+                await workPlugins.findByWorkAndPlugin(WORK_ID, 'local-content-extractor'),
+            ).toMatchObject({ activeCapabilities: ['content-extractor'] });
+            expect(await workPlugins.findActiveByCapability(WORK_ID, 'search')).toBeNull();
+            const warnings = warningsAbout(result.warnings, 'local-content-extractor');
+            expect(warnings).toHaveLength(1);
+            expect(warnings[0]).toMatch(/"search": the plugin does not declare them/);
         });
 
         it('adds no warning for a plugin exported without any capability', async () => {
