@@ -7,7 +7,7 @@ import { UserPluginRepository } from '../plugins/repositories/user-plugin.reposi
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
 import {
-    loadPluginSchema,
+    loadRegisteredPlugins,
     PluginRegistryService,
 } from '../plugins/services/plugin-registry.service';
 import { UserRepository } from '../database/repositories/user.repository';
@@ -1099,23 +1099,39 @@ export class AccountImportService {
      * — enabled state, settings, priority — but without the capability binding, and the
      * import report says so. The same happens, fail closed, when this instance cannot
      * load the plugin to check: `supplementary` may be declared in the plugin class only,
-     * so a plugin that is not registered here, or fails to load, cannot be cleared.
+     * so a plugin that is not registered here, or fails to load, cannot be cleared. The
+     * load is the one the facades use to pick a provider (`loadRegisteredPlugins`): it
+     * waits for a first load another caller started and leaves out an entry whose
+     * `onLoad` failed, so an unusable plugin is not restored as a provider either.
+     *
+     * A malformed field (not an array of names) restores no binding, with a warning,
+     * rather than failing the whole plugin row.
      */
     private async importableActiveCapabilities(
         dp: ExportedWorkPlugin,
         workSlug: string,
         result: ImportResult,
     ): Promise<string[]> {
-        const requested =
+        const exported: unknown =
             dp.activeCapabilities ?? (dp.activeCapability ? [dp.activeCapability] : []);
+        if (!Array.isArray(exported)) {
+            result.warnings.push(
+                `Work plugin "${dp.pluginId}" on work "${workSlug}" was imported without active capabilities: its "activeCapabilities" field is not a list of capability names.`,
+            );
+            return [];
+        }
+        const requested = exported.filter(
+            (capability): capability is string =>
+                typeof capability === 'string' && capability.length > 0,
+        );
         if (requested.length === 0) {
-            return requested;
+            return [];
         }
         const named = requested.map((capability) => `"${capability}"`).join(', ');
 
         const registered = this.pluginRegistry.get(dp.pluginId);
-        const loaded = registered ? await loadPluginSchema(registered.plugin, registered) : false;
-        if (!registered || !loaded) {
+        const usable = registered ? await loadRegisteredPlugins([registered]) : [];
+        if (!registered || usable.length === 0) {
             result.warnings.push(
                 `Work plugin "${dp.pluginId}" on work "${workSlug}" was imported without its active capabilities (${named}): this instance could not load the plugin to check that it may be a capability provider. Choose the provider again in the Work's settings.`,
             );

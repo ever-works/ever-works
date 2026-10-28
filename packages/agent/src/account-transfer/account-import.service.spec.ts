@@ -1823,7 +1823,7 @@ describe('AccountImportService', () => {
             if (dataSource?.isInitialized) await dataSource.destroy();
         });
 
-        type Entry = { supplementary?: boolean; failsToLoad?: boolean };
+        type Entry = { supplementary?: boolean; failsToLoad?: boolean; onLoadFails?: boolean };
 
         /** A registry holding exactly `entries`, as their class manifests describe them. */
         function registryWith(entries: Record<string, Entry>) {
@@ -1831,13 +1831,8 @@ describe('AccountImportService', () => {
                 get: jest.fn((pluginId: string) => {
                     const entry = entries[pluginId];
                     if (!entry) return undefined;
-                    return {
-                        plugin: entry.failsToLoad
-                            ? {
-                                  __isMaterialized: false,
-                                  __materialize: jest.fn().mockRejectedValue(new Error('boom')),
-                              }
-                            : {},
+                    const registered: Record<string, unknown> = {
+                        plugin: {},
                         state: 'loaded',
                         manifest: {
                             id: pluginId,
@@ -1845,6 +1840,24 @@ describe('AccountImportService', () => {
                             supplementary: entry.supplementary === true,
                         },
                     };
+                    if (entry.failsToLoad) {
+                        // The import itself fails: the proxy rejects.
+                        registered.plugin = {
+                            __isMaterialized: false,
+                            __materialize: jest.fn().mockRejectedValue(new Error('boom')),
+                        };
+                    } else if (entry.onLoadFails) {
+                        // The import works but `onLoad` throws: the proxy still resolves,
+                        // and the registry entry is left in `error` (callOnLoad).
+                        registered.plugin = {
+                            __isMaterialized: false,
+                            __materialize: jest.fn(async () => {
+                                registered.state = 'error';
+                                return {};
+                            }),
+                        };
+                    }
+                    return registered;
                 }),
             };
         }
@@ -1965,6 +1978,38 @@ describe('AccountImportService', () => {
             ).toBeNull();
             expect(warningsAbout(result.warnings, 'notion-extractor')[0]).toMatch(
                 /could not load the plugin/,
+            );
+        });
+
+        it("fails closed when the plugin's onLoad fails during that first load", async () => {
+            const result = await importWith(
+                registryWith({ 'local-content-extractor': { onLoadFails: true } }),
+                [exported('local-content-extractor')],
+            );
+
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toBeNull();
+            expect(warningsAbout(result.warnings, 'local-content-extractor')[0]).toMatch(
+                /could not load the plugin/,
+            );
+        });
+
+        it('restores the plugin row without a binding when activeCapabilities is malformed', async () => {
+            const result = await importWith(registryWith({ 'local-content-extractor': {} }), [
+                exported('local-content-extractor', {
+                    activeCapabilities: 'content-extractor' as unknown as string[],
+                }),
+            ]);
+
+            expect(
+                await workPlugins.findByWorkAndPlugin(WORK_ID, 'local-content-extractor'),
+            ).toMatchObject({ enabled: true, activeCapabilities: [] });
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toBeNull();
+            expect(warningsAbout(result.warnings, 'local-content-extractor')[0]).toMatch(
+                /not a list of capability names/,
             );
         });
 
