@@ -6,6 +6,10 @@ import { WorkCustomDomainRepository } from '../database/repositories/work-custom
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { PluginRepository } from '../plugins/repositories/plugin.repository';
+import {
+    loadPluginSchema,
+    PluginRegistryService,
+} from '../plugins/services/plugin-registry.service';
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkAdvancedPromptsRepository } from '../database/repositories/work-advanced-prompts.repository';
 import { WorkScheduleRepository } from '../database/repositories/work-schedule.repository';
@@ -19,6 +23,7 @@ import type {
     ConflictResolution,
     ImportResult,
     ExportedWork,
+    ExportedWorkPlugin,
 } from './types';
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 import { sanitizePrompt } from '../utils/sanitize.util';
@@ -232,6 +237,13 @@ export class AccountImportService {
         private readonly advancedPromptsRepository: WorkAdvancedPromptsRepository,
         private readonly scheduleRepository: WorkScheduleRepository,
         private readonly gitFacade: GitFacadeService,
+        /**
+         * Global (`PluginsModule`). Read to refuse restoring a supplementary plugin
+         * as a Work's capability provider (C-1, {@link importableActiveCapabilities}).
+         * Required on purpose: an unbound registry must fail the boot, not silently
+         * turn that check off.
+         */
+        private readonly pluginRegistry: PluginRegistryService,
     ) {}
 
     async previewImport(userId: string, payload: AccountExportPayload): Promise<ImportPreview> {
@@ -1054,8 +1066,11 @@ export class AccountImportService {
                     pluginId: dp.pluginId,
                     pluginEntityId: pluginEntity.id,
                     enabled: dp.enabled,
-                    activeCapabilities:
-                        dp.activeCapabilities ?? (dp.activeCapability ? [dp.activeCapability] : []),
+                    activeCapabilities: await this.importableActiveCapabilities(
+                        dp,
+                        dir.slug,
+                        result,
+                    ),
                     settings: dp.settings || {},
                     secretSettings,
                     priority: dp.priority,
@@ -1066,6 +1081,53 @@ export class AccountImportService {
                 );
             }
         }
+    }
+
+    /**
+     * The active capabilities an exported Work plugin may be restored with (C-1, Ever
+     * Works #18).
+     *
+     * `setActiveCapability` and `enablePluginForWork` refuse to record a SUPPLEMENTARY
+     * plugin (notion-extractor, pdf-extractor, officecli-extractor) as a Work's capability
+     * provider (`PluginOperationsService.refuseSupplementaryProvider`): the facade runs
+     * such a plugin for the URLs it claims on top of the Work's provider, never as it, and
+     * `findActiveByCapability` could answer it ahead of the real one. Import used to write
+     * an export's `activeCapabilities` straight into the repository, past that rule.
+     *
+     * Owner decision B5 (refuse such an export, or accept it) is open; this is the safe
+     * additive reading, "B5 default: drop with warning". The plugin row is still restored
+     * — enabled state, settings, priority — but without the capability binding, and the
+     * import report says so. The same happens, fail closed, when this instance cannot
+     * load the plugin to check: `supplementary` may be declared in the plugin class only,
+     * so a plugin that is not registered here, or fails to load, cannot be cleared.
+     */
+    private async importableActiveCapabilities(
+        dp: ExportedWorkPlugin,
+        workSlug: string,
+        result: ImportResult,
+    ): Promise<string[]> {
+        const requested =
+            dp.activeCapabilities ?? (dp.activeCapability ? [dp.activeCapability] : []);
+        if (requested.length === 0) {
+            return requested;
+        }
+        const named = requested.map((capability) => `"${capability}"`).join(', ');
+
+        const registered = this.pluginRegistry.get(dp.pluginId);
+        const loaded = registered ? await loadPluginSchema(registered.plugin, registered) : false;
+        if (!registered || !loaded) {
+            result.warnings.push(
+                `Work plugin "${dp.pluginId}" on work "${workSlug}" was imported without its active capabilities (${named}): this instance could not load the plugin to check that it may be a capability provider. Choose the provider again in the Work's settings.`,
+            );
+            return [];
+        }
+        if (registered.manifest.supplementary) {
+            result.warnings.push(
+                `Work plugin "${dp.pluginId}" on work "${workSlug}" is a supplementary plugin, so it was not restored as the Work's active provider for ${named}. It still runs for the URLs it handles, alongside the Work's own provider.`,
+            );
+            return [];
+        }
+        return requested;
     }
 
     private async importWorkRepoData(

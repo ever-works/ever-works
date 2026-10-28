@@ -4,10 +4,19 @@ jest.mock('../generators/data-generator/data-repository', () => ({
     DataRepository: { create: jest.fn() },
 }));
 
+import { DataSource } from 'typeorm';
 import { AccountImportService } from './account-import.service';
+import { ENTITIES } from '../database/_entities-inventory';
 import { DataRepository } from '../generators/data-generator/data-repository';
+import { WorkPluginEntity } from '../plugins/entities/work-plugin.entity';
+import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { MASKED_SECRET_PREFIX } from './types';
-import type { AccountExportPayload, ConflictResolution, ExportedWork } from './types';
+import type {
+    AccountExportPayload,
+    ConflictResolution,
+    ExportedWork,
+    ExportedWorkPlugin,
+} from './types';
 
 const dataRepoCreateMock = DataRepository.create as jest.Mock;
 
@@ -51,7 +60,9 @@ describe('AccountImportService', () => {
         };
     }
 
-    function makeService() {
+    function makeService(
+        overrides: { workPluginRepository?: unknown; pluginRegistry?: unknown } = {},
+    ) {
         const queryRunner = makeQueryRunner();
         const dataSource = {
             createQueryRunner: jest.fn().mockReturnValue(queryRunner),
@@ -101,6 +112,15 @@ describe('AccountImportService', () => {
             commit: jest.fn().mockResolvedValue(undefined),
             push: jest.fn().mockResolvedValue(undefined),
         };
+        // Every plugin is registered, loaded and NOT supplementary unless a case says
+        // otherwise (C-1), so the cases below keep restoring their capabilities.
+        const pluginRegistry = {
+            get: jest.fn((pluginId: string) => ({
+                plugin: {},
+                state: 'loaded',
+                manifest: { id: pluginId, capabilities: [], supplementary: false },
+            })),
+        };
 
         const service = new AccountImportService(
             dataSource as any,
@@ -114,7 +134,12 @@ describe('AccountImportService', () => {
             advancedPromptsRepository as any,
             scheduleRepository as any,
             gitFacade as any,
+            (overrides.pluginRegistry ?? pluginRegistry) as any,
         );
+        if (overrides.workPluginRepository) {
+            // A real repository: assert what is ACTIVE afterwards, not an argument list.
+            (service as any).workPluginRepository = overrides.workPluginRepository;
+        }
 
         return {
             service,
@@ -132,6 +157,7 @@ describe('AccountImportService', () => {
                 advancedPromptsRepository,
                 scheduleRepository,
                 gitFacade,
+                pluginRegistry,
             },
         };
     }
@@ -1758,6 +1784,200 @@ describe('AccountImportService', () => {
             expect(
                 result.warnings.some((w) => w.includes('Failed to import profile settings')),
             ).toBe(true);
+        });
+    });
+
+    /**
+     * C-1 (Ever Works #18). `setActiveCapability` / `enablePluginForWork` refuse to make a
+     * SUPPLEMENTARY plugin a Work's capability provider; import used to write an export's
+     * `activeCapabilities` straight into the repository, past that rule. Owner decision B5
+     * (refuse vs accept such an export) is open, so import takes the safe additive reading
+     * — "B5 default: drop with warning": the plugin row is restored WITHOUT the binding,
+     * and the report says so. Asserted against the REAL `WorkPluginRepository` on SQLite,
+     * through the `findActiveByCapability` lookup the content-extractor facade relies on.
+     */
+    describe('C-1: a supplementary plugin is not restored as a capability provider', () => {
+        const WORK_ID = '22222222-2222-4222-8222-222222222218';
+        let dataSource: DataSource;
+        let workPlugins: WorkPluginRepository;
+
+        beforeAll(async () => {
+            dataSource = new DataSource({
+                type: 'better-sqlite3',
+                database: ':memory:',
+                entities: ENTITIES,
+                synchronize: true,
+                logging: false,
+            });
+            await dataSource.initialize();
+            // The Work and the plugin catalogue rows are mocked; only the binding is real.
+            await dataSource.query('PRAGMA foreign_keys = OFF');
+            workPlugins = new WorkPluginRepository(dataSource.getRepository(WorkPluginEntity));
+        });
+
+        beforeEach(async () => {
+            await dataSource.query('DELETE FROM "work_plugins"');
+        });
+
+        afterAll(async () => {
+            if (dataSource?.isInitialized) await dataSource.destroy();
+        });
+
+        type Entry = { supplementary?: boolean; failsToLoad?: boolean };
+
+        /** A registry holding exactly `entries`, as their class manifests describe them. */
+        function registryWith(entries: Record<string, Entry>) {
+            return {
+                get: jest.fn((pluginId: string) => {
+                    const entry = entries[pluginId];
+                    if (!entry) return undefined;
+                    return {
+                        plugin: entry.failsToLoad
+                            ? {
+                                  __isMaterialized: false,
+                                  __materialize: jest.fn().mockRejectedValue(new Error('boom')),
+                              }
+                            : {},
+                        state: 'loaded',
+                        manifest: {
+                            id: pluginId,
+                            capabilities: ['content-extractor'],
+                            supplementary: entry.supplementary === true,
+                        },
+                    };
+                }),
+            };
+        }
+
+        function exported(
+            pluginId: string,
+            fields: Partial<ExportedWorkPlugin> = {},
+        ): ExportedWorkPlugin {
+            return {
+                pluginId,
+                enabled: true,
+                activeCapabilities: ['content-extractor'],
+                settings: {},
+                priority: 0,
+                ...fields,
+            };
+        }
+
+        async function importWith(
+            registry: ReturnType<typeof registryWith>,
+            exportedPlugins: ExportedWorkPlugin[],
+        ) {
+            const { service, mocks } = makeService({
+                workPluginRepository: workPlugins,
+                pluginRegistry: registry,
+            });
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+            mocks.workRepository.create.mockResolvedValue({ id: WORK_ID, slug: 'a' });
+            mocks.pluginRepository.findByPluginId.mockImplementation(async (pluginId: string) => ({
+                id: `entity-${pluginId}`,
+            }));
+            return service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', workPlugins: exportedPlugins })]),
+                [],
+            );
+        }
+
+        const warningsAbout = (warnings: string[], pluginId: string) =>
+            warnings.filter((warning) => warning.includes(`"${pluginId}"`));
+
+        it("imports notion-extractor's ['content-extractor'] binding as inactive, with a warning", async () => {
+            const result = await importWith(
+                registryWith({ 'notion-extractor': { supplementary: true } }),
+                [exported('notion-extractor')],
+            );
+
+            // The plugin row itself is restored (enabled, settings, priority)...
+            expect(
+                await workPlugins.findByWorkAndPlugin(WORK_ID, 'notion-extractor'),
+            ).toMatchObject({ enabled: true, activeCapabilities: [] });
+            // ...but it is not the Work's content-extractor afterwards.
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toBeNull();
+            const warnings = warningsAbout(result.warnings, 'notion-extractor');
+            expect(warnings).toHaveLength(1);
+            expect(warnings[0]).toMatch(/supplementary plugin/);
+            expect(warnings[0]).toContain('"content-extractor"');
+            expect(warnings[0]).toContain('"a"');
+        });
+
+        it('drops the legacy single `activeCapability` field the same way', async () => {
+            const result = await importWith(
+                registryWith({ 'pdf-extractor': { supplementary: true } }),
+                [
+                    exported('pdf-extractor', {
+                        activeCapabilities: undefined,
+                        activeCapability: 'content-extractor',
+                    }),
+                ],
+            );
+
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toBeNull();
+            expect(warningsAbout(result.warnings, 'pdf-extractor')).toHaveLength(1);
+        });
+
+        it('control: a real provider imported beside it keeps its binding and is the active one', async () => {
+            const result = await importWith(
+                registryWith({
+                    'notion-extractor': { supplementary: true },
+                    'local-content-extractor': {},
+                }),
+                [exported('notion-extractor'), exported('local-content-extractor')],
+            );
+
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toMatchObject({
+                pluginId: 'local-content-extractor',
+                activeCapabilities: ['content-extractor'],
+            });
+            expect(warningsAbout(result.warnings, 'local-content-extractor')).toEqual([]);
+        });
+
+        it('fails closed when this instance has no registry entry to check the plugin against', async () => {
+            const result = await importWith(registryWith({}), [exported('notion-extractor')]);
+
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toBeNull();
+            const warnings = warningsAbout(result.warnings, 'notion-extractor');
+            expect(warnings).toHaveLength(1);
+            expect(warnings[0]).toMatch(/could not load the plugin/);
+        });
+
+        it('fails closed when the plugin fails to load, so its class manifest cannot be read', async () => {
+            const result = await importWith(
+                registryWith({ 'notion-extractor': { failsToLoad: true } }),
+                [exported('notion-extractor')],
+            );
+
+            expect(
+                await workPlugins.findActiveByCapability(WORK_ID, 'content-extractor'),
+            ).toBeNull();
+            expect(warningsAbout(result.warnings, 'notion-extractor')[0]).toMatch(
+                /could not load the plugin/,
+            );
+        });
+
+        it('adds no warning for a plugin exported without any capability', async () => {
+            const result = await importWith(
+                registryWith({ 'notion-extractor': { supplementary: true } }),
+                [exported('notion-extractor', { activeCapabilities: [] })],
+            );
+
+            expect(
+                await workPlugins.findByWorkAndPlugin(WORK_ID, 'notion-extractor'),
+            ).toMatchObject({ activeCapabilities: [] });
+            expect(warningsAbout(result.warnings, 'notion-extractor')).toEqual([]);
         });
     });
 });
