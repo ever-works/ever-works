@@ -147,7 +147,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	 * App Provisioner (APW-04 T1, plan §2.6/§7.3) — this is the one pipeline
 	 * that turns `runtimeEnvironment.networkingMode = 'limited'` into an
 	 * ENFORCED sandbox policy rather than advisory guidance, through
-	 * `resolveEnvironmentNetworking` (`utils/runtime-environment.ts:38-56`)
+	 * `resolveEnvironmentNetworking` (`utils/runtime-environment.ts`)
 	 * on the environment it creates for the session. Together with
 	 * `runSandboxSession` below it is what makes this plugin the
 	 * provisioning runtime: the platform selects a pipeline by this pair of
