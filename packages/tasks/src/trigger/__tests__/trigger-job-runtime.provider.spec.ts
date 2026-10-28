@@ -342,6 +342,71 @@ describe('TriggerJobRuntimeProvider', () => {
                 );
             });
 
+            // C-7 — a BYO client that fails to build falls open to the
+            // platform's project for THAT bind. The fallback view used to be
+            // memoised under `(tenantId, credentialVersion)`, so every later
+            // job for the tenant kept running on the platform's singleton
+            // project until the credentials changed, even once the tenant's
+            // client could be built again.
+            it('uses its own project on the next bind after a client build that threw', async () => {
+                const trigger = vi.fn(async () => ({ id: 'run_byo_after_retry' }));
+                const client = { tasks: { trigger }, runs: { cancel: vi.fn(), retrieve: vi.fn() } };
+                const clientFactory = vi
+                    .fn()
+                    .mockImplementationOnce(() => {
+                        throw new Error('transient: tenant API unreachable');
+                    })
+                    .mockImplementation(() => client);
+                const byo = new TriggerJobRuntimeProvider(
+                    triggerServiceMock as unknown as TriggerService,
+                    { clientFactory: clientFactory as never },
+                );
+
+                const fallback = byo.bindToTenant(byoSnapshot) as unknown as {
+                    tenantClient: unknown;
+                };
+                expect(fallback.tenantClient).toBeNull();
+
+                const view = byo.bindToTenant(byoSnapshot);
+                expect((view as unknown as { tenantClient: unknown }).tenantClient).toBe(client);
+                expect(clientFactory).toHaveBeenCalledTimes(2);
+
+                const dispatchers = view.dispatchers as unknown as {
+                    dispatchKbEmbedDocument: (p: unknown) => Promise<string | null>;
+                };
+                await expect(
+                    dispatchers.dispatchKbEmbedDocument({ workId: 'w', documentId: 'd' }),
+                ).resolves.toBe('run_byo_after_retry');
+                expect(trigger).toHaveBeenCalledTimes(1);
+
+                // The successful build is memoised as before.
+                expect(byo.bindToTenant(byoSnapshot)).toBe(view);
+                expect(clientFactory).toHaveBeenCalledTimes(2);
+            });
+
+            it('re-binding through a fallback view retries the build too', () => {
+                const client = {
+                    tasks: { trigger: vi.fn() },
+                    runs: { cancel: vi.fn(), retrieve: vi.fn() },
+                };
+                const clientFactory = vi
+                    .fn()
+                    .mockImplementationOnce(() => {
+                        throw new Error('transient');
+                    })
+                    .mockImplementation(() => client);
+                const byo = new TriggerJobRuntimeProvider(
+                    triggerServiceMock as unknown as TriggerService,
+                    { clientFactory: clientFactory as never },
+                );
+
+                const fallback = byo.bindToTenant(byoSnapshot);
+                const rebound = fallback.bindToTenant!(byoSnapshot);
+
+                expect(rebound).not.toBe(fallback);
+                expect((rebound as unknown as { tenantClient: unknown }).tenantClient).toBe(client);
+            });
+
             it("answers { status: 'unknown' } when the tenant's read throws", async () => {
                 const retrieve = vi.fn(async () => Promise.reject(new Error('401')));
 
