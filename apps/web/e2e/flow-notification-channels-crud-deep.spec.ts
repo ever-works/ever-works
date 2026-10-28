@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { expectProviderRejected } from './helpers/notification-channels';
 
 /**
  * Notification CHANNELS — DEEP account/settings/integrations coverage targeting
@@ -79,8 +80,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     passes through as plaintext at rest too — but the OWNER-reads-plaintext API
  *     contract holds identically whether or not a key is configured, so the secret
  *     round-trip assertions are env-agnostic.
- *   - No channel-delivery plugin is enabled, so :id/test on an owned channel is a
- *     truthful failure; a positive status is also tolerated.
+ *   - The channel plugins are bound and every target is fictitious, so :id/test on
+ *     an owned channel is a truthful failure carrying the provider's rejection
+ *     (the plugin calls the real provider host, which needs outbound network).
  *   - PUBLIC webhook uses an EMPTY-storageState context so the shared auth cookie
  *     is NOT inherited (a bare newContext() would carry it).
  */
@@ -546,22 +548,16 @@ test.describe('Notification channels — deep CRUD / isolation / validation cont
             targetConfig: { botToken: 'x:y', chatId: '1' },
         });
 
-        // Owner test-send returns the result DIRECTLY (201). CI enables no channel
-        // plugin → truthful 'failed' with a provider-specific error; a positive
-        // status is tolerated if some env wires the plugin.
+        // Owner test-send returns the result DIRECTLY (201). The telegram-channel plugin
+        // is bound and really calls the Bot API with the fictitious token; Telegram answers
+        // 404 "Not Found" for a malformed bot token, and the plugin reports exactly that —
+        // status 'failed', no provider message id, never a fabricated delivery.
         const testRes = await request.post(`${CHANNELS}/${ch.id}/test`, {
             headers: authedHeaders(token),
             timeout: TIMEOUT,
         });
         expect(testRes.status()).toBe(201);
-        const body = await testRes.json();
-        expect(typeof body.status).toBe('string');
-        if (body.status === 'failed') {
-            expect(typeof body.error).toBe('string');
-            expect(body.error.toLowerCase()).toMatch(/plugin|materialize|disabled|not found/);
-        } else {
-            expect(['delivered', 'queued', 'sent', 'accepted']).toContain(body.status);
-        }
+        expectProviderRejected(await testRes.json(), 'telegram-channel', 404);
 
         // DELETE → 204 the first time.
         const del1 = await request.delete(`${CHANNELS}/${ch.id}`, {

@@ -1,5 +1,13 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import {
+    expectConfigRefused,
+    expectPluginNotBound,
+    expectProviderRejected,
+    SLACK_OFF_HOST_REFUSAL,
+    type BoundChannelPluginId,
+    type ChannelTestResult,
+} from './helpers/notification-channels';
 
 /**
  * Settings → Integrations → CHANNELS — deep cross-feature integration flows for the
@@ -19,21 +27,25 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *
  * This file owns the CONNECTOR lifecycle for the chat/messaging integrations
  * (Slack/Discord/Telegram/WhatsApp/Novu/webhook), which the companions do not exercise:
- *   1. Slack connector full lifecycle: connect → test (truthful CI state) → reconfigure
- *      webhook URL → disable (the off gate) → re-enable → disconnect → 404 after.
+ *   1. Slack connector full lifecycle: connect → test (the provider rejects the fictitious
+ *      hook) → reconfigure webhook URL → disable (the off gate) → re-enable → disconnect →
+ *      404 after.
  *   2. Multi-provider matrix in one inbox: discord/slack/telegram/whatsapp/novu/webhook
- *      coexist; each test-send reports a per-pluginId truthful failure; secrets stored verbatim.
+ *      coexist; each test-send reports that provider's own truthful failure; secrets stored
+ *      verbatim.
  *   3. Public provider delivery-event webhook (POST /events/:pluginId) — 202 ACCEPTED,
  *      echoes the pluginId, @Public (no bearer), throttled, GET not allowed.
  *   4. Per-user channel ISOLATION matrix — list/patch/test/delete of a foreign channel id
  *      is a scoped 404 "Channel not found", never a cross-tenant leak or hijack.
- *   5. Configure-validation edges — any pluginId+targetConfig is accepted at CONNECT
- *      (validation is deferred to test/send time), the disabled gate is also a SEND gate,
- *      and a missing `name` is rejected up front by the CreateChannelDto guard with a 400
- *      class-validator error (the hardened replacement for the former no-DTO-guard 500).
+ *   5. Configure-validation edges — CONNECT stores any pluginId+targetConfig verbatim, and
+ *      the bound plugin is what validates it at send time: the Slack plugin refuses an
+ *      off-host / plain-http / metadata-IP webhook before making any request, accepts a
+ *      hooks.slack.com URL (which then reaches Slack), and an unknown pluginId resolves to
+ *      no plugin. A missing `name` is rejected up front by the CreateChannelDto guard with
+ *      a 400 class-validator error (the hardened replacement for the former no-DTO-guard 500).
  *   6. UI Add-channel wizard (seeded storageState) at /settings/integrations/channels —
  *      open dialog → pick Slack → fill webhook → Create → row appears → Test shows the
- *      truthful failure badge → Remove drops the row.
+ *      provider's truthful failure badge → Remove drops the row.
  *
  * PROBED, TRUTHFUL contracts (verified via curl against http://127.0.0.1:3100 with
  * throwaway registered users BEFORE writing any assertion; cross-checked against
@@ -48,8 +60,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *        targetConfig, verified:false, disabledAt:null, tenantId:null, organizationId:null,
  *        createdAt, updatedAt }.  NO validation at create: ANY pluginId string + ANY
  *        targetConfig is accepted (slack/discord/telegram/whatsapp/novu/webhook/garbage);
- *        even a non-hooks.slack.com URL is stored verbatim. The delivery plugin + its
- *        config schema are only resolved at test/send time. Multi-field secrets
+ *        even a non-hooks.slack.com URL is stored verbatim. The delivery plugin validates
+ *        the config at test/send time, before it makes any request. Multi-field secrets
  *        (telegram botToken+chatId, whatsapp accessToken+phoneNumberId+to) round-trip
  *        verbatim in targetConfig.  Omitting `name` -> 400 {"statusCode":400,
  *        "error":"Bad Request","message":[…"name …"]} — the CreateChannelDto guard
@@ -62,14 +74,19 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     DELETE /:id -> 204 (scoped: findOwnedOrThrow runs first). Foreign/unknown id -> 404
  *        "Channel not found" (NOT a silent no-op — owner's row untouched).
  *     POST   /:id/test -> 201 { status, error?, providerMessageId? } returned DIRECTLY
- *        (NOT wrapped). CI enables no channel-delivery plugin, so the TRUTHFUL state for an
- *        ENABLED channel is status:'failed' with
- *        error:"Notification channel plugin not found or disabled: <pluginId>"
- *        (a transient first-touch variant "Failed to materialize plugin \"<pluginId>\""
- *        was also observed — both tolerated). A DISABLED channel -> status:'failed',
- *        error:"channel disabled" (the gate is enforced at SEND time too). A foreign/
- *        deleted id -> 404 "Channel not found". If an env DID enable a delivery plugin,
- *        a delivered/queued/sent status is also accepted.
+ *        (NOT wrapped). Every channel plugin is BOUND (the loader materializes them since
+ *        #2988) and every target here is fictitious, so an ENABLED channel's test-send is
+ *        always status:'failed' with no providerMessageId, and the error is the plugin's:
+ *          - its config refusal, e.g. "slack-channel: targetConfig.webhookUrl must start
+ *            with https://hooks.slack.com/" (no request made); or
+ *          - the provider's rejection, wrapped as "<Provider> … failed (<HTTP status>): …"
+ *            (Slack/Discord 404 for an unknown hook; Telegram/WhatsApp/Novu 401 for a
+ *            fictitious credential — see helpers/notification-channels.ts).
+ *        A pluginId that names no channel plugin (`webhook`, a made-up id) ->
+ *        error:"Notification channel plugin not found or disabled: <pluginId>".
+ *        A DISABLED channel -> status:'failed', error:"channel disabled" (the gate is
+ *        enforced at SEND time too, before the plugin). A foreign/deleted id -> 404
+ *        "Channel not found".
  *     POST   /events/:pluginId  @Public @Throttle(600/60s) -> 202 ACCEPTED
  *        { received:true, pluginId } — echoes ANY pluginId path segment verbatim,
  *        no bearer required. GET on the same path -> 404 (POST-only route).
@@ -87,9 +104,12 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     "✗ <error>"/"✓ Sent" badge; Remove drops the row.
  *
  * ENVIRONMENT NOTES (CI-faithful):
- *   - No channel-delivery plugin is enabled in CI, so test-send NEVER succeeds; assertions
- *     pin the truthful failure SHAPE/reason, never delivery. The connect/configure/disable/
- *     disconnect/isolation CONTRACT is fully deterministic and is what these flows assert.
+ *   - Every target is fictitious, so test-send NEVER succeeds; assertions pin the plugin's
+ *     truthful failure reason per provider, never delivery. A well-formed target makes the
+ *     plugin call the real provider host (the plugins pin their hosts, so no local fake can
+ *     stand in), which needs outbound network from the API process. The connect/configure/
+ *     disable/disconnect/isolation CONTRACT is fully deterministic and is what these flows
+ *     assert.
  *   - CROSS-SPEC ISOLATION: every API mutation runs on a FRESH registerUserViaAPI() user
  *     (unique email per run). Membership uses toContain / not.toContain, never exact totals,
  *     to tolerate the shared in-memory DB. The seeded storageState user is used ONLY for the
@@ -113,11 +133,7 @@ interface NotificationChannel {
     organizationId: string | null;
 }
 
-interface TestResult {
-    status: string;
-    error?: string;
-    providerMessageId?: string;
-}
+type TestResult = ChannelTestResult;
 
 async function listChannels(
     request: APIRequestContext,
@@ -159,26 +175,6 @@ async function testSend(
     return { http: res.status(), body: (await res.json()) as TestResult };
 }
 
-/**
- * Assert a test-send result for a channel whose delivery plugin is NOT enabled in CI.
- * The truthful state is a 201 with status:'failed' and a per-pluginId reason — OR, if a
- * delivery plugin happens to be enabled, a success status. Never a non-2xx.
- */
-function expectTruthfulUnconfiguredTest(result: TestResult, pluginId: string) {
-    expect(typeof result.status).toBe('string');
-    if (result.status === 'failed') {
-        // Probed wordings: "Notification channel plugin not found or disabled: <id>" and
-        // the transient first-touch "Failed to materialize plugin \"<id>\"". Both name the plugin.
-        expect(result.error, `test error should reference ${pluginId}`).toBeTruthy();
-        expect(result.error!).toContain(pluginId);
-        expect(result.error!.toLowerCase()).toMatch(
-            /plugin not found|disabled|materialize|no .*plugin/,
-        );
-    } else {
-        expect(['delivered', 'queued', 'sent', 'accepted', 'ok']).toContain(result.status);
-    }
-}
-
 test.describe('Settings · Integrations · Channels — connector lifecycle', () => {
     test('Slack connector: connect → test → reconfigure URL → disable gate → re-enable → disconnect', async ({
         request,
@@ -192,7 +188,7 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         expect(await listChannels(request, token)).toEqual([]);
 
         // CONNECT a Slack incoming-webhook channel. Create performs NO URL validation —
-        // the plugin's hooks.slack.com prefix check is deferred to test/send time.
+        // the plugin's hooks.slack.com host check runs at test/send time.
         const slack = await connectChannel(request, token, 'slack-channel', 'Eng Alerts', {
             webhookUrl: 'https://hooks.slack.com/services/T000/B000/firstsecret',
         });
@@ -209,11 +205,13 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         expect(slack.organizationId).toBeNull();
         expect((await listChannels(request, token)).map((c) => c.id)).toContain(slack.id);
 
-        // TEST — CI enables no slack delivery plugin, so the truthful state is a failed
-        // send naming the plugin. The "Test" button surfaces exactly this to the operator.
+        // TEST — the slack-channel plugin is bound and the URL is a well-formed hooks.slack.com
+        // hook, so the plugin really POSTs it; Slack answers 404 for a hook that does not
+        // exist, and the plugin reports exactly that. Never a fabricated success. The "Test"
+        // button surfaces this same result to the operator.
         const t1 = await testSend(request, token, slack.id);
         expect(t1.http).toBe(201);
-        expectTruthfulUnconfiguredTest(t1.body, 'slack-channel');
+        expectProviderRejected(t1.body, 'slack-channel', 404);
 
         // RECONFIGURE — point the connector at a new webhook URL (rotating the secret).
         // targetConfig is replaced wholesale, name + enabled state untouched.
@@ -254,7 +252,8 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         );
 
         // RE-ENABLE — clears disabledAt; the connector returns to the active list and the
-        // test-send reverts to the plugin-resolution failure (the gate is lifted).
+        // test-send reaches the plugin again (the gate is lifted), which POSTs the ROTATED
+        // hook and reports Slack's 404 for it.
         const enable = await request.patch(`${API_BASE}/api/notification-channels/${slack.id}`, {
             headers: authedHeaders(token),
             data: { disabled: false },
@@ -269,7 +268,7 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
             tReenabled.body.error,
             're-enabled connector is no longer "channel disabled"',
         ).not.toBe('channel disabled');
-        expectTruthfulUnconfiguredTest(tReenabled.body, 'slack-channel');
+        expectProviderRejected(tReenabled.body, 'slack-channel', 404);
 
         // DISCONNECT — DELETE is scoped + idempotent on the owner; the row vanishes and a
         // subsequent test-send 404s "Channel not found".
@@ -296,36 +295,58 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
 
         // Connect one of each supported connector kind in a single inbox. The CONFIG shapes
         // mirror the UI wizard's per-provider field map (NotificationChannelsSettings PROVIDERS).
-        const specs: Array<{ pluginId: string; name: string; cfg: Record<string, unknown> }> = [
+        // Every config is well-formed for its plugin but fictitious, so each test-send reaches
+        // the real provider and `testSend` pins the HTTP status that provider rejects it with
+        // (`webhook` names no channel plugin, so it never leaves the facade).
+        const rejectedWith =
+            (pluginId: BoundChannelPluginId, httpStatus: number) => (r: TestResult) =>
+                expectProviderRejected(r, pluginId, httpStatus);
+        const specs: Array<{
+            pluginId: string;
+            name: string;
+            cfg: Record<string, unknown>;
+            testSend: (r: TestResult) => void;
+        }> = [
             {
                 pluginId: 'discord-channel',
                 name: 'Team Discord',
                 cfg: { webhookUrl: 'https://discord.com/api/webhooks/100/discordsecret' },
+                // Unknown webhook id → 404 (Discord code 10015 "Unknown Webhook").
+                testSend: rejectedWith('discord-channel', 404),
             },
             {
                 pluginId: 'slack-channel',
                 name: 'Team Slack',
                 cfg: { webhookUrl: 'https://hooks.slack.com/services/T/B/slacksecret' },
+                // Unknown incoming webhook → 404.
+                testSend: rejectedWith('slack-channel', 404),
             },
             {
                 pluginId: 'telegram-channel',
                 name: 'Team Telegram',
                 cfg: { botToken: '123456:tgsecrettoken', chatId: '@teamchannel' },
+                // Well-formed but unknown bot token → 401 "Unauthorized".
+                testSend: rejectedWith('telegram-channel', 401),
             },
             {
                 pluginId: 'whatsapp-channel',
                 name: 'Team WhatsApp',
                 cfg: { accessToken: 'wa-secret', phoneNumberId: '55501', to: '+15551234567' },
+                // Unparseable access token → 401 (OAuthException).
+                testSend: rejectedWith('whatsapp-channel', 401),
             },
             {
                 pluginId: 'novu-channel',
                 name: 'Team Novu',
                 cfg: { apiKey: 'novu-secret', workflowId: 'wf-1', subscriberId: 'sub-1' },
+                // Unknown API key → 401 "API Key not found".
+                testSend: rejectedWith('novu-channel', 401),
             },
             {
                 pluginId: 'webhook',
                 name: 'Generic Webhook',
                 cfg: { url: 'https://example.com/ingest', secret: 'hmac-secret' },
+                testSend: (r) => expectPluginNotBound(r, 'webhook'),
             },
         ];
 
@@ -351,12 +372,14 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
             expect(pluginIds).toContain(s.pluginId);
         }
 
-        // Each connector's test-send reports a truthful, plugin-specific failure in CI —
-        // proving the facade resolves per-pluginId (the error names the exact plugin).
-        for (const ch of created) {
+        // Each connector's test-send reports its own provider's truthful failure — proving the
+        // facade resolves per-pluginId (each error carries that plugin's own prefix) and that
+        // the stored multi-field secrets reach the plugin intact (each provider got far enough
+        // to reject the credential itself, not a missing-field refusal).
+        for (const [i, ch] of created.entries()) {
             const t = await testSend(request, token, ch.id);
-            expect(t.http).toBe(201);
-            expectTruthfulUnconfiguredTest(t.body, ch.pluginId);
+            expect(t.http, `${ch.pluginId} test-send`).toBe(201);
+            specs[i].testSend(t.body);
         }
 
         // Disconnecting ONE connector leaves the others intact (scoped delete).
@@ -491,7 +514,7 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         });
     });
 
-    test('configure-validation edges — connect accepts any config (validation deferred to send), empty PATCH is a no-op, missing name is a 400 DTO-guard rejection', async ({
+    test('configure-validation edges — connect stores any config verbatim, the bound plugin refuses an off-host or unsafe webhook at send and accepts a hooks.slack.com one, empty PATCH is a no-op, missing name is a 400 DTO-guard rejection', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request, { email: `sic-cfg-${Date.now()}@test.local` });
@@ -502,21 +525,60 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         expect(anonList.status()).toBe(401);
 
         // CONNECT a Slack connector with a NON-slack URL. Create performs no URL validation —
-        // it is stored verbatim. The plugin's hooks.slack.com prefix check only fires on send.
+        // it is stored verbatim. Validation belongs to the plugin, which runs it on send.
         const badUrl = await connectChannel(request, token, 'slack-channel', 'Misconfigured', {
             webhookUrl: 'https://evil.example.com/not-a-slack-hook',
         });
         expect(badUrl.targetConfig).toEqual({
             webhookUrl: 'https://evil.example.com/not-a-slack-hook',
         });
-        // Test-send of the misconfigured connector still surfaces the plugin-resolution
-        // failure in CI (no delivery plugin to even reach the URL check) — never a 5xx.
+        // Test-send of the misconfigured connector: the bound slack-channel plugin refuses the
+        // off-host URL BEFORE making any request (its SSRF/host guard) — a truthful failure
+        // with the plugin's exact reason, never a 5xx and never a request to evil.example.com.
         const tBad = await testSend(request, token, badUrl.id);
         expect(tBad.http).toBe(201);
-        expectTruthfulUnconfiguredTest(tBad.body, 'slack-channel');
+        expectConfigRefused(tBad.body, SLACK_OFF_HOST_REFUSAL);
 
-        // CONNECT a totally unknown pluginId — also accepted at create (the facade only
-        // fails to resolve it at send time, with the pluginId named in the error).
+        // What the plugin REFUSES: anything that is not an https URL on hooks.slack.com —
+        // plain http, a look-alike host that merely starts with the Slack host name, and the
+        // cloud metadata address. Each is stored verbatim, then refused at send with the same
+        // exact reason, before any request leaves the API.
+        const probe = await connectChannel(request, token, 'slack-channel', 'Host probe', {
+            webhookUrl: 'https://evil.example.com/probe',
+        });
+        for (const refused of [
+            'http://hooks.slack.com/services/T000/B000/plainhttp',
+            'https://hooks.slack.com.evil.example/services/T000/B000/lookalike',
+            'http://169.254.169.254/latest/meta-data/',
+        ]) {
+            const repoint = await request.patch(
+                `${API_BASE}/api/notification-channels/${probe.id}`,
+                {
+                    headers: authedHeaders(token),
+                    data: { targetConfig: { webhookUrl: refused } },
+                    timeout: TIMEOUT,
+                },
+            );
+            expect(repoint.status(), `store ${refused}`).toBe(200);
+            const t = await testSend(request, token, probe.id);
+            expect(t.http, `test-send ${refused}`).toBe(201);
+            expectConfigRefused(t.body, SLACK_OFF_HOST_REFUSAL);
+        }
+
+        // What the plugin ACCEPTS: a hooks.slack.com URL passes its validation, so the plugin
+        // really POSTs it — and Slack's 404 for the fictitious hook comes back as the reason.
+        const accepted = await request.patch(`${API_BASE}/api/notification-channels/${probe.id}`, {
+            headers: authedHeaders(token),
+            data: { targetConfig: { webhookUrl: 'https://hooks.slack.com/services/T000/B000/ok' } },
+            timeout: TIMEOUT,
+        });
+        expect(accepted.status()).toBe(200);
+        const tAccepted = await testSend(request, token, probe.id);
+        expect(tAccepted.http).toBe(201);
+        expectProviderRejected(tAccepted.body, 'slack-channel', 404);
+
+        // CONNECT a totally unknown pluginId — also accepted at create; at send time the
+        // facade resolves no plugin for it and names the pluginId in the error.
         const unknownPlugin = await connectChannel(
             request,
             token,
@@ -528,7 +590,7 @@ test.describe('Settings · Integrations · Channels — connector lifecycle', ()
         );
         const tUnknown = await testSend(request, token, unknownPlugin.id);
         expect(tUnknown.http).toBe(201);
-        expectTruthfulUnconfiguredTest(tUnknown.body, 'totally-made-up-channel');
+        expectPluginNotBound(tUnknown.body, 'totally-made-up-channel');
 
         // Empty PATCH ({}) is a no-op 200 that preserves the row as-is.
         const noop = await request.patch(`${API_BASE}/api/notification-channels/${badUrl.id}`, {
@@ -670,17 +732,18 @@ test.describe('Settings · Integrations · Channels — UI', () => {
         await expect(rowTestButton).toBeVisible();
         await expect(rowRemoveButton).toBeVisible();
 
-        // Test surfaces the TRUTHFUL per-plugin failure badge — CI enables no slack delivery
-        // plugin, so the server-action test resolves `{ status:'failed', error:… }` and the row
-        // renders a red "✗ <error>" badge naming the plugin (probed: `Failed to materialize
-        // plugin "slack-channel"`). Retry the click to ride out any pre-hydration swallow.
+        // Test surfaces the TRUTHFUL provider failure badge — the bound slack-channel plugin
+        // POSTs the fictitious hook, Slack answers 404, so the server-action test resolves
+        // `{ status:'failed', error:'Slack webhook failed (404): …' }` and the row renders a red
+        // "✗ <error>" badge, never the green "✓ Sent". Retry the click to ride out any
+        // pre-hydration swallow.
         const testBadge = createdRow.locator('span.text-red-600');
         await expect(async () => {
             await rowTestButton.click({ timeout: 5_000 }).catch(() => {});
             await expect(testBadge).toBeVisible({ timeout: 5_000 });
         }).toPass({ timeout: 30_000 });
-        await expect(testBadge).toContainText('✗');
-        await expect(testBadge).toContainText(/materialize|not found|disabled|fail/i);
+        await expect(testBadge).toContainText('✗ Slack webhook failed (404): ');
+        await expect(createdRow.locator('span.text-green-600')).toHaveCount(0);
 
         // Remove drops the row (the documented flow-6 affordance) and cleans up the channel this
         // test created in the shared in-memory DB. Retry the click to ride out a swallow.
