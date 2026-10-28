@@ -70,6 +70,8 @@ describe('GrokPlugin', () => {
 		 * longer lists. The list below is the set of text model ids on the
 		 * vendor's models page on 2026-10-28:
 		 *   https://docs.x.ai/developers/models
+		 * minus `grok-4.20-multi-agent-0309`, which is not a Chat Completions
+		 * model (the API this plugin speaks), so it must never be a default.
 		 * Update it from that page, never from memory.
 		 */
 		const VERIFIED_XAI_TEXT_MODEL_IDS = [
@@ -79,7 +81,6 @@ describe('GrokPlugin', () => {
 			'grok-4.3',
 			'grok-4.20-0309-reasoning',
 			'grok-4.20-0309-non-reasoning',
-			'grok-4.20-multi-agent-0309',
 			'grok-build-0.1'
 		];
 

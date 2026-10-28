@@ -78,7 +78,11 @@ export interface AiOperationsConfig {
 export class AiOperations {
 	constructor(private defaultConfig: AiOperationsConfig) {}
 
-	/** Per-model cache of params the provider has rejected (e.g. temperature, reasoning). */
+	/**
+	 * Params the provider has rejected (e.g. temperature, reasoning), per
+	 * endpoint and model ({@link paramCacheKey}): a proxy that refuses a param
+	 * says nothing about the provider's own endpoint.
+	 */
 	private readonly rejectedParams = new Map<string, Set<string>>();
 
 	/**
@@ -92,7 +96,7 @@ export class AiOperations {
 		const config = this.mergeConfig(configOverrides);
 		const model = options.model || config.model;
 
-		return this.withParamRetry(model, async (skip) => {
+		return this.withParamRetry(this.paramCacheKey(config, model), async (skip) => {
 			const baseLlm = this.createChatModel(config, model, options, skip);
 			const llm = this.bindTools(baseLlm, options, skip);
 			const tracker = new TokenUsageTracker();
@@ -151,7 +155,7 @@ export class AiOperations {
 		const config = this.mergeConfig(configOverrides);
 		const model = config.model;
 
-		return this.withParamRetry(model, async (skip) => {
+		return this.withParamRetry(this.paramCacheKey(config, model), async (skip) => {
 			const llm = this.createChatModel(
 				config,
 				model,
@@ -183,17 +187,18 @@ export class AiOperations {
 		const model = options.model || config.model;
 		const messages = this.toLangChainMessages(options.messages);
 
-		const skip = new Set(this.rejectedParams.get(model));
+		const cacheKey = this.paramCacheKey(config, model);
+		const skip = new Set(this.rejectedParams.get(cacheKey));
 		let stream: AsyncIterable<AIMessageChunk>;
 		try {
 			const baseLlm = this.createChatModel(config, model, options, skip);
 			const llm = this.bindTools(baseLlm, options, skip);
 			stream = await llm.stream(messages);
 		} catch (error) {
-			const param = this.parseRejectedParam(error);
-			if (!param || skip.has(param)) throw error;
+			const param = this.nextRejectedParam(error, skip);
+			if (!param) throw error;
 			skip.add(param);
-			this.rejectedParams.set(model, new Set(skip));
+			this.rejectedParams.set(cacheKey, new Set(skip));
 			const baseLlm = this.createChatModel(config, model, options, skip);
 			const llm = this.bindTools(baseLlm, options, skip);
 			stream = await llm.stream(messages);
@@ -369,7 +374,7 @@ export class AiOperations {
 				// Same rejected-parameter retry as a real request, so a model
 				// that refuses a default parameter (e.g. `temperature` on
 				// Claude 4.7+) does not fail validation that real calls pass.
-				this.withParamRetry(model, (skip) =>
+				this.withParamRetry(this.paramCacheKey(config, model), (skip) =>
 					this.createChatModel(config, model, undefined, skip).invoke([
 						new HumanMessage('Respond with just "OK" to confirm you are working.')
 					])
@@ -519,24 +524,42 @@ export class AiOperations {
 
 	/**
 	 * Generic retry: if the API rejects an unsupported parameter, rebuild
-	 * the model without it and retry once. Handles temperature, reasoning,
-	 * etc. across all providers/models in one place.
+	 * the model without it and retry, once per newly rejected parameter (a
+	 * request can be refused for `temperature`, then for a forced
+	 * `tool_choice`). Handles temperature, reasoning, etc. across all
+	 * providers/models in one place.
 	 *
-	 * Uses a per-model cache so the same param is never sent twice.
+	 * Uses a per-endpoint-and-model cache so the same param is never sent twice.
 	 */
-	private async withParamRetry<T>(model: string, operation: (skip: Set<string>) => Promise<T>): Promise<T> {
-		const skip = new Set(this.rejectedParams.get(model));
-		try {
-			return await operation(skip);
-		} catch (error) {
-			const param = this.parseRejectedParam(error);
-			if (param && !skip.has(param)) {
+	private async withParamRetry<T>(cacheKey: string, operation: (skip: Set<string>) => Promise<T>): Promise<T> {
+		const skip = new Set(this.rejectedParams.get(cacheKey));
+		// Each pass adds a param not yet in `skip`, and there are only a few,
+		// so this ends.
+		for (;;) {
+			try {
+				return await operation(skip);
+			} catch (error) {
+				const param = this.nextRejectedParam(error, skip);
+				if (!param) throw error;
 				skip.add(param);
-				this.rejectedParams.set(model, new Set(skip));
-				return operation(skip);
+				this.rejectedParams.set(cacheKey, new Set(skip));
 			}
-			throw error;
 		}
+	}
+
+	/** The param to leave out on the next attempt, or `undefined` when a retry cannot help. */
+	private nextRejectedParam(error: unknown, skip: ReadonlySet<string>): string | undefined {
+		let param = this.parseRejectedParam(error);
+		// The tool choice was refused again after forced choices were dropped:
+		// this provider takes no tool choice at all, so send no tools, which is
+		// what every refused tool choice did before the two were told apart.
+		if (param === 'tool_choice' && skip.has('tool_choice')) param = 'tools';
+		return param && !skip.has(param) ? param : undefined;
+	}
+
+	/** Key for {@link rejectedParams}: the endpoint and the model. */
+	private paramCacheKey(config: AiOperationsConfig, model: string): string {
+		return `${config.baseURL ?? ''}|${model}`;
 	}
 
 	private mapTokenUsage(tracker: TokenUsageTracker) {
@@ -571,7 +594,11 @@ export class AiOperations {
 		}));
 
 		const callOptions: Partial<ChatOpenAICompletionsCallOptions> = { tools };
-		if (options.toolChoice) {
+		// After the model refused a forced choice (`required` or a named
+		// function), send none and let it choose: the tools stay bound.
+		// `auto` and `none` are still sent as written.
+		const forced = options.toolChoice === 'required' || typeof options.toolChoice === 'object';
+		if (options.toolChoice && !(forced && skip?.has('tool_choice'))) {
 			callOptions.tool_choice = options.toolChoice;
 		}
 
@@ -585,7 +612,10 @@ export class AiOperations {
 		if (namesParam(msg, 'reasoning') || namesParam(msg, 'reasoning_effort')) return 'reasoning';
 		if (msg.includes('json_schema') || msg.includes('response_format') || msg.includes('structured output'))
 			return 'structured_output';
-		if (namesParam(msg, 'tools') || msg.includes('tool_choice')) return 'tools';
+		// A refused tool CHOICE keeps the tools: only a forced choice is dropped
+		// (see bindTools), as models without forced tool use expect.
+		if (msg.includes('tool_choice')) return 'tool_choice';
+		if (namesParam(msg, 'tools')) return 'tools';
 		return undefined;
 	}
 

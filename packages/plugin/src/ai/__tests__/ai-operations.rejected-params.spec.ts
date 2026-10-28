@@ -18,6 +18,20 @@ const TEMPERATURE_REJECTION = {
 	error: { type: 'invalid_request_error', message: '`temperature` is deprecated for this model.' }
 };
 
+function okCompletion(message: Record<string, unknown>): Response {
+	return new Response(
+		JSON.stringify({
+			id: 'r1',
+			object: 'chat.completion',
+			created: 1,
+			model: 'claude-opus-5-5',
+			choices: [{ index: 0, message, finish_reason: message.tool_calls ? 'tool_calls' : 'stop' }],
+			usage: { prompt_tokens: 3, completion_tokens: 1, total_tokens: 4 }
+		}),
+		{ status: 200, headers: { 'content-type': 'application/json' } }
+	);
+}
+
 /** Answers 400 to any request that carries `temperature`, 200 otherwise. */
 function stubProviderRejectingTemperature(): Sent[] {
 	const sent: Sent[] = [];
@@ -94,6 +108,142 @@ describe('AiOperations — a parameter the provider rejects in backticks', () =>
 		expect(result.success).toBe(true);
 		expect(sent).toHaveLength(2);
 		expect(sent[1].body).not.toHaveProperty('temperature');
+	});
+
+	it('keeps a rejection to the endpoint it came from', async () => {
+		// The proxy rejects `temperature`; the default endpoint accepts it.
+		const sent: Array<{ url: string; body: Record<string, unknown> }> = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: unknown, init: { body: string }) => {
+				const body = JSON.parse(init.body) as Record<string, unknown>;
+				sent.push({ url: String(url), body });
+				if (String(url).startsWith('https://proxy.example.com/') && 'temperature' in body) {
+					return new Response(JSON.stringify(TEMPERATURE_REJECTION), {
+						status: 400,
+						headers: { 'content-type': 'application/json' }
+					});
+				}
+				return okCompletion({ role: 'assistant', content: 'OK' });
+			})
+		);
+		const ops = anthropicOps();
+
+		await ops.testConnection({ baseURL: 'https://proxy.example.com/v1/' }, 'claude-opus-5-5');
+		await ops.createChatCompletion({ messages: [{ role: 'user', content: 'hi' }] });
+
+		const last = sent[sent.length - 1];
+		expect(last.url).toMatch(/^https:\/\/api\.anthropic\.com\//);
+		expect(last.body.temperature).toBe(0.7);
+	});
+
+	describe('a forced tool choice the model rejects', () => {
+		// What the Claude API answers on models without forced tool use.
+		const TOOL_CHOICE_REJECTION = {
+			type: 'error',
+			error: {
+				type: 'invalid_request_error',
+				message: 'tool_choice: type "tool" and "any" are not supported for this model.'
+			}
+		};
+		const parameters = { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] };
+		const tools = [
+			{ type: 'function' as const, function: { name: 'get_weather', description: 'Weather', parameters } }
+		];
+
+		/** Rejects `temperature`, then any forced `tool_choice`; otherwise answers a tool call. */
+		function stubProviderRejectingForcedChoice(): Sent[] {
+			const sent: Sent[] = [];
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async (_url: unknown, init: { body: string }) => {
+					const body = JSON.parse(init.body) as Record<string, unknown>;
+					sent.push({ body });
+					const reject = (payload: unknown) =>
+						new Response(JSON.stringify(payload), {
+							status: 400,
+							headers: { 'content-type': 'application/json' }
+						});
+					if ('temperature' in body) return reject(TEMPERATURE_REJECTION);
+					if (body.tool_choice === 'required' || typeof body.tool_choice === 'object') {
+						return reject(TOOL_CHOICE_REJECTION);
+					}
+					return okCompletion({
+						role: 'assistant',
+						content: null,
+						tool_calls: [
+							{
+								id: 'call_1',
+								type: 'function',
+								function: { name: 'get_weather', arguments: '{"city":"Paris"}' }
+							}
+						]
+					});
+				})
+			);
+			return sent;
+		}
+
+		it('retries with the tools kept and the choice left to the model', async () => {
+			const sent = stubProviderRejectingForcedChoice();
+
+			const response = await anthropicOps().createChatCompletion({
+				messages: [{ role: 'user', content: 'weather?' }],
+				tools,
+				toolChoice: 'required'
+			});
+
+			const last = sent[sent.length - 1].body;
+			expect(last.tools).toEqual(tools);
+			expect(last).not.toHaveProperty('tool_choice');
+			expect(response.choices[0].message.toolCalls?.[0].function.name).toBe('get_weather');
+		});
+
+		it('still sends tool_choice "none" to that model afterwards', async () => {
+			const sent = stubProviderRejectingForcedChoice();
+			const ops = anthropicOps();
+
+			await ops.createChatCompletion({
+				messages: [{ role: 'user', content: 'weather?' }],
+				tools,
+				toolChoice: { type: 'function', function: { name: 'get_weather' } }
+			});
+			await ops.createChatCompletion({ messages: [{ role: 'user', content: 'hi' }], tools, toolChoice: 'none' });
+
+			const last = sent[sent.length - 1].body;
+			expect(last.tools).toEqual(tools);
+			expect(last.tool_choice).toBe('none');
+		});
+	});
+
+	it('drops the tools for a provider that refuses every tool_choice, as before', async () => {
+		const sent: Sent[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (_url: unknown, init: { body: string }) => {
+				const body = JSON.parse(init.body) as Record<string, unknown>;
+				sent.push({ body });
+				if ('tool_choice' in body) {
+					return new Response(
+						JSON.stringify({
+							error: { type: 'invalid_request_error', message: 'tool_choice is not supported' }
+						}),
+						{ status: 400, headers: { 'content-type': 'application/json' } }
+					);
+				}
+				return okCompletion({ role: 'assistant', content: 'plain answer' });
+			})
+		);
+		const ops = new AiOperations({ apiKey: 'k', model: 'local-model', providerType: 'openai' });
+
+		const response = await ops.createChatCompletion({
+			messages: [{ role: 'user', content: 'hi' }],
+			tools: [{ type: 'function', function: { name: 'noop', parameters: { type: 'object' } } }],
+			toolChoice: 'auto'
+		});
+
+		expect(response.choices[0].message.content).toBe('plain answer');
+		expect(sent[sent.length - 1].body).not.toHaveProperty('tools');
 	});
 
 	it('still reports a failure the retry cannot fix', async () => {
