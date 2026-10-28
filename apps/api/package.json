@@ -72,6 +72,7 @@
         "handlebars": "^4.7.10",
         "helmet": "^8.1.0",
         "ioredis": "^5.10.1",
+        "kysely": "^0.28.17",
         "multer": "^2.5.0",
         "mysql2": "^3.24.2",
         "nodemailer": "^10.2.1",
