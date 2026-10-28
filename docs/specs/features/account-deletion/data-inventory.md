@@ -19,9 +19,9 @@ Screenshots of a local run: `docs/pr-assets/account-deletion/`.
 | Confirm                                           | `POST https://api.ever.works/api/account-deletion/confirm` `{token, confirm:true}` → `200 {"deleted":true,"accounts":1,"workspacesDeleted":0 or 1}` / 410                          |
 
 Stage / dev: `app-stage.ever.works` + `api-stage.ever.works`, `app-dev.ever.works` + `api-dev.ever.works` (same paths).
-`callbackUrl` is optional; it is honoured only when its host is `WEB_URL`'s host or listed in the API's
-`ALLOWED_CALLBACK_HOSTS` (so `https://ever.co/...` works only if ops add `ever.co` there). Otherwise the link opens
-`https://app.ever.works/delete-account/confirm`. The contract's extra body fields (`locale`, `appName`, `appLogo`,
+`callbackUrl` is optional. It must be `https` and its host listed in the API's `ALLOWED_CALLBACK_HOSTS` (so
+`https://ever.co/...` works only if ops add `ever.co` there); on the app's own host (`WEB_URL`) the path is ignored and
+the link always opens `https://app.ever.works/delete-account/confirm`, which is also the fallback for anything else. The contract's extra body fields (`locale`, `appName`, `appLogo`,
 `appSignature`, `appLink`, `companyLink`, `companyName`) are accepted and ignored — Ever Works brands its own email.
 
 ## How Ever Works is shaped (so the website copy is right)

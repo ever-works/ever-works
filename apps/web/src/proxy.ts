@@ -130,9 +130,14 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
  * sets `<meta name="referrer" content="no-referrer">`). The confirm page's
  * token travels in the URL fragment, which never reaches this function.
  */
+/** The path without a leading `/org/<slug>` workspace prefix. */
+function withoutWorkspacePrefix(pathname: string): string {
+    return pathname.replace(/^\/org\/[^/]+(?=\/|$)/, '') || '/';
+}
+
 function isAccountDeletionPage(pathname: string): boolean {
     // Also under a workspace prefix (`/org/<slug>/delete-account/...`).
-    const path = pathname.replace(/^\/org\/[^/]+(?=\/|$)/, '') || '/';
+    const path = withoutWorkspacePrefix(pathname);
     return path === ROUTES.DELETE_ACCOUNT || path.startsWith(`${ROUTES.DELETE_ACCOUNT}/`);
 }
 
@@ -318,8 +323,14 @@ export default async function proxy(req: NextRequest) {
     // session cookie.
     const auth = await getAuthFromRequest();
     if (!auth.isAuthenticated || auth.isExpired) {
-        const loginUrl = new URL(ROUTES.AUTH_LOGIN, req.url);
-        const response = NextResponse.redirect(loginUrl);
+        // A signed-out visit to a workspace-prefixed deletion page goes to the
+        // same, public, unprefixed page — not to /login. A redirect whose
+        // Location has no fragment keeps the visitor's fragment, so a deletion
+        // token in it would otherwise land on /login, where analytics run.
+        const target = isAccountDeletionPage(pathname)
+            ? new URL(withoutWorkspacePrefix(pathname), req.url)
+            : new URL(ROUTES.AUTH_LOGIN, req.url);
+        const response = NextResponse.redirect(target);
 
         if (req.cookies.has(AUTH_COOKIE_NAME)) {
             response.cookies.delete(AUTH_COOKIE_NAME);

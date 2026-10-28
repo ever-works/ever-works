@@ -245,8 +245,23 @@ export class AccountDeletionTokenService {
         if (!this.urls.allowedCallbackHosts.has(parsed.host.toLowerCase())) {
             return this.urls.defaultConfirmUrl;
         }
+        // On the platform's own web app there is exactly one confirm page, and
+        // it is the one that strips the fragment and runs without analytics.
+        // Any other path there (a workspace-prefixed copy, /login, …) would
+        // leave the token in a page URL, so the caller's path is ignored.
+        if (parsed.host.toLowerCase() === this.defaultConfirmHost()) {
+            return this.urls.defaultConfirmUrl;
+        }
         // Drop any fragment-borne token a caller tried to smuggle in; keep the route.
         return callbackUrl.replace(/([#?&])token=[^&#]*/g, '$1').replace(/[?&#]$/, '');
+    }
+
+    private defaultConfirmHost(): string | null {
+        try {
+            return new URL(this.urls.defaultConfirmUrl).host.toLowerCase();
+        } catch {
+            return null;
+        }
     }
 
     private ref(email: string): string {

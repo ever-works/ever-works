@@ -262,6 +262,13 @@ describe('AccountDeletionTokenService', () => {
             expect(service.resolveConfirmUrl('javascript:alert(1)')).toBe(
                 'https://app.ever.works/delete-account/confirm',
             );
+            // On the platform's own web host only its one confirm page is used, whatever path is named.
+            expect(service.resolveConfirmUrl('https://app.ever.works/login')).toBe(
+                'https://app.ever.works/delete-account/confirm',
+            );
+            expect(
+                service.resolveConfirmUrl('https://app.ever.works/org/acme/delete-account/confirm'),
+            ).toBe('https://app.ever.works/delete-account/confirm');
             // An allowed host over plain http could be altered in transit and read the fragment.
             expect(service.resolveConfirmUrl('http://ever.co/delete/confirm')).toBe(
                 'https://app.ever.works/delete-account/confirm',

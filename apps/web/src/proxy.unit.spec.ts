@@ -205,6 +205,17 @@ describe('self-serve account deletion pages', () => {
         const signedOut = await proxy(request('/org/acme/delete-account/confirm'));
         expect(signedOut.status).toBeGreaterThanOrEqual(300);
         expect(signedOut.status).toBeLessThan(400);
+        // Signed out, the prefixed page goes to the public unprefixed page (the
+        // browser carries the #token fragment along), never to /login.
+        expect(new URL(signedOut.headers.get('location') as string).pathname).toBe(
+            '/delete-account/confirm',
+        );
+    });
+
+    it('still sends other signed-out pages to /login', async () => {
+        getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: false, isExpired: false });
+        const response = await proxy(request('/org/acme/missions'));
+        expect(new URL(response.headers.get('location') as string).pathname).toBe('/login');
     });
 
     it('leaves other pages with the default referrer policy', async () => {
