@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     HttpException,
     HttpStatus,
     Injectable,
@@ -41,6 +42,7 @@ import {
 import { MailService } from '../mail/mail.service';
 import { EmailDraftService } from '@ever-works/agent/email';
 import type { EmailSendOrigin } from '@ever-works/contracts';
+import type { EmailInboundAddressPolicy } from '@ever-works/plugin';
 
 /**
  * EW-711 #44 — how long an address-verification token stays valid after
@@ -57,6 +59,15 @@ export const VERIFICATION_RESEND_COOLDOWN_MS = 60 * 1000;
 
 /** EW-P4-3 — where the confirmation link lands (a public web page, see apps/web). */
 export const EMAIL_ADDRESS_VERIFY_PATH = '/email-address/verify';
+
+/**
+ * Answered (409) when another account already holds a mailbox that its
+ * provider plugin keeps to one owner per deployment
+ * (`IEmailInboundPlugin.inboundAddressPolicy.exclusive`).
+ */
+export const EXCLUSIVE_ADDRESS_TAKEN = 'This address is already registered by another account.';
+
+const INBOUND_DIRECTIONS: readonly EmailAddressDirection[] = ['inbound', 'both'];
 
 /** EW-P4-3 — what `POST /api/email/addresses/:id/verify` answers. */
 export interface TriggerVerificationResult {
@@ -247,14 +258,26 @@ export class EmailService {
         return this.addresses.findActiveByUser(userId, direction);
     }
 
+    /**
+     * Register a tenant address for `userId`, under its provider plugin's
+     * address policy when it declares one (domain, lower-cased, single owner).
+     */
     async createAddress(
         userId: string,
         input: CreateEmailAddressInput,
     ): Promise<TenantEmailAddress> {
+        // The provider plugin's address rules, if it declares any (asked of
+        // its loaded instance — 503 when it cannot load). None: the address
+        // is registered exactly as before.
+        const policy = await this.emailFacade.inboundAddressPolicy(input.pluginId);
+        // A policy's mailbox is stored lower-cased: such a plugin's deliveries
+        // are matched on the lower-cased recipient, and the binding lookup is exact.
+        const address = policy ? input.address.trim().toLowerCase() : input.address;
+        if (policy) await this.assertAddressPolicy(policy, userId, address, input.direction);
         const verificationToken = randomBytes(24).toString('base64url');
-        return this.addresses.save({
+        const saved = await this.addresses.save({
             userId,
-            address: input.address,
+            address,
             direction: input.direction,
             pluginId: input.pluginId,
             providerSettings: input.providerSettings,
@@ -265,22 +288,92 @@ export class EmailService {
             // confirmation link cannot verify the address indefinitely.
             verificationTokenExpiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
         } as TenantEmailAddress);
+        if (policy?.exclusive && INBOUND_DIRECTIONS.includes(saved.direction)) {
+            // Two accounts registering the same mailbox at once both pass the
+            // check above (no unique index spans users). Oldest first, the one
+            // the binding picks is kept; a row another account wrote before
+            // this one means this request lost the race.
+            const holders = await this.addresses.findEnabledInboundByAddress(address);
+            const first = holders.find((row) => row.userId !== userId || row.id === saved.id);
+            if (first && first.id !== saved.id) {
+                await this.addresses.delete(saved.id, userId);
+                throw new ConflictException(EXCLUSIVE_ADDRESS_TAKEN);
+            }
+        }
+        return saved;
     }
 
+    /**
+     * Change an owned address's settings, reply default or disabled state;
+     * re-enabling it applies its provider plugin's address policy again.
+     */
     async updateAddress(
         userId: string,
         id: string,
         input: UpdateEmailAddressInput,
     ): Promise<TenantEmailAddress> {
-        await this.findOwnedOrThrow(userId, id);
+        const row = await this.findOwnedOrThrow(userId, id);
         const patch: Partial<TenantEmailAddress> = {};
         if (input.providerSettings) patch.providerSettings = input.providerSettings;
         if (typeof input.defaultForReplies === 'boolean')
             patch.defaultForReplies = input.defaultForReplies;
         if (typeof input.disabled === 'boolean')
             patch.disabledAt = input.disabled ? new Date() : null;
+        // Re-enabling is the one update that changes who receives a mailbox
+        // (the row keeps its old `createdAt`, so the binding would prefer it
+        // over a newer holder): its plugin's address rules apply again.
+        const policy =
+            input.disabled === false && row.disabledAt
+                ? await this.emailFacade.inboundAddressPolicy(row.pluginId)
+                : null;
+        if (policy) {
+            await this.assertAddressPolicy(policy, userId, row.address, row.direction, row.id);
+        }
         await this.addresses.update(id, patch);
+        if (policy?.exclusive && INBOUND_DIRECTIONS.includes(row.direction)) {
+            // As in `createAddress`: another account that took the mailbox
+            // meanwhile keeps it, and this row goes back to disabled.
+            const holders = await this.addresses.findEnabledInboundByAddress(row.address);
+            if (holders.some((holder) => holder.userId !== userId)) {
+                await this.addresses.update(id, { disabledAt: row.disabledAt });
+                throw new ConflictException(EXCLUSIVE_ADDRESS_TAKEN);
+            }
+        }
         return this.findOwnedOrThrow(userId, id);
+    }
+
+    /**
+     * A provider plugin's address rules (`IEmailInboundPlugin.inboundAddressPolicy`):
+     * the address must be on the policy's domain — 400 — and, for an
+     * `exclusive` policy and an address that receives mail, no other account
+     * may hold an enabled inbound row for the same mailbox (case-insensitive,
+     * any plugin: the binding picks the oldest such row, so this one would
+     * never receive) — 409. `excludeId` is the row being re-enabled.
+     */
+    private async assertAddressPolicy(
+        policy: EmailInboundAddressPolicy,
+        userId: string,
+        address: string,
+        direction: EmailAddressDirection,
+        excludeId?: string,
+    ): Promise<void> {
+        const at = address.lastIndexOf('@');
+        if (
+            at <= 0 ||
+            address
+                .slice(at + 1)
+                .trim()
+                .toLowerCase() !== policy.domain
+        ) {
+            throw new BadRequestException(
+                `Addresses of this provider must be on @${policy.domain}.`,
+            );
+        }
+        if (!policy.exclusive || !INBOUND_DIRECTIONS.includes(direction)) return;
+        const holders = await this.addresses.findEnabledInboundByAddress(address);
+        if (holders.some((row) => row.id !== excludeId && row.userId !== userId)) {
+            throw new ConflictException(EXCLUSIVE_ADDRESS_TAKEN);
+        }
     }
 
     async deleteAddress(userId: string, id: string): Promise<void> {

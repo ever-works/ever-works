@@ -83,6 +83,8 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskApproverRepository: class TaskApproverRepository {},
     // Reviewer agent stage (slice AD, EW-811).
     TaskAgentReviewService: class TaskAgentReviewService {},
+    // APW-04 T10 (bd1b6fb39) — the run's Task, for the git tools' provisioning write rule.
+    TaskRepository: class TaskRepository {},
     TaskStatus: {},
     RUN_STEERING_PORT: 'RUN_STEERING_PORT',
     // APW-08 T17 — the App Work change gate the git tools ask.
@@ -112,6 +114,27 @@ jest.mock('@ever-works/agent/fleet', () => ({
     FleetService: class FleetService {},
     FleetJobService: class FleetJobService {},
     FleetKillSwitchService: class FleetKillSwitchService {},
+    // The optional services the Fleet lanes (FL-04 … FL-20) appended to the domain tool
+    // sources. Without a stub each was `undefined` here, so the pin could not name them.
+    FleetMachineActionsService: class FleetMachineActionsService {},
+    FleetSessionService: class FleetSessionService {},
+    FleetPortsService: class FleetPortsService {},
+    FleetCheckoutService: class FleetCheckoutService {},
+    FleetCommandService: class FleetCommandService {},
+    FleetPortTunnelService: class FleetPortTunnelService {},
+    FleetNodeHealthService: class FleetNodeHealthService {},
+    NeedsALookService: class NeedsALookService {},
+    FleetVirtualService: class FleetVirtualService {},
+    FleetGitIdentityService: class FleetGitIdentityService {},
+    FleetScheduleService: class FleetScheduleService {},
+    FleetSessionActionService: class FleetSessionActionService {},
+    FleetCloudService: class FleetCloudService {},
+    FleetUsageViewService: class FleetUsageViewService {},
+    FleetActionsRunnersService: class FleetActionsRunnersService {},
+    FLEET_STATUS_READER: 'FLEET_STATUS_READER',
+    FLEET_LOGS_READER: 'FLEET_LOGS_READER',
+    FLEET_WAKE_TOOL_PORT: 'FLEET_WAKE_TOOL_PORT',
+    FLEET_DESKTOP_READER: 'FLEET_DESKTOP_READER',
 }));
 jest.mock('@ever-works/agent/pr-review', () => ({
     PrReviewModule: class PrReviewModule {},
@@ -183,7 +206,32 @@ import { AgentsModule } from './agents.module';
 import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
-import { FleetModule, FleetService } from '@ever-works/agent/fleet';
+import {
+    FleetModule,
+    FleetService,
+    FleetMachineActionsService,
+    FleetSessionService,
+    FleetPortsService,
+    FleetCheckoutService,
+    FleetCommandService,
+    FleetPortTunnelService,
+    FleetNodeHealthService,
+    NeedsALookService,
+    FleetVirtualService,
+    FleetGitIdentityService,
+    FleetScheduleService,
+    FleetSessionActionService,
+    FleetCloudService,
+    FleetUsageViewService,
+    FleetActionsRunnersService,
+    FLEET_STATUS_READER,
+    FLEET_LOGS_READER,
+    FLEET_WAKE_TOOL_PORT,
+    FLEET_DESKTOP_READER,
+} from '@ever-works/agent/fleet';
+import { FleetOperationsService } from '../fleet-link/fleet-operations.service';
+import { FleetTaskHandoffService } from '../fleet/tasks/fleet-task-handoff.service';
+import { FleetPullRequestService } from '../fleet/session-git/fleet-pull-request.service';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import { PolicyModule, MergePolicyService, ToolGrantService } from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
@@ -194,6 +242,7 @@ import {
     TaskReviewerRepository,
     TaskApproverRepository,
     TaskAgentReviewService,
+    TaskRepository,
     APP_WORK_CHANGE_GATE,
 } from '@ever-works/agent/tasks-domain';
 import {
@@ -230,6 +279,19 @@ const findProvider = (token: unknown): FactoryProvider | undefined =>
     (meta('providers') as FactoryProvider[]).find(
         (provider) => provider && typeof provider === 'object' && provider.provide === token,
     );
+
+/**
+ * Where the optional approvals service sits in the domain tool sources' `inject`. It was the
+ * last entry until the Fleet lanes appended their own optional services after it, so the
+ * proposals cases address it by token rather than as `length - 1`.
+ */
+const approvalsIndex = (factory: FactoryProvider | undefined): number => {
+    const at = (factory?.inject ?? []).findIndex(
+        (entry) => (entry as { token?: unknown } | null)?.token === AgentApprovalsService,
+    );
+    expect(at).toBeGreaterThan(-1);
+    return at;
+};
 
 describe('api-side AgentsModule — domain chat-tool wiring', () => {
     it('imports every module that backs a domain chat tool', () => {
@@ -291,7 +353,38 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             // `resolve_escalation` and `editAgentFile`. APPENDED LAST for the
             // same positional reason, and OPTIONAL: unbound, both tools refuse.
             { token: AgentApprovalsService, optional: true },
+            // The Fleet lanes, each APPENDED LAST (positional) and OPTIONAL: unbound (or its
+            // feature flag off), the matching tools are simply not offered.
+            { token: FleetMachineActionsService, optional: true }, // 923a875c9 (FL-09)
+            { token: FleetSessionService, optional: true }, // 21db7182b (FL-04 P2)
+            { token: FleetPortsService, optional: true }, // 3efc44102 (FL-10 P1)
+            { token: FleetCheckoutService, optional: true }, // 954308ed5 (FL-14 P2)
+            { token: FleetCommandService, optional: true }, // 6add233e5 (FL-12 P2)
+            { token: FleetPortTunnelService, optional: true }, // 159cd5fb0 (FL-10 P2)
+            { token: FLEET_STATUS_READER, optional: true }, // e262f519e (FL-19)
+            { token: FleetOperationsService, optional: true }, // e262f519e (FL-19)
+            { token: FLEET_LOGS_READER, optional: true }, // e262f519e (FL-19)
+            { token: FleetNodeHealthService, optional: true }, // e262f519e (FL-19)
+            { token: NeedsALookService, optional: true }, // e262f519e (FL-19)
+            { token: FleetVirtualService, optional: true }, // b76ee4b1c (FL-16 P1)
+            { token: FleetTaskHandoffService, optional: true }, // 5b1277230 (FL-15 P3)
+            { token: FleetGitIdentityService, optional: true }, // 5b1277230 (FL-15 P3)
+            { token: FLEET_WAKE_TOOL_PORT, optional: true }, // 653f5461f (FL-19 P2)
+            { token: FleetScheduleService, optional: true }, // 9e97331f4 (FL-13 P2)
+            { token: FleetSessionActionService, optional: true }, // 9b65a908c (FL-06 P3)
+            { token: FleetPullRequestService, optional: true }, // 9b65a908c (FL-06 P3)
+            { token: FleetCloudService, optional: true }, // c63f255e8 (FL-17)
+            { token: FleetUsageViewService, optional: true }, // 4d4407def (FL-20)
+            { token: FleetActionsRunnersService, optional: true }, // f04b78c18 (FL-18 P1)
+            { token: FLEET_DESKTOP_READER, optional: true }, // cca91ad1a (FL-07)
         ]);
+    });
+
+    it('takes exactly one factory parameter per injected service (the list is positional)', () => {
+        // The container passes `inject` positionally to `useFactory`; a parameter missing (or
+        // extra) shifts every service after it into the wrong slot with nothing failing.
+        const factory = findProvider(AGENT_DOMAIN_TOOL_SOURCES);
+        expect(factory?.useFactory?.length).toBe(factory?.inject?.length);
     });
 
     it('provides WorkOwnershipService locally but does NOT export it from this @Global module', () => {
@@ -431,16 +524,18 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             ...(factory.inject ?? []).map((_, index) => ({ stub: index })),
         ) as { tasks?: Record<string, unknown> };
         expect(bundle?.tasks?.agentReviews).toBeDefined();
-        // Positional proof: the LAST REQUIRED injected service is the one
-        // that lands here, so an insertion anywhere earlier is caught. Since
-        // #2685 the optional `AppChangeRequestService` is appended after it,
-        // so the reviewer is second-to-last and the app-change service last.
-        expect(bundle?.tasks?.agentReviews).toEqual({
-            stub: (factory?.inject ?? []).length - 3,
-        });
+        // Positional proof: the stub at the reviewer's own index in `inject` is the one that
+        // lands here, so an insertion anywhere earlier (in `inject` or in the factory's
+        // parameters, but not both) is caught. Indexed by token rather than from the end: since
+        // #2685 optional services follow it, and the Fleet lanes appended twenty-two more after
+        // the approvals service (see the full pin above), so "length - 3" stopped pointing at it.
+        const inject = factory?.inject ?? [];
+        const reviewerAt = inject.indexOf(TaskAgentReviewService);
+        expect(reviewerAt).toBe(18);
+        expect(bundle?.tasks?.agentReviews).toEqual({ stub: reviewerAt });
         expect(
             (bundle as { appChanges?: { service?: unknown } } | undefined)?.appChanges?.service,
-        ).toEqual({ stub: (factory?.inject ?? []).length - 2 });
+        ).toEqual({ stub: reviewerAt + 1 });
     });
 
     it('carries every domain in the assembled bundle', () => {
@@ -482,7 +577,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         const approvals = {
             createProposal: jest.fn().mockResolvedValue({ id: 'p-1', status: 'pending' }),
         };
-        stubs[stubs.length - 1] = approvals;
+        stubs[approvalsIndex(factory)] = approvals;
         const bundle = factory?.useFactory?.(...stubs) as {
             proposals?: { propose: (userId: string, input: unknown) => Promise<unknown> };
         };
@@ -517,7 +612,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
                 decidedVia: null,
             }),
         };
-        stubs[stubs.length - 1] = approvals;
+        stubs[approvalsIndex(factory)] = approvals;
         const bundle = factory?.useFactory?.(...stubs) as {
             proposals: { propose: (userId: string, input: unknown) => Promise<unknown> };
         };
@@ -570,7 +665,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
     it('carries no proposals seam when the approvals service is not bound', () => {
         const factory = findProvider(AGENT_DOMAIN_TOOL_SOURCES);
         const stubs: unknown[] = (factory?.inject ?? []).map((_, index) => ({ stub: index }));
-        stubs[stubs.length - 1] = undefined;
+        stubs[approvalsIndex(factory)] = undefined;
         const bundle = factory?.useFactory?.(...stubs) as Record<string, unknown>;
         expect(bundle.proposals).toBeUndefined();
     });
@@ -651,6 +746,9 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
             // construction keeps working; the tools refuse an App Work change
             // when it is absent rather than skipping the check.
             { token: APP_WORK_CHANGE_GATE, optional: true },
+            // APW-04 T10 (bd1b6fb39) — APPENDED + optional: the run's Task, for the App
+            // provisioning write rule.
+            { token: TaskRepository, optional: true },
         ]);
     });
 

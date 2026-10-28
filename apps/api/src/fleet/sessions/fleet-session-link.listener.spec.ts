@@ -56,7 +56,14 @@ describe('FleetSessionLinkListener', () => {
     });
 
     it('subscribes to session.event and session.list, and unsubscribes on shutdown', () => {
-        expect([...handlers.keys()].sort()).toEqual(['session.event', 'session.list']);
+        // 05fd85ee6 (FL-05 P1) added `session.status` and `session.attention` (the merged state
+        // and the needs-you signal) beside FL-04's two reports.
+        expect([...handlers.keys()].sort()).toEqual([
+            'session.attention',
+            'session.event',
+            'session.list',
+            'session.status',
+        ]);
         listener.onModuleDestroy();
         expect(handlers.size).toBe(0);
     });

@@ -20,6 +20,8 @@ vi.mock('@/app/actions/dashboard', () => ({
     deleteWork: vi.fn(),
     // APW-01 T39 — the App Work deploy target (APW-06's route, `404` today).
     getAppDeleteTarget: vi.fn(),
+    // APW-06 T59 (7e53baced) — the dialog now reads what deleting removes and keeps.
+    getAppDeletionPreview: vi.fn(),
 }));
 // Only owners see the danger zone at all. The gate under test is the
 // kind's, not the role's, so the permission is granted up front.
@@ -28,7 +30,8 @@ vi.mock('../WorkDetailContext', () => ({
 }));
 
 import { DeleteComponent } from './DeleteComponent';
-import { deleteWork, getAppDeleteTarget } from '@/app/actions/dashboard';
+import { deleteWork, getAppDeleteTarget, getAppDeletionPreview } from '@/app/actions/dashboard';
+import type { AppDeletionPreviewResponse } from '@/lib/api/work';
 
 const REPOSITORY_CHECKBOXES = [
     'deleteDataRepository',
@@ -75,6 +78,26 @@ function makeAppWork(
             createdByThisWork,
         },
     } as unknown as Work;
+}
+
+/**
+ * APW-06 T59 (7e53baced) — `GET /api/works/:id/app-deletion-preview` for a deployed App on
+ * the member's own cluster: one workload removed, one volume kept unless stored data goes too.
+ */
+function makePreview(
+    overrides: Partial<AppDeletionPreviewResponse> = {},
+): AppDeletionPreviewResponse {
+    return {
+        target: 'your-cluster',
+        deployed: true,
+        deleting: false,
+        stateUnreadable: false,
+        deployInProgress: false,
+        removes: [{ kind: 'Component', name: 'web' }],
+        keeps: [{ kind: 'PersistentVolumeClaim', label: 'Postgres data', sizeGiB: 5 }],
+        destroysWithData: [{ kind: 'PersistentVolumeClaim', label: 'Postgres data', sizeGiB: 5 }],
+        ...overrides,
+    };
 }
 
 /** The dialog's own delete button, after the Work-name confirmation is typed. */
@@ -153,13 +176,19 @@ describe('DeleteComponent — an App Work (APW-01 T39)', () => {
         vi.clearAllMocks();
         vi.mocked(deleteWork).mockResolvedValue({ success: true } as never);
         vi.mocked(getAppDeleteTarget).mockResolvedValue({ success: true, target: 'your-cluster' });
+        // APW-06 T59 (7e53baced) — no Deployment running, so the delete stays available.
+        vi.mocked(getAppDeletionPreview).mockResolvedValue({
+            success: true,
+            preview: makePreview(),
+        });
     });
 
-    /** Open the dialog and wait for the app-target read to settle. */
+    /** Open the dialog and wait for the app-target and deletion-preview reads to settle. */
     async function openAppDialog(work: Work): Promise<void> {
         render(<DeleteComponent work={work} />);
         await openDeleteDialog();
         await waitFor(() => expect(getAppDeleteTarget).toHaveBeenCalledWith('w-app'));
+        await waitFor(() => expect(getAppDeletionPreview).toHaveBeenCalledWith('w-app'));
     }
 
     it('offers **Also delete stored data** and the fork box, and no generated-repository box', async () => {
@@ -269,6 +298,62 @@ describe('DeleteComponent — an App Work (APW-01 T39)', () => {
         confirmWorkName('Cal.diy');
         fireEvent.click(screen.getByText('deleteConfirmButton'));
 
+        await waitFor(() => expect(deleteWork).toHaveBeenCalledWith('w-app', {}));
+    });
+
+    // APW-06 T59 (7e53baced) — the deletion preview the dialog reads when it opens.
+    it('lists what the delete removes and keeps, from the deletion preview', async () => {
+        await openAppDialog(makeAppWork());
+
+        expect(await screen.findByTestId('app-delete-preview-removes')).toHaveTextContent(
+            'deleteAppPreviewComponent',
+        );
+        expect(screen.getByText('deleteAppPreviewKeeps')).toBeInTheDocument();
+        expect(screen.getByTestId('app-delete-preview-keeps')).toHaveTextContent(
+            'Postgres data (PersistentVolumeClaim)',
+        );
+        expect(screen.queryByText('deleteAppPreviewDestroysWithData')).not.toBeInTheDocument();
+    });
+
+    it('names the stored data as deleted once the stored-data box is ticked and the slug typed', async () => {
+        await openAppDialog(makeAppWork());
+        await screen.findByText('deleteAppStoredData');
+
+        fireEvent.click(screen.getByText('deleteAppStoredData'));
+        fireEvent.change(screen.getByPlaceholderText('cal-diy'), {
+            target: { value: 'cal-diy' },
+        });
+
+        expect(await screen.findByText('deleteAppPreviewDestroysWithData')).toBeInTheDocument();
+        expect(screen.queryByText('deleteAppPreviewKeeps')).not.toBeInTheDocument();
+    });
+
+    it('disables the delete while a Deployment is running, even with the name typed', async () => {
+        vi.mocked(getAppDeletionPreview).mockResolvedValue({
+            success: true,
+            preview: makePreview({ deployInProgress: true }),
+        });
+
+        await openAppDialog(makeAppWork());
+        await screen.findByTestId('app-delete-preview-deploying');
+        confirmWorkName('Cal.diy');
+
+        expect(screen.getByText('deleteConfirmButton').closest('button')).toBeDisabled();
+        fireEvent.click(screen.getByText('deleteConfirmButton'));
+        expect(deleteWork).not.toHaveBeenCalled();
+    });
+
+    it('says the preview is unavailable when it cannot be read, and still allows the delete', async () => {
+        vi.mocked(getAppDeletionPreview).mockResolvedValue({
+            success: false,
+            error: 'unreachable',
+        });
+
+        await openAppDialog(makeAppWork());
+        expect(await screen.findByText('deleteAppPreviewUnavailable')).toBeInTheDocument();
+
+        confirmWorkName('Cal.diy');
+        fireEvent.click(screen.getByText('deleteConfirmButton'));
         await waitFor(() => expect(deleteWork).toHaveBeenCalledWith('w-app', {}));
     });
 });

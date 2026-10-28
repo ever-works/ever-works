@@ -1,12 +1,22 @@
 /**
- * Shared AI operations wrapping LangChain's ChatOpenAI and OpenAIEmbeddings.
+ * Shared AI operations wrapping LangChain's Chat Completions model and OpenAIEmbeddings.
  * All AI provider plugins delegate to this class rather than using LangChain directly.
+ *
+ * The chat model is `ChatOpenAICompletions`, not `ChatOpenAI`. Since
+ * @langchain/openai 1.x, `ChatOpenAI` silently switches some model names
+ * (`*codex*`, `gpt-5.6`, `gpt-5.x-pro`) to the Responses API. Every provider here
+ * is an OpenAI-compatible Chat Completions endpoint, and this class reads plain
+ * string content: on the Responses path the answer arrives as content blocks and
+ * `createChatCompletion` would return an empty string. Pinning the Completions
+ * class keeps every model on the API the providers actually speak.
  *
  * This follows the same pattern as GitOperations in packages/plugin/src/git/git-operations.ts.
  */
 import type { ZodType } from 'zod';
 import { jsonrepair } from 'jsonrepair';
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
+import { ChatOpenAICompletions, OpenAIEmbeddings, type ChatOpenAICompletionsCallOptions } from '@langchain/openai';
+import type { BaseLanguageModelInput } from '@langchain/core/language_models/base';
+import type { Runnable } from '@langchain/core/runnables';
 import {
 	HumanMessage,
 	SystemMessage,
@@ -14,7 +24,7 @@ import {
 	ToolMessage,
 	type AIMessageChunk,
 	type BaseMessage,
-	type MessageContentComplex
+	type ContentBlock
 } from '@langchain/core/messages';
 import type {
 	ChatCompletionOptions,
@@ -42,6 +52,9 @@ import {
 // and is intentionally excluded from the helpers barrel.
 import { isSafeWebhookUrl, safeFetchWithDnsPin } from '../helpers/ssrf-guard.js';
 
+/** The chat model, possibly with tools bound: what `invoke` and `stream` run on. */
+type ChatRunnable = Runnable<BaseLanguageModelInput, AIMessageChunk, ChatOpenAICompletionsCallOptions>;
+
 export interface AiOperationsConfig {
 	apiKey: string;
 	model: string;
@@ -59,7 +72,7 @@ export class AiOperations {
 	private readonly rejectedParams = new Map<string, Set<string>>();
 
 	/**
-	 * Create a chat completion using LangChain's ChatOpenAI.
+	 * Create a chat completion using LangChain's Chat Completions model.
 	 * Plain text only — for structured JSON output, use `askJson` instead.
 	 */
 	async createChatCompletion(
@@ -387,7 +400,7 @@ export class AiOperations {
 	 * caller's schema here, exactly as LangChain's zod output parser did.
 	 */
 	private async invokeStructured(
-		llm: ChatOpenAI,
+		llm: ChatOpenAICompletions,
 		prompt: string,
 		schema: ZodType,
 		model: string,
@@ -422,7 +435,7 @@ export class AiOperations {
 
 	/** Raw invoke → jsonrepair → zod parse. */
 	private async invokeWithJsonRepair(
-		llm: ChatOpenAI,
+		llm: ChatOpenAICompletions,
 		prompt: string,
 		schema: ZodType,
 		tracker: TokenUsageTracker
@@ -440,7 +453,7 @@ export class AiOperations {
 	/**
 	 * Security (SSRF): lexically reject a user-supplied `baseURL` that targets a
 	 * private / loopback / link-local / cloud-metadata host before it is handed
-	 * to LangChain's ChatOpenAI / OpenAIEmbeddings (whose internal fetch we
+	 * to LangChain's ChatOpenAICompletions / OpenAIEmbeddings (whose internal fetch we
 	 * cannot route through `safeFetchWithDnsPin`). Undefined `baseURL` means the
 	 * provider's hosted default endpoint is used — that is always allowed.
 	 * DNS-rebinding is only partially covered here (lexical-only); the raw
@@ -457,7 +470,7 @@ export class AiOperations {
 		model: string,
 		options?: ChatCompletionOptions,
 		skip?: Set<string>
-	): ChatOpenAI {
+	): ChatOpenAICompletions {
 		// Security (SSRF): validate the user-supplied baseURL before LangChain
 		// issues any LLM request (chat/stream/askJson/testConnection all build
 		// the client here), since the request body + Bearer key would otherwise
@@ -477,7 +490,7 @@ export class AiOperations {
 
 		const temperature = skip?.has('temperature') ? undefined : (options?.temperature ?? config.temperature);
 
-		return new ChatOpenAI({
+		return new ChatOpenAICompletions({
 			apiKey: config.apiKey,
 			model,
 			temperature,
@@ -520,11 +533,13 @@ export class AiOperations {
 	}
 
 	/**
-	 * Bind tools to a ChatOpenAI model when tool definitions are provided.
-	 * Uses llm.bind() with OpenAI-format tools to ensure the `type: 'function'`
-	 * wrapper is always present in the API request.
+	 * Bind tools to the chat model when tool definitions are provided.
+	 *
+	 * The tools ride along as call options (`withConfig`), already in OpenAI's
+	 * `{ type: 'function', function }` shape, so the request carries them exactly
+	 * as written. LangChain 1.x removed `Runnable.bind()`, which did the same.
 	 */
-	private bindTools(llm: ChatOpenAI, options?: ChatCompletionOptions, skip?: Set<string>): ChatOpenAI {
+	private bindTools(llm: ChatOpenAICompletions, options?: ChatCompletionOptions, skip?: Set<string>): ChatRunnable {
 		if (!options?.tools?.length || skip?.has('tools')) {
 			return llm;
 		}
@@ -538,12 +553,12 @@ export class AiOperations {
 			}
 		}));
 
-		const bindArgs: Record<string, unknown> = { tools };
+		const callOptions: Partial<ChatOpenAICompletionsCallOptions> = { tools };
 		if (options.toolChoice) {
-			bindArgs.tool_choice = options.toolChoice;
+			callOptions.tool_choice = options.toolChoice;
 		}
 
-		return llm.bind(bindArgs) as unknown as ChatOpenAI;
+		return llm.withConfig(callOptions);
 	}
 
 	private parseRejectedParam(error: unknown): string | undefined {
@@ -596,11 +611,11 @@ export class AiOperations {
 	 * An all-text array is joined back into a plain string — no reason to
 	 * hand a provider a one-element parts array for what is just text.
 	 */
-	private toLangChainContent(content: ChatMessage['content']): string | MessageContentComplex[] {
+	private toLangChainContent(content: ChatMessage['content']): string | ContentBlock[] {
 		if (typeof content === 'string') return content;
 		if (!Array.isArray(content) || content.length === 0) return '';
 
-		const parts: MessageContentComplex[] = [];
+		const parts: ContentBlock[] = [];
 		let sawNonText = false;
 		for (const part of content) {
 			if (typeof part === 'string') {

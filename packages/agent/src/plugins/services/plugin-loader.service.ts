@@ -400,6 +400,77 @@ export class PluginLoaderService {
     }
 
     /**
+     * The export of a plugin module that is the plugin: the default export,
+     * else `<Pascal>` / `<Pascal>Plugin`, else any exported plugin class, else
+     * any exported plugin instance.
+     *
+     * `import()` of a CommonJS entry (tsup's `dist/index.cjs`) answers the
+     * whole `module.exports` object as `default`. Taking that object as the
+     * plugin refused every plugin without a default export ("Exported value is
+     * not a valid plugin") on its first use: the email providers and the
+     * notification channels, which export only `<Name>Plugin` and an instance.
+     * So the exports object is searched too, and a `default` that is not a
+     * plugin no longer hides the named ones.
+     */
+    private selectPluginExport(
+        module: Record<string, unknown>,
+        pluginId: string,
+    ): { value: unknown } | { instance: IPlugin } {
+        const usable = (value: unknown) =>
+            this.classValidator.isPluginClass(value) || this.classValidator.isPlugin(value);
+        const cjsExports =
+            module.default && typeof module.default === 'object'
+                ? (module.default as Record<string, unknown>)
+                : undefined;
+        const scopes = cjsExports ? [module, cjsExports] : [module];
+        const pascal = this.toPascalCase(pluginId);
+
+        const named = [
+            module.default,
+            cjsExports?.default,
+            ...scopes.flatMap((scope) => [scope[pascal], scope[`${pascal}Plugin`]]),
+        ];
+        const direct = named.find(usable);
+        if (direct) return { value: direct };
+
+        // Any other export — but only one that IS this plugin (`id` = the
+        // manifest's): an entry may also export a base or helper plugin class,
+        // which must not be registered under this id. Exported instances first,
+        // read without constructing anything (`postmarkPlugin`, `sendgridPlugin`);
+        // then exported classes, each constructed once to read its id — the
+        // matching probe IS the plugin (not constructed twice), the others are
+        // dropped (a plugin constructor holds no resources: they belong in
+        // `onLoad`).
+        const exportsOf = (scope: Record<string, unknown>) =>
+            Object.keys(scope)
+                .filter((key) => key !== 'default')
+                .map((key) => scope[key]);
+        for (const scope of scopes) {
+            const instance = exportsOf(scope).find(
+                (value) =>
+                    this.classValidator.isPlugin(value) && (value as IPlugin).id === pluginId,
+            );
+            if (instance) return { value: instance };
+        }
+        for (const scope of scopes) {
+            for (const value of exportsOf(scope)) {
+                if (!this.classValidator.isPluginClass(value)) continue;
+                let probe: IPlugin | undefined;
+                try {
+                    probe = new value();
+                } catch {
+                    continue;
+                }
+                if (probe?.id === pluginId) return { instance: probe };
+            }
+        }
+
+        // Nothing usable: the caller reports a present default as "not a valid
+        // plugin", and its absence as "no plugin class found", as before.
+        return { value: module.default };
+    }
+
+    /**
      * Load a plugin module from disk
      */
     private async loadPluginModule(
@@ -429,21 +500,10 @@ export class PluginLoaderService {
             // Dynamic import
             const module = await import(entryPath);
 
-            // Look for default export or named export matching plugin ID
-            let PluginClass = module.default;
-            if (!PluginClass && module[this.toPascalCase(manifest.id)]) {
-                PluginClass = module[this.toPascalCase(manifest.id)];
-            }
-
-            // Try to find any exported class that looks like a plugin
-            if (!PluginClass) {
-                for (const key of Object.keys(module)) {
-                    if (this.classValidator.isPluginClass(module[key])) {
-                        PluginClass = module[key];
-                        break;
-                    }
-                }
-            }
+            const selected = this.selectPluginExport(module, manifest.id);
+            // A class the scan already constructed (and matched by id).
+            if ('instance' in selected) return selected.instance;
+            const PluginClass = selected.value;
 
             if (!PluginClass) {
                 this.logger.error(`No plugin class found in ${entryPath}`);
@@ -451,11 +511,23 @@ export class PluginLoaderService {
             }
 
             // Instantiate the plugin
+            let plugin: IPlugin | null = null;
             if (this.classValidator.isPluginClass(PluginClass)) {
-                return new PluginClass();
+                plugin = new PluginClass();
             } else if (this.classValidator.isPlugin(PluginClass)) {
                 // Already an instance
-                return PluginClass;
+                plugin = PluginClass;
+            }
+            if (plugin) {
+                // The default / <Pascal> export is taken as before; an id that
+                // disagrees with the manifest is reported, not refused (no
+                // plugin that loads today stops loading).
+                if (typeof plugin.id === 'string' && plugin.id !== manifest.id) {
+                    this.logger.warn(
+                        `Plugin export in ${entryPath} has id "${plugin.id}" but its manifest says "${manifest.id}"`,
+                    );
+                }
+                return plugin;
             }
 
             this.logger.error(`Exported value is not a valid plugin: ${entryPath}`);

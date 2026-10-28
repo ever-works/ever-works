@@ -155,7 +155,7 @@
 			"sharp@<0.35.4": ">=0.35.4 <1.0.0",
 			"liquidjs@<10.27.1": ">=10.27.1",
 			"js-yaml@>=5.0.0 <5.4.1": ">=5.5.0 <6.0.0",
-			"better-auth@<1.6.22": ">=1.6.22 <2.0.0",
+			"better-auth@<1.7.7": ">=1.7.7 <2.0.0",
 			"brace-expansion@<1.1.20": ">=1.1.20 <2.0.0",
 			"brace-expansion@>=2.0.0 <2.1.6": ">=2.1.6 <3.0.0",
 			"brace-expansion@>=3.0.0 <3.0.8": ">=3.0.8 <4.0.0",
@@ -185,7 +185,14 @@
 			"@better-auth/core>zod": ">=4.6.7 <5.0.0",
 			"jira.js>zod": ">=4.6.7 <5.0.0",
 			"@brightdata/sdk>zod": ">=4.6.7 <5.0.0",
-			"@zapier/zapier-sdk>zod": ">=4.6.7 <5.0.0"
+			"@zapier/zapier-sdk>zod": ">=4.6.7 <5.0.0",
+			"@atproto/api>zod": ">=4.6.7 <5.0.0",
+			"@atproto/common-web>zod": ">=4.6.7 <5.0.0",
+			"@atproto/lexicon>zod": ">=4.6.7 <5.0.0",
+			"@atproto/xrpc>zod": ">=4.6.7 <5.0.0",
+			"@mendable/firecrawl-js>zod": ">=4.6.7 <5.0.0",
+			"exa-js>zod": ">=4.6.7 <5.0.0",
+			"bash-tool>zod": ">=4.6.7 <5.0.0"
 		}
 	},
 	"prettier": {

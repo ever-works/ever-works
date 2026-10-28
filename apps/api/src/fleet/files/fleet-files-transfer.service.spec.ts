@@ -190,14 +190,20 @@ describe('FleetFilesTransferService — download', () => {
             out,
         );
         await settle();
-        fake.emit.binary(FLEET_LINK_FRAME_KINDS.DATA, header('a.log', 5));
+        // The sink reports a full response only through `write`'s return value (its contract), so
+        // the frame must carry bytes for the response to refuse. A header-only frame writes nothing
+        // in raw mode and buffers nothing on the platform, so holding its credit protects no window
+        // (this case, written unrun in bbd7b4172, sent one and so could never pass).
+        const payload = Buffer.concat([header('a.log', 5), bytes('hello')]);
+        fake.emit.binary(FLEET_LINK_FRAME_KINDS.DATA, payload);
+        expect(Buffer.concat(out.chunks).toString()).toBe('hello');
         expect(fake.sent.filter((frame) => frame.kind === FLEET_LINK_FRAME_KINDS.ACK)).toHaveLength(
             0,
         );
         out.drain();
         const acks = fake.sent.filter((frame) => frame.kind === FLEET_LINK_FRAME_KINDS.ACK);
         expect(acks).toHaveLength(1);
-        expect(decodeFleetLinkAck(acks[0].payload)).toBe(header('a.log', 5).byteLength);
+        expect(decodeFleetLinkAck(acks[0].payload)).toBe(payload.byteLength);
     });
 
     it('builds a zip for several entries', async () => {

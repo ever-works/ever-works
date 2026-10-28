@@ -30,7 +30,13 @@ vi.mock('@/lib/api/server-api', () => ({ serverFetch }));
 import { getSoonRuns } from './dashboard-data';
 
 /** Mirrors `ScheduleQueryDto` — see the api-side spec that pins this set. */
-const API_WHITELISTED_QUERY_PARAMS = ['sourceType', 'entityKind', 'enabledOnly'];
+const API_WHITELISTED_QUERY_PARAMS = [
+    'sourceType',
+    'entityKind',
+    'enabledOnly',
+    // 7191198c4 (FL-13 P1) added the server's `node` filter; the Soon block does not send it.
+    'node',
+];
 
 /** Nest's 400 body for a non-whitelisted query parameter. */
 class ForbiddenParamError extends Error {

@@ -30,7 +30,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
-		"@langchain/textsplitters": "^0.1.0",
+		"@langchain/textsplitters": "^1.0.2",
 		"stopword": "^3.1.5",
 		"string-similarity-js": "^2.1.4",
 		"zod": "^4.6.7"
