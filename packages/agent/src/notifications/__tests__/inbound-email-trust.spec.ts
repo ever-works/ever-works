@@ -256,3 +256,75 @@ describe('inbound email trusted-sender rule', () => {
         expect(bareSenderAddress(42)).toBe('');
     });
 });
+
+/**
+ * Ever Email Router — the metadata the REAL plugin parses from a router
+ * delivery is what this module reads: Cloudflare's verdict mapped onto
+ * `dmarc` / `spf` / `dkim`, and Cloudflare's `Authentication-Results` as the
+ * topmost header (so `INBOUND_EMAIL_AUTHSERV_ID=mx.cloudflare.net` works),
+ * never the message's own.
+ */
+describe('inbound email trust — Ever Email Router metadata', () => {
+    type RouterPlugin = {
+        parseInboundWebhook(
+            raw: Buffer,
+            headers: Record<string, string>,
+            options: Record<string, unknown>,
+        ): Promise<{ from: string; metadata: Record<string, unknown> }>;
+    };
+    const { EverEmailRouterPlugin } = jest.requireActual<{
+        EverEmailRouterPlugin: new () => RouterPlugin;
+    }>('../../../../plugins/ever-email-router/src/ever-email-router-plugin');
+
+    async function parse(authenticationResults?: string, extraHeader = '') {
+        const mime = `${extraHeader}From: Ada <ada@acme.test>\r\nTo: agent@ever.email\r\nSubject: hi\r\n\r\nhello\r\n`;
+        const body = Buffer.from(
+            JSON.stringify({
+                raw: Buffer.from(mime).toString('base64'),
+                envelope: { from: 'bounce@acme.test', to: ['agent@ever.email'] },
+                ...(authenticationResults ? { authenticationResults } : {}),
+            }),
+        );
+        return new EverEmailRouterPlugin().parseInboundWebhook(body, {}, {});
+    }
+
+    it('reads a Cloudflare pass from the mapped fields, with no authserv-id configured', async () => {
+        const message = await parse(
+            'mx.cloudflare.net; dkim=pass header.d=acme.test; spf=pass smtp.mailfrom=bounce@acme.test; dmarc=pass header.from=acme.test',
+        );
+        expect(senderAuthVerdict(message.metadata, message.from, {})).toBe('pass');
+    });
+
+    it('reads a Cloudflare fail as fail', async () => {
+        const message = await parse(
+            'mx.cloudflare.net; dkim=none; spf=fail smtp.mailfrom=bounce@acme.test; dmarc=fail header.from=acme.test',
+        );
+        expect(senderAuthVerdict(message.metadata, message.from, {})).toBe('fail');
+    });
+
+    it('with INBOUND_EMAIL_AUTHSERV_ID=mx.cloudflare.net, a delivery without a router verdict is unverified even if the message forges one', async () => {
+        const message = await parse(
+            undefined,
+            'Authentication-Results: mx.cloudflare.net; dmarc=pass header.from=acme.test\r\n',
+        );
+        expect(
+            senderAuthVerdict(message.metadata, message.from, {
+                INBOUND_EMAIL_AUTHSERV_ID: 'mx.cloudflare.net',
+            }),
+        ).toBe('unverified');
+    });
+
+    it("with INBOUND_EMAIL_AUTHSERV_ID=mx.cloudflare.net, the router's header is the topmost one read", async () => {
+        const message = await parse(
+            'mx.cloudflare.net; dkim=pass header.d=acme.test',
+            'Authentication-Results: mx.cloudflare.net; spf=fail smtp.mailfrom=acme.test\r\n',
+        );
+        // Without the mapped fields, only the header path is left to decide.
+        const { dkim: _dkim, dkimDomain: _dkimDomain, ...headerOnly } = message.metadata;
+        expect(
+            senderAuthVerdict(headerOnly, message.from, {
+                INBOUND_EMAIL_AUTHSERV_ID: 'mx.cloudflare.net',
+            }),
+        ).toBe('pass');
+    });
+});

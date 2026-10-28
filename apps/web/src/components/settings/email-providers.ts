@@ -15,8 +15,8 @@ export interface EmailProviderOption {
 }
 
 /**
- * The shipped email-provider plugins (docs/features/agent-email.md). Only
- * Postmark and Mailgun can receive mail.
+ * The shipped email-provider plugins (docs/features/agent-email.md). Postmark,
+ * Mailgun and the Ever Email Router can receive mail; the router only receives.
  */
 export const EMAIL_PROVIDERS: readonly EmailProviderOption[] = [
     {
@@ -34,6 +34,14 @@ export const EMAIL_PROVIDERS: readonly EmailProviderOption[] = [
         outbound: true,
         inboundSecret:
             'Set the Mailgun plugin\'s "Webhook signing key" (Settings → Plugins) and point a Mailgun route\'s forward() at the URL.',
+    },
+    {
+        id: 'ever-email-router',
+        name: 'Ever Email Router',
+        inbound: true,
+        outbound: false,
+        inboundSecret:
+            'Use an address on the router domain: @ever.email unless the operator set EVER_EMAIL_DOMAIN (one owner per mailbox). The shared router already posts to this URL once the operator sets EVER_EMAIL_ROUTER_SECRET; there is nothing to register yourself.',
     },
     { id: 'resend', name: 'Resend', inbound: false, outbound: true },
     { id: 'sendgrid', name: 'SendGrid', inbound: false, outbound: true },

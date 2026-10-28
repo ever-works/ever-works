@@ -291,10 +291,16 @@ export class SessionDaemonSupervisor {
 		const client = this.client;
 		if (!client || this.stopped) return;
 		try {
-			this.health = await client.request<DaemonHealth>('health', {}, 5_000);
+			const health = await client.request<DaemonHealth>('health', {}, 5_000);
+			if (this.client !== client || this.stopped) return;
+			this.health = health;
 			this.misses = 0;
 			this.emitChange();
 		} catch {
+			// The connection closed with this check still unanswered: its close handler already
+			// scheduled the reconnect, and scheduling another check here would cancel it, leaving
+			// the supervisor stuck in `connecting` with no timer at all.
+			if (this.client !== client || this.stopped) return;
 			this.misses += 1;
 			if (this.misses >= MAX_HEALTH_MISSES) {
 				this.options.logger?.warn('The session daemon stopped answering — reconnecting.');

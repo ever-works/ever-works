@@ -147,8 +147,66 @@ describe('ScheduleRowMenu', () => {
         await openMenu('Morning scan');
         fireEvent.click(screen.getByTestId('schedule-control-runNow'));
         await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith(`${T}.runNow.queuedToast`));
-        expect(runScheduleNow).toHaveBeenCalledWith('recurring_task:t-1');
+        // FL-13 (12bf1cc10): run-now now says whether the member confirmed a run on a computer.
+        expect(runScheduleNow).toHaveBeenCalledWith('recurring_task:t-1', { confirm: false });
         expect(onChanged).toHaveBeenCalled();
+    });
+
+    /** FL-13 (12bf1cc10, FR-25) — a Command schedule on a computer, which runs on a real machine. */
+    function nodeSchedule(): ScheduleEntry {
+        return schedule(
+            {
+                id: 'node_schedule:ns-1',
+                sourceType: 'node_schedule',
+                ownerType: 'node',
+                ownerId: 'n-1',
+                ownerName: 'Nightly backup',
+                ownerLink: '/fleet/computers/n-1/schedules',
+            },
+            { runNow: true, disabledReasons: {} },
+        );
+    }
+
+    it('asks before running a schedule on a computer, and sends the confirmation with the run', async () => {
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        vi.mocked(runScheduleNow).mockResolvedValue({
+            ok: true,
+            result: {
+                kind: 'run',
+                scheduleId: 'node_schedule:ns-1',
+                runIds: ['run-2'],
+                parked: false,
+                queuedReason: null,
+                taskId: null,
+                nextRunAt: null,
+            },
+        });
+        render(<ScheduleRowMenu schedule={nodeSchedule()} />);
+        await openMenu('Nightly backup');
+        expect(screen.getByTestId('schedule-owner-entry').textContent).toContain(
+            `${T}.actions.openComputer`,
+        );
+        fireEvent.click(screen.getByTestId('schedule-control-runNow'));
+
+        await waitFor(() =>
+            expect(runScheduleNow).toHaveBeenCalledWith('node_schedule:ns-1', { confirm: true }),
+        );
+        expect(confirm).toHaveBeenCalledWith(
+            `${T}.runNow.confirmOnComputer({"name":"Nightly backup"})`,
+        );
+        confirm.mockRestore();
+    });
+
+    it('runs nothing on the computer when the member cancels the confirmation', async () => {
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+        render(<ScheduleRowMenu schedule={nodeSchedule()} />);
+        await openMenu('Nightly backup');
+        fireEvent.click(screen.getByTestId('schedule-control-runNow'));
+
+        await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+        expect(runScheduleNow).not.toHaveBeenCalled();
+        expect(toastSuccess).not.toHaveBeenCalled();
+        confirm.mockRestore();
     });
 
     it('explains a refused run-now instead of failing silently', async () => {
@@ -309,5 +367,7 @@ describe('ScheduleRowMenu', () => {
         expect(ownerEntryKey({ sourceType: 'mission_tick' })).toBe('openMission');
         expect(ownerEntryKey({ sourceType: 'inbound_trigger' })).toBe('openTriggers');
         expect(ownerEntryKey({ sourceType: 'work_schedule' })).toBe('openWork');
+        // FL-13 (12bf1cc10): a Command schedule opens its computer.
+        expect(ownerEntryKey({ sourceType: 'node_schedule' })).toBe('openComputer');
     });
 });

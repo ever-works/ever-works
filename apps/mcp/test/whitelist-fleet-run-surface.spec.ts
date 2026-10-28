@@ -202,7 +202,44 @@ const REFUSED_FOR_RUN_TOKENS: Record<string, string> = {
 	fleet_runners_cancel_run: "cancels a whole workflow run of a person's repository",
 	// FL-07 desktop view & control: the `desktop` family (watching and controlling a person's
 	// screen) is never reachable with a run token — not even the read of its displays.
-	fleet_desktop_displays: "the displays of a person's computer (the desktop view family)"
+	fleet_desktop_displays: "the displays of a person's computer (the desktop view family)",
+	// App Works (B1 #2960 added these 32 MCP tools). Refused for run tokens, fail-closed: an
+	// App Work run on a computer never gets the platform's MCP tools (APW-08 T47, #2961), and
+	// these act on deployed Apps, their clusters, env names and upstream forks. Whether the
+	// read-only half may be granted is an owner question (Q175); granting it means adding the
+	// routes to FLEET_RUN_TOKEN_ROUTES, not removing entries here.
+	inspect_app_source: 'App Works: reads a repository for App creation (a person starts App Works)',
+	get_app_status: "App Works: a person's deployed App state",
+	refresh_app_status: 'App Works: asks the cluster worker for fresh state',
+	list_app_deployments: "App Works: a person's deployment history",
+	request_app_logs: "App Works: reads a deployed App's logs",
+	get_app_logs: "App Works: a deployed App's logs",
+	get_app_target: 'App Works: the cluster an App deploys to',
+	get_app_deletion_preview: 'App Works: what deleting an App removes',
+	run_app_smoke: 'App Works: runs checks against a live App',
+	rollback_app: 'App Works: changes what a live App runs',
+	change_app_lifecycle: 'App Works: stops, starts or restarts a live App',
+	list_app_builds: "App Works: a person's Builds",
+	get_app_build: "App Works: a person's Build",
+	cancel_app_build: 'App Works: cancels a Build',
+	get_app_env: "App Works: an App's env names (values stay masked)",
+	list_app_dependencies: "App Works: an App's databases and services",
+	get_app_spec: "App Works: an App's spec",
+	validate_app_spec: 'App Works: validates an App spec',
+	apply_app_blueprint: "App Works: writes a Blueprint into an App's spec",
+	upgrade_app_blueprint: 'App Works: upgrades an App to a new Blueprint version',
+	dismiss_app_blueprint_upgrade: 'App Works: hides a Blueprint upgrade from the owner',
+	get_app_license: "App Works: an App's licence classification",
+	list_app_catalog_entries: 'App Works: the Apps catalog',
+	list_app_blueprints: 'App Works: the Blueprint catalog',
+	list_app_licenses: 'App Works: the licence registry',
+	get_app_catalog_entry: 'App Works: an Apps catalog entry',
+	get_app_provisioning: "App Works: an App's provisioning state",
+	cancel_app_provisioning: 'App Works: cancels provisioning',
+	list_app_changes: "App Works: an App's change requests",
+	get_app_upstream: "App Works: an App's upstream fork state",
+	sync_app_upstream: 'App Works: syncs an App from its upstream',
+	retry_app_readiness: 'App Works: re-runs fork readiness'
 };
 
 /** The hand-written `kb.*` tools and the API routes each one calls. */

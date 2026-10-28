@@ -6,6 +6,14 @@ vi.mock('next-intl', async () => {
     const { testTranslations } = await import('./fleet-test-intl');
     return { useLocale: () => 'en-GB', useTranslations: testTranslations };
 });
+// `Button` (95ac05a22) imports the locale-aware Link, whose `next-intl/navigation`
+// loads `next/navigation`: not an ES module outside Next. Mocking `next-intl` alone leaves
+// that path, so this file never loaded.
+vi.mock('@/i18n/navigation', () => ({
+    Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
+}));
 
 import { WakePanel } from './overview/WakePanel';
 

@@ -275,6 +275,26 @@ describe('the session module and its daemon', () => {
 		expect(link.events('lost')[0]).toMatchObject({ sessionId: 's1', event: 'lost' });
 	});
 
+	it('respawns a daemon that went away while a health check was still unanswered', async () => {
+		supervisor.start();
+		await eventually(() => supervisor.healthy);
+		// The daemon dies while it answers the next health check: the socket closes with that
+		// request pending. Its rejection must not cancel the reconnect the close scheduled.
+		const dying = server!;
+		const dyingCore = core!;
+		let asked = false;
+		dyingCore.health = () => {
+			asked = true;
+			void dying.close();
+			throw new Error('the daemon died');
+		};
+		await eventually(() => asked, 5_000);
+		server = null;
+		await eventually(() => !supervisor.healthy, 5_000);
+		await eventually(() => supervisor.healthy && spawns === 2, 10_000);
+		expect(supervisor.report()).toMatchObject({ state: 'running' });
+	});
+
 	describe('with the daemon up', () => {
 		beforeEach(async () => {
 			supervisor.start();
