@@ -400,6 +400,53 @@ export class PluginLoaderService {
     }
 
     /**
+     * The export of a plugin module that is the plugin: the default export,
+     * else `<Pascal>` / `<Pascal>Plugin`, else any exported plugin class, else
+     * any exported plugin instance.
+     *
+     * `import()` of a CommonJS entry (tsup's `dist/index.cjs`) answers the
+     * whole `module.exports` object as `default`. Taking that object as the
+     * plugin refused every plugin without a default export ("Exported value is
+     * not a valid plugin") on its first use: the email providers and the
+     * notification channels, which export only `<Name>Plugin` and an instance.
+     * So the exports object is searched too, and a `default` that is not a
+     * plugin no longer hides the named ones.
+     */
+    private selectPluginExport(module: Record<string, unknown>, pluginId: string): unknown {
+        const usable = (value: unknown) =>
+            this.classValidator.isPluginClass(value) || this.classValidator.isPlugin(value);
+        const cjsExports =
+            module.default && typeof module.default === 'object'
+                ? (module.default as Record<string, unknown>)
+                : undefined;
+        const scopes = cjsExports ? [module, cjsExports] : [module];
+        const pascal = this.toPascalCase(pluginId);
+
+        const named = [
+            module.default,
+            cjsExports?.default,
+            ...scopes.flatMap((scope) => [scope[pascal], scope[`${pascal}Plugin`]]),
+        ];
+        const direct = named.find(usable);
+        if (direct) return direct;
+
+        for (const check of [
+            (value: unknown) => this.classValidator.isPluginClass(value),
+            (value: unknown) => this.classValidator.isPlugin(value),
+        ]) {
+            for (const scope of scopes) {
+                for (const key of Object.keys(scope)) {
+                    if (key !== 'default' && check(scope[key])) return scope[key];
+                }
+            }
+        }
+
+        // Nothing usable: the caller reports a present default as "not a valid
+        // plugin", and its absence as "no plugin class found", as before.
+        return module.default;
+    }
+
+    /**
      * Load a plugin module from disk
      */
     private async loadPluginModule(
@@ -429,21 +476,7 @@ export class PluginLoaderService {
             // Dynamic import
             const module = await import(entryPath);
 
-            // Look for default export or named export matching plugin ID
-            let PluginClass = module.default;
-            if (!PluginClass && module[this.toPascalCase(manifest.id)]) {
-                PluginClass = module[this.toPascalCase(manifest.id)];
-            }
-
-            // Try to find any exported class that looks like a plugin
-            if (!PluginClass) {
-                for (const key of Object.keys(module)) {
-                    if (this.classValidator.isPluginClass(module[key])) {
-                        PluginClass = module[key];
-                        break;
-                    }
-                }
-            }
+            const PluginClass = this.selectPluginExport(module, manifest.id);
 
             if (!PluginClass) {
                 this.logger.error(`No plugin class found in ${entryPath}`);

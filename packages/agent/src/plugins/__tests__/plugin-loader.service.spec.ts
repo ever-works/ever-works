@@ -1239,6 +1239,88 @@ describe('PluginLoaderService — registering a runtime-installed plugin (T27)',
 
         await expect(loader.discover()).resolves.toEqual([]);
     });
+
+    describe('which export of a plugin module is the plugin', () => {
+        /** A package whose entry is the given CommonJS source (tsup's `dist/index.cjs` shape). */
+        function writeModule(id: string, source: string): string {
+            const dir = versioned(id);
+            writePluginPackage(dir, id);
+            fsSync.writeFileSync(nodePath.join(dir, 'index.js'), source);
+            return dir;
+        }
+
+        const pluginClass = (name: string, id: string) =>
+            `class ${name} {\n` +
+            `  constructor() { this.id = ${JSON.stringify(id)}; }\n` +
+            `  async onLoad() {}\n` +
+            `  async onUnload() {}\n` +
+            `}\n`;
+
+        const load = (dir: string, id: string) =>
+            (loader as any).loadPluginModule(dir, { id }) as Promise<{ id: string } | null>;
+
+        it('loads a CommonJS plugin that exports its class only by name (Postmark, Slack…)', async () => {
+            // `import()` of a CommonJS entry answers the whole `module.exports`
+            // object as `default`: taking it as the plugin refused every plugin
+            // that has no default export ("Exported value is not a valid
+            // plugin") — the email providers and notification channels.
+            const dir = writeModule(
+                'named-only',
+                pluginClass('NamedOnlyPlugin', 'named-only') +
+                    'exports.NamedOnlyPlugin = NamedOnlyPlugin;\n' +
+                    'exports.namedOnlyPlugin = new NamedOnlyPlugin();\n' +
+                    'exports.SOME_LIMIT = 3;\n',
+            );
+            await makeLoader();
+
+            const plugin = await load(dir, 'named-only');
+
+            expect(plugin).not.toBeNull();
+            expect(plugin!.id).toBe('named-only');
+            expect(typeof (plugin as unknown as { onLoad: unknown }).onLoad).toBe('function');
+        });
+
+        it('loads a plugin that exports only an instance by name', async () => {
+            // A plain object, not a class instance: only a complete IPlugin
+            // (id, name, version, category, capabilities, onLoad, onUnload).
+            const dir = writeModule(
+                'instance-only',
+                'exports.instanceOnlyPlugin = {\n' +
+                    '  id: "instance-only", name: "Instance only", version: "1.2.0",\n' +
+                    '  category: "utility", capabilities: [],\n' +
+                    '  async onLoad() {}, async onUnload() {}\n' +
+                    '};\n',
+            );
+            await makeLoader();
+
+            const plugin = await load(dir, 'instance-only');
+
+            expect(plugin?.id).toBe('instance-only');
+        });
+
+        it('still prefers the default export over other exported plugin classes', async () => {
+            const dir = writeModule(
+                'with-default',
+                pluginClass('Main', 'with-default') +
+                    pluginClass('Other', 'other') +
+                    'Object.defineProperty(exports, "__esModule", { value: true });\n' +
+                    'exports.Other = Other;\n' +
+                    'exports.default = Main;\n',
+            );
+            await makeLoader();
+
+            const plugin = await load(dir, 'with-default');
+
+            expect(plugin?.id).toBe('with-default');
+        });
+
+        it('answers null for a module that exports no plugin', async () => {
+            const dir = writeModule('no-plugin', 'exports.helper = () => 1;\nexports.LIMIT = 2;\n');
+            await makeLoader();
+
+            await expect(load(dir, 'no-plugin')).resolves.toBeNull();
+        });
+    });
 });
 
 /**
