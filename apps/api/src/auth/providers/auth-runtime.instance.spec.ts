@@ -42,6 +42,7 @@ jest.mock('node:crypto', () => ({
     randomUUID: () => randomUUIDMock(),
 }));
 
+import { SqliteDialect } from 'kysely';
 import { createAuthRuntimeInstance } from './auth-runtime.instance';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
 import { AuthProvider as RegistrationProvider } from '../../config/constants';
@@ -136,13 +137,20 @@ describe('createAuthRuntimeInstance', () => {
     });
 
     describe('database client resolution', () => {
-        it('uses `driver.databaseConnection` for `better-sqlite3`', () => {
+        it('wraps `driver.databaseConnection` in a SQLite dialect with Better Auth transactions off for `better-sqlite3`', () => {
+            // Better Auth >=1.7 would otherwise open its own transactions on the
+            // connection TypeORM shares across the whole DataSource; the real
+            // interaction is pinned in `auth-runtime.sqlite-transactions.spec.ts`.
             const conn = { kind: 'sqlite' };
             const ds = makeDataSource('better-sqlite3', { databaseConnection: conn });
 
             createAuthRuntimeInstance(ds as any);
 
-            expect(getCapturedOptions().database).toBe(conn);
+            expect(getCapturedOptions().database).toEqual({
+                dialect: expect.any(SqliteDialect),
+                type: 'sqlite',
+                transaction: false,
+            });
         });
 
         it('uses `driver.master` for `postgres`', () => {
