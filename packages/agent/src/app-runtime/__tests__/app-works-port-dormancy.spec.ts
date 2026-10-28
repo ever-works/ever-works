@@ -270,6 +270,10 @@ const BOUND: readonly string[] = [
     'APP_DEPLOY_HOST_SOURCE',
     'APP_DEPLOY_SPEC_SOURCE',
     'APP_ENV_ACTIVITY',
+    // 8812f3590 (lane aw-builds-bindings, 2026-10-27) — `AppEnvModule` binds it to
+    // `appEnvActorNames`: the Environment table's "Set · by Maya" now names the Work's owner or
+    // member who set a value (never an email, `null` for anyone else) instead of no one.
+    'APP_ENV_ACTOR_NAMES',
     'APP_ENV_DEPLOY_READINESS',
     'APP_ENV_ENSURE_GENERATED',
     'APP_ENV_RESOLVER_FINGERPRINTS',
@@ -436,7 +440,7 @@ const UNBOUND: readonly string[] = [
     'APP_COMMIT_ANCESTRY',
     'APP_DEPENDENCY_CLUSTER_ACCESS',
     'APP_DEPLOY_TARGET_RESOLVER',
-    'APP_ENV_ACTOR_NAMES',
+    // `APP_ENV_ACTOR_NAMES` left this list on 2026-10-27 (8812f3590): see BOUND.
     'APP_ENV_BUILD_FINGERPRINTS',
     'APP_ENV_DEPLOY_FINGERPRINTS',
     // APW-01 T15 — bound OUTSIDE this package, twice: `apps/api`'s App Works module
@@ -463,6 +467,10 @@ const UNBOUND: readonly string[] = [
     'APP_RUNTIME_NOTIFICATIONS',
     'APP_RUNTIME_TARGET',
     'APP_RUNTIME_VERIFICATION_FACADE',
+    // APW-08 T18 (7c1ce7ff4) — the App Work run brief, bound OUTSIDE this package by `apps/api`'s
+    // `@Global()` `AgentsModule` to `AppRunBriefService` (read by `AgentRunService` and the fleet
+    // planner). No module in `packages/agent` provides it.
+    'APP_RUN_BRIEF_SOURCE',
     'APP_TARGET_UPDATED_PORT',
     'APP_UPSTREAM_PRIVATE_COPY_PORT',
     'APP_UPSTREAM_STATE_READER',
@@ -476,6 +484,10 @@ const UNBOUND: readonly string[] = [
     'APP_WORKS_TELEMETRY_SINK',
     'APP_WORK_DELETION_COMPLETION',
     'APP_WORK_DELETION_PORT',
+    // APW-08 T47 (cf9f1075e) — "is this run an App Work run?", bound OUTSIDE this package by
+    // `apps/api`'s `@Global()` `AgentsModule` (a factory over the Task and Work repositories),
+    // where every agent run executes. No module in `packages/agent` provides it.
+    'APP_WORK_RUN_CLASSIFIER',
 ];
 
 /**
@@ -602,8 +614,12 @@ describe('App Works port dormancy register (§5.10)', () => {
         // declared but classified nowhere; it is provided by the worker only — nothing was bound.
         // 29/47 → 28/48 on 2026-10-26 (lane aw-safety): `APP_HOSTS_REBUILD_REQUESTER` is bound by
         // `AppDeployRequestModule` (APW-05's rebuild behind T26's primary-domain change).
-        expect(UNBOUND).toHaveLength(28);
-        expect(BOUND).toHaveLength(48);
+        // 28/48 → 27/49 on 2026-10-27 (8812f3590): `APP_ENV_ACTOR_NAMES` is bound by `AppEnvModule`.
+        // 27/49 → 29/49 the same day: `APP_RUN_BRIEF_SOURCE` (APW-08 T18, 7c1ce7ff4) and
+        // `APP_WORK_RUN_CLASSIFIER` (APW-08 T47, cf9f1075e) are new ports, both bound by the API's
+        // `AgentsModule` and by no module here — nothing moved.
+        expect(UNBOUND).toHaveLength(29);
+        expect(BOUND).toHaveLength(49);
     });
 
     it('names where the worker binds what this package does not', () => {

@@ -1,3 +1,24 @@
+// The same heavy-tree doubles as `github-issue-intake.service.spec.ts`: the webhook dispatcher
+// imports the GitHub App sync service, whose module graph reaches the API's NotificationsModule →
+// AuthModule → the ESM-only `better-auth`, which this CJS Jest cannot parse (this spec, added in
+// 547001604, never loaded).
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class {},
+    IngestInstallBindingRepository: class {},
+}));
+jest.mock('@ever-works/agent/pr-review', () => ({ PrReviewService: class {} }));
+jest.mock('@ever-works/agent/plugins', () => ({
+    PluginSettingsService: class {},
+    UserPluginRepository: class {},
+}));
+jest.mock('@ever-works/agent/database', () => ({
+    GitHubAppInstallationRepository: class {},
+    GitHubAppUserLinkRepository: class {},
+}));
+jest.mock('../../integrations/github-app/github-app-sync.service', () => ({
+    GitHubAppSyncService: class {},
+}));
+
 import {
     GITHUB_PR_INTAKE_ACTIONS,
     GitHubPrIntakeService,

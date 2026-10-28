@@ -20,6 +20,8 @@ import {
  */
 describe('IntegrationTasksWriteController', () => {
     const ORG = 'org-1';
+    /** What every integration PATCH hands `TasksService.update` (30b75d6e1). */
+    const RESERVED_LABELS_RESTRICTED = { restrictReservedLabels: { who: 'An integration key' } };
     const principal = {
         keyId: 'key-1',
         keyName: 'Gauzy',
@@ -344,6 +346,9 @@ describe('IntegrationTasksWriteController', () => {
             'task-1',
             { title: 'New', teamId: 'team-a' },
             expect.anything(),
+            // 30b75d6e1 (works-security) — an integration key may neither add nor remove a
+            // reserved label; the service judges it against the row it writes.
+            RESERVED_LABELS_RESTRICTED,
         );
         expect(teamResources.attach).toHaveBeenCalledWith(
             'owner-1',
@@ -385,6 +390,9 @@ describe('IntegrationTasksWriteController', () => {
             'task-1',
             { priority: 'p1' },
             expect.anything(),
+            // 30b75d6e1 (works-security) — an integration key may neither add nor remove a
+            // reserved label; the service judges it against the row it writes.
+            RESERVED_LABELS_RESTRICTED,
         );
     });
 
@@ -452,6 +460,9 @@ describe('IntegrationTasksWriteController', () => {
             'task-1',
             { dueAt: null, estimateMinutes: 30 },
             expect.anything(),
+            // 30b75d6e1 (works-security) — an integration key may neither add nor remove a
+            // reserved label; the service judges it against the row it writes.
+            RESERVED_LABELS_RESTRICTED,
         );
     });
 

@@ -9,7 +9,13 @@
  */
 
 jest.mock('@nestjs/typeorm', () => ({
-    TypeOrmModule: { forFeature: () => class TypeOrmFeatureStub {} },
+    TypeOrmModule: {
+        forFeature: () => class TypeOrmFeatureStub {},
+        // The barrel re-exports `./sessions` (762aef7ef, FL-04), whose attention delivery
+        // (5f9c3a5d5, FL-05 P2) imports NotificationService, which reaches the database
+        // barrel — so loading the barrel now evaluates DatabaseModule's decorator too.
+        forRootAsync: () => class TypeOrmRootStub {},
+    },
     InjectRepository: () => () => undefined,
     InjectDataSource: () => () => undefined,
 }));

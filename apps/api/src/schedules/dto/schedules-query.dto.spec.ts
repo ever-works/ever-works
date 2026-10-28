@@ -38,7 +38,16 @@ const GLOBAL_PIPE_OPTIONS = {
  * derived from the DTO) so it reads as the published contract; the
  * "no undeclared filters" test below proves the DTO has not drifted from it.
  */
-const SUPPORTED_QUERY_PARAMS = ['sourceType', 'entityKind', 'enabledOnly'] as const;
+const SUPPORTED_QUERY_PARAMS = [
+    'sourceType',
+    'entityKind',
+    'enabledOnly',
+    // 7191198c4 (FL-13 P1) — schedules on computers: only those that run on this computer.
+    'node',
+] as const;
+
+/** A computer id, for the `node` filter (a UUID). */
+const NODE_ID = '11111111-1111-4111-8111-111111111111';
 
 /**
  * The parameters the dashboard's Soon block used to send. Every one of them is
@@ -75,6 +84,7 @@ describe('ScheduleQueryDto — GET /api/schedules query contract', () => {
             ['sourceType', { sourceType: 'work_schedule' }],
             ['entityKind', { entityKind: 'work' }],
             ['enabledOnly', { enabledOnly: 'true' }],
+            ['node', { node: NODE_ID }],
         ])('accepts %s on its own', async (_name, query) => {
             await expect(transform(query)).resolves.toBeDefined();
         });
@@ -157,6 +167,11 @@ describe('ScheduleQueryDto — GET /api/schedules query contract', () => {
         it('rejects a non-boolean enabledOnly', async () => {
             const messages = await rejectionMessages({ enabledOnly: 'yes' });
             expect(messages.join(' ')).toMatch(/enabledOnly/);
+        });
+
+        it('rejects a node that is not a computer id (UUID)', async () => {
+            const messages = await rejectionMessages({ node: 'build-01' });
+            expect(messages.join(' ')).toMatch(/node/);
         });
     });
 });

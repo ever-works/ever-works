@@ -65,6 +65,9 @@ describe('AccountTransferModule + barrel re-exports', () => {
                     'GitHubSyncService',
                     'UserSyncConfig',
                     'UserSyncConfigRepository',
+                    // 9520b07ea (APW-01 T41) — the per-entry skip reason an import
+                    // report carries when an entry claims `kind: 'app'` (FR-54).
+                    'APP_KIND_NOT_IMPORTABLE',
                     'MASKED_SECRET_PREFIX',
                     'maskSecretValue',
                     'maskSecretSettings',

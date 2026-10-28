@@ -36,18 +36,36 @@ function setup(reply: unknown = { result: { entries: [], truncated: false, total
     return { service, link, channel, audit };
 }
 
+/**
+ * The refusal's text is its `hint` — the HTTP body `{ error: { code, hint } }`. `FleetLinkException`
+ * is an `HttpException` with an object body, so its `message` is Nest's generic "Fleet Link
+ * Exception" (c72ef6dbd); matching the text against `message` (as this case did, written unrun in
+ * bbd7b4172) could never pass. The code is pinned too.
+ */
+const refusal = (code: string, hint: string | RegExp) =>
+    expect.objectContaining({
+        code,
+        linkError: expect.objectContaining({
+            hint:
+                typeof hint === 'string'
+                    ? expect.stringContaining(hint)
+                    : expect.stringMatching(hint),
+        }),
+    });
+
 describe('parse helpers', () => {
     it('refuses escapes and bad roots before anything is contacted (U4)', () => {
         expect(() => parseFleetFilesLocation('../x', '')).toThrow(FleetLinkException);
+        expect(() => parseFleetFilesLocation(ROOT, '../../etc')).toThrow(FleetLinkException);
         expect(() => parseFleetFilesLocation(ROOT, '../../etc')).toThrow(
-            'That path leaves its root',
+            refusal('invalid', 'That path leaves its root'),
         );
         expect(parseFleetFilesLocation(ROOT, 'src//server/')).toEqual({
             root: ROOT,
             path: 'src/server',
         });
         expect(() => parseFleetFilesNames(['a/b'], 'entries', 10)).toThrow(
-            'That path leaves its root',
+            refusal('invalid', 'That path leaves its root'),
         );
         expect(() =>
             parseFleetFilesNames(
@@ -55,7 +73,7 @@ describe('parse helpers', () => {
                 'entries',
                 10,
             ),
-        ).toThrow(/fewer than 10/);
+        ).toThrow(refusal('limit_exceeded', /fewer than 10/));
     });
 });
 

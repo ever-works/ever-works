@@ -9,7 +9,7 @@ import { NotificationEventTypeBootstrap } from './notification-event-type-bootst
 /**
  * The registry is seeded from the shared core catalogue on every boot, so
  * every environment — including CI and e2e, where migrations do not run —
- * ends up with the same 24 core rows, and a plugin's own events beside them.
+ * ends up with the same 27 core rows, and a plugin's own events beside them.
  */
 describe('NotificationEventTypeBootstrap', () => {
     function quiet(service: NotificationEventTypeBootstrap) {
@@ -18,7 +18,7 @@ describe('NotificationEventTypeBootstrap', () => {
         return service;
     }
 
-    it('upserts all 24 core events as core rows, idempotently', async () => {
+    it('upserts all 27 core events as core rows, idempotently', async () => {
         const rows = new Map<string, Record<string, unknown>>();
         const eventTypes = {
             upsert: jest.fn(async (row: Record<string, unknown>) => {
@@ -30,7 +30,8 @@ describe('NotificationEventTypeBootstrap', () => {
         await service.onApplicationBootstrap();
         await service.onApplicationBootstrap();
 
-        expect(rows.size).toBe(24);
+        // 24 → 27 in 5f9c3a5d5 (FL-05 P2): the three session events, asserted by name below.
+        expect(rows.size).toBe(27);
         expect(rows.get('digest_ready')).toMatchObject({
             source: 'core',
             pluginId: null,
@@ -45,6 +46,24 @@ describe('NotificationEventTypeBootstrap', () => {
             category: 'agents',
             defaultChannels: ['in-app'],
         });
+        expect(rows.get('fleet_session_needs_you')).toMatchObject({
+            source: 'core',
+            category: 'agent',
+            urgent: true,
+            defaultChannels: ['in-app', 'email'],
+        });
+        expect(rows.get('fleet_session_finished')).toMatchObject({
+            source: 'core',
+            category: 'agent',
+            urgent: false,
+            defaultChannels: ['in-app'],
+        });
+        expect(rows.get('fleet_session_failed')).toMatchObject({
+            source: 'core',
+            category: 'agent',
+            urgent: false,
+            defaultChannels: ['in-app'],
+        });
     });
 
     it('keeps seeding the rest when one upsert fails', async () => {
@@ -56,7 +75,8 @@ describe('NotificationEventTypeBootstrap', () => {
         };
         const service = quiet(new NotificationEventTypeBootstrap(undefined, eventTypes as never));
         await service.onApplicationBootstrap();
-        expect(eventTypes.upsert).toHaveBeenCalledTimes(24);
+        // 27 core events (5f9c3a5d5 added FL-05's three): one refused, every one still attempted.
+        expect(eventTypes.upsert).toHaveBeenCalledTimes(27);
     });
 
     it('namespaces plugin-contributed events and leaves their defaults to the manifest', async () => {
