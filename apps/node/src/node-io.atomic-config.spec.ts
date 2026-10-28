@@ -41,9 +41,11 @@ function config(overrides: Partial<NodeConfig> = {}): NodeConfig {
 /** The ACEs `icacls` lists for a file: `DOMAIN\user:(F)`, `BUILTIN\Users:(I)(RX)`, ... */
 function aclEntries(filePath: string): string[] {
 	const output = execFileSync('icacls', [filePath], { encoding: 'utf8', windowsHide: true });
+	// The first line echoes the path (possibly in another form: 8.3 short names) before its first ACE.
+	const name = path.basename(filePath);
 	return output
 		.split(/\r?\n/)
-		.map((line, index) => (index === 0 ? line.slice(filePath.length) : line).trim())
+		.map((line, index) => (index === 0 ? line.slice(line.lastIndexOf(name) + name.length) : line).trim())
 		.filter((line) => line.length > 0 && !/^Successfully processed/i.test(line));
 }
 
@@ -106,6 +108,16 @@ describe('createConfigFileSystem — atomic config writes on a real disk', () =>
 		expect(await fsp.readdir(dir)).toEqual([]);
 	});
 
+	it('cuts any older, longer content when writing into an existing file', async () => {
+		const fs = createConfigFileSystem();
+		const file = path.join(dir, 'existing.tmp');
+		await fsp.writeFile(file, 'a much longer previous content');
+
+		await fs.writeExistingFile!(file, 'short');
+
+		expect(await fsp.readFile(file, 'utf8')).toBe('short');
+	});
+
 	it.runIf(process.platform !== 'win32')(
 		'POSIX: the temp file is already 0600 when the credential is written, and the renamed files keep 0600',
 		async () => {
@@ -143,11 +155,15 @@ describe('createConfigFileSystem — atomic config writes on a real disk', () =>
 			const user = windowsAclUser(process.env);
 			expect(user).toBeTruthy();
 			const owner = (entry: string) => entry.toLowerCase().startsWith(`${user!.toLowerCase()}:`);
+			const ownerOnly = (entries: string[]) =>
+				entries.length > 0 && entries.every((entry) => owner(entry) && !entry.includes('(I)'));
 
-			// Control: a plain new file here inherits the directory's ACL.
+			// Control: a plain new file here is NOT owner-only (it inherits the
+			// directory's ACL, or gets the token's default DACL: SYSTEM,
+			// Administrators), so the check below can tell the difference.
 			const control = path.join(dir, 'control.txt');
 			await fsp.writeFile(control, 'x');
-			expect(aclEntries(control).some((entry) => entry.includes('(I)'))).toBe(true);
+			expect(ownerOnly(aclEntries(control)), aclEntries(control).join(' | ')).toBe(false);
 			await fsp.rm(control);
 
 			const real = createConfigFileSystem();
@@ -163,9 +179,7 @@ describe('createConfigFileSystem — atomic config writes on a real disk', () =>
 
 			expect(aclAtWrite).toHaveLength(2);
 			for (const entries of [...aclAtWrite, aclEntries(configPath), aclEntries(configBackupPath(configPath))]) {
-				expect(entries.length).toBeGreaterThan(0);
-				expect(entries.filter((entry) => entry.includes('(I)'))).toEqual([]);
-				expect(entries.filter((entry) => !owner(entry))).toEqual([]);
+				expect(ownerOnly(entries), entries.join(' | ')).toBe(true);
 			}
 		},
 		60_000

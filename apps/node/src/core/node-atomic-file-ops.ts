@@ -22,11 +22,16 @@ export function createNodeAtomicFileOps(
 			});
 		},
 		writeExistingFile: async (filePath, content) => {
-			// No O_CREAT: if the tightened temp file vanished, this fails rather
-			// than create a fresh file with default permissions around the content.
-			const handle = await fsp.open(filePath, fsConstants.O_WRONLY | fsConstants.O_TRUNC);
+			// No O_CREAT: if the tightened temp file vanished, this fails (ENOENT)
+			// rather than create a fresh file with default permissions around the
+			// content. No O_TRUNC either: without O_CREAT, libuv on Windows answers
+			// it with EINVAL. The explicit truncate below cuts any older tail.
+			const handle = await fsp.open(filePath, fsConstants.O_WRONLY);
 			try {
 				await handle.writeFile(content);
+				await handle.truncate(
+					typeof content === 'string' ? Buffer.byteLength(content, 'utf8') : content.byteLength
+				);
 				// On disk before the rename makes it the real file: otherwise a
 				// power cut could still publish an empty file under the new name.
 				await handle.sync();
