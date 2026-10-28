@@ -68,6 +68,11 @@ function kyselyAsBetterAuthBuildsIt(database: unknown): { db: Kysely<any>; trans
     throw new Error('unexpected Better Auth database option');
 }
 
+/**
+ * An email sign-up's writes as Better Auth 1.7.14 issues them for `database`:
+ * inside one Kysely transaction when the option turns transactions on, as
+ * plain statements otherwise. `whileHashing` runs between the two inserts.
+ */
 async function signUpAsBetterAuthDoes(
     database: unknown,
     email: string,

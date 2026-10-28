@@ -70,6 +70,12 @@ function getSqliteDatabase(
     };
 }
 
+/**
+ * The `database` option for Better Auth, taken from the initialized TypeORM
+ * driver so both share one database: the SQLite dialect above on
+ * better-sqlite3, the `pg` pool on Postgres, the `mysql2` pool on MySQL and
+ * MariaDB. Throws for any other driver, or one with no client yet.
+ */
 function getInitializedDatabaseClient(dataSource: DataSource): any {
     const driver = dataSource.driver as any;
 
