@@ -75,7 +75,9 @@ export function expectNotDelivered(result: ChannelTestResult, label: string): st
         undefined,
     );
     expect(typeof result.error, `${label}: the failure carries its reason`).toBe('string');
-    return result.error as string;
+    const error = result.error as string;
+    expect(error.trim(), `${label}: the failure reason is not blank`).not.toBe('');
+    return error;
 }
 
 /** The plugin refused the target config before any request; `expected` is its exact error. */
