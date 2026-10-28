@@ -11,6 +11,7 @@ import {
     type BlueprintRefusalCode,
 } from '@/app/actions/dashboard/app-spec';
 import { AppBlueprintUpgradeDialog } from './AppBlueprintUpgradeDialog';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 /**
  * APW-03 T31 (lane aw-blueprints) — the Blueprint card on the App spec settings tab
@@ -326,7 +327,7 @@ export function AppBlueprintCard({ workId, state, canEdit, onStateChange }: AppB
                 <div className="mt-3 space-y-1 text-sm" data-testid="app-blueprint-proposal">
                     <p>
                         <a
-                            href={proposal.url}
+                            href={safeHttpsUrl(proposal.url) ?? undefined}
                             target="_blank"
                             rel="noreferrer"
                             className="text-blue-600 underline dark:text-blue-400"

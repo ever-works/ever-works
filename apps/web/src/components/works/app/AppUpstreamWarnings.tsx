@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { ROUTES } from '@/lib/constants';
 import type { AppUpstreamStateResponse, AppUpstreamWarning } from '@ever-works/contracts';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 /**
  * APW-02 T30 — the warning list under the Upstream card (plan §5.2,
@@ -109,17 +110,19 @@ export function AppUpstreamWarnings({
                                 {t('warnings.openOnGitHub')}
                             </a>
                         )}
-                        {action === 'openPullRequest' && pullRequest && (
-                            <a
-                                data-testid={`app-upstream-warning-${warning.code}-action`}
-                                href={pullRequest.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-medium underline hover:no-underline"
-                            >
-                                {t('openPullRequest')}
-                            </a>
-                        )}
+                        {action === 'openPullRequest' &&
+                            pullRequest &&
+                            safeHttpsUrl(pullRequest.url) && (
+                                <a
+                                    data-testid={`app-upstream-warning-${warning.code}-action`}
+                                    href={safeHttpsUrl(pullRequest.url) ?? undefined}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-medium underline hover:no-underline"
+                                >
+                                    {t('openPullRequest')}
+                                </a>
+                            )}
                         {action === 'reviewGitHubAppAccess' && (
                             <a
                                 data-testid={`app-upstream-warning-${warning.code}-action`}

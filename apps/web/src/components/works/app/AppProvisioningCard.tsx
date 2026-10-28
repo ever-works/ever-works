@@ -11,6 +11,7 @@ import {
 } from '@/app/actions/dashboard/app-provisioning';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
+import { safePrUrl } from '@/components/tasks/TaskPrPill';
 import {
     Dialog,
     DialogClose,
@@ -83,6 +84,9 @@ export function AppProvisioningCard({ workId, initialState }: AppProvisioningCar
 
     const headline = provisioningHeadline(state);
     const latest: AppProvisioningTaskView | null = active ?? state.recent[0] ?? null;
+    // C-12: the provisioning Task's `prUrl` is written by the agent run — link it only
+    // when it is a plain `https:` URL (`safePrUrl`), never as-is.
+    const latestPrHref = safePrUrl(latest?.prUrl);
     const earlier = state.recent.filter((task) => task.taskId !== latest?.taskId).slice(0, 3);
     const triggerKey = provisioningTriggerKey(latest?.trigger);
 
@@ -218,9 +222,9 @@ export function AppProvisioningCard({ workId, initialState }: AppProvisioningCar
                         >
                             {t('openTask', { slug: latest.taskSlug })}
                         </Link>
-                        {latest.prUrl && (
+                        {latestPrHref && (
                             <a
-                                href={latest.prUrl}
+                                href={latestPrHref}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-medium text-primary hover:underline dark:text-primary-dark"

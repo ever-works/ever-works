@@ -14,6 +14,7 @@ import {
     runnerUpdateAvailable,
     type RunnerTone,
 } from './runners.shared';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 const TONE_CLASS: Readonly<Record<RunnerTone, string>> = {
     ok: 'text-success',
@@ -144,9 +145,9 @@ export function RunnerRow({
                 >
                     {t('logs')}
                 </Link>
-                {job?.url ? (
+                {safeHttpsUrl(job?.url) ? (
                     <a
-                        href={job.url}
+                        href={safeHttpsUrl(job?.url) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className={LINK}

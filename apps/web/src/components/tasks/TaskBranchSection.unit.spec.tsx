@@ -410,3 +410,84 @@ describe('TaskBranchSection - a refused primary branch is not shown as healthy',
         expect(screen.getByTestId('task-guard-refusal-banner')).toBeInTheDocument();
     });
 });
+
+/**
+ * C-12 (stored XSS): `prUrl` — the primary one and every linked entry's — is written
+ * from agent / provider data and rendered on the Task page. Before this fix it was
+ * passed to `href` as-is, so a `javascript:` / `data:` / `vbscript:` value became a
+ * clickable link on the operator's own session. It now goes through `safePrUrl`
+ * (plain `https:`, no credentials), as the board pill and the diff sheet already do,
+ * and anything else is shown as inert text.
+ */
+describe('TaskBranchSection - C-12: a hostile prUrl never becomes a clickable link', () => {
+    const HOSTILE = [
+        'javascript:alert(1)',
+        'JavaScript:alert(document.cookie)',
+        ' javascript:alert(1)',
+        'data:text/html,<script>alert(1)</script>',
+        'vbscript:msgbox(1)',
+        'https://user:pw@evil.invalid/pull/1',
+    ];
+
+    /** No anchor in the panel carries a script-bearing scheme or the hostile host. */
+    const expectNoUnsafeAnchor = (container: HTMLElement) => {
+        for (const anchor of container.querySelectorAll('a')) {
+            const href = anchor.getAttribute('href') ?? '';
+            expect(href).not.toMatch(/^\s*(javascript|data|vbscript):/i);
+            expect(href).not.toContain('evil.invalid');
+        }
+    };
+
+    const linked = (prUrl: string) =>
+        [
+            {
+                repositoryId: 'acme/other',
+                branch: 'task/t-1-add-field-x',
+                baseRef: 'main',
+                headSha: 'e'.repeat(40),
+                prNumber: 7,
+                prUrl,
+                state: 'pr-open',
+                error: null,
+                updatedAt: '2026-09-24T00:00:00.000Z',
+            },
+        ] as unknown as Task['linkedPullRequests'];
+
+    it.each(HOSTILE)('shows the primary pull request %j as text, not a link', (prUrl) => {
+        const { container } = render(<TaskBranchSection task={make({ prUrl })} />);
+
+        expect(screen.queryByTestId('task-branch-pr-link')).toBeNull();
+        expect(screen.getByTestId('task-branch-pr-text').textContent).toBe('#10');
+        expectNoUnsafeAnchor(container);
+    });
+
+    it.each(HOSTILE)('shows a linked pull request %j as text, not a link', (prUrl) => {
+        const { container } = render(
+            <TaskBranchSection task={make({ linkedPullRequests: linked(prUrl) })} />,
+        );
+
+        const row = screen.getByTestId('task-linked-pr-acme/other');
+        expect(within(row).queryByRole('link')).toBeNull();
+        expect(within(row).getByTestId('task-linked-pr-text').textContent).toBe('#7');
+        expectNoUnsafeAnchor(container);
+    });
+
+    it('control: a plain https pull request URL still renders as the link', () => {
+        render(
+            <TaskBranchSection
+                task={make({
+                    linkedPullRequests: linked('https://github.com/acme/other/pull/7'),
+                })}
+            />,
+        );
+
+        expect(screen.getByTestId('task-branch-pr-link').getAttribute('href')).toBe(
+            'https://github.com/acme/repo/pull/10',
+        );
+        expect(
+            within(screen.getByTestId('task-linked-pr-acme/other'))
+                .getByRole('link', { name: /#7/ })
+                .getAttribute('href'),
+        ).toBe('https://github.com/acme/other/pull/7');
+    });
+});

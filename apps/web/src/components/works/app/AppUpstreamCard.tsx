@@ -17,6 +17,7 @@ import type {
 import { AppUpstreamWarnings } from './AppUpstreamWarnings';
 import { formatUpstreamAge, UpstreamDivergenceBadge } from './UpstreamDivergenceBadge';
 import { showUpstreamCardOnOverview } from '@/lib/works/app-upstream-visibility';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 /**
  * APW-02 T30 — the Upstream card (plan §5.2, `plan.md:629-640`; spec §6.1,
@@ -440,9 +441,12 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
                             {t(UPSTREAM_READINESS_COPY_KEYS[state.readiness.state])}
                         </span>
                         {state.readiness.state === 'waiting_for_setup_pr' &&
-                            state.readiness.setupPullRequestUrl && (
+                            safeHttpsUrl(state.readiness.setupPullRequestUrl) && (
                                 <a
-                                    href={state.readiness.setupPullRequestUrl}
+                                    href={
+                                        safeHttpsUrl(state.readiness.setupPullRequestUrl) ??
+                                        undefined
+                                    }
                                     target="_blank"
                                     rel="noreferrer"
                                     className="ml-2 text-primary dark:text-gray-100 hover:underline"
@@ -484,9 +488,9 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
                         {result && (
                             <p data-testid="app-upstream-result">
                                 {result.values ? t(result.key, result.values) : t(result.key)}
-                                {result.pullRequestUrl && sync.pullRequest && (
+                                {safeHttpsUrl(result.pullRequestUrl) && sync.pullRequest && (
                                     <a
-                                        href={result.pullRequestUrl}
+                                        href={safeHttpsUrl(result.pullRequestUrl) ?? undefined}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="ml-2 text-primary dark:text-gray-100 hover:underline"
@@ -505,18 +509,20 @@ export function AppUpstreamCard({ workId, variant, initialState }: AppUpstreamCa
                             </p>
                         )}
 
-                        {sync.pullRequest && !result?.pullRequestUrl && (
-                            <p>
-                                <a
-                                    href={sync.pullRequest.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-primary dark:text-gray-100 hover:underline"
-                                >
-                                    {t('openPullRequest')} #{sync.pullRequest.number}
-                                </a>
-                            </p>
-                        )}
+                        {sync.pullRequest &&
+                            !result?.pullRequestUrl &&
+                            safeHttpsUrl(sync.pullRequest.url) && (
+                                <p>
+                                    <a
+                                        href={safeHttpsUrl(sync.pullRequest.url) ?? undefined}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary dark:text-gray-100 hover:underline"
+                                    >
+                                        {t('openPullRequest')} #{sync.pullRequest.number}
+                                    </a>
+                                </p>
+                            )}
                     </div>
                 )}
 

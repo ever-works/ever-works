@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import { downloadFromUrl } from './downloadFromUrl';
+import { safeHttpsUrl } from '@/lib/utils/safe-link';
 
 interface ItemImportWizardProps {
     workId: string;
@@ -841,7 +842,7 @@ function ResultsStep({ result }: ResultsStepProps) {
                         Pull request #{result.pr_number} opened
                     </p>
                     <a
-                        href={result.pr_url}
+                        href={safeHttpsUrl(result.pr_url) ?? undefined}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-button-primary underline break-all"

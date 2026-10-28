@@ -65,6 +65,7 @@ import { MeetingParticipantQuickAdd } from './MeetingParticipantQuickAdd';
 import { MeetingSummary } from './MeetingSummary';
 import { MeetingSummaryGenerating } from './MeetingSummaryGenerating';
 import { deleteMeetingAction, ingestMeetingTranscriptAction, updateMeetingAction } from './actions';
+import { safeWebUrl } from '@/lib/utils/safe-link';
 
 export interface MeetingDetailClientProps {
     meeting: Meeting;
@@ -481,9 +482,9 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                     </Link>
 
                     <div className="flex min-w-0 items-center gap-2 overflow-x-auto py-0.5">
-                        {meeting.sourceUrl ? (
+                        {safeWebUrl(meeting.sourceUrl) ? (
                             <a
-                                href={meeting.sourceUrl}
+                                href={safeWebUrl(meeting.sourceUrl) ?? undefined}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className={cn(btn, 'shrink-0')}
