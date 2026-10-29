@@ -198,7 +198,8 @@
 			"@trigger.dev/schema-to-json>zod": ">=4.6.7 <5.0.0",
 			"@zapier/zapier-sdk-cli>zod": ">=4.6.7 <5.0.0",
 			"@zapier/zapier-sdk-mcp>zod": ">=4.6.7 <5.0.0",
-			"@modelcontextprotocol/sdk>zod": ">=4.6.7 <5.0.0"
+			"@modelcontextprotocol/sdk>zod": ">=4.6.7 <5.0.0",
+			"mermaid>katex": ">=0.18.2 <0.19.0"
 		}
 	},
 	"prettier": {
