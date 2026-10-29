@@ -32,6 +32,7 @@ import {
 import { AppBlueprintApplyService } from '../apps-catalog/app-blueprint-apply.service';
 import { AppLicenseModule } from '../app-license/app-license.module';
 import { AppWorksTelemetryService } from './app-works-telemetry.service';
+import { AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
 import { APP_SOURCE_CATALOG_PORT } from './app-source-catalog.port';
 import { APP_WORK_AGENT_RESOLVER, AppWorkAgentResolverService } from './app-work-agent-resolver';
 import { AppChangeRequestService } from './app-change-request.service';
@@ -461,6 +462,10 @@ export function buildAppPromptedValuesProvider(): FactoryProvider {
         // APW-01 T36 — FR-53's five events. Its sink is the API's to bind (a global
         // alias); unbound, events are counted and dropped. See the docstring above.
         AppWorksTelemetryService,
+        // APW-03 T49 — the App spec / Blueprint telemetry the resolver, the apply service
+        // and the upgrade service declared here emit, over the API's global
+        // `APP_SPEC_TELEMETRY_SINK` alias (never bound here; unbound ⇒ counted and dropped).
+        AppSpecTelemetry,
         // APW-08 T25 (lane aw-ai, 2026-10-17) — the agent-resolution rule, bound where
         // APW-02's `AppUpstreamStateService` (declared here) can see it (APW08-G18). Its
         // own dependencies are repository providers only (`DatabaseModule`).

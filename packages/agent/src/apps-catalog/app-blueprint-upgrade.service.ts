@@ -94,6 +94,7 @@ import {
     renderMergedAppSpecText,
     type AppSpecMergeResult,
 } from './app-spec-merge';
+import { APP_SPEC_TELEMETRY_EVENTS, AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
 
 /** The file every run reads and proposes. */
 export const APP_BLUEPRINT_SPEC_FILE = '.works/works.yml';
@@ -329,7 +330,35 @@ export class AppBlueprintUpgradeService {
         @Inject(APP_BLUEPRINT_APPLY_DISPATCHER)
         private readonly dispatcher?: AppBlueprintApplyDispatcher,
         @Optional() private readonly moduleRef?: ModuleRef,
+        // APW-03 T49 — `app.blueprint.apply_finished` for a run's proposal, failure or
+        // merged landing. Appended LAST and `@Optional()`; it never throws.
+        @Optional() private readonly telemetry?: AppSpecTelemetry,
     ) {}
+
+    /**
+     * APW-03 T49 — `app.blueprint.apply_finished` for one run that reached an outcome
+     * (`proposed` or `failed`); a `skipped` (locked) or `unchanged` run, or one with no
+     * valid mode, is not an outcome. Returns the result unchanged.
+     */
+    private observeRun(
+        result: AppBlueprintRunResult,
+        userId: string | null | undefined,
+    ): AppBlueprintRunResult {
+        if (!result.mode || (result.status !== 'proposed' && result.status !== 'failed')) {
+            return result;
+        }
+        this.telemetry?.track(
+            APP_SPEC_TELEMETRY_EVENTS.blueprintApplyFinished,
+            {
+                mode: result.mode,
+                path: result.status === 'proposed' ? 'pull_request' : null,
+                outcome: result.status === 'proposed' ? 'proposed' : 'failed',
+                ...(result.status === 'failed' && result.reason ? { reason: result.reason } : {}),
+            },
+            userId ?? null,
+        );
+        return result;
+    }
 
     /** The App spec state repository, when this graph has one (the API's does). */
     private states(): WorkAppSpecStateRepository | undefined {
@@ -618,7 +647,7 @@ export class AppBlueprintUpgradeService {
         }
         const job: AppBlueprintApplyJobPayload = { ...payload, workId, mode, blueprintId, version };
         if (!this.locks) {
-            return this.execute(job);
+            return this.observeRun(await this.execute(job), job.userId);
         }
         const locked = await this.locks.runExclusive(
             blueprintRunLockKey(workId),
@@ -630,7 +659,7 @@ export class AppBlueprintUpgradeService {
         if (!locked.acquired) {
             return this.result('skipped', workId, mode, version, 'locked');
         }
-        return locked.result as AppBlueprintRunResult;
+        return this.observeRun(locked.result as AppBlueprintRunResult, job.userId);
     }
 
     private async execute(job: AppBlueprintApplyJobPayload): Promise<AppBlueprintRunResult> {
@@ -851,6 +880,12 @@ export class AppBlueprintUpgradeService {
                 ref: { kind: 'pull_request', number: proposal.number, url: proposal.url },
             },
         });
+        // APW-03 T49 — the proposal merged: the run's final outcome.
+        this.telemetry?.track(
+            APP_SPEC_TELEMETRY_EVENTS.blueprintApplyFinished,
+            { mode, path: 'pull_request', outcome: 'applied' },
+            owner,
+        );
         return true;
     }
 
