@@ -381,7 +381,7 @@ export class PromptProcessingStep extends BasePipelineStep {
 			rewritten = rewritten.replace(url, '');
 		});
 
-		rewritten = rewritten.replace(/\s+/g, ' ').replace(/\s+\./g, '.').replace(/\s+,/g, ',').trim();
+		rewritten = rewritten.replace(/\s+/g, ' ').replace(/(?<!\s)\s+\./g, '.').replace(/(?<!\s)\s+,/g, ',').trim();
 
 		return rewritten;
 	}

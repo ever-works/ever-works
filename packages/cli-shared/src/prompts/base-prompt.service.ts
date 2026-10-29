@@ -243,10 +243,11 @@ export abstract class BasePromptService {
 	}
 
 	/**
-	 * Validates email format
+	 * Validates email format — same rule as `validateEmail` in
+	 * `utils/validation-utils.ts` (linear; no empty domain label).
 	 */
 	protected validateEmail(email: string): string | boolean {
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		const emailRegex = /^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$/;
 		if (!emailRegex.test(email)) {
 			return 'Please enter a valid email address';
 		}

@@ -260,7 +260,7 @@ export function resolveEffectiveDeploymentContext(
         const slug = (input.workSlug || input.workId)
             .toLowerCase()
             .replace(/[^a-z0-9-]+/g, '-')
-            .replace(/^-+|-+$/g, '')
+            .replace(/^-+|(?<!-)-+$/g, '')
             .slice(0, 40);
         const derived = slug ? `ever-works-${slug}-prod` : '';
         if (derived && !isReservedDeployNamespace(derived)) {

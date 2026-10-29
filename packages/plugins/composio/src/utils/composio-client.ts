@@ -106,7 +106,7 @@ export class ComposioClient {
 			// `@composio/client` follows axios-style naming. Strip trailing
 			// slashes so concatenation in the SDK works the same regardless
 			// of how the user typed it in settings.
-			sdkConfig.baseURL = baseUrl.replace(/\/+$/, '');
+			sdkConfig.baseURL = baseUrl.replace(/(?<!\/)\/+$/, '');
 		}
 		// The SDK constructor returns a richer instance than ComposioSdkLike
 		// declares; the structural cast pins us to the subset we actually use.

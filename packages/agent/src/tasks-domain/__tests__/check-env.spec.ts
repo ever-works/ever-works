@@ -151,6 +151,20 @@ describe('buildCheckEnv — platform secrets never reach a user-authored check',
         expect(env.HTTP_PROXY).toBe('http://proxy.corp:8080');
     });
 
+    it('still strips a password holding a colon, an empty user, and an odd scheme run', () => {
+        const env = buildCheckEnv({
+            parentEnv: {
+                ...PLATFORM_ENV,
+                HTTPS_PROXY: 'http://bob:pa:ss@proxy.corp:8080',
+                HTTP_PROXY: 'http://:token@proxy.corp:8080',
+                NO_PROXY: 'x=1socks5://u:p@h',
+            },
+        });
+        expect(env.HTTPS_PROXY).toBeUndefined();
+        expect(env.HTTP_PROXY).toBeUndefined();
+        expect(env.NO_PROXY).toBeUndefined();
+    });
+
     it('matches parent variables case-insensitively (Windows spells them Path/TEMP)', () => {
         const env = buildCheckEnv({
             parentEnv: {

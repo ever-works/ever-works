@@ -24,7 +24,7 @@ export function groupSimilarItems(items: MutableItemData[], logger: Logger): Mut
 	function tr(text: string): string {
 		return (text || '')
 			.toLowerCase()
-			.replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
+			.replace(/(?<!\s)\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
 			.replace(/[^\w\s]/g, ' ')
 			.replace(/\s+/g, ' ')
 			.trim();
@@ -35,7 +35,7 @@ export function groupSimilarItems(items: MutableItemData[], logger: Logger): Mut
 			if (!item.name) return { item, normalizedName: '' };
 			const normalizedName = item.name
 				.toLowerCase()
-				.replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
+				.replace(/(?<!\s)\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
 				.replace(/\s+/g, ' ')
 				.replace(/[^\w\s]/g, '')
 				.trim();
