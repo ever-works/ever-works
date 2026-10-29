@@ -37,6 +37,7 @@ import {
     TasksKanbanView,
 } from './TasksKanbanView';
 import { TaskScopeRowMenu } from './TaskScopeRowMenu';
+import { TaskDeliveryChips } from './TaskDeliveryChips';
 import { LayoutGrid, Table2, Kanban, type LucideIcon } from 'lucide-react';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
@@ -550,6 +551,8 @@ function TaskCard({ task, scope }: { task: Task; scope?: TaskScopeRef }) {
                 >
                     {task.status.replace('_', ' ')}
                 </span>
+                {/* APW-08 T27 — the delivery chip (the card is one link, so no nested link). */}
+                {task.delivery && <TaskDeliveryChips delivery={task.delivery} linkLive={false} />}
                 {(task.labels ?? []).slice(0, 3).map((label) => (
                     <span
                         key={label}
@@ -633,6 +636,9 @@ function TaskTable({ tasks, scope }: { tasks: Task[]; scope?: TaskScopeRef }) {
                                     />
                                     {t.status.replace('_', ' ')}
                                 </span>
+                                {t.delivery && (
+                                    <TaskDeliveryChips delivery={t.delivery} className="ml-1.5" />
+                                )}
                             </td>
                             <td className="px-4 py-2.5">
                                 <span

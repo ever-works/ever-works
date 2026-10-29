@@ -10,6 +10,7 @@ import {
     TASK_DELIVERY_STATES,
     isAppWorkKind,
     normalizeCommitSha,
+    type TaskDeliveryEmbed,
     type TaskDeliveryState,
     type TaskDeliveryView,
 } from '@ever-works/contracts';
@@ -481,6 +482,61 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             })),
             history,
         };
+    }
+
+    /**
+     * APW-08 T24 — `GET /api/tasks?includeDelivery=true`: the board chip's inputs for each listed
+     * Task the chain tracks, keyed by Task id (an untracked Task has no entry). The rows are the
+     * caller's already owner-scoped page, never client ids, and every deciding Deployment is read
+     * in ONE `IN` query — no per-row read. A failed read degrades to the state alone: the list
+     * must never fail because of a chip.
+     */
+    async listEmbeds(
+        rows: readonly Pick<Task, 'id' | 'deliveryState' | 'deliveryDeploymentId' | 'mergeCommitSha'>[],
+    ): Promise<Map<string, TaskDeliveryEmbed>> {
+        const tracked = rows.filter((row) => isDeliveryState(row.deliveryState));
+        const embeds = new Map<string, TaskDeliveryEmbed>();
+        if (tracked.length === 0) return embeds;
+        const deploymentIds = [
+            ...new Set(
+                tracked
+                    .filter((row) => row.deliveryState === 'live' || row.deliveryState === 'deploy_failed')
+                    .map((row) => row.deliveryDeploymentId)
+                    .filter((id): id is string => typeof id === 'string' && id.length > 0),
+            ),
+        ];
+        let deployments = new Map<string, WorkDeployment>();
+        if (deploymentIds.length > 0) {
+            try {
+                const found = await this.deployments.find({ where: { id: In(deploymentIds) } });
+                deployments = new Map(found.map((row) => [row.id, row]));
+            } catch (error) {
+                this.logger.warn(
+                    `Delivery list embed: ${deploymentIds.length} Deployment(s) could not be read (${errorText(error)}).`,
+                );
+            }
+        }
+        for (const row of tracked) {
+            const state = row.deliveryState as TaskDeliveryState;
+            const deployment = row.deliveryDeploymentId
+                ? (deployments.get(row.deliveryDeploymentId) ?? null)
+                : null;
+            const merge = (row.mergeCommitSha ?? '').trim();
+            const deployed = (deployment?.commitSha ?? '').trim();
+            embeds.set(row.id, {
+                state,
+                liveUrl: state === 'live' ? (deployment?.website ?? null) : null,
+                outcome:
+                    state === 'deploy_failed' && deployment
+                        ? deploymentFailureOutcome(deployment)
+                        : null,
+                liveWithWarnings:
+                    state === 'live' && deployment ? deploymentHasWarnings(deployment) : false,
+                carriedByLaterChange:
+                    state === 'live' && Boolean(merge && deployed && deployed !== merge),
+            });
+        }
+        return embeds;
     }
 
     /**
