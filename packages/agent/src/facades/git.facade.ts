@@ -31,6 +31,7 @@ import type {
     GitRepositoryTreeOptions,
     GitCommitter,
     GitFileChange,
+    GitLocalCommit,
     IGitFacade,
     GitProviderInfo,
     // PR insights (kanban run cockpit M5/M6).
@@ -2314,6 +2315,40 @@ export class GitFacadeService implements IGitFacade {
     ): Promise<string> {
         const plugin = await this.getPlugin(providerId);
         return plugin.switchBranch(dir, branch, create);
+    }
+
+    /**
+     * The local commit `ref` points at, with its parents, or `null` when the ref does not exist
+     * (C-10 / APW-08 T12: prove a push carries only the commit just made). Throws
+     * {@link GitOperationNotSupportedError} when the provider has no local commit reader, so a caller
+     * that guards a push on it fails closed rather than pushing unproven commits.
+     */
+    async readLocalCommit(
+        providerId: string,
+        dir: string,
+        ref: string,
+    ): Promise<GitLocalCommit | null> {
+        const plugin = await this.getPlugin(providerId);
+        const impl = plugin.readLocalCommit;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('readLocalCommit', plugin.id);
+        }
+        return impl.call(plugin, dir, ref);
+    }
+
+    /** Point local `branch` at `sha` and check it out (C-10 rollback). Throws when unsupported. */
+    async resetBranchTo(
+        providerId: string,
+        dir: string,
+        branch: string,
+        sha: string,
+    ): Promise<void> {
+        const plugin = await this.getPlugin(providerId);
+        const impl = plugin.resetBranchTo;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('resetBranchTo', plugin.id);
+        }
+        return impl.call(plugin, dir, branch, sha);
     }
 
     async getStatus(providerId: string, dir: string): Promise<GitFileChange[]> {

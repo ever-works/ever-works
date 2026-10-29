@@ -1317,6 +1317,60 @@ async function assertRealWriteTarget(
                 };
 
                 /**
+                 * C-10 / APW-08 T12 — a `commitToRepo` push may carry ONLY the commit that call
+                 * made. The working copy is shared per Work, so its branch can already hold local
+                 * commits nobody judged (planted by another writer of the checkout, or left by an
+                 * earlier run); a plain push would ship them with ours, unseen by the change gate.
+                 *
+                 * The anchor is the remote tip of `branch`, or of `base` for a branch the remote
+                 * does not have yet. Before anything is written the local branch must sit exactly on
+                 * it; after the commit, the new commit must be its only child. Anything else — and a
+                 * provider that cannot read local commits or the remote tip — refuses, so nothing
+                 * unproven is ever pushed.
+                 */
+                const pushAnchorOf = async (input: {
+                    providerId: string;
+                    userId: string;
+                    workId: string;
+                    owner: string;
+                    repo: string;
+                    branch: string;
+                    base: string;
+                }): Promise<{ anchor: string | null; remoteHasBranch: boolean }> => {
+                    const options = {
+                        providerId: input.providerId,
+                        userId: input.userId,
+                        workId: input.workId,
+                    } as any;
+                    const tipOf = async (name: string): Promise<string | null> =>
+                        name
+                            ? ((await git.getLatestCommit(input.owner, input.repo, name, options))
+                                  ?.sha ?? null)
+                            : null;
+                    const branchTip = await tipOf(input.branch);
+                    return branchTip
+                        ? { anchor: branchTip, remoteHasBranch: true }
+                        : { anchor: await tipOf(input.base), remoteHasBranch: false };
+                };
+                const refusePush = (
+                    owner: string,
+                    repo: string,
+                    branch: string,
+                    why: string,
+                ): never => {
+                    throw new Error(
+                        `commitToRepo: refusing to push ${owner}/${repo}@${branch} — ${why} A push may ` +
+                            `carry only the commit this call makes. Nothing was pushed.`,
+                    );
+                };
+                const localTipOf = async (
+                    providerId: string,
+                    dir: string,
+                    branch: string,
+                ): Promise<{ sha: string; parents: readonly string[] } | null> =>
+                    git.readLocalCommit(providerId, dir, `refs/heads/${branch}`);
+
+                /**
                  * The branch the working copy is BASED on (plan §2.2): the Work's
                  * declared `taskIsolationBaseBranch` when it has one — the column
                  * whose own contract is "where Task branches fork from; NULL = the
@@ -1664,7 +1718,63 @@ async function assertRealWriteTarget(
                             // to commit. Reproduced against the real library: write, add,
                             // switch, commit -> null, edits gone; switch, write, add,
                             // commit -> a sha, edits committed.
+                            // C-10 — whether the branch already exists locally, read BEFORE the
+                            // switch creates it: a branch new to both sides must start from the
+                            // remote base tip, and `switchBranch` creates it from whatever branch
+                            // the shared checkout was left on (an earlier call's feature branch).
+                            const existedLocally =
+                                (await localTipOf(providerId, dir, branch).catch(() => null)) !==
+                                null;
                             await git.switchBranch(providerId, dir, branch, true);
+                            // C-10 — BEFORE anything is written: the branch must sit exactly on
+                            // the remote tip (or the base tip for a new branch). A local commit
+                            // ahead of it is one nobody judged; refusing here also means this
+                            // call adds no commit of its own on top of it.
+                            let pushAnchor: string | null;
+                            let tipBefore: { sha: string } | null;
+                            try {
+                                const remote = await pushAnchorOf({
+                                    providerId,
+                                    userId,
+                                    workId,
+                                    owner: target.owner,
+                                    repo: target.repo,
+                                    branch,
+                                    base,
+                                });
+                                pushAnchor = remote.anchor;
+                                if (!existedLocally && !remote.remoteHasBranch && pushAnchor) {
+                                    await git.resetBranchTo(providerId, dir, branch, pushAnchor);
+                                }
+                                tipBefore = await localTipOf(providerId, dir, branch);
+                            } catch (error) {
+                                return refusePush(
+                                    target.owner,
+                                    target.repo,
+                                    branch,
+                                    `what the branch would send could not be proven (${
+                                        (error as Error).message ?? error
+                                    }).`,
+                                );
+                            }
+                            if (!pushAnchor) {
+                                refusePush(
+                                    target.owner,
+                                    target.repo,
+                                    branch,
+                                    'neither the branch nor its base could be read on the remote.',
+                                );
+                            }
+                            if (!tipBefore || tipBefore.sha !== pushAnchor) {
+                                refusePush(
+                                    target.owner,
+                                    target.repo,
+                                    branch,
+                                    `the working copy's branch is at ${tipBefore?.sha.slice(0, 12) ?? 'nothing'}, ` +
+                                        `not at the remote tip ${pushAnchor!.slice(0, 12)} (it carries local commits ` +
+                                        `that are not on the remote, or is behind it). Nothing was written or committed.`,
+                                );
+                            }
                             // Empty `files` commits nothing new: the switch above resets
                             // the index to the branch, so there is nothing staged to take.
                             let stagedChanges = 0;
@@ -1743,6 +1853,28 @@ async function assertRealWriteTarget(
                                 name: committerName,
                                 email: committerEmail,
                             } as any);
+                            // C-10 — AFTER the commit: the branch tip is this call's commit, whose
+                            // only parent is the anchor (or, with nothing staged, still the
+                            // anchor itself). Belt and braces against another writer of the shared
+                            // checkout committing between the check above and here.
+                            const tipAfter = await localTipOf(providerId, dir, branch).catch(
+                                () => null,
+                            );
+                            const onlyThisCommit = sha
+                                ? tipAfter?.sha === sha &&
+                                  tipAfter.parents.length === 1 &&
+                                  tipAfter.parents[0] === pushAnchor
+                                : tipAfter?.sha === pushAnchor;
+                            if (!onlyThisCommit) {
+                                refusePush(
+                                    target.owner,
+                                    target.repo,
+                                    branch,
+                                    `the branch moved while this call committed (tip ${
+                                        tipAfter?.sha.slice(0, 12) ?? 'unknown'
+                                    }, expected ${sha ? `a child of ${pushAnchor!.slice(0, 12)}` : pushAnchor!.slice(0, 12)}).`,
+                                );
+                            }
                             // APW-08 P0 — the push NAMES the branch (`ref` /
                             // `remoteRef`), so the remote receives the branch we
                             // committed to instead of "whatever HEAD is at push
@@ -1768,7 +1900,17 @@ async function assertRealWriteTarget(
                                         workId,
                                     } as any,
                                 )
-                                .catch((err: Error) => {
+                                .catch(async (err: Error) => {
+                                    // C-10 — drop this call's own commit again, so the shared
+                                    // checkout is not left ahead of the remote: the next call's
+                                    // anchor check would otherwise refuse every later commit on
+                                    // this branch. A retry recreates the commit. Best effort: a
+                                    // failed rollback only means that next call refuses safely.
+                                    if (sha && pushAnchor) {
+                                        await git
+                                            .resetBranchTo(providerId, dir, branch, pushAnchor)
+                                            .catch(() => undefined);
+                                    }
                                     // Don't swallow push failures silently — the
                                     // model needs to know its commit didn't reach
                                     // the remote so it can retry or escalate.

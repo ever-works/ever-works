@@ -1244,6 +1244,8 @@ describe('api-side AgentsModule — INBOUND_EMAIL_TASK_SPAWNER', () => {
 describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution (APW-08 P0)', () => {
     const WORK_ID = 'work-1';
     const WORK_DIR = '/tmp/ever-works/work-1';
+    /** C-10 — the remote tip every branch (or its base) is at, in the doubled facade. */
+    const REMOTE_TIP = 'a'.repeat(40);
 
     /** A non-GitHub provider id, so "resolved from the Work" is observable. */
     const WORK_PROVIDER = 'gitlab';
@@ -1334,6 +1336,28 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         getStatus: jest.fn().mockResolvedValue([]),
         commit: jest.fn().mockResolvedValue('sha-1'),
         push: jest.fn().mockResolvedValue(undefined),
+        // C-10 — the push guard's reads. The remote has every branch (or its base) at
+        // REMOTE_TIP; the local branch sits on REMOTE_TIP until this call's `commit` runs, and
+        // on that commit (parent REMOTE_TIP) after it. Read from the call ORDER of the other
+        // doubles, so a case that overrides `commit` or calls the tool twice stays consistent.
+        getLatestCommit: jest.fn().mockResolvedValue({ sha: REMOTE_TIP }),
+        readLocalCommit: jest.fn(async function (this: {
+            commit: jest.Mock;
+            switchBranch: jest.Mock;
+        }) {
+            const last = (mock: jest.Mock): number => {
+                const order = mock.mock.invocationCallOrder;
+                return order.length ? order[order.length - 1] : -1;
+            };
+            if (last(this.commit) < last(this.switchBranch))
+                return { sha: REMOTE_TIP, parents: [] };
+            const results = this.commit.mock.results;
+            const committed = results.length ? await results[results.length - 1].value : null;
+            return committed
+                ? { sha: committed, parents: [REMOTE_TIP] }
+                : { sha: REMOTE_TIP, parents: [] };
+        }),
+        resetBranchTo: jest.fn().mockResolvedValue(undefined),
         createPullRequest: jest
             .fn()
             .mockResolvedValue({ number: 7, url: 'https://git.test/pr/7', state: 'open' }),
@@ -2037,6 +2061,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
         const who = { name: 'probe', email: 'probe@example.test' };
         let dir: string;
         let ops: InstanceType<typeof GitOperations>;
+        /** C-10 — the doubled remote: branch → tip. `main` starts at the initial commit. */
+        let remoteTips: Record<string, string>;
 
         beforeEach(async () => {
             dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'commit-to-repo-real-'));
@@ -2048,7 +2074,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             fs.writeFileSync(nodePath.join(dir, 'README.md'), '# v1\n');
             fs.writeFileSync(nodePath.join(dir, '.gitignore'), 'secrets.env\n');
             await ops.add(dir, ['README.md', '.gitignore']);
-            await ops.commit(dir, 'initial', who);
+            const initial = await ops.commit(dir, 'initial', who);
+            remoteTips = { main: initial as string };
         });
         afterEach(() => {
             fs.rmSync(dir, { recursive: true, force: true });
@@ -2069,6 +2096,19 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             );
             git.getStatus.mockImplementation((_p: string, d: string) => ops.getStatus(d));
             git.getMainBranch.mockImplementation((_p: string, d: string) => ops.getMainBranch(d));
+            // C-10 — local reads are the library's own; the remote is `remoteTips`, and a
+            // successful (doubled) push publishes the local tip of the ref it names.
+            // The doubles' types come from their zero-argument defaults, hence the casts.
+            git.readLocalCommit.mockImplementation(((_p: string, d: string, ref: string) =>
+                ops.readLocalCommit(d, ref)) as never);
+            git.resetBranchTo.mockImplementation(((_p: string, d: string, b: string, s: string) =>
+                ops.resetBranchTo(d, b, s)) as never);
+            git.getLatestCommit.mockImplementation((async (_o: string, _r: string, b: string) =>
+                remoteTips[b] ? { sha: remoteTips[b] } : null) as never);
+            git.push.mockImplementation((async (o: { dir: string; ref: string }) => {
+                const tip = await ops.readLocalCommit(o.dir, o.ref);
+                if (tip) remoteTips[o.ref.replace(/^refs\/heads\//, '')] = tip.sha;
+            }) as never);
             return git;
         };
         const committedFiles = (sha: string): string[] =>
@@ -2131,6 +2171,94 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             const result = await facade.commitToRepo(commitInput({ branch: 'feature/empty' }));
 
             expect(result).toMatchObject({ sha: null, filesChanged: 0 });
+        });
+
+        /**
+         * C-10 / APW-08 T12 — a push may carry ONLY the commit this call makes. The working
+         * copy is shared per Work, so a commit planted on its branch by any other writer
+         * would otherwise ride along with an ordinary push, unseen by the change gate.
+         */
+        it('refuses a branch that already carries a local commit the remote lacks — nothing written', async () => {
+            await ops.switchBranch(dir, 'feature/pricing', true);
+            fs.writeFileSync(nodePath.join(dir, 'planted.txt'), 'planted\n');
+            await ops.add(dir, ['planted.txt']);
+            const planted = await ops.commit(dir, 'planted', who);
+            await ops.switchBranch(dir, 'main');
+            const git = realGit();
+            const { facade } = build({ git });
+
+            await expect(
+                facade.commitToRepo(
+                    commitInput({
+                        branch: 'feature/pricing',
+                        files: [{ path: 'src/pricing.ts', body: 'export const price = 1;\n' }],
+                    }),
+                ),
+            ).rejects.toThrow(/refusing to push[\s\S]*Nothing was written or committed/);
+
+            expect(git.push).not.toHaveBeenCalled();
+            expect(git.commit).not.toHaveBeenCalled();
+            expect(fs.existsSync(nodePath.join(dir, 'src', 'pricing.ts'))).toBe(false);
+            expect((await ops.readLocalCommit(dir, 'refs/heads/feature/pricing'))?.sha).toBe(
+                planted,
+            );
+        });
+
+        it('starts a second new branch from the base tip, not from the branch the checkout was left on', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const first = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/a',
+                    files: [{ path: 'src/a.ts', body: 'export const a = 1;\n' }],
+                }),
+            );
+            // The shared checkout is now ON feature/a; `switchBranch` would branch from here.
+            const second = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/b',
+                    files: [{ path: 'src/b.ts', body: 'export const b = 1;\n' }],
+                }),
+            );
+
+            expect(second.sha).toMatch(/^[0-9a-f]{40}$/);
+            expect(remoteTips['feature/b']).toBe(second.sha);
+            // One commit on the base tip — feature/a's commit does not ride along.
+            expect((await ops.readLocalCommit(dir, 'refs/heads/feature/b'))?.parents).toEqual([
+                remoteTips.main,
+            ]);
+            expect(committedFiles(second.sha as string)).toEqual(['src/b.ts']);
+            expect(first.sha).not.toBe(second.sha);
+        });
+
+        it('drops its own commit again when the push fails, so the retry is not refused', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+            const input = commitInput({
+                branch: 'feature/pricing',
+                files: [{ path: 'src/a.ts', body: 'export const a = 1;\n' }],
+            });
+            git.push.mockRejectedValueOnce(new Error('network down'));
+
+            await expect(facade.commitToRepo(input)).rejects.toThrow(/push failed/);
+            // Back on the anchor it branched from — the remote's `main` tip.
+            expect(git.resetBranchTo).toHaveBeenCalledWith(
+                expect.any(String),
+                dir,
+                'feature/pricing',
+                remoteTips.main,
+            );
+            expect((await ops.readLocalCommit(dir, 'refs/heads/feature/pricing'))?.sha).toBe(
+                remoteTips.main,
+            );
+
+            const retry = await facade.commitToRepo(input);
+            expect(retry.sha).toMatch(/^[0-9a-f]{40}$/);
+            expect(remoteTips['feature/pricing']).toBe(retry.sha);
+            expect((await ops.readLocalCommit(dir, 'refs/heads/feature/pricing'))?.parents).toEqual(
+                [remoteTips.main],
+            );
         });
 
         /**
@@ -2389,6 +2517,56 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                 }),
                 expect.objectContaining({ providerId: WORK_PROVIDER }),
             );
+        });
+
+        describe('C-10 — a push carries only the commit this call makes', () => {
+            const files = [{ path: 'src/pricing.ts', body: 'export const price = 1;\n' }];
+
+            it('refuses BEFORE writing when the branch is not at the remote tip', async () => {
+                const git = makeGit();
+                const planted = { sha: 'b'.repeat(40), parents: [REMOTE_TIP] };
+                // Read twice before writing: does the branch exist (before the switch), and
+                // where is it (after).
+                git.readLocalCommit.mockResolvedValueOnce(planted).mockResolvedValueOnce(planted);
+                const { facade } = build({ git });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/refusing to push[\s\S]*not at the remote tip/);
+                expect(git.add).not.toHaveBeenCalled();
+                expect(git.commit).not.toHaveBeenCalled();
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it('fails closed when the provider cannot read local commits', async () => {
+                const git = makeGit();
+                git.readLocalCommit.mockRejectedValue(
+                    new Error("Git provider 'gitea' does not support readLocalCommit."),
+                );
+                const { facade } = build({ git });
+
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                ).rejects.toThrow(/could not be proven/);
+                expect(git.commit).not.toHaveBeenCalled();
+                expect(git.push).not.toHaveBeenCalled();
+            });
+
+            it('refuses a new commit that is not a direct child of the remote tip', async () => {
+                const git = makeGit();
+                git.readLocalCommit
+                    .mockResolvedValueOnce({ sha: REMOTE_TIP, parents: [] }) // exists (pre-switch)
+                    .mockResolvedValueOnce({ sha: REMOTE_TIP, parents: [] }) // at the anchor
+                    .mockResolvedValueOnce({ sha: 'sha-1', parents: ['c'.repeat(40)] });
+                const { facade } = build({ git });
+
+                // No files: nothing touches the (fake) disk, and the doubled `commit` still
+                // answers a sha, so the post-commit check is what refuses.
+                await expect(
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing' })),
+                ).rejects.toThrow(/branch moved while this call committed/);
+                expect(git.push).not.toHaveBeenCalled();
+            });
         });
 
         it('bases the clone on that same branch when the caller names one', async () => {
