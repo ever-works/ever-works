@@ -13,7 +13,7 @@
  *  - the input is longer than any icon (`MAX_INLINE_SVG_LENGTH`), or
  *  - an event-handler-shaped attribute survives the scrub, or
  *  - a dangerous URL scheme survives anywhere in the body, or
- *  - the scrub is not a fixed point: if a second pass would still remove
+ *  - the scrub is not a fixed point: if a second pass of a pattern would still remove
  *    something, the first pass spliced a new construct together out of the
  *    leftovers (`<scr<script>ipt>`, `<!<!-- -->-- -->`) — the input was built to
  *    survive one pass, so nothing of it is rendered (CodeQL
@@ -43,31 +43,49 @@ export const MAX_INLINE_SVG_LENGTH = 8000;
 // A dangerous URL scheme anywhere in the body, after the scrub.
 const SVG_DANGEROUS_URL_RE = /\b(?:javascript|vbscript|data|file)\s*:/i;
 
+// The scrub, in order. Each pattern only removes text.
+const SCRUB_PATTERNS: readonly RegExp[] = [
+    // XML processing instructions / DOCTYPE do not belong inline.
+    /<\?xml[^>]*\?>/gi,
+    /<!DOCTYPE[^>]*>/gi,
+    // Comments / CDATA, so payloads cannot hide inside them.
+    /<!--[\s\S]*?-->/g,
+    /<!\[CDATA\[[\s\S]*?\]\]>/g,
+    SVG_STYLE_BLOCK_RE,
+    SVG_DANGEROUS_TAG_RE,
+    SVG_DANGEROUS_ATTR_RE,
+];
+
+/**
+ * `input.replace(pattern, '')` until nothing changes (the shape CodeQL
+ * js/incomplete-multi-character-sanitization recognises), counting the passes that
+ * removed something. Every pass shortens the text and the input is capped, so it ends.
+ */
+function stripUntilStable(input: string, pattern: RegExp): { text: string; rounds: number } {
+    let rounds = 0;
+    let previous: string;
+    let current = input;
+    do {
+        previous = current;
+        current = current.replace(pattern, '');
+        if (current !== previous) rounds += 1;
+    } while (current !== previous);
+    return { text: current, rounds };
+}
+
 export function sanitizeInlineSvg(svg: string | null | undefined): string {
     if (typeof svg !== 'string' || svg.length > MAX_INLINE_SVG_LENGTH) return '';
-    // Scrub until stable. Every step only removes text, so a pass that changes nothing
-    // means no pattern matches at all; a SECOND pass that still changes something means
-    // the first spliced a construct together, and the input is refused.
     let cleaned = svg;
-    let previous: string;
-    let changingPasses = 0;
-    do {
-        previous = cleaned;
-        // The whole scrub, inline in the loop (the until-stable shape CodeQL
-        // js/incomplete-multi-character-sanitization recognises).
-        cleaned = cleaned
-            // XML processing instructions / DOCTYPE do not belong inline.
-            .replace(/<\?xml[^>]*\?>/gi, '')
-            .replace(/<!DOCTYPE[^>]*>/gi, '')
-            // Comments / CDATA, so payloads cannot hide inside them.
-            .replace(/<!--[\s\S]*?-->/g, '')
-            .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
-            .replace(SVG_STYLE_BLOCK_RE, '')
-            .replace(SVG_DANGEROUS_TAG_RE, '')
-            .replace(SVG_DANGEROUS_ATTR_RE, '');
-        if (cleaned !== previous) changingPasses += 1;
-        if (changingPasses > 1) return '';
-    } while (cleaned !== previous);
+    for (const pattern of SCRUB_PATTERNS) {
+        const pass = stripUntilStable(cleaned, pattern);
+        // A second removing pass means the first spliced a construct together out of the
+        // leftovers: the input was built to survive one pass, so none of it is rendered.
+        if (pass.rounds > 1) return '';
+        cleaned = pass.text;
+    }
+    // A later pattern's removal can splice an earlier pattern's construct together, so the
+    // result must already be clean for every pattern.
+    if (SCRUB_PATTERNS.some((pattern) => cleaned.replace(pattern, '') !== cleaned)) return '';
     if (SVG_DANGEROUS_URL_RE.test(cleaned) || SVG_HANDLER_LEFT_RE.test(cleaned)) return '';
     return cleaned;
 }
