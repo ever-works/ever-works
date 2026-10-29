@@ -143,11 +143,22 @@ export function normalizeBrowserCheck(raw: unknown): NormalizedBrowserCheck {
 
 /** Extract `<title>` from a serialized DOM, or null. */
 export function extractTitle(dom: string): string | null {
-	const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(dom);
-	if (!match) {
+	// Opener, then the first closer after it — two forward scans. One regex with a
+	// lazy body (`<title[^>]*>([\s\S]*?)<\/title>`) retried from every `<title` a
+	// page repeats without a closer (CodeQL js/polynomial-redos); the opener's own
+	// run stops at the next `<` for the same reason.
+	const opener = /<title[^<>]*>/i.exec(dom);
+	if (!opener) {
 		return null;
 	}
-	const title = match[1].replace(/\s+/g, ' ').trim();
+	const start = opener.index + opener[0].length;
+	const closer = /<\/title>/gi;
+	closer.lastIndex = start;
+	const close = closer.exec(dom);
+	if (!close) {
+		return null;
+	}
+	const title = dom.slice(start, close.index).replace(/\s+/g, ' ').trim();
 	return title ? title.slice(0, 200) : null;
 }
 

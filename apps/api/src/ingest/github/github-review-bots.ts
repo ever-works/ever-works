@@ -222,24 +222,80 @@ export function isReviewBotNoise(body: string | null | undefined): boolean {
     return NOTHING_ACTIONABLE.test(stripReviewBotMarkup(text));
 }
 
-const HTML_COMMENT = /<!--[\s\S]*?-->/g;
+/**
+ * A `<details …>` opener or a `</details>` closer. The attribute run stops at
+ * the next `<` as well as at `>`, so a long body of unclosed openers is
+ * scanned once, not once per opener (CodeQL js/polynomial-redos).
+ */
+const DETAILS_TOKEN = /<details\b[^<>]*>|<\/details\s*>/gi;
 
 /**
- * One `<details>` block that contains no nested `<details>`. Applied until
- * nothing changes so nested blocks (CodeRabbit nests its static-analysis
- * logs two deep) unwind from the inside out.
+ * `![P1 Badge](https://…)` — pure decoration once the severity is parsed.
+ * Neither bracket run crosses another opener, for the same linear-scan reason.
  */
-const INNERMOST_DETAILS = /<details\b[^>]*>(?:(?!<details\b)[\s\S])*?<\/details>/gi;
-
-/** `![P1 Badge](https://…)` — pure decoration once the severity is parsed. */
-const MARKDOWN_IMAGE = /!\[[^\]]*\]\([^)]*\)/g;
+const MARKDOWN_IMAGE = /!\[[^[\]]*\]\([^()]*\)/g;
 
 /**
  * Presentation tags the bots wrap findings in. Deliberately a fixed list
  * rather than "any tag": `Promise<void>` in a code sample must survive.
+ * The attribute run stops at the next `<` (see {@link DETAILS_TOKEN}).
  */
 const HTML_TAG =
-    /<\/?(?:a|img|sub|sup|br|hr|p|div|span|h[1-6]|b|i|strong|em|blockquote|summary|table|thead|tbody|tr|td|th|kbd|picture|source)\b[^>]*>/gi;
+    /<\/?(?:a|img|sub|sup|br|hr|p|div|span|h[1-6]|b|i|strong|em|blockquote|summary|table|thead|tbody|tr|td|th|kbd|picture|source)\b[^<>]*>/gi;
+
+/**
+ * Drop every `<!--` … `-->` span in one left-to-right pass, then any `<!--`
+ * still left — the opener of an unclosed comment, or one a removal spliced
+ * together (`<!<!-- x -->-- y -->`) — so no comment survives
+ * (CodeQL js/incomplete-multi-character-sanitization).
+ */
+function stripHtmlComments(text: string): string {
+    let out = '';
+    let cursor = 0;
+    for (;;) {
+        const open = text.indexOf('<!--', cursor);
+        if (open === -1) break;
+        const close = text.indexOf('-->', open + 4);
+        if (close === -1) break;
+        out += text.slice(cursor, open);
+        cursor = close + 3;
+    }
+    out += text.slice(cursor);
+    return out.split('<!--').join('');
+}
+
+/**
+ * Drop every complete `<details>` block, nested ones included (CodeRabbit nests
+ * its static-analysis logs two deep), in one pass over the openers and closers:
+ * a closer pairs with the latest open opener, and an outermost pair's span goes.
+ * An opener nothing closes, and a closer nothing opened, stay — as the old
+ * innermost-first regex loop left them.
+ */
+function stripDetailsBlocks(text: string): string {
+    const open: number[] = [];
+    const spans: Array<[number, number]> = [];
+    for (const match of text.matchAll(DETAILS_TOKEN)) {
+        const start = match.index ?? 0;
+        if (match[0][1] !== '/') {
+            open.push(start);
+            continue;
+        }
+        const opener = open.pop();
+        if (opener === undefined) continue;
+        const end = start + match[0].length;
+        // A pair that encloses the spans already found replaces them.
+        while (spans.length > 0 && spans[spans.length - 1][0] > opener) spans.pop();
+        spans.push([opener, end]);
+    }
+    if (spans.length === 0) return text;
+    let out = '';
+    let cursor = 0;
+    for (const [start, end] of spans) {
+        out += text.slice(cursor, start);
+        cursor = end;
+    }
+    return out + text.slice(cursor);
+}
 
 /**
  * Reduce a bot body to the words a Task can act on. CodeRabbit's inline
@@ -248,12 +304,7 @@ const HTML_TAG =
  * and never reach the finding itself.
  */
 export function stripReviewBotMarkup(body: string | null | undefined): string {
-    let text = (body ?? '').replace(HTML_COMMENT, '');
-    let previous: string;
-    do {
-        previous = text;
-        text = text.replace(INNERMOST_DETAILS, '');
-    } while (text !== previous);
+    let text = stripDetailsBlocks(stripHtmlComments(body ?? ''));
     text = text.replace(MARKDOWN_IMAGE, '').replace(HTML_TAG, '');
     return text
         .split('\n')

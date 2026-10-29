@@ -301,6 +301,35 @@ describe('github-review-bots', () => {
             ).toBe('The import is mid-file.');
         });
 
+        it('leaves no comment behind when one removal would splice another together', () => {
+            const stripped = stripReviewBotMarkup('keep <!<!-- a -->-- b --> this <!-- unclosed');
+            expect(stripped).not.toContain('<!--');
+            expect(stripped).toContain('keep');
+            expect(stripped).toContain('this');
+        });
+
+        it('keeps an unclosed outer <details> and drops the complete inner one', () => {
+            expect(
+                stripReviewBotMarkup('A <details>B <details>C</details> D'),
+            ).toBe('A <details>B  D');
+            expect(stripReviewBotMarkup('A</details> <details>x</details>B')).toBe('A</details> B');
+        });
+
+        it('stays linear on hostile bodies (CodeQL js/polynomial-redos)', () => {
+            const hostile = [
+                '<!--'.repeat(20_000),
+                '<details'.repeat(20_000),
+                '<a'.repeat(20_000),
+                '!['.repeat(20_000),
+                '![x]('.repeat(20_000),
+            ];
+            for (const body of hostile) {
+                const started = Date.now();
+                stripReviewBotMarkup(body);
+                expect(Date.now() - started).toBeLessThan(1_000);
+            }
+        });
+
         it('leaves generics in code samples alone — only presentation tags are stripped', () => {
             expect(stripReviewBotMarkup('Return `Promise<void>` here, not `Array<string>`.')).toBe(
                 'Return `Promise<void>` here, not `Array<string>`.',

@@ -430,11 +430,20 @@ export function playbookSearchFields(entry: {
 	};
 }
 
-const HTML_TAG_PATTERN = /<[^>]*>/g;
+/**
+ * One tag. Its body stops at the next `<` as well as at `>`, so a run of
+ * unclosed `<` is scanned once, not once per `<` (CodeQL js/polynomial-redos).
+ */
+const HTML_TAG_PATTERN = /<[^<>]*>/g;
 
-/** Strip HTML tags, trim, and cap a catalogue string at `max` characters. */
+/**
+ * Strip HTML tags, trim, and cap a catalogue string at `max` characters. Any
+ * `<` or `>` left once the tags are gone goes too: a split tag such as
+ * `<scr<b>ipt>` leaves no markup behind (CodeQL
+ * js/incomplete-multi-character-sanitization).
+ */
 export function sanitizePlaybookText(value: string, max: number): string {
-	return value.replace(HTML_TAG_PATTERN, '').trim().slice(0, max);
+	return value.replace(HTML_TAG_PATTERN, '').replace(/[<>]/g, '').trim().slice(0, max);
 }
 
 export type PlaybookEntryAcceptance =
