@@ -18,6 +18,13 @@ const REGISTRY: Record<string, (props: never) => ReactElement> = {
 } as Record<string, (props: never) => ReactElement>;
 
 /**
+ * The registry as a Map, for lookups by a caller-supplied slug: a Map has no
+ * prototype chain to resolve `constructor` or `toString` through (CodeQL
+ * js/unvalidated-dynamic-method-call).
+ */
+const TEMPLATES: ReadonlyMap<string, (props: never) => ReactElement> = new Map(Object.entries(REGISTRY));
+
+/**
  * Render a registered React-Email template to its canonical
  * `{ html, text }` pair. The HTML is the cross-client email body; the
  * text is the plain-text fallback (`render(..., { plainText: true })`).
@@ -27,8 +34,7 @@ const REGISTRY: Record<string, (props: never) => ReactElement> = {
  * provider plugin ships it.
  */
 export async function renderTemplate<TProps>(slug: string, props: TProps): Promise<RenderedEmail> {
-	// Own keys only: `constructor` or `toString` would otherwise resolve on the prototype.
-	const factory = Object.prototype.hasOwnProperty.call(REGISTRY, slug) ? REGISTRY[slug] : undefined;
+	const factory = TEMPLATES.get(slug);
 	if (!factory) {
 		throw new Error(`Unknown email template: ${slug}`);
 	}
@@ -38,7 +44,7 @@ export async function renderTemplate<TProps>(slug: string, props: TProps): Promi
 }
 
 export function listTemplates(): string[] {
-	return Object.keys(REGISTRY);
+	return Array.from(TEMPLATES.keys());
 }
 
 export type { AgentSummaryTemplateProps, AgentMessageTemplateProps };
