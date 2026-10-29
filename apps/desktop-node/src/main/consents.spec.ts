@@ -83,6 +83,41 @@ describe('desktop consents', () => {
 		});
 	});
 
+	it('rejects a refused save with the old file whole — never an in-place rewrite (#380 review)', async () => {
+		const before = '{"version":1,"work":false,"attend":true,"manage":true}';
+		const files = new Map<string, string>([['/u/node-consents.json', before]]);
+		const calls: string[] = [];
+		const fs = {
+			readFile: async (path: string) => files.get(path) ?? null,
+			writeFile: async (path: string) => {
+				calls.push(`writeFile ${path}`);
+			},
+			createFileExclusive: async (path: string, content: string) => {
+				files.set(path, content);
+			},
+			writeExistingFile: async (path: string, content: string | Uint8Array) => {
+				files.set(path, String(content));
+			},
+			rename: async () => {
+				throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' });
+			},
+			remove: async (path: string) => {
+				files.delete(path);
+			}
+		};
+
+		await expect(
+			saveDesktopConsents(
+				fs,
+				'/u/node-consents.json',
+				{ work: true, attend: false, manage: false },
+				{ platform: 'linux' }
+			)
+		).rejects.toThrow('EPERM');
+		expect(calls).toEqual([]);
+		expect([...files.entries()]).toEqual([['/u/node-consents.json', before]]);
+	});
+
 	it('takes only literal booleans; a missing key keeps its default', () => {
 		expect(normalizeDesktopConsents({ work: 'false', attend: 1, manage: true })).toEqual({
 			work: true,

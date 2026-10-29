@@ -1,4 +1,4 @@
-import { writeStateFile, type StateFileSystem } from 'ever-works-node';
+import { replaceFileAtomically, supportsAtomicWrites, type StateFileSystem } from 'ever-works-node';
 import { DEFAULT_DESKTOP_CONSENTS, type DesktopConsentsView } from '../shared/ipc-contract';
 
 /**
@@ -46,6 +46,10 @@ export async function loadDesktopConsents(fs: ConsentsFs, filePath: string): Pro
  * Atomic since Gauzy Ever Works #380: the tray writes this file while the app may be killed (an
  * upgrade, a force-quit), and an in-place rewrite torn by that kill read back as the defaults —
  * silently undoing whatever the owner had chosen.
+ *
+ * STRICTLY atomic, unlike the node's own state records (`writeStateFile`), which fall back to an
+ * in-place rewrite when the OS refuses the temp file or the rename: here a refused save rejects
+ * with the old file whole, and the caller keeps the consents it had and says the save failed.
  */
 export async function saveDesktopConsents(
 	fs: ConsentsFs,
@@ -54,7 +58,13 @@ export async function saveDesktopConsents(
 	options: { platform?: string } = {}
 ): Promise<void> {
 	const value = normalizeDesktopConsents(consents);
-	await writeStateFile(fs, filePath, `${JSON.stringify({ version: 1, ...value }, null, 2)}\n`, {
+	const content = `${JSON.stringify({ version: 1, ...value }, null, 2)}\n`;
+	if (!supportsAtomicWrites(fs)) {
+		// Test doubles only: the real config filesystem always carries the atomic primitives.
+		await fs.writeFile(filePath, content);
+		return;
+	}
+	await replaceFileAtomically(fs, filePath, content, {
 		...(options.platform ? { platform: options.platform } : {})
 	});
 }
