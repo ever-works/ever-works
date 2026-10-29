@@ -7,8 +7,9 @@
  * (CodeQL js/incomplete-multi-character-sanitization). A tag's body stops at the next
  * `<`, so every pass is linear (js/polynomial-redos), and the passes are capped: real
  * values settle in one or two, and whatever a capped run leaves cannot open a tag once
- * the stray openers (a `<` before a letter, `/`, `!` or `?`) go. `a -> b` and `x < y`
- * keep their text.
+ * the stray openers go: every run of `<` before a letter, `/`, `!` or `?` (the whole
+ * run, so dropping one `<` cannot glue the previous one onto the name). `a -> b` and
+ * `x < y` keep their text.
  */
 export const MAX_TAG_STRIP_PASSES = 32;
 
@@ -20,5 +21,5 @@ export function stripHtmlTags(value: string): string {
         previous = current;
         current = current.replace(/<[^<>]*>/g, '');
     } while (current !== previous && ++passes < MAX_TAG_STRIP_PASSES);
-    return current.replace(/<(?=[a-z/!?])/gi, '');
+    return current.replace(/(?<!<)<+(?=[a-z/!?])/gi, '');
 }

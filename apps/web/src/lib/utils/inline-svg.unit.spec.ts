@@ -23,9 +23,17 @@ describe('sanitizeInlineSvg', () => {
     });
 
     it('strips a handler glued to the previous quoted value (the HTML parser accepts it)', () => {
-        const out = sanitizeInlineSvg('<svg><img src="x"onerror=alert(1)></svg>');
-        expect(out).not.toMatch(/onerror/i);
-        expect(out).toBe('<svg><img src="x"></svg>');
+        const out = sanitizeInlineSvg('<svg><rect x="1"onclick="alert(1)"/></svg>');
+        expect(out).not.toMatch(/onclick/i);
+        expect(out).toBe('<svg><rect x="1"/></svg>');
+    });
+
+    it('fails closed on an HTML element, inside <desc> too, and on a reference to another host', () => {
+        expect(sanitizeInlineSvg('<svg><img src="x"onerror=alert(1)></svg>')).toBe('');
+        expect(sanitizeInlineSvg('<svg><desc><img src="https://attacker.test/x"></desc></svg>')).toBe('');
+        expect(sanitizeInlineSvg('<svg><filter id="f"/></svg>')).toBe('');
+        expect(sanitizeInlineSvg('<svg><rect fill="url(https://attacker.test/p)"/></svg>')).toBe('');
+        expect(sanitizeInlineSvg('<svg><rect fill="url(#grad)"/></svg>')).toBe('<svg><rect fill="url(#grad)"/></svg>');
     });
 
     it('fails closed when anything handler-shaped is left, and on oversized input', () => {

@@ -473,7 +473,8 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 				if (!LINK_SCHEMES.has(parsed.protocol)) continue;
 				isExternal = parsed.host !== baseHost;
 			} catch {
-				// Invalid URL, assume internal
+				// Unparseable even against the base: not a link the allow-list can vouch for.
+				continue;
 			}
 
 			links.push({

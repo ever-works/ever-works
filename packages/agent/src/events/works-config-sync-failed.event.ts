@@ -17,10 +17,11 @@ const ERROR_MESSAGE_MAX_LENGTH = 500;
  */
 function sanitizeErrorMessage(raw: string): string {
     // Replace credentials in URLs: https://user:secret@host → https://[REDACTED]@host
-    // The scheme stays outside the match (it is kept as written either way), so no
-    // letter run is rescanned from every offset (CodeQL js/polynomial-redos); a
-    // `://user:secret@` with no scheme before it is redacted too.
-    const withoutUrlCredentials = raw.replace(/:\/\/[^/\s@:]+:[^/\s@]*@/g, '://[REDACTED]@');
+    // Any userinfo goes: `user:secret@`, `:token@` (empty user) and the token-only
+    // `ghp_…@` form git remotes use. The scheme stays outside the match (it is kept as
+    // written either way), so no letter run is rescanned from every offset (CodeQL
+    // js/polynomial-redos); a `://…@` with no scheme before it is redacted too.
+    const withoutUrlCredentials = raw.replace(/:\/\/[^/\s@]+@/g, '://[REDACTED]@');
     // sanitizeDescription: strips control chars, collapses whitespace, removes
     // newlines, and truncates to ERROR_MESSAGE_MAX_LENGTH.
     return sanitizeDescription(withoutUrlCredentials, ERROR_MESSAGE_MAX_LENGTH);

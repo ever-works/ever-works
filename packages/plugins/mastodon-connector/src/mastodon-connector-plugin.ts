@@ -71,7 +71,7 @@ export function stripStatusHtml(html: string | undefined): string | undefined {
 		// Any `<` a capped run left that could still open a tag. Both steps run before the
 		// entities are decoded: the result is plain text, and an escaped `&lt;` in the
 		// status is meant to read as `<` (CodeQL js/incomplete-multi-character-sanitization).
-		.replace(/<(?=[a-z/!?])/gi, '')
+		.replace(/(?<!<)<+(?=[a-z/!?])/gi, '')
 		.replace(/&nbsp;/g, ' ')
 		.replace(/&lt;/g, '<')
 		.replace(/&gt;/g, '>')

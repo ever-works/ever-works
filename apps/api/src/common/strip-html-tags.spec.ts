@@ -19,6 +19,14 @@ describe('stripHtmlTags', () => {
         expect(stripHtmlTags(nested)).not.toMatch(/<[a-z/!?]/i);
     });
 
+    it('leaves no tag at the cap boundary either (review of #3029)', () => {
+        for (let extra = 0; extra < 4; extra++) {
+            const n = MAX_TAG_STRIP_PASSES + extra;
+            const out = stripHtmlTags(`${'<'.repeat(n)}script${'>'.repeat(n)}`);
+            expect(out).not.toMatch(/<[a-z/!?]/i);
+        }
+    });
+
     it('stays fast on a long run of unclosed openers', () => {
         const started = Date.now();
         stripHtmlTags('<'.repeat(100_000));

@@ -451,7 +451,7 @@ export function sanitizePlaybookText(value: string, max: number): string {
 		previous = current;
 		current = current.replace(HTML_TAG_PATTERN, '');
 	} while (current !== previous && ++passes < 32);
-	return current.replace(/<(?=[a-z/!?])/gi, '').trim().slice(0, max);
+	return current.replace(/(?<!<)<+(?=[a-z/!?])/gi, '').trim().slice(0, max);
 }
 
 export type PlaybookEntryAcceptance =
