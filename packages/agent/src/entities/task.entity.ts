@@ -139,7 +139,7 @@ export interface TaskLinkedPullRequest {
 // have not been noticed yet. Shipped by 1795110000000-AddTaskDatesAndEstimate.
 @Index('idx_tasks_due_soon', ['dueAt', 'dueSoonNotifiedAt'])
 // APW-08 T9 (plan §3.1) — the delivery reconciler's scan: open delivery states,
-// stalest first. Shipped by 1792080000000-AddTaskDeliveryState.
+// stalest first. Shipped by 1792320000000-AddTaskDeliveryState.
 @Index('idx_tasks_delivery_due', ['deliveryState', 'deliveryUpdatedAt'])
 // APW-08 T9 / S29 — a merge is recorded ONCE per (Work, merge commit). Partial on
 // Postgres and SQLite; MySQL/MariaDB have no partial index and get the plain unique
@@ -736,7 +736,7 @@ export class Task {
     // Task that is not a merged change of an App Work, which is every row that
     // predates them: `deliveryState = NULL` means "not tracked", and such a
     // Task completes on merge exactly as before. Shipped by
-    // `1792080000000-AddTaskDeliveryState`.
+    // `1792320000000-AddTaskDeliveryState`.
 
     /** The commit the merge produced on the App Work's source branch — what a Build/Deployment must contain. */
     @Column({ type: 'varchar', length: 64, nullable: true })

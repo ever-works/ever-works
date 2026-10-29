@@ -3,6 +3,14 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
 /**
  * APW-08 T9 (plan §3.1, §3.5 slot `00`) — the App Works delivery chain's columns on `tasks`.
  *
+ * ## The stamp
+ *
+ * Plan §3.5 reserved `1792080000000` for this migration, but stage and production have already
+ * applied newer App Works migrations (the newest on `develop` is
+ * `1792310000000-CreateStripeRelayDeadLetters`). Per the build lead, this one is stamped at the
+ * next free slot AFTER the newest so it runs last and keeps the block's applied order; it has no
+ * dependency on anything stamped between the two.
+ *
  * | column                 | type             | what                                                            |
  * |------------------------|------------------|-----------------------------------------------------------------|
  * | `mergeCommitSha`       | varchar(64)      | the commit a Build/Deployment must contain                      |
@@ -41,8 +49,8 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  * completes on merge exactly as before. Every step re-reads the table first (SQLite recreates it on
  * an added column), so a re-run is a no-op and `down()` drops exactly what `up()` added.
  */
-export class AddTaskDeliveryState1792080000000 implements MigrationInterface {
-    name = 'AddTaskDeliveryState1792080000000';
+export class AddTaskDeliveryState1792320000000 implements MigrationInterface {
+    name = 'AddTaskDeliveryState1792320000000';
 
     static readonly TABLE = 'tasks';
     static readonly INDEX_DUE = 'idx_tasks_delivery_due';
@@ -54,7 +62,7 @@ export class AddTaskDeliveryState1792080000000 implements MigrationInterface {
     }
 
     static columns(driver: string): TableColumn[] {
-        const date = AddTaskDeliveryState1792080000000.dateType(driver);
+        const date = AddTaskDeliveryState1792320000000.dateType(driver);
         return [
             new TableColumn({ name: 'mergeCommitSha', type: 'varchar', length: '64', isNullable: true }),
             new TableColumn({ name: 'deliveryState', type: 'varchar', length: '24', isNullable: true }),
@@ -67,7 +75,7 @@ export class AddTaskDeliveryState1792080000000 implements MigrationInterface {
     }
 
     static indexes(): TableIndex[] {
-        const C = AddTaskDeliveryState1792080000000;
+        const C = AddTaskDeliveryState1792320000000;
         return [
             new TableIndex({ name: C.INDEX_DUE, columnNames: ['deliveryState', 'deliveryUpdatedAt'] }),
             new TableIndex({
@@ -81,7 +89,7 @@ export class AddTaskDeliveryState1792080000000 implements MigrationInterface {
     }
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        const C = AddTaskDeliveryState1792080000000;
+        const C = AddTaskDeliveryState1792320000000;
         if (!(await queryRunner.getTable(C.TABLE))) return;
 
         for (const column of C.columns(queryRunner.connection.options.type)) {
@@ -99,7 +107,7 @@ export class AddTaskDeliveryState1792080000000 implements MigrationInterface {
 
     /** Drops the three indexes, then the seven columns — nothing else. */
     public async down(queryRunner: QueryRunner): Promise<void> {
-        const C = AddTaskDeliveryState1792080000000;
+        const C = AddTaskDeliveryState1792320000000;
         if (!(await queryRunner.getTable(C.TABLE))) return;
 
         for (const index of C.indexes()) {

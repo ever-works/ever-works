@@ -1798,4 +1798,65 @@ describe('TriggerInternalController', () => {
             expect(health.shouldSample).not.toHaveBeenCalled();
         });
     });
+
+    // -------------------------------------------------------------------
+    // APW-08 T23 — the `app-change-delivery` reconciler's remote target
+    // -------------------------------------------------------------------
+
+    describe('the APW-08 TaskDeliveryService remote target', () => {
+        it('reaches reconcile over the hop with the batch the worker passed', async () => {
+            const summary = { scanned: 1, changed: 1, closed: 0, failed: 0 };
+            const delivery = {
+                reconcile: jest.fn().mockResolvedValue(summary),
+                closeWithoutDeploy: jest.fn(),
+                requestFollowUp: jest.fn(),
+                recordMerge: jest.fn(),
+            };
+            (controller as any).taskDeliveryService = delivery;
+            controller.onModuleInit();
+
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'TaskDeliveryService',
+                method: 'reconcile',
+                args: superjson.serialize([{ limit: 200 }]) as any,
+            });
+            expect(delivery.reconcile).toHaveBeenCalledWith({ limit: 200 });
+            expect(superjson.deserialize(response.result as any)).toEqual(summary);
+        });
+
+        it("exposes reconcile ONLY — a person's Close anyway / Try once more never reaches the worker", async () => {
+            const delivery = {
+                reconcile: jest.fn(),
+                closeWithoutDeploy: jest.fn(),
+                requestFollowUp: jest.fn(),
+                recordMerge: jest.fn(),
+            };
+            (controller as any).taskDeliveryService = delivery;
+            controller.onModuleInit();
+
+            for (const method of ['closeWithoutDeploy', 'requestFollowUp', 'recordMerge']) {
+                await expect(
+                    controller.callRemote(VALID_SECRET, {
+                        name: 'TaskDeliveryService',
+                        method,
+                        args: superjson.serialize([]) as any,
+                    }),
+                ).rejects.toThrow(`Method not in allow-list for TaskDeliveryService: ${method}`);
+            }
+            expect(delivery.closeWithoutDeploy).not.toHaveBeenCalled();
+            expect(delivery.requestFollowUp).not.toHaveBeenCalled();
+        });
+
+        it('is an unknown target when the chain is not bound', async () => {
+            (controller as any).taskDeliveryService = undefined;
+            controller.onModuleInit();
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'TaskDeliveryService',
+                    method: 'reconcile',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toBeDefined();
+        });
+    });
 });

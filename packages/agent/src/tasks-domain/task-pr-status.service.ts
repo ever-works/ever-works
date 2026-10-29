@@ -17,6 +17,7 @@ import {
     type PromotionLaneWatcher,
 } from '../policy/promotion-merge-guard.port';
 import { pickOwnerRepo, requireTaskRepository } from './task-repository';
+import { TASK_DELIVERY_TRACKER, type TaskDeliveryTracker } from './task-delivery.port';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -100,6 +101,18 @@ export interface PrStatusSyncSummary {
     merged: number;
     completed: number;
     failed: number;
+    /**
+     * APW-08 T22 — merges the App Works delivery chain took over: recorded as `merged` and NOT
+     * completed here (the Task closes when its change is live). Always `0` without the chain.
+     */
+    deliveryTracked: number;
+}
+
+/** What {@link TaskPrStatusService.refreshTask} answers: the Task, and the provider read behind it. */
+export interface TaskPrRefresh {
+    task: Task;
+    /** `null` when no provider read happened, or the pull request is gone from the provider. */
+    status: GitPullRequestStatus | null;
 }
 
 @Injectable()
@@ -107,7 +120,7 @@ export class TaskPrStatusService {
     private readonly logger = new Logger(TaskPrStatusService.name);
 
     /** Single-flight map, keyed by task id (rule 2 above). */
-    private readonly inFlight = new Map<string, Promise<Task>>();
+    private readonly inFlight = new Map<string, Promise<TaskPrRefresh>>();
 
     constructor(
         private readonly tasks: TaskRepository,
@@ -138,6 +151,12 @@ export class TaskPrStatusService {
         // `task.runtime_updated`, no version or updatedAt bump. Appended LAST
         // + @Optional (positional-spec arity rule).
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // APW-08 T22 — the App Works delivery chain's merge hook. Appended LAST + @Optional()
+        // (positional-spec arity rule) and injected by TOKEN so this file never imports the
+        // app-works graph. Absent, every merged pull request completes its Task as before.
+        @Optional()
+        @Inject(TASK_DELIVERY_TRACKER)
+        private readonly delivery?: TaskDeliveryTracker,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -168,14 +187,26 @@ export class TaskPrStatusService {
             return this.toView(task, true);
         }
 
-        const refreshed = await this.refreshTask(task, userId).catch((error) => {
-            this.logger.warn(
-                `PR status refresh failed for task ${task.id}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
-            return task;
-        });
+        const before = task.prState;
+        const refreshed = await this.refreshTask(task, userId)
+            .then(async (result) => {
+                // APW-08 T22 — the on-demand read can be the first to see a merge, and the sweep
+                // never re-selects a merged pull request, so a tracked merge is recorded here too
+                // (once: `recordMerge` writes only from no state). Nothing else changes on this
+                // path — it still never completes a Task.
+                if (result.task.prState === 'merged' && before !== 'merged') {
+                    await this.recordTrackedMerge(result.task, result.status);
+                }
+                return result.task;
+            })
+            .catch((error) => {
+                this.logger.warn(
+                    `PR status refresh failed for task ${task.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                return task;
+            });
         return this.toView(refreshed, refreshed === task);
     }
 
@@ -265,6 +296,7 @@ export class TaskPrStatusService {
             merged: 0,
             completed: 0,
             failed: 0,
+            deliveryTracked: 0,
         };
         if (!this.gitFacade) return summary;
 
@@ -279,11 +311,15 @@ export class TaskPrStatusService {
         for (const task of due) {
             try {
                 const before = task.prState;
-                const after = await this.refreshTask(task, task.userId);
+                const { task: after, status } = await this.refreshTask(task, task.userId);
                 summary.refreshed += 1;
                 if (after.prState === 'merged' && before !== 'merged') {
                     summary.merged += 1;
-                    if (await this.completeOnMerge(after)) summary.completed += 1;
+                    if (await this.recordTrackedMerge(after, status)) {
+                        summary.deliveryTracked += 1;
+                    } else if (await this.completeOnMerge(after)) {
+                        summary.completed += 1;
+                    }
                 } else {
                     await this.offerRedGateToFixLoop(after);
                 }
@@ -298,6 +334,34 @@ export class TaskPrStatusService {
         }
 
         return summary;
+    }
+
+    /**
+     * APW-08 T22 (FR-29, FR-30, FR-33) — a merge the App Works delivery chain follows is recorded
+     * (`deliveryState = 'merged'`) and the Task stays in review until its change is live; the
+     * caller then skips `completeOnMerge`. Any other merge — another branch (S19), a non-App
+     * Work, no merge commit reported, no chain bound — answers `false` and completes as before.
+     *
+     * A tracker that THROWS also answers `false`: a merged Task is never stranded in review by a
+     * broken hook (the chain degrades to today's behaviour, plan §8.2).
+     */
+    private async recordTrackedMerge(
+        task: Task,
+        status: GitPullRequestStatus | null,
+    ): Promise<boolean> {
+        if (!this.delivery) return false;
+        try {
+            if (!(await this.delivery.isDeliveryTracked(task, status))) return false;
+            if (status) await this.delivery.recordMerge(task, status);
+            return true;
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the delivery merge hook threw; completing on merge instead (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return false;
+        }
     }
 
     /**
@@ -416,14 +480,18 @@ export class TaskPrStatusService {
     /**
      * Provider read + cache write for one Task, single-flighted.
      * Returns the Task with the fresh cache values applied in memory
-     * (so the caller can answer without a re-read).
+     * (so the caller can answer without a re-read) AND the provider's
+     * status behind it (APW-08 T22, APW08-G10: the merge hook needs the
+     * merge commit and base branch, which the Task does not store).
+     * `status` is `null` exactly where no read happened or the pull
+     * request is gone from the provider.
      */
-    private async refreshTask(task: Task, userId: string): Promise<Task> {
+    private async refreshTask(task: Task, userId: string): Promise<TaskPrRefresh> {
         const existing = this.inFlight.get(task.id);
         if (existing) return existing;
 
         const work = (async () => {
-            if (!this.gitFacade || !task.prNumber || !task.workId) return task;
+            if (!this.gitFacade || !task.prNumber || !task.workId) return { task, status: null };
             const target = await this.resolveRepo(task, userId);
             const status = await this.gitFacade.getPullRequestStatus(
                 target.owner,
@@ -436,7 +504,7 @@ export class TaskPrStatusService {
                 // The PR is gone from the provider. Record the read so the
                 // sweep does not spin on it; the state stays whatever it was.
                 await this.tasks.updatePrStatusCache(task.id, { ciCheckedAt: checkedAt });
-                return Object.assign(task, { ciCheckedAt: checkedAt });
+                return { task: Object.assign(task, { ciCheckedAt: checkedAt }), status: null };
             }
             const patch = this.toCachePatch(status, checkedAt);
             // Reviewer agent stage (slice AD) — the head this Task had
@@ -569,7 +637,7 @@ export class TaskPrStatusService {
                         return undefined;
                     });
             }
-            return task;
+            return { task, status };
         })().finally(() => {
             this.inFlight.delete(task.id);
         });

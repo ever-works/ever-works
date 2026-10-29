@@ -1,4 +1,9 @@
-import { normalizeRecordListView, type TaskCostView } from '@ever-works/contracts';
+import {
+    normalizeRecordListView,
+    type TaskCostView,
+    type TaskDeliveryFollowUpResponse,
+    type TaskDeliveryView,
+} from '@ever-works/contracts';
 import {
     BadRequestException,
     Body,
@@ -31,6 +36,7 @@ import {
     RUN_BATCH_MAX_TASKS,
     TaskPrStatusService,
     TaskBoardService,
+    TaskDeliveryService,
     type TaskActorType,
     type TaskAuthorType,
     type ListTasksFilter,
@@ -100,8 +106,10 @@ import {
     AddBlockerDto,
     AddRelationDto,
     AddReviewerDto,
+    CloseTaskDeliveryDto,
     CreateTaskDto,
     RejectTaskDto,
+    RequestTaskDeliveryFollowUpDto,
     ResolveEscalationDto,
     PostTaskChatDto,
     RunTaskDto,
@@ -312,6 +320,10 @@ export class TasksController {
         // positional construction keeps compiling; absent, the view lists no runs and still
         // answers the Task's total from the usage ledger.
         @Optional() private readonly agentRuns?: AgentRunRepository,
+        // APW-08 T24 — the App Works delivery chain behind `:id/delivery*`. Appended LAST +
+        // @Optional() so every positional construction keeps compiling; absent, the read answers
+        // an untracked chain and the two writes answer 503.
+        @Optional() private readonly delivery?: TaskDeliveryService,
     ) {}
 
     /**
@@ -1582,6 +1594,61 @@ export class TasksController {
         return buildTaskCostView(id, { usage: this.pluginUsage, runs: this.agentRuns ?? null });
     }
 
+    @Get(':id/delivery')
+    @ApiOperation({
+        summary:
+            "APW-08 — where a merged App Work change stands: merged → building → built → deploying → live (or failed / closed without deploying), with the Build, Deployment, follow-ups and the chain's timeline.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async getDelivery(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<TaskDeliveryView> {
+        // Owner-scoped like `:id/cost` — another account's Task is a 404.
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        if (!this.delivery) return untrackedDeliveryView(task.id);
+        return this.delivery.getView(task);
+    }
+
+    @Post(':id/delivery/close')
+    @ApiOperation({
+        summary:
+            "APW-08 S9/S20 — Close anyway: move the Task to Done although its change is not live. Passes the approver and blocker gates; 422 { code: 'notClosable' } unless the change is merged, built or failed.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async closeDelivery(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: CloseTaskDeliveryDto,
+    ): Promise<TaskDeliveryView> {
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        if (!this.delivery) {
+            throw new ServiceUnavailableException('The delivery chain is not available.');
+        }
+        return this.delivery.closeWithoutDeploy(auth.userId, task, body?.note ?? null);
+    }
+
+    @Post(':id/delivery/follow-up')
+    @ApiOperation({
+        summary:
+            "APW-08 S22 — Try once more: consume the Task's open delivery-failed Inbox item and open one more follow-up Task. Every refusal is 422 { code: 'followUpLimit' }.",
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async requestDeliveryFollowUp(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: RequestTaskDeliveryFollowUpDto,
+    ): Promise<TaskDeliveryFollowUpResponse> {
+        const scope = this.scopeContext.getScope();
+        const task = await this.service.getOne(auth.userId, id, scope);
+        if (!this.delivery) {
+            throw new ServiceUnavailableException('The delivery chain is not available.');
+        }
+        return this.delivery.requestFollowUp(auth.userId, task, body.escalationId, scope);
+    }
+
     @Post(':id/chat')
     @ApiOperation({
         summary:
@@ -1632,4 +1699,21 @@ export class TasksController {
             scope,
         );
     }
+}
+
+/** APW-08 — the chain of a Task the delivery chain does not track (or a runtime without it). */
+function untrackedDeliveryView(taskId: string): TaskDeliveryView {
+    return {
+        taskId,
+        state: null,
+        mergeCommitSha: null,
+        pullRequest: null,
+        build: null,
+        deployment: null,
+        liveUrl: null,
+        liveWithWarnings: false,
+        carriedByLaterChange: false,
+        followUps: [],
+        history: [],
+    };
 }

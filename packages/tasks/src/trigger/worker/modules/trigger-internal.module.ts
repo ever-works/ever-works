@@ -25,6 +25,7 @@ import {
     TaskChatService,
     TaskGateJudgeService,
     TaskGateRunnerService,
+    TaskDeliveryService,
     TaskPrStatusService,
     TaskRecurrenceDispatcherService,
     TaskReviewRejectionService,
@@ -424,6 +425,15 @@ export const WORK_UPSTREAM_STATE_REPOSITORY = 'WorkUpstreamStateRepository';
             provide: TaskPrStatusService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'TaskPrStatusService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // APW-08 T23 — the `app-change-delivery` cron calls reconcile() over the internal RPC
+        // channel. The real service needs the git facade (commit ancestry) and the Build /
+        // Deployment rows, both API-side — same shape as TaskPrStatusService.
+        {
+            provide: TaskDeliveryService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskDeliveryService'),
             inject: [TriggerInternalApiClient],
         },
         // Notifications v2 (EW-663) — the notification-channel-delivery

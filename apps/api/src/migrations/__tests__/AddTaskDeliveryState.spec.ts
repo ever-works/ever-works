@@ -1,5 +1,5 @@
 import { DataSource, Table } from 'typeorm';
-import { AddTaskDeliveryState1792080000000 } from '../1792080000000-AddTaskDeliveryState';
+import { AddTaskDeliveryState1792320000000 } from '../1792320000000-AddTaskDeliveryState';
 
 /**
  * APW-08 T9 — the delivery columns on `tasks` (plan §3.1, §3.5 slot `00`).
@@ -9,9 +9,9 @@ import { AddTaskDeliveryState1792080000000 } from '../1792080000000-AddTaskDeliv
  * partial one created without its predicate, would pass an insert-shaped test and still let a
  * merge be recorded twice.
  */
-describe('AddTaskDeliveryState1792080000000', () => {
+describe('AddTaskDeliveryState1792320000000', () => {
     let dataSource: DataSource;
-    const migration = new AddTaskDeliveryState1792080000000();
+    const migration = new AddTaskDeliveryState1792320000000();
     const ADDED = [
         'deliveryBuildId',
         'deliveryClosedById',
