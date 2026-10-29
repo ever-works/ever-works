@@ -49,7 +49,17 @@ describe('inbox.shared — contract parity', () => {
         const kinds: InboxItemKind[] = [...INBOX_ITEM_KINDS];
         const statuses: InboxItemStatus[] = [...INBOX_ITEM_STATUSES];
         const sourceTypes: InboxItemSourceType[] = [...INBOX_ITEM_SOURCE_TYPES];
-        expect(kinds).toEqual(['question', 'approval', 'escalation', 'notice']);
+        expect(kinds).toEqual([
+            'question',
+            'approval',
+            'escalation',
+            'notice',
+            // Integration inbox push — appended.
+            'mention',
+            'assignment',
+            'email',
+            'other',
+        ]);
         expect(statuses).toEqual(['open', 'answered', 'archived']);
         // `fleet-run` (self-build slice Q) is appended LAST — the contracts
         // list is ordered by the release each source shipped in.
@@ -62,6 +72,8 @@ describe('inbox.shared — contract parity', () => {
             'fleet-run',
             // FL-05 — a session on a computer that needs you.
             'fleet-session',
+            // Integration inbox push — an item another product filed.
+            'integration',
         ]);
     });
 

@@ -301,7 +301,11 @@ export interface InboxItemDto {
 // the record and the run, so My Decisions is the Inbox read through a
 // ranking and a handful of filters, never a parallel queue.
 
-/** The Inbox kinds that ask the human to decide (everything but `notice`). */
+/**
+ * The Inbox kinds that ask the human to decide: not the FYI ones (`notice`,
+ * and the integration push's `mention` / `assignment` / `email` / `other`).
+ * An integration's `question` / `approval` IS a decision and shows in My Decisions.
+ */
 export const INBOX_DECISION_KINDS: readonly InboxItemKind[] = ['question', 'approval', 'escalation'];
 
 /** Default page of the decision view. */

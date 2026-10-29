@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils/cn';
 import {
     INBOX_MAX_REPLY_CHARS,
     decisionNeedsReason,
+    isIntegrationItem,
     type InboxItem,
     type InboxReplyOutcome,
 } from '@/lib/api/inbox.shared';
@@ -240,7 +241,15 @@ export function InboxReplyComposer({
                     {t('reply.send')}
                 </Button>
                 <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                    {t('reply.hint')}
+                    {/* An integration item's answer goes back to the product that
+                        filed it, not to an agent (integration inbox push). */}
+                    {isIntegrationItem(item)
+                        ? t('reply.hintIntegration', {
+                              source:
+                                  item.sourceLabel?.trim() ||
+                                  t('integrationSource.fallbackLabel'),
+                          })
+                        : t('reply.hint')}
                 </span>
             </div>
         </div>

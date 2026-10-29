@@ -14,7 +14,17 @@
  * not drifted from the caps the API actually enforces.
  */
 
-export type InboxItemKind = 'question' | 'approval' | 'escalation' | 'notice';
+export type InboxItemKind =
+    | 'question'
+    | 'approval'
+    | 'escalation'
+    | 'notice'
+    // Integration inbox push (contracts `InboxItemKind`): kinds another product's
+    // Inbox has (Ever Gauzy first) that no Ever Works producer writes.
+    | 'mention'
+    | 'assignment'
+    | 'email'
+    | 'other';
 
 export type InboxItemStatus = 'open' | 'answered' | 'archived';
 
@@ -26,7 +36,23 @@ export type InboxItemSourceType =
     | 'work'
     | 'fleet-run'
     // FL-05 (contracts `InboxItemSourceType`): a session on a computer that needs you.
-    | 'fleet-session';
+    | 'fleet-session'
+    // Integration inbox push: an item an integration filed from its own Inbox.
+    | 'integration';
+
+/** Mirrors the contracts `InboxItemOrigin`. */
+export type InboxItemOrigin = 'platform' | 'integration';
+
+/**
+ * Mirrors the contracts `InboxItemEmailMeta`: the header block of a
+ * `kind: 'email'` integration item. Plain text BY CONTRACT.
+ */
+export interface InboxItemEmailMeta {
+    from: string;
+    to?: string | null;
+    subject: string;
+    receivedAt: string;
+}
 
 /**
  * Self-build slice Q — where a `fleet-run` question came from. Mirrors the
@@ -94,6 +120,26 @@ export interface InboxItem {
     firstViewedAt?: string | null;
     createdAt: string;
     updatedAt: string;
+    // ── Integration inbox push. OPTIONAL: an older API omits them. ──
+    /** `integration` = filed by another product from its own Inbox (e.g. Ever Gauzy). */
+    origin?: InboxItemOrigin;
+    /** The badge text of an integration item, e.g. "Ever Gauzy". Plain text. */
+    sourceLabel?: string | null;
+    /** The item in that product. Rendered only through `safeHttpsUrl`. */
+    sourceUrl?: string | null;
+    /** The header block of a `kind: 'email'` integration item. */
+    email?: InboxItemEmailMeta | null;
+    /** When it happened in that product, when it said so. */
+    occurredAt?: string | null;
+    /** The Goal it is about. */
+    goalId?: string | null;
+}
+
+/** An item another product filed into this Inbox (integration inbox push). */
+export function isIntegrationItem(
+    item: Pick<InboxItem, 'origin' | 'sourceType'> | null | undefined,
+): boolean {
+    return !!item && (item.origin === 'integration' || item.sourceType === 'integration');
 }
 
 /**

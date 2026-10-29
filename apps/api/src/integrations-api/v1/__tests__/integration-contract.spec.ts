@@ -57,7 +57,16 @@ import {
     IntegrationInboundEmailDto,
     IntegrationInboundMessageDto,
 } from '../email.controller';
-import { IntegrationInboxReplyDto, IntegrationInboxStateDto } from '../inbox.controller';
+import {
+    IntegrationCreateInboxItemDto,
+    IntegrationInboxChoiceDto,
+    IntegrationInboxEmailDto,
+    IntegrationInboxRelatedDto,
+    IntegrationInboxReplyDto,
+    IntegrationInboxResolutionDto,
+    IntegrationInboxStateDto,
+    IntegrationUpdateInboxItemDto,
+} from '../inbox.controller';
 import {
     IntegrationCreateKbDocumentDto,
     IntegrationCreateKbFolderDto,
@@ -345,6 +354,22 @@ const REQUEST_BODIES: Readonly<Record<string, BodyPair>> = {
     UpdateComment: { dto: IntegrationUpdateCommentDto },
     InboxReply: { dto: IntegrationInboxReplyDto },
     InboxStateChange: { dto: IntegrationInboxStateDto },
+    // CR-15 — the integration inbox push.
+    CreateInboxItem: {
+        dto: IntegrationCreateInboxItemDto,
+        nested: {
+            related: { dto: IntegrationInboxRelatedDto },
+            email: { dto: IntegrationInboxEmailDto },
+            choices: { dto: IntegrationInboxChoiceDto },
+        },
+    },
+    UpdateInboxItem: {
+        dto: IntegrationUpdateInboxItemDto,
+        nested: {
+            choices: { dto: IntegrationInboxChoiceDto },
+            resolution: { dto: IntegrationInboxResolutionDto },
+        },
+    },
     InboundEmail: {
         dto: IntegrationInboundEmailDto,
         nested: {

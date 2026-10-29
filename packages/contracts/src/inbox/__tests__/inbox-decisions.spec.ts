@@ -15,9 +15,15 @@ import {
  * decisions, the page bounds, and the one answer rule that is opt-in.
  */
 describe('INBOX_DECISION_KINDS', () => {
-	it('is every Inbox kind except the FYI notice', () => {
+	it('is every Inbox kind except the FYI ones (the notice, and the integration push mention / assignment / email / other)', () => {
 		expect([...INBOX_DECISION_KINDS]).toEqual(['question', 'approval', 'escalation']);
-		expect(INBOX_ITEM_KINDS.filter((kind) => !INBOX_DECISION_KINDS.includes(kind))).toEqual(['notice']);
+		expect(INBOX_ITEM_KINDS.filter((kind) => !INBOX_DECISION_KINDS.includes(kind))).toEqual([
+			'notice',
+			'mention',
+			'assignment',
+			'email',
+			'other'
+		]);
 	});
 
 	it('narrows untrusted values', () => {
