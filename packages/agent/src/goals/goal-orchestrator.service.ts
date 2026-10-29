@@ -38,6 +38,7 @@ import {
 import { saveGoalColumns } from './goal-column-save';
 import {
     ownershipRelationScopeOf,
+    ownershipScopeOf,
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
@@ -1020,27 +1021,30 @@ export class GoalOrchestratorService {
             const slotIteration = iterations[index];
             const slotAgentId = agentIds[index] ?? agentIds[agentIds.length - 1];
             try {
-                const task = await this.tasksService.create(
-                    goal.userId,
-                    {
-                        title: `[Goal] ${goal.title} — iteration ${slotIteration}`,
-                        description: this.buildIterationBrief(goal, slotIteration),
-                        status: TaskStatus.TODO,
-                        priority: TaskPriority.P2,
-                        labels: [GOAL_ITERATION_LABEL],
-                        goalId: goal.id,
-                        agentId: slotAgentId,
-                        createdByType: 'user',
-                        createdById: goal.userId,
-                        // Review 2026-10-17 F1: the Task carries the Goal's title
-                        // and brief, so a private Goal's iteration stays private.
-                        derivedFromPrivate: goal.visibility === 'private',
-                    },
-                    // The relation scope, as routing used to pick `slotAgentId`: a legacy
-                    // (null/null) Goal routes to a current-tenant Agent, and its raw stamp as
-                    // the create scope would refuse that Agent (#2213 `goal-orchestrator-legacy`).
-                    ownershipRelationScopeOf(goal),
-                );
+                const iterationInput: Parameters<TasksService['create']>[1] = {
+                    title: `[Goal] ${goal.title} — iteration ${slotIteration}`,
+                    description: this.buildIterationBrief(goal, slotIteration),
+                    status: TaskStatus.TODO,
+                    priority: TaskPriority.P2,
+                    labels: [GOAL_ITERATION_LABEL],
+                    goalId: goal.id,
+                    agentId: slotAgentId,
+                    createdByType: 'user',
+                    createdById: goal.userId,
+                    // Review 2026-10-17 F1: the Task carries the Goal's title
+                    // and brief, so a private Goal's iteration stays private.
+                    derivedFromPrivate: goal.visibility === 'private',
+                };
+                // Lookups follow the relation scope, as routing did to pick `slotAgentId`: a
+                // legacy (null/null) Goal routes to a current-tenant Agent, and its raw stamp as
+                // the lookup scope would refuse that Agent (#2213 `goal-orchestrator-legacy`). The
+                // iteration Task is still written with the Goal's explicit stamp.
+                const goalRelationScope = ownershipRelationScopeOf(goal);
+                const task = goalRelationScope
+                    ? await this.tasksService.create(goal.userId, iterationInput, goalRelationScope)
+                    : await this.tasksService.create(goal.userId, iterationInput, undefined, {
+                          ownershipStamp: ownershipScopeOf(goal),
+                      });
 
                 const dispatch = await this.transitions.dispatchAgentRun(task, slotAgentId, {
                     // Keyed on the iteration, so a double tick of the cron cannot

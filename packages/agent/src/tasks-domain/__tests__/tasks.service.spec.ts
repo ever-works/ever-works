@@ -511,6 +511,42 @@ describe('TasksService authorization guardrails', () => {
         expect(repos.tasks.create).toHaveBeenCalledWith(expect.objectContaining(everScope));
     });
 
+    it('writes an explicit legacy stamp while looking its Agent up owner-only (ownershipStamp, #2213)', async () => {
+        // A legacy (null/null) source row: its raw stamp as the LOOKUP scope would hide the
+        // same owner's current-tenant Agent, so callers pass `undefined` for the lookups and the
+        // explicit stamp separately — the row must not be left for the request-ALS subscriber.
+        const legacyStamp = { tenantId: null, organizationId: null };
+        const created = makeTask({ id: 'task-created', ...legacyStamp });
+        const { service, repos } = makeService();
+        repos.agents.findByIdAndUser.mockResolvedValueOnce({
+            id: 'agent-ever',
+            userId: 'user-1',
+            ...everScope,
+        });
+        repos.tasks.create.mockResolvedValueOnce(created);
+
+        await expect(
+            service.create(
+                'user-1',
+                {
+                    title: 'Delegated work',
+                    agentId: 'agent-ever',
+                    createdByType: 'user',
+                    createdById: 'user-1',
+                },
+                undefined,
+                { ownershipStamp: legacyStamp },
+            ),
+        ).resolves.toEqual(created);
+
+        expect(repos.agents.findByIdAndUser).toHaveBeenCalledWith(
+            'agent-ever',
+            'user-1',
+            undefined,
+        );
+        expect(repos.tasks.create).toHaveBeenCalledWith(expect.objectContaining(legacyStamp));
+    });
+
     it('rejects Mission-scoped task creation when the Mission is not owned by the user', async () => {
         const { service, repos } = makeService();
         repos.missions.findOne.mockResolvedValueOnce(null);

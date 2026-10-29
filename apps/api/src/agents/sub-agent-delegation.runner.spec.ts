@@ -164,7 +164,10 @@ describe('SubAgentDelegationRunnerService', () => {
 
         await runner.run(request({ childAgentId: CHILD_AGENT }));
 
-        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), personalScope);
+        // Owner-only lookups, and the child written with the explicit legacy stamp (#2213).
+        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), undefined, {
+            ownershipStamp: personalScope,
+        });
         expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
             expect.objectContaining(personalScope),
             CHILD_AGENT,
@@ -192,8 +195,11 @@ describe('SubAgentDelegationRunnerService', () => {
         expect(tasks.getOne).toHaveBeenCalledWith(OWNER, 'task-parent', undefined);
         // The WRITE path too (#2213 `sub-agent-delegation`): `TasksService.create` looks the
         // child Agent and the parent Task up again with this scope, so the raw legacy stamp
-        // ("legacy rows only") made it refuse both. `undefined` = owner-only, child unstamped.
-        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), undefined);
+        // ("legacy rows only") made it refuse both. `undefined` = owner-only lookups; the child is
+        // still written with the parent's explicit legacy stamp, never the request ALS scope.
+        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), undefined, {
+            ownershipStamp: legacyScope,
+        });
         expect(tasks.create).not.toHaveBeenCalledWith(OWNER, expect.any(Object), legacyScope);
     });
 
