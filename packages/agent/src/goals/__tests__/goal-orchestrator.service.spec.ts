@@ -678,7 +678,10 @@ describe('GoalOrchestratorService — advance', () => {
                 agentId: 'agent-7',
                 labels: ['goal-iteration'],
             }),
-            { tenantId: null, organizationId: null },
+            // The fixture Goal is legacy (null/null): owner-only lookups (relation scope
+            // `undefined`), the Task still written with the explicit legacy stamp (#2213).
+            undefined,
+            { ownershipStamp: { tenantId: null, organizationId: null } },
         );
         // The brief handed to the agent is built from persisted state, so
         // the open criterion and the session budget must both be in it.
@@ -717,7 +720,9 @@ describe('GoalOrchestratorService — advance', () => {
         expect(tasksService.create).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ goalId: 'g1', derivedFromPrivate: true }),
-            expect.anything(),
+            // Legacy fixture Goal → relation scope `undefined`, explicit legacy stamp (#2213).
+            undefined,
+            { ownershipStamp: { tenantId: null, organizationId: null } },
         );
     });
 
@@ -807,7 +812,7 @@ describe('GoalOrchestratorService — advance', () => {
 
     it('routes a legacy Goal to its same-owner current-tenant pinned Agent', async () => {
         const assignedAgentId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-        const { service, agents, transitions } = build({
+        const { service, agents, transitions, tasksService } = build({
             goal: {
                 loopStatus: 'running',
                 assignedAgentId,
@@ -823,6 +828,16 @@ describe('GoalOrchestratorService — advance', () => {
         await service.advance('u1', 'g1');
 
         expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', undefined);
+        // The iteration Task is created with the SAME relation scope for its lookups (#2213
+        // `goal-orchestrator-legacy`): the real `TasksService.create` re-checks the Agent with
+        // it, and the Goal's raw null/null stamp would refuse the current-tenant Agent. The Task
+        // itself is still written with that explicit legacy stamp.
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ goalId: 'g1', agentId: assignedAgentId }),
+            undefined,
+            { ownershipStamp: { tenantId: null, organizationId: null } },
+        );
         expect(transitions.dispatchAgentRun).toHaveBeenCalled();
     });
 
@@ -1432,7 +1447,9 @@ describe('GoalOrchestratorService — cold start (scope fallback)', () => {
         expect(tasksService.create).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ goalId: 'g1', agentId: 'agent-a' }),
-            { tenantId: null, organizationId: null },
+            // Same relation scope routing used above, explicit legacy stamp (#2213).
+            undefined,
+            { ownershipStamp: { tenantId: null, organizationId: null } },
         );
         expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-1' }),

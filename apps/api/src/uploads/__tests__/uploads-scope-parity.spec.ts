@@ -12,7 +12,7 @@ jest.mock('@ever-works/agent/database', () => ({
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, NotFoundException } from '@nestjs/common';
 import { ScopeContextService } from '../../scope/scope-context.service';
 import { SessionScopeGuard } from '../../scope/session-scope.guard';
 import { UploadsController } from '../uploads.controller';
@@ -175,6 +175,9 @@ describe('SessionScopeGuard vs UploadsController — Organization authorization 
         // aligning it, and the guard result above proves nothing.
         const { controller, req } = makeController(OTHER_TENANT);
 
-        await expect(controller.uploadAnonymous(mkFile(), req, undefined)).rejects.toThrow();
+        // The opaque 404 specifically, not just any throw (#2213 uploads-spec-weak-assert).
+        await expect(controller.uploadAnonymous(mkFile(), req, undefined)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
     });
 });

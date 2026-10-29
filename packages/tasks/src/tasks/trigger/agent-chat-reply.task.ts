@@ -1,4 +1,5 @@
 import { task } from '@trigger.dev/sdk';
+import { NotFoundException } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { AgentRunService } from '@ever-works/agent/agents';
@@ -147,12 +148,39 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 // The gate ran at dispatch time (`TaskChatService.post`);
                 // re-admitting here could only refuse work already in
                 // flight and strand it with no run row.
+                // Trigger workers have no request ALS, so nothing stamps this row for us: take
+                // the Task's ownership stamp when it has one and the Agent's for a legacy
+                // unstamped Task — exactly as `agent-task-execute` does. Unstamped, the run fell
+                // out of the Organization's run and cost views (#2213 `trigger-agentrun-stamp`).
+                // Only a confirmed missing Task ends the reply here (there is nothing to
+                // reply on); any other lookup failure propagates and Trigger retries, rather
+                // than silently stamping the run from the Agent.
+                let stampTask: Awaited<ReturnType<TasksService['getOne']>> | null;
+                try {
+                    stampTask = await tasks.getOne(payload.userId, payload.taskId);
+                } catch (error) {
+                    if (error instanceof NotFoundException) {
+                        return {
+                            status: 'skipped',
+                            reason: 'task-not-found',
+                            agentId: agent.id,
+                            taskId: payload.taskId,
+                        };
+                    }
+                    throw error;
+                }
+                const runOwnership =
+                    stampTask && (stampTask.tenantId != null || stampTask.organizationId != null)
+                        ? stampTask
+                        : agent;
                 run = await runs.createQueued({
                     agentId: agent.id,
                     userId: payload.userId,
                     triggerKind: 'chat',
                     taskId: payload.taskId,
                     chatMessageId: payload.triggeringMessageId,
+                    tenantId: runOwnership.tenantId ?? null,
+                    organizationId: runOwnership.organizationId ?? null,
                 });
             }
 

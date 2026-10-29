@@ -42,6 +42,17 @@ function isNullOperator(value: unknown): boolean {
     );
 }
 
+/**
+ * TypeORM's `In([...])` (#2213 `scoping-spec-in-operator`): production looks uploads up with
+ * `sha256: In(ids)`. A fake that compared that operator object with `===` never matched, so a
+ * scope regression on that path could not turn a spec red.
+ */
+function inOperatorValues(value: unknown): unknown[] | null {
+    if (typeof value !== 'object' || value === null) return null;
+    const operator = value as { _type?: string; _value?: unknown };
+    return operator._type === 'in' && Array.isArray(operator._value) ? operator._value : null;
+}
+
 function matchesWhere<T extends Record<string, unknown>>(
     row: T,
     where: FindOptionsWhere<T> | FindOptionsWhere<T>[] | undefined,
@@ -50,6 +61,8 @@ function matchesWhere<T extends Record<string, unknown>>(
     if (Array.isArray(where)) return where.some((branch) => matchesWhere(row, branch));
     return Object.entries(where).every(([key, expected]) => {
         if (isNullOperator(expected)) return row[key] == null;
+        const values = inOperatorValues(expected);
+        if (values) return values.includes(row[key]);
         return row[key] === expected;
     });
 }
@@ -401,19 +414,22 @@ describe('Organization ownership scoping', () => {
                     { id: 'edge-personal', agentId: legacyAgent.id, uploadId: uploadSha },
                 ]),
             };
+            const legacyUpload = {
+                sha256: uploadSha,
+                userId: 'user-1',
+                storagePath: `${uploadSha}.txt`,
+                originalFilename: 'legacy.txt',
+                mimeType: 'text/plain',
+                fileSize: 9,
+                tenantId: null,
+                organizationId: null,
+            };
+            // Through the same `In()`-aware fake as the negative case, so this positive
+            // control really exercises the production `where` (#2213 `scoping-spec-in-operator`).
             const uploads = {
-                find: jest.fn(async () => [
-                    {
-                        sha256: uploadSha,
-                        userId: 'user-1',
-                        storagePath: `${uploadSha}.txt`,
-                        originalFilename: 'legacy.txt',
-                        mimeType: 'text/plain',
-                        fileSize: 9,
-                        tenantId: null,
-                        organizationId: null,
-                    },
-                ]),
+                find: jest.fn(async (options: { where?: FindOptionsWhere<typeof legacyUpload> }) =>
+                    matchesWhere(legacyUpload, options.where) ? [legacyUpload] : [],
+                ),
             };
             const service = new AgentsService(
                 { findByIdAndUser: jest.fn(async () => legacyAgent) } as never,

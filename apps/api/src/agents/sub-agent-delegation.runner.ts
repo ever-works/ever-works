@@ -99,7 +99,10 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         if (!parent) {
             return this.failure(request, 'parent agent no longer exists');
         }
-        const ownershipScope = ownershipScopeOf(parent);
+        // A legacy (null/null) parent yields `undefined` here: owner-only lookups (its child Task
+        // still gets the explicit legacy stamp, below). Its raw `ownershipScopeOf` would mean "legacy
+        // rows only" and hide a current-tenant child Agent or parent Task (#2213 punch list,
+        // `sub-agent-delegation`). A stamped parent keeps its exact scope.
         const relationScope = ownershipRelationScopeOf(parent);
 
         const childAgentId = request.childAgentId ?? parent.id;
@@ -197,37 +200,41 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
 
         let childTask: Task;
         try {
-            childTask = await this.tasks.create(
-                parent.userId,
-                {
-                    title: this.titleFor(request),
-                    description: this.describe(request),
-                    parentTaskId,
-                    workId: request.scope.workId ?? null,
-                    // The child is raised BY an agent, not by a person. That
-                    // provenance is what lets the UI (and any later audit)
-                    // tell a delegated unit of work apart from one a human
-                    // filed.
-                    createdByType: 'agent',
-                    // The PARENT agent is the author of the delegation; the
-                    // child is merely assigned to execute it. Recording the
-                    // child here would lose who actually decided this work
-                    // should exist.
-                    createdById: request.parentAgentId,
-                    agentId: request.childAgentId ?? null,
-                    // Judgment layer G9 — the recursion bound, written by the
-                    // platform rather than declared by a caller.
-                    //
-                    // `request.depth` is the depth of THIS delegation (already
-                    // raised to the server-derived value by
-                    // `SubAgentDelegationService`), so the child sits one
-                    // deeper. This stamp is what the depth resolver reads back
-                    // on the next hop; without it the chain has no record of
-                    // itself and the cap is unenforceable.
-                    delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
-                },
-                ownershipScope,
-            );
+            const childInput: Parameters<TasksService['create']>[1] = {
+                title: this.titleFor(request),
+                description: this.describe(request),
+                parentTaskId,
+                workId: request.scope.workId ?? null,
+                // The child is raised BY an agent, not by a person. That
+                // provenance is what lets the UI (and any later audit)
+                // tell a delegated unit of work apart from one a human
+                // filed.
+                createdByType: 'agent',
+                // The PARENT agent is the author of the delegation; the
+                // child is merely assigned to execute it. Recording the
+                // child here would lose who actually decided this work
+                // should exist.
+                createdById: request.parentAgentId,
+                agentId: request.childAgentId ?? null,
+                // Judgment layer G9 — the recursion bound, written by the
+                // platform rather than declared by a caller.
+                //
+                // `request.depth` is the depth of THIS delegation (already
+                // raised to the server-derived value by
+                // `SubAgentDelegationService`), so the child sits one
+                // deeper. This stamp is what the depth resolver reads back
+                // on the next hop; without it the chain has no record of
+                // itself and the cap is unenforceable.
+                delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
+            };
+            // A stamped parent: its exact scope, for the lookups and the stamp alike. A legacy
+            // parent: owner-only lookups, and the child written with the parent's explicit
+            // {null,null} stamp — never left for the request-ALS subscriber to fill.
+            childTask = relationScope
+                ? await this.tasks.create(parent.userId, childInput, relationScope)
+                : await this.tasks.create(parent.userId, childInput, undefined, {
+                      ownershipStamp: ownershipScopeOf(parent),
+                  });
         } catch (error) {
             return this.failure(
                 request,

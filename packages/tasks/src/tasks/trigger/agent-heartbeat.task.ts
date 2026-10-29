@@ -147,6 +147,10 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                     agentId: agent.id,
                     userId: payload.userId,
                     triggerKind: 'heartbeat',
+                    // No request ALS in a Trigger worker: stamp the run from the persisted
+                    // Agent, the only owner a heartbeat has (#2213 `trigger-agentrun-stamp`).
+                    tenantId: agent.tenantId ?? null,
+                    organizationId: agent.organizationId ?? null,
                 });
             }
 

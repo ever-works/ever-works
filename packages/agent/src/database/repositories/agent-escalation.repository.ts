@@ -255,7 +255,7 @@ export class AgentEscalationRepository {
         id: string,
         userId: string,
         taskId: string,
-        scope: OwnershipScope,
+        scope: OwnershipScope | undefined,
         resolutionNote?: string | null,
     ): Promise<boolean> {
         const ownership = ownershipSqlPredicate('', scope, 'escalationOwnership');
@@ -275,7 +275,7 @@ export class AgentEscalationRepository {
             .andWhere('taskId = :taskId', { taskId })
             .andWhere('status = :open', { open: 'open' });
         if (ownership) {
-            const clause = scope.organizationId
+            const clause = scope?.organizationId
                 ? `(${ownership.clause} OR (tenantId IS NULL AND organizationId IS NULL))`
                 : ownership.clause;
             query.andWhere(clause, ownership.parameters);
