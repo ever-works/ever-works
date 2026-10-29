@@ -38,6 +38,10 @@ export * from './task-delivery.port';
 // APW-08 T26 / T54 — keyed Task-thread posts (FR-43).
 export * from './task-thread-poster.port';
 export * from './task-thread-posts';
+// APW-08 lane L7 — the run-side posts (Run started, Opened pull request, Checks passed / failed).
+export * from './task-lifecycle-poster.port';
+export * from './task-lifecycle-posts';
+export * from './task-lifecycle-posts.service';
 export {
     TaskDeliveryService,
     APP_CHANGE_ACTIONS,

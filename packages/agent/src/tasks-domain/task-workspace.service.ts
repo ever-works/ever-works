@@ -45,6 +45,8 @@ import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade
 import { TASK_STATUS_TRANSITIONS, TaskTransitionService } from './task-transition.service';
 import { TaskChatService } from './task-chat.service';
 import { renderTaskThreadPost, type TaskThreadPost } from './task-thread-posts';
+import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
+import { pullRequestOpenedPost } from './task-lifecycle-posts';
 import { MergePolicyService } from '../policy/merge-policy.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
@@ -264,6 +266,12 @@ export class TaskWorkspaceService {
         // the integration DTO shows (`runtime.prUrl`): `task.runtime_updated`.
         // Appended LAST + @Optional (positional-spec arity rule).
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // APW-08 T26 / T54 (FR-43) — the **Opened pull request #{number}.** post on an App Work
+        // Task. Appended LAST + @Optional() (this file's positional-spec arity rule, see
+        // `appChangeGate` above) and injected by TOKEN (see the port). Absent = no post.
+        @Optional()
+        @Inject(TASK_LIFECYCLE_POSTER)
+        private readonly lifecycle?: TaskLifecyclePoster,
     ) {}
 
     /**
@@ -2253,6 +2261,10 @@ export class TaskWorkspaceService {
             prNumber: pr.number,
             prUrl: pr.url,
         });
+        // APW-08 T26 / T54 (FR-43) — **Opened pull request #{number}.**, once: only when the
+        // number recorded now differs from the one the Task carried (`task` is the row as it was
+        // before this write). App Work Tasks only, as the run's Agent; never throws.
+        await this.postPullRequestOpened(task, work, args.agentId, pr.number);
         await this.transitionTask(task, TaskStatus.IN_REVIEW);
         this.logger.log(
             `Task ${task.id} opened PR #${pr.number} (${pr.url})` +
@@ -4056,6 +4068,36 @@ export class TaskWorkspaceService {
                 `Task ${task.id}: the change-guard refusal marker could not be ${
                     value === null ? 'cleared' : 'recorded'
                 }: ${error instanceof Error ? error.message : String(error)}`,
+            );
+        }
+    }
+
+    /**
+     * APW-08 T26 / T54 (FR-43) — the pull request this finalize just recorded, posted once into
+     * an App Work Task's thread (`pullRequestOpenedPost` compares against the number the Task
+     * carried before the write). Best-effort: the pull request is open whatever happens here.
+     */
+    private async postPullRequestOpened(
+        task: Task,
+        work: Work,
+        agentId: string,
+        prNumber: number,
+    ): Promise<void> {
+        if (!this.lifecycle) return;
+        const post = pullRequestOpenedPost(task.prNumber ?? null, prNumber);
+        if (!post) return;
+        try {
+            await this.lifecycle.post({
+                task,
+                post,
+                agentId: agentId || null,
+                workKind: work.kind ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the pull-request-opened post failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
             );
         }
     }

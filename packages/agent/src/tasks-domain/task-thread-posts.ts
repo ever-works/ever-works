@@ -22,6 +22,9 @@ export const TASK_THREAD_POST_ENGLISH = Object.freeze({
     prOpened: 'Opened pull request #{number}.',
     checksPassed: 'Checks passed.',
     checksFailed: 'Checks failed: {names}.',
+    // APW-08 lane L7 — a red verdict whose failing checks are not in the provider's capped list
+    // (more than `MAX_PR_CHECKS` legs) has no names to list; it never says "Checks failed: .".
+    checksFailedUnnamed: 'Checks failed.',
     merged: 'Merged into {branch}.',
     mergedNoBranch: 'Merged.',
     buildStarted: 'Build #{number} started.',

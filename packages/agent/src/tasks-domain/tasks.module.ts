@@ -30,6 +30,8 @@ import { TaskDeliveryService } from '../app-works/task-delivery.service';
 import { DeliveryFollowUpService } from '../app-works/delivery-follow-up.service';
 import { TASK_DELIVERY_TRACKER } from './task-delivery.port';
 import { TASK_THREAD_POSTER } from './task-thread-poster.port';
+import { TASK_LIFECYCLE_POSTER } from './task-lifecycle-poster.port';
+import { TaskLifecyclePostsService } from './task-lifecycle-posts.service';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
@@ -306,6 +308,13 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // APW-08 T26 / T54 — the delivery chain posts its progress into the Task thread (FR-43)
         // through the ordinary chat service.
         { provide: TASK_THREAD_POSTER, useExisting: TaskChatService },
+        // APW-08 T26 / T54 (FR-43, lane L7) — the run-side thread posts (Run started, Opened pull
+        // request, Checks passed / failed) for App Work Tasks, asked by `TaskRunDenormService`,
+        // `TaskWorkspaceService` and `TaskPrStatusService` through the token. Reads
+        // `WorkRepository` (provided above) and `AgentRunRepository` (AgentsModule, imported
+        // above), and posts through `TASK_THREAD_POSTER`.
+        TaskLifecyclePostsService,
+        { provide: TASK_LIFECYCLE_POSTER, useExisting: TaskLifecyclePostsService },
     ],
     exports: [
         // Exported as well as provided: the dispatch brief, the Fleet

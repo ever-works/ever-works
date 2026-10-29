@@ -18,6 +18,8 @@ import {
 } from '../policy/promotion-merge-guard.port';
 import { pickOwnerRepo, requireTaskRepository } from './task-repository';
 import { TASK_DELIVERY_TRACKER, type TaskDeliveryTracker } from './task-delivery.port';
+import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
+import { checksSettledPost } from './task-lifecycle-posts';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -157,6 +159,13 @@ export class TaskPrStatusService {
         @Optional()
         @Inject(TASK_DELIVERY_TRACKER)
         private readonly delivery?: TaskDeliveryTracker,
+        // APW-08 T26 / T54 (FR-43) — **Checks passed.** / **Checks failed: {names}.** on an App
+        // Work Task, once per settled verdict (see `checksSettledPost`). Appended LAST +
+        // @Optional() (positional-spec arity rule) and injected by TOKEN (see the port). Absent,
+        // a refresh posts nothing, exactly as before.
+        @Optional()
+        @Inject(TASK_LIFECYCLE_POSTER)
+        private readonly lifecycle?: TaskLifecyclePoster,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -519,6 +528,16 @@ export class TaskPrStatusService {
             // Reviewer agent stage (slice AD) — the head this Task had
             // recorded BEFORE this read, so a moved head is detectable below.
             const previousPrHead = task.prHeadSha ?? null;
+            // APW-08 T26 / T54 (FR-43) — the verdict this Task had recorded
+            // BEFORE this read against the one written now: a settled change
+            // owes one thread post, an unchanged one none (so a sweep or a
+            // poll that re-reads the same verdict posts nothing).
+            const checksPost = this.lifecycle
+                ? checksSettledPost(
+                      { ciState: task.ciState, checks: task.prChecks },
+                      { ciState: patch.ciState, checks: patch.prChecks },
+                  )
+                : null;
             await this.tasks.updatePrStatusCache(task.id, patch);
             await this.recordRuntimeChange(task, patch);
             // CI feedback + autonomous fix loop (slice AC, EW-806): the
@@ -553,6 +572,23 @@ export class TaskPrStatusService {
                 Object.assign(task, { branchState: 'merged' });
             }
             Object.assign(task, patch);
+
+            // APW-08 T26 / T54 (FR-43) — posted once the cache write landed
+            // and BEFORE the merge gate below may merge on green, so the
+            // thread reads "Checks passed." ahead of "Merged into …". App
+            // Work Tasks only (the poster decides); never throws.
+            if (checksPost && this.lifecycle) {
+                await this.lifecycle
+                    .post({ task, post: checksPost, workKind: target.workKind })
+                    .catch((error: unknown) => {
+                        this.logger.warn(
+                            `Task ${task.id}: the checks thread post threw: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                        return false;
+                    });
+            }
 
             // Reviewer agent stage (slice AD, EW-811) — a push while the
             // Task sits in `in_review` is not an ENTRY into `in_review`, so
@@ -736,6 +772,8 @@ export class TaskPrStatusService {
         repo: string;
         baseRef: string;
         gitOptions: { userId: string; providerId: string; workId: string };
+        /** APW-08 FR-43 — the Work's kind, so the thread post needs no second Work read. */
+        workKind: string | null;
     }> {
         const work = await this.works.findById(task.workId as string);
         if (!work) {
@@ -747,6 +785,7 @@ export class TaskPrStatusService {
             baseRef:
                 (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) || 'main',
             gitOptions: { userId, providerId: work.gitProvider, workId: work.id },
+            workKind: work.kind ?? null,
         };
     }
 

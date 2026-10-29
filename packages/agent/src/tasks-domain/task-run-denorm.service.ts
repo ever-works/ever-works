@@ -1,6 +1,9 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
+import type { Task } from '../entities/task.entity';
+import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
+import { runStartedPost } from './task-lifecycle-posts';
 
 /**
  * Statuses `TaskRunDenormService` mirrors onto the Task row. Matches the
@@ -31,6 +34,15 @@ export type TaskRunTerminalStatus = 'completed' | 'failed' | 'cancelled';
  * never source of truth (`agent_runs` is), so a failure here logs WARN
  * and returns false — it must never fail the run or the transition that
  * triggered it.
+ *
+ * APW-08 T26 / T54 (FR-43) — `recordStarted` is also the ONE moment both
+ * run paths share when a run starts on a Task (the cloud worker's claim in
+ * `agent-task-execute`, the fleet lease in `FleetAgentTaskReconcilerService`),
+ * so it is where an App Work Task gets its **Run started.** post. Once per
+ * run: the post fires only when the pointer moves to (this run, `running`)
+ * from anything else — a retry re-claiming a run already recorded `running`
+ * posts nothing (`runStartedPost`). Never thrown; a failed post changes
+ * nothing about the write or its answer.
  */
 @Injectable()
 export class TaskRunDenormService {
@@ -42,6 +54,12 @@ export class TaskRunDenormService {
         // write: it records `task.runtime_updated` and bumps neither the task's
         // version nor its updatedAt. Optional (positional-spec arity rule).
         @Optional() private readonly domainEvents?: DomainEventPublisher,
+        // APW-08 T26 / T54 (FR-43) — the **Run started.** post on an App Work Task. Appended
+        // LAST + @Optional() (positional-spec arity rule) and injected by TOKEN (see the port).
+        // Absent = the denorm reads and writes exactly what it did before.
+        @Optional()
+        @Inject(TASK_LIFECYCLE_POSTER)
+        private readonly lifecycle?: TaskLifecyclePoster,
     ) {}
 
     /** New run dispatched for the Task — unconditional pointer install. */
@@ -51,7 +69,33 @@ export class TaskRunDenormService {
 
     /** Worker claimed the run — only while the pointer is ours (or unset). */
     async recordStarted(taskId: string, runId: string): Promise<boolean> {
-        return this.write(taskId, runId, 'running', runId);
+        // FR-43 — the run pointer as it was BEFORE this write: the transition the post dedupes
+        // on. Read only when a poster is bound, so an install without one pays nothing.
+        const before = this.lifecycle ? await this.readTask(taskId) : null;
+        const applied = await this.write(taskId, runId, 'running', runId);
+        if (applied && before) await this.postRunStarted(before, runId);
+        return applied;
+    }
+
+    /** The Task row, or null (unreadable → no post: at most once beats at least once). */
+    private async readTask(taskId: string): Promise<Task | null> {
+        try {
+            return await this.tasks.findById(taskId);
+        } catch (err) {
+            this.logger.warn(`Run-start post skipped for task ${taskId}: the Task read failed: ${err}`);
+            return null;
+        }
+    }
+
+    /** **Run started.** — once per run, App Work Tasks only (the poster decides). Never throws. */
+    private async postRunStarted(before: Task, runId: string): Promise<void> {
+        const post = runStartedPost(before, runId);
+        if (!post || !this.lifecycle) return;
+        try {
+            await this.lifecycle.post({ task: before, post, runId });
+        } catch (err) {
+            this.logger.warn(`Run-start post failed for task ${before.id}: run ${runId}: ${err}`);
+        }
     }
 
     /** Run reached a terminal state — only while the pointer is ours (or unset). */
