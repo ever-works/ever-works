@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional, UnprocessableEntityException } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, type Repository } from 'typeorm';
 import type { GitPullRequestStatus } from '@ever-works/plugin';
@@ -11,6 +11,7 @@ import {
     isAppWorkKind,
     normalizeCommitSha,
     type TaskDeliveryEmbed,
+    type TaskDeliveryFixTaskResponse,
     type TaskDeliveryState,
     type TaskDeliveryView,
 } from '@ever-works/contracts';
@@ -30,6 +31,12 @@ import { GitFacadeService } from '../facades/git.facade';
 import { TaskTransitionService } from '../tasks-domain/task-transition.service';
 import { pickOwnerRepo, requireTaskRepository } from '../tasks-domain/task-repository';
 import type { TaskDeliveryTracker } from '../tasks-domain/task-delivery.port';
+import { TASK_THREAD_POSTER, type TaskThreadPoster } from '../tasks-domain/task-thread-poster.port';
+import {
+    renderTaskThreadPost,
+    taskThreadPost,
+    type TaskThreadPost,
+} from '../tasks-domain/task-thread-posts';
 import { readAppWorkSwitches } from './app-work-switches';
 import { readAppDeliveryDefaults } from './app-delivery-defaults';
 import { AppChangeTelemetry } from './app-change.telemetry';
@@ -86,6 +93,17 @@ import { DeliveryFollowUpService, type DeliveryFailure } from './delivery-follow
  * `EVER_WORKS_APP_AUTO_DEPLOY_ENABLED` off: the chain still reads (states, chips and history stay
  * honest) but no follow-up is opened — an operator stop is not a failure. The three APW08-G25
  * defaults the chain decides come from `app-delivery-defaults.ts`.
+ *
+ * ## The Task thread (FR-43, APW-08 T26 / T54)
+ *
+ * Every state change the chain records is also posted into the Task's own thread, once, in the
+ * order it happened — **Merged into {branch}.**, **Build #{n} started.**, **Build #{n}
+ * succeeded.** / **failed: {reason}.**, **Deploying.**, **Live at {url}.** / **Deployment
+ * failed: {outcome}.**, **Opened follow-up {slug}.**, **Closed without deploying.** Each post is
+ * KEYED (`deliveryPosts.*`, see `task-thread-posts.ts`): the Task page renders it in the reader's
+ * locale and `body` carries the English. The post speaks as the Task's Agent; a Task with no
+ * Agent gets a `system` post with no author id. Posting is best-effort — the Activity row is the
+ * record, and a refused post never undoes a state write.
  */
 
 export interface DeliverySweepSummary {
@@ -136,6 +154,13 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         @Optional() private readonly escalations?: AgentEscalationService,
         @Optional() private readonly activityLog?: ActivityLogService,
         @Optional() private readonly telemetry?: AppChangeTelemetry,
+        // APW-08 T26 / T54 — the Task thread posts (FR-43), through `TaskChatService` bound to
+        // the token in `TasksDomainModule`. Appended LAST + @Optional() per the positional-spec
+        // arity rule; injected by token (see the port). Absent = the chain records Activity
+        // only, exactly as before.
+        @Optional()
+        @Inject(TASK_THREAD_POSTER)
+        private readonly chat?: TaskThreadPoster,
     ) {}
 
     // ── The merge hook ────────────────────────────────────────────────
@@ -195,6 +220,11 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 branch: status.baseRef ?? null,
             },
         });
+        const branch = (status.baseRef ?? '').trim();
+        await this.postThread(
+            task,
+            branch ? taskThreadPost('merged', { branch }) : taskThreadPost('mergedNoBranch'),
+        );
         this.telemetry?.track(
             'app.change.merged',
             { workId: task.workId, taskId: task.id },
@@ -361,7 +391,7 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 deliveryUpdatedAt: now,
             });
             if (decision.state !== from) {
-                await this.recordStateChange(task, decision, mergeCommitSha);
+                await this.recordStateChange(task, decision, mergeCommitSha, { builds, deployments });
             }
         }
 
@@ -399,6 +429,7 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                             extra: { followUpTaskId: result.taskId, failureId: failure.failureId },
                         },
                     );
+                    await this.postFollowUpOpened(task, result.taskId);
                 } else if (result.kind === 'escalated') {
                     followUp = 'escalated';
                 }
@@ -425,7 +456,7 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
     /** `GET /api/tasks/:id/delivery`. The caller has already checked access to `task`. */
     async getView(task: Task): Promise<TaskDeliveryView> {
         const state = isDeliveryState(task.deliveryState) ? task.deliveryState : null;
-        const [build, deployment, work, followUps, history] = await Promise.all([
+        const [build, deployment, work, followUps, history, runtime] = await Promise.all([
             task.deliveryBuildId
                 ? this.builds.findOne({ where: { id: task.deliveryBuildId } })
                 : Promise.resolve(null),
@@ -435,6 +466,12 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             task.workId ? this.works.findById(task.workId) : Promise.resolve(null),
             this.followUps ? this.followUps.listFollowUps(task.id) : Promise.resolve([] as Task[]),
             this.history(task),
+            // S20 — only a `built` change asks whether a person has to deploy it.
+            state === 'built' && task.workId
+                ? this.runtimeStates
+                      .findOne({ where: { workId: task.workId } })
+                      .catch(() => null)
+                : Promise.resolve(null),
         ]);
         const merge = (task.mergeCommitSha ?? '').trim();
         const decidingSha = (deployment?.commitSha ?? build?.commitSha ?? '').trim();
@@ -481,6 +518,7 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 automatic: Boolean(row.followUpKey),
             })),
             history,
+            canDeployNow: canDeployNow(state, build, runtime),
         };
     }
 
@@ -617,6 +655,7 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             state: 'closed_without_deploy',
             extra: { from, closedById: userId },
         });
+        await this.postThread(task, taskThreadPost('closedWithoutDeploy'));
         if (task.workId) {
             this.telemetry?.track(
                 'app.change.closed_without_deploy',
@@ -714,10 +753,85 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                         extra: { followUpTaskId: result.taskId, failureId: failure.failureId, manual: true },
                     },
                 );
+                await this.postFollowUpOpened(task, result.taskId);
             }
             return { taskId: result.taskId };
         }
         throw refuse('The follow-up Task could not be opened.');
+    }
+
+    /**
+     * APW-08 T27 — `POST /api/tasks/:id/delivery/fix-task`, the section's **Create a fix Task**
+     * (behind a confirmation in the web). Files the fix Task for the change's CURRENT failure the
+     * same way the automatic follow-up does — `DeliveryFollowUpService.open`: the same title,
+     * description, Agent, `follow-up` relation and dispatch — as a person's decision
+     * (`manual: true`: the automatic budget does not apply, like **Try once more**). It is still
+     * ONE per failure: the follow-up key is the failure record's, so a fix Task already filed for
+     * it (automatically or by an earlier click) is answered with `created: false` and nothing new
+     * is filed. Every refusal is `422 { code: 'fixTaskUnavailable' }`.
+     */
+    async createFixTask(userId: string, task: Task): Promise<TaskDeliveryFixTaskResponse> {
+        const refuse = (message: string) =>
+            new UnprocessableEntityException({ code: 'fixTaskUnavailable', message });
+        const state = task.deliveryState ?? null;
+        if (state !== 'build_failed' && state !== 'deploy_failed') {
+            throw refuse('Only a change that failed to build or deploy gets a fix Task.');
+        }
+        if (!this.followUps || !task.workId) {
+            throw refuse('Fix Tasks are not available in this process.');
+        }
+        const work = await this.works.findById(task.workId);
+        if (!work) throw refuse('The App Work of this Task no longer exists.');
+        const [build, deployment] = await Promise.all([
+            task.deliveryBuildId
+                ? this.builds.findOne({ where: { id: task.deliveryBuildId } })
+                : Promise.resolve(null),
+            task.deliveryDeploymentId
+                ? this.deployments.findOne({ where: { id: task.deliveryDeploymentId } })
+                : Promise.resolve(null),
+        ]);
+        const decision: DeliveryDecision = {
+            kind: 'state',
+            state: state as TaskDeliveryState,
+            buildId: task.deliveryBuildId ?? null,
+            deploymentId: task.deliveryDeploymentId ?? null,
+            close: false,
+            liveWithWarnings: false,
+            outcome: deployment ? deploymentFailureOutcome(deployment) : null,
+            failurePhase: state === 'build_failed' ? 'build' : 'deploy',
+            carried: false,
+            reason: 'create a fix task',
+        };
+        const failure = this.failureOf(
+            task,
+            work,
+            decision,
+            build ? [build] : [],
+            deployment ? [deployment] : [],
+        );
+        if (!failure) throw refuse('The failure behind this change is no longer on record.');
+
+        const result = await this.followUps.open(failure, { manual: true });
+        if (result.kind !== 'opened' && result.kind !== 'exists') {
+            throw refuse('The fix Task could not be opened.');
+        }
+        const created = result.kind === 'opened';
+        if (created) {
+            await this.recordActivity(task, APP_CHANGE_ACTIONS.followUpOpened, ActivityStatus.COMPLETED, {
+                summary: `Fix Task opened by hand for the failed ${failure.phase}`,
+                state: state as TaskDeliveryState,
+                extra: {
+                    followUpTaskId: result.taskId,
+                    failureId: failure.failureId,
+                    manual: true,
+                    requestedById: userId,
+                },
+            });
+        }
+        const slug = created
+            ? await this.postFollowUpOpened(task, result.taskId)
+            : await this.slugOf(result.taskId);
+        return { taskId: result.taskId, slug, created };
     }
 
     // ── Internals ─────────────────────────────────────────────────────
@@ -871,6 +985,23 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         task: Task,
         decision: Extract<DeliveryDecision, { kind: 'state' }>,
         mergeCommitSha: string,
+        rows: { builds: readonly WorkBuild[]; deployments: readonly WorkDeployment[] },
+    ): Promise<void> {
+        await this.recordStateActivity(task, decision, mergeCommitSha);
+        const build = decision.buildId
+            ? (rows.builds.find((row) => row.id === decision.buildId) ?? null)
+            : null;
+        const deployment = decision.deploymentId
+            ? (rows.deployments.find((row) => row.id === decision.deploymentId) ?? null)
+            : null;
+        const post = statePost(decision, build, deployment);
+        if (post) await this.postThread(task, post);
+    }
+
+    private async recordStateActivity(
+        task: Task,
+        decision: Extract<DeliveryDecision, { kind: 'state' }>,
+        mergeCommitSha: string,
     ): Promise<void> {
         const extra = {
             buildId: decision.buildId,
@@ -987,6 +1118,45 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         }
     }
 
+    /**
+     * FR-43 — one keyed post into the Task's thread, as the Task's Agent or, with none, as
+     * `system` with no author id. Best-effort: never throws (the Activity row is the record).
+     */
+    private async postThread(task: Task, post: TaskThreadPost): Promise<void> {
+        if (!this.chat) return;
+        const agentId = (task.agentId ?? '').trim();
+        try {
+            await this.chat.post(task.userId, {
+                taskId: task.id,
+                authorType: agentId ? 'agent' : 'system',
+                authorId: agentId || null,
+                body: renderTaskThreadPost(post),
+                messageKey: post.key,
+                messageParams: post.params ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: the ${post.key} thread post could not be written (${errorText(error)}).`,
+            );
+        }
+    }
+
+    /** **Opened follow-up {slug}.** Returns the follow-up's slug (null when unreadable). */
+    private async postFollowUpOpened(task: Task, followUpTaskId: string): Promise<string | null> {
+        const slug = await this.slugOf(followUpTaskId);
+        if (slug) await this.postThread(task, taskThreadPost('followUpOpened', { taskSlug: slug }));
+        return slug;
+    }
+
+    private async slugOf(taskId: string): Promise<string | null> {
+        try {
+            const row = await this.tasks.findOne({ where: { id: taskId } });
+            return row?.slug ?? null;
+        } catch {
+            return null;
+        }
+    }
+
     /** Move `deliveryUpdatedAt` forward without changing the state (fair, stalest-first order). */
     private async touch(task: Task, from: TaskDeliveryState): Promise<void> {
         const now = new Date();
@@ -1038,6 +1208,82 @@ const PROGRESS_SUMMARY: Partial<Record<TaskDeliveryState, string>> = {
     built: 'Merged change built — waiting for a deployment',
     deploying: 'Deploying the merged change',
 };
+
+/** The longest failure reason a thread post quotes (the Build page has the rest). */
+const POST_REASON_MAX = 200;
+
+/**
+ * FR-43 — the thread post of one recorded state change, or `null` for a state the chain does not
+ * post on a reconcile (`merged` is posted by the merge hook, `closed_without_deploy` by Close
+ * anyway). Numbers, reasons and the URL are optional on the rows, hence the variants.
+ */
+function statePost(
+    decision: Extract<DeliveryDecision, { kind: 'state' }>,
+    build: WorkBuild | null,
+    deployment: WorkDeployment | null,
+): TaskThreadPost | null {
+    const number = typeof build?.number === 'number' ? build.number : null;
+    switch (decision.state) {
+        case 'building':
+            return number !== null
+                ? taskThreadPost('buildStarted', { number })
+                : taskThreadPost('buildStartedUnnumbered');
+        case 'built':
+            return number !== null
+                ? taskThreadPost('buildSucceeded', { number })
+                : taskThreadPost('buildSucceededUnnumbered');
+        case 'build_failed': {
+            const reason = buildFailureReason(build);
+            if (number !== null) {
+                return reason
+                    ? taskThreadPost('buildFailed', { number, reason })
+                    : taskThreadPost('buildFailedNoReason', { number });
+            }
+            return reason
+                ? taskThreadPost('buildFailedUnnumbered', { reason })
+                : taskThreadPost('buildFailedUnnumberedNoReason');
+        }
+        case 'deploying':
+            return taskThreadPost('deploying');
+        case 'live': {
+            const url = (deployment?.website ?? '').trim();
+            return url ? taskThreadPost('live', { url }) : taskThreadPost('liveNoUrl');
+        }
+        case 'deploy_failed':
+            return taskThreadPost('deployFailed', { outcome: decision.outcome ?? 'failed' });
+        default:
+            return null;
+    }
+}
+
+/** Why a Build failed, in the words APW-05 recorded (one line, capped). `null` = not recorded. */
+function buildFailureReason(build: WorkBuild | null): string | null {
+    if (!build) return null;
+    const raw = [build.notDeployableReason, build.blockedReason, build.failureClass].find(
+        (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
+    if (!raw) return null;
+    const line = raw.replace(/\s+/g, ' ').trim().replace(/[.\s]+$/, '');
+    return line.length > POST_REASON_MAX ? `${line.slice(0, POST_REASON_MAX - 1)}…` : line;
+}
+
+/**
+ * S20 — **Deploy now** is offered for a `built` change on an App Work that deploys somewhere and
+ * has auto-deploy off (its own setting or the operator's switch): nothing else will deploy it. A
+ * Build is needed — the Deployment is of that Build.
+ */
+function canDeployNow(
+    state: TaskDeliveryState | null,
+    build: WorkBuild | null,
+    runtime: WorkAppRuntimeState | null,
+): boolean {
+    if (state !== 'built' || !build || !runtime) return false;
+    const target = String(runtime.target ?? '').trim();
+    if (!target || target === 'none') return false;
+    const autoDeploy =
+        runtime.targetSettings?.autoDeploy !== false && readAppWorkSwitches().autoDeployEnabled;
+    return !autoDeploy;
+}
 
 function isDeliveryState(value: unknown): value is TaskDeliveryState {
     return typeof value === 'string' && (TASK_DELIVERY_STATES as readonly string[]).includes(value);

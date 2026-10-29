@@ -14,8 +14,12 @@ import {
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { ownershipScopeOf, type OwnershipScope } from '../database/ownership-scope';
-import { TaskChatMessage } from '../entities/task-chat-message.entity';
-import type { Task, TaskAuthorType, TaskExternalAuthor } from '../entities/task.entity';
+import {
+    TaskChatMessage,
+    type TaskChatAuthorType,
+    type TaskChatMessageParams,
+} from '../entities/task-chat-message.entity';
+import type { Task, TaskExternalAuthor } from '../entities/task.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
@@ -54,14 +58,30 @@ const KB_LINK_RE = /\[\[([^\]]{1,200})\]\]/g;
 
 export interface PostChatInput {
     taskId: string;
-    /** EW-P1-2: `'integration'` when an integration key posts without acting as a user. */
-    authorType: TaskAuthorType;
-    authorId: string;
+    /**
+     * EW-P1-2: `'integration'` when an integration key posts without acting as a user.
+     * APW-08 T54: `'system'` for a platform post on a Task with no Agent to speak for it — never
+     * reachable from a route (the controllers set the author from the principal).
+     */
+    authorType: TaskChatAuthorType;
+    /** Required for every author type except `'system'`, whose posts carry none. */
+    authorId: string | null;
     body: string;
     attachments?: { uploadId: string }[];
     /** EW-P1-2: display attribution for an `'integration'` author (ignored otherwise). */
     externalAuthor?: TaskExternalAuthor | null;
+    /**
+     * APW-08 T54 (FR-43) — the copy key of a platform post (`deliveryPosts.live`), rendered in the
+     * reader's locale. `body` must still carry the pre-rendered English (the fallback).
+     */
+    messageKey?: string | null;
+    /** APW-08 T54 — the values `messageKey`'s copy takes. */
+    messageParams?: TaskChatMessageParams | null;
 }
+
+/** `messageKey` column width (migration 1792330000000). */
+const MESSAGE_KEY_MAX = 64;
+const MESSAGE_KEY_RE = /^[a-z][A-Za-z0-9]*(\.[a-z][A-Za-z0-9]*)+$/;
 
 export interface MentionLookups {
     /** Slugs the user owns — map<slug, agentId>. */
@@ -131,14 +151,25 @@ export class TaskChatService {
             ownershipScope,
         );
         this.assertBody(input.body);
+        const authorId = input.authorType === 'system' ? (input.authorId ?? null) : input.authorId;
+        if (!authorId && input.authorType !== 'system') {
+            throw new BadRequestException('A chat message needs an author.');
+        }
+        const messageKey = this.normalizeMessageKey(input.messageKey);
 
         const mentions = this.parseMentions(input.body, lookups);
 
         const data: Partial<TaskChatMessage> = {
             taskId: task.id,
             authorType: input.authorType,
-            authorId: input.authorId,
+            authorId,
             body: input.body,
+            // APW-08 T54 — a keyed platform post; params only travel with a key.
+            messageKey,
+            messageParams:
+                messageKey && input.messageParams && Object.keys(input.messageParams).length > 0
+                    ? input.messageParams
+                    : null,
             mentions: mentions.records.length > 0 ? mentions.records : null,
             attachments:
                 input.attachments && input.attachments.length > 0 ? input.attachments : null,
@@ -164,8 +195,10 @@ export class TaskChatService {
                           changedFields: ['comments'],
                           actor:
                               input.authorType === 'agent'
-                                  ? { type: 'agent', id: input.authorId, label: null }
-                                  : undefined,
+                                  ? { type: 'agent', id: authorId as string, label: null }
+                                  : input.authorType === 'system'
+                                    ? { type: 'system', id: 'system', label: null }
+                                    : undefined,
                       },
                   );
                   return created;
@@ -647,6 +680,21 @@ export class TaskChatService {
             if (visible) return { task: visible, owned: false };
         }
         throw new NotFoundException(`Task ${taskId} not found.`);
+    }
+
+    /**
+     * APW-08 T54 — a stored key is a dotted copy path of camelCase segments, ≤ 64 characters
+     * (`deliveryPosts.live`). Anything else is dropped (the post keeps its English `body`)
+     * rather than refused: a post must not fail because of its translation key.
+     */
+    private normalizeMessageKey(raw: string | null | undefined): string | null {
+        const key = (raw ?? '').trim();
+        if (!key) return null;
+        if (key.length > MESSAGE_KEY_MAX || !MESSAGE_KEY_RE.test(key)) {
+            this.logger.warn(`Dropping an invalid chat message key (${key.slice(0, 80)}).`);
+            return null;
+        }
+        return key;
     }
 
     private assertBody(body: string): void {

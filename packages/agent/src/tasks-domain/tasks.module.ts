@@ -29,6 +29,7 @@ import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { TaskDeliveryService } from '../app-works/task-delivery.service';
 import { DeliveryFollowUpService } from '../app-works/delivery-follow-up.service';
 import { TASK_DELIVERY_TRACKER } from './task-delivery.port';
+import { TASK_THREAD_POSTER } from './task-thread-poster.port';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
@@ -302,6 +303,9 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         DeliveryFollowUpService,
         TaskDeliveryService,
         { provide: TASK_DELIVERY_TRACKER, useExisting: TaskDeliveryService },
+        // APW-08 T26 / T54 — the delivery chain posts its progress into the Task thread (FR-43)
+        // through the ordinary chat service.
+        { provide: TASK_THREAD_POSTER, useExisting: TaskChatService },
     ],
     exports: [
         // Exported as well as provided: the dispatch brief, the Fleet

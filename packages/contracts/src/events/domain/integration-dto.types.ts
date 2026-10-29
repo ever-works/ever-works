@@ -206,8 +206,10 @@ export interface IntegrationTaskCommentDto {
 	readonly id: string;
 	readonly taskId: string;
 	readonly organizationId: string;
-	readonly authorType: 'user' | 'agent' | 'integration';
-	readonly authorId: string;
+	/** APW-08 T54 — `'system'`: a platform post (a delivery-chain progress line). */
+	readonly authorType: 'user' | 'agent' | 'integration' | 'system';
+	/** `null` only for a `'system'` post on a Task with no Agent. */
+	readonly authorId: string | null;
 	readonly externalAuthor?: {
 		readonly name: string;
 		readonly avatarUrl?: string | null;

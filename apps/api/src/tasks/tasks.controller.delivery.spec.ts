@@ -52,6 +52,9 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
             getView: jest.fn().mockResolvedValue(VIEW),
             closeWithoutDeploy: jest.fn().mockResolvedValue({ ...VIEW, state: 'closed_without_deploy' }),
             requestFollowUp: jest.fn().mockResolvedValue({ taskId: 'follow-1' }),
+            createFixTask: jest
+                .fn()
+                .mockResolvedValue({ taskId: 'fix-1', slug: 'T-9', created: true }),
         };
         const controller = new TasksController(
             { getOne } as never,
@@ -155,6 +158,66 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
             await expect(
                 controller.requestDeliveryFollowUp(auth, 'task-1', { escalationId: 'esc-1' }),
             ).rejects.toMatchObject({ response: { code: 'followUpLimit' } });
+        });
+    });
+
+    describe('POST /tasks/:id/delivery/fix-task (APW-08 T27)', () => {
+        it('loads the Task owner-scoped, then files the fix Task for THAT Task as the user', async () => {
+            const { controller, getOne, delivery } = make();
+            await expect(controller.createDeliveryFixTask(auth, 'task-1')).resolves.toEqual({
+                taskId: 'fix-1',
+                slug: 'T-9',
+                created: true,
+            });
+            expect(getOne).toHaveBeenCalledWith('user-1', 'task-1', scope);
+            expect(delivery.createFixTask).toHaveBeenCalledWith('user-1', TASK);
+        });
+
+        it('passes the one refusal code through (422 fixTaskUnavailable)', async () => {
+            const { controller, delivery } = make();
+            delivery.createFixTask.mockRejectedValue(
+                new UnprocessableEntityException({ code: 'fixTaskUnavailable' }),
+            );
+            await expect(controller.createDeliveryFixTask(auth, 'task-1')).rejects.toMatchObject({
+                response: { code: 'fixTaskUnavailable' },
+            });
+        });
+
+        it('a cross-account Task is a 404 before anything is filed', async () => {
+            const { controller, getOne, delivery } = make();
+            getOne.mockRejectedValue(new NotFoundException());
+            await expect(controller.createDeliveryFixTask(auth, 'task-1')).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(delivery.createFixTask).not.toHaveBeenCalled();
+        });
+
+        it('refuses an API key before the Task is read (it can start a paid run)', async () => {
+            const { controller, getOne, delivery } = make();
+            await expect(controller.createDeliveryFixTask(apiKey, 'task-1')).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            expect(getOne).not.toHaveBeenCalled();
+            expect(delivery.createFixTask).not.toHaveBeenCalled();
+        });
+
+        it('answers 503 without the delivery chain', async () => {
+            const { controller } = make(false);
+            await expect(controller.createDeliveryFixTask(auth, 'task-1')).rejects.toBeInstanceOf(
+                ServiceUnavailableException,
+            );
+        });
+
+        it('mounts POST :id/delivery/fix-task, 201, throttled at 10/min', () => {
+            const proto = TasksController.prototype as unknown as Record<string, unknown>;
+            const handler = proto.createDeliveryFixTask as object;
+            expect(Reflect.getMetadata('path', handler)).toBe(':id/delivery/fix-task');
+            expect(Reflect.getMetadata('method', handler)).toBe(1);
+            expect(Reflect.getMetadata('__httpCode__', handler)).toBe(201);
+            const limits = Reflect.getMetadataKeys(handler)
+                .filter((key) => String(key).includes('THROTTLER') && String(key).includes('LIMIT'))
+                .map((key) => Reflect.getMetadata(key, handler));
+            expect(limits).toContain(10);
         });
     });
 

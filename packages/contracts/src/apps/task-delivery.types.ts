@@ -85,6 +85,17 @@ export interface TaskDeliveryFollowUpResponse {
 	taskId: string;
 }
 
+/**
+ * APW-08 T27 — `201` answer of `POST /api/tasks/:id/delivery/fix-task` (**Create a fix Task**):
+ * the fix Task for the change's CURRENT failure. `created: false` = one was already filed for that
+ * failure (automatically or by an earlier click) and that one is answered — one per failure.
+ */
+export interface TaskDeliveryFixTaskResponse {
+	taskId: string;
+	slug: string | null;
+	created: boolean;
+}
+
 export interface TaskDeliveryView {
 	taskId: string;
 	state: TaskDeliveryState | null;
@@ -97,6 +108,12 @@ export interface TaskDeliveryView {
 	carriedByLaterChange: boolean;
 	followUps: Array<{ taskId: string; slug: string; status: string; automatic: boolean }>;
 	history: Array<{ state: TaskDeliveryState; at: string; activityId: string | null }>;
+	/**
+	 * APW-08 T27 (S20) — the section offers **Deploy now**: the change is `built`, the App Work
+	 * deploys somewhere (its target is not None) and auto-deploy is off, so nothing will deploy it
+	 * unless a person does. Absent on answers from a build without this field (= not offered).
+	 */
+	canDeployNow?: boolean;
 }
 
 /**
