@@ -155,7 +155,7 @@ describe('WorksTemplateCatalogService', () => {
         });
         const { svc } = make(jest.fn(async () => rawOk(manifest)));
         const [row] = await svc.list();
-        expect(row.name).toBe('script>alert(1)Directory');
+        expect(row.name).toBe('alert(1)Directory');
         // No `<` that could open a tag is left anywhere in the row.
         expect(JSON.stringify(row)).not.toMatch(/<[a-z/!?]/i);
     });

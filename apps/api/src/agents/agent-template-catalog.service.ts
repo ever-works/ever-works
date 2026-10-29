@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { fetchPublicRawFile } from '../organizations/org-template-catalog.service';
+import { stripHtmlTags } from '../common/strip-html-tags';
 
 /**
  * Agent-template catalog (ADR-011, spec FR-26..FR-30).
@@ -66,11 +67,8 @@ const MAX_TAG_LEN = 60;
  * full DOM-based sanitizer is not available in the API runtime.
  */
 function stripHtml(value: string): string {
-    // The tag body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos),
-    // then any `<` that could still open a tag (before a letter, `/`, `!` or `?`), so a split
-    // tag such as `<scr<b>ipt>` leaves no markup while `a -> b` and `x < y` keep their text
-    // (CodeQL js/incomplete-multi-character-sanitization).
-    return value.replace(/<[^<>]*>/g, '').replace(/<(?=[a-z/!?])/gi, '');
+    // Until stable, then stray openers: see `common/strip-html-tags.ts`.
+    return stripHtmlTags(value);
 }
 
 /** `kanban-square` → `KanbanSquare` so the client icon map (PascalCase

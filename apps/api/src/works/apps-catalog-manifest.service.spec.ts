@@ -198,7 +198,7 @@ describe('apps catalog manifest projection', () => {
         expect(isPinnedRef('55de074b7feeb82ede98d2c31eedd28201ebba01')).toBe(true);
         expect(isPinnedRef('main')).toBe(false);
         expect(plainText('<script>x</script>a\u0000b', 10)).toBe('xa b');
-        expect(plainText('<scr<b>ipt>alert(1)</script>', 40)).toBe('script>alert(1)');
+        expect(plainText('<scr<b>ipt>alert(1)</script>', 40)).toBe('alert(1)');
         expect(plainText('1 > 0 and 2 >= 1, x < y', 40)).toBe('1 > 0 and 2 >= 1, x < y');
     });
 });

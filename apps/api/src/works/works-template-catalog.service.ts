@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { GitFacadeService } from '@ever-works/agent/facades';
+import { stripHtmlTags } from '../common/strip-html-tags';
 
 /**
  * Work-blueprint catalog (Works Templates spec, ADR-014).
@@ -125,11 +126,8 @@ const MAX_TAGS = 8;
  * we consume (no DOM sanitizer in the API runtime).
  */
 function stripHtml(value: string): string {
-    // The tag body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos),
-    // then any `<` that could still open a tag (before a letter, `/`, `!` or `?`), so a split
-    // tag such as `<scr<b>ipt>` leaves no markup while `a -> b` and `x < y` keep their text
-    // (CodeQL js/incomplete-multi-character-sanitization).
-    return value.replace(/<[^<>]*>/g, '').replace(/<(?=[a-z/!?])/gi, '');
+    // Until stable, then stray openers: see `common/strip-html-tags.ts`.
+    return stripHtmlTags(value);
 }
 
 /** `folder-tree` → `FolderTree` so the client icon map (PascalCase lucide

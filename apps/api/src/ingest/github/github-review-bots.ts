@@ -323,7 +323,14 @@ function stripDetailsBlocks(text: string): string {
  */
 export function stripReviewBotMarkup(body: string | null | undefined): string {
     let text = stripDetailsBlocks(stripHtmlComments(body ?? ''));
-    text = text.replace(MARKDOWN_IMAGE, '').replace(HTML_TAG, '');
+    text = text.replace(MARKDOWN_IMAGE, '');
+    // Presentation tags until none is left (bounded): one pass can splice a new one.
+    let previous: string;
+    let passes = 0;
+    do {
+        previous = text;
+        text = text.replace(HTML_TAG, '');
+    } while (text !== previous && ++passes < 8);
     return text
         .split('\n')
         .map((line) => line.trimEnd())

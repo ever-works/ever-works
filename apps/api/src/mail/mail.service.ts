@@ -13,6 +13,7 @@ import {
     MemberInvitedEvent,
     WorkInvitationIssuedEvent,
 } from '../events';
+import { stripHtmlTags as stripTagsToText } from '../common/strip-html-tags';
 
 const OWNER_CLAIM_ROLE = 'owner-claim';
 
@@ -651,11 +652,8 @@ export class MailService {
         if (!value) {
             return '';
         }
-        // The tag body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos),
-        // then any `<` that could still open a tag (before a letter, `/`, `!` or `?`), so a split
-        // tag such as `<scr<b>ipt>` leaves no markup while `a -> b` and `x < y` keep their text
-        // (CodeQL js/incomplete-multi-character-sanitization).
-        return value.replace(/<[^<>]*>/g, '').replace(/<(?=[a-z/!?])/gi, '');
+        // Until stable, then stray openers: see `common/strip-html-tags.ts`.
+        return stripTagsToText(value);
     }
 
     /**

@@ -17,6 +17,7 @@ import {
 } from '@ever-works/contracts';
 import { GitFacadeService } from '@ever-works/agent/facades';
 import { APPS_TIER_POLICY, type AppsTierPolicy } from '@ever-works/agent/app-runtime';
+import { stripHtmlTags } from '../common/strip-html-tags';
 
 /**
  * APW-03 — the manifest-backed Apps catalog (`GET /api/apps-catalog`).
@@ -87,16 +88,13 @@ export function isPinnedRef(ref: string): boolean {
 
 /**
  * Plain text, capped: tags and control characters out, whitespace collapsed.
- * A tag's body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos);
- * then any `<` that could still open a tag (before a letter, `/`, `!` or `?`) goes,
- * so a split tag such as `<scr<b>ipt>` leaves no markup while `1 > 0` and `x < y`
- * keep their text.
+ * Tags go until none is left, then any stray opener (`common/strip-html-tags.ts`), so a
+ * split tag such as `<scr<b>ipt>` leaves no markup while `1 > 0` and `x < y` keep
+ * their text.
  */
 export function plainText(value: unknown, max: number): string {
     if (typeof value !== 'string') return '';
-    return value
-        .replace(/<[^<>]*>/g, '')
-        .replace(/<(?=[a-z/!?])/gi, '')
+    return stripHtmlTags(value)
         .replace(/[\u0000-\u001f\u007f]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()

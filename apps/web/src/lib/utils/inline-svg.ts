@@ -60,10 +60,18 @@ function scrubOnce(svg: string): string {
 
 export function sanitizeInlineSvg(svg: string | null | undefined): string {
     if (typeof svg !== 'string' || svg.length > MAX_INLINE_SVG_LENGTH) return '';
-    const cleaned = scrubOnce(svg);
-    // Every step only removes text, so an unchanged second pass means no pattern
-    // matches the result at all.
-    if (scrubOnce(cleaned) !== cleaned) return '';
+    // Scrub until stable. Every step only removes text, so a pass that changes nothing
+    // means no pattern matches at all; a SECOND pass that still changes something means
+    // the first spliced a construct together, and the input is refused.
+    let cleaned = svg;
+    let previous: string;
+    let changingPasses = 0;
+    do {
+        previous = cleaned;
+        cleaned = scrubOnce(cleaned);
+        if (cleaned !== previous) changingPasses += 1;
+        if (changingPasses > 1) return '';
+    } while (cleaned !== previous);
     if (SVG_DANGEROUS_URL_RE.test(cleaned) || SVG_HANDLER_LEFT_RE.test(cleaned)) return '';
     return cleaned;
 }
