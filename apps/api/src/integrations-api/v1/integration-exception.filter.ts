@@ -14,6 +14,8 @@ import {
 import {
     DuplicateExternalRefError,
     IdempotencyConflictError,
+    IntegrationDomainRuleError,
+    IntegrationValidationError,
     InvalidCursorError,
     ResourceNotFoundError,
     VersionMismatchError,
@@ -105,6 +107,22 @@ export class IntegrationExceptionFilter implements ExceptionFilter {
         }
         if (exception instanceof ResourceNotFoundError) {
             return { status: HttpStatus.NOT_FOUND, code: 'not_found', message: exception.message };
+        }
+        if (exception instanceof IntegrationValidationError) {
+            return {
+                status: HttpStatus.BAD_REQUEST,
+                code: 'validation_failed',
+                message: exception.message,
+                details: { fields: [{ path: exception.path, message: exception.reason }] },
+            };
+        }
+        if (exception instanceof IntegrationDomainRuleError) {
+            return {
+                status: HttpStatus.UNPROCESSABLE_ENTITY,
+                code: 'domain_rule',
+                message: exception.message,
+                details: exception.details,
+            };
         }
         if (exception instanceof AggregateVersionConflictError) {
             // The If-Match re-check inside the write's transaction lost a race.

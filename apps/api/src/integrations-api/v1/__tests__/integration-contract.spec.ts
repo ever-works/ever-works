@@ -41,6 +41,8 @@ import {
 import {
     DuplicateExternalRefError,
     IdempotencyConflictError,
+    IntegrationDomainRuleError,
+    IntegrationValidationError,
     InvalidCursorError,
     ResourceNotFoundError,
     VersionMismatchError,
@@ -57,7 +59,16 @@ import {
     IntegrationInboundEmailDto,
     IntegrationInboundMessageDto,
 } from '../email.controller';
-import { IntegrationInboxReplyDto, IntegrationInboxStateDto } from '../inbox.controller';
+import {
+    IntegrationCreateInboxItemDto,
+    IntegrationInboxChoiceDto,
+    IntegrationInboxEmailDto,
+    IntegrationInboxRelatedDto,
+    IntegrationInboxReplyDto,
+    IntegrationInboxResolutionDto,
+    IntegrationInboxStateDto,
+    IntegrationUpdateInboxItemDto,
+} from '../inbox.controller';
 import {
     IntegrationCreateKbDocumentDto,
     IntegrationCreateKbFolderDto,
@@ -345,6 +356,22 @@ const REQUEST_BODIES: Readonly<Record<string, BodyPair>> = {
     UpdateComment: { dto: IntegrationUpdateCommentDto },
     InboxReply: { dto: IntegrationInboxReplyDto },
     InboxStateChange: { dto: IntegrationInboxStateDto },
+    // CR-15 — the integration inbox push.
+    CreateInboxItem: {
+        dto: IntegrationCreateInboxItemDto,
+        nested: {
+            related: { dto: IntegrationInboxRelatedDto },
+            email: { dto: IntegrationInboxEmailDto },
+            choices: { dto: IntegrationInboxChoiceDto },
+        },
+    },
+    UpdateInboxItem: {
+        dto: IntegrationUpdateInboxItemDto,
+        nested: {
+            choices: { dto: IntegrationInboxChoiceDto },
+            resolution: { dto: IntegrationInboxResolutionDto },
+        },
+    },
     InboundEmail: {
         dto: IntegrationInboundEmailDto,
         nested: {
@@ -602,6 +629,15 @@ describe('integration contract v1 — the API side (EW-P1-8, T25)', () => {
             ['If-Match pre-check', new VersionMismatchError(3, 4)],
             ['If-Match re-check', new AggregateVersionConflictError('task', 'task-1', 3, 4)],
             ['domain rule', new IntegrationHttpException(422, 'domain_rule', 'Archived.')],
+            // CR-15 — the inbox push's building-block refusals.
+            [
+                'domain rule (building block)',
+                new IntegrationDomainRuleError('Not a member.', { field: 'recipientUserId' }),
+            ],
+            [
+                'validation (building block)',
+                new IntegrationValidationError('sourceUrl', 'must be an https URL'),
+            ],
             ['rate limited', new IntegrationHttpException(429, 'rate_limited', 'Slow down.')],
             ['server error', new InternalServerErrorException('boom')],
             ['unknown throw', new Error('boom')],

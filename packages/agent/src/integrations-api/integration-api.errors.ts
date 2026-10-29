@@ -9,7 +9,38 @@
  * | {@link IdempotencyConflictError}  | 409    | `conflict`               |
  * | {@link InvalidCursorError}        | 400    | `validation_failed`      |
  * | {@link ResourceNotFoundError}     | 404    | `not_found`              |
+ * | {@link IntegrationValidationError}| 400    | `validation_failed`      |
+ * | {@link IntegrationDomainRuleError}| 422    | `domain_rule`            |
  */
+
+/**
+ * A request value the building block refuses on its own (defence in depth
+ * behind the route's DTO validation): `path` names the field.
+ */
+export class IntegrationValidationError extends Error {
+    constructor(
+        readonly path: string,
+        readonly reason: string,
+    ) {
+        super(`${path} ${reason}`);
+        this.name = 'IntegrationValidationError';
+    }
+}
+
+/**
+ * A well-formed write the organization's data refuses, e.g. an inbox item for
+ * someone who is not a member of the pinned organization, or one that names
+ * a Task of another organization. `details.field` names the field.
+ */
+export class IntegrationDomainRuleError extends Error {
+    constructor(
+        message: string,
+        readonly details: Record<string, unknown> = {},
+    ) {
+        super(message);
+        this.name = 'IntegrationDomainRuleError';
+    }
+}
 
 /** `If-Match` named a version the aggregate no longer has. */
 export class VersionMismatchError extends Error {
