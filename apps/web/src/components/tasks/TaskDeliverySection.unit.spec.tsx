@@ -17,17 +17,23 @@ import messages from '../../../messages/en.json';
  *  - **Try once more**: only while the change's delivery-failed Inbox item is open.
  */
 
-const { getDelivery, closeDelivery, followUp } = vi.hoisted(() => ({
+const { getDelivery, closeDelivery, followUp, createFix, requestDeploy } = vi.hoisted(() => ({
     getDelivery: vi.fn(),
     closeDelivery: vi.fn(),
     followUp: vi.fn(),
+    createFix: vi.fn(),
+    requestDeploy: vi.fn(),
 }));
 
 vi.mock('@/app/actions/tasks', () => ({
     getTaskDeliveryAction: getDelivery,
     closeDeliveryAction: closeDelivery,
     openDeliveryFollowUpAction: followUp,
+    createDeliveryFixTaskAction: createFix,
 }));
+
+// APW-08 T27 (lane L5) — Deploy now is APW-06's own button; only its server action is stubbed.
+vi.mock('@/app/actions/dashboard/app-runtime', () => ({ requestAppDeployAction: requestDeploy }));
 
 vi.mock('@/i18n/navigation', () => ({
     Link: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) =>
@@ -100,6 +106,8 @@ beforeEach(() => {
     getDelivery.mockReset();
     closeDelivery.mockReset();
     followUp.mockReset();
+    createFix.mockReset();
+    requestDeploy.mockReset();
 });
 
 afterEach(() => {
@@ -414,5 +422,133 @@ describe('TaskDeliverySection — Try once more (APW-08 T27)', () => {
                 copy.errors.followUpLimit,
             ),
         );
+    });
+});
+
+describe('TaskDeliverySection — Deploy now (APW-08 T27, S20)', () => {
+    it('a built change with auto-deploy off offers APW-06 Deploy now for THIS Build', async () => {
+        getDelivery.mockResolvedValue(ready(view('built', { deployment: null, canDeployNow: true })));
+        requestDeploy.mockResolvedValue({
+            success: true,
+            httpStatus: 202,
+            data: { deploymentId: 'd-9', warnings: [], advisory: [] },
+        });
+        renderSection();
+        const block = await screen.findByTestId('task-delivery-deploy-now');
+        expect(block.textContent).toContain(copy.deployNowHint);
+        const button = screen.getByTestId('app-deploy-now-button');
+        expect(button.textContent).toBe(messages.dashboard.workDetail.appDeploy.deployNow.button);
+        expect(button.className).toContain('dark:bg-white');
+
+        fireEvent.click(button);
+        await waitFor(() => expect(requestDeploy).toHaveBeenCalledWith('work-1', { buildId: 'b-1' }));
+        // The accepted request re-reads the chain (it moves to deploying on its own).
+        await waitFor(() => expect(getDelivery).toHaveBeenCalledTimes(2));
+    });
+
+    it('is not offered while auto-deploy is on, on another state, or without a Build', async () => {
+        getDelivery.mockResolvedValue(ready(view('built', { deployment: null, canDeployNow: false })));
+        renderSection();
+        await screen.findByTestId('task-delivery-timeline');
+        expect(screen.queryByTestId('task-delivery-deploy-now')).toBeNull();
+        cleanup();
+
+        getDelivery.mockResolvedValue(ready(view('deploying', { canDeployNow: true })));
+        renderSection();
+        await screen.findByTestId('task-delivery-timeline');
+        expect(screen.queryByTestId('task-delivery-deploy-now')).toBeNull();
+        cleanup();
+
+        getDelivery.mockResolvedValue(
+            ready(view('built', { deployment: null, build: null, canDeployNow: true })),
+        );
+        renderSection();
+        await screen.findByTestId('task-delivery-timeline');
+        expect(screen.queryByTestId('task-delivery-deploy-now')).toBeNull();
+    });
+});
+
+describe('TaskDeliverySection — Create a fix Task (APW-08 T27)', () => {
+    async function openFixConfirm() {
+        const trigger = await screen.findByTestId('task-delivery-create-fix-task');
+        trigger.focus();
+        fireEvent.click(trigger);
+        await screen.findByTestId('task-delivery-confirm-fix-task');
+        return trigger;
+    }
+
+    it('is offered on a failed change, and asks first; Cancel files nothing and returns focus', async () => {
+        getDelivery.mockResolvedValue(ready(view('build_failed')));
+        renderSection();
+        const trigger = await openFixConfirm();
+        expect(trigger.textContent).toBe(copy.createFixTask);
+        expect(screen.getByText(copy.createFixTaskConfirm)).toBeTruthy();
+
+        fireEvent.click(screen.getByTestId('task-delivery-fix-task-cancel'));
+        await waitFor(() => expect(screen.queryByTestId('task-delivery-confirm-fix-task')).toBeNull());
+        expect(createFix).not.toHaveBeenCalled();
+        await waitFor(() => expect(document.activeElement).toBe(trigger));
+    });
+
+    it('confirming files the fix Task, links it, re-reads the chain and moves focus to the heading', async () => {
+        getDelivery.mockResolvedValue(ready(view('deploy_failed')));
+        createFix.mockResolvedValue({ ok: true, taskId: 'fix-1', slug: 'T-9', created: true });
+        renderSection();
+        await openFixConfirm();
+
+        fireEvent.click(screen.getByTestId('task-delivery-confirm-fix-task'));
+
+        await waitFor(() => expect(createFix).toHaveBeenCalledWith('task-1'));
+        const result = await screen.findByTestId('task-delivery-fix-task-result');
+        expect(result.textContent).toContain('Fix Task T-9 was created.');
+        expect(screen.getByTestId('task-delivery-fix-task-link').getAttribute('href')).toBe(
+            '/tasks/fix-1',
+        );
+        expect(getDelivery).toHaveBeenCalledTimes(2);
+        expect(screen.queryByTestId('task-delivery-create-fix-task')).toBeNull();
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByRole('heading', { name: copy.sectionTitle }),
+            ),
+        );
+    });
+
+    it('a fix Task already filed for this failure is answered, not filed again', async () => {
+        getDelivery.mockResolvedValue(ready(view('build_failed')));
+        createFix.mockResolvedValue({ ok: true, taskId: 'follow-0', slug: 'T-1', created: false });
+        renderSection();
+        await openFixConfirm();
+        fireEvent.click(screen.getByTestId('task-delivery-confirm-fix-task'));
+        const result = await screen.findByTestId('task-delivery-fix-task-result');
+        expect(result.getAttribute('data-created')).toBe('false');
+        expect(result.textContent).toContain('A fix Task for this failure already exists: T-1.');
+    });
+
+    it('a refusal shows its copy by code and keeps the button', async () => {
+        getDelivery.mockResolvedValue(ready(view('build_failed')));
+        createFix.mockResolvedValue({ ok: false, code: 'fixTaskUnavailable', statusCode: 422 });
+        renderSection();
+        const trigger = await openFixConfirm();
+        fireEvent.click(screen.getByTestId('task-delivery-confirm-fix-task'));
+        await waitFor(() =>
+            expect(screen.getByTestId('task-delivery-error').textContent).toBe(
+                copy.errors.fixTaskUnavailable,
+            ),
+        );
+        expect(screen.getByTestId('task-delivery-create-fix-task')).toBe(trigger);
+        expect(deliveryErrorKey('fixTaskUnavailable')).toBe('fixTaskUnavailable');
+    });
+
+    it('is not offered on a change that did not fail, nor while Try once more is the offer', async () => {
+        getDelivery.mockResolvedValue(ready(view('built')));
+        renderSection();
+        await screen.findByTestId('task-delivery-close');
+        expect(screen.queryByTestId('task-delivery-create-fix-task')).toBeNull();
+        cleanup();
+
+        getDelivery.mockResolvedValue(ready(view('deploy_failed'), 'esc-1'));
+        renderSection();
+        await screen.findByTestId('task-delivery-retry');
+        expect(screen.queryByTestId('task-delivery-create-fix-task')).toBeNull();
     });
 });
