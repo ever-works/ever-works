@@ -18,6 +18,7 @@ import {
 import type { WorkUpstreamState } from '../entities/work-upstream-state.entity';
 import { GitFacadeService, GitOperationNotSupportedError } from '../facades/git.facade';
 import { APP_WORK_GIT_PROVIDER_ID } from './app-upstream-state.service';
+import { APP_UPSTREAM_TELEMETRY_EVENTS, AppUpstreamTelemetry } from './app-upstream.telemetry';
 
 /**
  * APW-02 T25 — Actions hygiene (plan §6.7, spec §4.6 FR-25…FR-31, ACC-02-08,
@@ -165,6 +166,9 @@ export class AppActionsHygieneService {
         @Optional() private readonly works?: WorkRepository,
         @Optional() private readonly git?: GitFacadeService,
         @Optional() private readonly activity?: ActivityLogService,
+        // APW-02 T39 (Gauzy Ever Works #37) - `app_actions.hygiene`. Appended LAST and
+        // `@Optional()`: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppUpstreamTelemetry,
     ) {}
 
     /**
@@ -176,6 +180,26 @@ export class AppActionsHygieneService {
      * repository the member can run.
      */
     async apply(workId: string, input?: AppActionsHygieneInput): Promise<AppActionsHygieneResult> {
+        const result = await this.applyPass(workId, input);
+        // APW-02 T39 - the pass's counts and its named state (plan 9.1); never a workflow
+        // name, path or id. `skipped` = the judged ids this pass neither disabled, kept
+        // nor enabled (seen on an earlier pass).
+        const judged = result.disabled.length + result.kept.length + result.enabled.length;
+        this.telemetry?.track(APP_UPSTREAM_TELEMETRY_EVENTS.hygiene, {
+            disabled: result.disabled.length,
+            kept: result.kept.length,
+            skipped: Math.max(0, result.seenIds.length - judged),
+            state: result.state,
+            truncated: result.truncated,
+            calls: result.calls,
+        });
+        return result;
+    }
+
+    private async applyPass(
+        workId: string,
+        input?: AppActionsHygieneInput,
+    ): Promise<AppActionsHygieneResult> {
         const state = await this.loadState(workId);
         const relation = state?.relation ?? input?.relation ?? null;
         const seenIds = mergeIds(

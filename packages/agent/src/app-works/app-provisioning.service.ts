@@ -35,6 +35,11 @@ import {
     type AppRepositoryDetection,
 } from './app-repository-detector';
 import { APP_WORK_AGENT_RESOLVER, type AppWorkAgentResolver } from './app-work-agent-resolver';
+import {
+    APP_PROVISION_TELEMETRY_EVENTS,
+    AppProvisioningTelemetry,
+    provisionAttemptsOf,
+} from './app-provisioning.telemetry';
 
 /**
  * APW-04 — the App Provisioner, both halves of owner Ruling A.
@@ -230,6 +235,9 @@ export class AppProvisioningService implements AppProvisioningCapability {
         // lazily, per call — the `app-builds.module.ts` pattern.
         @Optional() private readonly specs?: AppSpecService,
         @Optional() private readonly moduleRef?: ModuleRef,
+        // APW-04 T28 — `app.provision.started` / `app.provision.finished`. Appended LAST and
+        // `@Optional()`: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppProvisioningTelemetry,
     ) {}
 
     /** One in-flight start per Work in this process, so concurrent callers cannot file two Tasks. */
@@ -491,6 +499,23 @@ export class AppProvisioningService implements AppProvisioningCapability {
                 `${pullRequestUrl ? `, PR ${pullRequestUrl}` : ''}.`,
         );
 
+        // APW-04 T28 — the Task exists: provisioning has started. Codes and flags only (no
+        // repository, no draft, no brief, no pull request url).
+        this.telemetry?.track(
+            APP_PROVISION_TELEMETRY_EVENTS.started,
+            {
+                provisioningId: task.id,
+                trigger: input.trigger,
+                agentAssigned: Boolean(agentId),
+                held: Boolean(holdAutomatic || (agentId && holdMember)),
+                draftValid,
+                detectionSource: draftOrigin,
+                pullRequestOpened: Boolean(pullRequestUrl),
+                buildStrategy: inspection.detection.buildStrategy ?? null,
+            },
+            work.userId,
+        );
+
         return {
             started: true,
             reason: null,
@@ -653,6 +678,17 @@ export class AppProvisioningService implements AppProvisioningCapability {
         this.logger.log(
             `App provisioning for work ${work.id} cancelled by user ${input.userId}: Task ${open.id}` +
                 `${cancelledRunIds.length ? `, runs ${cancelledRunIds.join(', ')}` : ''}.`,
+        );
+        // APW-04 T28 — a cancel is the provisioning's end (an idempotent repeat above is not).
+        this.telemetry?.track(
+            APP_PROVISION_TELEMETRY_EVENTS.finished,
+            {
+                provisioningId: open.id,
+                status: 'cancelled',
+                failureReason: null,
+                attempts: provisionAttemptsOf(open.labels),
+            },
+            input.userId,
         );
         return {
             status: 'cancelled',

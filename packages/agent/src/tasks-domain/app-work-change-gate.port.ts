@@ -70,6 +70,18 @@ export interface AppWorkChangeGateInput {
      * (works-security 2026-10-18). `null` = an ordinary Task.
      */
     readonly taskOrigin: string | null;
+    /**
+     * The Task being judged — telemetry only (`app.change.guard_refused`,
+     * `app.provision.guard_rejected`, Gauzy Ever Works #37). Never read by the verdict.
+     */
+    readonly taskId?: string | null;
+    /**
+     * `false` ⇒ a refusal is NOT reported to telemetry (default `true`). Only the merge
+     * gate's re-judgement passes `false`: it re-evaluates the same branch after every
+     * pull-request status read (the two-minute sweep included), so reporting there would
+     * emit the same unchanged refusal on every tick. Never read by the verdict.
+     */
+    readonly reportRefusal?: boolean;
     readonly owner: string;
     readonly repo: string;
     readonly gitOptions: { userId: string; providerId: string; workId: string };

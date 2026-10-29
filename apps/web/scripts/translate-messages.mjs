@@ -916,7 +916,14 @@ function skipWhitespace(message, startIndex) {
     return index;
 }
 
+// Keys that would write through to Object.prototype instead of the messages
+// tree. A translated chunk is model output, so it never gets to name one.
+const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function mergeChunk(target, pathSegments, value) {
+    if (pathSegments.some((segment) => PROTOTYPE_KEYS.has(segment))) {
+        return;
+    }
     if (pathSegments.length === 0) {
         deepMergeInto(target, value);
         return;
@@ -948,6 +955,9 @@ function getRelativeChunkPath(parentPath, childPath) {
 
 function deepMergeInto(target, source) {
     for (const [key, value] of Object.entries(source)) {
+        if (PROTOTYPE_KEYS.has(key)) {
+            continue;
+        }
         if (isPlainObject(value) && isPlainObject(target[key])) {
             deepMergeInto(target[key], value);
             continue;

@@ -32,6 +32,10 @@ import {
 import { AppBlueprintApplyService } from '../apps-catalog/app-blueprint-apply.service';
 import { AppLicenseModule } from '../app-license/app-license.module';
 import { AppWorksTelemetryService } from './app-works-telemetry.service';
+import { AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
+import { AppProvisioningTelemetry } from './app-provisioning.telemetry';
+import { AppChangeTelemetry } from './app-change.telemetry';
+import { AppUpstreamTelemetry } from './app-upstream.telemetry';
 import { APP_SOURCE_CATALOG_PORT } from './app-source-catalog.port';
 import { APP_WORK_AGENT_RESOLVER, AppWorkAgentResolverService } from './app-work-agent-resolver';
 import { AppChangeRequestService } from './app-change-request.service';
@@ -461,6 +465,18 @@ export function buildAppPromptedValuesProvider(): FactoryProvider {
         // APW-01 T36 — FR-53's five events. Its sink is the API's to bind (a global
         // alias); unbound, events are counted and dropped. See the docstring above.
         AppWorksTelemetryService,
+        // APW-03 T49 — the App spec / Blueprint telemetry the resolver, the apply service
+        // and the upgrade service declared here emit, over the API's global
+        // `APP_SPEC_TELEMETRY_SINK` alias (never bound here; unbound ⇒ counted and dropped).
+        AppSpecTelemetry,
+        // Gauzy Ever Works #37 — the provisioner's (APW-04) and the evolve loop's (APW-08)
+        // telemetry, over the same global `APP_WORKS_TELEMETRY_SINK` alias.
+        AppProvisioningTelemetry,
+        AppChangeTelemetry,
+        // APW-02 T39 (Gauzy Ever Works #37) - the fork lifecycle telemetry the dispatcher,
+        // the hygiene pass (declared here) and the API's readiness run emit; exported below
+        // so the API-side `AppForkReadinessService` resolves it.
+        AppUpstreamTelemetry,
         // APW-08 T25 (lane aw-ai, 2026-10-17) — the agent-resolution rule, bound where
         // APW-02's `AppUpstreamStateService` (declared here) can see it (APW08-G18). Its
         // own dependencies are repository providers only (`DatabaseModule`).
@@ -526,6 +542,8 @@ export function buildAppPromptedValuesProvider(): FactoryProvider {
         // APW-01 T36 — exported so the API-side ready handler and `WorkModule`'s
         // `WorkLifecycleService` receive the same instance the services here do.
         AppWorksTelemetryService,
+        // APW-02 T39 - for the API-side readiness run (see the providers above).
+        AppUpstreamTelemetry,
         // APW-08 T25 / APW-04 — exported so the API's controllers, its copy of the ready
         // handler (`APP_PROVISIONING_SERVICE`), its readiness service
         // (`APP_PROVISION_EVENTS_PORT`) and the `remoteMap` (`AppProvisionEventsService`)

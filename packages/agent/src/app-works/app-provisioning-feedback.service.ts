@@ -15,6 +15,11 @@ import { TasksService } from '../tasks-domain/tasks.service';
 import { isAwaitingOwner } from '../tasks-domain/awaiting-owner';
 import { PROVISION_LABEL } from './app-change-guard';
 import { AppProvisioningService } from './app-provisioning.service';
+import {
+    APP_PROVISION_TELEMETRY_EVENTS,
+    AppProvisioningTelemetry,
+    type AppProvisionAttemptDecision,
+} from './app-provisioning.telemetry';
 
 /**
  * APW-04 — the provisioning feedback loop: what the platform learns when it builds, boots
@@ -95,7 +100,34 @@ export class AppProvisioningFeedbackService {
         @Optional() private readonly tasks?: TasksService,
         @Optional() private readonly chat?: TaskChatService,
         @Optional() private readonly provisioning?: AppProvisioningService,
+        // APW-04 T28 - `app.provision.attempt_finished` / `app.provision.finished`. Appended
+        // LAST and `@Optional()`: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppProvisioningTelemetry,
     ) {}
+
+    /**
+     * APW-04 T28 - one outcome on the provisioning Task, after the loop decided. The step
+     * and the verdict are codes; the evidence summary (branch, commit, deployment) never
+     * travels.
+     */
+    private observeAttempt(
+        work: Work,
+        task: Task,
+        evidence: ProvisioningEvidence,
+        decision: AppProvisionAttemptDecision,
+    ): void {
+        this.telemetry?.track(
+            APP_PROVISION_TELEMETRY_EVENTS.attemptFinished,
+            {
+                provisioningId: task.id,
+                n: attemptOf(task) + 1,
+                verdict: evidence.outcome,
+                failedStep: evidence.outcome === 'failed' ? evidence.stage : null,
+                decision,
+            },
+            work.userId,
+        );
+    }
 
     @OnEvent(AppBuildFailedEvent.EVENT_NAME)
     async onBuildFailed(event: AppBuildFailedEvent): Promise<void> {
@@ -142,6 +174,7 @@ export class AppProvisioningFeedbackService {
         if (evidence.outcome === 'succeeded') {
             if (!open) return 'ignored';
             await this.post(work, task, `✅ ${evidence.summary}`);
+            this.observeAttempt(work, task, evidence, 'posted');
             return 'posted';
         }
 
@@ -152,6 +185,17 @@ export class AppProvisioningFeedbackService {
                 task,
                 `❌ ${evidence.summary}\n\nThe provisioning loop stopped after ${MAX_PROVISION_ATTEMPTS} follow-up ` +
                     'iterations. A person needs to look at this repository before trying again.',
+            );
+            this.observeAttempt(work, task, evidence, 'exhausted');
+            this.telemetry?.track(
+                APP_PROVISION_TELEMETRY_EVENTS.finished,
+                {
+                    provisioningId: task.id,
+                    status: 'failed',
+                    failureReason: 'attempts_exhausted',
+                    attempts: attemptOf(task),
+                },
+                work.userId,
             );
             return 'exhausted';
         }
@@ -182,6 +226,7 @@ export class AppProvisioningFeedbackService {
                     );
                 }
             }
+            this.observeAttempt(work, task, evidence, 'iterated');
             return 'iterated';
         }
 
@@ -200,7 +245,11 @@ export class AppProvisioningFeedbackService {
                 `${evidence.summary} The App spec merged from Task ${task.slug} (/tasks/${task.id}) does not work yet; ` +
                 `this is follow-up iteration ${attempt} of ${MAX_PROVISION_ATTEMPTS}.`,
         });
-        return result.started ? 'reprovisioned' : 'ignored';
+        if (result.started) {
+            this.observeAttempt(work, task, evidence, 'reprovisioned');
+            return 'reprovisioned';
+        }
+        return 'ignored';
     }
 
     private async latestProvisionTask(work: Work): Promise<Task | null> {

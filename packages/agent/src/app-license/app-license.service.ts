@@ -90,6 +90,7 @@ import {
     LICENSE_REGISTRY_SNAPSHOT_SOURCE,
     type LicenseRegistryAttestation,
 } from './license-registry.snapshot';
+import { APP_SPEC_TELEMETRY_EVENTS, AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
 
 /** R-2's Activity family for licence rows (a local constant, like `app_source`). */
 export const APP_LICENSE_ACTIVITY_ACTION_TYPE = 'app_license';
@@ -272,6 +273,9 @@ export class AppLicenseService {
         @Optional()
         @Inject(APPS_TIER_POLICY)
         private readonly tier?: AppsTierPolicy,
+        // APW-03 T49 — `app.license.evaluated` / `app.license.attested`. Appended LAST and
+        // `@Optional()`: absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppSpecTelemetry,
     ) {}
 
     // ── the requests (T42/T43) ────────────────────────────────────────────────
@@ -292,6 +296,7 @@ export class AppLicenseService {
 
     /** One classification: read, classify, clear a stale attestation, write, record. */
     async evaluate(workId: string, reason?: string): Promise<AppLicenseEvaluation | null> {
+        const startedAtMs = Date.now();
         const states = this.states();
         if (!states) {
             this.logger.warn(
@@ -390,6 +395,21 @@ export class AppLicenseService {
                 details: { spdx, licenseClass },
             });
         }
+
+        // APW-03 T49 — the class, the two scan flags and counters; never the SPDX
+        // expression, the evidence paths or the repository.
+        this.telemetry?.track(
+            APP_SPEC_TELEMETRY_EVENTS.licenseEvaluated,
+            {
+                class: licenseClass,
+                mixed: detection?.mixed === true,
+                scanIncomplete: detection ? detection.scanIncomplete : true,
+                registrySource: 'snapshot',
+                fileReads: detection?.fileReads ?? 0,
+                durationMs: Math.max(0, Date.now() - startedAtMs),
+            },
+            userId ?? null,
+        );
 
         return {
             workId,
@@ -541,6 +561,11 @@ export class AppLicenseService {
             summary: `The owner attested the ${licenseClass} license${spdx ? ` (${spdx})` : ''}`,
             details: { spdx, licenseClass, textId: attestation.textId },
         });
+        this.telemetry?.track(
+            APP_SPEC_TELEMETRY_EVENTS.licenseAttested,
+            { class: licenseClass },
+            userId,
+        );
         return attestation;
     }
 

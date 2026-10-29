@@ -76,3 +76,5 @@ export * from './upstream-rate-limits';
 export * from './upstream-eligibility.rules';
 export * from './upstream-eligibility.service';
 export * from './upstream-pull-requests.module';
+// Gauzy Ever Works #37 - plan 9.1's telemetry.
+export * from './upstream-pr.telemetry';

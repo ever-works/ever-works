@@ -1356,6 +1356,7 @@ export class TaskWorkspaceService {
                 verdict = await this.appChangeGate.evaluate({
                     work,
                     taskOrigin: task.origin ?? null,
+                    taskId: task.id,
                     owner: target.owner,
                     repo: target.repo,
                     gitOptions,
@@ -3277,6 +3278,7 @@ export class TaskWorkspaceService {
             verdict = await this.appChangeGate.evaluate({
                 work,
                 taskOrigin: task.origin ?? null,
+                taskId: task.id,
                 owner,
                 repo,
                 gitOptions,
@@ -3929,6 +3931,11 @@ export class TaskWorkspaceService {
             const verdict = await this.appChangeGate.evaluate({
                 work,
                 taskOrigin: task.origin ?? null,
+                taskId: task.id,
+                // Telemetry only: this re-judgement runs after every pull-request status
+                // read (the merge sweep included), so an unchanged refusal is not reported
+                // again here — the branch judgements that run first already reported it.
+                reportRefusal: false,
                 owner,
                 repo,
                 gitOptions,
