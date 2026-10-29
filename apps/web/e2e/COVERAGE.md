@@ -740,6 +740,22 @@ skipped by name; on that job `APW_E2E_FLAGS_ON_LANE=1` turns a switch that reads
 into a failure. `e2e.yml` has no `pull_request` trigger, so the job runs wherever the
 workflow runs (stage pushes and dispatches).
 
+## APW-08 P1 — evolve loop (T29, added 2026-10-29)
+
+Three browser specs for plan §9.4's P1 rows. They run in the default config's `chromium` project
+(storageState user) and seed through two non-production routes that open on one gate,
+`NODE_ENV !== 'production'` + `E2E_APP_LAUNCHER_SEED=true` (already set on `e2e.yml`'s matrix):
+APW-11's `POST /api/e2e/app-launcher/seed` for the App Work, and APW-08 T29's
+`POST /api/e2e/app-works/task-seed` (`apps/api/src/tasks/e2e-task-seed.controller.ts`) for the
+worker-only delivery and change-guard columns of a Task (a `guard` body is judged by the real
+`AppChangeGuard`). Helpers: `helpers/app-works-evolve.ts`.
+
+| Spec (under `apps/web/e2e/`)       | Status | Covers                          | Runs for real                                                                                                                                                                                                                                                           | Waits for                                                                         |
+| ---------------------------------- | ------ | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `app-works-evolve-chat.spec.ts`    | [x]    | ACC-08-24, FR-44                | the model is mocked at `/api/chat` (the UI-message stream); the confirmation card, Start → the real `POST /api/works/:id/evolve` → one `app-change` Task, the chain card following the Task to Live on its 10 s refresh, Cancel files nothing, and **Request a change** | —                                                                                 |
+| `app-works-delivery-chips.spec.ts` | [x]    | ACC-08-17, ACC-08-21, ACC-08-22 | every chip state's text on the board card (`task-kanban-card` + `data-task-id`), the three APW-06 outcomes, the Delivery filter (UI and `?deliveryState=`), **Close anyway** (Keep open, confirm, `422 notClosable` after), `built` waiting                             | —                                                                                 |
+| `app-works-guard-refusals.spec.ts` | [~]    | ACC-08-11, ACC-08-12, ACC-08-14 | protected path, `.github/workflows/**`, rename out of a protected path, ≥ 300 files, > 3× size guidance (lockfiles not counted) on the Task page's refusal banner; `agentRequired` / `agentNotEligible` request refusals                                                | `test.fixme` — the not-admitted copy (ACC-08-08, ACC-08-10) needs T12 / T13 / T14 |
+
 ## Pass 15+ — long-tail / hardening
 
 Then iteratively tighten any `[x]` that still has thin assertions

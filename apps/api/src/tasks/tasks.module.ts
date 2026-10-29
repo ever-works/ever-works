@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, type Type } from '@nestjs/common';
 import {
     TasksDomainModule,
     AGENT_TASK_EXECUTE_DISPATCHER,
@@ -74,6 +74,27 @@ import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-recon
 import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
+import { isE2eAppLauncherSeedEnabled } from '../app-launcher/e2e-seed.controller';
+
+/**
+ * APW-08 T29 — the controllers this module declares. The two product controllers are always
+ * mounted; `POST /api/e2e/app-works/task-seed` (the evolve-loop e2e fixture route) is appended
+ * only when the APW-11 seed gate is open at boot — the same registration rule as
+ * `app-launcher.module.ts` (production first: `NODE_ENV=production` never mounts it), and its
+ * `E2eSeedEnabledGuard` re-reads the gate on every request. It is loaded lazily so a process with
+ * the gate closed (every production boot, and the module specs) never loads the fixture code.
+ */
+function tasksControllers(): Type<unknown>[] {
+    const controllers: Type<unknown>[] = [TasksController, TaskChatController];
+    if (isE2eAppLauncherSeedEnabled()) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { E2eTaskSeedController } = require('./e2e-task-seed.controller') as {
+            E2eTaskSeedController: Type<unknown>;
+        };
+        controllers.push(E2eTaskSeedController);
+    }
+    return controllers;
+}
 
 /**
  * Tasks feature — Phases 12 + 13 + 15. API-side module.
@@ -113,7 +134,7 @@ import { TaskChatController } from './task-chat.controller';
         FleetApiModule,
         AgentActivityLogModule,
     ],
-    controllers: [TasksController, TaskChatController],
+    controllers: tasksControllers(),
     providers: [
         // AUDIT A46/A24 — routing binding, not a replacement: the
         // Trigger.dev adapter is still the dispatcher for every install
