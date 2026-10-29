@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, IsNull, Repository, type SelectQueryBuilder } from 'typeorm';
+import {
+    Brackets,
+    type EntityManager,
+    In,
+    IsNull,
+    Repository,
+    type SelectQueryBuilder,
+} from 'typeorm';
 import {
     INBOX_DECISION_KINDS,
     INBOX_DECISION_MAX_LIMIT,
@@ -157,9 +164,13 @@ export interface InboxDecisionCountsRow {
  * The one definition of "work is stopped behind this decision": the linked
  * run is parked waiting for the human, or the linked Task is `blocked`.
  * Used by the ranking AND the header count so the two can never disagree.
+ *
+ * An integration item (integration inbox push) never blocks: its answer
+ * routes nowhere, so a Task it merely names (`related.taskId`) stays blocked
+ * whatever the member answers (`toInboxDecisionDto` applies the same rule).
  */
 const DECISION_BLOCKING_SQL =
-    '(run.awaitingInput = :decisionParked OR task.status = :decisionBlocked)';
+    "(run.awaitingInput = :decisionParked OR (task.status = :decisionBlocked AND item.origin != 'integration'))";
 
 /** The ranking's first key as a value: 1 = blocking. Repeated verbatim in the keyset predicate. */
 const DECISION_BLOCKING_RANK_SQL = `CASE WHEN ${DECISION_BLOCKING_SQL} THEN 1 ELSE 0 END`;
@@ -683,8 +694,10 @@ export class InboxItemRepository {
         id: string,
         userId: string,
         answer: { text?: string | null; optionId?: string | null },
+        /** Run inside this transaction (an integration item's answer records its event with it). */
+        manager?: EntityManager,
     ): Promise<boolean> {
-        const result = await this.repository
+        const result = await (manager ? manager.getRepository(InboxItem) : this.repository)
             .createQueryBuilder()
             .update(InboxItem)
             .set({

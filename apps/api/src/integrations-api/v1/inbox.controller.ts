@@ -15,28 +15,57 @@ import {
     UseFilters,
     UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsString, Length, MaxLength } from 'class-validator';
+import { ApiOperation, ApiProperty, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+    ArrayMaxSize,
+    IsArray,
+    IsBoolean,
+    IsIn,
+    IsISO8601,
+    IsOptional,
+    IsString,
+    IsUUID,
+    Length,
+    MaxLength,
+    ValidateBy,
+    ValidateNested,
+    type ValidationOptions,
+} from 'class-validator';
 import { InboxService } from '@ever-works/agent/inbox';
 import {
     assertIfMatch,
     IntegrationIdempotencyService,
     IntegrationInboxService,
+    type ExternalInboxWriter,
     type IntegrationInboxItem,
     type KeysetPage,
     parseIfMatch,
 } from '@ever-works/agent/integrations-api';
 import {
+    INBOX_EMAIL_FROM_MAX_CHARS,
+    INBOX_EMAIL_RECEIVED_AT_MAX_CHARS,
+    INBOX_EMAIL_SUBJECT_MAX_CHARS,
+    INBOX_EMAIL_TO_MAX_CHARS,
+    INBOX_EXTERNAL_BODY_MAX_CHARS,
+    INBOX_EXTERNAL_ID_MAX_CHARS,
+    INBOX_EXTERNAL_ITEM_KINDS,
+    INBOX_EXTERNAL_MAX_CHOICES,
     INBOX_ITEM_KINDS,
     INBOX_ITEM_STATUSES,
     INBOX_MAX_OPTION_ID_CHARS,
+    INBOX_MAX_OPTION_LABEL_CHARS,
     INBOX_MAX_REPLY_CHARS,
+    INBOX_MAX_TITLE_CHARS,
+    INBOX_SOURCE_LABEL_MAX_CHARS,
+    INBOX_SOURCE_URL_MAX_CHARS,
     INTEGRATION_INDIVIDUAL_DECISION_SCOPE,
     INTEGRATION_MERGE_DECISION_SCOPE,
+    isSafeInboxSourceUrl,
     type IntegrationInboxItemDto,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../../auth/decorators/user.decorator';
-import type { AuthenticatedUser } from '../../auth/types/auth.types';
+import type { AuthenticatedUser, IntegrationPrincipal } from '../../auth/types/auth.types';
 import { RequireScopes } from '../../auth/integration/integration.decorators';
 import { IntegrationHttpException } from '../../auth/integration/integration-http.exception';
 import { ScopeContextService } from '../../scope/scope-context.service';
@@ -48,6 +77,7 @@ import {
     type IdempotentResponse,
 } from './integration-idempotency';
 import {
+    IsOptionalNonNull,
     listParam,
     parseLimit,
     parseUpdatedSince,
@@ -58,6 +88,229 @@ import {
 } from './integration-request';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `sourceUrl`: an absolute `https:` URL without credentials (contracts `isSafeInboxSourceUrl`). */
+function IsSafeInboxSourceUrl(options?: ValidationOptions): PropertyDecorator {
+    return ValidateBy(
+        {
+            name: 'isSafeInboxSourceUrl',
+            validator: {
+                validate: (value: unknown) => isSafeInboxSourceUrl(value),
+                defaultMessage: () =>
+                    `sourceUrl must be an absolute https URL without credentials, at most ${INBOX_SOURCE_URL_MAX_CHARS} characters`,
+            },
+        },
+        options,
+    );
+}
+
+/** `InboxItemRelated` (contract v1 requests.schema.json): Ever Works ids of the pinned organization. */
+export class IntegrationInboxRelatedDto {
+    @ApiProperty({ required: false, nullable: true, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string | null;
+
+    @ApiProperty({ required: false, nullable: true, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    workId?: string | null;
+
+    @ApiProperty({ required: false, nullable: true, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    goalId?: string | null;
+}
+
+/** `InboxItemEmail` (contract v1 requests.schema.json): only for `kind: 'email'`. */
+export class IntegrationInboxEmailDto {
+    @ApiProperty({ minLength: 1, maxLength: INBOX_EMAIL_FROM_MAX_CHARS })
+    @IsString()
+    @Length(1, INBOX_EMAIL_FROM_MAX_CHARS)
+    from!: string;
+
+    @ApiProperty({ required: false, nullable: true, maxLength: INBOX_EMAIL_TO_MAX_CHARS })
+    @IsOptional()
+    @IsString()
+    @MaxLength(INBOX_EMAIL_TO_MAX_CHARS)
+    to?: string | null;
+
+    @ApiProperty({ minLength: 1, maxLength: INBOX_EMAIL_SUBJECT_MAX_CHARS })
+    @IsString()
+    @Length(1, INBOX_EMAIL_SUBJECT_MAX_CHARS)
+    subject!: string;
+
+    @ApiProperty({ format: 'date-time', maxLength: INBOX_EMAIL_RECEIVED_AT_MAX_CHARS })
+    @IsString()
+    @MaxLength(INBOX_EMAIL_RECEIVED_AT_MAX_CHARS)
+    @IsISO8601()
+    receivedAt!: string;
+}
+
+/** `InboxItemChoice` (contract v1 requests.schema.json): one answer button. */
+export class IntegrationInboxChoiceDto {
+    @ApiProperty({ minLength: 1, maxLength: INBOX_MAX_OPTION_ID_CHARS })
+    @IsString()
+    @Length(1, INBOX_MAX_OPTION_ID_CHARS)
+    id!: string;
+
+    @ApiProperty({ minLength: 1, maxLength: INBOX_MAX_OPTION_LABEL_CHARS })
+    @IsString()
+    @Length(1, INBOX_MAX_OPTION_LABEL_CHARS)
+    label!: string;
+}
+
+/** `CreateInboxItem` (contract v1 requests.schema.json): an integration files its own item. */
+export class IntegrationCreateInboxItemDto {
+    @ApiProperty({
+        minLength: 1,
+        maxLength: INBOX_EXTERNAL_ID_MAX_CHARS,
+        description:
+            "The integration's own id of the item. Unique per tenant and integration key, forever: a replay answers 200 with the existing item, unchanged.",
+    })
+    @IsString()
+    @Length(1, INBOX_EXTERNAL_ID_MAX_CHARS)
+    externalId!: string;
+
+    @ApiProperty({
+        format: 'uuid',
+        description: 'An active member of the pinned organization (422 domain_rule otherwise).',
+    })
+    @IsUUID()
+    recipientUserId!: string;
+
+    @ApiProperty({ enum: [...INBOX_EXTERNAL_ITEM_KINDS] })
+    @IsIn(INBOX_EXTERNAL_ITEM_KINDS as readonly string[])
+    kind!: string;
+
+    @ApiProperty({ minLength: 1, maxLength: INBOX_MAX_TITLE_CHARS })
+    @IsString()
+    @Length(1, INBOX_MAX_TITLE_CHARS)
+    title!: string;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        maxLength: INBOX_EXTERNAL_BODY_MAX_CHARS,
+        description: 'Markdown, stored and shown as plain text (never rendered as HTML).',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(INBOX_EXTERNAL_BODY_MAX_CHARS)
+    body?: string | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        format: 'uri',
+        maxLength: INBOX_SOURCE_URL_MAX_CHARS,
+        description: 'The item in the integration’s app: https only.',
+    })
+    @IsOptional()
+    @IsSafeInboxSourceUrl()
+    sourceUrl?: string | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        maxLength: INBOX_SOURCE_LABEL_MAX_CHARS,
+        description: 'The badge text; defaults to the integration’s name (e.g. "Ever Gauzy").',
+    })
+    @IsOptional()
+    @IsString()
+    @Length(1, INBOX_SOURCE_LABEL_MAX_CHARS)
+    sourceLabel?: string | null;
+
+    @ApiProperty({ required: false, nullable: true, type: IntegrationInboxRelatedDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => IntegrationInboxRelatedDto)
+    related?: IntegrationInboxRelatedDto | null;
+
+    @ApiProperty({ required: false, nullable: true, type: IntegrationInboxEmailDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => IntegrationInboxEmailDto)
+    email?: IntegrationInboxEmailDto | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: [IntegrationInboxChoiceDto],
+        maxItems: INBOX_EXTERNAL_MAX_CHOICES,
+        description: 'Only for kind question or approval.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(INBOX_EXTERNAL_MAX_CHOICES)
+    @ValidateNested({ each: true })
+    @Type(() => IntegrationInboxChoiceDto)
+    choices?: IntegrationInboxChoiceDto[] | null;
+
+    @ApiProperty({ required: false, nullable: true, format: 'date-time' })
+    @IsOptional()
+    @IsISO8601()
+    occurredAt?: string | null;
+}
+
+/** `InboxItemResolution` (contract v1 requests.schema.json): only with `state: 'resolved'`. */
+export class IntegrationInboxResolutionDto {
+    @ApiProperty({ required: false, nullable: true, maxLength: INBOX_MAX_OPTION_ID_CHARS })
+    @IsOptional()
+    @IsString()
+    @Length(1, INBOX_MAX_OPTION_ID_CHARS)
+    choiceId?: string | null;
+
+    @ApiProperty({ required: false, nullable: true, maxLength: INBOX_MAX_REPLY_CHARS })
+    @IsOptional()
+    @IsString()
+    @MaxLength(INBOX_MAX_REPLY_CHARS)
+    text?: string | null;
+}
+
+/** `UpdateInboxItem` (contract v1 requests.schema.json): the integration changes its own item. */
+export class IntegrationUpdateInboxItemDto {
+    @ApiProperty({ required: false, minLength: 1, maxLength: INBOX_MAX_TITLE_CHARS })
+    @IsOptionalNonNull()
+    @IsString()
+    @Length(1, INBOX_MAX_TITLE_CHARS)
+    title?: string;
+
+    @ApiProperty({ required: false, maxLength: INBOX_EXTERNAL_BODY_MAX_CHARS })
+    @IsOptionalNonNull()
+    @IsString()
+    @MaxLength(INBOX_EXTERNAL_BODY_MAX_CHARS)
+    body?: string;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: [IntegrationInboxChoiceDto],
+        maxItems: INBOX_EXTERNAL_MAX_CHOICES,
+        description: 'Replaces the choices (null clears them). Only for kind question or approval.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(INBOX_EXTERNAL_MAX_CHOICES)
+    @ValidateNested({ each: true })
+    @Type(() => IntegrationInboxChoiceDto)
+    choices?: IntegrationInboxChoiceDto[] | null;
+
+    @ApiProperty({
+        required: false,
+        enum: ['open', 'resolved', 'archived'],
+        description: '`resolved` is stored as status `answered` (with `resolution` as the answer).',
+    })
+    @IsOptionalNonNull()
+    @IsIn(['open', 'resolved', 'archived'])
+    state?: 'open' | 'resolved' | 'archived';
+
+    @ApiProperty({ required: false, nullable: true, type: IntegrationInboxResolutionDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => IntegrationInboxResolutionDto)
+    resolution?: IntegrationInboxResolutionDto | null;
+}
 
 /** `InboxReply` (contract v1 requests.schema.json): text, an option, or both. */
 export class IntegrationInboxReplyDto {
@@ -134,6 +387,16 @@ type Response = IdempotentResponse & { setHeader(name: string, value: string): u
  *
  * State changes go through `InboxService.setUnread` / `setArchived` (archiving
  * an OPEN fleet question releases its parked run, as in the app).
+ *
+ * **Integration inbox push** (`inbox:write`): `POST /inbox/items` files the
+ * integration's OWN Inbox item (Ever Gauzy pushes its notices, questions,
+ * approvals, mentions, assignments and emails) for one member of the pinned
+ * organization, `origin: 'integration'`; `PATCH /inbox/items/:id` changes it,
+ * for the key that created it only and at the `If-Match` version only. The
+ * member answers it in Ever Works like any other item; that answer routes
+ * nowhere and is recorded as `inbox.item.updated` for the integration to apply.
+ * Both writes are per-key rate limited like every v1 write
+ * (`INTEGRATION_THROTTLE_WRITES_PER_MIN`, `UserAwareThrottlerGuard`).
  */
 @ApiTags('Integrations API v1')
 @Controller('api/integrations/v1/inbox/items')
@@ -169,6 +432,90 @@ export class IntegrationInboxController {
                 limit: parseLimit(query.limit),
             })
             .catch(rethrowCursor);
+    }
+
+    @Post()
+    @RequireScopes('inbox:write')
+    @ApiOperation({
+        summary:
+            "File the integration's OWN Inbox item for a member of the pinned organization (origin integration). externalId de-duplicates forever: a replay answers 200 with the existing item, unchanged (Idempotency-Key optional)",
+    })
+    @ApiResponse({ status: 201, description: 'The new item (ETag = its version).' })
+    @ApiResponse({ status: 200, description: 'The item this externalId already names, unchanged.' })
+    @ApiResponse({
+        status: 422,
+        description: 'domain_rule: the recipient or a related id is not of the pinned organization',
+    })
+    async create(
+        @CurrentUser() user: AuthenticatedUser,
+        @Body() dto: IntegrationCreateInboxItemDto,
+        @Req() req: IdempotentRequest,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<unknown> {
+        const principal = principalOf(user);
+        assertRelatedReadScopes(principal, dto.related);
+        const writer = this.writer(principal);
+        const work = async (): Promise<{ status: number; body: IntegrationInboxItemDto }> => {
+            const { item, created } = await this.inbox.createExternal(writer, {
+                externalId: dto.externalId,
+                recipientUserId: dto.recipientUserId,
+                kind: dto.kind,
+                title: dto.title,
+                body: dto.body ?? null,
+                sourceUrl: dto.sourceUrl ?? null,
+                sourceLabel: dto.sourceLabel ?? null,
+                related: dto.related ?? null,
+                email: dto.email ?? null,
+                choices: dto.choices ?? null,
+                occurredAt: dto.occurredAt ?? null,
+            });
+            res.setHeader('ETag', item.etag);
+            return { status: created ? HttpStatus.CREATED : HttpStatus.OK, body: item.dto };
+        };
+        // `externalId` is the permanent de-duplication; an Idempotency-Key, when
+        // sent, also replays the first response for 24 h like every v1 create.
+        if (idempotencyKeyOf(req)) {
+            return runIdempotent(this.idempotency, principal, req, res, work);
+        }
+        const { status, body } = await work();
+        res.status(status);
+        return body;
+    }
+
+    @Patch(':id')
+    @RequireScopes('inbox:write')
+    @ApiOperation({
+        summary:
+            "Change the integration's own item (the key that created it only; If-Match required): title, body, choices, state open / resolved / archived, resolution",
+    })
+    @ApiResponse({ status: 404, description: 'not_found: not an item this key created' })
+    @ApiResponse({
+        status: 412,
+        description: 'version_mismatch: If-Match is not the current version',
+    })
+    async update(
+        @CurrentUser() user: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() dto: IntegrationUpdateInboxItemDto,
+        @Headers('if-match') ifMatch: string | undefined,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<IntegrationInboxItemDto> {
+        const principal = principalOf(user);
+        const expected = expectedVersion(ifMatch);
+        if (expected === null) {
+            throw validationFailed(
+                'If-Match',
+                'header is required: send the "<version>" ETag of the item',
+            );
+        }
+        const item = await this.inbox.updateExternal(this.writer(principal), id, expected, {
+            ...(dto.title !== undefined ? { title: dto.title } : {}),
+            ...(dto.body !== undefined ? { body: dto.body } : {}),
+            ...(dto.choices !== undefined ? { choices: dto.choices } : {}),
+            ...(dto.state !== undefined ? { state: dto.state } : {}),
+            ...(dto.resolution !== undefined ? { resolution: dto.resolution } : {}),
+        });
+        return this.send(res, item);
     }
 
     @Get(':id')
@@ -303,6 +650,16 @@ export class IntegrationInboxController {
         return pinnedOrganizationOf(this.scope.getScope().organizationId);
     }
 
+    /** The key, in the pinned organization of this request, as the writer of its own items. */
+    private writer(principal: IntegrationPrincipal): ExternalInboxWriter {
+        return {
+            organizationId: this.organizationId(),
+            tenantId: this.scope.getScope().tenantId ?? principal.tenantId,
+            integrationKeyId: principal.keyId,
+            defaultSourceLabel: defaultSourceLabelOf(principal),
+        };
+    }
+
     private send(res: Response, item: IntegrationInboxItem): IntegrationInboxItemDto {
         res.setHeader('ETag', item.etag);
         return item.dto;
@@ -347,6 +704,43 @@ function expectedVersion(header: string | undefined): number | null {
         throw validationFailed('If-Match', 'must be the "<version>" ETag of the record');
     }
     return parsed;
+}
+
+/** The read scope that names each `related` id (linking a record needs to be allowed to read it). */
+const RELATED_READ_SCOPES = [
+    ['taskId', 'tasks:read'],
+    ['workId', 'works:read'],
+    ['goalId', 'goals:read'],
+] as const;
+
+/**
+ * `related` ids are records the key must be allowed to READ: without the
+ * scope, a key with `inbox:write` alone could tell an existing Task / Work /
+ * Goal id from an unknown one (422 vs 201) and link to it. `403 scope_missing`
+ * names what is missing.
+ */
+export function assertRelatedReadScopes(
+    principal: IntegrationPrincipal,
+    related: IntegrationInboxRelatedDto | null | undefined,
+): void {
+    if (!related) return;
+    const missing = RELATED_READ_SCOPES.filter(
+        ([field, scope]) => related[field] && !principal.scopes.includes(scope),
+    ).map(([, scope]) => scope);
+    if (missing.length > 0) {
+        throw new IntegrationHttpException(
+            403,
+            'scope_missing',
+            `Linking an inbox item to a record needs the scope that reads it: ${missing.join(', ')}.`,
+            { missing, reason: 'related_read_scope' },
+        );
+    }
+}
+
+/** The badge an integration item gets when the request names none: the integration's name. */
+export function defaultSourceLabelOf(principal: IntegrationPrincipal): string {
+    if (principal.integrationKind === 'ever-gauzy') return 'Ever Gauzy';
+    return principal.keyName?.trim() || 'Integration';
 }
 
 function idempotencyKeyOf(req: IdempotentRequest): string | undefined {

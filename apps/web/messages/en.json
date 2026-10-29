@@ -1094,11 +1094,26 @@
                 "question": "Question",
                 "approval": "Approval",
                 "escalation": "Escalation",
-                "notice": "Notice"
+                "notice": "Notice",
+                "mention": "Mention",
+                "assignment": "Assignment",
+                "email": "Email",
+                "other": "Message"
             },
             "empty": {
                 "active": "Nothing is waiting on you.",
                 "archived": "No archived messages."
+            },
+            "integrationSource": {
+                "fallbackLabel": "Integration",
+                "open": "Open in {source}",
+                "occurredAt": "Happened",
+                "email": {
+                    "from": "From",
+                    "to": "To",
+                    "subject": "Subject",
+                    "received": "Received"
+                }
             },
             "rowMenu": {
                 "label": "Message actions",
@@ -1129,6 +1144,7 @@
                 "placeholder": "Write your reply…",
                 "send": "Send Reply",
                 "hint": "Your reply goes straight back to the agent.",
+                "hintIntegration": "Your reply is sent back to {source}.",
                 "needsAnswer": "Pick an option or write a reply first.",
                 "reasonRequired": "Why? (required)",
                 "reasonOptional": "Why? (optional)",
