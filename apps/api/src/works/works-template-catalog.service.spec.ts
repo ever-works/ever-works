@@ -137,6 +137,28 @@ describe('WorksTemplateCatalogService', () => {
         expect(git.getFileContent).not.toHaveBeenCalled();
     });
 
+    it('leaves no markup in a name or tag a split tag tried to smuggle through', async () => {
+        const manifest = JSON.stringify({
+            version: 1,
+            blueprints: [
+                {
+                    slug: 'directory',
+                    name: '<scr<b>ipt>alert(1)</script>Directory',
+                    title: 'Directory',
+                    kind: 'directory',
+                    chipType: 'directory',
+                    status: 'production',
+                    tags: ['<<img src=x onerror=1>>seo'],
+                    template: { repo: 'ever-works/directory-web-template', ref: 'develop' },
+                },
+            ],
+        });
+        const { svc } = make(jest.fn(async () => rawOk(manifest)));
+        const [row] = await svc.list();
+        expect(row.name).toBe('scriptalert(1)Directory');
+        expect(JSON.stringify(row)).not.toMatch(/[<>]/);
+    });
+
     it('filters by chipType in-memory', async () => {
         const { svc } = make(jest.fn(async () => rawOk(MANIFEST)));
         const rows = await svc.list('directory');
