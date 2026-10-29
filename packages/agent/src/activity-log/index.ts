@@ -32,4 +32,5 @@ export {
 } from './feed-narration';
 export { resolveFeedActor, withDerivedActor, referencedAgentId } from './feed-actor';
 export { resolveFeedTarget } from './feed-target';
+export { workDeletedActivity } from './work-deleted-activity';
 export type { ActivityActorKind } from '../entities/activity-log.types';
