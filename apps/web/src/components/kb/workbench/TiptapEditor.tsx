@@ -260,7 +260,7 @@ function isBodyDto(document: KbDocumentDto | KbDocumentBodyDto): document is KbD
 }
 
 function readMarkdown(editor: Editor): string | undefined {
-    const storage = editor.storage as Record<string, { getMarkdown?: () => string }>;
+    const storage = editor.storage as unknown as Record<string, { getMarkdown?: () => string }>;
     return storage.markdown?.getMarkdown?.();
 }
 
