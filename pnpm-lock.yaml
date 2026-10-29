@@ -26,7 +26,7 @@ overrides:
   socket.io-parser@<3.3.6: '>=3.3.6 <3.4.0'
   socket.io-parser@>=3.4.0 <3.4.5: '>=3.4.5 <4.0.0'
   socket.io-parser@>=4.0.0 <4.2.7: '>=4.2.7 <5.0.0'
-  systeminformation@<5.31.7: '>=5.31.7'
+  systeminformation@<5.33.16: '>=5.33.16 <6.0.0'
   websocket-driver@<0.7.5: '>=0.7.5'
   defu@<6.1.5: '>=6.1.5'
   rollup@>=4.0.0 <4.59.0: '>=4.59.0'
@@ -96,7 +96,7 @@ overrides:
   '@xmldom/xmldom@>=0.7.0 <0.8.15': '>=0.8.15 <0.9.0'
   '@grpc/grpc-js@>=1.14.0 <1.14.5': '>=1.14.5 <2.0.0'
   tinypool@<2.1.2: '>=2.1.2 <3.0.0'
-  seroval@<1.6.3: '>=1.6.3 <2.0.0'
+  seroval@<1.6.11: '>=1.6.11 <1.7.0'
   http-cache-semantics@<4.3.0: '>=4.3.0 <5.0.0'
   body-parser@<1.20.9: '>=1.20.9 <2.0.0'
   body-parser@>=2.0.0 <2.4.0: '>=2.4.0 <3.0.0'
@@ -21169,10 +21169,10 @@ packages:
     resolution: {integrity: sha512-S0xQPhUTefAhNvNWFg0c1J8qJArHt5KdtJ/cFAofo06KD1MVSeFWyl4iiu+ApDIuw0WhjpOfCdgConOfAnLgkw==}
     engines: {node: '>=10'}
     peerDependencies:
-      seroval: '>=1.6.3 <2.0.0'
+      seroval: '>=1.6.11 <1.7.0'
 
-  seroval@1.6.8:
-    resolution: {integrity: sha512-HlSgSAkTk4EqHcje1ptJjfZi1YDv5KbhVJ/d3P7T/nAXua2VmDu+AKDX5VTdFfZf48nDkWB2TKYt0DrCSa+3wg==}
+  seroval@1.6.12:
+    resolution: {integrity: sha512-CqbIVfk/7GL3ITwZI55lcPbpQbjHZ2DD5cUj4iH7E9YsCfHNJV1mx7yNp86Z84w5IpmkZZS/2s5vPOWmVWSdQg==}
     engines: {node: '>=10'}
 
   serve-handler@6.1.7:
@@ -21783,8 +21783,8 @@ packages:
     resolution: {integrity: sha512-Bh7QjT8/SuKUIfObSXNHNSK6WHo6J1tHCqJsuaFDP7gP0fkzSfTxI8y85JrppZ0h8l0maIgc2tfuZQ6/t3GtnQ==}
     engines: {node: ^14.18.0 || >=16.0.0}
 
-  systeminformation@5.32.0:
-    resolution: {integrity: sha512-7gfXs43T91miPxxTTtrYitotR/8MPsI2gy3XgUMs6kmOE/JCVqZp6nJpx4XkSutoSqDh6+Y2ovvb2A3RQCR+8w==}
+  systeminformation@5.33.18:
+    resolution: {integrity: sha512-SF8DBQx3ypa8zDqZlezpHQ6M2g7TrqSEWpAtC4OsHCdLmi7J2WdxaSbA8/DJyEn2l/CHPrW0VFenoqoDccrw6g==}
     engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
@@ -29273,7 +29273,7 @@ snapshots:
   '@opentelemetry/host-metrics@0.38.3(@opentelemetry/api@1.9.1)':
     dependencies:
       '@opentelemetry/api': 1.9.1
-      systeminformation: 5.32.0
+      systeminformation: 5.33.18
 
   '@opentelemetry/instrumentation-amqplib@0.70.0(@opentelemetry/api@1.9.0)':
     dependencies:
@@ -29404,7 +29404,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/instrumentation': 0.223.0(@opentelemetry/api@1.9.0)
-      systeminformation: 5.32.0
+      systeminformation: 5.33.18
     transitivePeerDependencies:
       - supports-color
 
@@ -43965,11 +43965,11 @@ snapshots:
 
   serialize-javascript@7.1.4: {}
 
-  seroval-plugins@1.5.4(seroval@1.6.8):
+  seroval-plugins@1.5.4(seroval@1.6.12):
     dependencies:
-      seroval: 1.6.8
+      seroval: 1.6.12
 
-  seroval@1.6.8: {}
+  seroval@1.6.12: {}
 
   serve-handler@6.1.7:
     dependencies:
@@ -44280,8 +44280,8 @@ snapshots:
   solid-js@1.9.13:
     dependencies:
       csstype: 3.2.3
-      seroval: 1.6.8
-      seroval-plugins: 1.5.4(seroval@1.6.8)
+      seroval: 1.6.12
+      seroval-plugins: 1.5.4(seroval@1.6.12)
 
   solid-motionone@1.0.4(solid-js@1.9.13):
     dependencies:
@@ -44737,7 +44737,7 @@ snapshots:
     dependencies:
       '@pkgr/core': 0.2.9
 
-  systeminformation@5.32.0: {}
+  systeminformation@5.33.18: {}
 
   tabbable@6.4.0: {}
 
