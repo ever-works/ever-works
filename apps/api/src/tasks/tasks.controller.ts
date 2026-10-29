@@ -586,9 +586,7 @@ export class TasksController {
             deliveryDeploymentId?: string | null;
             mergeCommitSha?: string | null;
         },
-    >(
-        rows: T[],
-    ): Promise<Array<T & { delivery: TaskDeliveryEmbed | null }>> {
+    >(rows: T[]): Promise<Array<T & { delivery: TaskDeliveryEmbed | null }>> {
         let embeds = new Map<string, TaskDeliveryEmbed>();
         if (this.delivery) {
             try {

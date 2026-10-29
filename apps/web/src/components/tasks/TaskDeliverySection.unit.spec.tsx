@@ -44,7 +44,10 @@ import {
 const copy = messages.dashboard.tasksPage.delivery;
 const MERGE = '3f9c2ab0000000000000000000000000000000aa';
 
-function view(state: TaskDeliveryState, overrides: Partial<TaskDeliveryView> = {}): TaskDeliveryView {
+function view(
+    state: TaskDeliveryState,
+    overrides: Partial<TaskDeliveryView> = {},
+): TaskDeliveryView {
     return {
         taskId: 'task-1',
         state,
@@ -111,7 +114,9 @@ describe('TaskDeliverySection — the timeline (APW-08 T27)', () => {
                 view('live', {
                     liveUrl: 'https://bookings.example.app',
                     liveWithWarnings: true,
-                    followUps: [{ taskId: 'f-1', slug: 'T-121', status: 'cancelled', automatic: true }],
+                    followUps: [
+                        { taskId: 'f-1', slug: 'T-121', status: 'cancelled', automatic: true },
+                    ],
                 }),
             ),
         );
@@ -121,12 +126,18 @@ describe('TaskDeliverySection — the timeline (APW-08 T27)', () => {
         expect(screen.getByTestId('task-delivery-row-merged').textContent).toContain(
             'Pull request #42 merged into production',
         );
-        expect(screen.getByTestId('task-delivery-row-build').textContent).toContain('Build #57 of 3f9c2ab');
+        expect(screen.getByTestId('task-delivery-row-build').textContent).toContain(
+            'Build #57 of 3f9c2ab',
+        );
         expect(screen.getByTestId('task-delivery-build-logs').getAttribute('href')).toBe(
             'https://github.com/acme/bookings/actions/runs/57',
         );
-        expect(screen.getByTestId('task-delivery-builds-link').getAttribute('href')).toBe('/works/work-1/builds');
-        expect(screen.getByTestId('task-delivery-row-deployment').textContent).toContain('Deployment #31');
+        expect(screen.getByTestId('task-delivery-builds-link').getAttribute('href')).toBe(
+            '/works/work-1/builds',
+        );
+        expect(screen.getByTestId('task-delivery-row-deployment').textContent).toContain(
+            'Deployment #31',
+        );
         expect(screen.getByTestId('task-delivery-deployments-link').getAttribute('href')).toBe(
             '/works/work-1/deploy',
         );
@@ -137,7 +148,9 @@ describe('TaskDeliverySection — the timeline (APW-08 T27)', () => {
             'Live at https://bookings.example.app',
         );
         expect(screen.getByTestId('task-delivery-warnings').textContent).toBe(copy.warnings);
-        expect(screen.getByTestId('task-delivery-chip').textContent).toContain(copy.chipLiveWarnings);
+        expect(screen.getByTestId('task-delivery-chip').textContent).toContain(
+            copy.chipLiveWarnings,
+        );
         // The follow-up a later live deployment made unnecessary, with its Task status label.
         const followUpRow = screen.getByTestId('task-delivery-follow-up');
         expect(followUpRow.textContent).toContain('Follow-up: T-121 (Cancelled)');
@@ -152,18 +165,37 @@ describe('TaskDeliverySection — the timeline (APW-08 T27)', () => {
         getDelivery.mockResolvedValue(
             ready(
                 view('deploy_failed', {
-                    deployment: { id: 'd-1', number: null, status: 'ROLLED_BACK', outcome: 'rolled_back' },
-                    build: { id: 'b-1', number: null, status: 'succeeded', commitSha: MERGE, logsUrl: 'javascript:alert(1)' },
+                    deployment: {
+                        id: 'd-1',
+                        number: null,
+                        status: 'ROLLED_BACK',
+                        outcome: 'rolled_back',
+                    },
+                    build: {
+                        id: 'b-1',
+                        number: null,
+                        status: 'succeeded',
+                        commitSha: MERGE,
+                        logsUrl: 'javascript:alert(1)',
+                    },
                 }),
             ),
         );
         renderSection();
         await waitFor(() => expect(screen.getByTestId('task-delivery-chip')).toBeTruthy());
-        expect(screen.getByTestId('task-delivery-chip').textContent).toBe('Deploy failed ✗ (rolled back)');
-        expect(screen.getByTestId('task-delivery-row-build').textContent).toContain('Build of 3f9c2ab');
+        expect(screen.getByTestId('task-delivery-chip').textContent).toBe(
+            'Deploy failed ✗ (rolled back)',
+        );
+        expect(screen.getByTestId('task-delivery-row-build').textContent).toContain(
+            'Build of 3f9c2ab',
+        );
         expect(screen.queryByTestId('task-delivery-build-logs')).toBeNull();
-        expect(screen.getByTestId('task-delivery-row-deployment').textContent).toContain(copy.deploymentUnnumbered);
-        expect(screen.getByTestId('task-delivery-row-deployment').getAttribute('data-step')).toBe('failed');
+        expect(screen.getByTestId('task-delivery-row-deployment').textContent).toContain(
+            copy.deploymentUnnumbered,
+        );
+        expect(screen.getByTestId('task-delivery-row-deployment').getAttribute('data-step')).toBe(
+            'failed',
+        );
     });
 
     it('says so when the first read fails', async () => {
@@ -226,11 +258,15 @@ describe('TaskDeliverySection — polling (APW-08 T27)', () => {
         const calls = getDelivery.mock.calls.length;
         // One read on open plus one every 10 s for 30 minutes — then nothing.
         expect(calls).toBe(1 + ticks);
-        expect(screen.getByTestId('task-delivery-polling-stopped').textContent).toBe(copy.pollingStopped);
+        expect(screen.getByTestId('task-delivery-polling-stopped').textContent).toBe(
+            copy.pollingStopped,
+        );
 
         for (let i = 0; i < 30; i++) await flush(DELIVERY_POLL_INTERVAL_MS);
         expect(getDelivery).toHaveBeenCalledTimes(calls);
-        expect(screen.getByTestId('task-delivery-polling-stopped').textContent).toBe(copy.pollingStopped);
+        expect(screen.getByTestId('task-delivery-polling-stopped').textContent).toBe(
+            copy.pollingStopped,
+        );
     });
 
     it('a failed poll keeps the last answer and still schedules the next read', async () => {
@@ -242,7 +278,9 @@ describe('TaskDeliverySection — polling (APW-08 T27)', () => {
         renderSection();
         await flush();
         await flush(DELIVERY_POLL_INTERVAL_MS);
-        expect(screen.getByTestId('task-delivery-section').getAttribute('data-state')).toBe('deploying');
+        expect(screen.getByTestId('task-delivery-section').getAttribute('data-state')).toBe(
+            'deploying',
+        );
         await flush(DELIVERY_POLL_INTERVAL_MS);
         expect(getDelivery).toHaveBeenCalledTimes(3);
     });
@@ -261,13 +299,17 @@ describe('TaskDeliverySection — Close anyway (APW-08 T27)', () => {
     it('is labelled by the state: Close anyway for a failure, Close without deploying while waiting', async () => {
         getDelivery.mockResolvedValue(ready(view('build_failed')));
         renderSection();
-        await waitFor(() => expect(screen.getByTestId('task-delivery-close').textContent).toBe(copy.closeAnyway));
+        await waitFor(() =>
+            expect(screen.getByTestId('task-delivery-close').textContent).toBe(copy.closeAnyway),
+        );
         cleanup();
 
         getDelivery.mockResolvedValue(ready(view('built')));
         renderSection();
         await waitFor(() =>
-            expect(screen.getByTestId('task-delivery-close').textContent).toBe(copy.closeWithoutDeploying),
+            expect(screen.getByTestId('task-delivery-close').textContent).toBe(
+                copy.closeWithoutDeploying,
+            ),
         );
     });
 
@@ -297,7 +339,11 @@ describe('TaskDeliverySection — Close anyway (APW-08 T27)', () => {
             expect(screen.getByTestId('task-delivery-chip').textContent).toBe(copy.chipClosed),
         );
         expect(screen.queryByTestId('task-delivery-close')).toBeNull();
-        await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: copy.sectionTitle })));
+        await waitFor(() =>
+            expect(document.activeElement).toBe(
+                screen.getByRole('heading', { name: copy.sectionTitle }),
+            ),
+        );
     });
 
     it('a refusal shows its copy by code, keeps the button and returns focus to it', async () => {
@@ -308,7 +354,11 @@ describe('TaskDeliverySection — Close anyway (APW-08 T27)', () => {
 
         fireEvent.click(screen.getByTestId('task-delivery-confirm-close'));
 
-        await waitFor(() => expect(screen.getByTestId('task-delivery-error').textContent).toBe(copy.errors.notClosable));
+        await waitFor(() =>
+            expect(screen.getByTestId('task-delivery-error').textContent).toBe(
+                copy.errors.notClosable,
+            ),
+        );
         expect(screen.getByTestId('task-delivery-close')).toBe(trigger);
         await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
@@ -345,7 +395,9 @@ describe('TaskDeliverySection — Try once more (APW-08 T27)', () => {
 
         await waitFor(() => expect(followUp).toHaveBeenCalledWith('task-1', 'esc-1'));
         await waitFor(() =>
-            expect(screen.getByTestId('task-delivery-follow-up-opened').textContent).toBe(copy.followUpOpened),
+            expect(screen.getByTestId('task-delivery-follow-up-opened').textContent).toBe(
+                copy.followUpOpened,
+            ),
         );
         expect(getDelivery).toHaveBeenCalledTimes(2);
     });
@@ -358,7 +410,9 @@ describe('TaskDeliverySection — Try once more (APW-08 T27)', () => {
         fireEvent.click(await screen.findByTestId('task-delivery-retry'));
 
         await waitFor(() =>
-            expect(screen.getByTestId('task-delivery-error').textContent).toBe(copy.errors.followUpLimit),
+            expect(screen.getByTestId('task-delivery-error').textContent).toBe(
+                copy.errors.followUpLimit,
+            ),
         );
     });
 });

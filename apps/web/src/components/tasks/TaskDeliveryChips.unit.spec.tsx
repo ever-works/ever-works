@@ -5,7 +5,11 @@ import { NextIntlClientProvider } from 'next-intl';
 import { TASK_DELIVERY_STATES } from '@ever-works/contracts';
 import messages from '../../../messages/en.json';
 import type { Task } from '@/lib/api/tasks';
-import { TaskDeliveryChips, deliveryChipKey, type TaskDeliveryChipInput } from './TaskDeliveryChips';
+import {
+    TaskDeliveryChips,
+    deliveryChipKey,
+    type TaskDeliveryChipInput,
+} from './TaskDeliveryChips';
 import { TasksKanbanView } from './TasksKanbanView';
 
 /**
@@ -39,7 +43,8 @@ function renderChip(delivery: TaskDeliveryChipInput | null, linkLive?: boolean) 
     );
 }
 
-const chipText = () => screen.getByTestId('task-delivery-chip').textContent?.replace('↗', '').trim();
+const chipText = () =>
+    screen.getByTestId('task-delivery-chip').textContent?.replace('↗', '').trim();
 
 afterEach(() => cleanup());
 
@@ -55,7 +60,9 @@ describe('TaskDeliveryChips (APW-08 T27)', () => {
     ] as const)('%s reads its spec §6.1 copy', (state, text) => {
         renderChip({ state });
         expect(chipText()).toBe(text);
-        expect(screen.getByTestId('task-delivery-chip').getAttribute('data-delivery-state')).toBe(state);
+        expect(screen.getByTestId('task-delivery-chip').getAttribute('data-delivery-state')).toBe(
+            state,
+        );
     });
 
     it('pins the English copy of the states, so a renamed key cannot pass silently', () => {
@@ -170,7 +177,9 @@ describe('TaskDeliveryChips (APW-08 T27)', () => {
         const cards = screen.getAllByTestId('task-kanban-card');
         const tracked = cards.find((card) => card.getAttribute('data-task-id') === 'task-a')!;
         const untracked = cards.find((card) => card.getAttribute('data-task-id') === 'task-b')!;
-        expect(within(tracked).getByTestId('task-delivery-chip').textContent).toBe(copy.chipDeploying);
+        expect(within(tracked).getByTestId('task-delivery-chip').textContent).toBe(
+            copy.chipDeploying,
+        );
         expect(within(untracked).queryByTestId('task-delivery-chip')).toBeNull();
     });
 });

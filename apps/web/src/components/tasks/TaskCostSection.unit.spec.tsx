@@ -75,10 +75,15 @@ describe('TaskCostSection (APW-08 T27)', () => {
         expect(getCost).toHaveBeenCalledWith('task-1');
         expect(screen.getByTestId('task-cost-runs').textContent).toBe('Runs 2 · $1.84');
         expect(screen.getByTestId('task-cost-total').textContent).toBe('Total $1.84');
-        const amounts = screen.getAllByTestId('task-cost-run-amount').map((cell) => cell.textContent);
+        const amounts = screen
+            .getAllByTestId('task-cost-run-amount')
+            .map((cell) => cell.textContent);
         expect(amounts).toEqual(['$1.20', '$0.64']);
         const receipts = screen.getAllByText(copy.receipt).map((link) => link.getAttribute('href'));
-        expect(receipts).toEqual(['/agents/sessions/run-aaaaaaaa-1', '/agents/sessions/run-bbbbbbbb-2']);
+        expect(receipts).toEqual([
+            '/agents/sessions/run-aaaaaaaa-1',
+            '/agents/sessions/run-bbbbbbbb-2',
+        ]);
         expect(screen.queryByTestId('task-cost-builds')).toBeNull();
     });
 
@@ -86,10 +91,7 @@ describe('TaskCostSection (APW-08 T27)', () => {
         getCost.mockResolvedValue({
             ok: true,
             cost: cost({
-                runs: [
-                    { ...cost().runs[0] },
-                    { ...cost().runs[1], costCents: null },
-                ],
+                runs: [{ ...cost().runs[0] }, { ...cost().runs[1], costCents: null }],
                 totalCents: null,
             }),
         });
@@ -100,7 +102,9 @@ describe('TaskCostSection (APW-08 T27)', () => {
         expect(screen.getByTestId('task-cost-total').textContent).toBe('Total unknown');
         // One unpriced run makes the runs' sum unknown: a partial sum would read as the whole.
         expect(screen.getByTestId('task-cost-runs').textContent).toBe('Runs 2 · unknown');
-        const amounts = screen.getAllByTestId('task-cost-run-amount').map((cell) => cell.textContent);
+        const amounts = screen
+            .getAllByTestId('task-cost-run-amount')
+            .map((cell) => cell.textContent);
         expect(amounts).toEqual(['$1.20', 'unknown']);
         expect(screen.getByTestId('task-cost-section').textContent).not.toContain('$0.00');
     });
@@ -134,13 +138,17 @@ describe('TaskCostSection (APW-08 T27)', () => {
         getCost.mockResolvedValueOnce({ ok: true, cost: cost({ runsTruncated: true }) });
         renderSection();
         await waitFor(() => expect(screen.getByTestId('task-cost-truncated')).toBeTruthy());
-        expect(screen.getByTestId('task-cost-truncated').textContent).toBe('Showing the newest 50 runs.');
+        expect(screen.getByTestId('task-cost-truncated').textContent).toBe(
+            'Showing the newest 50 runs.',
+        );
         cleanup();
 
         getCost.mockResolvedValueOnce({ ok: false, code: 'COST_READ_FAILED' });
         renderSection();
         await waitFor(() => expect(screen.getByTestId('task-cost-unavailable')).toBeTruthy());
-        expect(screen.getByTestId('task-cost-section').getAttribute('data-state')).toBe('unavailable');
+        expect(screen.getByTestId('task-cost-section').getAttribute('data-state')).toBe(
+            'unavailable',
+        );
     });
 
     it('sumRunCents is unknown as soon as one run is', () => {

@@ -115,7 +115,12 @@ describe('TasksController — list delivery filter and embed (APW-08 T24)', () =
     describe('?deliveryState=', () => {
         it('passes the tokens to the owner-scoped list, de-duplicated, with the other filters', async () => {
             const { controller, list } = make();
-            await callList(controller, 'build_failed, deploy_failed,waiting,build_failed', undefined, 'w-1');
+            await callList(
+                controller,
+                'build_failed, deploy_failed,waiting,build_failed',
+                undefined,
+                'w-1',
+            );
             expect(list).toHaveBeenCalledTimes(1);
             const [userId, filter, , passedScope] = list.mock.calls[0];
             expect(userId).toBe('user-1');
@@ -137,7 +142,9 @@ describe('TasksController — list delivery filter and embed (APW-08 T24)', () =
 
         it('an unknown token is a 400 and the list is never read', async () => {
             const { controller, list } = make();
-            await expect(callList(controller, 'live,shipped')).rejects.toBeInstanceOf(BadRequestException);
+            await expect(callList(controller, 'live,shipped')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
             await expect(callList(controller, 'LIVE')).rejects.toBeInstanceOf(BadRequestException);
             expect(list).not.toHaveBeenCalled();
         });
@@ -160,7 +167,10 @@ describe('TasksController — list delivery filter and embed (APW-08 T24)', () =
             // The embed is computed from the rows the owner-scoped list returned.
             expect(delivery.listEmbeds).toHaveBeenCalledWith(ROWS);
             const byId = Object.fromEntries(
-                (result.data as unknown as Array<{ id: string; delivery: unknown }>).map((row) => [row.id, row.delivery]),
+                (result.data as unknown as Array<{ id: string; delivery: unknown }>).map((row) => [
+                    row.id,
+                    row.delivery,
+                ]),
             );
             expect(byId.a).toEqual(EMBED_A);
             expect(byId.b).toBeNull();
@@ -176,12 +186,15 @@ describe('TasksController — list delivery filter and embed (APW-08 T24)', () =
         });
 
         it('a runtime without the chain, or a failed chain read, still answers each state', async () => {
-            for (const delivery of [undefined, { listEmbeds: jest.fn().mockRejectedValue(new Error('down')) }]) {
+            for (const delivery of [
+                undefined,
+                { listEmbeds: jest.fn().mockRejectedValue(new Error('down')) },
+            ]) {
                 const { controller } = make(delivery);
                 const result = await callList(controller, undefined, 'true');
-                const states = (result.data as unknown as Array<{ delivery: { state: string } | null }>).map(
-                    (row) => row.delivery?.state ?? null,
-                );
+                const states = (
+                    result.data as unknown as Array<{ delivery: { state: string } | null }>
+                ).map((row) => row.delivery?.state ?? null);
                 expect(states).toEqual(['live', null, 'deploy_failed']);
             }
         });

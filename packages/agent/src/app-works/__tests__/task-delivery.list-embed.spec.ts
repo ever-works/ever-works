@@ -48,14 +48,22 @@ function task(id: string, overrides: Partial<Task> = {}) {
 describe('TaskDeliveryService.listEmbeds (APW-08 T24)', () => {
     it('skips untracked Tasks and reads nothing for a page without a tracked one', async () => {
         const repo = deploymentsRepo([]);
-        const embeds = await make(repo).listEmbeds([task('a'), task('b', { deliveryState: 'bogus' })]);
+        const embeds = await make(repo).listEmbeds([
+            task('a'),
+            task('b', { deliveryState: 'bogus' }),
+        ]);
         expect(embeds.size).toBe(0);
         expect(repo.find).not.toHaveBeenCalled();
     });
 
     it('reads every deciding Deployment of the page in one IN query, only for live / deploy_failed', async () => {
         const repo = deploymentsRepo([
-            { id: 'd-live', state: 'READY', commitSha: MERGE, website: 'https://bookings.example.app' },
+            {
+                id: 'd-live',
+                state: 'READY',
+                commitSha: MERGE,
+                website: 'https://bookings.example.app',
+            },
             { id: 'd-failed', state: 'ROLLED_BACK', commitSha: MERGE, website: null },
         ]);
         const embeds = await make(repo).listEmbeds([
@@ -83,7 +91,11 @@ describe('TaskDeliveryService.listEmbeds (APW-08 T24)', () => {
             liveWithWarnings: false,
             carriedByLaterChange: false,
         });
-        expect(embeds.get('deploying')).toMatchObject({ state: 'deploying', liveUrl: null, outcome: null });
+        expect(embeds.get('deploying')).toMatchObject({
+            state: 'deploying',
+            liveUrl: null,
+            outcome: null,
+        });
         expect(embeds.get('merged')).toMatchObject({ state: 'merged', liveUrl: null });
     });
 

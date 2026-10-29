@@ -63,13 +63,18 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
             data-testid="task-cost-section"
             data-state={load.kind}
         >
-            <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">{t('sectionTitle')}</h2>
+            <h2 className="text-sm font-medium text-text dark:text-text-dark mb-3">
+                {t('sectionTitle')}
+            </h2>
 
             {load.kind === 'loading' && (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('loading')}</p>
             )}
             {load.kind === 'unavailable' && (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="task-cost-unavailable">
+                <p
+                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid="task-cost-unavailable"
+                >
                     {t('unavailable')}
                 </p>
             )}
@@ -88,7 +93,10 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
                                 {t('builds', {
                                     count: load.cost.builds.length,
                                     minutes: load.cost.builds.every((b) => b.runnerMinutes !== null)
-                                        ? load.cost.builds.reduce((n, b) => n + (b.runnerMinutes ?? 0), 0)
+                                        ? load.cost.builds.reduce(
+                                              (n, b) => n + (b.runnerMinutes ?? 0),
+                                              0,
+                                          )
                                         : t('unknown'),
                                     payer: load.cost.builds.every((b) => b.payer === 'github')
                                         ? t('paidByGithub')
@@ -97,14 +105,19 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
                             </span>
                         )}
                         <span className="font-medium" data-testid="task-cost-total">
-                            {t('total', { amount: money(load.cost.totalCents, load.cost.currency) })}
+                            {t('total', {
+                                amount: money(load.cost.totalCents, load.cost.currency),
+                            })}
                         </span>
                     </div>
 
                     {load.cost.runs.length === 0 ? (
                         <p className="text-text-muted dark:text-text-muted-dark">{t('noRuns')}</p>
                     ) : (
-                        <ul className="divide-y divide-border/40 dark:divide-border-dark/40" data-testid="task-cost-run-list">
+                        <ul
+                            className="divide-y divide-border/40 dark:divide-border-dark/40"
+                            data-testid="task-cost-run-list"
+                        >
                             {load.cost.runs.map((run) => {
                                 const href = receiptHref(run.receiptUrl);
                                 return (
@@ -116,11 +129,17 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
                                         <span className="font-mono text-text-secondary dark:text-text-secondary-dark">
                                             {t('runLabel', { id: run.runId.slice(0, 8) })}
                                         </span>
-                                        <span className="ml-auto tabular-nums" data-testid="task-cost-run-amount">
+                                        <span
+                                            className="ml-auto tabular-nums"
+                                            data-testid="task-cost-run-amount"
+                                        >
                                             {money(run.costCents, load.cost.currency)}
                                         </span>
                                         {href && (
-                                            <Link href={href} className="text-text-muted hover:text-primary hover:underline">
+                                            <Link
+                                                href={href}
+                                                className="text-text-muted hover:text-primary hover:underline"
+                                            >
                                                 {t('receipt')}
                                             </Link>
                                         )}
@@ -131,7 +150,10 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
                     )}
 
                     {load.cost.runsTruncated && (
-                        <p className="text-text-muted dark:text-text-muted-dark" data-testid="task-cost-truncated">
+                        <p
+                            className="text-text-muted dark:text-text-muted-dark"
+                            data-testid="task-cost-truncated"
+                        >
                             {t('runsTruncated', { count: load.cost.runsLimit })}
                         </p>
                     )}

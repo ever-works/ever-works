@@ -38,8 +38,24 @@ const STATE_TONES: Record<TaskDeliveryState, Tone> = {
     closed_without_deploy: 'neutral',
 };
 
+type OutcomeKey = 'failed' | 'rolledBack' | 'rollbackFailed' | 'liveWithWarnings';
+
+/** A `dashboard.tasksPage.delivery.*` chip leaf. */
+export type DeliveryChipKey =
+    | 'chipMerged'
+    | 'chipBuilding'
+    | 'chipBuildFailed'
+    | 'chipBuilt'
+    | 'chipDeploying'
+    | 'chipDeployFailed'
+    | 'chipDeployFailedPlain'
+    | 'chipLive'
+    | 'chipLiveWarnings'
+    | 'chipCarried'
+    | 'chipClosed';
+
 /** `dashboard.tasksPage.delivery.outcome.*` leaf of an APW-06 failure outcome. */
-const OUTCOME_KEYS: Record<TaskDeliveryDeployOutcome, string> = {
+const OUTCOME_KEYS: Record<TaskDeliveryDeployOutcome, OutcomeKey> = {
     failed: 'failed',
     rolled_back: 'rolledBack',
     rollback_failed: 'rollbackFailed',
@@ -47,7 +63,7 @@ const OUTCOME_KEYS: Record<TaskDeliveryDeployOutcome, string> = {
 };
 
 /** The `dashboard.tasksPage.delivery.*` leaf of the chip a delivery state reads. */
-export function deliveryChipKey(input: TaskDeliveryChipInput): string {
+export function deliveryChipKey(input: TaskDeliveryChipInput): DeliveryChipKey {
     switch (input.state) {
         case 'merged':
             return 'chipMerged';
@@ -103,9 +119,8 @@ export function TaskDeliveryChips({
             ? OUTCOME_KEYS[delivery.outcome as TaskDeliveryDeployOutcome]
             : null;
     const outcome = outcomeKey ? t(`outcome.${outcomeKey}`) : '';
-    const label = key === 'chipDeployFailed' ? t(key, { outcome }) : t(key);
-    const ariaLabel =
-        key === 'chipDeployFailed' ? t('ariaDeployFailed', { outcome }) : undefined;
+    const label = key === 'chipDeployFailed' ? t('chipDeployFailed', { outcome }) : t(key);
+    const ariaLabel = key === 'chipDeployFailed' ? t('ariaDeployFailed', { outcome }) : undefined;
     const tone = TONES[STATE_TONES[delivery.state]];
     // A deployment target may serve plain http; anything else (`javascript:` …) renders inert.
     const liveUrl = delivery.state === 'live' && linkLive ? safeWebUrl(delivery.liveUrl) : null;

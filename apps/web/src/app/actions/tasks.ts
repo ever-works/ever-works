@@ -1,10 +1,6 @@
 'use server';
 
-import type {
-    TaskCostView,
-    TaskDeliveryView,
-    TaskExtraRepo,
-} from '@ever-works/contracts';
+import type { TaskCostView, TaskDeliveryView, TaskExtraRepo } from '@ever-works/contracts';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
@@ -778,7 +774,10 @@ export type TaskDeliveryActionResult =
       }
     | { ok: false; code: string; statusCode?: number };
 
-function deliveryFailure(err: unknown, fallback: string): { ok: false; code: string; statusCode?: number } {
+function deliveryFailure(
+    err: unknown,
+    fallback: string,
+): { ok: false; code: string; statusCode?: number } {
     if (err instanceof ApiResponseError) {
         return { ok: false, code: err.code ?? fallback, statusCode: err.statusCode };
     }
@@ -823,13 +822,18 @@ export async function getTaskDeliveryAction(id: string): Promise<TaskDeliveryAct
 export async function closeDeliveryAction(
     id: string,
     note?: string | null,
-): Promise<{ ok: true; view: TaskDeliveryView } | { ok: false; code: string; statusCode?: number }> {
+): Promise<
+    { ok: true; view: TaskDeliveryView } | { ok: false; code: string; statusCode?: number }
+> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
     if (!user) redirect(ROUTES.AUTH_LOGIN);
 
     try {
-        const view = await tasksAPI.closeDelivery(id, note?.trim() ? note.trim().slice(0, 500) : null);
+        const view = await tasksAPI.closeDelivery(
+            id,
+            note?.trim() ? note.trim().slice(0, 500) : null,
+        );
         revalidatePath('/tasks');
         revalidatePath(`/tasks/${id}`);
         return { ok: true, view };

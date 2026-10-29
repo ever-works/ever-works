@@ -72,7 +72,11 @@ describe('TaskRepository.findByUserIdFiltered — deliveryState (APW-08 T24, SQL
             status: TaskStatus.DONE,
         });
         // Another account's Tasks in the same states: never part of OWNER's list.
-        await makeTask('foreign-live', { userId: OTHER, createdById: OTHER, deliveryState: 'live' });
+        await makeTask('foreign-live', {
+            userId: OTHER,
+            createdById: OTHER,
+            deliveryState: 'live',
+        });
         await makeTask('foreign-open-pr', { userId: OTHER, createdById: OTHER, prState: 'open' });
     });
 

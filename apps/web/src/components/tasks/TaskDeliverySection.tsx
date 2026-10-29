@@ -54,7 +54,9 @@ export function isDeliveryOpen(state: TaskDeliveryState | null | undefined): boo
 }
 
 /** Which `delivery.errors.*` copy a refusal gets — by the API's own code, never a message. */
-export function deliveryErrorKey(code: string | undefined): 'notClosable' | 'followUpLimit' | 'generic' {
+export function deliveryErrorKey(
+    code: string | undefined,
+): 'notClosable' | 'followUpLimit' | 'generic' {
     return code === 'notClosable' || code === 'followUpLimit' ? code : 'generic';
 }
 
@@ -122,7 +124,8 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
     const [retrying, setRetrying] = useState(false);
     const [errorKey, setErrorKey] = useState<ReturnType<typeof deliveryErrorKey> | null>(null);
     const [followUpOpened, setFollowUpOpened] = useState(false);
-    const startedAt = useRef<number>(Date.now());
+    // Set when the section mounts (the effect below); the 30-minute poll budget counts from it.
+    const startedAt = useRef<number>(0);
     const closeTriggerRef = useRef<HTMLButtonElement | null>(null);
     const headingRef = useRef<HTMLHeadingElement | null>(null);
     const confirmWasOpen = useRef(false);
@@ -140,11 +143,15 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 });
             } else {
                 // A failed poll keeps the last answer; only a failed FIRST read says so.
-                setLoad((previous) => (previous.kind === 'ready' ? previous : { kind: 'unavailable' }));
+                setLoad((previous) =>
+                    previous.kind === 'ready' ? previous : { kind: 'unavailable' },
+                );
             }
         } catch {
             if (!cancelled.current) {
-                setLoad((previous) => (previous.kind === 'ready' ? previous : { kind: 'unavailable' }));
+                setLoad((previous) =>
+                    previous.kind === 'ready' ? previous : { kind: 'unavailable' },
+                );
             }
         } finally {
             if (!cancelled.current) setReads((n) => n + 1);
@@ -235,7 +242,8 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
     const retryEscalationId =
         load.kind === 'ready' && state && FAILED_STATES.has(state) ? load.retryEscalationId : null;
     const closable = Boolean(state && CLOSABLE_STATES.has(state));
-    const closeLabel = state && FAILED_STATES.has(state) ? t('closeAnyway') : t('closeWithoutDeploying');
+    const closeLabel =
+        state && FAILED_STATES.has(state) ? t('closeAnyway') : t('closeWithoutDeploying');
 
     return (
         <section
@@ -270,7 +278,10 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('loading')}</p>
             )}
             {load.kind === 'unavailable' && (
-                <p className="text-xs text-text-muted dark:text-text-muted-dark" data-testid="task-delivery-unavailable">
+                <p
+                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid="task-delivery-unavailable"
+                >
                     {t('unavailable')}
                 </p>
             )}
@@ -278,7 +289,11 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
             {view?.state && (
                 <ol className="space-y-2 text-xs" data-testid="task-delivery-timeline">
                     {view.pullRequest && (
-                        <TimelineRow step="done" testId="task-delivery-row-merged" at={when(view.pullRequest.mergedAt)}>
+                        <TimelineRow
+                            step="done"
+                            testId="task-delivery-row-merged"
+                            at={when(view.pullRequest.mergedAt)}
+                        >
                             {(() => {
                                 const label = view.pullRequest.base
                                     ? t('merged', {
@@ -288,7 +303,12 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                     : t('mergedNoBranch', { number: view.pullRequest.number });
                                 const href = safeHttpsUrl(view.pullRequest.url);
                                 return href ? (
-                                    <a href={href} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline">
+                                    <a
+                                        href={href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="hover:text-primary hover:underline"
+                                    >
                                         {label}
                                     </a>
                                 ) : (
@@ -303,7 +323,11 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                             step={buildStep(view.state)}
                             testId="task-delivery-row-build"
                             at={when(phaseAt(view, ['building', 'built', 'build_failed']))}
-                            ariaLabel={buildStep(view.state) === 'done' ? t('ariaBuildSucceeded') : undefined}
+                            ariaLabel={
+                                buildStep(view.state) === 'done'
+                                    ? t('ariaBuildSucceeded')
+                                    : undefined
+                            }
                         >
                             <span>
                                 {view.build.number != null
@@ -311,7 +335,9 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                           number: view.build.number,
                                           shortSha: view.build.commitSha.slice(0, 7),
                                       })
-                                    : t('buildUnnumbered', { shortSha: view.build.commitSha.slice(0, 7) })}
+                                    : t('buildUnnumbered', {
+                                          shortSha: view.build.commitSha.slice(0, 7),
+                                      })}
                             </span>
                             {safeHttpsUrl(view.build.logsUrl) && (
                                 <a
@@ -397,7 +423,9 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                                 })}
                             </Link>
                             {followUp.status === 'cancelled' && view.state === 'live' && (
-                                <span className="ml-2 text-text-muted">{t('followUpCancelled')}</span>
+                                <span className="ml-2 text-text-muted">
+                                    {t('followUpCancelled')}
+                                </span>
                             )}
                         </li>
                     ))}
@@ -405,17 +433,29 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
             )}
 
             {followUpOpened && (
-                <p className="mt-3 text-xs text-text-secondary" role="status" data-testid="task-delivery-follow-up-opened">
+                <p
+                    className="mt-3 text-xs text-text-secondary"
+                    role="status"
+                    data-testid="task-delivery-follow-up-opened"
+                >
                     {t('followUpOpened')}
                 </p>
             )}
             {errorKey && (
-                <p className="mt-3 text-xs text-danger" role="alert" data-testid="task-delivery-error" data-code={errorKey}>
+                <p
+                    className="mt-3 text-xs text-danger"
+                    role="alert"
+                    data-testid="task-delivery-error"
+                    data-code={errorKey}
+                >
                     {t(`errors.${errorKey}`)}
                 </p>
             )}
             {pollingStopped && isDeliveryOpen(state) && (
-                <p className="mt-3 text-xs text-text-muted" data-testid="task-delivery-polling-stopped">
+                <p
+                    className="mt-3 text-xs text-text-muted"
+                    data-testid="task-delivery-polling-stopped"
+                >
                     {t('pollingStopped')}
                 </p>
             )}
@@ -457,7 +497,12 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 </div>
             )}
 
-            <Dialog open={confirmOpen} onOpenChange={(next) => (next ? undefined : closing ? undefined : setConfirmOpen(false))}>
+            <Dialog
+                open={confirmOpen}
+                onOpenChange={(next) =>
+                    next ? undefined : closing ? undefined : setConfirmOpen(false)
+                }
+            >
                 <DialogContent className="max-w-md">
                     <DialogClose onClose={() => (closing ? undefined : setConfirmOpen(false))} />
                     <DialogHeader className="mb-0">

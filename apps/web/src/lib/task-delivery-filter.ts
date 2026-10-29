@@ -8,9 +8,17 @@ import { TASK_DELIVERY_FILTER_GROUPS, type TaskDeliveryFilterGroup } from '@ever
  * The options, in order, with the `dashboard.tasksPage.delivery.*` leaf each one reads. The
  * tokens each sends to `GET /api/tasks?deliveryState=` are `TASK_DELIVERY_FILTER_GROUPS[option]`.
  */
+export type TaskDeliveryFilterLabelKey =
+    | 'filterWaiting'
+    | 'filterBuilding'
+    | 'filterDeploying'
+    | 'filterLive'
+    | 'filterFailed'
+    | 'filterClosed';
+
 export const TASK_DELIVERY_FILTER_OPTIONS: ReadonlyArray<{
     value: TaskDeliveryFilterGroup;
-    labelKey: string;
+    labelKey: TaskDeliveryFilterLabelKey;
 }> = [
     { value: 'waiting', labelKey: 'filterWaiting' },
     { value: 'building', labelKey: 'filterBuilding' },
