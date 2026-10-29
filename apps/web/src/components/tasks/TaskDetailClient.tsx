@@ -30,6 +30,8 @@ import { TaskActivitySection } from './TaskActivitySection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
+import { TaskDeliverySection } from './TaskDeliverySection';
+import { TaskCostSection } from './TaskCostSection';
 import { TaskRunControls, type TaskRunOpenQuestion } from './TaskRunControls';
 import { TaskRunsHistory } from './TaskRunsHistory';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
@@ -561,6 +563,12 @@ export function TaskDetailClient({
                     {/* Tasks on computers (FL-15 P1) — the Computer block. */}
                     {fleetSection}
 
+                    {/* APW-08 T27 — Delivery, above Checks: only for a merged App Work change
+                        the delivery chain tracks (every other Task has no delivery state). */}
+                    {task.deliveryState && (
+                        <TaskDeliverySection taskId={task.id} workId={task.workId ?? null} />
+                    )}
+
                     {/* Quality gates (Wave 3 M6) — Checks section */}
                     <TaskChecksSection task={task} initialGateRun={initialGateRun} />
 
@@ -677,6 +685,10 @@ export function TaskDetailClient({
                             </div>
                         </form>
                     </section>
+
+                    {/* APW-08 T27 — Cost, last: the Task's runs, their receipts and the total
+                        (`GET /api/tasks/:id/cost`); an unpriced amount reads "unknown". */}
+                    <TaskCostSection taskId={task.id} />
                 </div>
 
                 {/* ---- Right rail: Details + recurring -------------------- */}
