@@ -17,7 +17,8 @@ import type {
 	GitFileStatus,
 	GitFetchBranchOptions,
 	GitCommitRangeOptions,
-	GitCommitRangeCount
+	GitCommitRangeCount,
+	GitLocalCommit
 } from '../contracts/capabilities/git-provider.interface.js';
 import { countCommitRange } from './commit-range.js';
 
@@ -376,6 +377,30 @@ export class GitOperations implements IGitOperations {
 				await git.add({ fs, dir, filepath });
 			}
 		}
+	}
+
+	/**
+	 * The local commit `ref` points at and its parents, or `null` when the ref does not exist
+	 * (C-10 / APW-08 T12 — prove what a push carries before sending it). Read-only.
+	 */
+	async readLocalCommit(dir: string, ref: string): Promise<GitLocalCommit | null> {
+		let oid: string;
+		try {
+			oid = await git.resolveRef({ fs, dir, ref });
+		} catch {
+			return null;
+		}
+		const { commit } = await git.readCommit({ fs, dir, oid });
+		return { sha: oid, parents: [...commit.parent] };
+	}
+
+	/**
+	 * Point local `branch` at `sha` and check it out, discarding the working tree and index (C-10:
+	 * drop a just-made commit whose push failed). `sha` must already be in the local object store.
+	 */
+	async resetBranchTo(dir: string, branch: string, sha: string): Promise<void> {
+		await git.writeRef({ fs, dir, ref: `refs/heads/${branch}`, value: sha, force: true });
+		await git.checkout({ fs, dir, ref: branch, force: true });
 	}
 
 	async commit(dir: string, message: string, committer?: GitCommitter): Promise<string | null> {

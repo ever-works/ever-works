@@ -120,6 +120,15 @@ export interface GitCommit {
 	readonly date: string;
 }
 
+/**
+ * A commit of the LOCAL working copy and its parents (C-10 / APW-08 T12). Used to prove what a push
+ * will carry before it is sent.
+ */
+export interface GitLocalCommit {
+	readonly sha: string;
+	readonly parents: readonly string[];
+}
+
 export type GitFileStatus = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked';
 
 export interface GitFileChange {
@@ -864,6 +873,22 @@ export interface IGitOperations {
 	getMainBranch(dir: string): Promise<string | null>;
 	switchBranch(dir: string, branch: string, create?: boolean): Promise<string>;
 	getStatus(dir: string): Promise<GitFileChange[]>;
+	/**
+	 * The local commit `ref` (a full ref such as `refs/heads/x`) points at, with its parent shas, or
+	 * `null` when the ref does not exist. Read-only. Lets a caller prove that a push carries only the
+	 * commit it just made (C-10 / APW-08 T12).
+	 *
+	 * Optional so existing providers keep compiling. Callers MUST verify the method is present before
+	 * calling it — the lazy-plugin proxy over-reports optional methods (see `GitFacadeService`).
+	 */
+	readLocalCommit?(dir: string, ref: string): Promise<GitLocalCommit | null>;
+	/**
+	 * Point local branch `branch` at `sha` (a commit the working copy already has) and check it out,
+	 * discarding the working tree and index. Used to drop a commit this process just made when its push
+	 * failed, so the shared checkout is not left ahead of the remote (C-10). Optional, like
+	 * {@link readLocalCommit}.
+	 */
+	resetBranchTo?(dir: string, branch: string, sha: string): Promise<void>;
 	/**
 	 * Absolute path of the working copy for `owner/repo`.
 	 *

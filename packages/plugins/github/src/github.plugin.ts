@@ -35,6 +35,7 @@ import type {
 	GitPushOptions,
 	GitCommitter,
 	GitFileChange,
+	GitLocalCommit,
 	OAuthConfig,
 	OAuthToken,
 	OAuthUser,
@@ -697,6 +698,16 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 	async getStatus(dir: string): Promise<GitFileChange[]> {
 		this.ensureGitOps();
 		return this.gitOps!.getStatus(dir);
+	}
+
+	async readLocalCommit(dir: string, ref: string): Promise<GitLocalCommit | null> {
+		this.ensureGitOps();
+		return this.gitOps!.readLocalCommit(dir, ref);
+	}
+
+	async resetBranchTo(dir: string, branch: string, sha: string): Promise<void> {
+		this.ensureGitOps();
+		return this.gitOps!.resetBranchTo(dir, branch, sha);
 	}
 
 	getLocalDir(owner: string, repo: string, checkoutKey?: string): string {
