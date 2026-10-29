@@ -134,7 +134,7 @@ import { CACHE_MANAGER, Cache, CacheEntryRepository } from '@ever-works/agent/ca
 import { UpdateWorkScheduleDto, UpdateSourceValidationDto } from '@ever-works/agent/dto';
 import { WorkScheduleStatus } from '@ever-works/agent/entities';
 import { SubscriptionService } from '@ever-works/agent/subscriptions';
-import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { ActivityLogService, workDeletedActivity } from '@ever-works/agent/activity-log';
 import { ActivityActionType, ActivityStatus } from '@ever-works/agent/entities';
 import {
     WORK_CACHE_TTL_MS,
@@ -1760,38 +1760,13 @@ export class WorksController {
         const user = await this.authService.getUser(auth.userId);
         const result = await this.workLifecycleService.deleteWork(id, deleteWorkDto, user);
 
-        // ACC-NEG-07 — "Activity records the deletion and names what was kept".
-        // `activity_log.workId` is a foreign key to `works`, and a completed delete has
-        // already removed that row, so a record that names it as `workId` is refused
-        // (and the refusal swallowed below): the deletion was never recorded. Only an
-        // App Work whose removal the App runtime took over keeps its row (APW-01 T39,
-        // FR-40a — it reads **Deleting…**), so only that record may reference it; the
-        // foreign key's `SET NULL` clears it once `completeAppWorkDeletion` runs. The
-        // Work's identity and the outcome — including the `Kept: …` notes the service
-        // writes into `message` — travel in `details` either way.
-        //
-        // A pending delete's row keeps its **Deleting work** summary: it records the
-        // member's request, and nothing rewrites it. The END of that removal is a
-        // different record — APW-06's `AppRuntimeDeletionService` writes
-        // `app.deploy.removed` (`reason: 'app_work_deleted'`, `kept[]`, APW-06 plan
-        // §9.4) before it calls `completeAppWorkDeletion`, which itself logs nothing.
-        const rowRemains = result.status === 'pending' || result.deleting === true;
-        this.activityLogService
-            .log({
-                userId: auth.userId,
-                ...(rowRemains ? { workId: id } : {}),
-                actionType: ActivityActionType.WORK_DELETED,
-                action: 'work.deleted',
-                status: ActivityStatus.COMPLETED,
-                summary: rowRemains ? 'Deleting work' : 'Deleted work',
-                details: {
-                    workId: id,
-                    slug: result.slug,
-                    deletedRepositories: result.deleted_repositories ?? [],
-                    message: result.message,
-                },
-            })
-            .catch(() => {});
+        // ACC-NEG-07 — "Activity records the deletion and names what was kept". The record,
+        // and why it names the Work as `workId` only while its row remains (the foreign key),
+        // is `workDeletedActivity` — shared with the internal CLI (C-13). The END of an App
+        // Work's removal is a different record: APW-06's `AppRuntimeDeletionService` writes
+        // `app.deploy.removed` (`reason: 'app_work_deleted'`, `kept[]`, APW-06 plan §9.4)
+        // before it calls `completeAppWorkDeletion`, which itself logs nothing.
+        this.activityLogService.log(workDeletedActivity(auth.userId, id, result)).catch(() => {});
         return result;
     }
 
