@@ -316,6 +316,11 @@ describe('acceptPlaybookEntry', () => {
 describe('sanitizePlaybookText / sanitizePlaybookEntry', () => {
 	it('strips markup and caps the length', () => {
 		expect(sanitizePlaybookText('<b>Hello</b> <script>x</script>world', 200)).toBe('Hello xworld');
+		expect(sanitizePlaybookText('<scr<b>ipt>alert(1)</script>', 200)).toBe('alert(1)');
+		expect(sanitizePlaybookText('Ship a -> b when x < y', 200)).toBe('Ship a -> b when x < y');
+		const started = Date.now();
+		sanitizePlaybookText('<'.repeat(50_000), 200);
+		expect(Date.now() - started).toBeLessThan(1_000);
 		expect(sanitizePlaybookText('x'.repeat(300), PLAYBOOK_TEXT_LIMITS.title)).toHaveLength(120);
 	});
 

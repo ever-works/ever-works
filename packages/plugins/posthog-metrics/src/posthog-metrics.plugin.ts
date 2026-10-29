@@ -555,7 +555,7 @@ export class PostHogMetricsPlugin implements IMetricsProviderPlugin {
 				`apiHost must be an http(s) URL (got '${parsed.protocol}//').`
 			);
 		}
-		return raw.replace(/\/+$/, '');
+		return raw.replace(/(?<!\/)\/+$/, '');
 	}
 
 	private resolveProjectId(settings?: PluginSettings, opts?: { optional: boolean }): string | undefined {

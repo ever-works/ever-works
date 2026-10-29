@@ -229,6 +229,25 @@ describe('agent/events submodule', () => {
             expect(evt.errorMessage).toBe('remote returned 500');
         });
 
+        it('redacts URL credentials, keeping scheme and host, and stays linear on a long letter run', () => {
+            const evt = new WorksConfigSyncFailedEvent(
+                'w1',
+                'u1',
+                'provider_changed',
+                'org/repo',
+                'push to https://ghp_abc:x-oauth-basic@github.com/o/r failed',
+            );
+            expect(evt.errorMessage).toBe('push to https://[REDACTED]@github.com/o/r failed');
+            for (const url of ['https://:tok@github.com/o/r', 'https://ghp_tok@github.com/o/r']) {
+                const e = new WorksConfigSyncFailedEvent('w', 'u', 'provider_changed', 'r', `x ${url} y`);
+                expect(e.errorMessage).toBe('x https://[REDACTED]@github.com/o/r y');
+            }
+
+            const started = Date.now();
+            new WorksConfigSyncFailedEvent('w', 'u', 'provider_changed', 'r', 'a'.repeat(50_000));
+            expect(Date.now() - started).toBeLessThan(1_000);
+        });
+
         it('shares the WorksConfigSyncReason union with the *Requested* event', () => {
             // Compile-time + runtime: a value valid for one is valid for the
             // other. If someone forks the union, this test fails first.

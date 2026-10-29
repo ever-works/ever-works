@@ -452,4 +452,32 @@ describe('DataRepository', () => {
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });
+
+    it('rewrites the "tried" and "(plugin:" forms, and stays linear on a long whitespace run', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+        const repository = await DataRepository.create(repoDir);
+        const reference = (url: string, error: string) => ({
+            url,
+            normalized_url: url,
+            last_attempted_at: '2026-05-02T13:36:33.000Z',
+            status: 'error' as const,
+            error,
+        });
+
+        const started = Date.now();
+        await repository.writeReferences([
+            reference('https://a.test/', 'Content extraction failed for https://a.test/; tried 2 plugins'),
+            reference('https://b.test/', 'Content extraction failed for https://b.test/   (plugin: local)'),
+            reference('https://c.test/', `Content extraction failed for x${' '.repeat(80_000)}y`),
+        ]);
+        // The old lazy captures took seconds on 30k spaces; the fix is linear.
+        expect(Date.now() - started).toBeLessThan(1_500);
+
+        const referencesYaml = await fs.readFile(path.join(repoDir, 'references.yml'), 'utf-8');
+        expect(referencesYaml).toContain('Content processing failed for https://a.test/; tried 2 plugins');
+        expect(referencesYaml).toContain('Content processing failed for https://b.test/ (plugin: local)');
+        expect(referencesYaml).not.toContain('Content extraction failed');
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
 });

@@ -54,5 +54,5 @@ export class GenericRegistryProvider implements RegistryProvider {
 }
 
 function normaliseHost(server: string): string {
-	return server.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+	return server.replace(/^https?:\/\//i, '').replace(/(?<!\/)\/+$/, '');
 }

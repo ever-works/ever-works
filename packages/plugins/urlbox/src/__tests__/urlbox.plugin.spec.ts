@@ -272,6 +272,22 @@ describe('UrlboxPlugin', () => {
 			expect(result.message).toContain('API key is not configured');
 		});
 
+		it('accepts the urlbox 2.x render host and refuses a lookalike', async () => {
+			const Urlbox = vi.mocked((await import('urlbox')).default);
+			vi.mocked(mockContext.getSettings).mockResolvedValue({ apiKey: 'test-key' });
+			await plugin.onLoad(mockContext);
+
+			Urlbox.mockReturnValueOnce({
+				generateRenderLink: vi.fn().mockReturnValue('https://api.urlbox.io/v1/render?url=x')
+			} as never);
+			expect((await plugin.validateCredentials()).valid).toBe(true);
+
+			Urlbox.mockReturnValueOnce({
+				generateRenderLink: vi.fn().mockReturnValue('https://evil.test/?api.urlbox.io')
+			} as never);
+			expect((await plugin.validateCredentials()).valid).toBe(false);
+		});
+
 		it('should return valid when credentials are configured', async () => {
 			vi.mocked(mockContext.getSettings).mockResolvedValue({
 				apiKey: 'test-key'

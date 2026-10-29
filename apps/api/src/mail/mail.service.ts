@@ -13,6 +13,7 @@ import {
     MemberInvitedEvent,
     WorkInvitationIssuedEvent,
 } from '../events';
+import { stripHtmlTags as stripTagsToText } from '../common/strip-html-tags';
 
 const OWNER_CLAIM_ROLE = 'owner-claim';
 
@@ -651,7 +652,8 @@ export class MailService {
         if (!value) {
             return '';
         }
-        return value.replace(/<[^>]*>/g, '');
+        // Until stable, then stray openers: see `common/strip-html-tags.ts`.
+        return stripTagsToText(value);
     }
 
     /**

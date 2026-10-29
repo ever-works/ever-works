@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { GitFacadeService } from '@ever-works/agent/facades';
+import { stripHtmlTags } from '../common/strip-html-tags';
 
 /**
  * Prebuilt-company catalog (teams-and-companies spec §6, ADR-014).
@@ -70,7 +71,8 @@ const MAX_TAG_LEN = 60;
 const MAX_FILES = 400;
 
 function stripHtml(value: string): string {
-    return value.replace(/<[^>]*>/g, '');
+    // Until stable, then stray openers: see `common/strip-html-tags.ts`.
+    return stripHtmlTags(value);
 }
 
 // Refs are operator-controlled env values (tag/sha/branch); reject anything

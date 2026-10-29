@@ -46,7 +46,7 @@ export function dataDirSegment(value: string): string {
     const readable = value
         .toLowerCase()
         .replace(/[^a-z0-9.-]+/gu, '-')
-        .replace(/^[-.]+|[-.]+$/gu, '')
+        .replace(/^[-.]+|(?<![-.])[-.]+$/gu, '')
         .slice(0, 40);
     const digest = createHash('sha256').update(value).digest('hex').slice(0, 12);
     return readable ? `${readable}-${digest}` : digest;

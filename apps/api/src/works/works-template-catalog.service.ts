@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CACHE_MANAGER, Cache } from '@ever-works/agent/cache';
 import { GitFacadeService } from '@ever-works/agent/facades';
+import { stripHtmlTags } from '../common/strip-html-tags';
 
 /**
  * Work-blueprint catalog (Works Templates spec, ADR-014).
@@ -125,7 +126,8 @@ const MAX_TAGS = 8;
  * we consume (no DOM sanitizer in the API runtime).
  */
 function stripHtml(value: string): string {
-    return value.replace(/<[^>]*>/g, '');
+    // Until stable, then stray openers: see `common/strip-html-tags.ts`.
+    return stripHtmlTags(value);
 }
 
 /** `folder-tree` → `FolderTree` so the client icon map (PascalCase lucide

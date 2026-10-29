@@ -51,7 +51,7 @@ export function normalizeUrl(url: string): string {
 		.trim()
 		.replace(/^https?:\/\//, '')
 		.replace(/^www\./, '')
-		.replace(/\/+$/, '')
+		.replace(/(?<!\/)\/+$/, '')
 		.replace(/\/(tree|blob)\/[^/]+.*$/, '')
 		.replace(/#.*$/, '')
 		.replace(/\/index\.(html?|php|aspx?)$/, '');
@@ -86,7 +86,7 @@ export function normalizeItemName(name: string): string {
 
 	return name
 		.toLowerCase()
-		.replace(/\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
+		.replace(/(?<!\s)\s+v?(\d+\.)*\d+(\s+|$)/g, ' ')
 		.replace(/[^\w\s]/g, ' ')
 		.replace(/\s+/g, ' ')
 		.replace(/\b(js|javascript|library|framework|tool|app|application)\b/g, '')

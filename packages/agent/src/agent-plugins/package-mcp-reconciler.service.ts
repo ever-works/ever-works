@@ -84,7 +84,7 @@ export function connectionNameFor(packageName: string, serverName: string): stri
     const slug = source
         .toLowerCase()
         .replace(/[^a-z0-9]+/gu, '-')
-        .replace(/^-+|-+$/gu, '');
+        .replace(/^-+|(?<!-)-+$/gu, '');
 
     // Truncation alone collides. Two servers under one package whose names
     // share their first 80 normalised characters produce the same slug, and

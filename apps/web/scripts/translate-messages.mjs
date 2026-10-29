@@ -918,10 +918,14 @@ function skipWhitespace(message, startIndex) {
 
 // Keys that would write through to Object.prototype instead of the messages
 // tree. A translated chunk is model output, so it never gets to name one.
-const PROTOTYPE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// Spelled out as comparisons, the guard CodeQL js/prototype-pollution-utility
+// recognises.
+function isPrototypeKey(key) {
+    return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
 
 function mergeChunk(target, pathSegments, value) {
-    if (pathSegments.some((segment) => PROTOTYPE_KEYS.has(segment))) {
+    if (pathSegments.some((segment) => isPrototypeKey(segment))) {
         return;
     }
     if (pathSegments.length === 0) {
@@ -955,7 +959,7 @@ function getRelativeChunkPath(parentPath, childPath) {
 
 function deepMergeInto(target, source) {
     for (const [key, value] of Object.entries(source)) {
-        if (PROTOTYPE_KEYS.has(key)) {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
             continue;
         }
         if (isPlainObject(value) && isPlainObject(target[key])) {

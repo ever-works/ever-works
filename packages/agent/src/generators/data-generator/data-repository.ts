@@ -798,17 +798,21 @@ export class DataRepository {
             return `No items retrieved from URL: ${url}`;
         }
 
+        // No two adjacent runs can trade characters: each capture starts on a
+        // non-space, and the `\s+` before `(plugin:` may only start where a
+        // whitespace run starts (`(?<!\s)`). Otherwise a long whitespace run in
+        // an error text is rescanned from every offset (CodeQL js/polynomial-redos).
         return error
             .replace(
-                /^Content extraction failed for URL:\s*(.+)$/s,
+                /^Content extraction failed for URL:\s*(\S.*)$/s,
                 'Processing failed for URL: $1',
             )
             .replace(
-                /^Content extraction failed for\s+(.+?);\s+tried/s,
+                /^Content extraction failed for\s+(\S.*?);\s+tried/s,
                 'Content processing failed for $1; tried',
             )
             .replace(
-                /^Content extraction failed for\s+(.+?)\s+\(plugin:/s,
+                /^Content extraction failed for\s+(\S.*?)(?<!\s)\s+\(plugin:/s,
                 'Content processing failed for $1 (plugin:',
             )
             .replace(/\bcontent extraction\b/gi, 'content processing')
