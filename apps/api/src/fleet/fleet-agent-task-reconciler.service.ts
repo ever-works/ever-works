@@ -21,6 +21,7 @@ import {
 import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
 import { PluginUsageService } from '@ever-works/agent/usage';
 import {
+    foldNotAdmittedChecks,
     TaskChatService,
     TaskRepository,
     TaskRunDenormService,
@@ -368,7 +369,15 @@ export class FleetAgentTaskReconcilerService {
             return;
         }
 
-        const result = parseAgentTaskResult(event.result);
+        // APW-08 T13 (FR-14, ACC-08-10) — the node graded only what it ran.
+        // An App Work's not-admitted checks were frozen onto the JOB by the
+        // planner (never the node's report, which a node cannot forge into
+        // this list), and are folded in here, once, before any reader below:
+        // the run row, the finalize gate and the run message all see one
+        // verdict, and a required not-admitted check keeps it from being
+        // green. A job without the field is returned untouched.
+        const parsed = parseAgentTaskResult(event.result);
+        const result = parsed ? foldNotAdmittedChecks(parsed, plannedNotAdmitted(event.job)) : null;
         const task = await this.tasks.findById(ctx.taskId);
         const agentId = ctx.agentId ?? run.agentId;
 
@@ -1643,6 +1652,24 @@ function reportedPush(result: FleetAgentTaskResult | null | undefined): string |
     const git = result?.git;
     if (!git || !git.pushed || git.empty) return null;
     return typeof git.branch === 'string' && git.branch.trim() ? git.branch.trim() : null;
+}
+
+/**
+ * APW-08 T13 — the not-admitted App checks the PLANNER put on this job
+ * (`payload.notAdmittedChecks`), shape-checked: an entry without a string id
+ * is dropped, and `required` is anything but an explicit `false` (a check
+ * that cannot be read as advisory keeps the gate from grading green).
+ */
+function plannedNotAdmitted(job: FleetJobView): Array<{ id: string; required: boolean }> {
+    const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
+    const raw = payload?.notAdmittedChecks;
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .filter(
+            (entry): entry is { id: string; required?: unknown } =>
+                !!entry && typeof entry === 'object' && typeof entry.id === 'string',
+        )
+        .map((entry) => ({ id: entry.id, required: entry.required !== false }));
 }
 
 /**

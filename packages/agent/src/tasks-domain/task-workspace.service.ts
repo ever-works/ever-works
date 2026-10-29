@@ -720,12 +720,21 @@ export class TaskWorkspaceService {
      * import path depends on it), so this is a theoretical gap rather than
      * a live one — but it is a gap, and it is why the FEATURE is opt-in
      * per Work rather than inferred from the file's presence.
+     *
+     * APW-08 T13 — the Work's KIND rides into the parser and the gate. An
+     * App Work's file is the App spec, so its `spec.checks` is read, and a
+     * check the owner has not admitted comes back under `notAdmitted`
+     * instead of refusing the plan (FR-14). Every other kind reads
+     * `spec.tasks` and refuses exactly as before. The opt-in above is NOT
+     * relaxed for an App Work: at the defaults (`repoDeclaredCommands` off)
+     * nothing is read, and switching it on is the `app.spec.applied`
+     * listener's job (T11, APW08-G02), never this reader's.
      */
     async readFleetRepoDeclaredCommands(input: {
         task: Task;
         userId: string;
         workspace: FleetTaskWorkspaceSpec;
-    }): Promise<{ setup: TaskAcceptanceCheck[]; checks: TaskAcceptanceCheck[] }> {
+    }): Promise<ReturnType<typeof admitRepoDeclaredCommands>> {
         const empty = { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] };
         if (!input.task.workId) return empty;
         const work = await this.works.findById(input.task.workId);
@@ -797,12 +806,16 @@ export class TaskWorkspaceService {
             );
         }
 
-        const declared = parseRepoDeclaredCommands((parsed as Record<string, unknown>).spec);
+        const declared = parseRepoDeclaredCommands(
+            (parsed as Record<string, unknown>).spec,
+            work.kind,
+        );
         return admitRepoDeclaredCommands({
             declared,
             policy,
             mountDirs: (input.workspace.mounts ?? []).map((mount) => mount.mountDir),
             repositoryId: `${owner}/${repo}`,
+            kind: work.kind,
         });
     }
 

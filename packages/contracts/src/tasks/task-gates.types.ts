@@ -177,8 +177,14 @@ export interface TaskCheckResult {
 	/**
 	 * `green`/`red` mirror the exit code; `timeout` = killed at
 	 * `timeoutSec`; `error` = the check could not be executed at all.
+	 *
+	 * `not-admitted` (APW-08 T13, FR-14) — an App spec check whose command
+	 * the Work owner has not admitted for their machines. It was never
+	 * executed (`exitCode: null`, `durationMs: 0`), and it is not green, so a
+	 * REQUIRED one keeps the gate from grading green on the strength of the
+	 * checks that did run. Additive: no other Work kind produces it.
 	 */
-	status: 'green' | 'red' | 'timeout' | 'error';
+	status: 'green' | 'red' | 'timeout' | 'error' | 'not-admitted';
 	/** Wall-clock duration of the check. */
 	durationMs: number;
 	/** Last lines of combined stdout/stderr, for the run report. */
