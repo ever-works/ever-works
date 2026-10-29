@@ -115,8 +115,14 @@ export class E2eTaskSeedController {
         if (userId.length === 0) {
             throw new UnauthorizedException();
         }
-        const task = await this.tasksService.getOne(userId, body.taskId, this.scopeContext.getScope());
-        const work = task.workId ? await this.workRows.findOne({ where: { id: task.workId } }) : null;
+        const task = await this.tasksService.getOne(
+            userId,
+            body.taskId,
+            this.scopeContext.getScope(),
+        );
+        const work = task.workId
+            ? await this.workRows.findOne({ where: { id: task.workId } })
+            : null;
         if (!work || !isAppWorkKind(work.kind)) {
             throw new UnprocessableEntityException({
                 code: 'notAppWork',
@@ -129,7 +135,12 @@ export class E2eTaskSeedController {
         if (body.delivery) {
             const merge = body.delivery.mergeCommitSha ?? randomBytes(20).toString('hex');
             if (body.delivery.deployment) {
-                deploymentId = await this.seedDeployment(task, work, merge, body.delivery.deployment);
+                deploymentId = await this.seedDeployment(
+                    task,
+                    work,
+                    merge,
+                    body.delivery.deployment,
+                );
             }
             Object.assign(patch, deliveryPatch(body.delivery, merge, deploymentId, task.prNumber));
         }
@@ -141,7 +152,8 @@ export class E2eTaskSeedController {
             if (verdict.allowed !== true) {
                 recorded = refusalBody(verdict);
                 patch.branchGuardRefusal = recorded;
-                patch.branchRef = task.branchRef ?? `task/${(task.slug ?? 'e2e').toLowerCase()}-e2e`;
+                patch.branchRef =
+                    task.branchRef ?? `task/${(task.slug ?? 'e2e').toLowerCase()}-e2e`;
                 patch.branchState = 'pushed';
             }
         }

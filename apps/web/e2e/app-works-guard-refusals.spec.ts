@@ -150,7 +150,10 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
         );
     });
 
-    test('a change of 300 files or more is refused as too many to check', async ({ page, request }) => {
+    test('a change of 300 files or more is refused as too many to check', async ({
+        page,
+        request,
+    }) => {
         const token = await seededToken(request);
         const { workId } = await seedAppWork(request, token);
         const { task, verdict } = await refusedTask(request, token, workId, 'huge change', {
@@ -167,10 +170,14 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
         const under = await createWorkTask(request, token, workId, { title: '299 files' });
         const judged = await seedTaskState(request, token, {
             taskId: under.id,
-            guard: { protectedPaths: [BRAND], files: [{ path: 'src/one.ts', additions: 1 }], totalFiles: 299 },
+            guard: {
+                protectedPaths: [BRAND],
+                files: [{ path: 'src/one.ts', additions: 1 }],
+                totalFiles: 299,
+            },
         });
         expect(judged.guard?.allowed).toBe(true);
-        expect(((await readTask(request, token, under.id)).branchGuardRefusal ?? null)).toBeNull();
+        expect((await readTask(request, token, under.id)).branchGuardRefusal ?? null).toBeNull();
 
         const section = await openTaskBranch(page, task.id);
         await expect(section.getByTestId('task-guard-refusal-reason')).toContainText(
@@ -226,7 +233,9 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
 
         // The allowed Task has no branch panel at all (no branch was recorded) — and no banner.
         await gotoDashboard(page, `/en/tasks/${noted.id}`);
-        await expect(page.getByTestId('task-isolation-override-section')).toBeVisible({ timeout: 45_000 });
+        await expect(page.getByTestId('task-isolation-override-section')).toBeVisible({
+            timeout: 45_000,
+        });
         await expect(page.getByTestId('task-guard-refusal-banner')).toHaveCount(0);
     });
 
@@ -248,7 +257,11 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
         expect(await refused.json()).toMatchObject({ status: 'refused', code: 'agentRequired' });
 
         await gotoDashboard(page, `/en/works/${workId}/tasks`);
-        await page.getByTestId('app-change-open').click();
+        // The header button is server-rendered before it is hydrated: click until it opens.
+        await expect(async () => {
+            await page.getByTestId('app-change-open').click({ timeout: 5_000 });
+            await expect(page.getByTestId('app-change-dialog')).toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 30_000 });
         await page.getByTestId('app-change-text').fill('Make the header blue');
         await page.getByTestId('app-change-submit').click();
         const error = page.getByTestId('app-change-error');
@@ -289,14 +302,11 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
         expect(body.message).toContain('may not commit to repositories');
     });
 
-    test.fixme(
-        'not admitted: with no Fleet node and no isolated environment no run starts and the S15 copy shows (ACC-08-08, ACC-08-10)',
-        async () => {
-            // Unbuilt on develop: isolated-run admission (APW-08 T12) and App checks on Fleet nodes
-            // (T13/T14) have no surface yet — no Task-page copy reads "This app's code can only run
-            // on one of your machines or in an isolated sandbox, and none is set up." or "Not
-            // admitted — review this check before it runs on your machines." When they land, seed
-            // an App Work with no Fleet node, press Run on its Task and assert that copy here.
-        },
-    );
+    test.fixme('not admitted: with no Fleet node and no isolated environment no run starts and the S15 copy shows (ACC-08-08, ACC-08-10)', async () => {
+        // Unbuilt on develop: isolated-run admission (APW-08 T12) and App checks on Fleet nodes
+        // (T13/T14) have no surface yet — no Task-page copy reads "This app's code can only run
+        // on one of your machines or in an isolated sandbox, and none is set up." or "Not
+        // admitted — review this check before it runs on your machines." When they land, seed
+        // an App Work with no Fleet node, press Run on its Task and assert that copy here.
+    });
 });

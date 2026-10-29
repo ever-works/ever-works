@@ -108,7 +108,9 @@ function chipFixtures(): ChipFixture[] {
         },
         {
             key: 'live',
-            seed: { delivery: { state: 'live', deployment: { state: 'READY', website: LIVE_URL } } },
+            seed: {
+                delivery: { state: 'live', deployment: { state: 'READY', website: LIVE_URL } },
+            },
             state: 'live',
             text: 'Live ✓',
             href: LIVE_URL,
@@ -153,7 +155,9 @@ interface SeededBoard {
     untracked: CreatedTask;
 }
 
-async function seedBoard(request: APIRequestContext): Promise<SeededBoard & { fixtures: ChipFixture[] }> {
+async function seedBoard(
+    request: APIRequestContext,
+): Promise<SeededBoard & { fixtures: ChipFixture[] }> {
     const token = await seededToken(request);
     const { workId } = await seedAppWork(request, token);
     const fixtures = chipFixtures();
@@ -222,9 +226,13 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
             params: { workId: board.workId, includeDelivery: 'true', limit: '100' },
         });
         expect(list.status()).toBe(200);
-        const rows = ((await list.json()) as { data: Array<{ id: string; delivery?: unknown }> }).data;
+        const rows = ((await list.json()) as { data: Array<{ id: string; delivery?: unknown }> })
+            .data;
         const byId = new Map(rows.map((row) => [row.id, row]));
-        expect(byId.get(board.untracked.id)?.delivery ?? null, 'untracked Task has no embed').toBeNull();
+        expect(
+            byId.get(board.untracked.id)?.delivery ?? null,
+            'untracked Task has no embed',
+        ).toBeNull();
         const rolledBack = byId.get(board.tasks.get('deploy_failed_rolled_back')!.id)?.delivery as
             | { state: string; outcome: string | null }
             | undefined;
@@ -245,7 +253,10 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
             await expect(chip).toHaveAttribute('data-delivery-state', fixture.state);
             await expect(chip).toHaveText(new RegExp(`^${escapeRegExp(fixture.text)}`));
             if (fixture.href) {
-                await expect(chip).toHaveAttribute('href', new RegExp(`^${escapeRegExp(fixture.href)}`));
+                await expect(chip).toHaveAttribute(
+                    'href',
+                    new RegExp(`^${escapeRegExp(fixture.href)}`),
+                );
             }
         }
 
@@ -266,17 +277,26 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         request,
     }) => {
         const board = await seedBoard(request);
-        const failedIds = ['build_failed', 'deploy_failed_failed', 'deploy_failed_rolled_back', 'deploy_failed_rollback_failed'].map(
-            (key) => board.tasks.get(key)!.id,
-        );
+        const failedIds = [
+            'build_failed',
+            'deploy_failed_failed',
+            'deploy_failed_rolled_back',
+            'deploy_failed_rollback_failed',
+        ].map((key) => board.tasks.get(key)!.id);
 
         // API half: the group's tokens filter in SQL — exactly the failed rows of this Work.
         const filtered = await request.get(`${API_BASE}/api/tasks`, {
             headers: authedHeaders(board.token),
-            params: { workId: board.workId, deliveryState: 'build_failed,deploy_failed', limit: '100' },
+            params: {
+                workId: board.workId,
+                deliveryState: 'build_failed,deploy_failed',
+                limit: '100',
+            },
         });
         expect(filtered.status()).toBe(200);
-        const filteredIds = ((await filtered.json()) as { data: Array<{ id: string }> }).data.map((row) => row.id);
+        const filteredIds = ((await filtered.json()) as { data: Array<{ id: string }> }).data.map(
+            (row) => row.id,
+        );
         expect([...filteredIds].sort()).toEqual([...failedIds].sort());
         const unknown = await request.get(`${API_BASE}/api/tasks`, {
             headers: authedHeaders(board.token),
@@ -289,17 +309,24 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
 
         // UI half: choose Failed, Apply → `?delivery=failed`, and only the failed cards remain.
         await pickDelivery(page, 'failed', 'Failed');
-        await page.getByTestId('work-tasks-delivery-filter').getByRole('button', { name: 'Apply' }).click();
+        await page
+            .getByTestId('work-tasks-delivery-filter')
+            .getByRole('button', { name: 'Apply' })
+            .click();
         await expect(page).toHaveURL(/[?&]delivery=failed(&|$)/, { timeout: 30_000 });
         await expect(page.getByTestId('task-delivery-filter-select')).toContainText('Failed');
 
         // The filtered page renders the cards view by default; every card is a link to its Task.
         const main = page.locator('main');
         for (const id of failedIds) {
-            await expect(main.locator(`a[href$="/tasks/${id}"]`).first()).toBeVisible({ timeout: 30_000 });
+            await expect(main.locator(`a[href$="/tasks/${id}"]`).first()).toBeVisible({
+                timeout: 30_000,
+            });
         }
         for (const key of ['merged', 'live', 'closed', 'built']) {
-            await expect(main.locator(`a[href$="/tasks/${board.tasks.get(key)!.id}"]`)).toHaveCount(0);
+            await expect(main.locator(`a[href$="/tasks/${board.tasks.get(key)!.id}"]`)).toHaveCount(
+                0,
+            );
         }
         await expect(main.locator(`a[href$="/tasks/${board.untracked.id}"]`)).toHaveCount(0);
         const chips = main.getByTestId('task-delivery-chip');
@@ -312,13 +339,19 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
 
         // Live narrows to the three live cards.
         await pickDelivery(page, 'live', 'Live');
-        await page.getByTestId('work-tasks-delivery-filter').getByRole('button', { name: 'Apply' }).click();
+        await page
+            .getByTestId('work-tasks-delivery-filter')
+            .getByRole('button', { name: 'Apply' })
+            .click();
         await expect(page).toHaveURL(/[?&]delivery=live(&|$)/, { timeout: 30_000 });
         await expect(main.getByTestId('task-delivery-chip')).toHaveCount(3, { timeout: 30_000 });
 
         // Any = no filter: every Task of the Work, the untracked one included.
         await pickDelivery(page, '', 'Any');
-        await page.getByTestId('work-tasks-delivery-filter').getByRole('button', { name: 'Apply' }).click();
+        await page
+            .getByTestId('work-tasks-delivery-filter')
+            .getByRole('button', { name: 'Apply' })
+            .click();
         await expect(page).toHaveURL(/[?&]delivery=(&|$)|\/tasks$/, { timeout: 30_000 });
         await expect(main.locator(`a[href$="/tasks/${board.untracked.id}"]`).first()).toBeVisible({
             timeout: 30_000,
@@ -335,7 +368,10 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         const task = await createWorkTask(request, token, workId, { title: 'close anyway' });
         // The change was in review when it merged; its Build failed.
         await transitionTask(request, token, task.id, 'in_review');
-        await seedTaskState(request, token, { taskId: task.id, delivery: { state: 'build_failed', prNumber: 7 } });
+        await seedTaskState(request, token, {
+            taskId: task.id,
+            delivery: { state: 'build_failed', prNumber: 7 },
+        });
 
         await gotoDashboard(page, `/en/tasks/${task.id}`);
         const section = page.getByTestId('task-delivery-section');
@@ -344,7 +380,9 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         await expect(section).toContainText('Pull request #7 merged');
 
         // A failed change also offers Create a fix Task beside Close anyway.
-        await expect(section.getByTestId('task-delivery-create-fix-task')).toHaveText('Create a fix Task');
+        await expect(section.getByTestId('task-delivery-create-fix-task')).toHaveText(
+            'Create a fix Task',
+        );
 
         // 1 — Close anyway opens the confirmation (a portalled dialog); Keep open dismisses it and
         //     nothing is written.
@@ -367,9 +405,12 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         // 2 — Close anyway → Close anyway: the chain reads Closed without deploying, the Task is Done.
         await section.getByTestId('task-delivery-close').click();
         await page.getByTestId('task-delivery-confirm-close').click();
-        await expect(section.getByTestId('task-delivery-chip')).toHaveText('Closed without deploying', {
-            timeout: 30_000,
-        });
+        await expect(section.getByTestId('task-delivery-chip')).toHaveText(
+            'Closed without deploying',
+            {
+                timeout: 30_000,
+            },
+        );
         await expect(section.getByTestId('task-delivery-close')).toHaveCount(0);
 
         const after = await request.get(`${API_BASE}/api/tasks/${task.id}/delivery`, {
@@ -395,10 +436,9 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
 
         // The reload reads the same answer from the server.
         await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('task-delivery-section').getByTestId('task-delivery-chip')).toHaveText(
-            'Closed without deploying',
-            { timeout: 45_000 },
-        );
+        await expect(
+            page.getByTestId('task-delivery-section').getByTestId('task-delivery-chip'),
+        ).toHaveText('Closed without deploying', { timeout: 45_000 });
     });
 
     test('a built change on an App Work that is not deployed reads Built ✓ · Waiting for a deployment and offers Close without deploying', async ({
@@ -414,9 +454,13 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         await gotoDashboard(page, `/en/tasks/${task.id}`);
         const section = page.getByTestId('task-delivery-section');
         await expect(section).toBeVisible({ timeout: 45_000 });
-        await expect(section.getByTestId('task-delivery-chip')).toHaveText(/^Built ✓ · Waiting for a deployment/);
+        await expect(section.getByTestId('task-delivery-chip')).toHaveText(
+            /^Built ✓ · Waiting for a deployment/,
+        );
         // `built` is closable but not a failure: the action reads "Close without deploying".
-        await expect(section.getByTestId('task-delivery-close')).toHaveText('Close without deploying');
+        await expect(section.getByTestId('task-delivery-close')).toHaveText(
+            'Close without deploying',
+        );
         // No deploy target is configured on the seeded Work, so Deploy now is not offered.
         await expect(section.getByTestId('task-delivery-deploy-now')).toHaveCount(0);
         await expect(section.getByTestId('task-delivery-create-fix-task')).toHaveCount(0);

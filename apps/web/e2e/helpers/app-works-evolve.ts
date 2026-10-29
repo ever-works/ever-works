@@ -61,7 +61,10 @@ export async function seedAppWork(
         data: { kind: 'app', name, deployments: [] },
     });
     const body = await res.text();
-    expect(res.status(), `POST ${APP_WORK_SEED_PATH} answered ${res.status()} — ${GATE_HINT}. Body: ${body}`).toBe(201);
+    expect(
+        res.status(),
+        `POST ${APP_WORK_SEED_PATH} answered ${res.status()} — ${GATE_HINT}. Body: ${body}`,
+    ).toBe(201);
     const json = JSON.parse(body) as { workId: string; slug: string; name: string };
     return { workId: json.workId, slug: json.slug, name: json.name };
 }
@@ -117,7 +120,9 @@ export async function transitionTask(
         data: { to: status, mode: 'sync' },
     });
     const text = await res.text();
-    expect(res.ok(), `POST /api/tasks/${id}/transition → ${status}: ${res.status()} ${text}`).toBe(true);
+    expect(res.ok(), `POST /api/tasks/${id}/transition → ${status}: ${res.status()} ${text}`).toBe(
+        true,
+    );
 }
 
 export type DeliveryStateName =
@@ -187,7 +192,10 @@ export async function seedTaskState(
         data: body,
     });
     const text = await res.text();
-    expect(res.status(), `POST ${TASK_SEED_PATH} answered ${res.status()} — ${GATE_HINT}. Body: ${text}`).toBe(201);
+    expect(
+        res.status(),
+        `POST ${TASK_SEED_PATH} answered ${res.status()} — ${GATE_HINT}. Body: ${text}`,
+    ).toBe(201);
     return JSON.parse(text) as TaskSeedResult;
 }
 

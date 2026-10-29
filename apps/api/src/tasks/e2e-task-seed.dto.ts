@@ -39,7 +39,12 @@ import { TASK_DELIVERY_STATES, type TaskDeliveryState } from '@ever-works/contra
 export const E2E_TASK_SEED_SHA_PATTERN = /^[0-9a-f]{7,64}$/;
 
 /** The `work_deployments.state` spellings the delivery chain reads (`task-delivery.rules.ts`). */
-export const E2E_TASK_SEED_DEPLOYMENT_STATES = ['READY', 'ERROR', 'ROLLED_BACK', 'BUILDING'] as const;
+export const E2E_TASK_SEED_DEPLOYMENT_STATES = [
+    'READY',
+    'ERROR',
+    'ROLLED_BACK',
+    'BUILDING',
+] as const;
 export type E2eTaskSeedDeploymentState = (typeof E2E_TASK_SEED_DEPLOYMENT_STATES)[number];
 
 /** `GitDiffFile.status` values a fixture may name. */
