@@ -400,8 +400,11 @@ export const DOMAIN_EVENT_ROUTE_COVERAGE: Readonly<Record<string, RouteCoverage>
     'DELETE /api/works/:id/comparisons/:slug': { exempt: WORK_CONTENT },
 
     // ── Inbox (`api/inbox`, `api/escalations`, `api/agent-approvals`; EW-P3-1) ──
-    // + `inbox.item.state_changed` when routing fails after the claim marked the item read.
-    'POST /api/inbox/:id/reply': { events: ['inbox.item.answered', 'inbox.item.state_changed'] },
+    // + `inbox.item.state_changed` when routing fails after the claim marked the item read;
+    // `inbox.item.updated` instead of `answered` for an integration item (integration inbox push).
+    'POST /api/inbox/:id/reply': {
+        events: ['inbox.item.answered', 'inbox.item.updated', 'inbox.item.state_changed'],
+    },
     'PATCH /api/inbox/:id/read': { events: ['inbox.item.state_changed'] },
     'POST /api/inbox/:id/archive': { events: ['inbox.item.state_changed'] },
     'POST /api/inbox/:id/unarchive': { events: ['inbox.item.state_changed'] },
@@ -414,9 +417,12 @@ export const DOMAIN_EVENT_ROUTE_COVERAGE: Readonly<Record<string, RouteCoverage>
     'POST /api/agent-approvals/:id/reject': { events: ['inbox.item.answered'] },
     // Integration API v1 Inbox: the same `InboxService` writes, as the recipient.
     'POST /api/integrations/v1/inbox/items/:id/reply': {
-        events: ['inbox.item.answered', 'inbox.item.state_changed'],
+        events: ['inbox.item.answered', 'inbox.item.updated', 'inbox.item.state_changed'],
     },
     'PATCH /api/integrations/v1/inbox/items/:id/state': { events: ['inbox.item.state_changed'] },
+    // Integration inbox push: the key files and changes its OWN items (origin integration).
+    'POST /api/integrations/v1/inbox/items': { events: ['inbox.item.created'] },
+    'PATCH /api/integrations/v1/inbox/items/:id': { events: ['inbox.item.updated'] },
     // Integration API v1 agent email (EW-P4-1): the provider path's dispatcher; + the Task link.
     'POST /api/integrations/v1/email/inbound': {
         events: ['email.message.received', 'email.message.status_changed'],

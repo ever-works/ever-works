@@ -15,6 +15,7 @@ import {
 import type { AgentActionRiskFlag } from '@/lib/api/agent-approvals';
 import { InboxAnswerSummary } from './InboxAnswerSummary';
 import { InboxFleetSource } from './InboxFleetSource';
+import { InboxIntegrationSource } from './InboxIntegrationSource';
 import { InboxSessionSource } from './InboxSessionSource';
 import { InboxReplyComposer } from './InboxReplyComposer';
 
@@ -125,6 +126,8 @@ export function InboxDecisionDetail({
                 </p>
                 <InboxFleetSource item={decision} />
                 <InboxSessionSource item={decision} />
+                {/* Integration inbox push — a question / approval another product filed. */}
+                <InboxIntegrationSource item={decision} />
             </div>
 
             <div className="flex flex-wrap items-center gap-2">

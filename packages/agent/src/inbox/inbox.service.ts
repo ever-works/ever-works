@@ -701,12 +701,25 @@ export class InboxService implements InboxProducer {
         // The claim is released again if routing throws, so a downstream
         // hiccup still leaves the human an answerable item — the reason
         // the original order routed first.
-        const claimed = await this.items.markAnswered(id, userId, {
+        const answerFields = {
             // FL-05: a session's free-text answer is typed into the session and
             // never persisted (spec §6 privacy) — the option id is recorded.
             text: row.sourceType === 'fleet-session' ? null : text || null,
             optionId: option?.id ?? null,
-        });
+        };
+        // Integration inbox push: an item another product filed routes nowhere —
+        // the answer is stored on the row and recorded as `inbox.item.updated`,
+        // which the integration reads back and applies in its own app. No run is
+        // steered, resumed or started, whatever the item links to. The answer and
+        // its event (the version step) commit TOGETHER: the integration's
+        // `PATCH If-Match` then can never land on the version it read before the
+        // answer and overwrite it, and an answer is never stored that the
+        // integration would not hear about.
+        const external = isIntegrationItem(row);
+        const claimed =
+            external && this.domainEvents
+                ? await this.answerIntegrationItem(id, userId, answerFields, row.unread)
+                : await this.items.markAnswered(id, userId, answerFields);
         if (!claimed) {
             const winner = await this.items.findOwned(id, userId);
             if (!winner) throw new NotFoundException(`Inbox item ${id} not found.`);
@@ -721,8 +734,11 @@ export class InboxService implements InboxProducer {
         let runId: string | undefined;
         let restart: InboxReplyRestart = 'none';
         try {
+            if (external) {
+                routed = 'none';
+            }
             // FL-05: a session's Decision answers the session, not a Run.
-            if (
+            else if (
                 row.sourceType === 'fleet-session' &&
                 (row.kind === 'question' || row.kind === 'approval')
             ) {
@@ -764,7 +780,9 @@ export class InboxService implements InboxProducer {
                         }
                         break;
                     }
-                    case 'notice':
+                    default:
+                        // A notice, and the integration kinds (mention, assignment,
+                        // email, other): nothing to route, the answer is recorded.
                         routed = 'none';
                         break;
                 }
@@ -787,7 +805,8 @@ export class InboxService implements InboxProducer {
             throw err;
         }
 
-        await this.recordAnswered(id, row.unread);
+        // An integration item's answer was recorded WITH its claim (answerIntegrationItem).
+        if (!external) await this.recordAnswered(id, row.unread);
         const fresh = await this.items.findOwned(id, userId);
         if (!fresh) throw new NotFoundException(`Inbox item ${id} not found.`);
 
@@ -897,7 +916,7 @@ export class InboxService implements InboxProducer {
     /** A full-snapshot change of one item (bumps its version). */
     private async recordChanged(
         id: string,
-        type: 'inbox.item.answered' | 'inbox.item.state_changed',
+        type: 'inbox.item.answered' | 'inbox.item.state_changed' | 'inbox.item.updated',
         changedFields: string[],
         previous: Record<string, unknown>,
     ): Promise<void> {
@@ -914,14 +933,47 @@ export class InboxService implements InboxProducer {
      * `inbox.item.answered` — whichever door the answer came through (Inbox
      * reply, escalation resolve, approval decide). Recorded once per answer:
      * only the caller that won the `markAnswered` claim gets here.
+     * (An INTEGRATION item's answer is `inbox.item.updated`, recorded with
+     * its claim: {@link answerIntegrationItem}.)
      */
     private async recordAnswered(id: string, wasUnread: boolean): Promise<void> {
-        await this.recordChanged(
-            id,
-            'inbox.item.answered',
-            ['status', 'unread', 'answeredAt', 'answerText', 'answerOptionId'],
-            { status: 'open', unread: !!wasUnread },
-        );
+        await this.recordChanged(id, 'inbox.item.answered', ANSWER_FIELDS, {
+            status: 'open',
+            unread: !!wasUnread,
+        });
+    }
+
+    /**
+     * Integration inbox push — the member answers an item another product
+     * filed. The claim (`markAnswered`, CAS on `status = 'open'`) and its
+     * `inbox.item.updated` event (which takes the next version) are ONE
+     * transaction, unlike the best-effort recording of every other answer:
+     *
+     *  - the integration's `PATCH /inbox/items/:id` is a compare-and-set on
+     *    `version`, so it can never land on the version it read before the
+     *    answer and reopen or overwrite it (`412` instead);
+     *  - the event is how the integration learns the answer, so an answer
+     *    whose event could not be written is not stored either: the reply
+     *    fails and the item stays answerable.
+     *
+     * Returns whether this call won the claim (`false` = someone answered first).
+     */
+    private async answerIntegrationItem(
+        id: string,
+        userId: string,
+        answer: { text: string | null; optionId: string | null },
+        wasUnread: boolean,
+    ): Promise<boolean> {
+        const publisher = this.domainEvents!;
+        return publisher.transaction(async (manager) => {
+            const claimed = await this.items.markAnswered(id, userId, answer, manager);
+            if (!claimed) return false;
+            await publisher.changed(manager, 'inbox_item', id, 'inbox.item.updated', {
+                changedFields: ANSWER_FIELDS,
+                previous: { status: 'open', unread: !!wasUnread },
+            });
+            return true;
+        });
     }
 
     // ── internals ─────────────────────────────────────────────────
@@ -1204,7 +1256,7 @@ export class InboxService implements InboxProducer {
             await this.notifications.notifyInboxItem({
                 userId: row.userId,
                 itemId: row.id,
-                kind: row.kind,
+                kind: notificationKindOf(row.kind),
                 title: row.title,
                 message: row.body,
             });
@@ -1276,4 +1328,19 @@ function firstLine(text: string): string {
 /** An unanswered question a FLEET run is parked on (slice Q dismissal rule). */
 function isOpenFleetQuestion(row: InboxItem): boolean {
     return row.kind === 'question' && row.status === 'open' && row.sourceType === 'fleet-run';
+}
+
+/** The fields an answer changes, as its event names them. */
+const ANSWER_FIELDS = ['status', 'unread', 'answeredAt', 'answerText', 'answerOptionId'];
+
+/** An item an integration key filed (integration inbox push): its answer routes nowhere. */
+export function isIntegrationItem(row: Pick<InboxItem, 'origin' | 'sourceType'>): boolean {
+    return row.origin === 'integration' || row.sourceType === 'integration';
+}
+
+/** The notification family of an item: the integration kinds ring as a notice. */
+function notificationKindOf(
+    kind: InboxItem['kind'],
+): 'question' | 'approval' | 'escalation' | 'notice' {
+    return kind === 'question' || kind === 'approval' || kind === 'escalation' ? kind : 'notice';
 }

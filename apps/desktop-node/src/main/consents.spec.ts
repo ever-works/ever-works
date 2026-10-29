@@ -38,6 +38,86 @@ describe('desktop consents', () => {
 		expect(await loadDesktopConsents(fs, '/u/node-consents.json')).toEqual(DEFAULT_DESKTOP_CONSENTS);
 	});
 
+	it('saves through a temp file renamed into place when the filesystem can (#380)', async () => {
+		const files = new Map<string, string>([['/u/node-consents.json', '{"version":1,"work":false}']]);
+		const calls: string[] = [];
+		const fs = {
+			readFile: async (path: string) => files.get(path) ?? null,
+			writeFile: async (path: string) => {
+				calls.push(`writeFile ${path}`);
+			},
+			createFileExclusive: async (path: string, content: string) => {
+				calls.push('create');
+				files.set(path, content);
+			},
+			writeExistingFile: async (path: string, content: string | Uint8Array) => {
+				calls.push('write');
+				files.set(path, String(content));
+			},
+			rename: async (from: string, to: string) => {
+				calls.push('rename');
+				files.set(to, files.get(from) ?? '');
+				files.delete(from);
+			},
+			remove: async (path: string) => {
+				files.delete(path);
+			}
+		};
+
+		await saveDesktopConsents(
+			fs,
+			'/u/node-consents.json',
+			{ work: true, attend: true, manage: false },
+			{
+				platform: 'linux'
+			}
+		);
+
+		// Never rewritten in place: a kill mid-save leaves the old file whole, not a torn one.
+		expect(calls).toEqual(['create', 'write', 'rename']);
+		expect([...files.keys()]).toEqual(['/u/node-consents.json']);
+		expect(await loadDesktopConsents(fs, '/u/node-consents.json')).toEqual({
+			work: true,
+			attend: true,
+			manage: false
+		});
+	});
+
+	it('rejects a refused save with the old file whole — never an in-place rewrite (#380 review)', async () => {
+		const before = '{"version":1,"work":false,"attend":true,"manage":true}';
+		const files = new Map<string, string>([['/u/node-consents.json', before]]);
+		const calls: string[] = [];
+		const fs = {
+			readFile: async (path: string) => files.get(path) ?? null,
+			writeFile: async (path: string) => {
+				calls.push(`writeFile ${path}`);
+			},
+			createFileExclusive: async (path: string, content: string) => {
+				files.set(path, content);
+			},
+			writeExistingFile: async (path: string, content: string | Uint8Array) => {
+				files.set(path, String(content));
+			},
+			rename: async () => {
+				throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' });
+			},
+			remove: async (path: string) => {
+				files.delete(path);
+			}
+		};
+
+		await expect(
+			saveDesktopConsents(
+				fs,
+				'/u/node-consents.json',
+				{ work: true, attend: false, manage: false },
+				{ platform: 'linux' }
+			)
+		).rejects.toThrow('EPERM');
+		expect(calls).toEqual([]);
+		expect([...files.entries()]).toEqual([['/u/node-consents.json', before]]);
+	});
+
 	it('takes only literal booleans; a missing key keeps its default', () => {
 		expect(normalizeDesktopConsents({ work: 'false', attend: 1, manage: true })).toEqual({
 			work: true,

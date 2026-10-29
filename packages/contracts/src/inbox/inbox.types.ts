@@ -21,9 +21,56 @@
  * the deliberately smaller shape the founder screenshots show.
  */
 
-export type InboxItemKind = 'question' | 'approval' | 'escalation' | 'notice';
+export type InboxItemKind =
+	| 'question'
+	| 'approval'
+	| 'escalation'
+	| 'notice'
+	// Integration inbox push (`origin: 'integration'`): kinds another product's
+	// Inbox has (Ever Gauzy first) that no Ever Works producer writes.
+	| 'mention'
+	| 'assignment'
+	| 'email'
+	| 'other';
 
-export const INBOX_ITEM_KINDS: readonly InboxItemKind[] = ['question', 'approval', 'escalation', 'notice'];
+/** Appended in the order they shipped — the web mirror pins the sequence. */
+export const INBOX_ITEM_KINDS: readonly InboxItemKind[] = [
+	'question',
+	'approval',
+	'escalation',
+	'notice',
+	'mention',
+	'assignment',
+	'email',
+	'other'
+];
+
+/**
+ * The kinds an INTEGRATION may file (`POST /api/integrations/v1/inbox/items`).
+ * `escalation` is not one of them: an escalation is an Ever Works agent giving
+ * up, and answering it resolves an Ever Works record.
+ */
+export const INBOX_EXTERNAL_ITEM_KINDS: readonly InboxItemKind[] = [
+	'notice',
+	'question',
+	'approval',
+	'mention',
+	'assignment',
+	'email',
+	'other'
+];
+
+/** The kinds an integration may give answer buttons (`choices`). */
+export const INBOX_EXTERNAL_CHOICE_KINDS: readonly InboxItemKind[] = ['question', 'approval'];
+
+/**
+ * Who wrote the row: an Ever Works producer (`platform`, every row before the
+ * integration inbox push) or an integration key (`integration`: an item another
+ * product's Inbox put into the member's Ever Works Inbox).
+ */
+export type InboxItemOrigin = 'platform' | 'integration';
+
+export const INBOX_ITEM_ORIGINS: readonly InboxItemOrigin[] = ['platform', 'integration'];
 
 export type InboxItemStatus = 'open' | 'answered' | 'archived';
 
@@ -38,7 +85,10 @@ export type InboxItemSourceType =
 	| 'fleet-run'
 	// FL-05 (CONTRACTS R-12): a session on a computer that needs you — a question or a
 	// permission request (the Decision), or a blocked / failed notice.
-	| 'fleet-session';
+	| 'fleet-session'
+	// Integration inbox push: an item an integration key filed (`origin: 'integration'`).
+	// Its answer is stored on the item for the integration to read back; no run starts.
+	| 'integration';
 
 /** Appended in the order they shipped — the web spec pins the sequence. */
 export const INBOX_ITEM_SOURCE_TYPES: readonly InboxItemSourceType[] = [
@@ -48,7 +98,8 @@ export const INBOX_ITEM_SOURCE_TYPES: readonly InboxItemSourceType[] = [
 	'system',
 	'work',
 	'fleet-run',
-	'fleet-session'
+	'fleet-session',
+	'integration'
 ];
 
 /**
@@ -100,6 +151,92 @@ export const INBOX_MAX_OPTION_ID_CHARS = 64;
 export const INBOX_MAX_OPTION_LABEL_CHARS = 200;
 export const INBOX_MAX_REPLY_CHARS = 8000;
 
+// ── Integration inbox push (`POST /api/integrations/v1/inbox/items`) ──────
+//
+// An integration (Ever Gauzy first) files ITS OWN Inbox items into a member's
+// Ever Works Inbox. These caps are the contract's: the API refuses a value past
+// them (`400 validation_failed`) instead of truncating it, so the integration
+// never holds a copy that differs from the one Ever Works stored.
+
+/** `externalId`: the integration's own id of the item, unique per tenant and key. */
+export const INBOX_EXTERNAL_ID_MAX_CHARS = 128;
+/** An integration item's body (markdown, stored and shown as plain text). */
+export const INBOX_EXTERNAL_BODY_MAX_CHARS = 20_000;
+/** `sourceUrl` (`https:` only). */
+export const INBOX_SOURCE_URL_MAX_CHARS = 2000;
+/** `sourceLabel`, the badge text (defaults to the integration's name). */
+export const INBOX_SOURCE_LABEL_MAX_CHARS = 80;
+/** `choices` of a `question` / `approval` from an integration. */
+export const INBOX_EXTERNAL_MAX_CHOICES = 10;
+/** `email.from` (one address, optionally with a display name). */
+export const INBOX_EMAIL_FROM_MAX_CHARS = 320;
+/** `email.to` (one or more addresses, as the integration wrote them). */
+export const INBOX_EMAIL_TO_MAX_CHARS = 1000;
+/** `email.subject`. */
+export const INBOX_EMAIL_SUBJECT_MAX_CHARS = 300;
+/** `email.receivedAt` (an ISO 8601 date-time). */
+export const INBOX_EMAIL_RECEIVED_AT_MAX_CHARS = 64;
+
+/**
+ * The header block of a `kind: 'email'` item an integration filed: who sent
+ * it, to whom, its subject and when it arrived. Plain text BY CONTRACT; the
+ * web renders it as text, never as markup.
+ */
+export interface InboxItemEmailMeta {
+	from: string;
+	to?: string | null;
+	subject: string;
+	receivedAt: string;
+}
+
+/**
+ * Normalize an untrusted email header block (a DB column, a request body that
+ * already passed the API's validation) into a clean {@link InboxItemEmailMeta},
+ * or `null` when `from` or `subject` is missing. Strings are trimmed and
+ * capped; unknown keys are dropped.
+ */
+export function normalizeInboxEmailMeta(value: unknown): InboxItemEmailMeta | null {
+	if (!isRecord(value)) return null;
+	const text = (raw: unknown, max: number): string | null => {
+		if (typeof raw !== 'string') return null;
+		const trimmed = raw.trim();
+		return trimmed ? trimmed.slice(0, max) : null;
+	};
+	const from = text(value.from, INBOX_EMAIL_FROM_MAX_CHARS);
+	const subject = text(value.subject, INBOX_EMAIL_SUBJECT_MAX_CHARS);
+	if (!from || !subject) return null;
+	return {
+		from,
+		to: text(value.to, INBOX_EMAIL_TO_MAX_CHARS),
+		subject,
+		receivedAt: text(value.receivedAt, INBOX_EMAIL_RECEIVED_AT_MAX_CHARS) ?? ''
+	};
+}
+
+/** Whitespace or a control character anywhere in a URL. */
+const URL_UNSAFE_CHARS = /[\s\u0000-\u001f\u007f]/;
+
+/**
+ * Whether `value` is a link an integration may attach to an inbox item: an
+ * absolute `https:` URL of at most {@link INBOX_SOURCE_URL_MAX_CHARS}
+ * characters, with a host and no embedded credentials. `javascript:`, `data:`,
+ * `http:` and relative URLs are refused, and so is any whitespace or control
+ * character (a browser strips some of them and would resolve another URL than
+ * the one checked). The web checks again before it renders it (`safeHttpsUrl`).
+ */
+export function isSafeInboxSourceUrl(value: unknown): value is string {
+	if (typeof value !== 'string' || value.length === 0 || value.length > INBOX_SOURCE_URL_MAX_CHARS) {
+		return false;
+	}
+	if (URL_UNSAFE_CHARS.test(value)) return false;
+	try {
+		const url = new URL(value);
+		return url.protocol === 'https:' && url.hostname.length > 0 && !url.username && !url.password;
+	} catch {
+		return false;
+	}
+}
+
 /** One structured answer button on a `question` / `approval` item. */
 export interface InboxItemOption {
 	/** Stable machine token returned in the reply. */
@@ -139,6 +276,19 @@ export interface InboxItemDto {
 	firstViewedAt?: string | null;
 	createdAt: string;
 	updatedAt: string;
+	// ── Integration inbox push. Optional on the wire: an older API omits them. ──
+	/** `platform` (an Ever Works producer) or `integration` (filed by an integration key). */
+	origin?: InboxItemOrigin;
+	/** The badge text of an integration item, e.g. "Ever Gauzy". NULL for platform items. */
+	sourceLabel?: string | null;
+	/** The item in the integration's own app (`https:` only). NULL for platform items. */
+	sourceUrl?: string | null;
+	/** The header block of a `kind: 'email'` integration item. */
+	email?: InboxItemEmailMeta | null;
+	/** When it happened at the source, when the integration said so. */
+	occurredAt?: string | null;
+	/** The Goal an integration item is about. */
+	goalId?: string | null;
 }
 
 // ── My Decisions — the decision view of the Inbox ──────────────────────
@@ -151,7 +301,11 @@ export interface InboxItemDto {
 // the record and the run, so My Decisions is the Inbox read through a
 // ranking and a handful of filters, never a parallel queue.
 
-/** The Inbox kinds that ask the human to decide (everything but `notice`). */
+/**
+ * The Inbox kinds that ask the human to decide: not the FYI ones (`notice`,
+ * and the integration push's `mention` / `assignment` / `email` / `other`).
+ * An integration's `question` / `approval` IS a decision and shows in My Decisions.
+ */
 export const INBOX_DECISION_KINDS: readonly InboxItemKind[] = ['question', 'approval', 'escalation'];
 
 /** Default page of the decision view. */

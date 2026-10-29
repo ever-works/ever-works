@@ -82,6 +82,19 @@ export interface HelperFs {
 	sha256(path: string): Promise<string>;
 }
 
+/**
+ * A helper trust file would be written on Windows with no owner-only ACL step (Gauzy Ever Works
+ * #380). Fails closed: a temp file carrying the directory's inherited ACL must never become the
+ * admission record or the helper binary, so the write rejects with the target untouched. The CLI
+ * and the desktop app both inject `restrict`; this only fires for a host that forgot to.
+ */
+export class HelperAclUnavailableError extends Error {
+	constructor(path: string) {
+		super(`Refusing to write ${path}: no owner-only ACL step was provided on Windows`);
+		this.name = 'HelperAclUnavailableError';
+	}
+}
+
 /** The real filesystem. `restrict` applies the owner-only ACL on Windows (`node-io`'s helper). */
 export function createHelperFs(options: {
 	platform: string;
@@ -89,10 +102,11 @@ export function createHelperFs(options: {
 }): HelperFs {
 	const paths = options.platform === 'win32' ? win32 : posix;
 	const atomic = createNodeAtomicFileOps(options.platform);
-	/** The final mode on POSIX; the owner-only ACL on Windows, when the host supplies one. */
+	/** The final mode on POSIX; the owner-only ACL on Windows — required there (fails closed). */
 	const tightenTemp = async (temporary: string, mode: number): Promise<void> => {
 		if (options.platform !== 'win32') await fsp.chmod(temporary, mode);
 		else if (options.restrict) await options.restrict(temporary);
+		else throw new HelperAclUnavailableError(temporary);
 	};
 	return {
 		async readText(path) {

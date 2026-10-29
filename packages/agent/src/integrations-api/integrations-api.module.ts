@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DomainEventsModule } from '../domain-events/domain-events.module';
 import { ExternalRecordLinksService } from './external-record-links.service';
 import { IntegrationEmailService } from './integration-email.service';
 import { IntegrationIdempotencyService } from './integration-idempotency.service';
@@ -13,6 +14,9 @@ import { IntegrationResourcesService } from './integration-resources.service';
  * they share, so it can be tested on every database dialect.
  */
 @Module({
+    // The integration inbox push records `inbox.item.created` / `inbox.item.updated`
+    // in the write's own transaction (`DomainEventPublisher`).
+    imports: [DomainEventsModule],
     providers: [
         ExternalRecordLinksService,
         IntegrationIdempotencyService,

@@ -123,6 +123,11 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     // Internal caches and metering plumbing.
     'CacheEntry',
     'CreditMeterEvent',
+    // Self-serve account deletion (#2986): the deletion audit row and its
+    // one-time link (`emailHash`, `tokenHash`). It describes the deletion of an
+    // ACCOUNT, not workspace content, and a restore must never bring back — let
+    // alone replay — a deletion request or a still-valid deletion token.
+    'AccountDeletionRequest',
 ]);
 
 const DROPPED_ENTITY_SET = new Set(BACKUP_DROPPED_ENTITIES);
