@@ -2204,6 +2204,34 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             );
         });
 
+        it('starts a second new branch from the base tip, not from the branch the checkout was left on', async () => {
+            const git = realGit();
+            const { facade } = build({ git });
+
+            const first = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/a',
+                    files: [{ path: 'src/a.ts', body: 'export const a = 1;\n' }],
+                }),
+            );
+            // The shared checkout is now ON feature/a; `switchBranch` would branch from here.
+            const second = await facade.commitToRepo(
+                commitInput({
+                    branch: 'feature/b',
+                    files: [{ path: 'src/b.ts', body: 'export const b = 1;\n' }],
+                }),
+            );
+
+            expect(second.sha).toMatch(/^[0-9a-f]{40}$/);
+            expect(remoteTips['feature/b']).toBe(second.sha);
+            // One commit on the base tip — feature/a's commit does not ride along.
+            expect((await ops.readLocalCommit(dir, 'refs/heads/feature/b'))?.parents).toEqual([
+                remoteTips.main,
+            ]);
+            expect(committedFiles(second.sha as string)).toEqual(['src/b.ts']);
+            expect(first.sha).not.toBe(second.sha);
+        });
+
         it('drops its own commit again when the push fails, so the retry is not refused', async () => {
             const git = realGit();
             const { facade } = build({ git });
@@ -2496,10 +2524,10 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
 
             it('refuses BEFORE writing when the branch is not at the remote tip', async () => {
                 const git = makeGit();
-                git.readLocalCommit.mockResolvedValueOnce({
-                    sha: 'b'.repeat(40),
-                    parents: [REMOTE_TIP],
-                });
+                const planted = { sha: 'b'.repeat(40), parents: [REMOTE_TIP] };
+                // Read twice before writing: does the branch exist (before the switch), and
+                // where is it (after).
+                git.readLocalCommit.mockResolvedValueOnce(planted).mockResolvedValueOnce(planted);
                 const { facade } = build({ git });
 
                 await expect(
@@ -2512,7 +2540,7 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
 
             it('fails closed when the provider cannot read local commits', async () => {
                 const git = makeGit();
-                git.readLocalCommit.mockRejectedValueOnce(
+                git.readLocalCommit.mockRejectedValue(
                     new Error("Git provider 'gitea' does not support readLocalCommit."),
                 );
                 const { facade } = build({ git });
@@ -2527,7 +2555,8 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             it('refuses a new commit that is not a direct child of the remote tip', async () => {
                 const git = makeGit();
                 git.readLocalCommit
-                    .mockResolvedValueOnce({ sha: REMOTE_TIP, parents: [] })
+                    .mockResolvedValueOnce({ sha: REMOTE_TIP, parents: [] }) // exists (pre-switch)
+                    .mockResolvedValueOnce({ sha: REMOTE_TIP, parents: [] }) // at the anchor
                     .mockResolvedValueOnce({ sha: 'sha-1', parents: ['c'.repeat(40)] });
                 const { facade } = build({ git });
 

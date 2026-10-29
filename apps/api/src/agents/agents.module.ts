@@ -1336,7 +1336,7 @@ async function assertRealWriteTarget(
                     repo: string;
                     branch: string;
                     base: string;
-                }): Promise<string | null> => {
+                }): Promise<{ anchor: string | null; remoteHasBranch: boolean }> => {
                     const options = {
                         providerId: input.providerId,
                         userId: input.userId,
@@ -1347,7 +1347,10 @@ async function assertRealWriteTarget(
                             ? ((await git.getLatestCommit(input.owner, input.repo, name, options))
                                   ?.sha ?? null)
                             : null;
-                    return (await tipOf(input.branch)) ?? (await tipOf(input.base));
+                    const branchTip = await tipOf(input.branch);
+                    return branchTip
+                        ? { anchor: branchTip, remoteHasBranch: true }
+                        : { anchor: await tipOf(input.base), remoteHasBranch: false };
                 };
                 const refusePush = (
                     owner: string,
@@ -1715,6 +1718,13 @@ async function assertRealWriteTarget(
                             // to commit. Reproduced against the real library: write, add,
                             // switch, commit -> null, edits gone; switch, write, add,
                             // commit -> a sha, edits committed.
+                            // C-10 — whether the branch already exists locally, read BEFORE the
+                            // switch creates it: a branch new to both sides must start from the
+                            // remote base tip, and `switchBranch` creates it from whatever branch
+                            // the shared checkout was left on (an earlier call's feature branch).
+                            const existedLocally =
+                                (await localTipOf(providerId, dir, branch).catch(() => null)) !==
+                                null;
                             await git.switchBranch(providerId, dir, branch, true);
                             // C-10 — BEFORE anything is written: the branch must sit exactly on
                             // the remote tip (or the base tip for a new branch). A local commit
@@ -1723,7 +1733,7 @@ async function assertRealWriteTarget(
                             let pushAnchor: string | null;
                             let tipBefore: { sha: string } | null;
                             try {
-                                pushAnchor = await pushAnchorOf({
+                                const remote = await pushAnchorOf({
                                     providerId,
                                     userId,
                                     workId,
@@ -1732,6 +1742,10 @@ async function assertRealWriteTarget(
                                     branch,
                                     base,
                                 });
+                                pushAnchor = remote.anchor;
+                                if (!existedLocally && !remote.remoteHasBranch && pushAnchor) {
+                                    await git.resetBranchTo(providerId, dir, branch, pushAnchor);
+                                }
                                 tipBefore = await localTipOf(providerId, dir, branch);
                             } catch (error) {
                                 return refusePush(
