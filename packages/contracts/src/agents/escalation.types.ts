@@ -37,6 +37,11 @@
  *                          same failure (or retrying past the configured
  *                          ceiling) without progress, and stopped it before it
  *                          spent the rest of its budget on the same wall.
+ * - `delivery-failed`    — APW-08 (FR-37/FR-38): a merged App Work change
+ *                          failed to build or deploy and the automatic
+ *                          follow-up budget is spent (or the follow-up could
+ *                          not be filed), so a person decides — **Open the
+ *                          Task**, **Close anyway** or **Try once more**.
  */
 export type AgentEscalationReasonCode =
 	| 'gate-exhausted'
@@ -48,7 +53,8 @@ export type AgentEscalationReasonCode =
 	| 'awaiting-input'
 	| 'run-parked'
 	| 'queued-too-long'
-	| 'loop-detected';
+	| 'loop-detected'
+	| 'delivery-failed';
 
 /** Canonical list — one source of truth for `@IsIn` validators and pins. */
 export const AGENT_ESCALATION_REASON_CODES: readonly AgentEscalationReasonCode[] = [
@@ -61,7 +67,8 @@ export const AGENT_ESCALATION_REASON_CODES: readonly AgentEscalationReasonCode[]
 	'awaiting-input',
 	'run-parked',
 	'queued-too-long',
-	'loop-detected'
+	'loop-detected',
+	'delivery-failed'
 ];
 
 /**

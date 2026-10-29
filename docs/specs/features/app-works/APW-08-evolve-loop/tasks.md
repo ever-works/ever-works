@@ -493,6 +493,18 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
 
 ## P1.6 — Delivery chain
 
+**Status (2026-10-29, lane L3, branch `feat/apw08-delivery-chain`, Gauzy Ever Works #10): the backend chain is built** —
+T7 (delivery constants, route codes, `delivery-failed`; not `TaskCheckResult 'not-admitted'`, which is the checks lane's),
+T8, T9 (stamped `1792320000000-AddTaskDeliveryState` — after the newest applied App Works migration — and carrying
+`followUpKey`, so slot `03` stays whole for T54), T20 (`task-delivery.rules.ts`, one case per plan §2.4 row), T21
+(`task-delivery.service.ts`, `delivery-follow-up.service.ts`), T22 (`refreshTask` → `{ task, status }`, hook by token
+`TASK_DELIVERY_TRACKER`), T23 (`app-change-delivery.task.ts`, RPC facade `reconcile` only), T24's delivery routes and
+T55's follow-up half (the guard half was already keyed on `Task.origin`). The APW08-G25 defaults the chain decides are
+env-backed in `packages/agent/src/app-works/app-delivery-defaults.ts`. **Not built:** T24's list filters
+(`deliveryState`, `includeDelivery` on `GET /api/tasks`), T26 thread posts and T54 (keyed posts, nullable `authorId`),
+and every web surface (T27–T29). The chain's states that CONTRACTS §6 does not name (`building`, `built`, `deploying`)
+are recorded as `app.change.progressed` so FR-35's timeline has every change.
+
 - [ ] **T20. Pure delivery rules.**
       **Create** `packages/agent/src/app-works/task-delivery.rules.ts` (new) — `decideDelivery(input)` over merge sha,
       Builds, Deployments, ancestry answers, target and auto-deploy flags.

@@ -22,6 +22,13 @@ import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
+import { WorkBuild } from '../entities/work-build.entity';
+import { WorkDeployment } from '../entities/work-deployment.entity';
+import { WorkAppRuntimeState } from '../entities/work-app-runtime-state.entity';
+import { AgentEscalation } from '../entities/agent-escalation.entity';
+import { TaskDeliveryService } from '../app-works/task-delivery.service';
+import { DeliveryFollowUpService } from '../app-works/delivery-follow-up.service';
+import { TASK_DELIVERY_TRACKER } from './task-delivery.port';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
@@ -141,6 +148,12 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
             // needs no forFeature here: the relation loads through the
             // DataSource metadata (both entities are in ENTITIES).
             AgentRepoAttachment,
+            // APW-08 T21 — what the delivery chain reads: APW-05 Builds, APW-06 Deployments
+            // and runtime state, and the delivery-failed escalations it raises.
+            WorkBuild,
+            WorkDeployment,
+            WorkAppRuntimeState,
+            AgentEscalation,
         ]),
         ActivityLogModule,
         // Phase 15 — TaskTransitionService + TaskChatService consume
@@ -285,6 +298,10 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // Backed by `cache_entries` through DatabaseModule (imported above);
         // local, not exported, like CommunityPrModule's copy.
         DistributedTaskLockService,
+        // APW-08 T21/T22 — the App Works delivery chain and its merge hook.
+        DeliveryFollowUpService,
+        TaskDeliveryService,
+        { provide: TASK_DELIVERY_TRACKER, useExisting: TaskDeliveryService },
     ],
     exports: [
         // Exported as well as provided: the dispatch brief, the Fleet
@@ -333,6 +350,9 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         TaskAgentReviewService,
         TaskGateRunnerService,
         TaskGateJudgeService,
+        DeliveryFollowUpService,
+        TaskDeliveryService,
+        TASK_DELIVERY_TRACKER,
     ],
 })
 export class TasksDomainModule {}

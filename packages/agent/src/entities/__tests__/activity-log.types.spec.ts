@@ -176,6 +176,8 @@ describe('activity-log.types', () => {
             ['APP_DEPENDENCY', 'app_dependency'],
             // APW-09 T6 — the upstream pull request family (`app.upstream_pr.*`).
             ['APP_UPSTREAM_PR', 'app_upstream_pr'],
+            // APW-08 T7 — the evolve loop's delivery family (`app.change.*`).
+            ['APP_CHANGE', 'app_change'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -518,7 +520,9 @@ describe('activity-log.types', () => {
             //    read 221 against 220; recounted here -> 221.
             // +1 app_upstream_pr (APW-09 T6, lane aw-upstream-prs — the upstream pull request
             //    family), with its `feed-kind.ts` row in the same change -> 222. Nothing existing moves.
-            expect(literals).toHaveLength(222);
+            // +1 app_change (APW-08 T7/T21, lane L3 — the evolve loop's delivery family), with its
+            //    `feed-kind.ts` row in the same change -> 223. Nothing existing moves.
+            expect(literals).toHaveLength(223);
         });
 
         it('every literal fits the varchar(50) action_type column', () => {

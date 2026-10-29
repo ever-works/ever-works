@@ -697,6 +697,32 @@ export class RunTasksBatchDto {
     items: RunTaskBatchItemDto[];
 }
 
+// ── App Works delivery (APW-08 T24, plan §4) ────────────────────────
+
+/** `POST /api/tasks/:id/delivery/close` — Close anyway / Close without deploying. */
+export class CloseTaskDeliveryDto {
+    @ApiProperty({
+        required: false,
+        maxLength: 500,
+        description: 'Why the change is accepted as not live (kept on the Task feed).',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    note?: string;
+}
+
+/** `POST /api/tasks/:id/delivery/follow-up` — the S22 Inbox item's Try once more. */
+export class RequestTaskDeliveryFollowUpDto {
+    @ApiProperty({
+        format: 'uuid',
+        description:
+            "The open `delivery-failed` escalation (Inbox item) of THIS Task — consumed once; any other id answers 422 followUpLimit.",
+    })
+    @IsUUID()
+    escalationId: string;
+}
+
 // ── Task board read (AW-02) ─────────────────────────────────────────
 
 /**

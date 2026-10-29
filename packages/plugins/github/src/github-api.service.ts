@@ -2284,6 +2284,11 @@ export class GitHubApiService {
 			mergeable: typeof pr.mergeable === 'boolean' ? pr.mergeable : null,
 			headSha,
 			baseRef: pr.base?.ref ?? null,
+			// APW-08 T8 — the commit the merge produced; the App Works delivery chain
+			// follows it. GitHub reports a test-merge sha on an OPEN pull request too,
+			// which is not a commit on the base branch, so it is reported only once
+			// the pull request has merged.
+			mergeCommitSha: merged ? (pr.merge_commit_sha ?? null) : null,
 			reviewDecision,
 			ciState: deriveCiState(checks),
 			checks: capped,
@@ -2571,6 +2576,43 @@ export class GitHubApiService {
 
 		const result = capDiffFiles((data.files ?? []).map(toDiffFile), opts);
 		return typeof data.total_commits === 'number' ? { ...result, totalCommits: data.total_commits } : result;
+	}
+
+	/**
+	 * APW-08 T8 — is `ancestorSha` the same commit as, or an ancestor of,
+	 * `descendantSha`? One `compareCommitsWithBasehead` call
+	 * (`ancestor...descendant`): `identical` and `ahead` mean the descendant
+	 * contains the ancestor; `behind` and `diverged` mean it does not; a 404
+	 * (either commit unknown) is `null`, "cannot say". Any other failure throws.
+	 *
+	 * `per_page: 1` because only the comparison's `status` is read — never its
+	 * files or commits.
+	 */
+	async isAncestorCommit(
+		owner: string,
+		repo: string,
+		ancestorSha: string,
+		descendantSha: string,
+		token: string,
+		baseUrl?: string
+	): Promise<boolean | null> {
+		const octokit = this.createOctokit(token, baseUrl);
+		let status: string | undefined;
+		try {
+			const { data } = await octokit.rest.repos.compareCommitsWithBasehead({
+				owner,
+				repo,
+				basehead: `${ancestorSha}...${descendantSha}`,
+				per_page: 1
+			});
+			status = data.status;
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 404) return null;
+			throw err;
+		}
+		if (status === 'identical' || status === 'ahead') return true;
+		if (status === 'behind' || status === 'diverged') return false;
+		return null;
 	}
 
 	/**

@@ -524,6 +524,13 @@ export enum ActivityActionType {
     // the URL, the state and a refusal code — never a title, a body or a diff (FR-37). Additive member —
     // `actionType` is a plain varchar, so no migration is needed. Never publishable (R-34).
     APP_UPSTREAM_PR = 'app_upstream_pr',
+    // APW-08 T7/T21 (Resolution R-2) — the evolve loop's delivery family: one row per change of a
+    // merged App Work change's delivery state, the dotted CONTRACTS §6 event in `action`
+    // (`app.change.merged`, `app.change.live`, `app.change.failed`, `app.change.closed`,
+    // `app.change.follow_up_opened`), written by `TaskDeliveryService`. `details` carry ids, shas
+    // and state names only (`resourceType: 'task'` + `resourceId`, so the per-Task feed lists them).
+    // Additive member — `actionType` is a plain varchar, so no migration is needed.
+    APP_CHANGE = 'app_change',
     // EW-P1-2 — integration keys (`ew_int_…`) and the integration principal.
     //   - INTEGRATION_WRITE: one row per successful write an integration key
     //     makes, with `actorKind = 'external'`, `actorLabel = 'Ever Gauzy

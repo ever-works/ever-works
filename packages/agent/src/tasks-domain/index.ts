@@ -32,6 +32,25 @@ export * from './app-work-cloud-push';
 export * from './task-repository';
 // PR insights (kanban run cockpit M5/M6) — PR status cache + capped diff.
 export * from './task-pr-status.service';
+// APW-08 T21–T24 — the App Works delivery chain (provided by TasksDomainModule): the merge hook's
+// port, the reconciler behind `app-change-delivery`, the Task delivery routes and follow-ups.
+export * from './task-delivery.port';
+export {
+    TaskDeliveryService,
+    APP_CHANGE_ACTIONS,
+    type DeliverySweepSummary,
+} from '../app-works/task-delivery.service';
+export {
+    DeliveryFollowUpService,
+    FOLLOW_UP_NO_LONGER_NEEDED_NOTE,
+    followUpKeyOf,
+} from '../app-works/delivery-follow-up.service';
+export { decideDelivery } from '../app-works/task-delivery.rules';
+export {
+    APP_DELIVERY_DEFAULTS_ENV,
+    APP_DELIVERY_DEFAULT_VALUES,
+    readAppDeliveryDefaults,
+} from '../app-works/app-delivery-defaults';
 export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';

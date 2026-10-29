@@ -138,6 +138,21 @@ export interface TaskLinkedPullRequest {
 // EW-P2-3 — the due-soon scan walks rows with a `dueAt` inside the window that
 // have not been noticed yet. Shipped by 1795110000000-AddTaskDatesAndEstimate.
 @Index('idx_tasks_due_soon', ['dueAt', 'dueSoonNotifiedAt'])
+// APW-08 T9 (plan §3.1) — the delivery reconciler's scan: open delivery states,
+// stalest first. Shipped by 1792320000000-AddTaskDeliveryState.
+@Index('idx_tasks_delivery_due', ['deliveryState', 'deliveryUpdatedAt'])
+// APW-08 T9 / S29 — a merge is recorded ONCE per (Work, merge commit). Partial on
+// Postgres and SQLite; MySQL/MariaDB have no partial index and get the plain unique
+// index, which is the stronger form there because repeated NULLs are distinct
+// (APW08-G17).
+@Index('uq_tasks_work_merge_commit', ['workId', 'mergeCommitSha'], {
+    unique: true,
+    where: '"mergeCommitSha" IS NOT NULL',
+})
+// APW-08 T55 (APW08-G23) — one automatic follow-up per failure record, keyed on a
+// SERVER-written column, never on a user-editable label. NULLs are distinct on
+// every driver, so Tasks that are not automatic follow-ups never collide.
+@Index('uq_tasks_follow_up_key', ['followUpKey'], { unique: true })
 export class Task {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -714,4 +729,46 @@ export class Task {
      */
     @Column({ type: 'int', default: 1 })
     version: number;
+
+    // ── App Works delivery (APW-08 T9, plan §3.1) ───────────────────
+    // Written only by `TaskDeliveryService` (the PR-status sweep's merge hook
+    // and the `app-change-delivery` reconciler). Every column is NULL for every
+    // Task that is not a merged change of an App Work, which is every row that
+    // predates them: `deliveryState = NULL` means "not tracked", and such a
+    // Task completes on merge exactly as before. Shipped by
+    // `1792320000000-AddTaskDeliveryState`.
+
+    /** The commit the merge produced on the App Work's source branch — what a Build/Deployment must contain. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    mergeCommitSha?: string | null;
+
+    /** One of `TASK_DELIVERY_STATES` (`@ever-works/contracts`); NULL = not tracked. */
+    @Column({ type: 'varchar', length: 24, nullable: true })
+    deliveryState?: string | null;
+
+    /** The `work_builds.id` that decided the current state. No FK (cross-epic table). */
+    @Column({ type: 'uuid', nullable: true })
+    deliveryBuildId?: string | null;
+
+    /** The `work_deployments.id` that decided it. No FK. */
+    @Column({ type: 'uuid', nullable: true })
+    deliveryDeploymentId?: string | null;
+
+    /** Reconciler ordering (stalest first) and the compare-and-set's witness. */
+    @PortableDateColumn({ nullable: true })
+    deliveryUpdatedAt?: Date | null;
+
+    /** Who chose **Close anyway** / **Close without deploying** (S9, S20). */
+    @Column({ type: 'uuid', nullable: true })
+    deliveryClosedById?: string | null;
+
+    /**
+     * APW-08 T55 (APW08-G23) — `followup:<originalTaskId>:<failedBuildOrDeploymentId>`
+     * on an AUTOMATIC follow-up Task, NULL on every other Task. The dedup key
+     * (`uq_tasks_follow_up_key`): one failure record opens one follow-up, and a
+     * user who edits or clears the Task's labels changes nothing. 82 characters
+     * for two uuids, so the column is 120.
+     */
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    followUpKey?: string | null;
 }
