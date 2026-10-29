@@ -51,7 +51,11 @@ const CALL = 'call_abc123';
 
 const args = {
     id: WORK,
-    body: { request: 'Add an SMS reminder the day before a booking.', agentId: AGENT, channel: 'chat' },
+    body: {
+        request: 'Add an SMS reminder the day before a booking.',
+        agentId: AGENT,
+        channel: 'chat',
+    },
 };
 const confirmation = {
     __confirmationRequired: true,
@@ -63,7 +67,13 @@ const confirmation = {
 };
 const answer = {
     success: true,
-    data: { status: 'accepted', taskId: 'task-118', taskSlug: 'T-118', taskUrl: '/tasks/task-118', warnings: [] },
+    data: {
+        status: 'accepted',
+        taskId: 'task-118',
+        taskSlug: 'T-118',
+        taskUrl: '/tasks/task-118',
+        warnings: [],
+    },
 };
 
 function chain(overrides: Partial<TaskChangeChain> = {}): TaskChangeChain {
@@ -183,37 +193,75 @@ describe('ChatChangeCard — reply and chain (spec §6.4)', () => {
         expect(stepState('run')).toBe('active');
         expect(stepState('pullRequest')).toBe('pending');
         // Every step says its state in text, not colour alone.
-        expect(screen.getByTestId('chat-change-step-run').textContent).toContain('Run: in progress');
+        expect(screen.getByTestId('chat-change-step-run').textContent).toContain(
+            'Run: in progress',
+        );
     });
 
     it.each([
-        [chain({ runStatus: 'completed', prNumber: 7, prState: 'open' }), ['done', 'done', 'pending', 'pending', 'pending']],
-        [chain({ prNumber: 7, prState: 'merged', deliveryState: 'merged' }), ['done', 'done', 'pending', 'pending', 'pending']],
-        [chain({ prNumber: 7, deliveryState: 'building' }), ['done', 'done', 'active', 'pending', 'pending']],
-        [chain({ prNumber: 7, deliveryState: 'build_failed' }), ['done', 'done', 'failed', 'pending', 'pending']],
-        [chain({ prNumber: 7, deliveryState: 'built' }), ['done', 'done', 'done', 'pending', 'pending']],
-        [chain({ prNumber: 7, deliveryState: 'deploying' }), ['done', 'done', 'done', 'active', 'pending']],
-        [chain({ prNumber: 7, deliveryState: 'deploy_failed' }), ['done', 'done', 'done', 'failed', 'pending']],
-        [chain({ prNumber: 7, deliveryState: 'live', status: 'done' }), ['done', 'done', 'done', 'done', 'done']],
+        [
+            chain({ runStatus: 'completed', prNumber: 7, prState: 'open' }),
+            ['done', 'done', 'pending', 'pending', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, prState: 'merged', deliveryState: 'merged' }),
+            ['done', 'done', 'pending', 'pending', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, deliveryState: 'building' }),
+            ['done', 'done', 'active', 'pending', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, deliveryState: 'build_failed' }),
+            ['done', 'done', 'failed', 'pending', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, deliveryState: 'built' }),
+            ['done', 'done', 'done', 'pending', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, deliveryState: 'deploying' }),
+            ['done', 'done', 'done', 'active', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, deliveryState: 'deploy_failed' }),
+            ['done', 'done', 'done', 'failed', 'pending'],
+        ],
+        [
+            chain({ prNumber: 7, deliveryState: 'live', status: 'done' }),
+            ['done', 'done', 'done', 'done', 'done'],
+        ],
         [chain({ runStatus: 'failed' }), ['failed', 'pending', 'pending', 'pending', 'pending']],
-        [chain({ prNumber: 7, prState: 'closed' }), ['done', 'failed', 'pending', 'pending', 'pending']],
+        [
+            chain({ prNumber: 7, prState: 'closed' }),
+            ['done', 'failed', 'pending', 'pending', 'pending'],
+        ],
     ])('chain states %#', (value, expected) => {
         const steps = changeChainSteps(value);
-        expect([steps.run, steps.pullRequest, steps.build, steps.deployment, steps.live]).toEqual(expected);
+        expect([steps.run, steps.pullRequest, steps.build, steps.deployment, steps.live]).toEqual(
+            expected,
+        );
     });
 
     it('a member request held for the owner says so', async () => {
         vi.useFakeTimers();
-        getChain.mockResolvedValue({ ok: true, chain: chain({ status: 'backlog', runStatus: null }) });
+        getChain.mockResolvedValue({
+            ok: true,
+            chain: chain({ status: 'backlog', runStatus: null }),
+        });
         show({ ...answer, data: { ...answer.data, awaitingOwner: true } });
         await flush();
-        expect(screen.getByTestId('chat-change-card-chain').textContent).toContain(copy.awaitingOwner);
+        expect(screen.getByTestId('chat-change-card-chain').textContent).toContain(
+            copy.awaitingOwner,
+        );
     });
 
     it('only the confirmation and a filed Task are its outputs; a refusal is left to the generic result', () => {
         expect(isAppChangeCardOutput(confirmation)).toBe(true);
         expect(isAppChangeCardOutput(answer)).toBe(true);
-        expect(isAppChangeCardOutput({ success: false, status: 409, code: 'agentRequired' })).toBe(false);
+        expect(isAppChangeCardOutput({ success: false, status: 409, code: 'agentRequired' })).toBe(
+            false,
+        );
         expect(isAppChangeCardOutput(null)).toBe(false);
     });
 });
@@ -234,8 +282,14 @@ describe('ChatChangeCard — polling (FR-44)', () => {
     it('stops once the change is live', async () => {
         vi.useFakeTimers();
         getChain
-            .mockResolvedValueOnce({ ok: true, chain: chain({ prNumber: 7, deliveryState: 'deploying' }) })
-            .mockResolvedValue({ ok: true, chain: chain({ prNumber: 7, deliveryState: 'live', status: 'done' }) });
+            .mockResolvedValueOnce({
+                ok: true,
+                chain: chain({ prNumber: 7, deliveryState: 'deploying' }),
+            })
+            .mockResolvedValue({
+                ok: true,
+                chain: chain({ prNumber: 7, deliveryState: 'live', status: 'done' }),
+            });
         show(answer);
         await flush();
         await flush(CHANGE_CARD_POLL_INTERVAL_MS);
@@ -247,14 +301,19 @@ describe('ChatChangeCard — polling (FR-44)', () => {
 
     it('stops after 30 minutes without a change, and says so', async () => {
         vi.useFakeTimers();
-        getChain.mockResolvedValue({ ok: true, chain: chain({ prNumber: 7, deliveryState: 'building' }) });
+        getChain.mockResolvedValue({
+            ok: true,
+            chain: chain({ prNumber: 7, deliveryState: 'building' }),
+        });
         show(answer);
         await flush();
         const ticks = CHANGE_CARD_IDLE_MAX_MS / CHANGE_CARD_POLL_INTERVAL_MS;
         for (let i = 0; i < ticks; i++) await flush(CHANGE_CARD_POLL_INTERVAL_MS);
         const calls = getChain.mock.calls.length;
         expect(calls).toBe(1 + ticks);
-        expect(screen.getByTestId('chat-change-card-polling-stopped').textContent).toBe(copy.pollingStopped);
+        expect(screen.getByTestId('chat-change-card-polling-stopped').textContent).toBe(
+            copy.pollingStopped,
+        );
 
         for (let i = 0; i < 30; i++) await flush(CHANGE_CARD_POLL_INTERVAL_MS);
         expect(getChain).toHaveBeenCalledTimes(calls);
@@ -284,7 +343,11 @@ describe('ChatChangeCard — polling (FR-44)', () => {
         expect(isChangeChainSettled(chain({ deliveryState: 'closed_without_deploy' }))).toBe(true);
         expect(isChangeChainSettled(chain({ status: 'cancelled' }))).toBe(true);
         expect(isChangeChainSettled(chain({ status: 'done', deliveryState: null }))).toBe(true);
-        expect(isChangeChainSettled(chain({ status: 'in_review', deliveryState: 'merged' }))).toBe(false);
-        expect(isChangeChainSettled(chain({ status: 'done', deliveryState: 'deploying' }))).toBe(false);
+        expect(isChangeChainSettled(chain({ status: 'in_review', deliveryState: 'merged' }))).toBe(
+            false,
+        );
+        expect(isChangeChainSettled(chain({ status: 'done', deliveryState: 'deploying' }))).toBe(
+            false,
+        );
     });
 });

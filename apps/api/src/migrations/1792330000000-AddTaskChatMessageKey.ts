@@ -50,7 +50,12 @@ export class AddTaskChatMessageKey1792330000000 implements MigrationInterface {
 
     static columns(): TableColumn[] {
         return [
-            new TableColumn({ name: 'messageKey', type: 'varchar', length: '64', isNullable: true }),
+            new TableColumn({
+                name: 'messageKey',
+                type: 'varchar',
+                length: '64',
+                isNullable: true,
+            }),
             // `simple-json` is a `text` column holding JSON on every driver.
             new TableColumn({ name: 'messageParams', type: 'text', isNullable: true }),
         ];

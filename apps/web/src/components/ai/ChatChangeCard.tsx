@@ -54,7 +54,8 @@ const PAST_BUILD: ReadonlySet<string> = new Set(['built', 'deploying', 'deploy_f
  */
 export function changeChainSteps(chain: TaskChangeChain): Record<ChangeStep, ChangeStepState> {
     const delivery = chain.deliveryState ?? null;
-    const merged = Boolean(delivery && DELIVERED_PAST_MERGE.has(delivery)) || chain.prState === 'merged';
+    const merged =
+        Boolean(delivery && DELIVERED_PAST_MERGE.has(delivery)) || chain.prState === 'merged';
 
     let run: ChangeStepState = 'pending';
     if (merged || chain.prNumber) run = 'done';
@@ -88,7 +89,10 @@ export function isChangeChainSettled(chain: TaskChangeChain): boolean {
     if (chain.status === 'cancelled') return true;
     // Done without a delivery chain = the change completed on merge (not tracked); done WITH an
     // open chain is still being followed.
-    return chain.status === 'done' && (!delivery || delivery === 'build_failed' || delivery === 'deploy_failed');
+    return (
+        chain.status === 'done' &&
+        (!delivery || delivery === 'build_failed' || delivery === 'deploy_failed')
+    );
 }
 
 interface ConfirmationShape {
@@ -249,7 +253,10 @@ function ChangeConfirmation({
                     onClick={() => {
                         setResolved('cancelled');
                         sendMessage(
-                            cancelCardMessage({ toolName: APP_CHANGE_TOOL, target: confirmation.target }),
+                            cancelCardMessage({
+                                toolName: APP_CHANGE_TOOL,
+                                target: confirmation.target,
+                            }),
                         );
                     }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors cursor-pointer"
@@ -308,8 +315,7 @@ function ChangeChain({ answer, workId }: { answer: AnswerShape['data']; workId: 
 
     const read = useCallback(async () => {
         try {
-            const hidden =
-                typeof document !== 'undefined' && document.visibilityState === 'hidden';
+            const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
             if (!hidden) {
                 const result = await getTaskChangeChainAction(taskId);
                 if (cancelled.current) return;
@@ -374,7 +380,10 @@ function ChangeChain({ answer, workId }: { answer: AnswerShape['data']; workId: 
                     {chain.title}
                 </p>
             )}
-            <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]" data-testid="chat-change-card-steps">
+            <ol
+                className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]"
+                data-testid="chat-change-card-steps"
+            >
                 {STEPS.map((step, index) => {
                     const state: ChangeStepState = steps?.[step] ?? 'pending';
                     const label = t(STEP_LABEL[step] as never);
@@ -386,7 +395,10 @@ function ChangeChain({ answer, workId }: { answer: AnswerShape['data']; workId: 
                             data-state={state}
                         >
                             {index > 0 && (
-                                <span className="text-text-muted dark:text-text-muted-dark" aria-hidden="true">
+                                <span
+                                    className="text-text-muted dark:text-text-muted-dark"
+                                    aria-hidden="true"
+                                >
                                     ─
                                 </span>
                             )}

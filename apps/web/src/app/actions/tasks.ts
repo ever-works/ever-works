@@ -917,7 +917,9 @@ export interface TaskChangeChain {
  */
 export async function getTaskChangeChainAction(
     id: string,
-): Promise<{ ok: true; chain: TaskChangeChain } | { ok: false; code: string; statusCode?: number }> {
+): Promise<
+    { ok: true; chain: TaskChangeChain } | { ok: false; code: string; statusCode?: number }
+> {
     // Security: verify session server-side before reading data
     const user = await getAuthFromCookie();
     if (!user) redirect(ROUTES.AUTH_LOGIN);

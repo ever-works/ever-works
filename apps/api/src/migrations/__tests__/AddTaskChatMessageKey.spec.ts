@@ -37,7 +37,10 @@ describe('AddTaskChatMessageKey1792330000000', () => {
         );
         await runner.createIndex(
             'task_chat_messages',
-            new TableIndex({ name: 'idx_task_chat_author', columnNames: ['authorType', 'authorId'] }),
+            new TableIndex({
+                name: 'idx_task_chat_author',
+                columnNames: ['authorType', 'authorId'],
+            }),
         );
         for (const [id, type, author, body] of [
             ['m-1', 'user', 'user-1', 'Please add an SMS reminder.'],
@@ -66,7 +69,9 @@ describe('AddTaskChatMessageKey1792330000000', () => {
         return dataSource.query(`PRAGMA table_info("task_chat_messages")`);
     }
 
-    async function authors(): Promise<Array<{ id: string; authorType: string; authorId: string | null }>> {
+    async function authors(): Promise<
+        Array<{ id: string; authorType: string; authorId: string | null }>
+    > {
         return dataSource.query(
             `SELECT id, "authorType", "authorId" FROM task_chat_messages ORDER BY id`,
         );
@@ -77,7 +82,9 @@ describe('AddTaskChatMessageKey1792330000000', () => {
         const added = (await columns()).filter((column) => ADDED.includes(column.name));
         expect(added.map((column) => column.name).sort()).toEqual(ADDED);
         for (const column of added) expect(column.notnull).toBe(0);
-        expect(added.find((column) => column.name === 'messageKey')?.type).toMatch(/varchar\(64\)/i);
+        expect(added.find((column) => column.name === 'messageKey')?.type).toMatch(
+            /varchar\(64\)/i,
+        );
     });
 
     it('widens authorId to nullable and every existing row keeps its authorId', async () => {
@@ -89,7 +96,11 @@ describe('AddTaskChatMessageKey1792330000000', () => {
         expect((await columns()).find((column) => column.name === 'authorId')?.notnull).toBe(0);
         expect(await authors()).toEqual(before);
         const [row] = await dataSource.query(`SELECT * FROM task_chat_messages WHERE id = 'm-2'`);
-        expect(row).toMatchObject({ body: 'Opened pull request #7.', messageKey: null, messageParams: null });
+        expect(row).toMatchObject({
+            body: 'Opened pull request #7.',
+            messageKey: null,
+            messageParams: null,
+        });
     });
 
     it('accepts a system post with no author, a key and its params', async () => {
@@ -99,7 +110,11 @@ describe('AddTaskChatMessageKey1792330000000', () => {
             [JSON.stringify({ url: 'https://bookings.example.app' })],
         );
         const [row] = await dataSource.query(`SELECT * FROM task_chat_messages WHERE id = 'm-4'`);
-        expect(row).toMatchObject({ authorType: 'system', authorId: null, messageKey: 'deliveryPosts.live' });
+        expect(row).toMatchObject({
+            authorType: 'system',
+            authorId: null,
+            messageKey: 'deliveryPosts.live',
+        });
         expect(JSON.parse(row.messageParams)).toEqual({ url: 'https://bookings.example.app' });
     });
 
@@ -116,7 +131,11 @@ describe('AddTaskChatMessageKey1792330000000', () => {
         const once = await columns();
         await expect(run('up')).resolves.toBeUndefined();
         expect(await columns()).toEqual(once);
-        expect((await authors()).map((row) => row.authorId)).toEqual(['user-1', 'agent-1', 'key-1']);
+        expect((await authors()).map((row) => row.authorId)).toEqual([
+            'user-1',
+            'agent-1',
+            'key-1',
+        ]);
     });
 
     it('down() drops only the two added columns: authorId stays nullable, rows and authors stay', async () => {

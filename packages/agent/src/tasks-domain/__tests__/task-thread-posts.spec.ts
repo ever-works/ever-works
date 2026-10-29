@@ -29,12 +29,12 @@ describe('task-thread-posts — the copy', () => {
         expect(renderTaskThreadPost(taskThreadPost('merged', { branch: 'production' }))).toBe(
             'Merged into production.',
         );
-        expect(renderTaskThreadPost(taskThreadPost('buildFailed', { number: 4, reason: 'compile' }))).toBe(
-            'Build #4 failed: compile.',
-        );
-        expect(renderTaskThreadPost(taskThreadPost('deployFailed', { outcome: 'rollback_failed' }))).toBe(
-            'Deployment failed: rollback failed.',
-        );
+        expect(
+            renderTaskThreadPost(taskThreadPost('buildFailed', { number: 4, reason: 'compile' })),
+        ).toBe('Build #4 failed: compile.');
+        expect(
+            renderTaskThreadPost(taskThreadPost('deployFailed', { outcome: 'rollback_failed' })),
+        ).toBe('Deployment failed: rollback failed.');
         expect(renderTaskThreadPost(taskThreadPost('followUpOpened', { taskSlug: 'T-2' }))).toBe(
             'Opened follow-up T-2.',
         );
@@ -69,7 +69,11 @@ describe('TaskChatService.post — keyed posts (T54)', () => {
 
     beforeEach(() => {
         tasks = { findByIdAndUser: jest.fn().mockResolvedValue({ id: 't1', userId: 'u1' }) };
-        messages = { create: jest.fn((data: Record<string, unknown>) => Promise.resolve({ id: 'm1', ...data })) };
+        messages = {
+            create: jest.fn((data: Record<string, unknown>) =>
+                Promise.resolve({ id: 'm1', ...data }),
+            ),
+        };
         activity = { log: jest.fn().mockResolvedValue(undefined) };
         svc = new TaskChatService(
             tasks as never,
@@ -133,7 +137,11 @@ describe('TaskChatService.post — keyed posts (T54)', () => {
             messageKey: `deliveryPosts.${'a'.repeat(60)}`,
         });
         for (const call of messages.create.mock.calls) {
-            expect(call[0]).toMatchObject({ body: 'Deploying.', messageKey: null, messageParams: null });
+            expect(call[0]).toMatchObject({
+                body: 'Deploying.',
+                messageKey: null,
+                messageParams: null,
+            });
         }
     });
 });

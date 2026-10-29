@@ -12,7 +12,9 @@ describe('TaskWorkspaceService.postSystemMessage (APW-08 T54)', () => {
     const input = { task, userId: 'user-1', agentId: 'agent-1' };
 
     function harness() {
-        const post = jest.fn(async (_userId: string, _message: Record<string, unknown>) => undefined);
+        const post = jest.fn(
+            async (_userId: string, _message: Record<string, unknown>) => undefined,
+        );
         const service = new TaskWorkspaceService(
             {} as never, // works
             {} as never, // tasks
@@ -56,7 +58,10 @@ describe('TaskWorkspaceService.postSystemMessage (APW-08 T54)', () => {
 
     it("a keyed post keeps the caller's own body when one is given", async () => {
         const { post, postSystemMessage } = harness();
-        await postSystemMessage(input, { key: 'deliveryPosts.checksPassed', body: 'All 4 checks passed.' });
+        await postSystemMessage(input, {
+            key: 'deliveryPosts.checksPassed',
+            body: 'All 4 checks passed.',
+        });
         expect(post.mock.calls[0][1]).toMatchObject({
             body: 'All 4 checks passed.',
             messageKey: 'deliveryPosts.checksPassed',

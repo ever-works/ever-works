@@ -4082,9 +4082,7 @@ export class TaskWorkspaceService {
                 authorType: 'agent',
                 authorId: input.agentId,
                 body,
-                ...(keyed
-                    ? { messageKey: keyed.key, messageParams: keyed.params ?? null }
-                    : {}),
+                ...(keyed ? { messageKey: keyed.key, messageParams: keyed.params ?? null } : {}),
             });
         } catch (error) {
             this.logger.warn(

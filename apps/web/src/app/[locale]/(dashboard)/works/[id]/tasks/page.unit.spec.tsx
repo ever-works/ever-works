@@ -18,7 +18,9 @@ vi.mock('next-intl/server', () => ({
     getTranslations: async () => (key: string) => key,
 }));
 vi.mock('@/i18n/navigation', () => ({
-    Link: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+    Link: ({ children, href }: { children: React.ReactNode; href: string }) => (
+        <a href={href}>{children}</a>
+    ),
 }));
 vi.mock('@/lib/api/tasks', () => ({ tasksAPI: { list } }));
 vi.mock('@/lib/api', () => ({ workAPI: { get: getWork, getRunsSummary } }));

@@ -11,7 +11,11 @@ import { TaskChatMessageText } from './TaskChatMessageText';
  * `body`.
  */
 
-type Message = { body: string; messageKey?: string | null; messageParams?: Record<string, string | number> | null };
+type Message = {
+    body: string;
+    messageKey?: string | null;
+    messageParams?: Record<string, string | number> | null;
+};
 
 /** A locale bundle whose deliveryPosts differ from English, to prove the KEY is what renders. */
 const de = {
@@ -28,7 +32,10 @@ const de = {
             },
             delivery: {
                 ...en.dashboard.tasksPage.delivery,
-                outcome: { ...en.dashboard.tasksPage.delivery.outcome, rolledBack: 'zurückgesetzt' },
+                outcome: {
+                    ...en.dashboard.tasksPage.delivery.outcome,
+                    rolledBack: 'zurückgesetzt',
+                },
             },
         },
     },
@@ -64,7 +71,11 @@ describe('TaskChatMessageText (APW-08 T54)', () => {
     });
 
     it('renders a number param and maps an outcome code through the delivery outcome copy', () => {
-        show({ body: 'x', messageKey: 'deliveryPosts.buildSucceeded', messageParams: { number: 12 } });
+        show({
+            body: 'x',
+            messageKey: 'deliveryPosts.buildSucceeded',
+            messageParams: { number: 12 },
+        });
         expect(text()).toBe('Build #12 erfolgreich.');
         cleanup();
         show({
@@ -81,7 +92,11 @@ describe('TaskChatMessageText (APW-08 T54)', () => {
     });
 
     it('a message without a key shows its body exactly as before', () => {
-        show({ body: 'Please add an SMS reminder.\nThanks', messageKey: null, messageParams: null });
+        show({
+            body: 'Please add an SMS reminder.\nThanks',
+            messageKey: null,
+            messageParams: null,
+        });
         expect(text()).toBe('Please add an SMS reminder.\nThanks');
     });
 

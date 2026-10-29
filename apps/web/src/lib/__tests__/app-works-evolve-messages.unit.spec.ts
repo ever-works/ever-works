@@ -133,7 +133,9 @@ describe('APW-08 evolve copy (T28)', () => {
         }
         // Spec §6.4's copy, verbatim.
         const en = bundle('en');
-        expect(at(en, 'dashboard.workDetail.requestChange.title')).toBe('Start a change on {work}?');
+        expect(at(en, 'dashboard.workDetail.requestChange.title')).toBe(
+            'Start a change on {work}?',
+        );
         expect(at(en, 'dashboard.workDetail.requestChange.body')).toBe(
             '{agent} will work on it. An agent run will start; runs are billed to your workspace.',
         );

@@ -427,7 +427,9 @@ describe('TaskDeliverySection — Try once more (APW-08 T27)', () => {
 
 describe('TaskDeliverySection — Deploy now (APW-08 T27, S20)', () => {
     it('a built change with auto-deploy off offers APW-06 Deploy now for THIS Build', async () => {
-        getDelivery.mockResolvedValue(ready(view('built', { deployment: null, canDeployNow: true })));
+        getDelivery.mockResolvedValue(
+            ready(view('built', { deployment: null, canDeployNow: true })),
+        );
         requestDeploy.mockResolvedValue({
             success: true,
             httpStatus: 202,
@@ -441,13 +443,17 @@ describe('TaskDeliverySection — Deploy now (APW-08 T27, S20)', () => {
         expect(button.className).toContain('dark:bg-white');
 
         fireEvent.click(button);
-        await waitFor(() => expect(requestDeploy).toHaveBeenCalledWith('work-1', { buildId: 'b-1' }));
+        await waitFor(() =>
+            expect(requestDeploy).toHaveBeenCalledWith('work-1', { buildId: 'b-1' }),
+        );
         // The accepted request re-reads the chain (it moves to deploying on its own).
         await waitFor(() => expect(getDelivery).toHaveBeenCalledTimes(2));
     });
 
     it('is not offered while auto-deploy is on, on another state, or without a Build', async () => {
-        getDelivery.mockResolvedValue(ready(view('built', { deployment: null, canDeployNow: false })));
+        getDelivery.mockResolvedValue(
+            ready(view('built', { deployment: null, canDeployNow: false })),
+        );
         renderSection();
         await screen.findByTestId('task-delivery-timeline');
         expect(screen.queryByTestId('task-delivery-deploy-now')).toBeNull();
@@ -485,7 +491,9 @@ describe('TaskDeliverySection — Create a fix Task (APW-08 T27)', () => {
         expect(screen.getByText(copy.createFixTaskConfirm)).toBeTruthy();
 
         fireEvent.click(screen.getByTestId('task-delivery-fix-task-cancel'));
-        await waitFor(() => expect(screen.queryByTestId('task-delivery-confirm-fix-task')).toBeNull());
+        await waitFor(() =>
+            expect(screen.queryByTestId('task-delivery-confirm-fix-task')).toBeNull(),
+        );
         expect(createFix).not.toHaveBeenCalled();
         await waitFor(() => expect(document.activeElement).toBe(trigger));
     });
