@@ -53,6 +53,16 @@ export interface SafetyPlatformStop {
     shouldHaltDispatch(): Promise<boolean>;
 }
 
+/**
+ * DI tokens for the four optional rails (C-9). Each rail is an interface, and an interface erases to
+ * `Object` in the emitted constructor metadata, so without a token a binding could never reach the
+ * gate: `@Optional()` would inject `undefined` without a word. None is bound today.
+ */
+export const SAFETY_SCOPE_PAUSE = 'SAFETY_SCOPE_PAUSE' as const;
+export const SAFETY_GRANT_CHECK = 'SAFETY_GRANT_CHECK' as const;
+export const SAFETY_CAP_CHECK = 'SAFETY_CAP_CHECK' as const;
+export const SAFETY_RULE_CHECK = 'SAFETY_RULE_CHECK' as const;
+
 /** The scope pause question: is this Agent / Mission / Run itself stopped? */
 export interface SafetyScopePause {
     isScopePaused(subject: SafetyRailSubject): Promise<boolean>;
