@@ -126,9 +126,10 @@ const MAX_TAGS = 8;
  */
 function stripHtml(value: string): string {
     // The tag body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos),
-    // and any `<` / `>` left afterwards goes, so a split tag such as `<scr<b>ipt>`
-    // leaves no markup (CodeQL js/incomplete-multi-character-sanitization).
-    return value.replace(/<[^<>]*>/g, '').replace(/[<>]/g, '');
+    // then any `<` that could still open a tag (before a letter, `/`, `!` or `?`), so a split
+    // tag such as `<scr<b>ipt>` leaves no markup while `a -> b` and `x < y` keep their text
+    // (CodeQL js/incomplete-multi-character-sanitization).
+    return value.replace(/<[^<>]*>/g, '').replace(/<(?=[a-z/!?])/gi, '');
 }
 
 /** `folder-tree` → `FolderTree` so the client icon map (PascalCase lucide

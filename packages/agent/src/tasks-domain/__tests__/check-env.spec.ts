@@ -165,6 +165,15 @@ describe('buildCheckEnv — platform secrets never reach a user-authored check',
         expect(env.NO_PROXY).toBeUndefined();
     });
 
+    it('checks a long value in linear time (CodeQL js/polynomial-redos)', () => {
+        const started = Date.now();
+        const env = buildCheckEnv({
+            parentEnv: { ...PLATFORM_ENV, NO_PROXY: `${'a'.repeat(30_000)}${':'.repeat(30_000)}` },
+        });
+        expect(env.NO_PROXY).toBeDefined();
+        expect(Date.now() - started).toBeLessThan(1_000);
+    });
+
     it('matches parent variables case-insensitively (Windows spells them Path/TEMP)', () => {
         const env = buildCheckEnv({
             parentEnv: {

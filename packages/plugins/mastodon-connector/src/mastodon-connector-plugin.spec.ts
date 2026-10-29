@@ -99,7 +99,7 @@ describe('MastodonConnectorPlugin', () => {
 		expect(stripStatusHtml('a<br>b')).toBe('a\nb');
 		expect(stripStatusHtml('&lt;script&gt; &amp; &quot;q&quot;')).toBe('<script> & "q"');
 		// A split tag leaves no markup; escaped brackets still decode.
-		expect(stripStatusHtml('<scr<b>ipt>x</script> &lt;ok&gt;')).toBe('scriptx <ok>');
+		expect(stripStatusHtml('<scr<b>ipt>x</script> &lt;ok&gt; a -> b')).toBe('script>x <ok> a -> b');
 		expect(stripStatusHtml('<p></p>')).toBeUndefined();
 		expect(stripStatusHtml(undefined)).toBeUndefined();
 	});

@@ -22,6 +22,17 @@ describe('sanitizeInlineSvg', () => {
         expect(sanitizeInlineSvg('<svg><!<!-- a -->-- b --></svg>')).toBe('');
     });
 
+    it('strips a handler glued to the previous quoted value (the HTML parser accepts it)', () => {
+        const out = sanitizeInlineSvg('<svg><img src="x"onerror=alert(1)></svg>');
+        expect(out).not.toMatch(/onerror/i);
+        expect(out).toBe('<svg><img src="x"></svg>');
+    });
+
+    it('fails closed when anything handler-shaped is left, and on oversized input', () => {
+        expect(sanitizeInlineSvg('<svg><text>onclick=1</text></svg>')).toBe('');
+        expect(sanitizeInlineSvg(`<svg>${'<a'.repeat(5_000)}</svg>`)).toBe('');
+    });
+
     it('fails closed on a dangerous URL scheme that survives the scrub', () => {
         expect(sanitizeInlineSvg('<svg><path fill="url(javascript:alert(1))"/></svg>')).toBe('');
         expect(sanitizeInlineSvg('<svg><path d="data:text/html,x"/></svg>')).toBe('');

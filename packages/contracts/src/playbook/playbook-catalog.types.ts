@@ -437,13 +437,13 @@ export function playbookSearchFields(entry: {
 const HTML_TAG_PATTERN = /<[^<>]*>/g;
 
 /**
- * Strip HTML tags, trim, and cap a catalogue string at `max` characters. Any
- * `<` or `>` left once the tags are gone goes too: a split tag such as
- * `<scr<b>ipt>` leaves no markup behind (CodeQL
+ * Strip HTML tags, trim, and cap a catalogue string at `max` characters. Then any
+ * `<` that could still open a tag (before a letter, `/`, `!` or `?`) goes: a split
+ * tag such as `<scr<b>ipt>` leaves no markup, while `a -> b` keeps its text (CodeQL
  * js/incomplete-multi-character-sanitization).
  */
 export function sanitizePlaybookText(value: string, max: number): string {
-	return value.replace(HTML_TAG_PATTERN, '').replace(/[<>]/g, '').trim().slice(0, max);
+	return value.replace(HTML_TAG_PATTERN, '').replace(/<(?=[a-z/!?])/gi, '').trim().slice(0, max);
 }
 
 export type PlaybookEntryAcceptance =

@@ -87,14 +87,16 @@ export function isPinnedRef(ref: string): boolean {
 
 /**
  * Plain text, capped: tags and control characters out, whitespace collapsed.
- * Any `<` or `>` left once the tags are gone goes too, so a split tag such as
- * `<scr<b>ipt>` cannot leave markup behind.
+ * A tag's body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos);
+ * then any `<` that could still open a tag (before a letter, `/`, `!` or `?`) goes,
+ * so a split tag such as `<scr<b>ipt>` leaves no markup while `1 > 0` and `x < y`
+ * keep their text.
  */
 export function plainText(value: unknown, max: number): string {
     if (typeof value !== 'string') return '';
     return value
-        .replace(/<[^>]*>/g, '')
-        .replace(/[<>]/g, '')
+        .replace(/<[^<>]*>/g, '')
+        .replace(/<(?=[a-z/!?])/gi, '')
         .replace(/[\u0000-\u001f\u007f]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()

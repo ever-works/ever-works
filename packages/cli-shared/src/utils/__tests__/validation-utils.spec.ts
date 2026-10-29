@@ -44,7 +44,9 @@ describe('validateEmail', () => {
 
 	it('stays linear on a long run of dots (CodeQL js/polynomial-redos)', () => {
 		const started = Date.now();
+		// Correctness, not speed: the old pattern ACCEPTED an all-dots domain.
 		expect(validateEmail(`a@${'.'.repeat(50_000)}`).isValid).toBe(false);
+		// Speed: the old pattern took seconds here.
 		expect(validateEmail(`a@${'a.'.repeat(25_000)}@`).isValid).toBe(false);
 		expect(Date.now() - started).toBeLessThan(1_000);
 	});

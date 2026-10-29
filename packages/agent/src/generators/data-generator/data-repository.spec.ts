@@ -468,9 +468,10 @@ describe('DataRepository', () => {
         await repository.writeReferences([
             reference('https://a.test/', 'Content extraction failed for https://a.test/; tried 2 plugins'),
             reference('https://b.test/', 'Content extraction failed for https://b.test/   (plugin: local)'),
-            reference('https://c.test/', `Content extraction failed for x${' '.repeat(30_000)}y`),
+            reference('https://c.test/', `Content extraction failed for x${' '.repeat(80_000)}y`),
         ]);
-        expect(Date.now() - started).toBeLessThan(2_000);
+        // The old lazy captures took seconds on 30k spaces; the fix is linear.
+        expect(Date.now() - started).toBeLessThan(1_500);
 
         const referencesYaml = await fs.readFile(path.join(repoDir, 'references.yml'), 'utf-8');
         expect(referencesYaml).toContain('Content processing failed for https://a.test/; tried 2 plugins');

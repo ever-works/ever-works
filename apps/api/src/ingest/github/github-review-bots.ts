@@ -244,8 +244,8 @@ const HTML_TAG =
     /<\/?(?:a|img|sub|sup|br|hr|p|div|span|h[1-6]|b|i|strong|em|blockquote|summary|table|thead|tbody|tr|td|th|kbd|picture|source)\b[^<>]*>/gi;
 
 /**
- * Drop every `<!--` … `-->` span in one left-to-right pass, then any `<!--`
- * still left — the opener of an unclosed comment, or one a removal spliced
+ * Drop every `<!--` … `-->` span in one left-to-right pass, then defuse any
+ * opener still left — of an unclosed comment, or one a removal spliced
  * together (`<!<!-- x -->-- y -->`) — so no comment survives
  * (CodeQL js/incomplete-multi-character-sanitization).
  */
@@ -261,7 +261,10 @@ function stripHtmlComments(text: string): string {
         cursor = close + 3;
     }
     out += text.slice(cursor);
-    return out.split('<!--').join('');
+    // Every `<` run directly before `!--` goes, keeping the `!--`: no comment opener
+    // can be left, nor formed by joining what surrounds a removed one. The
+    // lookbehind starts each match at a run's first `<` (linear).
+    return out.replace(/(?<!<)<+!--/g, '!--');
 }
 
 /**
@@ -271,7 +274,7 @@ function stripHtmlComments(text: string): string {
  * An opener nothing closes, and a closer nothing opened, stay — as the old
  * innermost-first regex loop left them.
  */
-function stripDetailsBlocks(text: string): string {
+function stripDetailsBlocksOnce(text: string): string {
     const open: number[] = [];
     const spans: Array<[number, number]> = [];
     for (const match of text.matchAll(DETAILS_TOKEN)) {
@@ -295,6 +298,21 @@ function stripDetailsBlocks(text: string): string {
         cursor = end;
     }
     return out + text.slice(cursor);
+}
+
+/**
+ * {@link stripDetailsBlocksOnce} until nothing changes, so a block spliced together
+ * by a removal (`<det<details>x</details>ails>…</details>`) goes too. Bounded:
+ * real bodies settle in one or two passes.
+ */
+function stripDetailsBlocks(text: string): string {
+    let current = text;
+    for (let pass = 0; pass < 8; pass++) {
+        const next = stripDetailsBlocksOnce(current);
+        if (next === current) break;
+        current = next;
+    }
+    return current;
 }
 
 /**

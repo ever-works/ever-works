@@ -308,6 +308,16 @@ describe('github-review-bots', () => {
             expect(stripped).toContain('this');
         });
 
+        it('defuses a comment opener formed by joining what surrounds a removed one', () => {
+            expect(stripReviewBotMarkup('x <!<!---- hidden')).not.toContain('<!--');
+        });
+
+        it('drops a <details> block a removal spliced together', () => {
+            expect(
+                stripReviewBotMarkup('P <det<details>x</details>ails>hidden</details> Q'),
+            ).toBe('P  Q');
+        });
+
         it('keeps an unclosed outer <details> and drops the complete inner one', () => {
             expect(
                 stripReviewBotMarkup('A <details>B <details>C</details> D'),
@@ -319,8 +329,8 @@ describe('github-review-bots', () => {
             const hostile = [
                 '<!--'.repeat(20_000),
                 '<details'.repeat(20_000),
-                '<a'.repeat(20_000),
-                '!['.repeat(20_000),
+                '<a'.repeat(40_000),
+                '!['.repeat(40_000),
                 '![x]('.repeat(20_000),
             ];
             for (const body of hostile) {
