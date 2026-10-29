@@ -192,7 +192,8 @@
 			"@atproto/xrpc>zod": ">=4.6.7 <5.0.0",
 			"@mendable/firecrawl-js>zod": ">=4.6.7 <5.0.0",
 			"exa-js>zod": ">=4.6.7 <5.0.0",
-			"bash-tool>zod": ">=4.6.7 <5.0.0"
+			"bash-tool>zod": ">=4.6.7 <5.0.0",
+			"@docusaurus/theme-mermaid>mermaid": ">=12.2.0 <13.0.0"
 		}
 	},
 	"prettier": {
