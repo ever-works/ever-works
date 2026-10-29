@@ -1622,6 +1622,9 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: CloseTaskDeliveryDto,
     ): Promise<TaskDeliveryView> {
+        // Review of #3030 — accepting a change as not live is a person's decision, like resolving
+        // an escalation: no API key, automation or fleet run may make it.
+        requireHumanSession(auth, 'close a change without deploying it');
         const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         if (!this.delivery) {
             throw new ServiceUnavailableException('The delivery chain is not available.');
@@ -1641,6 +1644,8 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: RequestTaskDeliveryFollowUpDto,
     ): Promise<TaskDeliveryFollowUpResponse> {
+        // Review of #3030 — "Try once more" answers an Inbox item (an escalation): a human gate.
+        requireHumanSession(auth, 'try a failed change once more');
         const scope = this.scopeContext.getScope();
         const task = await this.service.getOne(auth.userId, id, scope);
         if (!this.delivery) {

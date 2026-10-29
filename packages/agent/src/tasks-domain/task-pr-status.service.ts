@@ -352,8 +352,17 @@ export class TaskPrStatusService {
         if (!this.delivery) return false;
         try {
             if (!(await this.delivery.isDeliveryTracked(task, status))) return false;
-            if (status) await this.delivery.recordMerge(task, status);
-            return true;
+            // A Task the chain already follows (its state was recorded by an earlier read).
+            if (task.deliveryState) return true;
+            if (!status) return false;
+            const { recorded } = await this.delivery.recordMerge(task, status);
+            if (recorded) return true;
+            // Review of #3030 — a merge that was NOT recorded (a unique-index conflict, a caught
+            // write error) leaves `deliveryState` NULL, and skipping the completion then would
+            // strand the Task in review. Only a genuinely lost compare-and-set (another reader
+            // recorded this merge first) counts as tracked, and only once the row says so.
+            const current = await this.tasks.findById(task.id);
+            return Boolean(current?.deliveryState);
         } catch (error) {
             this.logger.warn(
                 `Task ${task.id}: the delivery merge hook threw; completing on merge instead (${

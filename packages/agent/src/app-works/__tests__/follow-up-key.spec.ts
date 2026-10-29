@@ -257,6 +257,25 @@ describe('the follow-up Task (FR-36, S7)', () => {
         expect(text).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz0123456789');
     });
 
+    it('redacts a multi-line PEM private key whole, body lines included (review of #3030)', () => {
+        const body = ['MIIEowIBAAKCAQEAsecretbodyline1', 'Zm9vYmFyc2VjcmV0Ym9keWxpbmUy', 'c2VjcmV0Ym9keWxpbmUz'];
+        const excerpt = ['step 3 failed', '-----BEGIN RSA PRIVATE KEY-----', ...body, '-----END RSA PRIVATE KEY-----', 'exit 1'];
+        const tail = failureLogTail(failure({ phase: 'build', build: { id: 'b1', status: 'failed', failureExcerpt: excerpt } }));
+        const text = tail.join('\n');
+        for (const line of body) expect(text).not.toContain(line);
+        expect(text).toContain('step 3 failed');
+        expect(text).toContain('exit 1');
+    });
+
+    it('drops the body of a key whose footer was cut off, even when the tail slice would drop its header', () => {
+        const body = Array.from({ length: 205 }, (_, i) => `c2VjcmV0a2V5Ym9keQ${i}`);
+        const excerpt = ['build output', '-----BEGIN PRIVATE KEY-----', ...body];
+        const tail = failureLogTail(failure({ phase: 'build', build: { id: 'b1', status: 'failed', failureExcerpt: excerpt } }));
+        const text = tail.join('\n');
+        for (const line of body) expect(text).not.toContain(line);
+        expect(text).toContain('build output');
+    });
+
     it('names the APW-06 outcome of a deployment failure', () => {
         expect(describeFailure(failure())).toContain('- Outcome: rolled back');
         expect(describeFailure(failure({ outcome: 'rollback_failed' }))).toContain('- Outcome: rollback failed');

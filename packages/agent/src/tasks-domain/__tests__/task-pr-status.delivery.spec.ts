@@ -46,6 +46,7 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
     };
 
     let tasks: {
+        findById: jest.Mock;
         findByIdAndUser: jest.Mock;
         findDuePrStatusSync: jest.Mock;
         updatePrStatusCache: jest.Mock;
@@ -74,6 +75,7 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
 
     beforeEach(() => {
         tasks = {
+            findById: jest.fn().mockResolvedValue({ id: 'task-1', deliveryState: null }),
             findByIdAndUser: jest.fn(),
             findDuePrStatusSync: jest.fn().mockResolvedValue([makeTask()]),
             updatePrStatusCache: jest.fn().mockResolvedValue(undefined),
@@ -121,6 +123,22 @@ describe('TaskPrStatusService — delivery merge hook (APW-08 T22)', () => {
             expect.objectContaining({ actorType: 'agent' }),
         );
         expect(summary).toMatchObject({ merged: 1, completed: 1, deliveryTracked: 0 });
+    });
+
+    it('a merge the chain could NOT record (a conflict, a caught write error) completes on merge (review of #3030)', async () => {
+        tracker.recordMerge.mockResolvedValue({ recorded: false });
+        const summary = await service().syncDuePrStatuses();
+        expect(tasks.findById).toHaveBeenCalledWith('task-1');
+        expect(transitions.transition).toHaveBeenCalledTimes(1);
+        expect(summary).toMatchObject({ completed: 1, deliveryTracked: 0 });
+    });
+
+    it('a lost compare-and-set (another reader recorded it first) is tracked, once the row says so', async () => {
+        tracker.recordMerge.mockResolvedValue({ recorded: false });
+        tasks.findById.mockResolvedValue({ id: 'task-1', deliveryState: 'merged' });
+        const summary = await service().syncDuePrStatuses();
+        expect(transitions.transition).not.toHaveBeenCalled();
+        expect(summary).toMatchObject({ completed: 0, deliveryTracked: 1 });
     });
 
     it('a tracker that throws never strands the Task — it completes on merge', async () => {

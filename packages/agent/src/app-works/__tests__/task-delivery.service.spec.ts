@@ -45,8 +45,12 @@ function fakeRepo<T extends Row>(rows: T[] = [], unique: Array<readonly string[]
         rows,
         escape: (name: string) => `"${name}"`,
         wheres: [] as string[],
-        find: jest.fn(async (options: { where?: Row; take?: number; order?: Row } = {}) => {
-            let out = rows.filter((row) => matches(row, options.where ?? {}));
+        find: jest.fn(async (options: { where?: Row | Row[]; take?: number; order?: Row } = {}) => {
+            const where = options.where ?? {};
+            // An array `where` is TypeORM's OR of its members.
+            let out = rows.filter((row) =>
+                Array.isArray(where) ? where.some((branch) => matches(row, branch)) : matches(row, where),
+            );
             if (options.order) {
                 const [[key, dir]] = Object.entries(options.order);
                 out = [...out].sort((a, b) => {
@@ -470,19 +474,36 @@ describe('TaskDeliveryService — the reconciler (FR-30…FR-40)', () => {
         expect(h.transitions.transition).not.toHaveBeenCalled();
     });
 
-    it('a refused close (an approver gate) leaves the Task where it is, to be retried next tick', async () => {
+    it('a refused close (an approver gate) leaves the Task where it is, and the next tick retries it', async () => {
         const h = harness({ tasks: [tracked()], deployments: [deployment()] });
-        h.transitions.transition.mockRejectedValue(new Error('approval pending'));
-        const outcome = await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
+        const row = h.tasks.rows[0] as unknown as Task;
+        h.transitions.transition.mockRejectedValueOnce(new Error('approval pending'));
+        const outcome = await h.service.reconcileTask(row);
         expect(outcome).toMatchObject({ changed: true, closed: false });
-        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'live', status: TaskStatus.IN_REVIEW });
+        expect(row).toMatchObject({ deliveryState: 'live', status: TaskStatus.IN_REVIEW });
+
+        // Review of #3030 — `live` is terminal for the decision, not for the Task: the next tick
+        // still visits it and retries the close, once the gate allows it.
+        const summary = await h.service.reconcile();
+        expect(summary).toMatchObject({ scanned: 1, closed: 1 });
+        expect(h.transitions.transition).toHaveBeenCalledTimes(2);
+        expect(row).toMatchObject({ deliveryState: 'live', status: TaskStatus.DONE });
+
+        // Done: never visited again.
+        await expect(h.service.reconcile()).resolves.toMatchObject({ scanned: 0 });
+        expect(h.transitions.transition).toHaveBeenCalledTimes(2);
     });
 
     it('reconcile: stalest first, one failing Task does not abort the tick, counters and sweep telemetry', async () => {
         const good = tracked({ id: 'task-good', deliveryUpdatedAt: new Date(2) });
         const bad = tracked({ id: 'task-bad', workId: 'work-boom', deliveryUpdatedAt: new Date(1) });
         // A merge commit is recorded once per Work (the unique index), so the third change has its own.
-        const done = tracked({ id: 'task-live', deliveryState: 'live', mergeCommitSha: LATER });
+        const done = tracked({
+            id: 'task-live',
+            deliveryState: 'live',
+            status: TaskStatus.DONE,
+            mergeCommitSha: LATER,
+        });
         const h = harness({ tasks: [good, bad, done], builds: [build({ status: 'running', deployable: false })] });
         h.works.findById.mockImplementation(async (id: string) => {
             if (id === 'work-boom') throw new Error('boom');
@@ -520,13 +541,43 @@ describe('TaskDeliveryService — Close anyway (S9, S20)', () => {
         );
     });
 
-    it('a gate refusal throws and changes nothing', async () => {
+    it('a gate refusal throws and changes nothing — the chain write is reverted', async () => {
         const h = harness({ tasks: [tracked({ deliveryState: 'built' })] });
         h.transitions.transition.mockRejectedValue(new Error('approvers pending'));
         await expect(h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task)).rejects.toThrow(
             'approvers pending',
         );
-        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'built' });
+        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'built', deliveryClosedById: null });
+        expect(h.activityLog.log).not.toHaveBeenCalled();
+    });
+
+    it('writes the chain BEFORE moving the Task: a lost race closes nothing (review of #3030)', async () => {
+        const h = harness({ tasks: [tracked({ deliveryState: 'deploy_failed' })] });
+        const stale = { ...h.tasks.rows[0] } as unknown as Task;
+        Object.assign(h.tasks.rows[0], { deliveryState: 'deploying' });
+        const view = await h.service.closeWithoutDeploy('user-1', stale);
+        expect(h.transitions.transition).not.toHaveBeenCalled();
+        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'deploying', status: TaskStatus.IN_REVIEW });
+        expect(view.state).toBe('deploying');
+    });
+
+    it.each([TaskStatus.BLOCKED, TaskStatus.TODO, TaskStatus.BACKLOG])(
+        'refuses a %s Task with 422 notClosable instead of skipping the move',
+        async (status) => {
+            const h = harness({ tasks: [tracked({ deliveryState: 'deploy_failed', status })] });
+            await expect(
+                h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task),
+            ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'notClosable' }) });
+            expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'deploy_failed' });
+            expect(h.transitions.transition).not.toHaveBeenCalled();
+        },
+    );
+
+    it('closes the chain of a Task a person already moved to Done, without moving it again', async () => {
+        const h = harness({ tasks: [tracked({ deliveryState: 'built', status: TaskStatus.DONE })] });
+        const view = await h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task);
+        expect(view.state).toBe('closed_without_deploy');
+        expect(h.transitions.transition).not.toHaveBeenCalled();
     });
 
     it('a closed change is never reconciled again — no further follow-up (FR-40)', async () => {
@@ -578,14 +629,40 @@ describe('TaskDeliveryService — Try once more (S22, APW08-G21)', () => {
         expect(h.followUps.open).not.toHaveBeenCalled();
     });
 
-    it('a replay loses the consume race and is refused with the same code', async () => {
-        const h = harness({ tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: 'b' })] });
+    it('a replay loses the consume race and is refused with the same code (one follow-up, by key)', async () => {
+        const b = build({ status: 'failed', deployable: false });
+        const h = harness({
+            tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: b.id })],
+            builds: [b],
+        });
         h.escalations.getForUser.mockResolvedValue(escalation());
         h.escalations.resolveForTask.mockResolvedValue(false);
+        h.followUps.open.mockResolvedValue({ kind: 'exists', taskId: 'follow-1' } as never);
         await expect(
             h.service.requestFollowUp('user-1', h.tasks.rows[0] as unknown as Task, 'esc-1', scope),
         ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'followUpLimit' }) });
-        expect(h.followUps.open).not.toHaveBeenCalled();
+        expect(h.activityLog.log).not.toHaveBeenCalled();
+    });
+
+    it('a refused retry leaves the Inbox item OPEN: it is consumed only once a follow-up exists (review of #3030)', async () => {
+        const b = build({ status: 'failed', deployable: false });
+        const h = harness({
+            tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: b.id })],
+            builds: [b],
+        });
+        h.escalations.getForUser.mockResolvedValue(escalation());
+        h.followUps.open.mockResolvedValue({
+            kind: 'escalated',
+            reason: 'create-failed',
+            escalationId: 'esc-1',
+        } as never);
+        await expect(
+            h.service.requestFollowUp('user-1', h.tasks.rows[0] as unknown as Task, 'esc-1', scope),
+        ).rejects.toMatchObject({ response: expect.objectContaining({ code: 'followUpLimit' }) });
+        expect(h.followUps.open).toHaveBeenCalledWith(expect.objectContaining({ failureId: b.id }), {
+            manual: true,
+        });
+        expect(h.escalations.resolveForTask).not.toHaveBeenCalled();
     });
 
     it('a change that is not failed is refused', async () => {

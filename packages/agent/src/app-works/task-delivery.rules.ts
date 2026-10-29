@@ -252,7 +252,13 @@ export function decideDelivery(input: DeliveryDecisionInput): DeliveryDecision {
 
     if (deployment && deploymentDecides) {
         const state = String(deployment.state).toUpperCase();
-        const carried = (deployment.commitSha ?? '').trim() !== merge;
+        // A Deployment that recorded no commit carries its Build's (review of #3030) — the same
+        // fallback the delivery view uses — so a Deployment of the merge Build is not "carried".
+        const linkedBuild = deployment.buildId
+            ? input.builds.find((row) => row.id === deployment.buildId)
+            : undefined;
+        const decidingSha = ((deployment.commitSha ?? '').trim() || linkedBuild?.commitSha || '').trim();
+        const carried = decidingSha !== merge;
         const ids = {
             deploymentId: deployment.id,
             buildId: deployment.buildId ?? build?.id ?? null,

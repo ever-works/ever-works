@@ -470,10 +470,19 @@ export function failureLogTail(failure: DeliveryFailure): string[] {
         const lastError = failure.deployment?.lastError;
         if (typeof lastError === 'string' && lastError.trim()) raw.push(...lastError.split(/\r?\n/));
     }
-    return raw
-        .slice(-APP_FAILURE_LOG_TAIL_LINES)
-        .map((line) => redactSecrets(line).cleaned);
+    // Redact the WHOLE recorded text first, then split and take the tail (review of #3030): a PEM
+    // private key spans lines, so a per-line pass leaves its body lines untouched, and a tail cut
+    // first can drop the header that marks them. A key whose footer was cut off is removed from its
+    // header to the end — the body lines carry no marker of their own.
+    const joined = raw
+        .join('\n')
+        .replace(UNTERMINATED_PEM_PRIVATE_KEY, '[REDACTED:pem_private_key]');
+    return redactSecrets(joined).cleaned.split('\n').slice(-APP_FAILURE_LOG_TAIL_LINES);
 }
+
+/** A PEM private-key header with no matching footer after it, through the end of the text. */
+const UNTERMINATED_PEM_PRIVATE_KEY =
+    /-----BEGIN ((?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY)-----(?![\s\S]*-----END \1-----)[\s\S]*$/;
 
 function triedText(count: number): string {
     if (count <= 1) return 'once';

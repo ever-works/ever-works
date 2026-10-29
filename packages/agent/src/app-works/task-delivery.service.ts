@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, type Repository } from 'typeorm';
+import { In, Not, type Repository } from 'typeorm';
 import type { GitPullRequestStatus } from '@ever-works/plugin';
 import {
     APP_DELIVERY_RECONCILE_BATCH,
@@ -218,7 +218,16 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         };
         const limit = Math.max(1, Math.min(opts.limit ?? APP_DELIVERY_RECONCILE_BATCH, APP_DELIVERY_RECONCILE_BATCH));
         const due = await this.tasks.find({
-            where: { deliveryState: In([...TASK_DELIVERY_OPEN_STATES]) },
+            where: [
+                { deliveryState: In([...TASK_DELIVERY_OPEN_STATES]) },
+                // Review of #3030 — a change that went `live` while its Task's close was refused
+                // (an approver gate, a blocker) is still owed its close: `live` is terminal for the
+                // decision, not for the Task, so it is visited until the Task is done.
+                {
+                    deliveryState: 'live',
+                    status: Not(In([TaskStatus.DONE, TaskStatus.CANCELLED])),
+                },
+            ],
             order: { deliveryUpdatedAt: 'ASC' },
             take: limit,
         });
@@ -322,7 +331,9 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
 
         if (decision.kind === 'unchanged') {
             await this.touch(task, from);
-            return { ...none, decision };
+            // A live change whose Task did not close yet: retry the close (see `reconcile`).
+            const closed = from === 'live' ? await this.closeTask(task) : false;
+            return { ...none, closed, decision };
         }
 
         let changed = false;
@@ -491,13 +502,26 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
                 message: 'Only a merged change that is not live and not deploying can be closed this way.',
             });
         }
-        if (
-            this.transitions &&
-            (task.status === TaskStatus.IN_PROGRESS || task.status === TaskStatus.IN_REVIEW)
-        ) {
-            await this.transitions.transition(task, TaskStatus.DONE, { actorType: 'user' });
+        // Review of #3030 — a Task that cannot reach Done (blocked, back in the backlog) is refused,
+        // never skipped: the chain must not read "closed" while the Task stays open.
+        const needsTransition =
+            task.status === TaskStatus.IN_PROGRESS || task.status === TaskStatus.IN_REVIEW;
+        const alreadyClosed =
+            task.status === TaskStatus.DONE || task.status === TaskStatus.CANCELLED;
+        if ((!needsTransition && !alreadyClosed) || (needsTransition && !this.transitions)) {
+            throw new UnprocessableEntityException({
+                code: 'notClosable',
+                state: from,
+                message: `This Task is ${task.status}; it can only be closed from in progress or in review.`,
+            });
         }
+        // The chain FIRST (compare-and-set), the Task SECOND: a reconciler that moved the state in
+        // between wins and nothing is closed; a gate that refuses the move reverts the chain.
         const now = new Date();
+        const previous = {
+            deliveryClosedById: task.deliveryClosedById ?? null,
+            deliveryUpdatedAt: task.deliveryUpdatedAt ?? null,
+        };
         const landed = await this.compareAndSet(task.id, from, {
             deliveryState: 'closed_without_deploy',
             deliveryClosedById: userId,
@@ -507,6 +531,22 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             // The reconciler moved it in between (e.g. it went live) — answer what is true now.
             const fresh = await this.tasks.findOne({ where: { id: task.id } });
             return this.getView(fresh ?? task);
+        }
+        if (needsTransition && this.transitions) {
+            try {
+                await this.transitions.transition(task, TaskStatus.DONE, { actorType: 'user' });
+            } catch (error) {
+                await this.compareAndSet(task.id, 'closed_without_deploy', {
+                    deliveryState: from,
+                    ...previous,
+                }).catch((revertError: unknown) => {
+                    this.logger.warn(
+                        `Task ${task.id}: reverting Close anyway after a refused move failed (${errorText(revertError)}).`,
+                    );
+                    return false;
+                });
+                throw error;
+            }
         }
         Object.assign(task, {
             deliveryState: 'closed_without_deploy',
@@ -534,8 +574,9 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
     /**
      * `POST /api/tasks/:id/delivery/follow-up` — the S22 Inbox item's **Try once more**. The
      * `delivery-failed` escalation of THIS Task is the one-shot token: it is consumed
-     * (resolved, compare-and-set on `open`) before the follow-up is opened, so a double click or a
-     * replay opens nothing more. Every refusal is `422 { code: 'followUpLimit' }` (plan §4).
+     * (resolved, compare-and-set on `open`) once the follow-up is open, so a double click or a
+     * replay opens nothing more — and a retry that could not open one leaves the item open for
+     * the person to try again. Every refusal is `422 { code: 'followUpLimit' }` (plan §4).
      */
     async requestFollowUp(
         userId: string,
@@ -561,15 +602,6 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
         ) {
             throw refuse('That Inbox item has already been used, or belongs to another Task.');
         }
-        const consumed = await this.escalations.resolveForTask(
-            escalationId,
-            userId,
-            task.id,
-            scope,
-            'Try once more',
-        );
-        if (!consumed) throw refuse('That Inbox item has already been used.');
-
         const work = await this.works.findById(task.workId);
         if (!work) throw refuse('The App Work of this Task no longer exists.');
         const [build, deployment] = await Promise.all([
@@ -600,8 +632,21 @@ export class TaskDeliveryService implements TaskDeliveryTracker {
             deployment ? [deployment] : [],
         );
         if (!failure) throw refuse('The failure behind this change is no longer on record.');
+        // Open FIRST, consume SECOND (review of #3030): a refused retry must leave the Inbox item
+        // open — consumed first, a failed create would leave the failure with no open escalation,
+        // and the reconciler's per-failure pre-check would then suppress it for good. The open is
+        // idempotent on `followUpKey`, so two racing clicks still file ONE follow-up; the click
+        // that loses the consume below is refused like any replay.
         const result = await this.followUps.open(failure, { manual: true });
         if (result.kind === 'opened' || result.kind === 'exists') {
+            const consumed = await this.escalations.resolveForTask(
+                escalationId,
+                userId,
+                task.id,
+                scope,
+                'Try once more',
+            );
+            if (!consumed) throw refuse('That Inbox item has already been used.');
             if (result.kind === 'opened') {
                 await this.recordActivity(
                     task,

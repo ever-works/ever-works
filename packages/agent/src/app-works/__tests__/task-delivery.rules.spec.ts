@@ -391,6 +391,21 @@ describe('decideDelivery — carry-along and containment (FR-31, S23, S24, ACC-0
             deploymentId: d.id,
         });
     });
+
+    it("a commit-less Deployment of the MERGE Build is not carried: it takes the Build's sha (review of #3030)", () => {
+        const b = build();
+        const d = deployment({ commitSha: null, buildId: b.id });
+        expect(decideDelivery(input({ builds: [b], deployments: [d] }))).toMatchObject({
+            state: 'live',
+            carried: false,
+        });
+        // ...and one of a LATER Build is.
+        const later = build({ commitSha: LATER });
+        const d2 = deployment({ commitSha: null, buildId: later.id });
+        expect(
+            decideDelivery(input({ builds: [later], deployments: [d2], ancestry: { [LATER]: true } })),
+        ).toMatchObject({ state: 'live', carried: true });
+    });
 });
 
 describe('the helpers', () => {

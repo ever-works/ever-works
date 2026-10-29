@@ -19,7 +19,12 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/services', () => ({ DecisionConflictService: class {} }));
 
 import 'reflect-metadata';
-import { NotFoundException, ServiceUnavailableException, UnprocessableEntityException } from '@nestjs/common';
+import {
+    ForbiddenException,
+    NotFoundException,
+    ServiceUnavailableException,
+    UnprocessableEntityException,
+} from '@nestjs/common';
 import { TasksController } from './tasks.controller';
 
 /**
@@ -32,7 +37,8 @@ import { TasksController } from './tasks.controller';
  * rules are pinned in `packages/agent/src/app-works/__tests__/task-delivery.service.spec.ts`.
  */
 describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
-    const auth = { userId: 'user-1' } as never;
+    const auth = { userId: 'user-1', authMethod: 'session' } as never;
+    const apiKey = { userId: 'user-1', authMethod: 'api-key' } as never;
     const scope = {
         tenantId: '11111111-1111-4111-8111-111111111111',
         organizationId: '22222222-2222-4222-8222-222222222222',
@@ -149,6 +155,32 @@ describe('TasksController — App Works delivery routes (APW-08 T24)', () => {
             await expect(
                 controller.requestDeliveryFollowUp(auth, 'task-1', { escalationId: 'esc-1' }),
             ).rejects.toMatchObject({ response: { code: 'followUpLimit' } });
+        });
+    });
+
+    describe('human-only decisions (review of #3030)', () => {
+        it('Close anyway refuses an API key before the Task is read or the chain written', async () => {
+            const { controller, getOne, delivery } = make();
+            await expect(controller.closeDelivery(apiKey, 'task-1', {})).rejects.toBeInstanceOf(
+                ForbiddenException,
+            );
+            expect(getOne).not.toHaveBeenCalled();
+            expect(delivery.closeWithoutDeploy).not.toHaveBeenCalled();
+        });
+
+        it('Try once more refuses an API key before the Inbox item is touched', async () => {
+            const { controller, getOne, delivery } = make();
+            await expect(
+                controller.requestDeliveryFollowUp(apiKey, 'task-1', { escalationId: 'esc-1' }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(getOne).not.toHaveBeenCalled();
+            expect(delivery.requestFollowUp).not.toHaveBeenCalled();
+        });
+
+        it('the read stays open to an API key (it decides nothing)', async () => {
+            const { controller, delivery } = make();
+            await expect(controller.getDelivery(apiKey, 'task-1')).resolves.toBe(VIEW);
+            expect(delivery.getView).toHaveBeenCalledTimes(1);
         });
     });
 
