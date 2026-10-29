@@ -807,7 +807,7 @@ describe('GoalOrchestratorService — advance', () => {
 
     it('routes a legacy Goal to its same-owner current-tenant pinned Agent', async () => {
         const assignedAgentId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
-        const { service, agents, transitions } = build({
+        const { service, agents, transitions, tasksService } = build({
             goal: {
                 loopStatus: 'running',
                 assignedAgentId,
@@ -823,6 +823,14 @@ describe('GoalOrchestratorService — advance', () => {
         await service.advance('u1', 'g1');
 
         expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', undefined);
+        // The iteration Task is created with the SAME relation scope (#2213
+        // `goal-orchestrator-legacy`): the real `TasksService.create` re-checks the Agent with
+        // it, and the Goal's raw null/null stamp would refuse the current-tenant Agent.
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ goalId: 'g1', agentId: assignedAgentId }),
+            undefined,
+        );
         expect(transitions.dispatchAgentRun).toHaveBeenCalled();
     });
 

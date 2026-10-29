@@ -15,6 +15,13 @@ jest.mock('@ever-works/agent/database', () => ({
         tenantId: row.tenantId ?? null,
         organizationId: row.organizationId ?? null,
     }),
+    ownershipRelationScopeOf: (row: {
+        tenantId?: string | null;
+        organizationId?: string | null;
+    }) =>
+        (row.tenantId ?? null) === null && (row.organizationId ?? null) === null
+            ? undefined
+            : { tenantId: row.tenantId ?? null, organizationId: row.organizationId ?? null },
 }));
 jest.mock('@ever-works/agent/services', () => ({ DecisionConflictService: class {} }));
 jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {} }));
@@ -133,6 +140,29 @@ describe('TasksController — board-run active scope', () => {
             userId,
             taskId,
             everScope,
+            'Approved',
+        );
+    });
+
+    it('resolves on a legacy Task with its relation scope, not the raw null/null stamp (#2213)', async () => {
+        // `escalation-cas-legacy`: the escalation on a legacy Task run by an Organization Agent
+        // is stamped from that run; the raw stamp would match legacy rows only and 404.
+        const { controller, service, escalations } = await build();
+        const escalationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        service.getOne.mockResolvedValueOnce({
+            id: taskId,
+            userId,
+            tenantId: null,
+            organizationId: null,
+        });
+
+        await controller.resolveEscalation(auth, taskId, escalationId, { note: 'Approved' });
+
+        expect(escalations.resolveForTask).toHaveBeenCalledWith(
+            escalationId,
+            userId,
+            taskId,
+            undefined,
             'Approved',
         );
     });

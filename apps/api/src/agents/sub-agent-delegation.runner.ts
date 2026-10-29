@@ -11,7 +11,6 @@ import {
     AgentRepository,
     AgentRunRepository,
     ownershipRelationScopeOf,
-    ownershipScopeOf,
 } from '@ever-works/agent/database';
 import { TasksService, TaskTransitionService, type Task } from '@ever-works/agent/tasks-domain';
 
@@ -99,7 +98,10 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         if (!parent) {
             return this.failure(request, 'parent agent no longer exists');
         }
-        const ownershipScope = ownershipScopeOf(parent);
+        // A legacy (null/null) parent yields `undefined` here: owner-only lookups, and a child
+        // Task left unstamped like its parent. Its raw `ownershipScopeOf` would mean "legacy
+        // rows only" and hide a current-tenant child Agent or parent Task (#2213 punch list,
+        // `sub-agent-delegation`). A stamped parent keeps its exact scope.
         const relationScope = ownershipRelationScopeOf(parent);
 
         const childAgentId = request.childAgentId ?? parent.id;
@@ -226,7 +228,7 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
                     // itself and the cap is unenforceable.
                     delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
                 },
-                ownershipScope,
+                relationScope,
             );
         } catch (error) {
             return this.failure(

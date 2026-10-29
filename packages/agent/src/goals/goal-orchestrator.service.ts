@@ -38,7 +38,6 @@ import {
 import { saveGoalColumns } from './goal-column-save';
 import {
     ownershipRelationScopeOf,
-    ownershipScopeOf,
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
@@ -1037,7 +1036,10 @@ export class GoalOrchestratorService {
                         // and brief, so a private Goal's iteration stays private.
                         derivedFromPrivate: goal.visibility === 'private',
                     },
-                    ownershipScopeOf(goal),
+                    // The relation scope, as routing used to pick `slotAgentId`: a legacy
+                    // (null/null) Goal routes to a current-tenant Agent, and its raw stamp as
+                    // the create scope would refuse that Agent (#2213 `goal-orchestrator-legacy`).
+                    ownershipRelationScopeOf(goal),
                 );
 
                 const dispatch = await this.transitions.dispatchAgentRun(task, slotAgentId, {

@@ -60,7 +60,7 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 import {
     AgentRepository,
     AgentRunRepository,
-    ownershipScopeOf,
+    ownershipRelationScopeOf,
     type OwnershipScope,
 } from '@ever-works/agent/database';
 import { buildTaskCostView } from './task-cost';
@@ -1307,7 +1307,10 @@ export class TasksController {
             escalationId,
             auth.userId,
             id,
-            ownershipScopeOf(task),
+            // A legacy (null/null) Task can carry an escalation stamped from its Organization
+            // Agent's run; the raw stamp would match legacy rows only and 404 the resolve
+            // (#2213 `escalation-cas-legacy`). `taskId` + `userId` still bind the row.
+            ownershipRelationScopeOf(task),
             body.note ?? null,
         );
         if (!resolved) {

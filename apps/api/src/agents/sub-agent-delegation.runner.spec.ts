@@ -190,7 +190,11 @@ describe('SubAgentDelegationRunnerService', () => {
 
         expect(agents.findByIdAndUser).toHaveBeenCalledWith(CHILD_AGENT, OWNER, undefined);
         expect(tasks.getOne).toHaveBeenCalledWith(OWNER, 'task-parent', undefined);
-        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), legacyScope);
+        // The WRITE path too (#2213 `sub-agent-delegation`): `TasksService.create` looks the
+        // child Agent and the parent Task up again with this scope, so the raw legacy stamp
+        // ("legacy rows only") made it refuse both. `undefined` = owner-only, child unstamped.
+        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), undefined);
+        expect(tasks.create).not.toHaveBeenCalledWith(OWNER, expect.any(Object), legacyScope);
     });
 
     describe("inputs reach the child's brief", () => {
