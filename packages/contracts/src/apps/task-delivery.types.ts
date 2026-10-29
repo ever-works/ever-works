@@ -99,6 +99,52 @@ export interface TaskDeliveryView {
 	history: Array<{ state: TaskDeliveryState; at: string; activityId: string | null }>;
 }
 
+/**
+ * APW-08 T24 — the `GET /api/tasks?deliveryState=` token for a change that is not merged yet
+ * (spec §6.1 **Waiting to merge**): no delivery state and an open (or draft) pull request.
+ * Never a value of `tasks.deliveryState`, so it cannot collide with one.
+ */
+export const TASK_DELIVERY_FILTER_WAITING = 'waiting' as const;
+
+/** One token of `GET /api/tasks?deliveryState=` (comma-separated). */
+export type TaskDeliveryStateFilter = TaskDeliveryState | typeof TASK_DELIVERY_FILTER_WAITING;
+
+/** Every token `GET /api/tasks?deliveryState=` accepts. */
+export const TASK_DELIVERY_STATE_FILTERS: readonly TaskDeliveryStateFilter[] = [
+	TASK_DELIVERY_FILTER_WAITING,
+	...TASK_DELIVERY_STATES
+];
+
+/**
+ * The App Work Tasks tab's **Delivery** select (spec §6.1): each option and the `deliveryState`
+ * tokens it sends. Every delivery state belongs to exactly one option, so "Any" is the only way
+ * to see every Task. `merged` waits for a Build and `built` waits for a Deployment, so each sits
+ * with the step it waits on.
+ */
+export const TASK_DELIVERY_FILTER_GROUPS = {
+	waiting: [TASK_DELIVERY_FILTER_WAITING],
+	building: ['merged', 'building'],
+	deploying: ['built', 'deploying'],
+	live: ['live'],
+	failed: ['build_failed', 'deploy_failed'],
+	closed: ['closed_without_deploy']
+} as const satisfies Record<string, readonly TaskDeliveryStateFilter[]>;
+export type TaskDeliveryFilterGroup = keyof typeof TASK_DELIVERY_FILTER_GROUPS;
+
+/**
+ * APW-08 T24 — what `GET /api/tasks?includeDelivery=true` attaches to a row as `delivery` (plan
+ * §4), `null` for a Task the chain does not track. The board chip's inputs, nothing more.
+ */
+export interface TaskDeliveryEmbed {
+	state: TaskDeliveryState;
+	/** The live Deployment's URL, only in `live`. */
+	liveUrl: string | null;
+	/** APW-06's failure outcome of the deciding Deployment, only in `deploy_failed`. */
+	outcome: TaskDeliveryDeployOutcome | null;
+	liveWithWarnings: boolean;
+	carriedByLaterChange: boolean;
+}
+
 /** One agent run of the Task and what it cost (the run receipt's own lines, summed). */
 export interface TaskCostRun {
 	runId: string;

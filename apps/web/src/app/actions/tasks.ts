@@ -1,6 +1,10 @@
 'use server';
 
-import type { TaskExtraRepo } from '@ever-works/contracts';
+import type {
+    TaskCostView,
+    TaskDeliveryView,
+    TaskExtraRepo,
+} from '@ever-works/contracts';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
@@ -751,4 +755,120 @@ export async function detachAttachmentAction(taskId: string, attachmentId: strin
     const res = await tasksAPI.removeAttachment(taskId, attachmentId);
     revalidatePath(`/tasks/${taskId}`);
     return res;
+}
+
+// ── App Works delivery and cost (APW-08 T27) ──────────────────────
+//
+// Same shape as the board's PR / diff actions: authenticate here, call the API through the
+// server client (which carries the session and the workspace selector exactly as every other
+// Task route does), and hand the component a VALUE — never a thrown message, which a production
+// build redacts. Refusals come back by the API's own `code`.
+
+/** The open `delivery-failed` Inbox item **Try once more** answers, if any (newest first). */
+const DELIVERY_RETRY_REASON = 'delivery-failed';
+/** The states whose chain may be waiting on a person (a failed Build or Deployment). */
+const DELIVERY_FAILED_STATES: ReadonlySet<string> = new Set(['build_failed', 'deploy_failed']);
+
+export type TaskDeliveryActionResult =
+    | {
+          ok: true;
+          view: TaskDeliveryView;
+          /** The open `delivery-failed` escalation **Try once more** consumes; null = none. */
+          retryEscalationId: string | null;
+      }
+    | { ok: false; code: string; statusCode?: number };
+
+function deliveryFailure(err: unknown, fallback: string): { ok: false; code: string; statusCode?: number } {
+    if (err instanceof ApiResponseError) {
+        return { ok: false, code: err.code ?? fallback, statusCode: err.statusCode };
+    }
+    return { ok: false, code: fallback };
+}
+
+/**
+ * `GET /api/tasks/:id/delivery`, plus — only while the chain is in a failed state — the Task's
+ * open `delivery-failed` escalation, so the section can offer **Try once more**. Read-only (no
+ * revalidatePath: this is the section's poll). Never throws.
+ */
+export async function getTaskDeliveryAction(id: string): Promise<TaskDeliveryActionResult> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const view = await tasksAPI.delivery(id);
+        let retryEscalationId: string | null = null;
+        if (view.state && DELIVERY_FAILED_STATES.has(view.state)) {
+            try {
+                const escalations = await tasksAPI.listEscalations(id);
+                retryEscalationId =
+                    (escalations.data ?? []).find(
+                        (row) =>
+                            row.reasonCode === DELIVERY_RETRY_REASON &&
+                            row.status === 'open' &&
+                            row.taskId === id,
+                    )?.id ?? null;
+            } catch {
+                // Best-effort: without the escalation read the section simply offers no retry.
+                retryEscalationId = null;
+            }
+        }
+        return { ok: true, view, retryEscalationId };
+    } catch (err) {
+        return deliveryFailure(err, 'DELIVERY_READ_FAILED');
+    }
+}
+
+/** **Close anyway** / **Close without deploying** — the Task moves to Done although not live. */
+export async function closeDeliveryAction(
+    id: string,
+    note?: string | null,
+): Promise<{ ok: true; view: TaskDeliveryView } | { ok: false; code: string; statusCode?: number }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const view = await tasksAPI.closeDelivery(id, note?.trim() ? note.trim().slice(0, 500) : null);
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${id}`);
+        return { ok: true, view };
+    } catch (err) {
+        return deliveryFailure(err, 'CLOSE_FAILED');
+    }
+}
+
+/** **Try once more** — opens one more follow-up Task from the open `delivery-failed` Inbox item. */
+export async function openDeliveryFollowUpAction(
+    id: string,
+    escalationId: string,
+): Promise<{ ok: true; taskId: string } | { ok: false; code: string; statusCode?: number }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    if (!escalationId) return { ok: false, code: 'followUpLimit', statusCode: 422 };
+    try {
+        const result = await tasksAPI.deliveryFollowUp(id, escalationId);
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${id}`);
+        return { ok: true, taskId: result.taskId };
+    } catch (err) {
+        return deliveryFailure(err, 'FOLLOW_UP_FAILED');
+    }
+}
+
+/** `GET /api/tasks/:id/cost` — the Task's runs and what they cost. Read-only; never throws. */
+export async function getTaskCostAction(
+    id: string,
+): Promise<{ ok: true; cost: TaskCostView } | { ok: false; code: string }> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        return { ok: true, cost: await tasksAPI.cost(id) };
+    } catch (err) {
+        return { ok: false, code: deliveryFailure(err, 'COST_READ_FAILED').code };
+    }
 }

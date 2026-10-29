@@ -1,7 +1,11 @@
 import {
     normalizeRecordListView,
+    TASK_DELIVERY_STATE_FILTERS,
+    TASK_DELIVERY_STATES,
     type TaskCostView,
+    type TaskDeliveryEmbed,
     type TaskDeliveryFollowUpResponse,
+    type TaskDeliveryStateFilter,
     type TaskDeliveryView,
 } from '@ever-works/contracts';
 import {
@@ -476,6 +480,18 @@ export class TasksController {
         required: false,
         description: "'true' also returns Tasks a trigger keeps off the board",
     })
+    @ApiQuery({
+        name: 'deliveryState',
+        required: false,
+        description:
+            "APW-08 — comma-separated App Work delivery states (merged, building, build_failed, built, deploying, deploy_failed, live, closed_without_deploy) or 'waiting' (not merged yet: an open pull request and no delivery state). OR-ed; narrows the caller's own list only.",
+    })
+    @ApiQuery({
+        name: 'includeDelivery',
+        required: false,
+        description:
+            "APW-08 — 'true' attaches each row's `delivery: { state, liveUrl, outcome, liveWithWarnings, carriedByLaterChange }`, null for a Task the delivery chain does not track",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -501,7 +517,12 @@ export class TasksController {
         @Query('includeHidden') includeHidden?: string,
         // Record visibility (EW-P1-3) — the list tab. Unknown or missing = `mine`.
         @Query('view') view?: string,
+        // APW-08 T24 — the App Work Tasks tab's Delivery filter and the board chips' embed.
+        // Appended LAST so every positional caller (specs) keeps its meaning.
+        @Query('deliveryState') deliveryState?: string,
+        @Query('includeDelivery') includeDelivery?: string,
     ) {
+        const deliveryStates = this.parseDeliveryStateList(deliveryState);
         const filter: ListTasksFilter = {
             view: normalizeRecordListView(view),
             status: this.parseStatusList(status),
@@ -516,6 +537,7 @@ export class TasksController {
             label,
             search,
             includeHidden: includeHidden === 'true',
+            ...(deliveryStates ? { deliveryState: deliveryStates } : {}),
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };
@@ -527,7 +549,71 @@ export class TasksController {
             },
             this.scopeContext.getScope(),
         );
-        return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
+        const data = includeDelivery === 'true' ? await this.withDeliveryEmbeds(rows) : rows;
+        return { data, meta: { total, limit: filter.limit, offset: filter.offset } };
+    }
+
+    /**
+     * APW-08 T24 — `?deliveryState=` as the filter's token list; an unknown token is a 400, like
+     * the status and priority filters. Empty (or only commas) = no filter.
+     */
+    private parseDeliveryStateList(value?: string): TaskDeliveryStateFilter[] | undefined {
+        if (!value) return undefined;
+        const parts = value
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+        const out: TaskDeliveryStateFilter[] = [];
+        for (const p of parts) {
+            if (!(TASK_DELIVERY_STATE_FILTERS as readonly string[]).includes(p)) {
+                throw new BadRequestException(`Invalid deliveryState filter: ${p}`);
+            }
+            if (!out.includes(p as TaskDeliveryStateFilter)) out.push(p as TaskDeliveryStateFilter);
+        }
+        return out.length > 0 ? out : undefined;
+    }
+
+    /**
+     * APW-08 T24 — `?includeDelivery=true`: each row gains `delivery` (null when untracked). The
+     * embed is computed from the rows `list` already owner-scoped, never from client ids. A
+     * runtime without the delivery chain — or a chain whose read failed — still answers each
+     * row's state from its own column, with no Deployment details.
+     */
+    private async withDeliveryEmbeds<
+        T extends {
+            id: string;
+            deliveryState?: string | null;
+            deliveryDeploymentId?: string | null;
+            mergeCommitSha?: string | null;
+        },
+    >(
+        rows: T[],
+    ): Promise<Array<T & { delivery: TaskDeliveryEmbed | null }>> {
+        let embeds = new Map<string, TaskDeliveryEmbed>();
+        if (this.delivery) {
+            try {
+                embeds = await this.delivery.listEmbeds(rows);
+            } catch {
+                embeds = new Map();
+            }
+        }
+        return rows.map((row) => {
+            const state = (TASK_DELIVERY_STATES as readonly string[]).includes(
+                row.deliveryState ?? '',
+            )
+                ? (row.deliveryState as TaskDeliveryEmbed['state'])
+                : null;
+            const delivery: TaskDeliveryEmbed | null = state
+                ? (embeds.get(row.id) ?? {
+                      state,
+                      liveUrl: null,
+                      outcome: null,
+                      liveWithWarnings: false,
+                      carriedByLaterChange: false,
+                  })
+                : null;
+            return { ...row, delivery };
+        });
     }
 
     @Post()

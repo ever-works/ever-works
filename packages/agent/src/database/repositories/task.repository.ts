@@ -15,7 +15,11 @@ import {
     sanitizeLikePattern,
 } from '../utils';
 import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
-import type { RecordListView } from '@ever-works/contracts';
+import {
+    TASK_DELIVERY_FILTER_WAITING,
+    type RecordListView,
+    type TaskDeliveryStateFilter,
+} from '@ever-works/contracts';
 import type { RecordAccessContext } from '../../record-visibility/record-access.types';
 import { visibleToPredicate } from '../../record-visibility/visible-to';
 
@@ -44,6 +48,14 @@ export interface ListTasksFilter {
     parentTaskId?: string | 'none';
     label?: string;
     search?: string;
+    /**
+     * APW-08 T24 — the App Work Tasks tab's **Delivery** filter: rows whose `deliveryState` is one
+     * of these, OR-ed. The token `'waiting'` (`TASK_DELIVERY_FILTER_WAITING`) is a change that is
+     * not merged yet: no delivery state and an open or draft pull request. Omitted or empty = no
+     * predicate, today's behaviour. Applied after the owner / visibility predicate like every
+     * other filter, so it only ever narrows.
+     */
+    deliveryState?: TaskDeliveryStateFilter[];
     /**
      * Include Tasks flagged `hiddenFromBoard` (trigger-spawned work the
      * owning trigger chose to keep off the board). Omitted/false =
@@ -296,6 +308,27 @@ export class TaskRepository {
         }
         if (filter.isRecurring !== undefined) {
             qb.andWhere('task.isRecurring = :isRecurring', { isRecurring: filter.isRecurring });
+        }
+        if (filter.deliveryState && filter.deliveryState.length > 0) {
+            const states = filter.deliveryState.filter(
+                (token) => token !== TASK_DELIVERY_FILTER_WAITING,
+            );
+            const waiting = filter.deliveryState.includes(TASK_DELIVERY_FILTER_WAITING);
+            // The tokens are OR-ed inside one parenthesised predicate, which is AND-ed with
+            // every other filter (and with the owner / visibility predicate before them).
+            const branches: string[] = [];
+            const params: Record<string, unknown> = {};
+            if (states.length > 0) {
+                branches.push('task.deliveryState IN (:...deliveryStates)');
+                params.deliveryStates = states;
+            }
+            if (waiting) {
+                branches.push(
+                    '(task.deliveryState IS NULL AND task.prState IN (:...waitingPrStates))',
+                );
+                params.waitingPrStates = ['open', 'draft'];
+            }
+            qb.andWhere(`(${branches.join(' OR ')})`, params);
         }
         if (filter.terminalUpdatedSince) {
             qb.andWhere(

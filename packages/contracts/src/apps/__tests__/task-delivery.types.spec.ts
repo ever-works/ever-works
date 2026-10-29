@@ -10,7 +10,10 @@ import {
 	TASK_DELIVERY_CLOSE_NOTE_MAX,
 	TASK_DELIVERY_DEPLOY_OUTCOMES,
 	TASK_DELIVERY_ERROR_CODES,
+	TASK_DELIVERY_FILTER_GROUPS,
+	TASK_DELIVERY_FILTER_WAITING,
 	TASK_DELIVERY_OPEN_STATES,
+	TASK_DELIVERY_STATE_FILTERS,
 	TASK_DELIVERY_STATES
 } from '../task-delivery.types.js';
 
@@ -66,5 +69,27 @@ describe('task-delivery.types (APW-08 T7)', () => {
 
 	it('pins the route error codes', () => {
 		expect(TASK_DELIVERY_ERROR_CODES).toEqual(['notClosable', 'followUpLimit', 'notTracked']);
+	});
+
+	it('the list filter accepts every state plus the not-merged-yet token, which is never a state', () => {
+		expect(TASK_DELIVERY_FILTER_WAITING).toBe('waiting');
+		expect((TASK_DELIVERY_STATES as readonly string[]).includes(TASK_DELIVERY_FILTER_WAITING)).toBe(false);
+		expect([...TASK_DELIVERY_STATE_FILTERS].sort()).toEqual(
+			[TASK_DELIVERY_FILTER_WAITING, ...TASK_DELIVERY_STATES].sort()
+		);
+	});
+
+	it('the Delivery select puts every state in exactly one option (spec §6.1)', () => {
+		expect(Object.keys(TASK_DELIVERY_FILTER_GROUPS)).toEqual([
+			'waiting',
+			'building',
+			'deploying',
+			'live',
+			'failed',
+			'closed'
+		]);
+		const tokens = Object.values(TASK_DELIVERY_FILTER_GROUPS).flat();
+		expect(new Set(tokens).size).toBe(tokens.length);
+		expect([...tokens].sort()).toEqual([...TASK_DELIVERY_STATE_FILTERS].sort());
 	});
 });
