@@ -799,7 +799,10 @@ export function declaredFrom(ctx: AppDependencyContext, cluster: SmtpDependencyC
 		cluster.workSlug
 			.toLowerCase()
 			.replace(/[^a-z0-9-]+/g, '-')
-			.replace(/^-+|-+$/g, '') || 'app';
+			// Runs of `-` collapse first, so the edge trim takes one character and
+			// never backtracks across a long run (CodeQL js/polynomial-redos).
+			.replace(/-{2,}/g, '-')
+			.replace(/^-|-$/g, '') || 'app';
 	return `no-reply@${slug}.invalid`;
 }
 

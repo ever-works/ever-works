@@ -25,7 +25,9 @@ export async function getActivityFeed(
         const data = await activityFeedAPI.get(workId, params);
         return { success: true, data };
     } catch (error) {
-        console.error(`Failed to get activity feed for work ${workId}:`, error);
+        // The id is an argument, not part of the format string: a `%` in it
+        // would otherwise be read as a placeholder.
+        console.error('Failed to get activity feed for work %s:', workId, error);
         // Security (info-leak): return a static message instead of the raw
         // error.message — backend/network exception text (internal hostnames,
         // stack details) must not cross the server/client boundary. The full

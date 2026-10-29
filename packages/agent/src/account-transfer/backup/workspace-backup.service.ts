@@ -389,8 +389,15 @@ export class WorkspaceBackupService {
      * Check a download link. Constant-time, and deliberately answers only
      * yes or no — a caller that learns WHY a token failed learns whether the
      * backup exists.
+     *
+     * `token` comes from a query string, where `?token=a&token=b` arrives as
+     * an array whatever the parameter's declared type says — anything but a
+     * string is a failed check, not a call into array methods.
      */
-    verifyDownloadToken(scope: WorkspaceBackupScope, backupId: string, token: string): boolean {
+    verifyDownloadToken(scope: WorkspaceBackupScope, backupId: string, token: unknown): boolean {
+        if (typeof token !== 'string') {
+            return false;
+        }
         const separator = token.indexOf('.');
         if (separator <= 0) {
             return false;

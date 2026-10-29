@@ -27,7 +27,8 @@ const REGISTRY: Record<string, (props: never) => ReactElement> = {
  * provider plugin ships it.
  */
 export async function renderTemplate<TProps>(slug: string, props: TProps): Promise<RenderedEmail> {
-	const factory = REGISTRY[slug];
+	// Own keys only: `constructor` or `toString` would otherwise resolve on the prototype.
+	const factory = Object.prototype.hasOwnProperty.call(REGISTRY, slug) ? REGISTRY[slug] : undefined;
 	if (!factory) {
 		throw new Error(`Unknown email template: ${slug}`);
 	}

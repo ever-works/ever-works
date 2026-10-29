@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeHttpsUrl, safeWebUrl } from './safe-link';
+import { safeDownloadHref, safeHttpsUrl, safeWebUrl } from './safe-link';
 
 const SCRIPT_BEARING = [
     'javascript:alert(1)',
@@ -52,5 +52,32 @@ describe('safeWebUrl', () => {
         expect(safeWebUrl('http://user:pw@evil.invalid/')).toBeNull();
         expect(safeWebUrl('/dashboard')).toBeNull();
         expect(safeWebUrl(null)).toBeNull();
+    });
+});
+
+describe('safeDownloadHref', () => {
+    it('accepts a same-origin serve path and storage or blob URLs as written', () => {
+        expect(safeDownloadHref('/api/uploads/serve/abc?workspace=w1')).toBe(
+            '/api/uploads/serve/abc?workspace=w1',
+        );
+        expect(safeDownloadHref('https://bucket.example.com/a.pdf')).toBe(
+            'https://bucket.example.com/a.pdf',
+        );
+        expect(safeDownloadHref('blob:https://app.example.com/1b2c')).toBe(
+            'blob:https://app.example.com/1b2c',
+        );
+    });
+
+    it.each(SCRIPT_BEARING)('refuses %j', (raw) => {
+        expect(safeDownloadHref(raw)).toBeNull();
+    });
+
+    it('refuses a path that resolves to another host', () => {
+        expect(safeDownloadHref('//evil.invalid/a.pdf')).toBeNull();
+        expect(safeDownloadHref('/\\evil.invalid/a.pdf')).toBeNull();
+        expect(safeDownloadHref('/\t/evil.invalid/a.pdf')).toBeNull();
+        expect(safeDownloadHref('https://user:pw@evil.invalid/a.pdf')).toBeNull();
+        expect(safeDownloadHref('')).toBeNull();
+        expect(safeDownloadHref(undefined)).toBeNull();
     });
 });

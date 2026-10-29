@@ -85,11 +85,16 @@ export function isPinnedRef(ref: string): boolean {
     return SHA_PATTERN.test(ref) || /^v\d/.test(ref);
 }
 
-/** Plain text, capped: tags and control characters out, whitespace collapsed. */
+/**
+ * Plain text, capped: tags and control characters out, whitespace collapsed.
+ * Any `<` or `>` left once the tags are gone goes too, so a split tag such as
+ * `<scr<b>ipt>` cannot leave markup behind.
+ */
 export function plainText(value: unknown, max: number): string {
     if (typeof value !== 'string') return '';
     return value
         .replace(/<[^>]*>/g, '')
+        .replace(/[<>]/g, '')
         .replace(/[\u0000-\u001f\u007f]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
