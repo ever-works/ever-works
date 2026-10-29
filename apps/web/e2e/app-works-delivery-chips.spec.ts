@@ -229,10 +229,12 @@ test.describe('App Works — delivery chips (APW-08 T29)', () => {
         const rows = ((await list.json()) as { data: Array<{ id: string; delivery?: unknown }> })
             .data;
         const byId = new Map(rows.map((row) => [row.id, row]));
-        expect(
-            byId.get(board.untracked.id)?.delivery ?? null,
-            'untracked Task has no embed',
-        ).toBeNull();
+        // The untracked row is listed, and its embed is an explicit `null` (the route's contract:
+        // `?includeDelivery=true` gives every row a `delivery` key) — a missing row or a missing
+        // key must fail here, not read as "no embed".
+        const untrackedRow = byId.get(board.untracked.id);
+        expect(untrackedRow, 'the untracked Task is listed').toBeDefined();
+        expect(untrackedRow, 'untracked Task has delivery: null').toHaveProperty('delivery', null);
         const rolledBack = byId.get(board.tasks.get('deploy_failed_rolled_back')!.id)?.delivery as
             | { state: string; outcome: string | null }
             | undefined;
