@@ -82,7 +82,9 @@ export class TaskRunDenormService {
         try {
             return await this.tasks.findById(taskId);
         } catch (err) {
-            this.logger.warn(`Run-start post skipped for task ${taskId}: the Task read failed: ${err}`);
+            this.logger.warn(
+                `Run-start post skipped for task ${taskId}: the Task read failed: ${err}`,
+            );
             return null;
         }
     }

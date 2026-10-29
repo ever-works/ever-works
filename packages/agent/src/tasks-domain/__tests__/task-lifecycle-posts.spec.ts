@@ -42,9 +42,9 @@ describe('task-lifecycle-posts — the rules', () => {
             expect(
                 runStartedPost({ latestRunId: 'run-0', latestRunStatus: 'running' }, 'run-1'),
             ).toEqual({ key: 'deliveryPosts.runStarted' });
-            expect(
-                runStartedPost({ latestRunId: null, latestRunStatus: null }, 'run-1'),
-            ).toEqual({ key: 'deliveryPosts.runStarted' });
+            expect(runStartedPost({ latestRunId: null, latestRunStatus: null }, 'run-1')).toEqual({
+                key: 'deliveryPosts.runStarted',
+            });
         });
 
         it('a retry re-claiming a run already recorded running is no event', () => {
@@ -141,7 +141,10 @@ describe('task-lifecycle-posts — the rules', () => {
 
         it('pending / unknown post nothing — the checks have not settled', () => {
             expect(
-                checksSettledPost({ ciState: null }, { ciState: 'pending', checks: [running('x')] }),
+                checksSettledPost(
+                    { ciState: null },
+                    { ciState: 'pending', checks: [running('x')] },
+                ),
             ).toBeNull();
             expect(checksSettledPost({ ciState: 'failing' }, { ciState: 'unknown' })).toBeNull();
             expect(checksSettledPost({ ciState: 'passing' }, { ciState: null })).toBeNull();
@@ -177,8 +180,12 @@ describe('TaskLifecyclePostsService — who gets a post, and who speaks', () => 
 
     function harness(kind: string | null = 'app') {
         const chat = { post: jest.fn().mockResolvedValue({ id: 'm1' }) };
-        const works = { findById: jest.fn().mockResolvedValue(kind ? { id: 'work-1', kind } : null) };
-        const runs = { findById: jest.fn().mockResolvedValue({ id: 'run-1', agentId: 'agent-run' }) };
+        const works = {
+            findById: jest.fn().mockResolvedValue(kind ? { id: 'work-1', kind } : null),
+        };
+        const runs = {
+            findById: jest.fn().mockResolvedValue({ id: 'run-1', agentId: 'agent-run' }),
+        };
         const poster = new TaskLifecyclePostsService(
             works as unknown as WorkRepository,
             runs as unknown as AgentRunRepository,
@@ -243,7 +250,10 @@ describe('TaskLifecyclePostsService — who gets a post, and who speaks', () => 
                 poster.post({ task, post: { key: 'deliveryPosts.runStarted' } }),
             ).resolves.toBe(false);
             await expect(
-                poster.post({ task: { ...task, workId: null }, post: { key: 'deliveryPosts.runStarted' } }),
+                poster.post({
+                    task: { ...task, workId: null },
+                    post: { key: 'deliveryPosts.runStarted' },
+                }),
             ).resolves.toBe(false);
             expect(chat.post).not.toHaveBeenCalled();
         },
@@ -251,7 +261,11 @@ describe('TaskLifecyclePostsService — who gets a post, and who speaks', () => 
 
     it('a kind the caller already read skips the Work read', async () => {
         const { chat, works, poster } = harness();
-        await poster.post({ task, post: { key: 'deliveryPosts.runStarted' }, workKind: 'directory' });
+        await poster.post({
+            task,
+            post: { key: 'deliveryPosts.runStarted' },
+            workKind: 'directory',
+        });
         await poster.post({ task, post: { key: 'deliveryPosts.runStarted' }, workKind: 'app' });
         expect(works.findById).not.toHaveBeenCalled();
         expect(chat.post).toHaveBeenCalledTimes(1);
@@ -260,13 +274,13 @@ describe('TaskLifecyclePostsService — who gets a post, and who speaks', () => 
     it('never throws: a refused post or a failed Work read answers false', async () => {
         const { chat, works, poster } = harness();
         chat.post.mockRejectedValueOnce(new Error('db down'));
-        await expect(poster.post({ task, post: { key: 'deliveryPosts.runStarted' } })).resolves.toBe(
-            false,
-        );
+        await expect(
+            poster.post({ task, post: { key: 'deliveryPosts.runStarted' } }),
+        ).resolves.toBe(false);
         works.findById.mockRejectedValueOnce(new Error('rpc'));
-        await expect(poster.post({ task, post: { key: 'deliveryPosts.runStarted' } })).resolves.toBe(
-            false,
-        );
+        await expect(
+            poster.post({ task, post: { key: 'deliveryPosts.runStarted' } }),
+        ).resolves.toBe(false);
     });
 
     it('without a bound chat port nothing is posted', async () => {
@@ -274,9 +288,9 @@ describe('TaskLifecyclePostsService — who gets a post, and who speaks', () => 
             { findById: jest.fn() } as unknown as WorkRepository,
             { findById: jest.fn() } as unknown as AgentRunRepository,
         );
-        await expect(poster.post({ task, post: { key: 'deliveryPosts.runStarted' } })).resolves.toBe(
-            false,
-        );
+        await expect(
+            poster.post({ task, post: { key: 'deliveryPosts.runStarted' } }),
+        ).resolves.toBe(false);
     });
 });
 
