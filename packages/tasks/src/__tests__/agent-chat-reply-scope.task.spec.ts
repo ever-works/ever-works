@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { NotFoundException } from '@nestjs/common';
 
 /**
  * Reviewer agent stage (slice AD, EW-811) — the chat-reply worker executes a
@@ -194,5 +195,25 @@ describe('agentChatReplyTask — a claimed row runs under its OWN admission scop
         await registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } });
 
         expect(runs.createQueued).toHaveBeenCalledWith(expect.objectContaining(ORG_SCOPE));
+    });
+
+    it('creates no run when the Task is confirmed missing', async () => {
+        tasks.getOne.mockRejectedValue(new NotFoundException('Task not found'));
+
+        const result = await registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(result).toMatchObject({ status: 'skipped', reason: 'task-not-found' });
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(runner.execute).not.toHaveBeenCalled();
+    });
+
+    it('does not fall back to the Agent stamp when the Task lookup fails for another reason', async () => {
+        tasks.getOne.mockRejectedValue(new Error('database unavailable'));
+        agents.findByIdAndUser.mockResolvedValue({ id: AGENT_ID, userId: OWNER, ...ORG_SCOPE });
+
+        await expect(
+            registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } }),
+        ).rejects.toThrow('database unavailable');
+        expect(runs.createQueued).not.toHaveBeenCalled();
     });
 });

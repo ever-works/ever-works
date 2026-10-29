@@ -28,7 +28,10 @@ describe('organization ownership response contracts', () => {
             'MissionWorkWithWork',
             {
                 id: 'relation-1',
-                ...ownership,
+                // Explicit, not spread: `satisfies` excess-checks only literal properties, so a
+                // spread would keep compiling after the type dropped these columns.
+                tenantId: ownership.tenantId,
+                organizationId: ownership.organizationId,
                 missionId: 'mission-1',
                 workId: 'work-1',
                 relation: 'created',
@@ -41,7 +44,10 @@ describe('organization ownership response contracts', () => {
             'MissionWorkWithMission',
             {
                 id: 'relation-1',
-                ...ownership,
+                // Explicit, not spread: `satisfies` excess-checks only literal properties, so a
+                // spread would keep compiling after the type dropped these columns.
+                tenantId: ownership.tenantId,
+                organizationId: ownership.organizationId,
                 missionId: 'mission-1',
                 workId: 'work-1',
                 relation: 'created',
