@@ -46,15 +46,20 @@ export function deduplicateByField<T extends { [K in F]?: string | null | undefi
 export function normalizeUrl(url: string): string {
 	if (!url) return '';
 
-	return url
+	let normalized = url
 		.toLowerCase()
 		.trim()
 		.replace(/^https?:\/\//, '')
 		.replace(/^www\./, '')
 		.replace(/(?<!\/)\/+$/, '')
-		.replace(/\/(tree|blob)\/[^/]+.*$/, '')
-		.replace(/#.*$/, '')
-		.replace(/\/index\.(html?|php|aspx?)$/, '');
+		// `/tree/<ref>…` / `/blob/<ref>…` to the end: ONE non-slash after the segment, then
+		// anything, so no two quantifiers share characters (`[^/]+.*` did, and `.` stopping at a
+		// newline made every start retry — CodeQL js/polynomial-redos).
+		.replace(/\/(tree|blob)\/[^/][\s\S]*$/, '');
+	// The fragment by index, not `/#.*$/`, which is retried from every `#` before a newline.
+	const hash = normalized.indexOf('#');
+	if (hash !== -1) normalized = normalized.slice(0, hash);
+	return normalized.replace(/\/index\.(html?|php|aspx?)$/, '');
 }
 
 /**
