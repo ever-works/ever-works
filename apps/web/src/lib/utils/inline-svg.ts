@@ -43,21 +43,6 @@ export const MAX_INLINE_SVG_LENGTH = 8000;
 // A dangerous URL scheme anywhere in the body, after the scrub.
 const SVG_DANGEROUS_URL_RE = /\b(?:javascript|vbscript|data|file)\s*:/i;
 
-function scrubOnce(svg: string): string {
-    return (
-        svg
-            // XML processing instructions / DOCTYPE do not belong inline.
-            .replace(/<\?xml[^>]*\?>/gi, '')
-            .replace(/<!DOCTYPE[^>]*>/gi, '')
-            // Comments / CDATA, so payloads cannot hide inside them.
-            .replace(/<!--[\s\S]*?-->/g, '')
-            .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
-            .replace(SVG_STYLE_BLOCK_RE, '')
-            .replace(SVG_DANGEROUS_TAG_RE, '')
-            .replace(SVG_DANGEROUS_ATTR_RE, '')
-    );
-}
-
 export function sanitizeInlineSvg(svg: string | null | undefined): string {
     if (typeof svg !== 'string' || svg.length > MAX_INLINE_SVG_LENGTH) return '';
     // Scrub until stable. Every step only removes text, so a pass that changes nothing
@@ -68,7 +53,18 @@ export function sanitizeInlineSvg(svg: string | null | undefined): string {
     let changingPasses = 0;
     do {
         previous = cleaned;
-        cleaned = scrubOnce(cleaned);
+        // The whole scrub, inline in the loop (the until-stable shape CodeQL
+        // js/incomplete-multi-character-sanitization recognises).
+        cleaned = cleaned
+            // XML processing instructions / DOCTYPE do not belong inline.
+            .replace(/<\?xml[^>]*\?>/gi, '')
+            .replace(/<!DOCTYPE[^>]*>/gi, '')
+            // Comments / CDATA, so payloads cannot hide inside them.
+            .replace(/<!--[\s\S]*?-->/g, '')
+            .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
+            .replace(SVG_STYLE_BLOCK_RE, '')
+            .replace(SVG_DANGEROUS_TAG_RE, '')
+            .replace(SVG_DANGEROUS_ATTR_RE, '');
         if (cleaned !== previous) changingPasses += 1;
         if (changingPasses > 1) return '';
     } while (cleaned !== previous);
