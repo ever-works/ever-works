@@ -678,7 +678,9 @@ describe('GoalOrchestratorService — advance', () => {
                 agentId: 'agent-7',
                 labels: ['goal-iteration'],
             }),
-            { tenantId: null, organizationId: null },
+            // The fixture Goal is legacy (null/null): its iteration Task is created with the
+            // relation scope (undefined = owner-only), never the raw stamp (#2213).
+            undefined,
         );
         // The brief handed to the agent is built from persisted state, so
         // the open criterion and the session budget must both be in it.
@@ -717,7 +719,8 @@ describe('GoalOrchestratorService — advance', () => {
         expect(tasksService.create).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ goalId: 'g1', derivedFromPrivate: true }),
-            expect.anything(),
+            // Legacy fixture Goal → relation scope `undefined` (#2213).
+            undefined,
         );
     });
 
@@ -1440,7 +1443,8 @@ describe('GoalOrchestratorService — cold start (scope fallback)', () => {
         expect(tasksService.create).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ goalId: 'g1', agentId: 'agent-a' }),
-            { tenantId: null, organizationId: null },
+            // Same relation scope routing used above (#2213 goal-orchestrator-legacy).
+            undefined,
         );
         expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-1' }),
