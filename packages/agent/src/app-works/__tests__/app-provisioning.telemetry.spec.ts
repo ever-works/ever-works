@@ -448,5 +448,12 @@ describe('Provisioning telemetry (APW-04 T28)', () => {
             const verdict = await gateWith(throwingSink).evaluate(input);
             expect(verdict.allowed).toBe(false);
         });
+
+        it('the merge re-judgement (reportRefusal: false) refuses the same and reports nothing', async () => {
+            const target = sink();
+            const verdict = await gateWith(target).evaluate({ ...input, reportRefusal: false });
+            expect(verdict.allowed).toBe(false);
+            expect(target.sent).toEqual([]);
+        });
     });
 });

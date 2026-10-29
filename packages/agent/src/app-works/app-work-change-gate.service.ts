@@ -94,7 +94,9 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
      * when the code has one). Codes and ids only - never the message or the paths.
      */
     private observeRefusal(input: AppWorkChangeGateInput, code: string | null): void {
-        if (!code) return;
+        // The merge gate's re-judgement opts out (`reportRefusal: false`): it re-reads the
+        // same branch on every sweep, and one refusal must not become one event per tick.
+        if (!code || input.reportRefusal === false) return;
         const taskId = input.taskId ?? null;
         const distinctId = input.work?.userId ?? null;
         if (input.taskOrigin === TASK_ORIGIN_APP_PROVISIONING) {

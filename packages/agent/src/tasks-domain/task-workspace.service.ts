@@ -3923,6 +3923,10 @@ export class TaskWorkspaceService {
                 work,
                 taskOrigin: task.origin ?? null,
                 taskId: task.id,
+                // Telemetry only: this re-judgement runs after every pull-request status
+                // read (the merge sweep included), so an unchanged refusal is not reported
+                // again here — the branch judgements that run first already reported it.
+                reportRefusal: false,
                 owner,
                 repo,
                 gitOptions,

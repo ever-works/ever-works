@@ -11,6 +11,7 @@ import {
 import { AppWorkChangeGateService } from '../app-work-change-gate.service';
 import { DEFAULT_SIZE_GUIDANCE } from '../app-work-rules.service';
 import { APP_WORK_SWITCH_ENV } from '../app-work-switches';
+import { TaskWorkspaceService } from '../../tasks-domain/task-workspace.service';
 
 /**
  * APW-08 (Gauzy Ever Works #37, 2026-10-29) — plan §8.1's evolve-loop telemetry.
@@ -302,6 +303,103 @@ describe('Evolve-loop telemetry (APW-08)', () => {
                 input,
             );
             expect(verdict.allowed).toBe(false);
+        });
+
+        it('reportRefusal: false refuses exactly the same and reports nothing', async () => {
+            const target = sink();
+            const verdict = await gateWith(target, '.github/workflows/ci.yml').evaluate({
+                ...input,
+                reportRefusal: false,
+            });
+            expect(verdict.allowed).toBe(false);
+            expect(target.sent).toEqual([]);
+        });
+
+        /**
+         * CodeRabbit on #3027: `TaskMergeGateService` calls `judgeAppWorkMerge` after every
+         * pull-request status read, the two-minute sweep included, so an unchanged refusal
+         * reported from there would become one event per tick. The merge re-judgement opts
+         * out; the branch judgement (which can be the first evaluation on the fallback
+         * paths) still reports.
+         */
+        describe('through TaskWorkspaceService, with the real gate', () => {
+            const TASK = {
+                id: 't1',
+                workId: 'w1',
+                userId: 'owner',
+                slug: 'add-a-thing',
+                labels: [] as string[],
+                origin: null,
+                prNumber: 12,
+                prUrl: 'https://example.test/pr/12',
+                branchRef: 'ever-works/task/x',
+            };
+
+            function workspaceWith(target: { track: (...args: unknown[]) => void }) {
+                const gate = gateWith(target, '.github/workflows/ci.yml');
+                const appWorkRow = {
+                    id: 'w1',
+                    userId: 'owner',
+                    kind: 'app',
+                    gitProvider: 'github',
+                    taskIsolationBaseBranch: 'main',
+                    getRepoOwner: () => 'me',
+                    getDataRepo: () => 'helpdesk-data',
+                    getWebsiteRepo: () => 'helpdesk',
+                };
+                return new TaskWorkspaceService(
+                    { findById: jest.fn(async () => appWorkRow) } as never, // works
+                    {
+                        updateById: jest.fn(async () => undefined),
+                        findById: jest.fn(async () => ({ id: 't1', status: 'in_progress' })),
+                    } as never, // tasks
+                    {} as never, // runs
+                    {} as never, // workspaceFacade
+                    {
+                        getRepository: jest.fn(async () => ({ defaultBranch: 'main' })),
+                        getCompareDiff: jest.fn(async () => ({ files: [], truncated: false })),
+                    } as never, // gitFacade
+                    { transition: jest.fn(async () => undefined) } as never, // transitions
+                    { post: jest.fn(async () => undefined) } as never, // taskChat
+                    undefined as never, // mergePolicy
+                    undefined as never, // activityLog
+                    undefined as never, // agentRepoAttachments
+                    undefined as never, // repoConnections
+                    gate as never,
+                );
+            }
+
+            it('a merge re-judgement (judgeAppWorkMerge) refuses and emits nothing', async () => {
+                const target = sink();
+                const workspace = workspaceWith(target);
+
+                const first = await workspace.judgeAppWorkMerge(TASK as never);
+                const sweep = await workspace.judgeAppWorkMerge(TASK as never);
+
+                expect(first).toEqual({ allowed: false, reason: 'app-change-refused' });
+                expect(sweep).toEqual({ allowed: false, reason: 'app-change-refused' });
+                expect(target.sent).toEqual([]);
+            });
+
+            it('a branch judgement (judgeAppWorkBranch) still emits guard_refused', async () => {
+                const target = sink();
+                const workspace = workspaceWith(target);
+
+                const outcome = await workspace.judgeAppWorkBranch({
+                    task: TASK as never,
+                    userId: 'owner',
+                    agentId: 'a1',
+                    reportedBranch: null,
+                });
+
+                expect(outcome).toMatchObject({ outcome: 'blocked-by-guard' });
+                expect(target.sent.map((entry) => [entry.event, entry.properties])).toEqual([
+                    [
+                        'app.change.guard_refused',
+                        { workId: 'w1', taskId: 't1', reason: 'protected', code: 'workflowPath' },
+                    ],
+                ]);
+            });
         });
     });
 });
