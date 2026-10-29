@@ -95,6 +95,26 @@ describe('sanitizeSvg', () => {
             expect(result).toEqual({ ok: false, reason: 'dangerous-content' });
         });
 
+        it('fails closed on a forbidden element that one removal pass would splice together', () => {
+            const result = sanitizeSvg(
+                '<svg viewBox="0 0 24 24"><scr<script></script>ipt>evil()</script><path d="M0 0"/></svg>',
+            );
+
+            expect(result).toEqual({ ok: false, reason: 'dangerous-content' });
+        });
+
+        it('still strips several forbidden elements that a single pass removes', () => {
+            const result = sanitizeSvg(
+                '<svg viewBox="0 0 24 24"><script>a()</script><use href="#x"/><path d="M0 0"/><set to="1"/></svg>',
+            );
+
+            expect(result.ok).toBe(true);
+            if (result.ok === true) {
+                expect(result.svg).not.toMatch(/<\s*(script|use|set)\b/i);
+                expect(result.svg).toContain('<path');
+            }
+        });
+
         it('strips xlink:href and href attributes', () => {
             const input =
                 '<svg viewBox="0 0 24 24"><a href="https://evil.example.com"><circle xlink:href="#bad" cx="12" cy="12" r="6"/></a></svg>';
