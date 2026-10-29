@@ -609,14 +609,12 @@ export class TaskWorkspaceService {
      * described workspace the primary contributes no grants (LESS access,
      * never more); the Work is not re-read for a second, looser match.
      *
-     * That match is the only thing scoped to a host. A mirror row that is also
-     * ATTACHED to the run's Agent or listed as a Task extra is skipped as a
-     * mount (`resolveFleetMounts` skips both by `owner/repo` only, host
-     * ignored, and logs each as the primary), yet its grants still join the
-     * union above like every attachment's and Task extra's — mounted or not.
-     * Recorded, not a regression: closing it needs a host-scoped primary skip
-     * there and in `normalizeFleetTaskWorkspaceMounts`, or dropping the grants
-     * of attachments and Task extras that were not mounted.
+     * That match is the only thing scoped to a host. An attachment or Task extra
+     * with the primary's `owner/repo` is skipped as a MOUNT (`resolveFleetMounts`
+     * skips it by `owner/repo` only, host ignored, as the primary), so its grants
+     * are skipped here by the same rule (C-11, #31): a mirror on another host
+     * used to be unmounted yet still add its names to the union. Grants follow
+     * what is mounted — LESS access, never more.
      */
     async resolveFleetRunEnvGrants(input: {
         task: Task;
@@ -646,6 +644,17 @@ export class TaskWorkspaceService {
                 { repoConnection: connection } as unknown as AgentRepoAttachment,
             ]);
             if (resolved) sources.push(resolved);
+        }
+        if (input.workspace) {
+            // The mount rule, applied to grants: what `resolveFleetMounts` skips as the primary
+            // is not mounted, so it grants nothing. The primary's own grants come below, from its
+            // host-matched registry row.
+            const primaryId = input.workspace.repositoryId.toLowerCase();
+            for (let index = sources.length - 1; index >= 0; index--) {
+                if (repositoryIdFromCloneUrl(sources[index].url)?.toLowerCase() === primaryId) {
+                    sources.splice(index, 1);
+                }
+            }
         }
         if (input.workspace && this.repoConnections) {
             const primary = await this.resolvePrimaryConnection(

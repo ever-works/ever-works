@@ -359,6 +359,43 @@ describe('TaskWorkspaceService.resolveFleetRunEnvGrants', () => {
         ).resolves.toEqual(['GH_TOKEN', 'DATABASE_URL']);
     });
 
+    it('grants nothing from an attached mirror of the primary on another host — it is not mounted (C-11)', async () => {
+        // The mirror has the primary's owner/repo, so `resolveFleetMounts` skips it as the
+        // primary; its grants used to join the union anyway.
+        repoConnections.listByUser.mockResolvedValue([
+            connection({
+                id: 'conn-primary',
+                url: 'https://github.com/ever-works/ever-works.git',
+                envGrants: ['DATABASE_URL'],
+            }),
+        ]);
+        attachments.listEnabledForAgentWithRepos.mockResolvedValue([
+            {
+                repoConnection: connection({
+                    id: 'conn-mirror',
+                    url: 'https://gitlab.example.com/ever-works/ever-works.git',
+                    envGrants: ['MIRROR_ONLY_SECRET'],
+                }),
+            },
+            {
+                repoConnection: connection({
+                    id: 'conn-1',
+                    url: 'https://github.com/ever-works/directory-web-template.git',
+                    envGrants: ['GH_TOKEN'],
+                }),
+            },
+        ]);
+
+        await expect(
+            build().resolveFleetRunEnvGrants({
+                task: makeTask(),
+                userId: 'user-1',
+                agentId: 'agent-1',
+                workspace,
+            }),
+        ).resolves.toEqual(['GH_TOKEN', 'DATABASE_URL']);
+    });
+
     it('drops an ungrantable name even if a row somehow carries one', async () => {
         repoConnections.listByUser.mockResolvedValue([
             connection({
