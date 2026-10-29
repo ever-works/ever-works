@@ -741,12 +741,19 @@ export class PluginSettingsService {
 
         // 4. Environment variable
         if (envVar && process.env[envVar] !== undefined) {
-            return {
-                key,
-                value: this.parseEnvValue(process.env[envVar]!, definition),
-                source: 'env',
-                isFallback: true,
-            };
+            const value = this.parseEnvValue(process.env[envVar]!, definition);
+            // C-14 (#34) — an operator env value is held to its property schema like a stored
+            // one (item limits, patterns, enums: `EVER_ID_ALLOWED_ISSUERS` had no item limit and
+            // `issuerUrl`'s pattern never ran). An invalid value is IGNORED, so the setting
+            // falls back to its default — fail-closed — rather than reaching the plugin.
+            if (this.envValueConforms(definition, value)) {
+                return {
+                    key,
+                    value,
+                    source: 'env',
+                    isFallback: true,
+                };
+            }
         }
 
         // 5. Default value
@@ -831,6 +838,37 @@ export class PluginSettingsService {
         if (scope === 'user' && !userId) {
             throw new BadRequestException('userId required for user scope');
         }
+    }
+
+    /** Env vars already reported as invalid — one warning per variable per process. */
+    private readonly rejectedEnvVars = new Set<string>();
+
+    /**
+     * Whether an env-bound value satisfies its own property schema (C-14).
+     *
+     * Secrets (`x-secret`) are not judged: a BYOK fallback key whose schema is stricter than the
+     * key itself would otherwise be dropped silently and the provider stop working. Without a
+     * validator (direct construction in tests) nothing is judged, as before.
+     *
+     * The warning names the variable and the schema errors, never the value.
+     */
+    private envValueConforms(definition: SettingDefinition, value: unknown): boolean {
+        if (!this.settingsValidator || definition.secret) return true;
+        const result = this.settingsValidator.validateSettings(
+            { [definition.key]: value },
+            { type: 'object', properties: { [definition.key]: definition.schema } } as JsonSchema,
+            definition.scope,
+        );
+        if (result.valid) return true;
+        const envVar = definition.envVar ?? definition.key;
+        if (!this.rejectedEnvVars.has(envVar)) {
+            this.rejectedEnvVars.add(envVar);
+            this.logger.warn(
+                `Ignoring ${envVar}: it does not match the "${definition.key}" setting's schema ` +
+                    `(${result.errors.join('; ')}); the setting falls back to its default.`,
+            );
+        }
+        return false;
     }
 
     /**
