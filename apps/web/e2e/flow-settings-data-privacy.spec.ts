@@ -355,16 +355,16 @@ test.describe('flow: privacy toggle <-> data-export interaction', () => {
     });
 });
 
-test.describe('flow: danger zone — delete account/data is a confirmed safe no-op', () => {
+test.describe('flow: danger zone — the delete is gated, and no stray path deletes anything', () => {
     // ── Flow 6 ───────────────────────────────────────────────────────────
-    // The danger-zone "delete account / delete all data" surface is wired to a
-    // server action that is intentionally DISABLED, and there is no REST delete
-    // endpoint. We prove the FULL end-to-end safety contract: drive the real
-    // settings UI to the armed-delete state (exact-email gate), confirm the
-    // destructive button is disabled until the email matches, AND independently
-    // confirm via the API that after every plausible deletion attempt the
-    // account + all its data SURVIVE (login still works, export still returns
-    // the same account, sync teardown is still a clean no-op).
+    // Since #2986 the danger-zone delete is REAL (`POST /api/account-deletion/me`),
+    // so this flow never confirms it: Part A drives the settings UI to the
+    // armed-delete state as the seeded user and stops there (the real delete is
+    // pinned on a disposable account in flow-account-data-deletion.spec.ts —
+    // confirming here deleted the shard's seeded user and failed every later
+    // spec). Part B proves via the API that the conventional deletion shapes
+    // delete nothing (login still works, export still returns the same account,
+    // sync teardown is still a clean no-op).
     test('UI double-gates deletion and the API proves no delete path destroys the account or its data', async ({
         page,
         request,
@@ -404,19 +404,13 @@ test.describe('flow: danger zone — delete account/data is a confirmed safe no-
             timeout: 10_000,
         });
 
-        // Gate 2: even the exact email only ARMS the button — clicking it routes
-        // through the disabled server action, so we stay on /danger (no account
-        // actually deleted). Best-effort: tolerate either an enabled button or a
-        // LOCAL/CI render where the toast path keeps us put.
+        // Gate 2: the exact email ARMS the button. Never click it here — the
+        // delete is real and this is the shard's shared seeded user.
         await confirmInput.fill(seeded.email);
-        await page.waitForTimeout(400);
-        if (await confirmBtn.isEnabled().catch(() => false)) {
-            await confirmBtn.click();
-        }
-        await page.waitForTimeout(1_000);
-        await expect(page, 'still on the danger page — deletion did not proceed').toHaveURL(
-            /\/settings\/danger/,
-        );
+        await expect(confirmBtn, 'the exact email arms the destructive button').toBeEnabled({
+            timeout: 10_000,
+        });
+        await expect(page, 'arming alone does not navigate').toHaveURL(/\/settings\/danger/);
 
         // ── Part B (API, fresh user — never the seeded user) ─────────────
         // Prove the safety contract directly: a fresh account with real data
