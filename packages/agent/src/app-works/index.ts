@@ -174,6 +174,13 @@ export * from './agent-app-change-tools';
 // APW-04 — the provisioning feedback loop (build / deploy / smoke → the provisioning Task).
 export * from './app-provisioning-feedback.service';
 
+// Gauzy Ever Works #37 — the provisioner's (APW-04 §10.1) and the evolve loop's (APW-08
+// §8.1) telemetry, over `APP_WORKS_TELEMETRY_SINK`.
+export * from './app-provisioning.telemetry';
+export * from './app-change.telemetry';
+// APW-02 T39 - the fork lifecycle telemetry (plan 9.1).
+export * from './app-upstream.telemetry';
+
 // APW-03 T27–T31 (lane aw-blueprints) — Blueprint apply-after-create and upgrades: the
 // three-way merge, the `app-blueprint-apply` job contract, the service behind the App spec
 // routes and the worker's RPC runner. Declared under `apps-catalog/`, which has no

@@ -20,6 +20,7 @@ import { UpstreamPullRequestRepository } from '../database/repositories/upstream
 import { UpstreamPullRequestRecordService } from './upstream-pull-request-record.service';
 import { UpstreamEligibilityService } from './upstream-eligibility.service';
 import { AppSpecModule } from '../app-spec/app-spec.module';
+import { UpstreamPrTelemetry } from './upstream-pr.telemetry';
 
 /**
  * APW-09 (Upstream pull requests) — the epic's agent-side module, and the home
@@ -151,6 +152,9 @@ import { AppSpecModule } from '../app-spec/app-spec.module';
         UpstreamPullRequestRecordService,
         // APW-09 T8/T9 — eligibility and the FR-26 / FR-39 limits.
         UpstreamEligibilityService,
+        // Gauzy Ever Works #37 - plan 9.1's events, over the API's global
+        // `APP_WORKS_TELEMETRY_SINK` alias; unbound, counted and dropped.
+        UpstreamPrTelemetry,
         {
             provide: UPSTREAM_CREDENTIAL_STORE,
             useExisting: UpstreamCredentialStateStore,

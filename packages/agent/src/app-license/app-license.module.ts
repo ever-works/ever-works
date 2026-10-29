@@ -5,6 +5,7 @@ import { FacadesModule } from '../facades/facades.module';
 import { APP_LICENSE_SERVICE } from '../app-runtime/app-license-gate';
 import { APP_UPSTREAM_LICENSE_SERVICE } from '../app-works/app-upstream-sync.service';
 import { AppLicenseService } from './app-license.service';
+import { AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
 
 /**
  * APW-03 T42 — the licence service and the two consumer tokens it binds.
@@ -23,6 +24,9 @@ import { AppLicenseService } from './app-license.service';
 @Module({
     imports: [DatabaseModule, FacadesModule, ActivityLogModule],
     providers: [
+        // APW-03 T49 — `app.license.*` telemetry over the API's global
+        // `APP_SPEC_TELEMETRY_SINK` alias; unbound, events are counted and dropped.
+        AppSpecTelemetry,
         AppLicenseService,
         { provide: APP_LICENSE_SERVICE, useExisting: AppLicenseService },
         { provide: APP_UPSTREAM_LICENSE_SERVICE, useExisting: AppLicenseService },

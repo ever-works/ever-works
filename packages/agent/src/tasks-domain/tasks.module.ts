@@ -75,6 +75,8 @@ import { DatabaseModule } from '../database/database.module';
 import { AppWorkRulesService } from '../app-works/app-work-rules.service';
 import { AppChangeGuard } from '../app-works/app-change-guard';
 import { AppWorkChangeGateService } from '../app-works/app-work-change-gate.service';
+import { AppChangeTelemetry } from '../app-works/app-change.telemetry';
+import { AppProvisioningTelemetry } from '../app-works/app-provisioning.telemetry';
 import { AppSpecModule } from '../app-spec/app-spec.module';
 import { APP_WORK_CHANGE_GATE } from './app-work-change-gate.port';
 import { DistributedTaskLockService } from '../cache/distributed-task-lock.service';
@@ -190,6 +192,11 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // that choice avoids).
         AppWorkChangeGateService,
         { provide: APP_WORK_CHANGE_GATE, useExisting: AppWorkChangeGateService },
+        // Gauzy Ever Works #37 — the gate's two guard-refusal events (APW-08's
+        // `app.change.guard_refused`, APW-04's `app.provision.guard_rejected`), over the
+        // API's global `APP_WORKS_TELEMETRY_SINK` alias; unbound, counted and dropped.
+        AppChangeTelemetry,
+        AppProvisioningTelemetry,
         TaskRepository,
         TaskCiAutoResumeAttemptRepository,
         TaskAgentReviewRepository,

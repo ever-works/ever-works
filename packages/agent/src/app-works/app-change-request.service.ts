@@ -18,6 +18,11 @@ import {
     type AppWorkAgentResolver,
     type AppWorkAgentSource,
 } from './app-work-agent-resolver';
+import {
+    APP_CHANGE_TELEMETRY_EVENTS,
+    AppChangeTelemetry,
+    appChangeSource,
+} from './app-change.telemetry';
 import { GitFacadeService } from '../facades/git.facade';
 import { AppSpecUnreadableError, AppWorkRulesService } from './app-work-rules.service';
 import { APP_CHANGES_PAUSED_MESSAGE, readAppWorkSwitches } from './app-work-switches';
@@ -177,9 +182,52 @@ export class AppChangeRequestService {
         // Works-security (2026-10-18) — the owner notice for an agent-written request held
         // for them. Appended LAST + @Optional() (positional-spec arity rule).
         @Optional() private readonly notifications?: NotificationService,
+        // APW-08 (Gauzy Ever Works #37) — `app.change.started` / `app.change.blocked_by_switch`.
+        // Appended LAST + @Optional(): absent, nothing is emitted; present, it never throws.
+        @Optional() private readonly telemetry?: AppChangeTelemetry,
     ) {}
 
+    /**
+     * File (and, for the owner, start) one change Task — see the class docstring. The
+     * answer is {@link decide}'s, unchanged; this wrapper only reports it (plan §8.1).
+     */
     async request(input: AppChangeRequestInput): Promise<AppChangeRequestResult> {
+        const result = await this.decide(input);
+        this.observe(input, result);
+        return result;
+    }
+
+    /**
+     * APW-08 — the two plan §8.1 events this service owns: the change started (a Task was
+     * filed), or the operator's switch stopped it before anything was filed. Every other
+     * refusal is a value the caller already renders and is not an evolve-loop event.
+     */
+    private observe(input: AppChangeRequestInput, result: AppChangeRequestResult): void {
+        if (!this.telemetry || !input?.work) return;
+        const workId = input.work.id;
+        if (result.status === 'accepted') {
+            this.telemetry.track(
+                APP_CHANGE_TELEMETRY_EVENTS.started,
+                {
+                    workId,
+                    taskId: result.taskId,
+                    source: appChangeSource(input.channel),
+                    dispatched: result.dispatched,
+                    awaitingOwner: result.awaitingOwner === true,
+                    agentSource: String(result.agentSource),
+                },
+                input.actorUserId || input.work.userId,
+            );
+        } else if (result.code === 'switchOff') {
+            this.telemetry.track(
+                APP_CHANGE_TELEMETRY_EVENTS.blockedBySwitch,
+                { workId, taskId: null, switch: 'evolve' },
+                input.actorUserId || input.work.userId,
+            );
+        }
+    }
+
+    private async decide(input: AppChangeRequestInput): Promise<AppChangeRequestResult> {
         const { work } = input;
         if (!isAppWorkKind(work.kind)) {
             return refused(422, 'notAppWork', `Work ${work.id} is not an App Work.`);
