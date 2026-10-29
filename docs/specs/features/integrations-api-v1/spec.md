@@ -471,7 +471,8 @@ The other direction: an integration files **its own** Inbox items into a member'
 current. **Ever Gauzy uses this for its Inbox push**: the notices, questions, approvals, mentions, assignments and
 emails of a paired member's Gauzy Inbox appear in that member's Ever Works Inbox, and the member's answer there goes
 back to Gauzy. Such an item is `origin: "integration"` (every other item is `origin: "platform"`) and carries the
-integration's `externalId`, `sourceUrl` and `sourceLabel` (and `email` for `kind: "email"`).
+integration's `externalId`, `sourceUrl` and `sourceLabel` (and `email` for `kind: "email"`), plus the
+`integrationKeyId` that filed it: compare it with `whoami.keyId` to tell your own items from another integration's.
 
 - `POST /inbox/items` [`CreateInboxItem`](./contract/schemas/requests.schema.json) (`inbox:write`) files one item for
   `recipientUserId`, which must be an **active member of the pinned organization** (on its roster, or the tenant owner);
@@ -481,7 +482,8 @@ integration's `externalId`, `sourceUrl` and `sourceLabel` (and `email` for `kind
   **`https:`** URL without credentials ≤ 2 000 (`javascript:`, `http:`, relative URLs answer `400`), `sourceLabel` ≤ 80
   (default: the integration's name, "Ever Gauzy" for an `ever-gauzy` key, else the key name). `related {taskId?,
 workId?, goalId?}` must name records the key can read in the pinned organization (`422 domain_rule` otherwise, a
-  private Task included). `email {from, to?, subject, receivedAt}` only for `kind: "email"`, `choices` (≤ 10 `{id ≤ 64,
+  private Task included), and linking one needs its read scope (`tasks:read`, `works:read`, `goals:read`; else
+  `403 scope_missing` with `details.missing`). `email {from, to?, subject, receivedAt}` only for `kind: "email"`, `choices` (≤ 10 `{id ≤ 64,
 label ≤ 200}`, ids unique) only for `question` / `approval`; they come back as the DTO's `options`. `occurredAt` is
   optional. Answers **`201`** with the inbox item DTO and its `ETag`.
 - **De-duplication is permanent.** `externalId` (≤ 128) is unique per tenant and integration key (a unique index): a
@@ -502,7 +504,11 @@ label ≤ 200}`, ids unique) only for `question` / `approval`; they come back as
   integration items too. A reply or decision the member makes in Ever Works is **stored on the item and routes
   nowhere**: no run is steered, resumed or started, whatever the item links to. It is recorded as
   **`inbox.item.updated`** (not `answered`) with `changedFields` `[status, unread, answeredAt, answerText,
-answerOptionId]`, so the integration applies the answer in its own app.
+answerOptionId]`, so the integration applies the answer in its own app. The answer and that event (its version step)
+  commit together: a `PATCH` at the version read before the answer answers `412` instead of overwriting it, and an
+  answer whose event cannot be written is not stored (the reply fails; the item stays answerable). An integration
+  question or approval is a decision in My Decisions, but it never counts as blocking, even when it names a blocked
+  Task.
 - **Events and the loop guard.** `inbox.item.created` / `inbox.item.updated` of these writes are recorded in the write's
   own transaction, so they carry the request's `X-Sync-Origin`; a consumer that reads the feed with
   `excludeOrigin=<its origin>` never receives its own items or edits back, while the member's answer (no origin) comes
@@ -773,7 +779,7 @@ for its Inbox push.
   `PATCH /inbox/items/:id` ([`UpdateInboxItem`](./contract/schemas/requests.schema.json)), both `inbox:write`.
 - **New event type** `inbox.item.updated` (catalog row after `inbox.item.deleted`): the integration's own `PATCH`, and
   the member's answer to an integration item (instead of `inbox.item.answered` on those items).
-- **Inbox item DTO**: `origin` (`platform` | `integration`), `externalId`, `sourceUrl`, `sourceLabel`, `email`,
+- **Inbox item DTO**: `origin` (`platform` | `integration`), `externalId`, `integrationKeyId`, `sourceUrl`, `sourceLabel`, `email`,
   `occurredAt`, `goalId` on every item (null / `platform` for Ever Works items; optional in the schema so events
   recorded before draft.17 still validate); `kind` adds `mention`, `assignment`, `email`, `other`; `sourceType`
   adds `integration`.
