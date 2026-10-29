@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
+import { loginViaUI } from './helpers/auth';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 
 /**
@@ -37,17 +38,14 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * DELETION CONTRACT (truthful, environment-adaptive):
  *   There is NO account-deletion REST endpoint — DELETE /api/account,
  *   POST /api/account/delete, POST /api/auth/delete-account, DELETE /api/auth/profile
- *   all 404 (verified live). The /settings/danger UI calls the `deleteAccount()`
- *   server action, which is intentionally a NO-OP guard returning
- *   { success:false, error:"Account deletion is disabled in demo" } — the
- *   account is preserved (a "safety/grace" contract: the destructive action is
- *   double-gated by an exact-email-match confirmation AND disabled server-side).
- *   We assert that real contract: the account is NEVER actually deleted and the
- *   user can still authenticate afterward.
+ *   all 404 (verified live). Since #2986 the /settings/danger UI deletes for
+ *   real (`POST /api/account-deletion/me`, double-gated by an exact-email
+ *   confirmation); the danger-zone test pins THAT contract on a disposable
+ *   account, and the conventional REST shapes above still delete nothing.
  *
- * Isolation: all API mutations run on FRESH registerUserViaAPI() users so the
- * shared in-memory DB stays clean for sibling specs; the seeded user
- * (storageState) is used only for the UI-driven danger-zone assertion.
+ * Isolation: all mutations — the danger-zone delete included — run on FRESH
+ * registerUserViaAPI() users so the shared in-memory DB, and above all the
+ * shard's seeded storageState user, stay intact for sibling specs.
  */
 
 const MASKED_SECRET_PREFIX = 'MASKED:';
@@ -429,14 +427,13 @@ test.describe('flow: account merge-conflict — import preview + resolution engi
     });
 });
 
-test.describe('flow: account deletion — danger-zone confirmation + grace/safety contract', () => {
+test.describe('flow: account deletion — danger-zone confirmation + no stray delete paths', () => {
     test('no REST account-deletion endpoint is exposed (all candidate paths 404), so the account survives', async ({
         request,
     }) => {
-        // A self-delete endpoint, if it existed, would be a catastrophic surface —
-        // confirm the platform exposes NONE of the conventional shapes. (Verified
-        // live: every candidate 404s.) The account-transfer controller is
-        // export/import/sync only; deletion is intentionally not wired server-side.
+        // The one delete path is `POST /api/account-deletion/me` (typed email, #2986) plus the
+        // emailed-link flow. None of the conventional shapes below may delete anything — the
+        // account-transfer controller is export/import/sync only.
         const user = await registerUserViaAPI(request);
         const H = authedHeaders(user.access_token);
 
@@ -452,8 +449,7 @@ test.describe('flow: account deletion — danger-zone confirmation + grace/safet
         expect([404, 405]).toContain(profileDelete.status());
 
         // Because nothing deleted the account, the user can still authenticate and
-        // re-export their data — the deletion "grace" contract: the account is
-        // fully preserved until a real, future deletion path ships.
+        // re-export their data.
         const login = await request.post(`${API_BASE}/api/auth/login`, {
             data: { email: user.email, password: user.password },
         });
@@ -463,12 +459,23 @@ test.describe('flow: account deletion — danger-zone confirmation + grace/safet
         expect(reExport.body.data.profile.email, 'still the same account').toBe(user.email);
     });
 
-    test('danger-zone UI double-gates deletion: destructive button stays disabled until the exact email is typed, then the action is safely refused', async ({
-        page,
+    test('danger-zone UI double-gates deletion: destructive button stays disabled until the exact email is typed, then really deletes the account', async ({
+        browser,
+        request,
     }) => {
-        const seeded = loadSeededTestUser();
+        // Since #2986 the Danger Zone calls the real `POST /api/account-deletion/me`. This test
+        // used to run as the shard's SEEDED user against a no-op action; against the real delete
+        // it removed the seeded account mid-shard and every later spec in the shard failed. It
+        // now signs a disposable user in and deletes THAT account.
+        const user = await registerUserViaAPI(request);
+        await request.post(`${API_BASE}/api/onboarding/dismiss`, {
+            headers: authedHeaders(user.access_token),
+        });
+        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const page = await context.newPage();
+        await loginViaUI(page, { email: user.email, password: user.password });
 
-        // Step 1 — open the danger zone (seeded/authenticated via storageState).
+        // Step 1 — open the danger zone as the disposable user.
         await page.goto('/en/settings/danger', { waitUntil: 'domcontentloaded' });
 
         // The page is hydration-racey under `next dev`; wait for the destructive
@@ -499,25 +506,24 @@ test.describe('flow: account deletion — danger-zone confirmation + grace/safet
 
         // Step 4 — typing the EXACT account email un-gates the button (proving the
         // confirmation is wired to the real, fresh profile email).
-        await confirmInput.fill(seeded.email);
+        await confirmInput.fill(user.email);
         await expect(confirmBtn, 'exact-email match enables the destructive button').toBeEnabled({
             timeout: 10_000,
         });
 
-        // Step 5 — confirm. The SERVER-SIDE grace contract kicks in: the
-        // `deleteAccount()` action is intentionally a no-op and returns
-        // { success:false, error:"Account deletion is disabled in demo" }, which
-        // the UI surfaces as an error toast and DOES NOT navigate to /register.
+        // Step 5 — confirm. The delete is real (#2986): the session cookie is cleared and the
+        // browser does a full load of the login page with the "account deleted" notice.
         await confirmBtn.click();
+        await expect(page, 'a real delete signs the user out to the login page').toHaveURL(
+            /\/login\?accountDeleted=1/,
+            { timeout: 30_000 },
+        );
+        await context.close();
 
-        // The truthful outcome: deletion is REFUSED. We assert the user stays put
-        // on /danger (no redirect to the register page that a *successful* delete
-        // would trigger). The error-toast copy is environment/i18n-dependent and
-        // transient, so we assert the durable navigation invariant instead.
-        await page.waitForTimeout(1_500);
-        await expect(
-            page,
-            'deletion is disabled server-side — the user is NOT redirected to register',
-        ).toHaveURL(/\/settings\/danger/);
+        // The account is gone: its credentials no longer sign in.
+        const login = await request.post(`${API_BASE}/api/auth/login`, {
+            data: { email: user.email, password: user.password },
+        });
+        expect(login.status(), 'the deleted account can no longer sign in').not.toBe(200);
     });
 });

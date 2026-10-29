@@ -200,10 +200,18 @@ test('ACC-06-44 — the Connect dialog: no serious axe violation, Esc closes it 
     // Keyboard reachability: the opener takes focus and Enter opens the dialog.
     await opener.focus();
     await expect(opener).toBeFocused();
-    await page.keyboard.press('Enter');
 
+    // Retry-to-open, still by keyboard: under `next dev` the server-rendered button is
+    // visible and focusable before hydration attaches its click handler, so the first
+    // Enter can be dropped (the same race the danger-zone specs guard against).
     const dialog = page.getByTestId('connect-cluster-dialog');
-    await expect(dialog).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+        if (!(await dialog.isVisible().catch(() => false))) {
+            await opener.focus();
+            await page.keyboard.press('Enter');
+        }
+        await expect(dialog).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
     await expect(page.getByRole('dialog')).toBeVisible();
 
     const violations = await runAxe(page, '[role="dialog"]');

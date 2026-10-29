@@ -409,7 +409,7 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
         ).toBe('unknown');
     });
 
-    test('a RED-licence repository is created as an App Work today: no refusal, no attestation route, no catalog entry', async ({
+    test('a RED-licence repository is created as an App Work today: no refusal at create, and the shipped catalog does not list it', async ({
         request,
     }) => {
         const run = stamp();
@@ -454,16 +454,19 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
         expect(forkWrites[0]?.method?.toUpperCase()).toBe('POST');
         expect(forkWrites[0]?.path).toBe(`${fakePath(redRepo.owner, redRepo.name)}/forks`);
 
-        // 3. Neither route the gate needs is mounted: the catalog the case says must
-        //    never list it, and the attestation the case says unblocks it.
-        const catalog = await listAppsCatalog(request, {});
+        // 3. Both routes the gate needs have shipped since this pin was written (APW-03): the
+        //    catalog — signed-in only — and the attestation write. The catalog must never list
+        //    the red-licence repository; the attest route is mounted (whatever it answers for
+        //    this body, it is no longer Nest's "Cannot POST").
+        const catalog = await listAppsCatalog(request, { token: user.access_token });
         expect(
             catalog.status,
-            `GET /api/apps-catalog body=${catalog.text.slice(0, 200)} — the catalog route ` +
-                'APW-03 owns is not mounted on this API, so "never lists it" cannot be observed ' +
-                'as a property of the catalog; it is observed as the route being absent.',
-        ).toBe(404);
-        expect(catalog.text).toContain('Cannot GET /api/apps-catalog');
+            `GET /api/apps-catalog body=${catalog.text.slice(0, 200)} — the catalog APW-03 owns`,
+        ).toBe(200);
+        expect(
+            catalog.text.includes(redRepo.name),
+            'the catalog never lists the red-licence repository',
+        ).toBe(false);
 
         const attest = await attestAppLicense(request, {
             token: user.access_token,
@@ -471,11 +474,10 @@ test.describe('ACC-NEG-01/02 — the licence class the gate turns on is not prod
             body: { accepted: true },
         });
         expect(
-            attest.status,
-            `POST /api/works/:id/app-license/attest body=${attest.text.slice(0, 200)} — the write ` +
-                'ACC-NEG-01/02 use to unblock a deploy does not exist yet (APW-03)',
-        ).toBe(404);
-        expect(attest.text).toContain('Cannot POST');
+            attest.text,
+            `POST /api/works/:id/app-license/attest status=${attest.status} — the write ` +
+                'ACC-NEG-01/02 use to unblock a deploy is mounted (APW-03)',
+        ).not.toContain('Cannot POST');
     });
 });
 

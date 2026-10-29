@@ -950,10 +950,16 @@ test.describe('Deploy chain — structural axis + end-to-end invariant', () => {
         };
 
         const before = await readGlobals();
-        // providers: the two built-ins, both enabled, unconfigured for a fresh user.
+        // providers: the two built-ins, both enabled, unconfigured for a fresh user — plus any
+        // deploy plugin added since (e.g. the App Works managed tier `k8s-apps-tier`). The
+        // invariant under test is that the list does not change with a Work, not its length.
         expect(before.providers.status).toBe('success');
-        expect(before.providers.providers.map((p) => p.id).sort()).toEqual(['k8s', 'vercel']);
-        expect(before.providers.providers.every((p) => p.enabled && !p.configured)).toBe(true);
+        const providerIds = before.providers.providers.map((p) => p.id).sort();
+        expect(providerIds).toEqual(expect.arrayContaining(['k8s', 'vercel']));
+        const builtIns = before.providers.providers.filter(
+            (p) => p.id === 'k8s' || p.id === 'vercel',
+        );
+        expect(builtIns.every((p) => p.enabled && !p.configured)).toBe(true);
         // cluster-sources: the non-admin option set — includes the shared + custom, OMITS admin-only k8s-works.
         const clusterValues = before.cluster.clusterSources.map((c) => c.value);
         expect(clusterValues).toContain('custom-kubeconfig');
@@ -966,7 +972,7 @@ test.describe('Deploy chain — structural axis + end-to-end invariant', () => {
 
         // The account-global reads are IDENTICAL — they are not keyed on any Work.
         const after = await readGlobals();
-        expect(after.providers.providers.map((p) => p.id).sort()).toEqual(['k8s', 'vercel']);
+        expect(after.providers.providers.map((p) => p.id).sort()).toEqual(providerIds);
         expect(after.cluster.clusterSources.map((c) => c.value)).toEqual(clusterValues);
         expect(after.validate.valid).toBe(false);
     });
