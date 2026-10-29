@@ -21,7 +21,29 @@ import {
  * when the container could provide them. Resolved through a REAL Nest container here: a double
  * passed by hand would hide exactly that.
  */
+/**
+ * Nest records an explicit `@Inject(token)` as `self:paramtypes`. The production build is SWC, which
+ * emits `Object` for a `X | null` union; this package's ts-jest compiles with `strictNullChecks:
+ * false`, under which the union collapses to `X` — so a container case alone cannot show the SWC
+ * failure for the installer. The declared token is what makes SWC and tsc agree; pin it.
+ */
+function declaredToken(target: object, index: number): unknown {
+    const declared = (Reflect.getMetadata('self:paramtypes', target) ?? []) as Array<{
+        index: number;
+        param: unknown;
+    }>;
+    return declared.find((entry) => entry.index === index)?.param;
+}
+
 describe('optional dependencies resolve by token in a real container (C-9)', () => {
+    it('declares the token each optional dependency is resolved by', () => {
+        expect(declaredToken(PluginInstallerService, 2)).toBe(PluginAllowlistRepository);
+        expect(declaredToken(SafetyGateService, 5)).toBe(SAFETY_SCOPE_PAUSE);
+        expect(declaredToken(SafetyGateService, 6)).toBe(SAFETY_GRANT_CHECK);
+        expect(declaredToken(SafetyGateService, 7)).toBe(SAFETY_CAP_CHECK);
+        expect(declaredToken(SafetyGateService, 8)).toBe(SAFETY_RULE_CHECK);
+    });
+
     it('PluginInstallerService receives the provided PluginAllowlistRepository', async () => {
         const allowlist = { findByPackageName: jest.fn() };
         const moduleRef = await Test.createTestingModule({
