@@ -70,7 +70,10 @@ const MAX_TAG_LEN = 60;
 const MAX_FILES = 400;
 
 function stripHtml(value: string): string {
-    return value.replace(/<[^>]*>/g, '');
+    // The tag body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos),
+    // and any `<` / `>` left afterwards goes, so a split tag such as `<scr<b>ipt>`
+    // leaves no markup (CodeQL js/incomplete-multi-character-sanitization).
+    return value.replace(/<[^<>]*>/g, '').replace(/[<>]/g, '');
 }
 
 // Refs are operator-controlled env values (tag/sha/branch); reject anything

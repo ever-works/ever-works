@@ -651,7 +651,10 @@ export class MailService {
         if (!value) {
             return '';
         }
-        return value.replace(/<[^>]*>/g, '');
+        // The tag body stops at the next `<` (one scan per run, CodeQL js/polynomial-redos),
+        // and any `<` / `>` left afterwards goes, so a split tag such as `<scr<b>ipt>`
+        // leaves no markup (CodeQL js/incomplete-multi-character-sanitization).
+        return value.replace(/<[^<>]*>/g, '').replace(/[<>]/g, '');
     }
 
     /**
