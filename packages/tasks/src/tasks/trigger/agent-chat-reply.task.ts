@@ -147,12 +147,25 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 // The gate ran at dispatch time (`TaskChatService.post`);
                 // re-admitting here could only refuse work already in
                 // flight and strand it with no run row.
+                // Trigger workers have no request ALS, so nothing stamps this row for us: take
+                // the Task's ownership stamp when it has one and the Agent's for a legacy
+                // unstamped Task — exactly as `agent-task-execute` does. Unstamped, the run fell
+                // out of the Organization's run and cost views (#2213 `trigger-agentrun-stamp`).
+                const stampTask = await tasks
+                    .getOne(payload.userId, payload.taskId)
+                    .catch(() => null);
+                const runOwnership =
+                    stampTask && (stampTask.tenantId != null || stampTask.organizationId != null)
+                        ? stampTask
+                        : agent;
                 run = await runs.createQueued({
                     agentId: agent.id,
                     userId: payload.userId,
                     triggerKind: 'chat',
                     taskId: payload.taskId,
                     chatMessageId: payload.triggeringMessageId,
+                    tenantId: runOwnership.tenantId ?? null,
+                    organizationId: runOwnership.organizationId ?? null,
                 });
             }
 

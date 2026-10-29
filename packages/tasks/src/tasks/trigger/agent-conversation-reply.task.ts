@@ -158,6 +158,10 @@ export const agentConversationReplyTask = task<
                     userId: payload.userId,
                     triggerKind: 'conversation',
                     conversationMessageId: payload.triggeringMessageId,
+                    // No request ALS in a Trigger worker: stamp the run from the persisted
+                    // Agent the conversation is with (#2213 `trigger-agentrun-stamp`).
+                    tenantId: agent.tenantId ?? null,
+                    organizationId: agent.organizationId ?? null,
                 });
             }
 
