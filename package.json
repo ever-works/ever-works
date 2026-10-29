@@ -192,7 +192,13 @@
 			"@atproto/xrpc>zod": ">=4.6.7 <5.0.0",
 			"@mendable/firecrawl-js>zod": ">=4.6.7 <5.0.0",
 			"exa-js>zod": ">=4.6.7 <5.0.0",
-			"bash-tool>zod": ">=4.6.7 <5.0.0"
+			"bash-tool>zod": ">=4.6.7 <5.0.0",
+			"trigger.dev>zod": ">=4.6.7 <5.0.0",
+			"@trigger.dev/core>zod": ">=4.6.7 <5.0.0",
+			"@trigger.dev/schema-to-json>zod": ">=4.6.7 <5.0.0",
+			"@zapier/zapier-sdk-cli>zod": ">=4.6.7 <5.0.0",
+			"@zapier/zapier-sdk-mcp>zod": ">=4.6.7 <5.0.0",
+			"@modelcontextprotocol/sdk>zod": ">=4.6.7 <5.0.0"
 		}
 	},
 	"prettier": {
