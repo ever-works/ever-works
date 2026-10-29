@@ -7,8 +7,10 @@ import {
     UpdateDateColumn,
 } from 'typeorm';
 import type {
+    InboxItemEmailMeta,
     InboxItemKind,
     InboxItemOption,
+    InboxItemOrigin,
     InboxItemSourceMeta,
     InboxItemSourceType,
     InboxItemStatus,
@@ -44,6 +46,18 @@ import { PortableDateColumn } from './_types';
  *   escalation → resolve the escalation with the reply as the note.
  *   notice     → just mark answered.
  *
+ * ## Integration items (`origin = 'integration'`)
+ *
+ * An integration key (Ever Gauzy first) files ITS OWN Inbox items here
+ * through `POST /api/integrations/v1/inbox/items`: `integrationKeyId`
+ * names the key, `externalId` the integration's id of the item (unique per
+ * tenant and key — the permanent de-duplication), `sourceUrl` /
+ * `sourceLabel` the link and badge back to the integration's app, and
+ * `emailMeta` the header block of a `kind: 'email'` item. Answering one
+ * routes nowhere: the answer is stored on the row and recorded as
+ * `inbox.item.updated`, which the integration reads back. Only the key
+ * that created an item may change it (`PATCH /inbox/items/:id`).
+ *
  * No `@ManyToOne` links (EW-654 no-cycle rule) and no FKs by design:
  * like `agent_escalations`, an inbox item must SURVIVE the deletion of
  * what it describes — "what did the agent ask me last week?" is still
@@ -58,6 +72,12 @@ import { PortableDateColumn } from './_types';
 // Integration API v1 keyset list (EW-P3-1, `GET /api/integrations/v1/inbox/items`):
 // one organization's messages ordered by `(updatedAt, id)` — migration 1795130100000.
 @Index('idx_inbox_items_org_updated', ['organizationId', 'updatedAt', 'id'])
+// Integration inbox push: one item per (tenant, integration key, externalId), forever —
+// the de-duplication a replayed create relies on (migration 1797200000000).
+@Index('uq_inbox_items_integration_external', ['tenantId', 'integrationKeyId', 'externalId'], {
+    unique: true,
+    where: '"externalId" IS NOT NULL',
+})
 export class InboxItem {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -152,6 +172,47 @@ export class InboxItem {
      */
     @PortableDateColumn({ nullable: true })
     firstViewedAt?: Date | null;
+
+    // ── Integration inbox push (`POST /api/integrations/v1/inbox/items`) ──
+
+    /**
+     * `platform` — written by an Ever Works producer (every row before the
+     * integration inbox push); `integration` — filed by an integration key.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'platform' })
+    origin: InboxItemOrigin;
+
+    /** The integration key that filed an `integration` item; NULL otherwise. No FK (EW-654). */
+    @Column({ type: 'uuid', nullable: true })
+    integrationKeyId?: string | null;
+
+    /** The integration's own id of the item (≤ 128). Unique per tenant + key; NULL for platform items. */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    externalId?: string | null;
+
+    /** The item in the integration's own app: `https:` only, ≤ 2000. Rendered through `safeHttpsUrl`. */
+    @Column({ type: 'varchar', length: 2000, nullable: true })
+    sourceUrl?: string | null;
+
+    /** The badge text of an `integration` item (≤ 80), e.g. "Ever Gauzy". Plain text. */
+    @Column({ type: 'varchar', length: 80, nullable: true })
+    sourceLabel?: string | null;
+
+    /**
+     * The header block of a `kind: 'email'` integration item (from, to,
+     * subject, receivedAt — capped strings, `normalizeInboxEmailMeta`).
+     * Plain text, never markup. NULL for every other item.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    emailMeta?: InboxItemEmailMeta | null;
+
+    /** When it happened at the source, as the integration reported it. NULL = not said. */
+    @PortableDateColumn({ nullable: true })
+    occurredAt?: Date | null;
+
+    /** The Goal an integration item is about (`related.goalId`). Raw uuid, no FK (EW-654). */
+    @Column({ type: 'uuid', nullable: true })
+    goalId?: string | null;
 
     // Tier C scope denormalization (EW-657). No @ManyToOne — cycle
     // avoidance, see user.entity.ts EW-654 comment.

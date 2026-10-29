@@ -12,6 +12,7 @@ import {
 	createConfigFileSystem,
 	createConfigWorkerSafetyGate,
 	createNodeRuntime,
+	restrictFileToOwnerWindows,
 	createResourceProbe,
 	currentEnvironment,
 	describeSelf,
@@ -166,6 +167,12 @@ function bootstrap(): void {
 			...runtimeConsentOptions(consents),
 			limits: clampResourceLimits(connectedConfig.limits),
 			resourceProbe,
+			// Owner-only ACL on the files the runtime writes beside the config (screen-helper trust
+			// files, session daemon token, hook files) — exactly what the CLI injects (Gauzy Ever
+			// Works #380). The helper trust writer now refuses to write on Windows without it.
+			...(process.platform === 'win32'
+				? { restrictFile: (file: string) => restrictFileToOwnerWindows(file) }
+				: {}),
 			startPaused: pausedByOperator,
 			workerSafetyGate: createConfigWorkerSafetyGate(fs, configPath, { platform: process.platform }),
 			persistUnsafe: async (unsafe) => {
@@ -283,7 +290,7 @@ function bootstrap(): void {
 	const setConsents = async (next: DesktopConsentsView): Promise<DesktopConsentsView> => {
 		const normalized = normalizeDesktopConsents(next);
 		try {
-			await saveDesktopConsents(fs, consentsPath, normalized);
+			await saveDesktopConsents(fs, consentsPath, normalized, { platform: process.platform });
 		} catch (error) {
 			logger.warn(`Could not save the consents: ${(error as Error).message}`);
 			return consents;
@@ -342,8 +349,8 @@ function bootstrap(): void {
 			// Fleet node link (FL-02 T-26): what the wizard chose, before the first connect.
 			if (request.consents) {
 				consents = normalizeDesktopConsents(request.consents);
-				await saveDesktopConsents(fs, consentsPath, consents).catch((error: unknown) =>
-					logger.warn(`Could not save the consents: ${(error as Error).message}`)
+				await saveDesktopConsents(fs, consentsPath, consents, { platform: process.platform }).catch(
+					(error: unknown) => logger.warn(`Could not save the consents: ${(error as Error).message}`)
 				);
 				tray?.updateConsents?.(consents);
 			}

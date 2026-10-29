@@ -3150,7 +3150,22 @@
                     "upgrade": "Upgrade",
                     "upgradeHint": "Paid plans are activated through billing once payments launch.",
                     "changeSuccess": "Plan updated to {name}",
-                    "changeError": "Failed to change plan"
+                    "changeError": "Failed to change plan",
+                    "perYear": "/yr",
+                    "cycle": {
+                        "label": "Billing cycle",
+                        "monthly": "Monthly",
+                        "annual": "Annual"
+                    },
+                    "billedYearly": "Billed {amount} yearly",
+                    "monthlyOnly": "Billed monthly (no annual option for this plan)",
+                    "checkoutSeats": {
+                        "label": "Members (Employees and Agents)",
+                        "extra": "{count} extra Members at {price}{period} each",
+                        "total": "Total {amount}{period}"
+                    },
+                    "manageSubscription": "Manage subscription",
+                    "subscribedNote": "You already have a subscription, so a second checkout is not offered. Change or cancel it from the billing portal."
                 },
                 "credits": {
                     "title": "Credits",
