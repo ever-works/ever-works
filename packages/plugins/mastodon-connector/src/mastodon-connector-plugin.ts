@@ -62,7 +62,11 @@ export function stripStatusHtml(html: string | undefined): string | undefined {
 	const text = html
 		.replace(/<br\s*\/?>/gi, '\n')
 		.replace(/<\/p>/gi, '\n\n')
-		.replace(/<[^>]+>/g, '')
+		// Tags (the body stops at the next `<`, so one scan per run), then any `<` /
+		// `>` a split tag left — before the entities are decoded, so an escaped `&lt;`
+		// in the status still reads as `<` (CodeQL js/incomplete-multi-character-sanitization).
+		.replace(/<[^<>]+>/g, '')
+		.replace(/[<>]/g, '')
 		.replace(/&nbsp;/g, ' ')
 		.replace(/&lt;/g, '<')
 		.replace(/&gt;/g, '>')
