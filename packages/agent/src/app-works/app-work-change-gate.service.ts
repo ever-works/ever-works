@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { AppSpec } from '@ever-works/contracts';
 import type { GitDiffResult } from '@ever-works/plugin';
 
@@ -12,6 +12,16 @@ import type {
 } from '../tasks-domain/app-work-change-gate.port';
 import { APP_SPEC_PATH, AppChangeGuard, MAX_FILES } from './app-change-guard';
 import { AppSpecUnreadableError, AppWorkRulesService } from './app-work-rules.service';
+import {
+    APP_CHANGE_TELEMETRY_EVENTS,
+    AppChangeTelemetry,
+    appChangeGuardRefusedReason,
+} from './app-change.telemetry';
+import {
+    APP_PROVISION_TELEMETRY_EVENTS,
+    AppProvisioningTelemetry,
+} from './app-provisioning.telemetry';
+import { TASK_ORIGIN_APP_PROVISIONING } from '../entities/task-origin';
 
 /**
  * APW-08 T17 — the change gate the shared finalize path asks through
@@ -71,7 +81,38 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
         private readonly guard: AppChangeGuard,
         private readonly specs: AppSpecService,
         private readonly git: GitFacadeService,
+        // Gauzy Ever Works #37 - `app.change.guard_refused` (APW-08) and
+        // `app.provision.guard_rejected` (APW-04). Appended LAST and `@Optional()`:
+        // absent, nothing is emitted; present, they never throw.
+        @Optional() private readonly changeTelemetry?: AppChangeTelemetry,
+        @Optional() private readonly provisionTelemetry?: AppProvisioningTelemetry,
     ) {}
+
+    /**
+     * Report one guard refusal: a provisioning Task's as `app.provision.guard_rejected`
+     * (the code list), every other Task's as `app.change.guard_refused` (plan 8.1's reason,
+     * when the code has one). Codes and ids only - never the message or the paths.
+     */
+    private observeRefusal(input: AppWorkChangeGateInput, code: string | null): void {
+        if (!code) return;
+        const taskId = input.taskId ?? null;
+        const distinctId = input.work?.userId ?? null;
+        if (input.taskOrigin === TASK_ORIGIN_APP_PROVISIONING) {
+            this.provisionTelemetry?.track(
+                APP_PROVISION_TELEMETRY_EVENTS.guardRejected,
+                { provisioningId: taskId, codes: [code] },
+                distinctId,
+            );
+            return;
+        }
+        const reason = appChangeGuardRefusedReason(code);
+        if (!reason) return;
+        this.changeTelemetry?.track(
+            APP_CHANGE_TELEMETRY_EVENTS.guardRefused,
+            { workId: input.work.id, taskId, reason, code },
+            distinctId,
+        );
+    }
 
     async evaluate(input: AppWorkChangeGateInput): Promise<AppWorkChangeGateVerdict> {
         try {
@@ -112,6 +153,7 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                       }
                     : { allowed: true, note: verdict.note };
             }
+            this.observeRefusal(input, verdict.code);
             return {
                 allowed: false,
                 message: verdict.message ?? 'This change was refused by the Work’s rules.',

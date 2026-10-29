@@ -1347,6 +1347,7 @@ export class TaskWorkspaceService {
                 verdict = await this.appChangeGate.evaluate({
                     work,
                     taskOrigin: task.origin ?? null,
+                    taskId: task.id,
                     owner: target.owner,
                     repo: target.repo,
                     gitOptions,
@@ -3268,6 +3269,7 @@ export class TaskWorkspaceService {
             verdict = await this.appChangeGate.evaluate({
                 work,
                 taskOrigin: task.origin ?? null,
+                taskId: task.id,
                 owner,
                 repo,
                 gitOptions,
@@ -3920,6 +3922,7 @@ export class TaskWorkspaceService {
             const verdict = await this.appChangeGate.evaluate({
                 work,
                 taskOrigin: task.origin ?? null,
+                taskId: task.id,
                 owner,
                 repo,
                 gitOptions,

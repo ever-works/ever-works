@@ -33,6 +33,8 @@ import { AppBlueprintApplyService } from '../apps-catalog/app-blueprint-apply.se
 import { AppLicenseModule } from '../app-license/app-license.module';
 import { AppWorksTelemetryService } from './app-works-telemetry.service';
 import { AppSpecTelemetry } from '../app-spec/app-spec-telemetry.port';
+import { AppProvisioningTelemetry } from './app-provisioning.telemetry';
+import { AppChangeTelemetry } from './app-change.telemetry';
 import { APP_SOURCE_CATALOG_PORT } from './app-source-catalog.port';
 import { APP_WORK_AGENT_RESOLVER, AppWorkAgentResolverService } from './app-work-agent-resolver';
 import { AppChangeRequestService } from './app-change-request.service';
@@ -466,6 +468,10 @@ export function buildAppPromptedValuesProvider(): FactoryProvider {
         // and the upgrade service declared here emit, over the API's global
         // `APP_SPEC_TELEMETRY_SINK` alias (never bound here; unbound ⇒ counted and dropped).
         AppSpecTelemetry,
+        // Gauzy Ever Works #37 — the provisioner's (APW-04) and the evolve loop's (APW-08)
+        // telemetry, over the same global `APP_WORKS_TELEMETRY_SINK` alias.
+        AppProvisioningTelemetry,
+        AppChangeTelemetry,
         // APW-08 T25 (lane aw-ai, 2026-10-17) — the agent-resolution rule, bound where
         // APW-02's `AppUpstreamStateService` (declared here) can see it (APW08-G18). Its
         // own dependencies are repository providers only (`DatabaseModule`).

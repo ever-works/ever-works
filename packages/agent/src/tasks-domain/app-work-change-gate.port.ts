@@ -70,6 +70,11 @@ export interface AppWorkChangeGateInput {
      * (works-security 2026-10-18). `null` = an ordinary Task.
      */
     readonly taskOrigin: string | null;
+    /**
+     * The Task being judged — telemetry only (`app.change.guard_refused`,
+     * `app.provision.guard_rejected`, Gauzy Ever Works #37). Never read by the verdict.
+     */
+    readonly taskId?: string | null;
     readonly owner: string;
     readonly repo: string;
     readonly gitOptions: { userId: string; providerId: string; workId: string };
