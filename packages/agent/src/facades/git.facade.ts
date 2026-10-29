@@ -1664,6 +1664,28 @@ export class GitFacadeService implements IGitFacade {
         return impl.call(plugin, owner, repo, base, head, diffOptions, token);
     }
 
+    /**
+     * APW-08 T8 — is `ancestorSha` the same commit as, or an ancestor of,
+     * `descendantSha`? `null` when the provider cannot say, INCLUDING a
+     * provider that does not implement the method: the App Works delivery
+     * reconciler then accepts exact-sha matches only (plan §8.2 — never claim
+     * "live" without proof). Unlike the other optional reads this is not an
+     * unsupported-operation error, because "cannot say" is a real answer the
+     * caller already handles.
+     */
+    async isAncestorCommit(
+        owner: string,
+        repo: string,
+        ancestorSha: string,
+        descendantSha: string,
+        options: GitFacadeOptions,
+    ): Promise<boolean | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.isAncestorCommit;
+        if (typeof impl !== 'function') return null;
+        return impl.call(plugin, owner, repo, ancestorSha, descendantSha, token);
+    }
+
     // ── APW-09 upstream pull requests (cross-repository) ──────────────
     //
     // T1's cross-repository fields need no code here, and that is worth

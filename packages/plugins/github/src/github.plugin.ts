@@ -583,6 +583,20 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin, 
 		return this.apiService.getCompareDiff(owner, repo, base, head, opts, token, settings.apiBaseUrl);
 	}
 
+	// APW-08 T8 — commit ancestry for the App Works delivery chain. Delegated
+	// explicitly: an undelegated service method reads as ABSENT to the
+	// lazy-plugin proxy (see the APW-09 note below).
+	async isAncestorCommit(
+		owner: string,
+		repo: string,
+		ancestorSha: string,
+		descendantSha: string,
+		token: string
+	): Promise<boolean | null> {
+		const settings = await this.getSettings();
+		return this.apiService.isAncestorCommit(owner, repo, ancestorSha, descendantSha, token, settings.apiBaseUrl);
+	}
+
 	// Upstream pull requests (APW-09 T2) — the two review reads and the temporary
 	// interaction limit. Delegated EXPLICITLY, like every other optional member
 	// above: a service method with no delegation here reads as ABSENT to the

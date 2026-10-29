@@ -607,6 +607,17 @@ export interface GitPullRequestStatus {
 	 * is absent.
 	 */
 	readonly baseRef?: string | null;
+	/**
+	 * The commit the merge produced on `baseRef` (GitHub `merge_commit_sha`)
+	 * once the pull request is merged; `null` while it is open or when the
+	 * provider reports none, `undefined` when this implementation does not
+	 * report it. Optional and additive (APW-08 T8, CONTRACTS §3).
+	 *
+	 * App Works delivery (APW-08 FR-29…FR-31) follows THIS commit until a
+	 * Build and a Deployment that contain it are live; without it a merged
+	 * change cannot be tracked, and the Task completes on merge as before.
+	 */
+	readonly mergeCommitSha?: string | null;
 	readonly reviewDecision?: GitReviewDecision | null;
 	/**
 	 * Roll-up over EVERY check the provider reports for the head commit —
@@ -1078,6 +1089,26 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		opts: GitDiffOptions | undefined,
 		token: string
 	): Promise<GitDiffResult>;
+
+	/**
+	 * APW-08 T8 (CONTRACTS §3) — is `ancestorSha` the same commit as, or an
+	 * ancestor of, `descendantSha`? The App Works delivery reconciler asks it
+	 * to decide whether a Build or Deployment of a later commit carries a
+	 * merged change along (FR-31).
+	 *
+	 * `true` — identical, or `descendantSha` is ahead of `ancestorSha`;
+	 * `false` — behind or diverged; `null` — the provider cannot say (either
+	 * commit is unknown to it). A broken read throws. OPTIONAL: without it the
+	 * reconciler accepts exact-sha matches only and never claims "live"
+	 * without proof.
+	 */
+	isAncestorCommit?(
+		owner: string,
+		repo: string,
+		ancestorSha: string,
+		descendantSha: string,
+		token: string
+	): Promise<boolean | null>;
 	createPullRequestComment?(
 		owner: string,
 		repo: string,

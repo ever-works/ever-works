@@ -20,6 +20,71 @@ export const TASK_DELIVERY_STATES = [
 ] as const;
 export type TaskDeliveryState = (typeof TASK_DELIVERY_STATES)[number];
 
+/**
+ * The states a reconciler still has work on (plan §2.4): a Task in one of them is visited on
+ * every `app-change-delivery` tick. `live` and `closed_without_deploy` are terminal for the Task.
+ */
+export const TASK_DELIVERY_OPEN_STATES = [
+	'merged',
+	'building',
+	'build_failed',
+	'built',
+	'deploying',
+	'deploy_failed'
+] as const satisfies readonly TaskDeliveryState[];
+
+/** The states **Close anyway** / **Close without deploying** accepts (S9, S20, plan §4). */
+export const TASK_DELIVERY_CLOSABLE_STATES = [
+	'merged',
+	'build_failed',
+	'built',
+	'deploy_failed'
+] as const satisfies readonly TaskDeliveryState[];
+
+/**
+ * `{outcome}` of a `deploy_failed` chip (FR-30): APW-06's own terminal outcome — a failed
+ * Deployment, a rolled-back one and one whose rollback itself failed are three different
+ * chips, and a rolled-back Deployment is never reported as a plain failure. `live_with_warnings`
+ * is only ever reported when the operator turned
+ * `EVER_WORKS_APP_DELIVERY_LIVE_WITH_WARNINGS_CLOSES` off (APW08-G25 / `CL-08-1`).
+ */
+export const TASK_DELIVERY_DEPLOY_OUTCOMES = [
+	'failed',
+	'rolled_back',
+	'rollback_failed',
+	'live_with_warnings'
+] as const;
+export type TaskDeliveryDeployOutcome = (typeof TASK_DELIVERY_DEPLOY_OUTCOMES)[number];
+
+/** Plan §3.4 — the follow-up budget defaults (FR-37, FR-38; APW08-G25 / `CL-08-5`). */
+export const APP_FOLLOW_UPS_PER_CHANGE_MAX = 2;
+export const APP_FOLLOW_UPS_OPEN_PER_WORK_MAX = 3;
+/** FR-36 — how many lines of the failure log a follow-up Task quotes, at most. */
+export const APP_FAILURE_LOG_TAIL_LINES = 200;
+/** Plan §6 — Tasks one `app-change-delivery` tick reconciles, at most. */
+export const APP_DELIVERY_RECONCILE_BATCH = 200;
+/** Plan §4 — `POST /api/tasks/:id/delivery/close` `{ note? }`, at most. */
+export const TASK_DELIVERY_CLOSE_NOTE_MAX = 500;
+
+/** Plan §4's error codes for the delivery routes (one 422 code per refusal family). */
+export const TASK_DELIVERY_ERROR_CODES = ['notClosable', 'followUpLimit', 'notTracked'] as const;
+export type TaskDeliveryErrorCode = (typeof TASK_DELIVERY_ERROR_CODES)[number];
+
+/** `POST /api/tasks/:id/delivery/close`. */
+export interface TaskDeliveryCloseRequest {
+	note?: string | null;
+}
+
+/** `POST /api/tasks/:id/delivery/follow-up` — the S22 Inbox item's **Try once more**. */
+export interface TaskDeliveryFollowUpRequest {
+	escalationId: string;
+}
+
+/** `202` answer of `POST /api/tasks/:id/delivery/follow-up`. */
+export interface TaskDeliveryFollowUpResponse {
+	taskId: string;
+}
+
 export interface TaskDeliveryView {
 	taskId: string;
 	state: TaskDeliveryState | null;
