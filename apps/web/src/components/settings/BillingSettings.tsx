@@ -803,12 +803,24 @@ export function BillingSettings({
                 testId="billing-plans"
             >
                 {plans.length > 0 && subscribedRecurring ? (
-                    <p
-                        className="text-xs text-text-muted dark:text-text-muted-dark"
-                        data-testid="billing-plans-subscribed-note"
-                    >
-                        {t('plans.subscribedNote')}
-                    </p>
+                    // Always reachable, even when the only other card is the current plan or Free.
+                    <div className="flex flex-wrap items-center gap-3">
+                        <p
+                            className="flex-1 min-w-48 text-xs text-text-muted dark:text-text-muted-dark"
+                            data-testid="billing-plans-subscribed-note"
+                        >
+                            {t('plans.subscribedNote')}
+                        </p>
+                        <Button
+                            variant="secondary"
+                            className="text-xs"
+                            data-testid="billing-plans-manage-subscription"
+                            disabled={lifecyclePending}
+                            onClick={() => void handleOpenPortal()}
+                        >
+                            {t('plans.manageSubscription')}
+                        </Button>
+                    </div>
                 ) : null}
                 {plans.length > 0 &&
                 anyPlanSellsAnnual &&
