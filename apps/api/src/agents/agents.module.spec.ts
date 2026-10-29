@@ -2531,8 +2531,10 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
                     .mockResolvedValueOnce({ sha: 'sha-1', parents: ['c'.repeat(40)] });
                 const { facade } = build({ git });
 
+                // No files: nothing touches the (fake) disk, and the doubled `commit` still
+                // answers a sha, so the post-commit check is what refuses.
                 await expect(
-                    facade.commitToRepo(commitInput({ branch: 'feature/pricing', files })),
+                    facade.commitToRepo(commitInput({ branch: 'feature/pricing' })),
                 ).rejects.toThrow(/branch moved while this call committed/);
                 expect(git.push).not.toHaveBeenCalled();
             });
