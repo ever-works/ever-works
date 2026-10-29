@@ -58,12 +58,21 @@ interface AiComparisonStructure {
 
 function isLikelyAssetUrl(url: string): boolean {
     const lowerUrl = url.toLowerCase();
+    // Asset hosts by the parsed host name, not a substring anywhere in the URL
+    // (CodeQL js/incomplete-url-substring-sanitization).
+    let host = '';
+    try {
+        host = new URL(url).hostname.toLowerCase();
+    } catch {
+        // Not an absolute URL: only the path heuristics below apply.
+    }
+    const onHost = (suffix: string) => host === suffix || host.endsWith(`.${suffix}`);
     return (
         /\.(png|jpe?g|gif|webp|svg|ico)(\?|$)/i.test(lowerUrl) ||
         lowerUrl.includes('/profile_images/') ||
         lowerUrl.includes('/repo-images/') ||
-        lowerUrl.includes('storage.googleapis.com') ||
-        lowerUrl.includes('twimg.com')
+        onHost('storage.googleapis.com') ||
+        onHost('twimg.com')
     );
 }
 

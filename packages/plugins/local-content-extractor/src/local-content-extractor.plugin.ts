@@ -91,6 +91,9 @@ export function guardedLookup(
 const guardedHttpAgent = new http.Agent({ lookup: guardedLookup as never });
 const guardedHttpsAgent = new https.Agent({ lookup: guardedLookup as never });
 
+/** Schemes an extracted link may carry; anything else (script, data, file) is dropped. */
+const LINK_SCHEMES = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+
 export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPlugin {
 	readonly id = 'local-content-extractor';
 	readonly name = 'Local Content Processor';
@@ -457,14 +460,18 @@ export class LocalContentExtractorPlugin implements IPlugin, IContentExtractorPl
 
 		for (const anchor of Array.from(anchorElements)) {
 			const href = anchor.getAttribute('href');
-			if (!href || href.startsWith('#') || href.startsWith('javascript:')) continue;
+			if (!href || href.startsWith('#')) continue;
 
 			const resolvedHref = this.resolveUrl(href, baseUrl);
 			let isExternal = false;
 
 			try {
-				const linkHost = new URL(resolvedHref).host;
-				isExternal = linkHost !== baseHost;
+				const parsed = new URL(resolvedHref);
+				// A scheme allow-list, not a `javascript:` prefix test: the URL parser drops
+				// case, leading spaces, tabs and newlines, and `data:` / `vbscript:` run script
+				// too (CodeQL js/incomplete-url-scheme-check).
+				if (!LINK_SCHEMES.has(parsed.protocol)) continue;
+				isExternal = parsed.host !== baseHost;
 			} catch {
 				// Invalid URL, assume internal
 			}
