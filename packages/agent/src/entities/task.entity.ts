@@ -327,6 +327,13 @@ export class Task {
          * an allow-listed app (F8). JSON column: no migration.
          */
         appSlug?: string | null;
+        /**
+         * APW-08 T16 — `true` on an App Work's ADVISORY `Ever Works check: {name}` leg (the App
+         * spec check is `required: false`, read at the PR base). Such a leg is reported and never
+         * reds the roll-up, the **Checks failed** post or the fix loop. Absent on every other
+         * check and every other Work kind. JSON column: no migration.
+         */
+        advisory?: boolean;
     }> | null;
 
     // ── Merge approval (self-build slice AE, EW-805) ─────────────────

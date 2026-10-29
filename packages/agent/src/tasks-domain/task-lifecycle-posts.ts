@@ -64,6 +64,11 @@ export interface CheckRecord {
     name?: string | null;
     status?: string | null;
     conclusion?: string | null;
+    /**
+     * APW-08 T16 — an App Work's advisory `Ever Works check: {name}` leg, as `TaskPrStatusService`
+     * marks it on the cached row. Never set for any other check or Work kind.
+     */
+    advisory?: boolean | null;
 }
 
 /** The Task's recorded CI verdict and the (capped) check list cached with it. */
@@ -114,12 +119,18 @@ export function checksSettledPost(
  * The failing checks' names, in the provider's order, de-duplicated, each cleaned to one line
  * (control characters and runs of whitespace collapsed) and cut at {@link CHECK_NAME_MAX_CHARS}.
  * "Failing" is the CI fix loop's own classification (`classifyCheckResult`).
+ *
+ * APW-08 T16 — an ADVISORY App leg (`advisory: true`) is never named: it does not red the
+ * roll-up, so naming it would tell a member a check failed the gate when it did not. The list is
+ * therefore the same required/advisory classification the roll-up used, and a red roll-up whose
+ * only failures are advisory legs past the classification (see `rollUpAppCiState`) posts the
+ * unnamed **Checks failed.** rather than the advisory names. No other check carries the flag.
  */
 export function failingCheckNames(checks: readonly CheckRecord[] | null | undefined): string[] {
     if (!Array.isArray(checks)) return [];
     const names: string[] = [];
     for (const check of checks) {
-        if (!check || classifyCheckResult(check) !== 'failing') continue;
+        if (!check || check.advisory === true || classifyCheckResult(check) !== 'failing') continue;
         const name = cleanCheckName(check.name);
         if (name && !names.includes(name)) names.push(name);
     }

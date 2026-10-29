@@ -172,6 +172,31 @@ describe('task-lifecycle-posts — the rules', () => {
             expect(joinCheckNames(['a', 'b'])).toBe('a, b');
             expect(joinCheckNames(['a', 'b', 'c', 'd', 'e', 'f', 'g'])).toBe('a, b, c, d, e, +2');
         });
+
+        // APW-08 T16 (FR-16) — the names are the roll-up's own required/advisory split: an App
+        // Work's ADVISORY leg (`advisory: true` on the cached row) never reds the gate, so it is
+        // never named as a failure either.
+        it('never names an advisory App leg, so the list matches the roll-up', () => {
+            const advisory = { ...red('Ever Works check: e2e'), advisory: true };
+            expect(
+                failingCheckNames([red('Ever Works check: type-check'), advisory, red('lint')]),
+            ).toEqual(['Ever Works check: type-check', 'lint']);
+            expect(failingCheckNames([advisory])).toEqual([]);
+            // `advisory: false` (or absent) is an ordinary check, named as before.
+            expect(failingCheckNames([{ ...red('Ever Works check: e2e'), advisory: false }])).toEqual(
+                ['Ever Works check: e2e'],
+            );
+        });
+
+        it('a red read whose only failing checks are advisory legs names none of them', () => {
+            const advisory = { ...red('Ever Works check: e2e'), advisory: true };
+            expect(
+                checksSettledPost(
+                    { ciState: 'passing', checks: [] },
+                    { ciState: 'failing', checks: [advisory] },
+                ),
+            ).toEqual(checksSettledPost({ ciState: 'passing' }, { ciState: 'failing', checks: [] }));
+        });
     });
 });
 

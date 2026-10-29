@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs
 import { DomainEventPublisher } from '../domain-events/domain-event-publisher.service';
 import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES, capChecks } from '@ever-works/plugin';
-import { normalizeCommitSha } from '@ever-works/contracts';
+import { isAppWorkKind, normalizeCommitSha } from '@ever-works/contracts';
 import { Task, TaskStatus } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -20,6 +20,8 @@ import { pickOwnerRepo, requireTaskRepository } from './task-repository';
 import { TASK_DELIVERY_TRACKER, type TaskDeliveryTracker } from './task-delivery.port';
 import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
 import { checksSettledPost } from './task-lifecycle-posts';
+import { TASK_APP_CHECKS, type TaskAppChecks } from './task-app-checks.port';
+import { hasAppCheckLeg, withAppCheckRollUp } from './app-check-legs';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -166,6 +168,14 @@ export class TaskPrStatusService {
         @Optional()
         @Inject(TASK_LIFECYCLE_POSTER)
         private readonly lifecycle?: TaskLifecyclePoster,
+        // APW-08 T16 (APW08-G04) — the required/advisory split of an App Work pull request's
+        // `Ever Works check: {name}` legs, read from the App rules at the PR base. Appended LAST +
+        // @Optional() (positional-spec arity rule) and injected by TOKEN (see the port: a value
+        // import of the App rules from here closes a require ring). Absent, or for any other Work
+        // kind, the provider's roll-up is used exactly as before.
+        @Optional()
+        @Inject(TASK_APP_CHECKS)
+        private readonly appChecks?: TaskAppChecks,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -416,6 +426,8 @@ export class TaskPrStatusService {
         const trustedApps = config.agents.getTrustedCheckApps();
         const failing = (Array.isArray(task.prChecks) ? task.prChecks : []).filter(
             (check) =>
+                // APW-08 T16 — an advisory App leg is reported, never handed to the fix loop.
+                check.advisory !== true &&
                 classifyCheckResult({
                     status: check.status,
                     conclusion: check.conclusion ?? null,
@@ -524,7 +536,13 @@ export class TaskPrStatusService {
                 await this.tasks.updatePrStatusCache(task.id, { ciCheckedAt: checkedAt });
                 return { task: Object.assign(task, { ciCheckedAt: checkedAt }), status: null };
             }
-            const patch = this.toCachePatch(status, checkedAt);
+            // APW-08 T16 (FR-16) — an App Work's advisory legs, read at the PR base, so a failing
+            // advisory `Ever Works check: {name}` leg reds neither the roll-up nor the merge gate
+            // nor the **Checks failed** post. `null` (and `effective === status`) for every other
+            // kind and whenever the rules cannot be read: then nothing is reclassified.
+            const advisory = await this.appAdvisoryLegs(task, target, status);
+            const effective = withAppCheckRollUp(status, advisory);
+            const patch = this.toCachePatch(effective, checkedAt, advisory);
             // Reviewer agent stage (slice AD) — the head this Task had
             // recorded BEFORE this read, so a moved head is detectable below.
             const previousPrHead = task.prHeadSha ?? null;
@@ -653,7 +671,7 @@ export class TaskPrStatusService {
             // what this just recorded, for the same live head.
             if (this.promotionLane) {
                 await this.promotionLane
-                    .onPullRequestStatusRefreshed(task, status)
+                    .onPullRequestStatusRefreshed(task, effective)
                     .catch((error: unknown) => {
                         this.logger.warn(
                             `Task ${task.id}: promotion lane threw after a PR status refresh: ${
@@ -672,7 +690,7 @@ export class TaskPrStatusService {
             // the LIVE `status` rather than the Task's cache.
             if (this.mergeGate) {
                 await this.mergeGate
-                    .onPullRequestStatusRefreshed(task, status)
+                    .onPullRequestStatusRefreshed(task, effective)
                     .catch((error: unknown) => {
                         this.logger.warn(
                             `Task ${task.id}: merge gate threw after a PR status refresh: ${
@@ -682,7 +700,7 @@ export class TaskPrStatusService {
                         return undefined;
                     });
             }
-            return { task, status };
+            return { task, status: effective };
         })().finally(() => {
             this.inFlight.delete(task.id);
         });
@@ -691,9 +709,38 @@ export class TaskPrStatusService {
         return work;
     }
 
+    /**
+     * APW-08 T16 — the advisory `Ever Works check: {name}` legs of an App Work pull request, from
+     * the App rules at the PR's base branch. Read only for an App Work whose status carries at
+     * least one App leg (no leg, no read). Never throws: a failed read classifies nothing, which
+     * can only keep a red roll-up red.
+     */
+    private async appAdvisoryLegs(
+        task: Task,
+        target: { baseRef: string; workKind: string | null },
+        status: GitPullRequestStatus,
+    ): Promise<ReadonlySet<string> | null> {
+        if (!this.appChecks || !isAppWorkKind(target.workKind)) return null;
+        if (!hasAppCheckLeg(status.checks)) return null;
+        try {
+            return await this.appChecks.advisoryLegs(task, status.baseRef ?? target.baseRef);
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id}: App check legs could not be classified; the provider roll-up stands (${
+                    error instanceof Error ? error.message : String(error)
+                }).`,
+            );
+            return null;
+        }
+    }
+
     private toCachePatch(
         status: GitPullRequestStatus,
         checkedAt: Date,
+        // APW-08 T16 — advisory App legs, marked on the cached row so every later reader of
+        // `prChecks` (the **Checks failed** names, the fix-loop re-offer) skips them without
+        // re-reading the rules. Absent for every other kind: the row is byte-for-byte as before.
+        advisory?: ReadonlySet<string> | null,
     ): Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks' | 'prHeadSha'> {
         return {
             prState: status.state,
@@ -712,6 +759,7 @@ export class TaskPrStatusService {
                 ...(check.detailsUrl ? { detailsUrl: check.detailsUrl } : {}),
                 // Who reported it (F8) — the fix-loop re-offer reads this.
                 appSlug: check.appSlug ?? null,
+                ...(advisory?.has(check.name) ? { advisory: true } : {}),
             })),
         };
     }
