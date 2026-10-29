@@ -352,10 +352,10 @@ export function decisionRestartKey(
 /**
  * An OPEN question is the only kind that leaves a run parked, so it is
  * the only kind that earns the "the agent is waiting for your reply"
- * banner.
+ * banner. Not an integration's question: no agent or run is behind it.
  */
 export function isAwaitingReply(item: InboxItem): boolean {
-    return item.kind === 'question' && item.status === 'open';
+    return item.kind === 'question' && item.status === 'open' && !isIntegrationItem(item);
 }
 
 /**

@@ -53,6 +53,10 @@
 			"type": ["string", "null"],
 			"maxLength": 128
 		},
+		"integrationKeyId": {
+			"description": "The integration key that filed an integration item (compare with whoami.keyId to tell your own items from another integration's); null for platform items.",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
 		"sourceUrl": {
 			"description": "The item in the integration's own app (https only); null for platform items.",
 			"type": ["string", "null"],

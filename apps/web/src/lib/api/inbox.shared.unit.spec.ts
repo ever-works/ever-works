@@ -117,6 +117,14 @@ describe('isAwaitingReply', () => {
         expect(isAwaitingReply(item({ kind: 'notice' }))).toBe(false);
     });
 
+    it('is false for an integration question: no agent run is parked behind it', () => {
+        expect(isAwaitingReply(item({ origin: 'integration', sourceType: 'integration' }))).toBe(
+            false,
+        );
+        // An older API that sends no `origin` is still recognised by its source type.
+        expect(isAwaitingReply(item({ sourceType: 'integration' }))).toBe(false);
+    });
+
     it('flags fleet-run questions by source type alone, whatever sourceMeta says', () => {
         // Slice Q: the source type is the signal; `sourceMeta` is decoration
         // that an older API omits and a degraded producer may leave null.

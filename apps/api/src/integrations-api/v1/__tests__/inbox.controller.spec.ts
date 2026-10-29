@@ -505,6 +505,31 @@ describe('IntegrationInboxController', () => {
         expect(keyed.status).toHaveBeenCalledWith(201);
     });
 
+    it('linking a related record needs the scope that reads it (403 scope_missing, nothing filed)', async () => {
+        const { controller, inbox } = setup();
+        const TASK = '3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41';
+        const body = { ...createBody, related: { taskId: TASK, goalId: TASK } };
+        const refused = await controller.create(as(null), body, createReq(), res()).then(
+            () => null,
+            (error: unknown) => error,
+        );
+        expect(refused).toBeInstanceOf(IntegrationHttpException);
+        expect((refused as IntegrationHttpException).getStatus()).toBe(403);
+        expect((refused as IntegrationHttpException).getResponse()).toMatchObject({
+            error: {
+                code: 'scope_missing',
+                details: { missing: ['tasks:read', 'goals:read'] },
+            },
+        });
+        expect(inbox.createExternal).not.toHaveBeenCalled();
+        // With the read scopes the link is the service's to check (422 if foreign).
+        await controller.create(as(null, ['tasks:read', 'goals:read']), body, createReq(), res());
+        expect(inbox.createExternal).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ related: { taskId: TASK, goalId: TASK } }),
+        );
+    });
+
     it('a generic key’s items default to the key name as their badge', async () => {
         const { controller, inbox } = setup();
         const generic = {

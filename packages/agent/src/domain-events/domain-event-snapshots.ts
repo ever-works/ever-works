@@ -742,6 +742,7 @@ export function toIntegrationInboxItemDto(row: InboxItem): IntegrationInboxItemD
         // Integration inbox push: who filed it, and the integration's own handle on it.
         origin: row.origin === 'integration' ? 'integration' : 'platform',
         externalId: row.externalId ?? null,
+        integrationKeyId: row.origin === 'integration' ? (row.integrationKeyId ?? null) : null,
         sourceUrl: row.sourceUrl ?? null,
         sourceLabel: row.sourceLabel ?? null,
         email: inboxEmailMeta(row),

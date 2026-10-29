@@ -93,6 +93,22 @@ describe('IntegrationInboxService — integration inbox push', () => {
         );
     const events = () =>
         dataSource.getRepository(DomainEvent).find({ order: { outboxSeq: 'ASC' } });
+    /** The app's own Inbox (what the member answers through), with the real publisher. */
+    const memberApp = () =>
+        new InboxService(
+            new InboxItemRepository(dataSource.getRepository(InboxItem)),
+            {
+                findById: async () => null,
+                findByIdAndUser: async () => null,
+                setAwaitingInput: async () => undefined,
+            } as never,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            publisher,
+        );
     /** The error a write is refused with (fails the test when it is not refused). */
     const refusal = async (write: Promise<unknown>): Promise<unknown> => {
         try {
@@ -181,10 +197,10 @@ describe('IntegrationInboxService — integration inbox push', () => {
         if (dataSource?.isInitialized) await dataSource.destroy();
     });
 
-    const task = (organizationId: string, visibility = 'organization') =>
+    const task = (organizationId: string, visibility = 'organization', userId = OWNER) =>
         dataSource.getRepository(Task).save({
             id: randomUUID(),
-            userId: OWNER,
+            userId,
             slug: `T-${Math.floor(Math.random() * 1e6)}`,
             title: 'Ship the feed',
             createdByType: 'user',
@@ -230,6 +246,8 @@ describe('IntegrationInboxService — integration inbox push', () => {
             kind: 'notice',
             origin: 'integration',
             externalId: 'gauzy-inbox-1',
+            // A key tells its own items from another integration's (whoami.keyId).
+            integrationKeyId: KEY,
             sourceUrl: 'https://app.gauzy.co/#/pages/inbox/1',
             sourceLabel: 'Ever Gauzy',
             sourceType: 'integration',
@@ -609,6 +627,85 @@ describe('IntegrationInboxService — integration inbox push', () => {
         expect(stored.dto.version).toBe(3);
         // One event per landed write, each at its own version.
         expect((await events()).map((event) => event.aggregateVersion)).toEqual([1, 2, 3]);
+    });
+
+    it("GATE If-Match + the member's answer: a PATCH at the version read before the answer landed is 412 and keeps the answer", async () => {
+        const { item } = await service.createExternal(
+            writer(),
+            input({ kind: 'question', choices: [{ id: 'yes', label: 'Yes' }] }),
+        );
+        // Gauzy read version 1; then the member answers in Ever Works.
+        await memberApp().reply(ADA, item.dto.id, { optionId: 'yes', text: 'Sure' });
+        expect((await service.get(ORG_A, item.dto.id)).dto.version).toBe(2);
+
+        for (const patch of [
+            { state: 'open' as const },
+            { state: 'resolved' as const, resolution: { text: 'Overwritten in Gauzy' } },
+        ]) {
+            const error = await refusal(service.updateExternal(writer(), item.dto.id, 1, patch));
+            expect(error).toBeInstanceOf(VersionMismatchError);
+        }
+        expect((await service.get(ORG_A, item.dto.id)).dto).toMatchObject({
+            status: 'answered',
+            answerOptionId: 'yes',
+            answerText: 'Sure',
+            version: 2,
+        });
+    });
+
+    it("the member's answer and its inbox.item.updated commit together: no event, no stored answer", async () => {
+        const { item } = await service.createExternal(writer(), input({ kind: 'question' }));
+        const changed = jest
+            .spyOn(publisher, 'changed')
+            .mockRejectedValueOnce(new Error('outbox unavailable'));
+        try {
+            await expect(
+                memberApp().reply(ADA, item.dto.id, { text: 'Yes, go ahead' }),
+            ).rejects.toThrow('outbox unavailable');
+        } finally {
+            changed.mockRestore();
+        }
+        // Still answerable, at the version the integration knows; nothing was recorded.
+        expect((await service.get(ORG_A, item.dto.id)).dto).toMatchObject({
+            status: 'open',
+            answerText: null,
+            version: 1,
+        });
+        expect((await events()).map((event) => event.type)).toEqual(['inbox.item.created']);
+        // The next try lands, with its event.
+        await memberApp().reply(ADA, item.dto.id, { text: 'Yes, go ahead' });
+        expect((await events()).map((event) => [event.type, event.aggregateVersion])).toEqual([
+            ['inbox.item.created', 1],
+            ['inbox.item.updated', 2],
+        ]);
+    });
+
+    it('an integration item never counts as blocking in My Decisions, even naming a blocked Task', async () => {
+        const blocked = await task(ORG_A, 'organization', ADA);
+        await dataSource.getRepository(Task).update(blocked.id, { status: 'blocked' } as never);
+        await service.createExternal(
+            writer(),
+            input({ kind: 'question', related: { taskId: blocked.id } }),
+        );
+        const repository = new InboxItemRepository(dataSource.getRepository(InboxItem));
+        expect(await repository.countDecisionsForUser(ADA)).toMatchObject({ open: 1, blocking: 0 });
+        const { rows } = await repository.listDecisionsForUser(ADA, {});
+        expect(rows.map((row) => row.blockingRank)).toEqual([0]);
+
+        // The same Task behind a platform question does block (the rule is unchanged).
+        await dataSource.getRepository(InboxItem).save({
+            userId: ADA,
+            organizationId: ORG_A,
+            tenantId: TENANT,
+            kind: 'question',
+            title: 'Which tier?',
+            body: 'Which tier?',
+            sourceType: 'agent-run',
+            taskId: blocked.id,
+            status: 'open',
+            unread: true,
+        } as unknown as InboxItem);
+        expect(await repository.countDecisionsForUser(ADA)).toMatchObject({ open: 2, blocking: 1 });
     });
 
     it('PATCH refuses a resolution without state resolved, a choiceId the item does not offer, and an empty body', async () => {

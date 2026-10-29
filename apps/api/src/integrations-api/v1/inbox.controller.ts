@@ -453,6 +453,7 @@ export class IntegrationInboxController {
         @Res({ passthrough: true }) res: Response,
     ): Promise<unknown> {
         const principal = principalOf(user);
+        assertRelatedReadScopes(principal, dto.related);
         const writer = this.writer(principal);
         const work = async (): Promise<{ status: number; body: IntegrationInboxItemDto }> => {
             const { item, created } = await this.inbox.createExternal(writer, {
@@ -703,6 +704,37 @@ function expectedVersion(header: string | undefined): number | null {
         throw validationFailed('If-Match', 'must be the "<version>" ETag of the record');
     }
     return parsed;
+}
+
+/** The read scope that names each `related` id (linking a record needs to be allowed to read it). */
+const RELATED_READ_SCOPES = [
+    ['taskId', 'tasks:read'],
+    ['workId', 'works:read'],
+    ['goalId', 'goals:read'],
+] as const;
+
+/**
+ * `related` ids are records the key must be allowed to READ: without the
+ * scope, a key with `inbox:write` alone could tell an existing Task / Work /
+ * Goal id from an unknown one (422 vs 201) and link to it. `403 scope_missing`
+ * names what is missing.
+ */
+export function assertRelatedReadScopes(
+    principal: IntegrationPrincipal,
+    related: IntegrationInboxRelatedDto | null | undefined,
+): void {
+    if (!related) return;
+    const missing = RELATED_READ_SCOPES.filter(
+        ([field, scope]) => related[field] && !principal.scopes.includes(scope),
+    ).map(([, scope]) => scope);
+    if (missing.length > 0) {
+        throw new IntegrationHttpException(
+            403,
+            'scope_missing',
+            `Linking an inbox item to a record needs the scope that reads it: ${missing.join(', ')}.`,
+            { missing, reason: 'related_read_scope' },
+        );
+    }
 }
 
 /** The badge an integration item gets when the request names none: the integration's name. */

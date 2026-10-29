@@ -311,6 +311,9 @@ export class IntegrationInboxService {
         const { set, changedFields, previous } = externalUpdateOf(row, patch);
         await this.transaction(async (manager) => {
             const escape = (name: string) => manager.connection.driver.escape(name);
+            // The member's answer to an integration item moves `version` in the same
+            // transaction as the answer (`InboxService.reply`), so a PATCH at the
+            // version read before it is refused here instead of overwriting it.
             const result = await manager
                 .createQueryBuilder()
                 .update(InboxItem)

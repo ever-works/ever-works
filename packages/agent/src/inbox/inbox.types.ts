@@ -54,9 +54,11 @@ export function toInboxDecisionDto(
     now: Date = new Date(),
 ): InboxDecisionDto {
     const item = toInboxItemDto(row.item);
+    // An integration item never blocks a Task: answering it routes nowhere (same
+    // rule as `DECISION_BLOCKING_SQL` in the repository).
     const blockingReason: InboxDecisionContext['blockingReason'] = row.runParked
         ? 'run-parked'
-        : row.taskStatus === 'blocked'
+        : row.taskStatus === 'blocked' && row.item.origin !== 'integration'
           ? 'task-blocked'
           : null;
     const runLive = row.runStatus === 'queued' || row.runStatus === 'running';

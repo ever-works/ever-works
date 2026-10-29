@@ -8,6 +8,7 @@
 	"kind": "approval",
 	"origin": "integration",
 	"externalId": "gauzy-inbox-3f2a9c1e",
+	"integrationKeyId": "7d0b4c3e-5f60-4182-8c9d-1e2f3a4b5c6d",
 	"sourceUrl": "https://app.gauzy.co/#/pages/inbox/3f2a9c1e",
 	"sourceLabel": "Ever Gauzy",
 	"email": null,

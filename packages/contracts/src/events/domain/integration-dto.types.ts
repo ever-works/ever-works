@@ -291,6 +291,8 @@ export interface IntegrationInboxItemDto {
 	readonly origin: 'platform' | 'integration';
 	/** The integration's own id of an `integration` item (unique per tenant and key); null otherwise. */
 	readonly externalId: string | null;
+	/** The integration key that filed an `integration` item (compare with `whoami.keyId`); null otherwise. */
+	readonly integrationKeyId: string | null;
 	/** The item in the integration's own app (`https:`); null for platform items. */
 	readonly sourceUrl: string | null;
 	/** The badge text of an `integration` item (e.g. "Ever Gauzy"); null for platform items. */
