@@ -4,13 +4,14 @@ import { useState, useTransition } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
+import { isAppWorkKind, type TaskAcceptanceCheck, type WorkChecksPolicy } from '@ever-works/contracts';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useRouter } from '@/i18n/navigation';
 import { updateQualityGatesSettings } from '@/app/actions/dashboard/works';
 import { ChecksEditor } from '@/components/tasks/ChecksEditor';
+import { AppChecksAdmissionCard } from '../AppChecksAdmissionCard';
 import { useSettings } from './SettingsContext';
 
 /**
@@ -22,6 +23,10 @@ import { useSettings } from './SettingsContext';
  * bounds the in-run iterate loop. Saves flow through the same
  * `PATCH /works/:id` UpdateWorkDto path as the sibling settings cards
  * (TaskIsolationSettings / CommitterSettings).
+ *
+ * APW-08 T14 — an App Work also gets the App checks admission card: the App
+ * spec's own checks, and **Admit for my machines** for each one its Fleet
+ * nodes may not run yet (FR-14). No other kind renders it.
  */
 export function QualityGatesSettings() {
     const t = useTranslations('dashboard.workDetail.settings.qualityGates');
@@ -174,6 +179,11 @@ export function QualityGatesSettings() {
                         </Button>
                     </div>
                 </div>
+
+                {/* APW-08 T14 — App spec checks and their admission (App Works only) */}
+                {isAppWorkKind(work.kind) && (
+                    <AppChecksAdmissionCard workId={work.id} policy={work.repoDeclaredCommands} />
+                )}
             </div>
         </div>
     );

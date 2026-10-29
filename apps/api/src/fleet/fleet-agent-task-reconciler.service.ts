@@ -1662,14 +1662,14 @@ function reportedPush(result: FleetAgentTaskResult | null | undefined): string |
  */
 function plannedNotAdmitted(job: FleetJobView): Array<{ id: string; required: boolean }> {
     const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
-    const raw = payload?.notAdmittedChecks;
+    // Read as unknown: the job row is JSON, whatever its type says.
+    const raw: unknown = payload?.notAdmittedChecks;
     if (!Array.isArray(raw)) return [];
-    return raw
-        .filter(
-            (entry): entry is { id: string; required?: unknown } =>
-                !!entry && typeof entry === 'object' && typeof entry.id === 'string',
-        )
-        .map((entry) => ({ id: entry.id, required: entry.required !== false }));
+    return raw.flatMap((entry: unknown) => {
+        if (!entry || typeof entry !== 'object') return [];
+        const { id, required } = entry as { id?: unknown; required?: unknown };
+        return typeof id === 'string' ? [{ id, required: required !== false }] : [];
+    });
 }
 
 /**
