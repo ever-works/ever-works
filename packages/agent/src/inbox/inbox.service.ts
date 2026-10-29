@@ -720,9 +720,17 @@ export class InboxService implements InboxProducer {
         let routed: InboxReplyRouted = 'none';
         let runId: string | undefined;
         let restart: InboxReplyRestart = 'none';
+        // Integration inbox push: an item another product filed routes nowhere. The
+        // answer is stored on the row (the claim above) and recorded as
+        // `inbox.item.updated`, which the integration reads back and applies in its
+        // own app. No run is steered, resumed or started, whatever the item links to.
+        const external = isIntegrationItem(row);
         try {
+            if (external) {
+                routed = 'none';
+            }
             // FL-05: a session's Decision answers the session, not a Run.
-            if (
+            else if (
                 row.sourceType === 'fleet-session' &&
                 (row.kind === 'question' || row.kind === 'approval')
             ) {
@@ -764,7 +772,9 @@ export class InboxService implements InboxProducer {
                         }
                         break;
                     }
-                    case 'notice':
+                    default:
+                        // A notice, and the integration kinds (mention, assignment,
+                        // email, other): nothing to route, the answer is recorded.
                         routed = 'none';
                         break;
                 }
@@ -787,7 +797,7 @@ export class InboxService implements InboxProducer {
             throw err;
         }
 
-        await this.recordAnswered(id, row.unread);
+        await this.recordAnswered(id, row.unread, external);
         const fresh = await this.items.findOwned(id, userId);
         if (!fresh) throw new NotFoundException(`Inbox item ${id} not found.`);
 
@@ -897,7 +907,7 @@ export class InboxService implements InboxProducer {
     /** A full-snapshot change of one item (bumps its version). */
     private async recordChanged(
         id: string,
-        type: 'inbox.item.answered' | 'inbox.item.state_changed',
+        type: 'inbox.item.answered' | 'inbox.item.state_changed' | 'inbox.item.updated',
         changedFields: string[],
         previous: Record<string, unknown>,
     ): Promise<void> {
@@ -914,11 +924,19 @@ export class InboxService implements InboxProducer {
      * `inbox.item.answered` — whichever door the answer came through (Inbox
      * reply, escalation resolve, approval decide). Recorded once per answer:
      * only the caller that won the `markAnswered` claim gets here.
+     *
+     * An INTEGRATION item's answer is `inbox.item.updated` instead (integration
+     * contract: the integration applies the member's answer from that event in
+     * its own app); same fields, same version step, one event either way.
      */
-    private async recordAnswered(id: string, wasUnread: boolean): Promise<void> {
+    private async recordAnswered(
+        id: string,
+        wasUnread: boolean,
+        external = false,
+    ): Promise<void> {
         await this.recordChanged(
             id,
-            'inbox.item.answered',
+            external ? 'inbox.item.updated' : 'inbox.item.answered',
             ['status', 'unread', 'answeredAt', 'answerText', 'answerOptionId'],
             { status: 'open', unread: !!wasUnread },
         );
@@ -1204,7 +1222,7 @@ export class InboxService implements InboxProducer {
             await this.notifications.notifyInboxItem({
                 userId: row.userId,
                 itemId: row.id,
-                kind: row.kind,
+                kind: notificationKindOf(row.kind),
                 title: row.title,
                 message: row.body,
             });
@@ -1276,4 +1294,14 @@ function firstLine(text: string): string {
 /** An unanswered question a FLEET run is parked on (slice Q dismissal rule). */
 function isOpenFleetQuestion(row: InboxItem): boolean {
     return row.kind === 'question' && row.status === 'open' && row.sourceType === 'fleet-run';
+}
+
+/** An item an integration key filed (integration inbox push): its answer routes nowhere. */
+export function isIntegrationItem(row: Pick<InboxItem, 'origin' | 'sourceType'>): boolean {
+    return row.origin === 'integration' || row.sourceType === 'integration';
+}
+
+/** The notification family of an item: the integration kinds ring as a notice. */
+function notificationKindOf(kind: InboxItem['kind']): 'question' | 'approval' | 'escalation' | 'notice' {
+    return kind === 'question' || kind === 'approval' || kind === 'escalation' ? kind : 'notice';
 }

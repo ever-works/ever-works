@@ -272,6 +272,11 @@ export interface IntegrationVisibilityPrivateData {
  * organization (such items never reach an integration). Fleet provenance
  * (`sourceMeta`: node names, branches, mount directories) is deliberately not
  * exposed.
+ *
+ * Integration inbox push (`POST /inbox/items`): an item an integration filed
+ * carries `origin: 'integration'`, its `externalId`, `sourceUrl` and
+ * `sourceLabel` (and `email` for `kind: 'email'`); every other item is
+ * `origin: 'platform'` with those fields null.
  */
 export interface IntegrationInboxItemDto {
 	readonly id: string;
@@ -281,7 +286,26 @@ export interface IntegrationInboxItemDto {
 	readonly updatedAt: string;
 	/** The human the message is for; replies and state changes act as this user only. */
 	readonly recipientUserId: string;
-	readonly kind: 'question' | 'approval' | 'escalation' | 'notice';
+	readonly kind: 'question' | 'approval' | 'escalation' | 'notice' | 'mention' | 'assignment' | 'email' | 'other';
+	/** Who filed it: an Ever Works producer, or an integration key (`POST /inbox/items`). */
+	readonly origin: 'platform' | 'integration';
+	/** The integration's own id of an `integration` item (unique per tenant and key); null otherwise. */
+	readonly externalId: string | null;
+	/** The item in the integration's own app (`https:`); null for platform items. */
+	readonly sourceUrl: string | null;
+	/** The badge text of an `integration` item (e.g. "Ever Gauzy"); null for platform items. */
+	readonly sourceLabel: string | null;
+	/** The header block of a `kind: 'email'` integration item; null otherwise. */
+	readonly email: {
+		readonly from: string;
+		readonly to?: string | null;
+		readonly subject: string;
+		readonly receivedAt: string;
+	} | null;
+	/** When it happened at the source (integration items that said so); null otherwise. */
+	readonly occurredAt: string | null;
+	/** The Goal an integration item is about (`related.goalId`); null otherwise. */
+	readonly goalId: string | null;
 	readonly title: string;
 	readonly body: string;
 	readonly options:

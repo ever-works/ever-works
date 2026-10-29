@@ -1,5 +1,6 @@
 import {
     INBOX_DECISION_DORMANT_AFTER_DAYS,
+    normalizeInboxEmailMeta,
     type InboxDecisionContext,
     type InboxDecisionDto,
     type InboxItemDto,
@@ -31,6 +32,13 @@ export function toInboxItemDto(row: InboxItem): InboxItemDto {
         firstViewedAt: toIsoOrNull(row.firstViewedAt),
         createdAt: row.createdAt?.toISOString() ?? new Date(0).toISOString(),
         updatedAt: row.updatedAt?.toISOString() ?? new Date(0).toISOString(),
+        // Integration inbox push — what the web needs to show where an item came from.
+        origin: row.origin === 'integration' ? 'integration' : 'platform',
+        sourceLabel: row.sourceLabel ?? null,
+        sourceUrl: row.sourceUrl ?? null,
+        email: normalizeInboxEmailMeta(row.emailMeta),
+        occurredAt: toIsoOrNull(row.occurredAt),
+        goalId: row.goalId ?? null,
     };
 }
 

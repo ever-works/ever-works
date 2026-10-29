@@ -1,8 +1,8 @@
 {
 	"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"$id": "https://ever.works/schemas/integrations/v1/resources/inbox-item.schema.json",
-	"title": "Inbox item DTO (P3, GET /inbox/items, GET /inbox/items/:id)",
-	"description": "One Inbox message addressed to ONE human, its recipient: a question an agent run asked, an approval request, an escalation mirror or a system notice. Also the `data` of inbox.item.* events. Not a ResourceBase: an inbox item is the recipient's message, not an organization resource, so it has no owner, visibility, teams or external links. `organizationId` is null for a message outside any organization; such items are recorded for in-process listeners but never served to integrations. Fleet provenance (node names, branches, mount directories) is not exposed. Replies and state changes act as `recipientUserId` only.",
+	"title": "Inbox item DTO (P3, GET /inbox/items, GET /inbox/items/:id, POST /inbox/items, PATCH /inbox/items/:id)",
+	"description": "One Inbox message addressed to ONE human, its recipient: a question an agent run asked, an approval request, an escalation mirror or a system notice — or, since v1-draft.17 (CR-15, integration inbox push), an item an integration filed from its own Inbox (`origin: integration`, e.g. Ever Gauzy's notices, questions, approvals, mentions, assignments and emails). Also the `data` of inbox.item.* events. Not a ResourceBase: an inbox item is the recipient's message, not an organization resource, so it has no owner, visibility, teams or external links. `organizationId` is null for a message outside any organization; such items are recorded for in-process listeners but never served to integrations. Fleet provenance (node names, branches, mount directories) is not exposed. Replies and state changes act as `recipientUserId` only. `origin`, `externalId`, `sourceUrl`, `sourceLabel`, `email`, `occurredAt` and `goalId` are always sent by draft.17 servers but optional here, so events recorded before draft.17 still validate.",
 	"type": "object",
 	"required": [
 		"id",
@@ -38,7 +38,44 @@
 			"description": "The human the message is for. Always set.",
 			"$ref": "../common.schema.json#/$defs/Uuid"
 		},
-		"kind": { "type": "string", "enum": ["question", "approval", "escalation", "notice"] },
+		"kind": {
+			"description": "question / approval / escalation / notice from Ever Works producers; an integration item may also be mention, assignment, email or other (never escalation).",
+			"type": "string",
+			"enum": ["question", "approval", "escalation", "notice", "mention", "assignment", "email", "other"]
+		},
+		"origin": {
+			"description": "platform = filed by an Ever Works producer; integration = filed by an integration key through POST /inbox/items (CR-15).",
+			"type": "string",
+			"enum": ["platform", "integration"]
+		},
+		"externalId": {
+			"description": "The integration's own id of an integration item (unique per tenant and integration key); null for platform items.",
+			"type": ["string", "null"],
+			"maxLength": 128
+		},
+		"sourceUrl": {
+			"description": "The item in the integration's own app (https only); null for platform items.",
+			"type": ["string", "null"],
+			"format": "uri",
+			"maxLength": 2000
+		},
+		"sourceLabel": {
+			"description": "The badge text of an integration item (defaults to the integration's name, e.g. \"Ever Gauzy\"); null for platform items.",
+			"type": ["string", "null"],
+			"maxLength": 80
+		},
+		"email": {
+			"description": "The header block of a kind email integration item; null otherwise.",
+			"oneOf": [{ "type": "null" }, { "$ref": "#/$defs/InboxItemEmail" }]
+		},
+		"occurredAt": {
+			"description": "When it happened at the source, as the integration said (integration items only).",
+			"$ref": "../common.schema.json#/$defs/NullableDateTime"
+		},
+		"goalId": {
+			"description": "The Goal an integration item is about (related.goalId).",
+			"$ref": "../common.schema.json#/$defs/NullableUuid"
+		},
 		"title": { "type": "string", "maxLength": 300 },
 		"body": { "type": "string" },
 		"options": {
@@ -50,7 +87,7 @@
 			"description": "Which producer filed it. Open set; consumers must accept unknown values.",
 			"type": "string",
 			"maxLength": 24,
-			"examples": ["agent-run", "fleet-run", "escalation", "proposal", "system", "work"]
+			"examples": ["agent-run", "fleet-run", "escalation", "proposal", "system", "work", "integration"]
 		},
 		"status": { "type": "string", "enum": ["open", "answered", "archived"] },
 		"unread": { "type": "boolean" },
@@ -68,6 +105,18 @@
 	},
 	"additionalProperties": false,
 	"$defs": {
+		"InboxItemEmail": {
+			"description": "Plain text; rendered as text, never as markup.",
+			"type": "object",
+			"required": ["from", "subject", "receivedAt"],
+			"properties": {
+				"from": { "type": "string", "minLength": 1, "maxLength": 320 },
+				"to": { "type": ["string", "null"], "maxLength": 1000 },
+				"subject": { "type": "string", "minLength": 1, "maxLength": 300 },
+				"receivedAt": { "type": "string", "maxLength": 64 }
+			},
+			"additionalProperties": false
+		},
 		"InboxItemOption": {
 			"type": "object",
 			"required": ["id", "label"],
