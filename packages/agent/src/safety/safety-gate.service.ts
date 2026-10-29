@@ -13,6 +13,10 @@ import { RailRefusalService } from './rail-refusal.service';
 import { defaultSafetyRailChain } from './rails';
 import {
     composeSafetyRails,
+    SAFETY_CAP_CHECK,
+    SAFETY_GRANT_CHECK,
+    SAFETY_RULE_CHECK,
+    SAFETY_SCOPE_PAUSE,
     type SafetyCapCheck,
     type SafetyGrantCheck,
     type SafetyRailContext,
@@ -65,10 +69,11 @@ export class SafetyGateService implements SafetyGate {
         // their decisions. Each is optional and appended last, so every
         // existing positional constructor call keeps working and an install
         // that binds none of them behaves exactly as it did before.
-        @Optional() private readonly scopePause?: SafetyScopePause,
-        @Optional() private readonly grantCheck?: SafetyGrantCheck,
-        @Optional() private readonly capCheck?: SafetyCapCheck,
-        @Optional() private readonly ruleCheck?: SafetyRuleCheck,
+        // By token (C-9): the types are interfaces, which the emitted metadata erases to `Object`.
+        @Optional() @Inject(SAFETY_SCOPE_PAUSE) private readonly scopePause?: SafetyScopePause,
+        @Optional() @Inject(SAFETY_GRANT_CHECK) private readonly grantCheck?: SafetyGrantCheck,
+        @Optional() @Inject(SAFETY_CAP_CHECK) private readonly capCheck?: SafetyCapCheck,
+        @Optional() @Inject(SAFETY_RULE_CHECK) private readonly ruleCheck?: SafetyRuleCheck,
     ) {}
 
     async evaluate(input: SafetyGateInput): Promise<SafetyGateVerdict> {
