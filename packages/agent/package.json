@@ -320,7 +320,7 @@
     },
     "scripts": {
         "dev": "concurrently \"pnpm build:dev\" \"pnpm build:types:dev\"",
-        "build": "nest build -b swc && tsc -p tsconfig.types.json",
+        "build": "nest build -b swc && node scripts/strip-dist-specs.mjs && tsc -p tsconfig.types.json",
         "type-check": "tsc -p tsconfig.json --noEmit",
         "build:dev": "nest build -b swc --watch",
         "build:types": "tsc -p tsconfig.types.json",
