@@ -26,7 +26,8 @@ import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
  * names its values — so the new author type needs no DDL.
  *
  * `body` stays NOT NULL and keeps carrying the pre-rendered English of a keyed post, so every
- * existing reader (the integration API, exports, the agent's thread context) is unchanged.
+ * existing reader (exports, the agent's thread context) is unchanged. `system` rows are
+ * thread-only: the Integration API's comment reads leave them out, so its DTO keeps a real author.
  * `followUpKey` on `tasks` (plan §3.5 put it in this slot) already shipped with
  * `1792320000000-AddTaskDeliveryState` and is not touched here.
  *

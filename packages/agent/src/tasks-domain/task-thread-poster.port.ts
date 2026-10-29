@@ -3,8 +3,9 @@ import type { TaskChatMessageParams } from '../entities/task-chat-message.entity
 /**
  * APW-08 T26 / T54 (FR-43) — the narrow port the delivery chain posts its progress through into a
  * Task's own thread. Bound to `TaskChatService` in `TasksDomainModule` (`useExisting`), so a post
- * goes through the same checks, mention parsing, Activity row and domain event as any other
- * message.
+ * goes through the same checks as any other message. An `'agent'` post also fires the comment
+ * event and Activity row like any agent message; a `'system'` post is thread-only (no
+ * `task.comment.created` event, no "commented" Activity row — see `TaskChatService.post`).
  *
  * A token rather than the class: `TaskDeliveryService` then needs neither `TaskChatService`'s
  * import graph nor a `forwardRef`, and an optional dependency injected by token survives SWC's

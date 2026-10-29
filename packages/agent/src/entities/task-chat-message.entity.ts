@@ -65,8 +65,9 @@ export class TaskChatMessage {
 
     /**
      * Always present. For a keyed post (`messageKey` set) it is the pre-rendered ENGLISH copy, so
-     * every reader that does not know the key (the integration API, exports, an agent's thread
-     * context) reads the same text it always did.
+     * every reader that does not know the key (exports, an agent's thread context) reads the same
+     * text it always did. A `'system'` post is thread-only: the Integration API does not serve it
+     * and no comment event or "commented" Activity row is written for it.
      */
     @Column({ type: 'text' })
     body: string;

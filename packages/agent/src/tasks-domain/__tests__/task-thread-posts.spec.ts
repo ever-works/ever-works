@@ -45,6 +45,14 @@ describe('task-thread-posts — the copy', () => {
         expect(renderTaskThreadPost({ key: 'deliveryPosts.nope' })).toBe('deliveryPosts.nope');
     });
 
+    it.each([['toString'], ['constructor'], ['hasOwnProperty'], ['__proto__']])(
+        'an inherited name (%s) is an unknown key, not a template (CodeRabbit on #3033)',
+        (leaf) => {
+            const key = `deliveryPosts.${leaf}`;
+            expect(renderTaskThreadPost({ key })).toBe(key);
+        },
+    );
+
     it('every key fits the 64-character column and is camelCase with no literal dot in the leaf', () => {
         for (const leaf of Object.keys(TASK_THREAD_POST_ENGLISH) as TaskThreadPostLeaf[]) {
             const key = taskThreadPostKey(leaf);
@@ -144,4 +152,96 @@ describe('TaskChatService.post — keyed posts (T54)', () => {
             });
         }
     });
+});
+
+/**
+ * Lead review of #3033 — a `system` post lives in the Task thread ONLY: it writes the thread row,
+ * but fires no `task.comment.created` domain / integration event and writes no "commented"
+ * Activity row (the delivery chain's own `app_change` rows record each state). A user or agent
+ * post still does both, exactly as before.
+ */
+describe('TaskChatService.post — a system post is thread-only (T54)', () => {
+    let messages: { create: jest.Mock };
+    let activity: { log: jest.Mock };
+    let publisher: { transaction: jest.Mock; child: jest.Mock };
+    let svc: TaskChatService;
+    const MANAGER = { tx: true };
+
+    beforeEach(() => {
+        messages = {
+            create: jest.fn((data: Record<string, unknown>) =>
+                Promise.resolve({
+                    id: 'm1',
+                    createdAt: new Date(0),
+                    updatedAt: new Date(0),
+                    ...data,
+                }),
+            ),
+        };
+        activity = { log: jest.fn().mockResolvedValue(undefined) };
+        publisher = {
+            transaction: jest.fn(async (work: (manager: unknown) => Promise<unknown>) =>
+                work(MANAGER),
+            ),
+            child: jest.fn().mockResolvedValue(undefined),
+        };
+        svc = new TaskChatService(
+            { findByIdAndUser: jest.fn().mockResolvedValue({ id: 't1', userId: 'u1' }) } as never,
+            messages as never,
+            { add: jest.fn() } as never,
+            activity as never,
+            undefined, // runs
+            undefined, // chatDispatcher
+            undefined, // steering
+            undefined, // dispatchGate
+            publisher as never, // domainEvents
+        );
+    });
+
+    const commented = () =>
+        activity.log.mock.calls.filter(
+            ([entry]) => (entry as { actionType?: string }).actionType === 'task_commented',
+        );
+
+    it('a system post writes the thread row, and no comment event and no commented Activity row', async () => {
+        const row = await svc.post('u1', {
+            taskId: 't1',
+            authorType: 'system',
+            authorId: null,
+            body: 'Deploying.',
+            messageKey: 'deliveryPosts.deploying',
+        });
+        expect(row).toMatchObject({ authorType: 'system', authorId: null, body: 'Deploying.' });
+        expect(messages.create).toHaveBeenCalledTimes(1);
+        // Written outside the event transaction: no manager, no event.
+        expect(messages.create.mock.calls[0][1]).toBeUndefined();
+        expect(publisher.transaction).not.toHaveBeenCalled();
+        expect(publisher.child).not.toHaveBeenCalled();
+        expect(activity.log).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['user', 'u1'],
+        ['agent', 'agent-1'],
+    ])(
+        'a %s post still fires task.comment.created and writes the commented Activity row',
+        async (authorType, authorId) => {
+            await svc.post('u1', {
+                taskId: 't1',
+                authorType: authorType as 'user' | 'agent',
+                authorId,
+                body: 'Looks good.',
+            });
+            expect(publisher.transaction).toHaveBeenCalledTimes(1);
+            expect(messages.create.mock.calls[0][1]).toBe(MANAGER);
+            expect(publisher.child).toHaveBeenCalledTimes(1);
+            const [, aggregate, taskId, event, payload] = publisher.child.mock.calls[0];
+            expect([aggregate, taskId, event]).toEqual(['task', 't1', 'task.comment.created']);
+            expect(payload).toMatchObject({ authorType, authorId, body: 'Looks good.' });
+            expect(commented()).toHaveLength(1);
+            expect(commented()[0][0]).toMatchObject({
+                details: expect.objectContaining({ messageId: 'm1' }),
+            });
+        },
+    );
 });

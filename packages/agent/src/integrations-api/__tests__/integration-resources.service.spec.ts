@@ -269,6 +269,41 @@ describe('IntegrationResourcesService', () => {
         ).rejects.toBeInstanceOf(ResourceNotFoundError);
     });
 
+    it('a system thread post (APW-08 T54, no author) is not a comment of this API: not listed, not served, not linkable', async () => {
+        const mine = await task(ORG_A, 'Ship the feed');
+        const messages = dataSource.getRepository(TaskChatMessage);
+        const human = await messages.save({
+            taskId: mine.id,
+            authorType: 'user',
+            authorId: OWNER,
+            body: 'Please add an SMS reminder',
+        } as unknown as TaskChatMessage);
+        const system = await messages.save({
+            taskId: mine.id,
+            authorType: 'system',
+            authorId: null,
+            body: 'Live at https://bookings.example.app.',
+            messageKey: 'deliveryPosts.live',
+            messageParams: { url: 'https://bookings.example.app' },
+        } as unknown as TaskChatMessage);
+
+        const page = await resources.comments(ORG_A, mine.id, {}, 'gauzy');
+        expect(page.data.map((dto) => dto.id)).toEqual([human.id]);
+        for (const dto of page.data) {
+            expectValid('resources/task-comment.schema.json', dto);
+            expect(typeof dto.authorId).toBe('string');
+        }
+        await expect(resources.comment(ORG_A, mine.id, system.id, 'gauzy')).rejects.toBeInstanceOf(
+            ResourceNotFoundError,
+        );
+        await expect(
+            resources.assertLinkTarget('task_comment', ORG_A, system.id, 'gauzy'),
+        ).rejects.toBeInstanceOf(ResourceNotFoundError);
+        await expect(
+            resources.assertLinkTarget('task_comment', ORG_A, human.id, 'gauzy'),
+        ).resolves.toBe(true);
+    });
+
     const idea = (organizationId: string, title: string, visibility = 'organization') =>
         dataSource.getRepository(WorkProposal).save({
             userId: OWNER,

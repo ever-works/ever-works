@@ -178,7 +178,14 @@ export class TaskChatService {
                     ? input.externalAuthor
                     : null,
         };
-        const publisher = this.domainEvents;
+        // APW-08 T54 (lead review of #3033) — a `system` post (a delivery-chain progress line on a
+        // Task with no Agent) lives in the Task thread ONLY: no `task.comment.created` domain /
+        // integration event (the Integration API's comment DTO carries a real author, and the
+        // Gauzy plugin expects one) and no "commented" Activity row (the chain's own `app_change`
+        // rows already record each state, so watchers are not told twice). Every other author
+        // type is written exactly as before.
+        const threadOnly = input.authorType === 'system';
+        const publisher = threadOnly ? undefined : this.domainEvents;
         const row = publisher
             ? await publisher.transaction(async (manager) => {
                   const created = await this.messages.create(data, manager);
@@ -196,9 +203,7 @@ export class TaskChatService {
                           actor:
                               input.authorType === 'agent'
                                   ? { type: 'agent', id: authorId as string, label: null }
-                                  : input.authorType === 'system'
-                                    ? { type: 'system', id: 'system', label: null }
-                                    : undefined,
+                                  : undefined,
                       },
                   );
                   return created;
@@ -215,16 +220,18 @@ export class TaskChatService {
             }
         }
 
-        await this.logActivity({
-            userId,
-            taskId: task.id,
-            scope: ownershipScopeOf(task),
-            actionType: ActivityActionType.TASK_COMMENTED,
-            details: {
-                messageId: row.id,
-                mentions: mentions.records.map((m) => m.slug ?? m.id ?? null),
-            },
-        });
+        if (!threadOnly) {
+            await this.logActivity({
+                userId,
+                taskId: task.id,
+                scope: ownershipScopeOf(task),
+                actionType: ActivityActionType.TASK_COMMENTED,
+                details: {
+                    messageId: row.id,
+                    mentions: mentions.records.map((m) => m.slug ?? m.id ?? null),
+                },
+            });
+        }
 
         // Phase 15.4 dispatch hook: for every @agent mention that
         // resolved, fan out an agent-chat-reply Trigger.dev run. Dedup

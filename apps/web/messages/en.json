@@ -2981,7 +2981,7 @@
                     "fixTaskUnavailable": "A fix Task can't be created for this change right now."
                 },
                 "deployNowHint": "Auto-deploy is off for this app, so this build waits for you to deploy it.",
-                "createFixTaskConfirm": "Create a Task to fix this failure? When this change has an Agent, it starts on the fix right away, and its run is billed to your workspace.",
+                "createFixTaskConfirm": "Create a Task to fix this failure? When this change has an Agent, Ever Works tries to start it on the fix right away (a paused agent or a spend limit can hold it); its run is billed to your workspace.",
                 "cancel": "Cancel",
                 "creatingFixTask": "Creating…",
                 "fixTaskCreated": "Fix Task {slug} was created.",

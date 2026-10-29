@@ -229,11 +229,8 @@ export function toTaskCommentDto(
         id: message.id,
         taskId: message.taskId,
         organizationId: message.organizationId ?? taskOrganizationId ?? '',
-        authorType:
-            authorType === 'agent' || authorType === 'integration' || authorType === 'system'
-                ? authorType
-                : 'user',
-        authorId: message.authorId ?? null,
+        authorType: authorType === 'agent' || authorType === 'integration' ? authorType : 'user',
+        authorId: message.authorId,
         // EW-P1-2 — display attribution of an integration author (null otherwise).
         externalAuthor:
             authorType === 'integration' && message.externalAuthor

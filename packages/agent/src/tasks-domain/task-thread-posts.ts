@@ -5,8 +5,9 @@ import type { TaskChatMessageParams } from '../entities/task-chat-message.entity
  *
  * A platform post into a Task's thread ("Build #3 succeeded.") is stored with a KEY and its
  * params, so the Task page renders it in the READER's locale, and with the pre-rendered English
- * in `body`, so every reader that does not know keys (the integration API, exports, an agent's
- * thread context) is unchanged.
+ * in `body`, so every reader that does not know keys (exports, an agent's thread context) is
+ * unchanged. A `system` post (no Agent) stays in the thread only: no comment event, no
+ * "commented" Activity row, not served by the Integration API.
  *
  * The key is a path relative to the web's `dashboard.tasksPage` messages. The English below is
  * the copy of record for `body`; `apps/web/messages/en.json` carries the same strings under
@@ -90,8 +91,12 @@ export function renderTaskThreadPost(post: TaskThreadPost): string {
     const leaf = post.key.startsWith(`${TASK_THREAD_POST_NAMESPACE}.`)
         ? post.key.slice(TASK_THREAD_POST_NAMESPACE.length + 1)
         : post.key;
-    const template = (TASK_THREAD_POST_ENGLISH as Record<string, string>)[leaf];
-    if (!template) return post.key;
+    // An OWN property only: `deliveryPosts.toString` must render as the unknown key it is, not
+    // reach the inherited function.
+    const template = Object.prototype.hasOwnProperty.call(TASK_THREAD_POST_ENGLISH, leaf)
+        ? (TASK_THREAD_POST_ENGLISH as Record<string, string>)[leaf]
+        : undefined;
+    if (typeof template !== 'string') return post.key;
     const params = post.params ?? {};
     return template.replace(/\{([A-Za-z0-9_]+)\}/g, (match, name: string) => {
         const value = params[name];
