@@ -22,6 +22,9 @@ export * from './task-pr-status-sync.task';
 // APW-08 T23 — follow merged App Work changes to live (`1-59/2`, one minute after the PR sweep):
 // `TaskDeliveryService.reconcile()` over the internal RPC channel.
 export * from './app-change-delivery.task';
+// APW-08 T50 — the ONE-SHOT backfill of App Work isolation columns (never scheduled; an
+// operator runs it): `AppWorkIsolationBackfillRunner.run()` over the internal RPC channel.
+export * from './app-work-isolation-backfill.task';
 // Desktop PRD M4 — return lapsed fleet-job leases to the pool so a
 // fleet whose nodes ALL died still converges (inline reclaim on the
 // lease path covers every other case).

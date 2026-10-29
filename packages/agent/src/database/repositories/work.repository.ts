@@ -297,6 +297,58 @@ export class WorkRepository {
     }
 
     /**
+     * APW-08 T11 / T50 — the ownership-scoped write of the columns an App Work keeps in step
+     * with its App spec (`AppWorkIsolationService.apply`).
+     *
+     * `WHERE id AND userId AND kind = 'app'`, so the write can only ever land on the App Work
+     * its caller read, owned by the owner its caller read — never on another kind (the evolve
+     * loop's columns are switched on for `app` only, plan §2.3) and never on a row whose owner
+     * changed between the read and the write. Additive: {@link update} is unchanged.
+     *
+     * Returns whether a row was written. An empty patch writes nothing and answers `false`.
+     */
+    async updateAppWorkColumns(id: string, userId: string, patch: Partial<Work>): Promise<boolean> {
+        if (!id || !userId || !patch || Object.keys(patch).length === 0) {
+            return false;
+        }
+        const result = await this.repository.update({ id, userId, kind: 'app' }, patch);
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * APW-08 T50 — one page of App Work ids whose Task base branch is still unset, in id order
+     * after `afterId` (keyset paging, so a Work the backfill has to leave alone is never read
+     * twice in one run). `kind = 'app'` is in the query, so no other kind is ever visited, and
+     * a Work that already carries a base branch is never returned — which is what makes the
+     * backfill re-runnable: a second run finds nothing to do.
+     *
+     * Ids only: the caller re-reads each one through {@link findById}, which loads the owner the
+     * entity's repository helpers fall back to (`getRepoOwner`).
+     */
+    async findAppWorkIdsWithoutIsolationBase(
+        limit: number,
+        afterId?: string | null,
+    ): Promise<string[]> {
+        const take = Math.max(1, Math.min(500, Math.floor(Number(limit) || 0) || 1));
+        const query = this.repository
+            .createQueryBuilder('work')
+            .select('work.id', 'id')
+            .where('work.kind = :kind', { kind: 'app' })
+            .andWhere(
+                new Brackets((qb) => {
+                    qb.where('work.taskIsolationBaseBranch IS NULL').orWhere(
+                        "TRIM(work.taskIsolationBaseBranch) = ''",
+                    );
+                }),
+            );
+        if (afterId) {
+            query.andWhere('work.id > :afterId', { afterId });
+        }
+        const rows = await query.orderBy('work.id', 'ASC').limit(take).getRawMany<{ id: string }>();
+        return rows.map((row) => row.id).filter((id): id is string => typeof id === 'string');
+    }
+
+    /**
      * EW-628 — webhook handler lookup. Returns every Work whose data
      * repository matches `<owner>/<repo>` AND has the GitHub App
      * installed (so a stray push to an unmanaged fork can't enqueue a

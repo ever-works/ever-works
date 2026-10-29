@@ -296,3 +296,108 @@ describe('TaskTransitionService — the predicates the fan-out shares', () => {
         });
     });
 });
+
+/**
+ * APW-08 T11 (FR-9, ACC-08-07 second half) — an Agent without commit permission cannot be
+ * started on an App Work Task: the dispatch is refused with the FR-9 copy, before any run row
+ * exists, and nothing is enqueued. Every other case dispatches exactly as before.
+ */
+describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on an App Work (APW-08 T11)', () => {
+    const KINDS: Record<string, string> = { 'w-app': 'app', 'w-site': 'directory' };
+    const FR9 = "This agent can't commit, and changes to an app always go through a branch.";
+    let runs: {
+        createQueued: jest.Mock;
+        markDispatchFailed: jest.Mock;
+        setTriggerRunId: jest.Mock;
+    };
+    let dispatcher: { enqueue: jest.Mock };
+    let works: { findById: jest.Mock };
+
+    function makeSvc(permissions: Record<string, boolean> | undefined): TaskTransitionService {
+        runs = {
+            createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
+            markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            setTriggerRunId: jest.fn().mockResolvedValue(undefined),
+        };
+        dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+        works = {
+            findById: jest.fn(async (id: string) => (KINDS[id] ? { id, kind: KINDS[id] } : null)),
+        };
+        const agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string) => ({
+                id,
+                userId,
+                ...(permissions ? { permissions } : {}),
+            })),
+        };
+        return new (TaskTransitionService as unknown as new (
+            ...args: unknown[]
+        ) => TaskTransitionService)(
+            { casUpdateStatus: jest.fn(), findById: jest.fn() },
+            { findByTaskId: jest.fn().mockResolvedValue([]) },
+            { allApproved: jest.fn().mockResolvedValue(true) },
+            { findAgentAssignees: jest.fn().mockResolvedValue([]) },
+            runs,
+            dispatcher,
+            undefined, // notifications
+            undefined, // runDenorm
+            undefined, // dispatchGate
+            works,
+            undefined, // terminalSessions
+            agents,
+        );
+    }
+
+    it('refuses an App Work Task whose Agent may not commit, with the FR-9 copy, and dispatches nothing', async () => {
+        const result = await makeSvc({ canCommitToRepo: false }).dispatchAgentRun(
+            makeTask({ workId: 'w-app' }),
+            'agent-a',
+        );
+
+        expect(result).toMatchObject({ runId: null, dispatched: false, parked: false });
+        expect(result.error).toBe(`no_commit_permission: ${FR9}`);
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('dispatches an App Work Task whose Agent may commit — with no Work read at all', async () => {
+        const result = await makeSvc({ canCommitToRepo: true }).dispatchAgentRun(
+            makeTask({ workId: 'w-app' }),
+            'agent-a',
+        );
+
+        expect(result).toMatchObject({ dispatched: true });
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        expect(works.findById).not.toHaveBeenCalled();
+    });
+
+    it('an Agent with no stored permissions is read the way the worker reads it (may commit)', async () => {
+        await expect(
+            makeSvc(undefined).dispatchAgentRun(makeTask({ workId: 'w-app' }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+    });
+
+    it('every other kind, and a Work-less Task, dispatch exactly as before with the same Agent', async () => {
+        const svc = makeSvc({ canCommitToRepo: false });
+        await expect(
+            svc.dispatchAgentRun(makeTask({ workId: 'w-site' }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+        await expect(
+            svc.dispatchAgentRun(makeTask({ workId: null }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+        // An unknown Work cannot be classified as an App Work: as before, it dispatches.
+        await expect(
+            svc.dispatchAgentRun(makeTask({ workId: 'w-gone' }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(3);
+    });
+
+    it('a review run is not a change: it passes on an App Work with an Agent that may not commit', async () => {
+        const svc = makeSvc({ canCommitToRepo: false });
+        const result = await svc.dispatchAgentRun(makeTask({ workId: 'w-app' }), 'agent-a', {
+            reviewId: 'review-1',
+        });
+
+        expect(result.error ?? '').not.toContain('no_commit_permission');
+    });
+});
