@@ -1976,6 +1976,7 @@
                 "prOpened": "Opened pull request #{number}.",
                 "checksPassed": "Checks passed.",
                 "checksFailed": "Checks failed: {names}.",
+                "checksFailedUnnamed": "Checks failed.",
                 "merged": "Merged into {branch}.",
                 "mergedNoBranch": "Merged.",
                 "buildStarted": "Build #{number} started.",
