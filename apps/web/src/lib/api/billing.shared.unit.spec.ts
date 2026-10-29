@@ -16,6 +16,7 @@ import {
     canUpgradePlan,
     formatCardExpiry,
     formatPaymentMethod,
+    holdsRecurringSubscription,
     invoiceStatusTone,
     isSubscriptionPastDue,
     packBonusPercent,
@@ -485,5 +486,35 @@ describe('canManageSeats — payments on + the plan actually sells seats', () =>
         expect(canManageSeats(seatsState({ allowance: null, included: null }), true)).toBe(false);
         // The seats call failed.
         expect(canManageSeats(null, true)).toBe(false);
+    });
+});
+
+describe('holdsRecurringSubscription — the plan cards never offer a checkout that 409s (A1)', () => {
+    it('is true for every live provider subscription, scheduled cancellation included', () => {
+        for (const status of ['active', 'trialing', 'past_due', 'unpaid', 'paused'] as const) {
+            expect(
+                holdsRecurringSubscription(overview({ subscription: subscription({ status }) })),
+            ).toBe(true);
+        }
+        expect(
+            holdsRecurringSubscription(
+                overview({ subscription: subscription({ cancelAtPeriodEnd: true }) }),
+            ),
+        ).toBe(true);
+    });
+
+    it('is false with no provider subscription, an ended one, or no overview', () => {
+        expect(
+            holdsRecurringSubscription(
+                overview({ subscription: subscription({ manageable: false }) }),
+            ),
+        ).toBe(false);
+        for (const status of ['none', 'canceled', 'incomplete_expired'] as const) {
+            expect(
+                holdsRecurringSubscription(overview({ subscription: subscription({ status }) })),
+            ).toBe(false);
+        }
+        expect(holdsRecurringSubscription(overview())).toBe(false);
+        expect(holdsRecurringSubscription(null)).toBe(false);
     });
 });

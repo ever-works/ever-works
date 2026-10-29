@@ -36,13 +36,21 @@ import {
 import {
     CLOUD_PLAN_TRIAL_DAYS,
     CREDIT_LEDGER_KINDS,
+    estimatePlanCheckoutTotal,
     formatCreditsAsDollars,
     formatMonthlyPrice,
     formatSignedCredits,
     isFreePlan,
     ledgerKindTone,
+    planCheckoutInterval,
+    planCyclePricePerMonth,
+    planExtraSeats,
     planOffersTrial,
+    planSeatPricePerCycle,
+    planSellsAnnual,
+    planSellsExtraSeats,
     type CreditLedgerKind,
+    type PlanBillingCycle,
     type CreditsBalance,
     type CreditsLedgerPage,
     type SubscriptionPlanList,
@@ -61,6 +69,7 @@ import {
     canResumeSubscription,
     formatCardExpiry,
     formatPaymentMethod,
+    holdsRecurringSubscription,
     invoiceStatusTone,
     isSubscriptionPastDue,
     packBonusPercent,
@@ -175,6 +184,75 @@ function PaymentMethodManageLink({ label }: { label: string }) {
     );
 }
 
+/**
+ * Members count on a paid plan card, for a NEW subscription (Gauzy Ever Works #126). Empty means
+ * "just the included allowance". The value is the TOTAL wanted, allowance included — the server
+ * bills only the excess and can never bill less than the plan itself.
+ */
+function PlanCheckoutSeats({
+    plan,
+    cycle,
+    value,
+    onChange,
+}: {
+    plan: SubscriptionPlanListItem;
+    cycle: PlanBillingCycle;
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const t = useTranslations('dashboard.settings.billing');
+    const included = plan.seatsIncluded ?? 0;
+    const wanted = value === '' ? included : Number(value);
+    const extra = planExtraSeats(plan, wanted);
+    const period =
+        planCheckoutInterval(plan, cycle) === 'annual' ? t('plans.perYear') : t('plans.perMonth');
+    const total = estimatePlanCheckoutTotal(plan, cycle, wanted);
+    return (
+        <div className="space-y-1" data-testid={`billing-plan-checkout-seats-${plan.code}`}>
+            <label className="flex items-center justify-between gap-2 text-xs text-text-muted dark:text-text-muted-dark">
+                {t('plans.checkoutSeats.label')}
+                <input
+                    type="number"
+                    min={included}
+                    step="1"
+                    inputMode="numeric"
+                    placeholder={String(included)}
+                    value={value}
+                    data-testid={`billing-plan-seats-input-${plan.code}`}
+                    onChange={(e) => onChange(e.target.value)}
+                    className="w-20 rounded-md border border-border dark:border-border-dark bg-transparent px-2 py-1 text-right text-xs text-text dark:text-text-dark"
+                />
+            </label>
+            {extra > 0 ? (
+                <p
+                    className="text-xs text-text-muted dark:text-text-muted-dark"
+                    data-testid={`billing-plan-extra-seats-${plan.code}`}
+                >
+                    {t('plans.checkoutSeats.extra', {
+                        count: extra,
+                        price: formatMonthlyPrice(
+                            String(planSeatPricePerCycle(plan, cycle)),
+                            plan.currency,
+                        ),
+                        period,
+                    })}
+                </p>
+            ) : null}
+            {extra > 0 && total !== null ? (
+                <p
+                    className="text-xs font-medium text-text dark:text-text-dark"
+                    data-testid={`billing-plan-checkout-total-${plan.code}`}
+                >
+                    {t('plans.checkoutSeats.total', {
+                        amount: formatMonthlyPrice(String(total), plan.currency),
+                        period,
+                    })}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
 export function BillingSettings({
     paymentsEnabled,
     initialPlan,
@@ -228,6 +306,11 @@ export function BillingSettings({
     // apply must not be offered as a live button.
     const upgradeEnabled = canUpgradePlan(overview, paymentsEnabled, subscriptionsEnabled);
     const [upgradingPlanCode, setUpgradingPlanCode] = useState<string | null>(null);
+    // Billing cycle + Members count for a NEW subscription (Gauzy Ever Works #126). The cycle
+    // toggle only renders when at least one paid plan sells a yearly price.
+    const [billingCycle, setBillingCycle] = useState<PlanBillingCycle>('monthly');
+    const [checkoutSeats, setCheckoutSeats] = useState<Record<string, string>>({});
+    const anyPlanSellsAnnual = plans.some((plan) => planSellsAnnual(plan));
     const [licencePendingCode, setLicencePendingCode] = useState<string | null>(null);
     const [licenceConfirmCode, setLicenceConfirmCode] = useState<string | null>(null);
 
@@ -334,6 +417,10 @@ export function BillingSettings({
     const showResume = canResumeSubscription(overviewWithLiveSubscription, paymentsEnabled);
     const statusToneClass = STATUS_TONE_CLASSES[subscriptionStatusTone(subscription.status)];
     const periodEndLabel = formatPeriodDate(subscription.currentPeriodEnd);
+    // Already subscribed ⇒ a second recurring checkout would 409 on the server (billing A1), so
+    // the paid cards route to the billing portal and the cycle toggle / Members count are hidden.
+    const subscribedRecurring =
+        upgradeEnabled && holdsRecurringSubscription(overviewWithLiveSubscription);
 
     const handleCancelSubscription = useCallback(async () => {
         setLifecyclePending(true);
@@ -397,39 +484,51 @@ export function BillingSettings({
         }
     }, [selectedPackId, t]);
 
-    const handleUpgradePlan = useCallback(
-        async (plan: SubscriptionPlanListItem) => {
-            if (!upgradeEnabled) {
-                // Degraded deployment: keep the pre-payments affordance
-                // rather than a button that always errors.
-                toast.info(t('plans.upgradeHint'));
+    /**
+     * Start a recurring plan checkout on the chosen cycle and Members count.
+     *
+     * 🛑 Deliberately NOT wrapped in `useCallback` (same reason as `handleBuyLicence` below): it
+     * reads `billingCycle` and `checkoutSeats`, and a memoized copy would charge the cycle the page
+     * opened with rather than the one the buyer picked.
+     */
+    const handleUpgradePlan = async (plan: SubscriptionPlanListItem) => {
+        if (!upgradeEnabled) {
+            // Degraded deployment: keep the pre-payments affordance
+            // rather than a button that always errors.
+            toast.info(t('plans.upgradeHint'));
+            return;
+        }
+        setUpgradingPlanCode(plan.code);
+        try {
+            // Only hints cross the wire — the server prices the plan code. `interval` is sent only
+            // for annual, so a monthly checkout keeps the original one-field body; `seats` (the
+            // TOTAL wanted, allowance included) only when it actually buys extra Members.
+            const interval = planCheckoutInterval(plan, billingCycle);
+            const wantedSeats = Number(checkoutSeats[plan.code]);
+            const buysExtraSeats =
+                planSellsExtraSeats(plan) && planExtraSeats(plan, wantedSeats) > 0;
+            const result = await startPlanCheckoutAction(plan.code, {
+                ...(interval === 'annual' ? { interval } : {}),
+                ...(buysExtraSeats ? { seats: Math.floor(wantedSeats) } : {}),
+            });
+            if (result.success && result.url) {
+                window.location.assign(result.url);
                 return;
             }
-            setUpgradingPlanCode(plan.code);
-            try {
-                // Only a PLAN CODE crosses the wire — the server prices it.
-                const result = await startPlanCheckoutAction(plan.code);
-                if (result.success && result.url) {
-                    window.location.assign(result.url);
-                    return;
-                }
-                toast.error(result.error ?? t('credits.checkoutError'));
-            } finally {
-                setUpgradingPlanCode(null);
-            }
-        },
-        [upgradeEnabled, t],
-    );
+            toast.error(result.error ?? t('credits.checkoutError'));
+        } finally {
+            setUpgradingPlanCode(null);
+        }
+    };
 
     /**
      * Buy a perpetual self-hosted commercial licence.
      *
-     * 🛑 Deliberately NOT wrapped in `useCallback`. The sibling
-     * `handleUpgradePlan` memoizes on `[upgradeEnabled, t]`, both stable for
-     * the mounted component — so any new state read inside such a callback
-     * would be captured at first render and never update. For a checkout
-     * handler that means charging the cadence the page opened with rather
-     * than the one the buyer chose. There is nothing here worth memoizing.
+     * 🛑 Deliberately NOT wrapped in `useCallback`. A callback memoized on
+     * `[upgradeEnabled, t]` (both stable for the mounted component) captures
+     * any other state it reads at first render and never updates. For a
+     * checkout handler that means charging the cadence the page opened with
+     * rather than the one the buyer chose. There is nothing here worth memoizing.
      */
     const handleBuyLicence = async (licence: SubscriptionPlanListItem) => {
         if (!upgradeEnabled) {
@@ -703,6 +802,44 @@ export function BillingSettings({
                 subtitle={t('plans.subtitle')}
                 testId="billing-plans"
             >
+                {plans.length > 0 && subscribedRecurring ? (
+                    <p
+                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                        data-testid="billing-plans-subscribed-note"
+                    >
+                        {t('plans.subscribedNote')}
+                    </p>
+                ) : null}
+                {plans.length > 0 &&
+                anyPlanSellsAnnual &&
+                upgradeEnabled &&
+                !subscribedRecurring ? (
+                    <div
+                        role="radiogroup"
+                        aria-label={t('plans.cycle.label')}
+                        data-testid="billing-plan-cycle"
+                        className="inline-flex rounded-lg border border-border dark:border-border-dark p-0.5"
+                    >
+                        {(['monthly', 'annual'] as const).map((cycle) => (
+                            <button
+                                key={cycle}
+                                type="button"
+                                role="radio"
+                                aria-checked={billingCycle === cycle}
+                                data-testid={`billing-plan-cycle-${cycle}`}
+                                onClick={() => setBillingCycle(cycle)}
+                                className={cn(
+                                    'rounded-md px-3 py-1 text-xs',
+                                    billingCycle === cycle
+                                        ? 'bg-surface-secondary dark:bg-surface-secondary-dark font-medium text-text dark:text-text-dark'
+                                        : 'text-text-muted dark:text-text-muted-dark',
+                                )}
+                            >
+                                {t(`plans.cycle.${cycle}`)}
+                            </button>
+                        ))}
+                    </div>
+                ) : null}
                 {plans.length === 0 ? (
                     <p className="text-sm text-text-muted dark:text-text-muted-dark py-4">
                         {t('plans.empty')}
@@ -727,8 +864,23 @@ export function BillingSettings({
                                     <p className="text-lg font-semibold text-text dark:text-text-dark">
                                         {isFreePlan(plan)
                                             ? t('plans.free')
-                                            : `${formatMonthlyPrice(plan.monthlyPrice, plan.currency)}${t('plans.perMonth')}`}
+                                            : `${formatMonthlyPrice(planCyclePricePerMonth(plan, billingCycle), plan.currency)}${t('plans.perMonth')}`}
                                     </p>
+                                    {!isFreePlan(plan) && billingCycle === 'annual' ? (
+                                        <p
+                                            className="text-xs text-text-muted dark:text-text-muted-dark"
+                                            data-testid={`billing-plan-cycle-note-${plan.code}`}
+                                        >
+                                            {planSellsAnnual(plan)
+                                                ? t('plans.billedYearly', {
+                                                      amount: formatMonthlyPrice(
+                                                          plan.annualPrice ?? '0',
+                                                          plan.currency,
+                                                      ),
+                                                  })
+                                                : t('plans.monthlyOnly')}
+                                        </p>
+                                    ) : null}
                                 </div>
                                 <ul className="text-xs text-text-muted dark:text-text-muted-dark space-y-1 flex-1">
                                     <li>{t('plans.maxWorks', { count: plan.maxWorks })}</li>
@@ -774,6 +926,22 @@ export function BillingSettings({
                                         </li>
                                     ) : null}
                                 </ul>
+                                {!plan.isCurrent &&
+                                upgradeEnabled &&
+                                !subscribedRecurring &&
+                                planSellsExtraSeats(plan) ? (
+                                    <PlanCheckoutSeats
+                                        plan={plan}
+                                        cycle={billingCycle}
+                                        value={checkoutSeats[plan.code] ?? ''}
+                                        onChange={(value) =>
+                                            setCheckoutSeats((prev) => ({
+                                                ...prev,
+                                                [plan.code]: value,
+                                            }))
+                                        }
+                                    />
+                                ) : null}
                                 {plan.isCurrent ? (
                                     <Button variant="secondary" disabled className="text-xs w-full">
                                         {t('plans.current')}
@@ -787,6 +955,18 @@ export function BillingSettings({
                                         onClick={() => handleSwitchPlan(plan)}
                                     >
                                         {t('plans.switchFree', { name: plan.name })}
+                                    </Button>
+                                ) : subscribedRecurring ? (
+                                    // A second recurring checkout would 409 (billing A1):
+                                    // changes to a live subscription go through the portal.
+                                    <Button
+                                        variant="secondary"
+                                        className="text-xs w-full"
+                                        data-testid={`billing-plan-manage-${plan.code}`}
+                                        disabled={lifecyclePending}
+                                        onClick={() => void handleOpenPortal()}
+                                    >
+                                        {t('plans.manageSubscription')}
                                     </Button>
                                 ) : (
                                     // Paid tiers activate through a billing-verified
