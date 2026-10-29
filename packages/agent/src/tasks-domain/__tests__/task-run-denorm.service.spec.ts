@@ -158,6 +158,22 @@ describe('TaskRunDenormService — Run started. (APW-08 FR-43)', () => {
         expect(lifecycle.post).toHaveBeenCalledTimes(1);
     });
 
+    it('overlapping claims of the same run share one write and one post (review of #3035)', async () => {
+        const results = await Promise.all([
+            service.recordStarted(TASK_ID, RUN_ID),
+            service.recordStarted(TASK_ID, RUN_ID),
+            service.recordStarted(TASK_ID, RUN_ID),
+        ]);
+        expect(results).toEqual([true, true, true]);
+        expect(tasks.findById).toHaveBeenCalledTimes(1);
+        expect(tasks.updateLatestRun).toHaveBeenCalledTimes(1);
+        expect(lifecycle.post).toHaveBeenCalledTimes(1);
+        // Settled → the next claim reads again (a later retry is not swallowed by the map).
+        await service.recordStarted(TASK_ID, RUN_ID);
+        expect(tasks.updateLatestRun).toHaveBeenCalledTimes(2);
+        expect(lifecycle.post).toHaveBeenCalledTimes(1);
+    });
+
     it('a second run on the Task is a second event', async () => {
         await service.recordStarted(TASK_ID, RUN_ID);
         await service.recordTerminal(TASK_ID, RUN_ID, 'completed');

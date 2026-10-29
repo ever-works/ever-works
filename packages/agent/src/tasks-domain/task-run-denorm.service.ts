@@ -48,6 +48,9 @@ export type TaskRunTerminalStatus = 'completed' | 'failed' | 'cancelled';
 export class TaskRunDenormService {
     private readonly logger = new Logger(TaskRunDenormService.name);
 
+    /** Single-flight map for `recordStarted` (FR-43 post), keyed by `taskId:runId`. */
+    private readonly startInFlight = new Map<string, Promise<boolean>>();
+
     constructor(
         private readonly tasks: TaskRepository,
         // Domain events (EW-P1-1 B2) — a run-status change is a runtime-only
@@ -69,9 +72,24 @@ export class TaskRunDenormService {
 
     /** Worker claimed the run — only while the pointer is ours (or unset). */
     async recordStarted(taskId: string, runId: string): Promise<boolean> {
-        // FR-43 — the run pointer as it was BEFORE this write: the transition the post dedupes
-        // on. Read only when a poster is bound, so an install without one pays nothing.
-        const before = this.lifecycle ? await this.readTask(taskId) : null;
+        if (!this.lifecycle) return this.write(taskId, runId, 'running', runId);
+        // FR-43 — overlapping claims of the SAME run share one read → write → post, so two of
+        // them cannot both read the pre-`running` row and both post (review of #3035). Two
+        // processes still can: the write does not say whether it made the transition, and a
+        // duplicate progress line is accepted over a marker table.
+        const key = `${taskId}:${runId}`;
+        const existing = this.startInFlight.get(key);
+        if (existing) return existing;
+        const work = this.startAndPost(taskId, runId).finally(() => {
+            this.startInFlight.delete(key);
+        });
+        this.startInFlight.set(key, work);
+        return work;
+    }
+
+    private async startAndPost(taskId: string, runId: string): Promise<boolean> {
+        // The run pointer as it was BEFORE this write: the transition the post dedupes on.
+        const before = await this.readTask(taskId);
         const applied = await this.write(taskId, runId, 'running', runId);
         if (applied && before) await this.postRunStarted(before, runId);
         return applied;
