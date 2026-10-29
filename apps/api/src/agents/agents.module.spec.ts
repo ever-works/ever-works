@@ -2098,19 +2098,17 @@ describe('api-side AgentsModule — AGENT_GIT_FACADE Work repository resolution 
             git.getMainBranch.mockImplementation((_p: string, d: string) => ops.getMainBranch(d));
             // C-10 — local reads are the library's own; the remote is `remoteTips`, and a
             // successful (doubled) push publishes the local tip of the ref it names.
-            git.readLocalCommit.mockImplementation((_p: string, d: string, ref: string) =>
-                ops.readLocalCommit(d, ref),
-            );
-            git.resetBranchTo.mockImplementation((_p: string, d: string, b: string, s: string) =>
-                ops.resetBranchTo(d, b, s),
-            );
-            git.getLatestCommit.mockImplementation(async (_o: string, _r: string, b: string) =>
-                remoteTips[b] ? { sha: remoteTips[b] } : null,
-            );
-            git.push.mockImplementation(async (o: { dir: string; ref: string }) => {
+            // The doubles' types come from their zero-argument defaults, hence the casts.
+            git.readLocalCommit.mockImplementation(((_p: string, d: string, ref: string) =>
+                ops.readLocalCommit(d, ref)) as never);
+            git.resetBranchTo.mockImplementation(((_p: string, d: string, b: string, s: string) =>
+                ops.resetBranchTo(d, b, s)) as never);
+            git.getLatestCommit.mockImplementation((async (_o: string, _r: string, b: string) =>
+                remoteTips[b] ? { sha: remoteTips[b] } : null) as never);
+            git.push.mockImplementation((async (o: { dir: string; ref: string }) => {
                 const tip = await ops.readLocalCommit(o.dir, o.ref);
                 if (tip) remoteTips[o.ref.replace(/^refs\/heads\//, '')] = tip.sha;
-            });
+            }) as never);
             return git;
         };
         const committedFiles = (sha: string): string[] =>
