@@ -48,7 +48,16 @@ describe('AddInboxItemIntegrationOrigin1797200000000', () => {
         );
         await runner.query(
             `INSERT INTO inbox_items (id, "userId", kind, title, body, "sourceType", status, "tenantId") VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            ['item-1', 'user-1', 'question', 'Which tier?', 'Which tier?', 'agent-run', 'open', 't-1'],
+            [
+                'item-1',
+                'user-1',
+                'question',
+                'Which tier?',
+                'Which tier?',
+                'agent-run',
+                'open',
+                't-1',
+            ],
         );
         await runner.release();
     });
@@ -63,7 +72,12 @@ describe('AddInboxItemIntegrationOrigin1797200000000', () => {
         await runner.release();
     }
 
-    const insert = (id: string, tenantId: string, keyId: string | null, externalId: string | null) =>
+    const insert = (
+        id: string,
+        tenantId: string,
+        keyId: string | null,
+        externalId: string | null,
+    ) =>
         dataSource.query(
             `INSERT INTO inbox_items (id, "userId", kind, title, body, "sourceType", status, "tenantId", origin, "integrationKeyId", "externalId") VALUES (?, 'user-1', 'notice', 't', 'b', 'integration', 'open', ?, 'integration', ?, ?)`,
             [id, tenantId, keyId, externalId],

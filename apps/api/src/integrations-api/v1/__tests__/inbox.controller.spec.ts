@@ -67,7 +67,11 @@ describe('IntegrationInboxController', () => {
             recordRelayedDecision: jest.fn().mockResolvedValue(true),
             // Integration inbox push.
             createExternal: jest.fn(async () => ({
-                item: { dto: dto(1, { origin: 'integration' }), etag: '"1"', recipientUserId: RECIPIENT },
+                item: {
+                    dto: dto(1, { origin: 'integration' }),
+                    etag: '"1"',
+                    recipientUserId: RECIPIENT,
+                },
                 created: true,
             })),
             updateExternal: jest.fn(async () => ({
@@ -466,7 +470,11 @@ describe('IntegrationInboxController', () => {
                 integrationKeyId: 'key-1',
                 defaultSourceLabel: 'Ever Gauzy',
             },
-            expect.objectContaining({ externalId: 'gauzy-1', recipientUserId: RECIPIENT, kind: 'notice' }),
+            expect.objectContaining({
+                externalId: 'gauzy-1',
+                recipientUserId: RECIPIENT,
+                kind: 'notice',
+            }),
         );
         expect(response.status).toHaveBeenCalledWith(201);
         expect(response.setHeader).toHaveBeenCalledWith('ETag', '"1"');
@@ -481,7 +489,9 @@ describe('IntegrationInboxController', () => {
             created: false,
         });
         const replay = res();
-        await expect(controller.create(as(null), createBody, createReq(), replay)).resolves.toMatchObject({
+        await expect(
+            controller.create(as(null), createBody, createReq(), replay),
+        ).resolves.toMatchObject({
             version: 4,
         });
         expect(replay.status).toHaveBeenCalledWith(200);
@@ -545,7 +555,9 @@ describe('IntegrationInboxController', () => {
         await expect(
             controller.update(as(null), 'item-1', { title: 'x' }, '"2"', res()),
         ).rejects.toBeInstanceOf(VersionMismatchError);
-        inbox.updateExternal.mockRejectedValueOnce(new ResourceNotFoundError('inbox_item', 'item-1'));
+        inbox.updateExternal.mockRejectedValueOnce(
+            new ResourceNotFoundError('inbox_item', 'item-1'),
+        );
         await expect(
             controller.update(as(null), 'item-1', { title: 'x' }, '"2"', res()),
         ).rejects.toBeInstanceOf(ResourceNotFoundError);
@@ -605,10 +617,10 @@ describe('integration inbox push request bodies', () => {
             'https://user:pass@app.gauzy.co/',
             `https://app.gauzy.co/${'a'.repeat(2000)}`,
         ]) {
-            expect([sourceUrl, await properties(IntegrationCreateInboxItemDto, { ...valid, sourceUrl })]).toEqual([
+            expect([
                 sourceUrl,
-                ['sourceUrl'],
-            ]);
+                await properties(IntegrationCreateInboxItemDto, { ...valid, sourceUrl }),
+            ]).toEqual([sourceUrl, ['sourceUrl']]);
         }
     });
 
@@ -635,18 +647,23 @@ describe('integration inbox push request bodies', () => {
             [{ occurredAt: 'yesterday' }, 'occurredAt'],
             [{ related: { taskId: 'not-a-uuid' } }, 'related'],
             [{ related: { projectId: '3c7e5f90-1b4d-4e6f-8a82-9c0d1e2f3a41' } }, 'related'],
-            [{ choices: Array.from({ length: 11 }, (_, i) => ({ id: `c${i}`, label: 'C' })) }, 'choices'],
+            [
+                { choices: Array.from({ length: 11 }, (_, i) => ({ id: `c${i}`, label: 'C' })) },
+                'choices',
+            ],
             [{ choices: [{ id: 'x'.repeat(65), label: 'A' }] }, 'choices'],
             [{ email: { from: 'a@b.c', subject: 'S', receivedAt: 'soon' } }, 'email'],
             [{ html: '<script>alert(1)</script>' }, 'html'],
         ];
         for (const [patch, property] of cases) {
-            expect([patch, await properties(IntegrationCreateInboxItemDto, { ...valid, ...patch })]).toEqual([
+            expect([
                 patch,
-                [property],
-            ]);
+                await properties(IntegrationCreateInboxItemDto, { ...valid, ...patch }),
+            ]).toEqual([patch, [property]]);
         }
-        expect(await properties(IntegrationUpdateInboxItemDto, { state: 'closed' })).toEqual(['state']);
+        expect(await properties(IntegrationUpdateInboxItemDto, { state: 'closed' })).toEqual([
+            'state',
+        ]);
         expect(await properties(IntegrationUpdateInboxItemDto, { title: null })).toEqual(['title']);
     });
 });

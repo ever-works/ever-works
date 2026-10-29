@@ -929,11 +929,7 @@ export class InboxService implements InboxProducer {
      * contract: the integration applies the member's answer from that event in
      * its own app); same fields, same version step, one event either way.
      */
-    private async recordAnswered(
-        id: string,
-        wasUnread: boolean,
-        external = false,
-    ): Promise<void> {
+    private async recordAnswered(id: string, wasUnread: boolean, external = false): Promise<void> {
         await this.recordChanged(
             id,
             external ? 'inbox.item.updated' : 'inbox.item.answered',
@@ -1302,6 +1298,8 @@ export function isIntegrationItem(row: Pick<InboxItem, 'origin' | 'sourceType'>)
 }
 
 /** The notification family of an item: the integration kinds ring as a notice. */
-function notificationKindOf(kind: InboxItem['kind']): 'question' | 'approval' | 'escalation' | 'notice' {
+function notificationKindOf(
+    kind: InboxItem['kind'],
+): 'question' | 'approval' | 'escalation' | 'notice' {
     return kind === 'question' || kind === 'approval' || kind === 'escalation' ? kind : 'notice';
 }

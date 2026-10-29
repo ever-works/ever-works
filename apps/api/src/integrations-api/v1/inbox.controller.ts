@@ -299,7 +299,7 @@ export class IntegrationUpdateInboxItemDto {
     @ApiProperty({
         required: false,
         enum: ['open', 'resolved', 'archived'],
-        description: "`resolved` is stored as status `answered` (with `resolution` as the answer).",
+        description: '`resolved` is stored as status `answered` (with `resolution` as the answer).',
     })
     @IsOptionalNonNull()
     @IsIn(['open', 'resolved', 'archived'])
@@ -488,7 +488,10 @@ export class IntegrationInboxController {
             "Change the integration's own item (the key that created it only; If-Match required): title, body, choices, state open / resolved / archived, resolution",
     })
     @ApiResponse({ status: 404, description: 'not_found: not an item this key created' })
-    @ApiResponse({ status: 412, description: 'version_mismatch: If-Match is not the current version' })
+    @ApiResponse({
+        status: 412,
+        description: 'version_mismatch: If-Match is not the current version',
+    })
     async update(
         @CurrentUser() user: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,

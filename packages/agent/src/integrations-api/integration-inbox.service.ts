@@ -116,7 +116,10 @@ export interface ExternalInboxItemUpdate {
     readonly choices?: readonly ExternalInboxChoice[] | null;
     readonly state?: ExternalInboxState;
     /** Only with `state: 'resolved'`: the choice picked and / or a note, recorded as the answer. */
-    readonly resolution?: { readonly choiceId?: string | null; readonly text?: string | null } | null;
+    readonly resolution?: {
+        readonly choiceId?: string | null;
+        readonly text?: string | null;
+    } | null;
 }
 
 /** What {@link IntegrationInboxService.createExternal} did. */
@@ -437,7 +440,10 @@ export class IntegrationInboxService {
     // ── internals ─────────────────────────────────────────────────────
 
     /** The item this key already filed under `externalId` (any organization), or `null`. */
-    private findExternal(writer: ExternalInboxWriter, externalId: string): Promise<InboxItem | null> {
+    private findExternal(
+        writer: ExternalInboxWriter,
+        externalId: string,
+    ): Promise<InboxItem | null> {
         return this.dataSource.getRepository(InboxItem).findOne({
             where: {
                 tenantId: writer.tenantId,
@@ -484,10 +490,7 @@ export class IntegrationInboxService {
      * pinned organization (the same rule as `GET /tasks/:id` etc.: another
      * organization's record, or a private one, is refused) — `422 domain_rule`.
      */
-    private async assertRelated(
-        organizationId: string,
-        related: NormalizedRelated,
-    ): Promise<void> {
+    private async assertRelated(organizationId: string, related: NormalizedRelated): Promise<void> {
         const kinds = [
             ['taskId', 'task'],
             ['workId', 'work'],
@@ -621,7 +624,8 @@ function choicesOf(kind: InboxItemKind, value: unknown): InboxItemOption[] | nul
 function emailOf(kind: InboxItemKind, value: unknown): InboxItemEmailMeta | null {
     if (value === undefined || value === null) return null;
     if (kind !== 'email') throw invalid('email', 'is only for kind email');
-    if (typeof value !== 'object' || Array.isArray(value)) throw invalid('email', 'must be an object');
+    if (typeof value !== 'object' || Array.isArray(value))
+        throw invalid('email', 'must be an object');
     const raw = value as Record<string, unknown>;
     const receivedAt = requiredText(
         'email.receivedAt',
@@ -719,9 +723,9 @@ function externalUpdateOf(row: InboxItem, patch: ExternalInboxItemUpdate): Exter
     if (patch.title !== undefined) change('title', titleText(patch.title));
     if (patch.body !== undefined) change('body', bodyText(patch.body));
     if (patch.choices !== undefined) change('options', choicesOf(row.kind, patch.choices));
-    const options = (
-        patch.choices !== undefined ? set.options : row.options
-    ) as InboxItemOption[] | null;
+    const options = (patch.choices !== undefined ? set.options : row.options) as
+        | InboxItemOption[]
+        | null;
 
     if (patch.resolution !== undefined && patch.resolution !== null && patch.state !== 'resolved') {
         throw invalid('resolution', "is only for state 'resolved'");

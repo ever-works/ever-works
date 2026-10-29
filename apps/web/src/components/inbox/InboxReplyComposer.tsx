@@ -246,8 +246,7 @@ export function InboxReplyComposer({
                     {isIntegrationItem(item)
                         ? t('reply.hintIntegration', {
                               source:
-                                  item.sourceLabel?.trim() ||
-                                  t('integrationSource.fallbackLabel'),
+                                  item.sourceLabel?.trim() || t('integrationSource.fallbackLabel'),
                           })
                         : t('reply.hint')}
                 </span>

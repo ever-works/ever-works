@@ -102,7 +102,9 @@ describe('InboxIntegrationSource', () => {
     });
 
     it('renders a label carrying markup as text', () => {
-        render(<InboxIntegrationSource item={item({ sourceLabel: '<img src=x onerror=alert(1)>' })} />);
+        render(
+            <InboxIntegrationSource item={item({ sourceLabel: '<img src=x onerror=alert(1)>' })} />,
+        );
         const badge = screen.getByTestId('inbox-integration-source-badge');
         expect(badge.textContent).toBe('<img src=x onerror=alert(1)>');
         expect(badge.querySelector('img')).toBeNull();
@@ -135,7 +137,10 @@ describe('InboxEmailHeader', () => {
     it('leaves out an empty To, and shows an unparseable date as the text it is', () => {
         render(
             <InboxEmailHeader
-                item={item({ kind: 'email', email: { ...email, to: null, receivedAt: 'yesterday' } })}
+                item={item({
+                    kind: 'email',
+                    email: { ...email, to: null, receivedAt: 'yesterday' },
+                })}
             />,
         );
         expect(screen.queryByTestId('inbox-email-header-to')).toBeNull();
@@ -144,7 +149,8 @@ describe('InboxEmailHeader', () => {
 
     it('renders nothing for another kind, or without the header block', () => {
         expect(
-            render(<InboxEmailHeader item={item({ kind: 'notice', email })} />).container.firstChild,
+            render(<InboxEmailHeader item={item({ kind: 'notice', email })} />).container
+                .firstChild,
         ).toBeNull();
         expect(
             render(<InboxEmailHeader item={item({ kind: 'email', email: null })} />).container

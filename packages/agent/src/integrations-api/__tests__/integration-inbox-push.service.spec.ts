@@ -153,9 +153,27 @@ describe('IntegrationInboxService — integration inbox push', () => {
             } as unknown as User);
         }
         await dataSource.getRepository(OrganizationMember).insert([
-            { organizationId: ORG_A, userId: ADA, tenantId: TENANT, role: 'member', joinedAt: new Date() },
-            { organizationId: ORG_B, userId: BOB, tenantId: TENANT, role: 'member', joinedAt: new Date() },
-            { organizationId: ORG_A, userId: EVE, tenantId: TENANT, role: 'member', joinedAt: new Date() },
+            {
+                organizationId: ORG_A,
+                userId: ADA,
+                tenantId: TENANT,
+                role: 'member',
+                joinedAt: new Date(),
+            },
+            {
+                organizationId: ORG_B,
+                userId: BOB,
+                tenantId: TENANT,
+                role: 'member',
+                joinedAt: new Date(),
+            },
+            {
+                organizationId: ORG_A,
+                userId: EVE,
+                tenantId: TENANT,
+                role: 'member',
+                joinedAt: new Date(),
+            },
         ] as unknown as OrganizationMember[]);
     });
 
@@ -224,7 +242,11 @@ describe('IntegrationInboxService — integration inbox push', () => {
         expectValid('resources/inbox-item.schema.json', item.dto);
 
         const [row] = await rows();
-        expect(row).toMatchObject({ integrationKeyId: KEY, tenantId: TENANT, origin: 'integration' });
+        expect(row).toMatchObject({
+            integrationKeyId: KEY,
+            tenantId: TENANT,
+            origin: 'integration',
+        });
         const [event] = await events();
         expect(event).toMatchObject({
             type: 'inbox.item.created',
@@ -268,7 +290,10 @@ describe('IntegrationInboxService — integration inbox push', () => {
             joinedAt: new Date(),
         } as unknown as OrganizationMember);
         const mine = await service.createExternal(writer(), input());
-        const theirs = await service.createExternal(writer({ integrationKeyId: OTHER_KEY }), input());
+        const theirs = await service.createExternal(
+            writer({ integrationKeyId: OTHER_KEY }),
+            input(),
+        );
         expect(theirs.created).toBe(true);
         expect(theirs.item.dto.id).not.toBe(mine.item.dto.id);
         await expect(
@@ -349,7 +374,9 @@ describe('IntegrationInboxService — integration inbox push', () => {
     // ── the security gates (each fails without its check) ─────────────
 
     it('GATE cross-org recipient: a member of another organization only is 422, and nothing is filed', async () => {
-        const error = await refusal(service.createExternal(writer(), input({ recipientUserId: BOB })));
+        const error = await refusal(
+            service.createExternal(writer(), input({ recipientUserId: BOB })),
+        );
         expect(error).toBeInstanceOf(IntegrationDomainRuleError);
         expect(error).toMatchObject({ details: { field: 'recipientUserId' } });
         // Nobody at all, and a deactivated member, are refused the same way.
@@ -397,7 +424,10 @@ describe('IntegrationInboxService — integration inbox push', () => {
             `https://app.gauzy.co/${'a'.repeat(2000)}`,
         ]) {
             const error = await refusal(service.createExternal(writer(), input({ sourceUrl })));
-            expect([sourceUrl, error instanceof IntegrationValidationError]).toEqual([sourceUrl, true]);
+            expect([sourceUrl, error instanceof IntegrationValidationError]).toEqual([
+                sourceUrl,
+                true,
+            ]);
             expect(error).toMatchObject({ path: 'sourceUrl' });
         }
         expect(await rows()).toEqual([]);
@@ -410,7 +440,10 @@ describe('IntegrationInboxService — integration inbox push', () => {
         );
         expect(item.dto.body).toHaveLength(20_000);
         const error = await refusal(
-            service.createExternal(writer(), input({ externalId: 'too-big', body: 'x'.repeat(20_001) })),
+            service.createExternal(
+                writer(),
+                input({ externalId: 'too-big', body: 'x'.repeat(20_001) }),
+            ),
         );
         expect(error).toBeInstanceOf(IntegrationValidationError);
         expect(error).toMatchObject({ path: 'body' });
@@ -426,7 +459,10 @@ describe('IntegrationInboxService — integration inbox push', () => {
                 'choices',
                 {
                     kind: 'question',
-                    choices: Array.from({ length: 11 }, (_, i) => ({ id: `c${i}`, label: `C${i}` })),
+                    choices: Array.from({ length: 11 }, (_, i) => ({
+                        id: `c${i}`,
+                        label: `C${i}`,
+                    })),
                 },
             ],
             [
@@ -511,7 +547,9 @@ describe('IntegrationInboxService — integration inbox push', () => {
             answerText: null,
             answerOptionId: null,
         });
-        const archived = await service.updateExternal(writer(), item.dto.id, 4, { state: 'archived' });
+        const archived = await service.updateExternal(writer(), item.dto.id, 4, {
+            state: 'archived',
+        });
         expect(archived.dto.status).toBe('archived');
     });
 
@@ -563,7 +601,9 @@ describe('IntegrationInboxService — integration inbox push', () => {
             service.updateExternal(writer(), item.dto.id, 2, { title: 'B' }),
         ]);
         expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
-        const rejected = results.find((result) => result.status === 'rejected') as PromiseRejectedResult;
+        const rejected = results.find(
+            (result) => result.status === 'rejected',
+        ) as PromiseRejectedResult;
         expect(rejected.reason).toBeInstanceOf(VersionMismatchError);
         const stored = await service.get(ORG_A, item.dto.id);
         expect(stored.dto.version).toBe(3);
@@ -630,10 +670,15 @@ describe('IntegrationInboxService — integration inbox push', () => {
                 }),
             ),
         );
-        await asGauzy(() => service.updateExternal(writer(), item.dto.id, 1, { body: 'Edited in Gauzy' }));
+        await asGauzy(() =>
+            service.updateExternal(writer(), item.dto.id, 1, { body: 'Edited in Gauzy' }),
+        );
 
         // The member answers in the Ever Works web Inbox (no X-Sync-Origin).
-        const outcome = await app.reply(ADA, item.dto.id, { optionId: 'approve', text: 'Looks right' });
+        const outcome = await app.reply(ADA, item.dto.id, {
+            optionId: 'approve',
+            text: 'Looks right',
+        });
         expect(outcome.routed).toBe('none');
         expect(steering.steer).not.toHaveBeenCalled();
         expect(steering.resume).not.toHaveBeenCalled();
