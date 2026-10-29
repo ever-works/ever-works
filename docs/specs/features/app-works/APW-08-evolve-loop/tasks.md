@@ -707,6 +707,7 @@ are recorded as `app.change.progressed` so FR-35's timeline has every change.
       **Done when**: the spec is green and the parity script reports zero keys added on a second run.
 
 - [ ] **T29. P1 e2e.**
+      **Status (2026-10-29, lane L6, branch `test/apw08-e2e`, Gauzy Ever Works #10): the three specs are written and green locally, except the not-admitted case** (one spec file at a time, SQLite in-memory API + `next dev`; counts include the `setup` project): `app-works-evolve-chat` 4 passed, `app-works-delivery-chips` 5 passed, `app-works-guard-refusals` 7 passed + 1 skipped, `flow-task-isolation-gates-contract` 12 passed, `flow-task-branch-gate-ui-journey` 7 passed (both unchanged). The worker-only state is seeded through a new non-production route `POST /api/e2e/app-works/task-seed` (`apps/api/src/tasks/e2e-task-seed.controller.ts`, same gate and guard as APW-11's seed route). Its `guard` body runs the real `AppChangeGuard`, so the refusal copy is the guard's own. Only the model is mocked in the chat spec. **Open:** the not-admitted copy (ACC-08-08, ACC-08-10) is a `test.fixme`, because T12 and T13/T14 have no surface yet.
       **Create** `apps/web/e2e/app-works-evolve-chat.spec.ts`, `apps/web/e2e/app-works-delivery-chips.spec.ts`,
       `apps/web/e2e/app-works-guard-refusals.spec.ts` (new) per [plan §9.4](./plan.md); prefer `getByTestId` for board
       cards. API behaviour is asserted here or in the controller specs — never in `apps/api/test/` (Resolution R-22).
