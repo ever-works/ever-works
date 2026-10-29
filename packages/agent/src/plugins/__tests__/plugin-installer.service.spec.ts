@@ -450,6 +450,16 @@ describe('PluginInstallerService (EW-693)', () => {
                 },
             });
             const pacote = makePinnedPacote({ gate: new Promise<void>(() => undefined) });
+            // C-6 (#26) — the deadline is a `Promise.race`: the install keeps running after the
+            // warmup gives up, and on a loaded runner it can still be BEFORE its fetch when the
+            // 50 ms pass. Await the fetch this case asserts on instead of assuming it has started.
+            let fetchStarted!: () => void;
+            const fetched = new Promise<void>((resolve) => (fetchStarted = resolve));
+            const extract = pacote.extract.bind(pacote);
+            pacote.extract = (spec, dest, opts) => {
+                fetchStarted();
+                return extract(spec, dest, opts);
+            };
             const installer = makeInstaller({
                 pluginRepo,
                 pacote,
@@ -459,6 +469,7 @@ describe('PluginInstallerService (EW-693)', () => {
             const result = await installer.warmupFromDb();
 
             expect(result).toEqual({ attempted: 1, succeeded: 0, failed: 1 });
+            await fetched;
             expect(pacote.extractCalls).toHaveLength(1);
             expect(pluginRepo.updateInstallState).not.toHaveBeenCalled();
         }, 3_000);
