@@ -86,6 +86,19 @@ describe('normalizeUrl', () => {
 	it('normalizes www + protocol combo', () => {
 		expect(normalizeUrl('https://www.example.com/')).toBe('example.com');
 	});
+
+	it('strips the fragment from its first #, and a tree path that holds one', () => {
+		expect(normalizeUrl('https://example.com/a#b#c')).toBe('example.com/a');
+		expect(normalizeUrl('https://github.com/u/r/tree/main#readme')).toBe('github.com/u/r');
+	});
+
+	it('stays linear on hostile input (CodeQL js/polynomial-redos)', () => {
+		const started = Date.now();
+		normalizeUrl(`${'#'.repeat(50_000)}\nx`);
+		normalizeUrl(`/tree/${'.'.repeat(50_000)}\nx`);
+		normalizeUrl('/tree/a'.repeat(20_000));
+		expect(Date.now() - started).toBeLessThan(1_000);
+	});
 });
 
 describe('normalizeItemName', () => {
