@@ -95,7 +95,8 @@ describe('normalizeUrl', () => {
 	it('stays linear on hostile input (CodeQL js/polynomial-redos)', () => {
 		const started = Date.now();
 		normalizeUrl(`${'#'.repeat(50_000)}\nx`);
-		normalizeUrl(`/tree/${'.'.repeat(50_000)}\nx`);
+		// The slash stops `[^/]+` while `.` stops at the newline: the old pattern's worst case.
+		normalizeUrl(`/tree/${'.'.repeat(50_000)}/\nx`);
 		normalizeUrl('/tree/a'.repeat(20_000));
 		expect(Date.now() - started).toBeLessThan(1_000);
 	});
