@@ -364,7 +364,8 @@ export class AppWorkCreateService {
         // refusing every taken slug at this step made `alreadyExisted` unreachable
         // (C9). When the slug's holder is the caller's own App Work created inside
         // the idempotency window, the refusal is DEFERRED to step 8, which either
-        // finds that Work on this request's repository and returns it, or throws
+        // finds that Work on this request's repository (or, for a repository not
+        // yet reported, by its recorded relation — C-16) and returns it, or throws
         // this same `409` — still before any provider write. Every other collision
         // is refused here, before the inspector, exactly as before.
         let slugConflictDeferred = false;
@@ -559,22 +560,38 @@ export class AppWorkCreateService {
             }
         }
 
-        // The deferred half of step 5: the taken slug was not this request's own
-        // idempotent answer, so it is refused exactly as step 5 refuses it — and,
-        // like every refusal, before the provider write. A deferred request that
-        // would create a brand-new fork or private copy always lands here: it has
-        // no coordinates yet, so it cannot be the equivalent of a Work that already
-        // exists (a private-copy double-submit therefore still answers this 409).
+        // The deferred half of step 5. A request that would create a brand-new
+        // private copy, or a fork into an owner the inspection's fork scan did not
+        // check (`existingForkChecked` not `true` — the 15-call budget did not
+        // reach it, or its check failed), has no coordinates to look the Work up by
+        // above: the first request's repository exists but is not reported. So its
+        // slug holder's RECORDED relation is compared with this request's instead
+        // (C-16) — the double-submit FR-23 answers with `alreadyExisted`. A fork
+        // into an owner the scan DID check and found empty is not compared: the
+        // holder's fork is not there, so returning its Work would hide that.
         //
-        // FR-23 gap, known and recorded: a fork double-submit lands here too when
-        // the target owner was outside the inspection's fork scan
-        // (`existingForkChecked: false` — the 15-call budget did not reach it, or
-        // its check failed). The first request's fork then exists but is not
-        // reported, so there is no `adoptedFork` to look the Work up by, and the
-        // identical retry answers this 409 instead of `alreadyExisted`. Closing it
-        // means comparing the slug holder's recorded upstream and owner with this
-        // request's before the throw.
+        // Otherwise the taken slug was not this request's own idempotent answer,
+        // and it is refused exactly as step 5 refuses it — and, like every
+        // refusal, before the provider write.
         if (input.slugConflictDeferred) {
+            const unreportedCoordinates =
+                mode === 'private-copy' ||
+                (mode === 'fork' && !adoptedFork && target?.existingForkChecked !== true);
+            if (unreportedCoordinates) {
+                const existing = await this.findIdenticalSlugHolder({
+                    userId: user.id,
+                    slug: dto.slug,
+                    mode,
+                    dataOwner: requestedOwner,
+                    upstream: input.upstreamCoordinates ?? {
+                        owner: inspect.repository.owner,
+                        repo: inspect.repository.repo,
+                    },
+                });
+                if (existing) {
+                    return existing;
+                }
+            }
             throw slugTakenConflict(dto.slug);
         }
 
@@ -1250,16 +1267,8 @@ export class AppWorkCreateService {
                 (work) => work.slug === slug && withinIdempotencyWindow(work.createdAt),
             );
             if (fresh) {
-                // The existing Work's own readiness is reported, not a hopeful
-                // `preparing`: the client reads the same value the Upstream card
-                // does.
                 const state = await this.workUpstreamStates.findByWorkId(fresh.id);
-                return {
-                    status: 'success',
-                    work: fresh,
-                    appSource: await this.appSourceViewOf(fresh, state?.readinessState),
-                    alreadyExisted: true,
-                };
+                return this.alreadyExistedAnswer(fresh, state?.readinessState);
             }
         }
 
@@ -1270,6 +1279,69 @@ export class AppWorkCreateService {
             `An App Work for ${dataOwner}/${dataRepo} already exists.`,
             { workId: first.id, workName: first.name },
         );
+    }
+
+    /**
+     * FR-23 for a deferred slug whose request has no coordinates to look the
+     * equivalent Work up by (step 8, C-16): the slug's holder answers
+     * `alreadyExisted` when it is still the caller's own fresh App Work AND its
+     * upstream state row records this request's relation, into this request's
+     * owner, of this request's upstream. `null` when any of that differs — the
+     * caller then refuses the slug.
+     *
+     * The holder is read again rather than carried from step 5: the inspection
+     * ran in between, and the answer must describe the row as it is now.
+     */
+    private async findIdenticalSlugHolder(input: {
+        userId: string;
+        slug: string;
+        mode: AppRepositoryMode;
+        dataOwner: string | null;
+        upstream: { owner: string; repo: string };
+    }): Promise<AppWorkCreateResult | null> {
+        const holder = await this.workRepository.findByOwnerAndSlug({
+            userId: input.userId,
+            owner: '',
+            slug: input.slug,
+        });
+        if (
+            !holder ||
+            holder.userId !== input.userId ||
+            !isAppWorkKind(holder.kind) ||
+            !withinIdempotencyWindow(holder.createdAt)
+        ) {
+            return null;
+        }
+        const state = await this.workUpstreamStates.findByWorkId(holder.id);
+        // Owners and repository names both compare case-insensitively, as GitHub
+        // matches them.
+        if (
+            !state ||
+            state.relation !== input.mode ||
+            !sameLogin(state.dataOwner, input.dataOwner) ||
+            !sameLogin(state.upstreamOwner, input.upstream.owner) ||
+            !sameLogin(state.upstreamRepo, input.upstream.repo)
+        ) {
+            return null;
+        }
+        return this.alreadyExistedAnswer(holder, state.readinessState);
+    }
+
+    /**
+     * FR-23's idempotent answer. The existing Work's own readiness is reported,
+     * not a hopeful `preparing`: the client reads the same value the Upstream
+     * card does.
+     */
+    private async alreadyExistedAnswer(
+        work: Work,
+        readiness?: string,
+    ): Promise<AppWorkCreateResult> {
+        return {
+            status: 'success',
+            work,
+            appSource: await this.appSourceViewOf(work, readiness),
+            alreadyExisted: true,
+        };
     }
 
     /**

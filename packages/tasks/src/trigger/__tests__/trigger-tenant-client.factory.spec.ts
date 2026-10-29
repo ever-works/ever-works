@@ -40,10 +40,16 @@ vi.mock('@trigger.dev/sdk/v3', () => ({
     auth: { withAuth: withAuthMock },
 }));
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
     createTenantTriggerClient,
     dispatchersFromTenantClient,
 } from '../trigger-tenant-client.factory';
+import {
+    appBlueprintApplyIdempotencyKey,
+    appUpstreamSyncIdempotencyKey,
+} from '../app-job-idempotency-keys';
 import { DEFAULT_TRIGGER_API_URL } from '@ever-works/job-runtime-trigger-plugin';
 
 const tenantA = {
@@ -497,5 +503,316 @@ describe('dispatchersFromTenantClient', () => {
         };
         const dispatchers = dispatchersFromTenantClient(fakeClient);
         expect(Object.isFrozen(dispatchers)).toBe(true);
+    });
+});
+
+/**
+ * C-8 — a BYO tenant's bound view reads its dispatchers from
+ * `dispatchersFromTenantClient`'s map ONLY (`bindToTenant` in
+ * `trigger-job-runtime.provider.ts`), so an App dispatcher missing here
+ * answered `undefined` for that tenant and the job never left the API: fork
+ * readiness stayed `dispatch_unavailable`, Builds and Blueprint applies ran in
+ * process, and a Deploy was never enqueued. These pin every `dispatchApp*`
+ * `TriggerService` declares to a mirror on the tenant's own client.
+ */
+describe('dispatchersFromTenantClient — every App dispatcher for a BYO tenant (C-8)', () => {
+    type Dispatch = (payload: unknown, opts?: { delayMs?: number }) => Promise<string | null>;
+
+    const srcDir = join(__dirname, '..', '..');
+
+    function tenantClient(trigger = vi.fn().mockResolvedValue({ id: 'tenant-app-run' })) {
+        return {
+            trigger,
+            client: { tasks: { trigger }, runs: { cancel: vi.fn(), retrieve: vi.fn() } },
+        };
+    }
+
+    function dispatcher(name: string, client: ReturnType<typeof tenantClient>['client']): Dispatch {
+        const fn = (dispatchers(client) as unknown as Record<string, unknown>)[name];
+        expect(typeof fn).toBe('function');
+        return fn as Dispatch;
+    }
+
+    const dispatchers = (client: ReturnType<typeof tenantClient>['client']) =>
+        dispatchersFromTenantClient(client);
+
+    /**
+     * Each App dispatcher, the task it must reach and the singleton's tags /
+     * keys. `taskModule` names the module whose exported `*_TASK_ID` the
+     * factory's re-typed id must equal.
+     */
+    const cases: Array<{
+        name: string;
+        payload: Record<string, unknown>;
+        taskId: string;
+        taskModule?: string;
+        options: Record<string, unknown>;
+        propagates?: boolean;
+    }> = [
+        {
+            name: 'dispatchAppDependencyProvision',
+            payload: { workId: 'w', kind: 'postgres', mode: 'provision' },
+            taskId: 'app-dependency-provision',
+            options: {
+                tags: ['app-dependency-provision', 'work:w', 'kind:postgres', 'mode:provision'],
+                concurrencyKey: 'app-dependency:w:postgres',
+            },
+            propagates: true,
+        },
+        {
+            name: 'dispatchAppSpecEvaluate',
+            payload: { workId: 'w', trigger: 'save' },
+            taskId: 'app-spec-evaluate',
+            options: {
+                tags: ['app-spec-evaluate', 'work:w', 'trigger:save'],
+                concurrencyKey: 'app-spec-evaluate:w',
+            },
+            propagates: true,
+        },
+        {
+            name: 'dispatchAppForkReadiness',
+            payload: { workId: 'w', reason: 'retry' },
+            taskId: 'app-fork-readiness',
+            taskModule: 'app-fork-readiness.task.ts',
+            options: {
+                tags: ['app-fork-readiness', 'work:w', 'trigger:retry'],
+                concurrencyKey: 'app-fork-readiness:w',
+            },
+        },
+        {
+            name: 'dispatchAppBuildPrepare',
+            payload: { workId: 'w', buildId: 'b1', reason: 'rebuild' },
+            taskId: 'app-build-prepare',
+            taskModule: 'app-build-prepare.task.ts',
+            options: {
+                tags: ['app-build-prepare', 'work:w', 'build:b1'],
+                concurrencyKey: 'app-build-prepare:w',
+            },
+        },
+        {
+            name: 'dispatchAppBuildWatch',
+            payload: { buildId: 'b1' },
+            taskId: 'app-build-watch',
+            taskModule: 'app-build-watch.task.ts',
+            options: {
+                tags: ['app-build-watch', 'build:b1'],
+                concurrencyKey: 'app-build-watch:b1',
+            },
+        },
+        {
+            name: 'dispatchAppDeploy',
+            payload: { workId: 'w', deploymentId: 'd1', trigger: 'manual' },
+            taskId: 'app-deploy',
+            taskModule: 'app-deploy.task.ts',
+            options: {
+                tags: ['app-deploy', 'work:w', 'deployment:d1', 'trigger:manual'],
+                concurrencyKey: 'app-deploy:w',
+            },
+        },
+        {
+            name: 'dispatchAppClusterOp',
+            payload: { workId: 'w', op: 'status-refresh' },
+            taskId: 'app-cluster-op',
+            taskModule: 'app-cluster-op.task.ts',
+            options: { tags: ['app-cluster-op', 'work:w', 'op:status-refresh'] },
+        },
+        {
+            name: 'dispatchAppUpstreamSync',
+            payload: { workId: 'w', trigger: 'manual' },
+            taskId: 'app-upstream-sync',
+            taskModule: 'app-upstream-sync.task.ts',
+            options: {
+                tags: ['app-upstream-sync', 'work:w', 'trigger:manual'],
+                concurrencyKey: 'app-upstream-sync:w',
+            },
+        },
+        {
+            name: 'dispatchAppBlueprintApply',
+            payload: { workId: 'w', mode: 'upgrade', version: '2.0.0', requestedAt: 't0' },
+            taskId: 'app-blueprint-apply',
+            taskModule: 'app-blueprint-apply.task.ts',
+            options: {
+                tags: ['app-blueprint-apply', 'work:w', 'mode:upgrade'],
+                idempotencyKey: 'app-blueprint-apply:w:upgrade:2.0.0:t0',
+                concurrencyKey: 'app-blueprint-apply:w',
+            },
+        },
+    ];
+
+    beforeEach(() => {
+        tasksTriggerMock.mockReset();
+    });
+
+    it('mirrors every dispatchApp* method TriggerService declares', () => {
+        // Read from the source, not the class: importing TriggerService pulls
+        // the worker's whole task graph in. A new App dispatcher added there
+        // without a BYO mirror fails here instead of answering `undefined`.
+        const source = readFileSync(join(srcDir, 'trigger', 'trigger.service.ts'), 'utf8');
+        const declared = [...source.matchAll(/^\s+async (dispatchApp\w+)\(/gm)].map((m) => m[1]);
+
+        expect(declared.sort()).toEqual(cases.map((c) => c.name).sort());
+        const { client } = tenantClient();
+        for (const name of declared) {
+            expect(typeof (dispatchers(client) as unknown as Record<string, unknown>)[name]).toBe(
+                'function',
+            );
+        }
+    });
+
+    it.each(cases)(
+        '$name triggers $taskId on the tenant client with the singleton tags and keys',
+        async ({ name, payload, taskId, options }) => {
+            const { trigger, client } = tenantClient();
+
+            await expect(dispatcher(name, client)(payload)).resolves.toBe('tenant-app-run');
+
+            expect(trigger).toHaveBeenCalledTimes(1);
+            expect(trigger).toHaveBeenCalledWith(taskId, payload, expect.objectContaining(options));
+            // No `machine` (like every BYO dispatcher), and never the SDK module.
+            expect(trigger.mock.calls[0][2]).not.toHaveProperty('machine');
+            expect(tasksTriggerMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(cases.filter((c) => c.taskModule))(
+        "$name's task id is the one $taskModule registers",
+        ({ taskId, taskModule }) => {
+            const source = readFileSync(join(srcDir, 'tasks', 'trigger', taskModule!), 'utf8');
+            expect(source).toMatch(new RegExp(`export const \\w+_TASK_ID = '${taskId}' as const;`));
+        },
+    );
+
+    it.each(cases.filter((c) => !c.propagates))(
+        '$name is soft: null when the SDK throws or answers no run id',
+        async ({ name, payload }) => {
+            const { client } = tenantClient(
+                vi
+                    .fn()
+                    .mockRejectedValueOnce(new Error('SDK down'))
+                    .mockResolvedValueOnce(undefined),
+            );
+            const dispatch = dispatcher(name, client);
+
+            await expect(dispatch(payload)).resolves.toBeNull();
+            await expect(dispatch(payload)).resolves.toBeNull();
+        },
+    );
+
+    it('dispatchAppSpecEvaluate propagates an SDK error and a missing run id (never a silent null)', async () => {
+        const { client } = tenantClient(
+            vi.fn().mockRejectedValueOnce(new Error('SDK down')).mockResolvedValueOnce(undefined),
+        );
+        const dispatch = dispatcher('dispatchAppSpecEvaluate', client);
+
+        await expect(dispatch({ workId: 'w', trigger: 'save' })).rejects.toThrow('SDK down');
+        await expect(dispatch({ workId: 'w', trigger: 'save' })).rejects.toThrow(
+            'SDK returned no run id',
+        );
+    });
+
+    it('dispatchAppUpstreamSync carries the minute-bucket idempotency key, defaulting the trigger to schedule', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-10-29T10:15:30.000Z'));
+        try {
+            const { trigger, client } = tenantClient();
+            await dispatcher('dispatchAppUpstreamSync', client)({ workId: 'w' });
+
+            const options = trigger.mock.calls[0][2] as Record<string, unknown>;
+            expect(options.tags).toEqual(['app-upstream-sync', 'work:w', 'trigger:schedule']);
+            expect(options.idempotencyKey).toBe('app-upstream-sync:w:schedule:202610291015');
+            expect(options.idempotencyKey).toBe(appUpstreamSyncIdempotencyKey('w', 'schedule'));
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('dispatchAppBlueprintApply uses the same idempotency key as the singleton', async () => {
+        const { trigger, client } = tenantClient();
+        const payload = { workId: 'w', mode: 'apply', version: '1.0.0' };
+
+        await dispatcher('dispatchAppBlueprintApply', client)(payload);
+
+        const options = trigger.mock.calls[0][2] as Record<string, unknown>;
+        expect(options.idempotencyKey).toBe('app-blueprint-apply:w:apply:1.0.0:');
+        expect(options.idempotencyKey).toBe(appBlueprintApplyIdempotencyKey(payload as never));
+    });
+
+    it.each(['dispatchAppDeploy', 'dispatchAppClusterOp'])(
+        '%s turns delayMs into the runtime delay',
+        async (name) => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-10-29T10:00:00.000Z'));
+            try {
+                const { trigger, client } = tenantClient();
+                await dispatcher(name, client)(
+                    { workId: 'w', deploymentId: 'd1', op: 'pause' },
+                    { delayMs: 5000 },
+                );
+
+                const options = trigger.mock.calls[0][2] as Record<string, unknown>;
+                expect(options.delay).toEqual(new Date('2026-10-29T10:00:05.000Z'));
+            } finally {
+                vi.useRealTimers();
+            }
+        },
+    );
+
+    it("dispatchAppClusterOp gives verification-deploy the task module's 3 600 s budget", async () => {
+        const { trigger, client } = tenantClient();
+        await dispatcher(
+            'dispatchAppClusterOp',
+            client,
+        )({ workId: 'w', op: 'verification-deploy' });
+
+        expect(trigger.mock.calls[0][2]).toMatchObject({ maxDuration: 3600 });
+        const source = readFileSync(
+            join(srcDir, 'tasks', 'trigger', 'app-cluster-op.task.ts'),
+            'utf8',
+        );
+        expect(source).toMatch(
+            /export const APP_CLUSTER_OP_VERIFICATION_MAX_DURATION = 3600 as const;/,
+        );
+    });
+
+    describe('in production', () => {
+        const env = { ...process.env };
+
+        afterEach(() => {
+            process.env.NODE_ENV = env.NODE_ENV;
+            if (env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED === undefined) {
+                delete process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED;
+            } else {
+                process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED =
+                    env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED;
+            }
+        });
+
+        it.each(['dispatchAppDeploy', 'dispatchAppClusterOp'])(
+            '%s enqueues nothing without the worker-isolation attestation, as the singleton refuses',
+            async (name) => {
+                process.env.NODE_ENV = 'production';
+                delete process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED;
+                const { trigger, client } = tenantClient();
+
+                await expect(
+                    dispatcher(name, client)({ workId: 'w', deploymentId: 'd1', op: 'pause' }),
+                ).resolves.toBeNull();
+                expect(trigger).not.toHaveBeenCalled();
+            },
+        );
+
+        it.each(['dispatchAppDeploy', 'dispatchAppClusterOp'])(
+            '%s enqueues on the tenant client once the operator attests',
+            async (name) => {
+                process.env.NODE_ENV = 'production';
+                process.env.EVER_WORKS_APPS_CLUSTER_WORKER_ISOLATED = 'true';
+                const { trigger, client } = tenantClient();
+
+                await expect(
+                    dispatcher(name, client)({ workId: 'w', deploymentId: 'd1', op: 'pause' }),
+                ).resolves.toBe('tenant-app-run');
+                expect(trigger).toHaveBeenCalledTimes(1);
+            },
+        );
     });
 });

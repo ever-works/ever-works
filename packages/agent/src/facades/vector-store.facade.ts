@@ -36,7 +36,12 @@ import {
     type DeleteByDocumentInput,
     type DeleteByWorkInput,
 } from '@ever-works/plugin';
-import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
+import {
+    loadRegisteredPlugins,
+    PluginRegistryService,
+    type RegisteredPlugin,
+} from '../plugins/services/plugin-registry.service';
+import { materializePlugin } from '../plugins/services/plugin-operation.util';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { config } from '../config';
@@ -220,11 +225,18 @@ export class VectorStoreFacadeService {
      * `VectorStoreNotConfiguredError` when nothing qualifies — KB
      * ingest catches this and surfaces a workbench banner so the
      * operator can install/pin a backend.
+     *
+     * Every leg answers the plugin's REAL instance, loaded (onLoad
+     * settled), never a cold lazy proxy: callers read
+     * `vectorCapabilities` synchronously (`EmbeddingModeResolver`),
+     * which a cold proxy answers with an async forwarding wrapper, so
+     * `embedsOnWrite` would read `undefined` and `'auto'` would always
+     * resolve to `'platform'`.
      */
     async select(opts: SelectVectorStoreOpts): Promise<IVectorStorePlugin> {
         // 1. Caller pin — when set, ONLY this provider is tried.
         if (opts.providerOverride) {
-            const pinned = this.lookupPlugin(opts.providerOverride);
+            const pinned = await this.lookupPlugin(opts.providerOverride);
             if (!pinned) {
                 throw new VectorStoreNotConfiguredError(
                     `Pinned vector-store provider '${opts.providerOverride}' not found or not ` +
@@ -241,7 +253,7 @@ export class VectorStoreFacadeService {
         // a misconfiguration, not a fallback trigger.
         const envPin = config.kb.getVectorStoreProviderId();
         if (envPin) {
-            const pinned = this.lookupPlugin(envPin);
+            const pinned = await this.lookupPlugin(envPin);
             if (!pinned) {
                 throw new VectorStoreNotConfiguredError(
                     `Operator-pinned vector-store provider '${envPin}' ` +
@@ -270,7 +282,13 @@ export class VectorStoreFacadeService {
                         inst &&
                         isVectorStorePlugin(inst)
                     ) {
-                        return inst;
+                        // One that cannot load falls through to the
+                        // registry default, as it would have had it
+                        // failed at boot.
+                        const loaded = await this.loadForUse(registered);
+                        if (loaded) {
+                            return loaded;
+                        }
                     }
                 }
             } catch (err) {
@@ -286,14 +304,23 @@ export class VectorStoreFacadeService {
         // capability advertised. Prefer `defaultForCapabilities`; fall
         // back to first by id (stable sort for deterministic dev/test
         // runs).
-        const candidates = this.registry
-            .getByCapability(VECTOR_STORE_CAPABILITY)
-            .filter(
-                (p) =>
-                    p.state === 'loaded' &&
-                    p.manifest.category === VECTOR_STORE_CATEGORY &&
-                    p.manifest.capabilities.includes(VECTOR_STORE_CAPABILITY),
-            );
+        //
+        // The candidates are loaded BEFORE that pick: a cold lazy
+        // proxy's registry entry carries only its package.json
+        // manifest, without the `defaultForCapabilities` its class's
+        // getManifest() may add, so the pick would differ from eager
+        // mode. One whose import or onLoad fails is now in `error` and
+        // is left out, as it would have been had it failed at boot.
+        const candidates = await loadRegisteredPlugins(
+            this.registry
+                .getByCapability(VECTOR_STORE_CAPABILITY)
+                .filter(
+                    (p) =>
+                        p.state === 'loaded' &&
+                        p.manifest.category === VECTOR_STORE_CATEGORY &&
+                        p.manifest.capabilities.includes(VECTOR_STORE_CAPABILITY),
+                ),
+        );
 
         if (candidates.length > 0) {
             const preferred = candidates.find((p) =>
@@ -302,7 +329,7 @@ export class VectorStoreFacadeService {
             const chosen =
                 preferred ??
                 [...candidates].sort((a, b) => a.plugin.id.localeCompare(b.plugin.id))[0];
-            const inst = chosen.plugin as unknown as IVectorStorePlugin;
+            const inst = (await materializePlugin(chosen.plugin)) as unknown as IVectorStorePlugin;
             if (isVectorStorePlugin(inst)) {
                 return inst;
             }
@@ -357,9 +384,10 @@ export class VectorStoreFacadeService {
      * Registry lookup that respects the vector-store contract: must be
      * `'loaded'`, must declare the `'vector-store'` capability token,
      * must structurally satisfy `IVectorStorePlugin`. Used by the
-     * operator-pin + caller-pin legs of `select()`.
+     * operator-pin + caller-pin legs of `select()`. A pinned plugin
+     * that cannot load answers `null`, so the pin still hard-fails.
      */
-    private lookupPlugin(pluginId: string): IVectorStorePlugin | null {
+    private async lookupPlugin(pluginId: string): Promise<IVectorStorePlugin | null> {
         const registered = this.registry.get(pluginId);
         if (!registered || registered.state !== 'loaded') {
             return null;
@@ -367,10 +395,20 @@ export class VectorStoreFacadeService {
         if (!registered.manifest.capabilities.includes(VECTOR_STORE_CAPABILITY)) {
             return null;
         }
-        const inst = registered.plugin as unknown as IVectorStorePlugin;
-        if (!isVectorStorePlugin(inst)) {
+        return this.loadForUse(registered);
+    }
+
+    /**
+     * `registered`'s REAL instance once its first load (onLoad
+     * included) has settled, or `null` when it cannot load or is not a
+     * vector store. Same shape as `GitFacadeService.loadForUse`.
+     */
+    private async loadForUse(registered: RegisteredPlugin): Promise<IVectorStorePlugin | null> {
+        const [usable] = await loadRegisteredPlugins([registered]);
+        if (!usable) {
             return null;
         }
-        return inst;
+        const inst = (await materializePlugin(usable.plugin)) as unknown as IVectorStorePlugin;
+        return isVectorStorePlugin(inst) ? inst : null;
     }
 }
