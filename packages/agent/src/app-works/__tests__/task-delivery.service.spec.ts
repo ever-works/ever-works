@@ -195,6 +195,10 @@ function harness(seed: { tasks?: Task[]; builds?: Row[]; deployments?: Row[]; ru
         findResourceEvents: jest.fn(async () => ({ activities: [], total: 0 })),
     };
     const telemetry = { track: jest.fn() };
+    // APW-08 T26 / T54 — the Task thread (FR-43): every post as `TaskChatService.post` takes it.
+    const chat = {
+        post: jest.fn(async (_userId: string, input: Row) => ({ id: `msg-${clock}`, ...input })),
+    };
     const service = new TaskDeliveryService(
         tasks as never,
         builds as never,
@@ -209,8 +213,9 @@ function harness(seed: { tasks?: Task[]; builds?: Row[]; deployments?: Row[]; ru
         escalations as never,
         activityLog as never,
         telemetry as never,
+        chat as never,
     );
-    return { service, tasks, builds, deployments, runtime, works, specStates, specs, git, transitions, followUps, escalations, activityLog, telemetry };
+    return { service, tasks, builds, deployments, runtime, works, specStates, specs, git, transitions, followUps, escalations, activityLog, telemetry, chat };
 }
 
 function build(overrides: Row = {}): Row {
@@ -716,6 +721,7 @@ describe('TaskDeliveryService — the view (GET /api/tasks/:id/delivery)', () =>
                 { state: 'merged', at: '2026-10-29T10:00:00.000Z', activityId: 'a1' },
                 { state: 'live', at: '2026-10-29T10:10:00.000Z', activityId: 'a2' },
             ],
+            canDeployNow: false,
         });
     });
 
@@ -728,5 +734,275 @@ describe('TaskDeliveryService — the view (GET /api/tasks/:id/delivery)', () =>
             history: [],
             carriedByLaterChange: false,
         });
+    });
+});
+
+/** The thread posts the chain wrote, as `[messageKey, body, authorType, authorId, params]`. */
+function posts(h: ReturnType<typeof harness>): Array<[string, string, string, string | null, Row | null]> {
+    return h.chat.post.mock.calls.map((call) => {
+        const input = (call as unknown as [string, Row])[1];
+        return [
+            input.messageKey as string,
+            input.body as string,
+            input.authorType as string,
+            (input.authorId as string | null) ?? null,
+            (input.messageParams as Row | null) ?? null,
+        ];
+    });
+}
+
+describe('TaskDeliveryService — the Task thread (FR-43, APW-08 T26 / T54)', () => {
+    it('posts one keyed message per state change, in order: merged → building → built → deploying → live (ACC-08-24)', async () => {
+        const h = harness({ runtime: { targetSettings: { autoDeploy: true } } });
+        const row = h.tasks.rows[0] as unknown as Task;
+        await h.service.recordMerge(row, merged());
+
+        const b = build({ status: 'running', deployable: false, number: 12 });
+        h.builds.rows.push(b);
+        await h.service.reconcileTask(row);
+        // A tick that changes nothing posts nothing.
+        await h.service.reconcileTask(row);
+
+        Object.assign(b, { status: 'succeeded', deployable: true });
+        await h.service.reconcileTask(row);
+
+        const d = deployment({ buildId: b.id, state: 'DEPLOYING' });
+        h.deployments.rows.push(d);
+        await h.service.reconcileTask(row);
+
+        Object.assign(d, { state: 'READY' });
+        await h.service.reconcileTask(row);
+
+        expect(row).toMatchObject({ deliveryState: 'live' });
+        expect(posts(h).map(([key, body]) => [key, body])).toEqual([
+            ['deliveryPosts.merged', 'Merged into production.'],
+            ['deliveryPosts.buildStarted', 'Build #12 started.'],
+            ['deliveryPosts.buildSucceeded', 'Build #12 succeeded.'],
+            ['deliveryPosts.deploying', 'Deploying.'],
+            ['deliveryPosts.live', 'Live at https://bookings.example.app.'],
+        ]);
+        // As the Task's Agent, into THIS Task's thread, as its owner.
+        for (const call of h.chat.post.mock.calls) {
+            const [userId, input] = call as unknown as [string, Row];
+            expect(userId).toBe('user-1');
+            expect(input).toMatchObject({ taskId: 'task-1', authorType: 'agent', authorId: 'agent-1' });
+        }
+        expect(posts(h)[1][4]).toEqual({ number: 12 });
+        expect(posts(h)[4][4]).toEqual({ url: 'https://bookings.example.app' });
+    });
+
+    it('a Task with no Agent stores a system post: authorType system, authorId null, and a key', async () => {
+        const h = harness({ tasks: [task({ agentId: null })] });
+        await h.service.recordMerge(h.tasks.rows[0] as unknown as Task, merged());
+        expect(h.chat.post).toHaveBeenCalledTimes(1);
+        const [, input] = h.chat.post.mock.calls[0] as unknown as [string, Row];
+        expect(input).toMatchObject({
+            authorType: 'system',
+            authorId: null,
+            messageKey: 'deliveryPosts.merged',
+            messageParams: { branch: 'production' },
+            body: 'Merged into production.',
+        });
+    });
+
+    it('a failed Build posts its number and the recorded reason, then the follow-up it opened', async () => {
+        const b = build({ status: 'failed', deployable: false, number: 4, failureClass: 'compile error.' });
+        const h = harness({
+            tasks: [tracked(), task({ id: 'follow-1', slug: 'T-2', workId: 'work-1' })],
+            builds: [b],
+        });
+        await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
+        expect(posts(h).map(([key, body]) => [key, body])).toEqual([
+            ['deliveryPosts.buildFailed', 'Build #4 failed: compile error.'],
+            ['deliveryPosts.followUpOpened', 'Opened follow-up T-2.'],
+        ]);
+        expect(posts(h)[0][4]).toEqual({ number: 4, reason: 'compile error' });
+    });
+
+    it('a rolled-back Deployment posts the outcome code (the reader renders it in their language)', async () => {
+        const b = build();
+        const d = deployment({ buildId: b.id, state: 'ROLLED_BACK', lastError: 'crashloop' });
+        const h = harness({ tasks: [tracked()], builds: [b], deployments: [d] });
+        h.followUps.open.mockResolvedValue({ kind: 'escalated', reason: 'chain-limit', escalationId: 'e' } as never);
+        await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
+        expect(posts(h)).toEqual([
+            ['deliveryPosts.deployFailed', 'Deployment failed: rolled back.', 'agent', 'agent-1', { outcome: 'rolled_back' }],
+        ]);
+    });
+
+    it('Close anyway posts "Closed without deploying."', async () => {
+        const h = harness({ tasks: [tracked({ deliveryState: 'build_failed' })] });
+        await h.service.closeWithoutDeploy('user-1', h.tasks.rows[0] as unknown as Task);
+        expect(posts(h).map(([key]) => key)).toEqual(['deliveryPosts.closedWithoutDeploy']);
+    });
+
+    it('a refused post never undoes the state write or the Activity row', async () => {
+        const h = harness({ tasks: [tracked()], builds: [build({ status: 'running', deployable: false })] });
+        h.chat.post.mockRejectedValue(new Error('secret-scan refused'));
+        const outcome = await h.service.reconcileTask(h.tasks.rows[0] as unknown as Task);
+        expect(outcome.changed).toBe(true);
+        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'building' });
+        expect(h.activityLog.log).toHaveBeenCalledTimes(1);
+    });
+
+    it('without the chat collaborator the chain records Activity exactly as before', async () => {
+        const h = harness({ tasks: [tracked()], builds: [build({ status: 'running', deployable: false })] });
+        const bare = new TaskDeliveryService(
+            h.tasks as never,
+            h.builds as never,
+            h.deployments as never,
+            h.runtime as never,
+            h.works as never,
+            h.specStates as never,
+            h.specs as never,
+            h.git as never,
+            h.transitions as never,
+            h.followUps as never,
+            h.escalations as never,
+            h.activityLog as never,
+            h.telemetry as never,
+        );
+        await bare.reconcileTask(h.tasks.rows[0] as unknown as Task);
+        expect(h.tasks.rows[0]).toMatchObject({ deliveryState: 'building' });
+        expect(h.activityLog.log).toHaveBeenCalledTimes(1);
+        expect(h.chat.post).not.toHaveBeenCalled();
+    });
+});
+
+describe('TaskDeliveryService — Create a fix Task (APW-08 T27)', () => {
+    const failedBuild = () => build({ id: 'build-x', status: 'failed', deployable: false });
+
+    it('files the failure follow-up as a person (manual), records it and posts it to the thread', async () => {
+        const b = failedBuild();
+        const h = harness({
+            tasks: [
+                tracked({ deliveryState: 'build_failed', deliveryBuildId: b.id }),
+                task({ id: 'follow-1', slug: 'T-2' }),
+            ],
+            builds: [b],
+        });
+        await expect(
+            h.service.createFixTask('user-1', h.tasks.rows[0] as unknown as Task),
+        ).resolves.toEqual({ taskId: 'follow-1', slug: 'T-2', created: true });
+        expect(h.followUps.open).toHaveBeenCalledWith(
+            expect.objectContaining({ phase: 'build', failureId: 'build-x' }),
+            { manual: true },
+        );
+        expect(h.activityLog.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                action: APP_CHANGE_ACTIONS.followUpOpened,
+                details: expect.objectContaining({
+                    followUpTaskId: 'follow-1',
+                    manual: true,
+                    requestedById: 'user-1',
+                }),
+            }),
+        );
+        expect(posts(h).map(([key]) => key)).toEqual(['deliveryPosts.followUpOpened']);
+    });
+
+    it('answers the fix Task already filed for this failure — one per failure, nothing new recorded', async () => {
+        const b = failedBuild();
+        const h = harness({
+            tasks: [
+                tracked({ deliveryState: 'build_failed', deliveryBuildId: b.id }),
+                task({ id: 'follow-0', slug: 'T-1' }),
+            ],
+            builds: [b],
+        });
+        h.followUps.open.mockResolvedValue({ kind: 'exists', taskId: 'follow-0' } as never);
+        await expect(
+            h.service.createFixTask('user-1', h.tasks.rows[0] as unknown as Task),
+        ).resolves.toEqual({ taskId: 'follow-0', slug: 'T-1', created: false });
+        expect(h.activityLog.log).not.toHaveBeenCalled();
+        expect(h.chat.post).not.toHaveBeenCalled();
+    });
+
+    it.each([['merged'], ['built'], ['live'], ['closed_without_deploy']])(
+        'refuses a change in %s (422 fixTaskUnavailable)',
+        async (state) => {
+            const h = harness({ tasks: [tracked({ deliveryState: state })] });
+            await expect(
+                h.service.createFixTask('user-1', h.tasks.rows[0] as unknown as Task),
+            ).rejects.toMatchObject({ response: { code: 'fixTaskUnavailable' } });
+            expect(h.followUps.open).not.toHaveBeenCalled();
+        },
+    );
+
+    it('refuses when the failure is no longer on record, or the follow-up could not be filed', async () => {
+        const h = harness({
+            tasks: [tracked({ deliveryState: 'deploy_failed', deliveryDeploymentId: 'gone' })],
+        });
+        await expect(
+            h.service.createFixTask('user-1', h.tasks.rows[0] as unknown as Task),
+        ).rejects.toBeInstanceOf(UnprocessableEntityException);
+
+        const b = failedBuild();
+        const h2 = harness({
+            tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: b.id })],
+            builds: [b],
+        });
+        h2.followUps.open.mockResolvedValue({
+            kind: 'escalated',
+            reason: 'create-failed',
+            escalationId: null,
+        } as never);
+        await expect(
+            h2.service.createFixTask('user-1', h2.tasks.rows[0] as unknown as Task),
+        ).rejects.toMatchObject({ response: { code: 'fixTaskUnavailable' } });
+    });
+});
+
+describe('TaskDeliveryService — Deploy now is offered (S20, APW-08 T27)', () => {
+    const builtTask = (b: Row) => tracked({ deliveryState: 'built', deliveryBuildId: b.id });
+
+    it('a built change on an App Work with auto-deploy off offers Deploy now', async () => {
+        const b = build();
+        const h = harness({
+            tasks: [builtTask(b)],
+            builds: [b],
+            runtime: { targetSettings: { autoDeploy: false } },
+        });
+        await expect(h.service.getView(h.tasks.rows[0] as unknown as Task)).resolves.toMatchObject({
+            state: 'built',
+            canDeployNow: true,
+        });
+    });
+
+    it('the operator auto-deploy switch off offers it too', async () => {
+        process.env.EVER_WORKS_APP_AUTO_DEPLOY_ENABLED = 'false';
+        const b = build();
+        const h = harness({ tasks: [builtTask(b)], builds: [b] });
+        await expect(h.service.getView(h.tasks.rows[0] as unknown as Task)).resolves.toMatchObject({
+            canDeployNow: true,
+        });
+    });
+
+    it('auto-deploy on, a target of None, no runtime row or another state does not', async () => {
+        const b = build();
+        const on = harness({ tasks: [builtTask(b)], builds: [b] });
+        await expect(on.service.getView(on.tasks.rows[0] as unknown as Task)).resolves.toMatchObject({
+            canDeployNow: false,
+        });
+        const none = harness({
+            tasks: [builtTask(b)],
+            builds: [b],
+            runtime: { target: 'none', targetSettings: { autoDeploy: false } },
+        });
+        await expect(none.service.getView(none.tasks.rows[0] as unknown as Task)).resolves.toMatchObject({
+            canDeployNow: false,
+        });
+        const missing = harness({ tasks: [builtTask(b)], builds: [b], runtime: null });
+        await expect(
+            missing.service.getView(missing.tasks.rows[0] as unknown as Task),
+        ).resolves.toMatchObject({ canDeployNow: false });
+        const failed = harness({
+            tasks: [tracked({ deliveryState: 'build_failed', deliveryBuildId: b.id })],
+            builds: [b],
+            runtime: { targetSettings: { autoDeploy: false } },
+        });
+        await expect(
+            failed.service.getView(failed.tasks.rows[0] as unknown as Task),
+        ).resolves.toMatchObject({ canDeployNow: false });
     });
 });

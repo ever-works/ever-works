@@ -11,6 +11,8 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 import { ApiResponseError } from '@/lib/api/server-api';
 import { appChangesAPI, type AppChangeRequestAnswer } from '@/lib/api/app-changes';
+import { workAPI } from '@/lib/api/work';
+import { agentsAPI } from '@/lib/api/agents';
 
 /**
  * APW-08 — the App Work overview's **Request a change** dialog and cost summary. Same projection
@@ -27,6 +29,8 @@ export interface AppChangeActionResult<T> {
 }
 
 const workIdSchema = z.string().min(1).max(64);
+/** One URL path segment of an id (uuid or slug-like): what a tool argument may name. */
+const pathSegmentIdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 const requestSchema = z.string().trim().min(1).max(4000);
 
 async function requireUser(): Promise<void> {
@@ -91,4 +95,35 @@ export async function getWorkCostAction(
     } catch (error) {
         return failure('read the Work cost', error);
     }
+}
+
+/**
+ * APW-08 T26 — the names the chat's change card confirms with ("Start a change on Bookings? ·
+ * Wren will work on it."): the App Work's and, when the request names one, the Agent's. Both are
+ * read as the signed-in user (another account's Work or Agent reads as unnamed). Never throws:
+ * a name the card cannot read is `null` and the card says it without the name.
+ */
+export async function getAppChangeTargetAction(
+    workId: string,
+    agentId?: string | null,
+): Promise<{ workName: string | null; agentName: string | null }> {
+    await requireUser();
+    const none = { workName: null, agentName: null };
+    // Both ids come from LLM-authored tool arguments and are interpolated into API paths, so
+    // each must be ONE path segment (no `/`, `.` or `%`), not only short.
+    if (!pathSegmentIdSchema.safeParse(workId).success) return none;
+    const agent = agentId && pathSegmentIdSchema.safeParse(agentId).success ? agentId : null;
+    const [workName, agentName] = await Promise.all([
+        workAPI
+            .get(workId)
+            .then((res) => res?.work?.name?.trim() || null)
+            .catch(() => null),
+        agent
+            ? agentsAPI
+                  .get(agent)
+                  .then((row) => row?.name?.trim() || null)
+                  .catch(() => null)
+            : Promise.resolve(null),
+    ]);
+    return { workName, agentName };
 }

@@ -12,6 +12,17 @@ import { createTranslator } from 'next-intl';
  *  - `dashboard.tasksPage.cost` — the Task page's Cost section;
  *  - `dashboard.activity.filters.types.appChange` — the `app_change` Activity badge.
  *
+ * Lane L5 (T26 / T27 / T54) adds:
+ *
+ *  - `dashboard.tasksPage.deliveryPosts` — the keyed Task-thread posts (FR-43), rendered in the
+ *    reader's locale; the agent's English `body` fallback is pinned to the same strings by
+ *    `packages/agent/src/tasks-domain/__tests__/task-thread-posts.spec.ts`;
+ *  - `dashboard.tasksPage.detail.systemAuthor` — the author of a `system` post;
+ *  - `dashboard.workDetail.requestChange` — the chat change card's confirmation (spec §6.4);
+ *  - `dashboard.aiChat.changeCard` — the chat change card's reply and chain;
+ *  - the new `dashboard.tasksPage.delivery` leaves (Deploy now's hint, Create a fix Task), inside
+ *    the sub-tree already listed.
+ *
  * `next-intl` falls back per LEAF, but an absent intermediate object collapses the whole subtree
  * into raw key paths, and none of `tsc`, the build or the English e2e lane notices. So:
  *
@@ -29,6 +40,10 @@ const SUBTREES = [
     'dashboard.tasksPage.delivery',
     'dashboard.tasksPage.cost',
     'dashboard.activity.filters.types.appChange',
+    'dashboard.tasksPage.deliveryPosts',
+    'dashboard.tasksPage.detail.systemAuthor',
+    'dashboard.workDetail.requestChange',
+    'dashboard.aiChat.changeCard',
 ] as const;
 
 type Tree = { [key: string]: string | Tree };
@@ -88,6 +103,43 @@ describe('APW-08 evolve copy (T28)', () => {
         expect(enLeaves).toContain('dashboard.tasksPage.delivery.closeConfirm');
         expect(enLeaves).toContain('dashboard.tasksPage.cost.unknown');
         expect(enLeaves).toContain('dashboard.activity.filters.types.appChange');
+    });
+
+    it('carries lane L5 copy: thread posts, Deploy now, Create a fix Task, the chat change card', () => {
+        expect(enLeaves.length).toBeGreaterThanOrEqual(125);
+        for (const path of [
+            'dashboard.tasksPage.deliveryPosts.merged',
+            'dashboard.tasksPage.deliveryPosts.buildStarted',
+            'dashboard.tasksPage.deliveryPosts.buildSucceeded',
+            'dashboard.tasksPage.deliveryPosts.buildFailed',
+            'dashboard.tasksPage.deliveryPosts.deploying',
+            'dashboard.tasksPage.deliveryPosts.live',
+            'dashboard.tasksPage.deliveryPosts.deployFailed',
+            'dashboard.tasksPage.deliveryPosts.followUpOpened',
+            'dashboard.tasksPage.deliveryPosts.closedWithoutDeploy',
+            'dashboard.tasksPage.delivery.deployNow',
+            'dashboard.tasksPage.delivery.deployNowHint',
+            'dashboard.tasksPage.delivery.createFixTask',
+            'dashboard.tasksPage.delivery.createFixTaskConfirm',
+            'dashboard.tasksPage.delivery.errors.fixTaskUnavailable',
+            'dashboard.tasksPage.detail.systemAuthor',
+            'dashboard.workDetail.requestChange.title',
+            'dashboard.workDetail.requestChange.body',
+            'dashboard.workDetail.requestChange.start',
+            'dashboard.aiChat.changeCard.started',
+            'dashboard.aiChat.changeCard.pollingStopped',
+        ]) {
+            expect(enLeaves).toContain(path);
+        }
+        // Spec §6.4's copy, verbatim.
+        const en = bundle('en');
+        expect(at(en, 'dashboard.workDetail.requestChange.title')).toBe(
+            'Start a change on {work}?',
+        );
+        expect(at(en, 'dashboard.workDetail.requestChange.body')).toBe(
+            '{agent} will work on it. An agent run will start; runs are billed to your workspace.',
+        );
+        expect(at(en, 'dashboard.tasksPage.deliveryPosts.live')).toBe('Live at {url}.');
     });
 
     it('every leaf exists, non-empty, in all 21 bundles', () => {

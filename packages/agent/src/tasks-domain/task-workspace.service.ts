@@ -44,6 +44,7 @@ import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TASK_STATUS_TRANSITIONS, TaskTransitionService } from './task-transition.service';
 import { TaskChatService } from './task-chat.service';
+import { renderTaskThreadPost, type TaskThreadPost } from './task-thread-posts';
 import { MergePolicyService } from '../policy/merge-policy.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
@@ -4059,17 +4060,29 @@ export class TaskWorkspaceService {
         }
     }
 
+    /**
+     * Post a platform message into the Task's thread, as the run's Agent.
+     *
+     * APW-08 T54 — accepts a keyed post (`{ key, params }`, see `task-thread-posts.ts`) IN
+     * ADDITION TO a plain `body` string. A keyed post stores the key and its params, so the Task
+     * page renders it in the reader's locale, and writes the pre-rendered English into `body` (or
+     * the caller's own `body`), so every reader that does not know keys is unchanged. Every
+     * existing caller passes a string and gets exactly the row it always did.
+     */
     private async postSystemMessage(
         input: { task: Task; userId: string; agentId: string },
-        body: string,
+        message: string | (TaskThreadPost & { body?: string }),
     ): Promise<void> {
         if (!this.taskChat) return;
+        const keyed = typeof message === 'string' ? null : message;
+        const body = keyed ? (keyed.body ?? renderTaskThreadPost(keyed)) : (message as string);
         try {
             await this.taskChat.post(input.userId, {
                 taskId: input.task.id,
                 authorType: 'agent',
                 authorId: input.agentId,
                 body,
+                ...(keyed ? { messageKey: keyed.key, messageParams: keyed.params ?? null } : {}),
             });
         } catch (error) {
             this.logger.warn(

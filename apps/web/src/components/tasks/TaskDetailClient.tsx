@@ -24,6 +24,7 @@ import type {
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { TaskScheduleSection } from './TaskScheduleSection';
+import { TaskChatMessageText } from './TaskChatMessageText';
 import { TaskPlanningSection } from './TaskPlanningSection';
 import { TaskSubtasksSection } from './TaskSubtasksSection';
 import { TaskActivitySection } from './TaskActivitySection';
@@ -617,7 +618,9 @@ export function TaskDetailClient({
                                                 ? '🤖'
                                                 : m.authorType === 'integration'
                                                   ? '🔗'
-                                                  : '👤'}
+                                                  : m.authorType === 'system'
+                                                    ? '⚙️'
+                                                    : '👤'}
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
@@ -625,7 +628,9 @@ export function TaskDetailClient({
                                                     {m.authorType === 'integration' &&
                                                     m.externalAuthor?.name
                                                         ? m.externalAuthor.name
-                                                        : `${m.authorId.slice(0, 8)}…`}
+                                                        : m.authorType === 'system' || !m.authorId
+                                                          ? t('systemAuthor')
+                                                          : `${m.authorId.slice(0, 8)}…`}
                                                 </span>
                                                 <span>
                                                     {new Date(m.createdAt).toLocaleString()}
@@ -633,7 +638,8 @@ export function TaskDetailClient({
                                                 </span>
                                             </div>
                                             <p className="text-sm text-text dark:text-text-dark mt-1 whitespace-pre-wrap">
-                                                {m.body}
+                                                {/* APW-08 T54 — a keyed post in the reader's locale; else the body. */}
+                                                <TaskChatMessageText message={m} />
                                             </p>
                                             {(m.mentions ?? []).length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-1">

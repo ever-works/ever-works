@@ -4,6 +4,7 @@ import {
     TASK_DELIVERY_STATES,
     type TaskCostView,
     type TaskDeliveryEmbed,
+    type TaskDeliveryFixTaskResponse,
     type TaskDeliveryFollowUpResponse,
     type TaskDeliveryStateFilter,
     type TaskDeliveryView,
@@ -1736,6 +1737,26 @@ export class TasksController {
             throw new ServiceUnavailableException('The delivery chain is not available.');
         }
         return this.delivery.requestFollowUp(auth.userId, task, body.escalationId, scope);
+    }
+
+    @Post(':id/delivery/fix-task')
+    @ApiOperation({
+        summary:
+            "APW-08 T27 — Create a fix Task: file the follow-up Task for this change's current failed Build or Deployment (the same Task the automatic follow-up files, one per failure; `created: false` answers the one already filed). Starts its Agent like the automatic follow-up. Every refusal is 422 { code: 'fixTaskUnavailable' }.",
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async createDeliveryFixTask(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<TaskDeliveryFixTaskResponse> {
+        // Filing a fix Task can start a paid agent run: a person's decision, like Try once more.
+        requireHumanSession(auth, 'create a fix Task for a failed change');
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        if (!this.delivery) {
+            throw new ServiceUnavailableException('The delivery chain is not available.');
+        }
+        return this.delivery.createFixTask(auth.userId, task);
     }
 
     @Post(':id/chat')

@@ -35,6 +35,9 @@ export * from './task-pr-status.service';
 // APW-08 T21–T24 — the App Works delivery chain (provided by TasksDomainModule): the merge hook's
 // port, the reconciler behind `app-change-delivery`, the Task delivery routes and follow-ups.
 export * from './task-delivery.port';
+// APW-08 T26 / T54 — keyed Task-thread posts (FR-43).
+export * from './task-thread-poster.port';
+export * from './task-thread-posts';
 export {
     TaskDeliveryService,
     APP_CHANGE_ACTIONS,

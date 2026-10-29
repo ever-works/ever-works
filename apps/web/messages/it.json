@@ -1639,7 +1639,8 @@
                 "openIdea": "Apri questa Idea",
                 "openAgent": "Apri questo Agente",
                 "extraRepos": "Also in",
-                "extraReposUpdateError": "Failed to update the extra repositories"
+                "extraReposUpdateError": "Failed to update the extra repositories",
+                "systemAuthor": "Ever Works"
             },
             "recurring": {
                 "section": "Programma ricorrente",
@@ -1912,8 +1913,17 @@
                 "errors": {
                     "notClosable": "This change can't be closed in its current state.",
                     "followUpLimit": "No more follow-ups can be opened for this change.",
-                    "generic": "That didn't work. Try again."
-                }
+                    "generic": "That didn't work. Try again.",
+                    "fixTaskUnavailable": "A fix Task can't be created for this change right now."
+                },
+                "deployNowHint": "Auto-deploy is off for this app, so this build waits for you to deploy it.",
+                "createFixTaskConfirm": "Create a Task to fix this failure? When this change has an Agent, Ever Works tries to start it on the fix right away (a paused agent or a spend limit can hold it); its run is billed to your workspace.",
+                "cancel": "Cancel",
+                "creatingFixTask": "Creating…",
+                "fixTaskCreated": "Fix Task {slug} was created.",
+                "fixTaskCreatedUnnamed": "A fix Task was created.",
+                "fixTaskExists": "A fix Task for this failure already exists: {slug}.",
+                "openFixTask": "Open the fix Task"
             },
             "cost": {
                 "sectionTitle": "Cost",
@@ -1929,6 +1939,28 @@
                 "runLabel": "Run {id}",
                 "receipt": "Receipt",
                 "runsTruncated": "Showing the newest {count} runs."
+            },
+            "deliveryPosts": {
+                "runStarted": "Run started.",
+                "prOpened": "Opened pull request #{number}.",
+                "checksPassed": "Checks passed.",
+                "checksFailed": "Checks failed: {names}.",
+                "merged": "Merged into {branch}.",
+                "mergedNoBranch": "Merged.",
+                "buildStarted": "Build #{number} started.",
+                "buildStartedUnnumbered": "Build started.",
+                "buildSucceeded": "Build #{number} succeeded.",
+                "buildSucceededUnnumbered": "Build succeeded.",
+                "buildFailed": "Build #{number} failed: {reason}.",
+                "buildFailedUnnumbered": "Build failed: {reason}.",
+                "buildFailedNoReason": "Build #{number} failed.",
+                "buildFailedUnnumberedNoReason": "Build failed.",
+                "deploying": "Deploying.",
+                "live": "Live at {url}.",
+                "liveNoUrl": "Live.",
+                "deployFailed": "Deployment failed: {outcome}.",
+                "followUpOpened": "Opened follow-up {taskSlug}.",
+                "closedWithoutDeploy": "Closed without deploying."
             }
         },
         "skillsPage": {
@@ -8069,6 +8101,14 @@
                     "targetNone": "Questa app non è ancora impostata per essere distribuita da nessuna parte. Scegli una destinazione di distribuzione per effettuare il provisioning delle sue dipendenze.",
                     "targetNotChecked": "Il tuo cluster non ha ancora superato la verifica. Verifica la connessione, poi riprova."
                 }
+            },
+            "requestChange": {
+                "title": "Start a change on {work}?",
+                "titleUnnamed": "Start this change?",
+                "body": "{agent} will work on it. An agent run will start; runs are billed to your workspace.",
+                "bodyNoAgent": "An agent will work on it. An agent run will start; runs are billed to your workspace.",
+                "start": "Start",
+                "cancel": "Cancel"
             }
         },
         "newPage": {
@@ -9387,6 +9427,25 @@
                 "loadError": "Impossibile caricare i modelli",
                 "noModels": "Nessun modello disponibile",
                 "context": "contesto {value}"
+            },
+            "changeCard": {
+                "starting": "Starting…",
+                "cancelled": "Cancelled",
+                "started": "Started {slug} on {work}.",
+                "startedUnnamed": "Started {slug}.",
+                "awaitingOwner": "Filed for the App Work's owner, who decides when it starts.",
+                "refused": "The change could not be started.",
+                "openTask": "Open the Task",
+                "stepRun": "Run",
+                "stepPullRequest": "Pull request",
+                "stepBuild": "Build",
+                "stepDeployment": "Deployment",
+                "stepLive": "Live",
+                "stateDone": "{step}: done",
+                "stateActive": "{step}: in progress",
+                "stateFailed": "{step}: failed",
+                "statePending": "{step}: not started",
+                "pollingStopped": "Stopped checking for updates. Open the Task to see where it stands."
             }
         },
         "plugins": {

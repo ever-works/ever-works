@@ -24,9 +24,11 @@ import { cn } from '@/lib/utils/cn';
 import { safeHttpsUrl, safeWebUrl } from '@/lib/utils/safe-link';
 import {
     closeDeliveryAction,
+    createDeliveryFixTaskAction,
     getTaskDeliveryAction,
     openDeliveryFollowUpAction,
 } from '@/app/actions/tasks';
+import { AppDeployNowButton } from '@/components/works/detail/deploy/app/AppDeployNowButton';
 import { TaskDeliveryChips } from './TaskDeliveryChips';
 
 /** Plan §5.1 — `GET /delivery` every 10 s while the chain is open … */
@@ -56,9 +58,16 @@ export function isDeliveryOpen(state: TaskDeliveryState | null | undefined): boo
 /** Which `delivery.errors.*` copy a refusal gets — by the API's own code, never a message. */
 export function deliveryErrorKey(
     code: string | undefined,
-): 'notClosable' | 'followUpLimit' | 'generic' {
-    return code === 'notClosable' || code === 'followUpLimit' ? code : 'generic';
+): 'notClosable' | 'followUpLimit' | 'fixTaskUnavailable' | 'generic' {
+    return code === 'notClosable' || code === 'followUpLimit' || code === 'fixTaskUnavailable'
+        ? code
+        : 'generic';
 }
+
+/** The section's primary call-to-action look (white in dark mode). */
+const PRIMARY_CTA = 'dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100';
+
+type FixTaskResult = { taskId: string; slug: string | null; created: boolean };
 
 type Step = 'done' | 'progress' | 'failed' | 'neutral';
 
@@ -108,6 +117,15 @@ type Load =
  * **Close anyway** (confirmed, focus returned to where it came from) and, when the change's
  * delivery-failed Inbox item is open, **Try once more**.
  *
+ * APW-08 T27 (lane L5) adds the section's two remaining actions:
+ *
+ *  - **Deploy now** (S20) for a `built` change whose App Work deploys somewhere with auto-deploy
+ *    off (`view.canDeployNow`): APW-06's own **Deploy now** (`AppDeployNowButton`,
+ *    `POST /api/works/:id/deploy`) for THIS change's Build, with every answer it renders;
+ *  - **Create a fix Task** for a failed Build or Deployment (when **Try once more** is not the
+ *    offer): confirmed first — it can start a paid agent run — then the fix Task filed the way the
+ *    automatic follow-up is, one per failure, linked from the section.
+ *
  * Polls `GET /delivery` every 10 s while the state is open and stops at a terminal state
  * (`live`, `closed_without_deploy`) or 30 minutes after the page opened, whichever is first.
  */
@@ -124,6 +142,11 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
     const [retrying, setRetrying] = useState(false);
     const [errorKey, setErrorKey] = useState<ReturnType<typeof deliveryErrorKey> | null>(null);
     const [followUpOpened, setFollowUpOpened] = useState(false);
+    const [fixConfirmOpen, setFixConfirmOpen] = useState(false);
+    const [creatingFix, setCreatingFix] = useState(false);
+    const [fixResult, setFixResult] = useState<FixTaskResult | null>(null);
+    const fixTriggerRef = useRef<HTMLButtonElement | null>(null);
+    const fixConfirmWasOpen = useRef(false);
     // Set when the section mounts (the effect below); the 30-minute poll budget counts from it.
     const startedAt = useRef<number>(0);
     const closeTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -211,6 +234,37 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
         }
     };
 
+    // The same focus return for the fix-Task confirm: its button, or the heading once it is gone.
+    useEffect(() => {
+        if (fixConfirmWasOpen.current && !fixConfirmOpen) {
+            const target = fixTriggerRef.current?.isConnected
+                ? fixTriggerRef.current
+                : headingRef.current;
+            target?.focus();
+        }
+        fixConfirmWasOpen.current = fixConfirmOpen;
+    }, [fixConfirmOpen, state]);
+
+    const confirmFixTask = async () => {
+        if (creatingFix) return;
+        setCreatingFix(true);
+        setErrorKey(null);
+        try {
+            const result = await createDeliveryFixTaskAction(taskId);
+            if (result.ok) {
+                setFixResult({ taskId: result.taskId, slug: result.slug, created: result.created });
+                await read();
+            } else {
+                setErrorKey(deliveryErrorKey(result.code));
+            }
+        } catch {
+            setErrorKey('generic');
+        } finally {
+            setCreatingFix(false);
+            setFixConfirmOpen(false);
+        }
+    };
+
     const tryOnceMore = async (escalationId: string) => {
         if (retrying) return;
         setRetrying(true);
@@ -242,6 +296,12 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
     const retryEscalationId =
         load.kind === 'ready' && state && FAILED_STATES.has(state) ? load.retryEscalationId : null;
     const closable = Boolean(state && CLOSABLE_STATES.has(state));
+    // While the change's Inbox item is open, Try once more IS the fix-Task offer.
+    const fixable = Boolean(state && FAILED_STATES.has(state) && !retryEscalationId && !fixResult);
+    const deployNow =
+        view?.state === 'built' && view.canDeployNow === true && view.build && workId
+            ? { workId, buildId: view.build.id }
+            : null;
     const closeLabel =
         state && FAILED_STATES.has(state) ? t('closeAnyway') : t('closeWithoutDeploying');
 
@@ -432,6 +492,43 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 </ul>
             )}
 
+            {deployNow && (
+                <div className="mt-4 space-y-2" data-testid="task-delivery-deploy-now">
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {t('deployNowHint')}
+                    </p>
+                    <AppDeployNowButton
+                        workId={deployNow.workId}
+                        buildId={deployNow.buildId}
+                        size="sm"
+                        buttonClassName={PRIMARY_CTA}
+                        onRequested={() => void read()}
+                    />
+                </div>
+            )}
+
+            {fixResult && (
+                <p
+                    className="mt-3 text-xs text-text-secondary dark:text-text-secondary-dark"
+                    role="status"
+                    data-testid="task-delivery-fix-task-result"
+                    data-created={fixResult.created ? 'true' : 'false'}
+                >
+                    {fixResult.created
+                        ? fixResult.slug
+                            ? t('fixTaskCreated', { slug: fixResult.slug })
+                            : t('fixTaskCreatedUnnamed')
+                        : t('fixTaskExists', { slug: fixResult.slug ?? '' })}{' '}
+                    <Link
+                        href={ROUTES.DASHBOARD_TASK(fixResult.taskId)}
+                        className="font-medium text-primary hover:underline dark:text-primary-dark"
+                        data-testid="task-delivery-fix-task-link"
+                    >
+                        {t('openFixTask')}
+                    </Link>
+                </p>
+            )}
+
             {followUpOpened && (
                 <p
                     className="mt-3 text-xs text-text-secondary"
@@ -460,8 +557,23 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                 </p>
             )}
 
-            {(closable || retryEscalationId) && (
+            {(closable || retryEscalationId || fixable) && (
                 <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                    {fixable && (
+                        <Button
+                            ref={fixTriggerRef}
+                            type="button"
+                            size="sm"
+                            data-testid="task-delivery-create-fix-task"
+                            onClick={() => {
+                                setErrorKey(null);
+                                setFixConfirmOpen(true);
+                            }}
+                            className={PRIMARY_CTA}
+                        >
+                            {t('createFixTask')}
+                        </Button>
+                    )}
                     {retryEscalationId && (
                         <>
                             <span className="text-xs text-text-muted dark:text-text-muted-dark mr-auto">
@@ -530,6 +642,46 @@ export function TaskDeliverySection({ taskId, workId }: { taskId: string; workId
                             className="dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
                         >
                             {closing ? t('closing') : t('closeAnyway')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={fixConfirmOpen}
+                onOpenChange={(next) =>
+                    next ? undefined : creatingFix ? undefined : setFixConfirmOpen(false)
+                }
+            >
+                <DialogContent className="max-w-md">
+                    <DialogClose
+                        onClose={() => (creatingFix ? undefined : setFixConfirmOpen(false))}
+                    />
+                    <DialogHeader className="mb-0">
+                        <DialogTitle className="text-base font-semibold text-text dark:text-text-dark pr-6">
+                            {t('createFixTaskConfirm')}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid="task-delivery-fix-task-cancel"
+                            disabled={creatingFix}
+                            onClick={() => setFixConfirmOpen(false)}
+                        >
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            data-testid="task-delivery-confirm-fix-task"
+                            loading={creatingFix}
+                            onClick={() => void confirmFixTask()}
+                            className={PRIMARY_CTA}
+                        >
+                            {creatingFix ? t('creatingFixTask') : t('createFixTask')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

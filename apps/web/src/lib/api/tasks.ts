@@ -9,6 +9,7 @@ import type {
     TaskBoardTerminalWindow,
     TaskCostView,
     TaskDeliveryEmbed,
+    TaskDeliveryFixTaskResponse,
     TaskDeliveryFollowUpResponse,
     TaskDeliveryState,
     TaskDeliveryStateFilter,
@@ -805,6 +806,19 @@ export const tasksAPI = {
         });
     },
 
+    /**
+     * APW-08 T27 — **Create a fix Task**: the follow-up Task for the change's current failure
+     * (201; `created: false` = the one already filed). 422 `fixTaskUnavailable` otherwise.
+     */
+    async deliveryFixTask(id: string) {
+        return serverMutation<TaskDeliveryFixTaskResponse>({
+            endpoint: `/tasks/${id}/delivery/fix-task`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
     /** `GET /api/tasks/:id/cost` — the Task's runs and what they cost (`null` = unknown). */
     async cost(id: string) {
         return serverFetch<TaskCostView>(`/tasks/${id}/cost`, { method: 'GET' });
@@ -919,14 +933,30 @@ export interface TaskChatMention {
     slug?: string;
 }
 
+/**
+ * APW-08 T54 — who wrote a chat message: {@link TaskAuthorType} plus `'system'`, a platform post
+ * (a delivery-chain progress line) on a Task with no Agent, which carries no author id.
+ */
+export type TaskChatAuthorType = TaskAuthorType | 'system';
+
 export interface TaskChatMessage {
     id: string;
     taskId: string;
-    authorType: TaskAuthorType;
-    authorId: string;
+    authorType: TaskChatAuthorType;
+    /** `null` only on a `'system'` post. */
+    authorId: string | null;
     /** EW-P1-2 — display attribution for an `'integration'` author. */
     externalAuthor?: { name: string; avatarUrl?: string | null; source: string } | null;
+    /** For a keyed post, the pre-rendered English — shown when the key cannot be rendered. */
     body: string;
+    /**
+     * APW-08 T54 (FR-43) — a platform post's copy key, relative to `dashboard.tasksPage`
+     * (`deliveryPosts.live`), rendered in the reader's locale. Absent / null on every message a
+     * person, an agent or an integration wrote.
+     */
+    messageKey?: string | null;
+    /** APW-08 T54 — the values `messageKey`'s copy takes. */
+    messageParams?: Record<string, string | number> | null;
     mentions: TaskChatMention[] | null;
     attachments: { uploadId: string }[] | null;
     editedAt: string | null;

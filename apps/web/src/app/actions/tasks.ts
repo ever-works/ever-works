@@ -1,6 +1,11 @@
 'use server';
 
-import type { TaskCostView, TaskDeliveryView, TaskExtraRepo } from '@ever-works/contracts';
+import type {
+    TaskCostView,
+    TaskDeliveryState,
+    TaskDeliveryView,
+    TaskExtraRepo,
+} from '@ever-works/contracts';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
@@ -17,7 +22,9 @@ import {
     type TaskChatMessage,
     type TaskDiff,
     type TaskPriority,
+    type TaskPrState,
     type TaskPrStatus,
+    type TaskRunStatus,
     type TaskScopeKey,
     type TaskStatus,
 } from '@/lib/api/tasks';
@@ -859,6 +866,82 @@ export async function openDeliveryFollowUpAction(
         return { ok: true, taskId: result.taskId };
     } catch (err) {
         return deliveryFailure(err, 'FOLLOW_UP_FAILED');
+    }
+}
+
+/**
+ * APW-08 T27 — **Create a fix Task**: the follow-up Task for the change's CURRENT failed Build or
+ * Deployment, filed the way the automatic follow-up is (one per failure: `created: false` answers
+ * the one already filed). It can start a paid agent run, so the section confirms first.
+ */
+export async function createDeliveryFixTaskAction(
+    id: string,
+): Promise<
+    | { ok: true; taskId: string; slug: string | null; created: boolean }
+    | { ok: false; code: string; statusCode?: number }
+> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const result = await tasksAPI.deliveryFixTask(id);
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${id}`);
+        return {
+            ok: true,
+            taskId: result.taskId,
+            slug: result.slug ?? null,
+            created: result.created === true,
+        };
+    } catch (err) {
+        return deliveryFailure(err, 'FIX_TASK_FAILED');
+    }
+}
+
+/** APW-08 T26 — what the chat's change card shows of a filed App change: one Task's chain. */
+export interface TaskChangeChain {
+    taskId: string;
+    slug: string;
+    title: string;
+    status: TaskStatus;
+    runStatus: TaskRunStatus | null;
+    prNumber: number | null;
+    prState: TaskPrState | null;
+    deliveryState: TaskDeliveryState | null;
+}
+
+/**
+ * APW-08 T26 (FR-44) — the chat change card's poll: the Task's run, pull request and delivery
+ * state in one read (`GET /api/tasks/:id`). Read-only (no revalidatePath); never throws.
+ */
+export async function getTaskChangeChainAction(
+    id: string,
+): Promise<
+    { ok: true; chain: TaskChangeChain } | { ok: false; code: string; statusCode?: number }
+> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const task = await tasksAPI.get(id);
+        if (!task) return { ok: false, code: 'NOT_FOUND', statusCode: 404 };
+        return {
+            ok: true,
+            chain: {
+                taskId: task.id,
+                slug: task.slug,
+                title: task.title,
+                status: task.status,
+                runStatus: task.latestRunStatus ?? null,
+                prNumber: task.prNumber ?? null,
+                prState: task.prState ?? null,
+                deliveryState: task.deliveryState ?? null,
+            },
+        };
+    } catch (err) {
+        return deliveryFailure(err, 'CHAIN_READ_FAILED');
     }
 }
 
