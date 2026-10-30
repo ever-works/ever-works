@@ -1,4 +1,9 @@
-export { EverConnectModule, everConnectModuleImports, isEverConnectEnabled } from './ever-connect.module';
+export {
+    EverConnectModule,
+    everConnectModuleImports,
+    isEverConnectEnabled,
+} from './ever-connect.module';
+export { EverConnectService, type EverConnectStatus } from './ever-connect.service';
 export * from './identity/ever-connect-identity.ports';
 export * from './identity/person-data-participant.port';
 export { EverIdLoginHandler, type EverIdLoginClientStatus } from './identity/ever-id-login.handler';

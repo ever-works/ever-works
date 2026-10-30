@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { config } from '../../config/constants';
 import { EVER_ID_CALLBACK_PATH } from '../../auth/services/ever-id-sign-in.service';
+import { EverConnectIntegrationChangedEvent } from '../ever-connect.events';
 import {
     EVER_CONNECT_PLATFORM,
     EVER_ID_LOGIN_INTEGRATION,
@@ -20,6 +22,9 @@ import { describeFailure, platformFailure } from './platform-answer';
  * only for two addresses on one origin.
  */
 export const EVER_ID_WEB_BACKCHANNEL_LOGOUT_PATH = '/api/auth/ever-id/backchannel-logout';
+
+/** The integration key of Sign in with Ever ID. */
+const EVER_ID_LOGIN_KEY = 'ever_id_login';
 
 /** The first read of a pending client, then twice as long each time up to 5 minutes. */
 export const CLIENT_READ_FIRST_MS = 5_000;
@@ -79,6 +84,20 @@ export class EverIdLoginHandler implements OnModuleDestroy {
 
     onModuleDestroy(): void {
         this.cancelTimer();
+    }
+
+    /** `ever_id_login` turned on or off at Ever Platform (or with the connection). */
+    @OnEvent(EverConnectIntegrationChangedEvent.EVENT_NAME, { async: true })
+    async onIntegrationChanged(event: EverConnectIntegrationChangedEvent): Promise<void> {
+        if (event.integrationKey !== EVER_ID_LOGIN_KEY) return;
+        try {
+            if (event.enabled) await this.start();
+            else await this.end();
+        } catch (error) {
+            this.logger.warn(
+                `Ever ID client not updated: ${error instanceof Error ? error.name : 'unknown'}`,
+            );
+        }
     }
 
     getStatus(): EverIdLoginClientStatus {
@@ -155,9 +174,11 @@ export class EverIdLoginHandler implements OnModuleDestroy {
             this.requestKey = null;
         } catch (error) {
             const failure = platformFailure(error);
-            if (failure.kind !== 'transient' && failure.kind !== 'rate_limited') {
-                this.requestKey = null;
-            }
+            const retryable =
+                failure.kind === 'transient' ||
+                failure.kind === 'rate_limited' ||
+                (failure.kind === 'problem' && failure.status >= 500);
+            if (!retryable) this.requestKey = null;
             if (failure.kind === 'problem' && failure.status === 409) {
                 // A client is pending or ready already: read it.
             } else if (failure.kind === 'problem' && failure.status === 403) {
@@ -171,7 +192,9 @@ export class EverIdLoginHandler implements OnModuleDestroy {
                 this.logger.warn(`Ever ID client refused: ${describeFailure(failure)}`);
                 return this.set('failed');
             } else {
-                this.logger.warn(`Ever ID client request will be retried: ${describeFailure(failure)}`);
+                this.logger.warn(
+                    `Ever ID client request will be retried: ${describeFailure(failure)}`,
+                );
                 this.schedule(
                     () => this.start(),
                     failure.kind === 'rate_limited' ? failure.retryAfterS * 1000 : undefined,
@@ -265,13 +288,15 @@ export class EverIdLoginHandler implements OnModuleDestroy {
             this.settings.invalidate();
             this.set('ready');
             // Links made before the client existed are reported once.
-            this.reporter.reportExistingLinks(issuer).catch((error) =>
-                this.logger.warn(
-                    `Existing Ever ID links not reported: ${
-                        error instanceof Error ? error.name : 'unknown'
-                    }`,
-                ),
-            );
+            this.reporter
+                .reportExistingLinks(issuer)
+                .catch((error) =>
+                    this.logger.warn(
+                        `Existing Ever ID links not reported: ${
+                            error instanceof Error ? error.name : 'unknown'
+                        }`,
+                    ),
+                );
             return this.status;
         }
 

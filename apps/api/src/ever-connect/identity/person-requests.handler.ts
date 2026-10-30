@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, In, MoreThan, QueryFailedError, type EntityManager } from 'typeorm';
-import { subjectHash } from '@ever-co/connect-sdk';
+import { subjectHash, type RequestBody } from '@ever-co/connect-sdk';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
 import {
     ActivityActionType,
@@ -215,15 +215,18 @@ export class PersonRequestsHandler {
     private async acknowledge(row: EverConnectPersonRequest): Promise<PersonRequestAnswer> {
         const client = await this.platform.client();
         if (!client) throw new PersonRequestNotAnsweredError('not_connected');
+        // The answer as the contract pins it (`detail.reason_code`, `legal_basis`);
+        // the SDK checks it against its own copy of the schema before sending.
+        const body = {
+            job_id: row.jobId,
+            result: row.result,
+            ...(row.reasonCode ? { detail: { reason_code: row.reasonCode } } : {}),
+            ...(row.legalBasis ? { legal_basis: row.legalBasis } : {}),
+            ...(row.exportUrl ? { export_url: row.exportUrl } : {}),
+        };
         try {
             await client.call('instanceAckRequest', {
-                body: {
-                    job_id: row.jobId,
-                    result: row.result as 'failed',
-                    ...(row.reasonCode ? { detail: { reason_code: row.reasonCode } } : {}),
-                    ...(row.legalBasis ? { legal_basis: row.legalBasis } : {}),
-                    ...(row.exportUrl ? { export_url: row.exportUrl } : {}),
-                },
+                body: body as unknown as RequestBody<'instanceAckRequest'>,
             });
         } catch (error) {
             const failure = platformFailure(error);
@@ -233,7 +236,10 @@ export class PersonRequestsHandler {
                 this.logger.warn(`Person request answer not taken: ${describeFailure(failure)}`);
                 return this.markRecorded(row);
             }
-            if (failure.kind === 'refused' || (failure.kind === 'problem' && failure.status === 422)) {
+            if (
+                failure.kind === 'refused' ||
+                (failure.kind === 'problem' && failure.status === 422)
+            ) {
                 // The answer does not fit the contract this build sends; sending it
                 // again changes nothing. It stays unrecorded and is logged.
                 this.logger.error(`Person request answer refused: ${describeFailure(failure)}`);

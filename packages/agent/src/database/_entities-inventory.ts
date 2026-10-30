@@ -227,6 +227,10 @@ import { IntegrationIdempotencyKey } from '../entities/integration-idempotency-k
 import { AccountDeletionRequest } from '../entities/account-deletion-request.entity';
 // Ever Connect — answers to Ever Platform's person deletion and export requests.
 import { EverConnectPersonRequest } from '../entities/ever-connect-person-request.entity';
+import { EverConnectConnection } from '../entities/ever-connect-connection.entity';
+import { EverConnectIntegration } from '../entities/ever-connect-integration.entity';
+import { EverConnectOutbox } from '../entities/ever-connect-outbox.entity';
+import { EverConnectLease } from '../entities/ever-connect-lease.entity';
 
 import {
     PluginEntity,
@@ -598,4 +602,10 @@ export const ENTITIES = [
     // Ever Connect — a connected installation's answers to Ever Platform's
     // deletion and export requests for a person (ids and machine codes only).
     EverConnectPersonRequest,
+    // Ever Connect — the connection (ids only), its integrations, the report
+    // outbox and the lease that makes one replica run the worker.
+    EverConnectConnection,
+    EverConnectIntegration,
+    EverConnectOutbox,
+    EverConnectLease,
 ];
