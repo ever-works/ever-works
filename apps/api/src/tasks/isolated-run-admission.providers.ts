@@ -11,6 +11,7 @@ import {
     type AppWorkRunPlacementPreview,
 } from '@ever-works/agent/app-works';
 import { AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
+import { GitFacadeService } from '@ever-works/agent/facades';
 import {
     FLEET_APP_WORK_LEASE_ADMISSION,
     FleetAgentNodeAffinityRepository,
@@ -105,6 +106,7 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
             affinities: FleetAgentNodeAffinityRepository,
             pushCredentials: FleetPushCredentialService,
             dispatcher: AgentTaskExecuteDispatcher,
+            git: GitFacadeService,
         ) =>
             new IsolatedRunAdmissionService({
                 works: {
@@ -149,6 +151,31 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
                             { repositoryId: `${owner}/${repo}` },
                         ])
                     ).ok,
+                // APW-08 T53 (FR-72) — APW-01 Inspect's own reading (the provider's `sizeKb` on
+                // `getRepository`). Asked only while the checkout stage has a limit; unbound (no
+                // git facade in this graph) reads as unmeasurable, which that limit refuses.
+                ...(git
+                    ? {
+                          repositorySizeKb: async (
+                              userId: string,
+                              owner: string,
+                              repo: string,
+                              work: AdmissionWork,
+                          ) => {
+                              const provider = (work as { gitProvider?: string | null }).gitProvider;
+                              // No provider named on the Work: unmeasurable, never a guessed one.
+                              if (!provider) return null;
+                              const repository = await git.getRepository(owner, repo, {
+                                  userId,
+                                  providerId: provider,
+                                  workId: work.id,
+                              });
+                              return typeof repository?.sizeKb === 'number'
+                                  ? repository.sizeKb
+                                  : null;
+                          },
+                      }
+                    : {}),
                 placementFor: async ({ task, agentId }): Promise<AppWorkRunPlacementPreview> =>
                     dispatcher.previewPlacement
                         ? dispatcher.previewPlacement({
@@ -171,6 +198,7 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
             FleetAgentNodeAffinityRepository,
             FleetPushCredentialService,
             AGENT_TASK_EXECUTE_DISPATCHER,
+            GitFacadeService,
         ],
     },
     {
