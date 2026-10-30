@@ -305,13 +305,37 @@ export class WorkRepository {
      * loop's columns are switched on for `app` only, plan §2.3) and never on a row whose owner
      * changed between the read and the write. Additive: {@link update} is unchanged.
      *
+     * `opts.onlyIfBaseBranchUnset` adds `taskIsolationBaseBranch IS NULL OR TRIM(…) = ''` to the
+     * same `WHERE` — T50's backfill only (review of #3036): the backfill read the row with no
+     * base, resolved one, and writes it; an `app.spec.applied` listener that wrote a newer branch
+     * in between must win, so the backfill's write then matches no row instead of overwriting it.
+     * The listener's own write stays unconditional (it is the newer answer).
+     *
      * Returns whether a row was written. An empty patch writes nothing and answers `false`.
      */
-    async updateAppWorkColumns(id: string, userId: string, patch: Partial<Work>): Promise<boolean> {
+    async updateAppWorkColumns(
+        id: string,
+        userId: string,
+        patch: Partial<Work>,
+        opts: { onlyIfBaseBranchUnset?: boolean } = {},
+    ): Promise<boolean> {
         if (!id || !userId || !patch || Object.keys(patch).length === 0) {
             return false;
         }
-        const result = await this.repository.update({ id, userId, kind: 'app' }, patch);
+        const result = await this.repository.update(
+            opts.onlyIfBaseBranchUnset
+                ? {
+                      id,
+                      userId,
+                      kind: 'app',
+                      // The same "unset" `findAppWorkIdsWithoutIsolationBase` pages on.
+                      taskIsolationBaseBranch: Raw(
+                          (column) => `(${column} IS NULL OR TRIM(${column}) = '')`,
+                      ),
+                  }
+                : { id, userId, kind: 'app' },
+            patch,
+        );
         return (result.affected ?? 0) > 0;
     }
 

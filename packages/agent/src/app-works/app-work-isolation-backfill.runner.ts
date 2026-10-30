@@ -198,11 +198,14 @@ export class AppWorkIsolationBackfillRunner {
             summary.bySource[resolved.source] += 1;
             return;
         }
-        if (await this.isolation.apply(work, patch)) {
+        // Conditional on the base being STILL unset (review of #3036): between this read and this
+        // write an `app.spec.applied` listener may have written a newer branch, which must win.
+        if (await this.isolation.apply(work, patch, { onlyIfBaseBranchUnset: true })) {
             summary.updated += 1;
             summary.bySource[resolved.source] += 1;
         } else {
-            // The scoped write matched no row: the Work changed owner or kind since it was read.
+            // The scoped write matched no row: the Work changed owner or kind since it was read,
+            // or the listener gave it a base branch meanwhile.
             summary.skipped += 1;
         }
     }

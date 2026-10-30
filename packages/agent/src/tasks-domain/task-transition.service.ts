@@ -1445,13 +1445,6 @@ export class TaskTransitionService {
                 error: 'agent-not-found',
             };
         }
-        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
-        // session on the computer the Agent is pinned to — the Fleet starts it
-        // (its own Run, trigger `session`, linked to this Task). Ownership was
-        // checked just above, at the one dispatch choke point.
-        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
-            return this.sessionSchedules.dispatch(task, agentId);
-        }
         // APW-08 T49 (R-30) — the operator's change switch, read HERE, at the one dispatch
         // choke point, so it bites for every surface (board, chat, Goal, recurrence, fan-out)
         // and for Tasks created before it was flipped. Off, an App Work Task gets no new run
@@ -1478,6 +1471,18 @@ export class TaskTransitionService {
             const error = describeAppWorkNoCommitPermission();
             this.logger.warn(`Task ${task.id}: no run dispatched for agent ${agentId} — ${error}`);
             return { runId: null, dispatched: false, parked: false, error };
+        }
+        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
+        // session on the computer the Agent is pinned to — the Fleet starts it
+        // (its own Run, trigger `session`, linked to this Task). Ownership was
+        // checked above, at the one dispatch choke point. Placed AFTER the two
+        // App Work refusals above (review of #3036): a session on an App Work
+        // Task is a change like any run, so the operator's T49 switch and the
+        // FR-9 commit permission bite for it too. Both read nothing unless changes
+        // are paused or the Agent may not commit, and they refuse App Work Tasks
+        // only, so every other session starts as before.
+        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
+            return this.sessionSchedules.dispatch(task, agentId);
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;

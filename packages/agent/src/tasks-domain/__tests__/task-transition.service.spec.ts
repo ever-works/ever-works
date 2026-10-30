@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { TaskTransitionService } from '../task-transition.service';
 import { TaskStatus, TaskPriority } from '../../entities/task.entity';
 import type { Task } from '../../entities/task.entity';
+import { FLEET_SESSION_SCHEDULE_LABEL } from '../task-session-schedule.port';
 
 function makeTask(over: Partial<Task> = {}): Task {
     return {
@@ -313,7 +314,10 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
     let dispatcher: { enqueue: jest.Mock };
     let works: { findById: jest.Mock };
 
-    function makeSvc(permissions: Record<string, boolean> | undefined): TaskTransitionService {
+    function makeSvc(
+        permissions: Record<string, boolean> | undefined,
+        extras: { agentReviews?: unknown; sessionSchedules?: unknown } = {},
+    ): TaskTransitionService {
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
@@ -345,6 +349,9 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
             works,
             undefined, // terminalSessions
             agents,
+            extras.agentReviews,
+            undefined, // domainEvents
+            extras.sessionSchedules,
         );
     }
 
@@ -393,11 +400,44 @@ describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on a
     });
 
     it('a review run is not a change: it passes on an App Work with an Agent that may not commit', async () => {
-        const svc = makeSvc({ canCommitToRepo: false });
+        // A review run needs its review service to bind the run (review of #3036: without it the
+        // dispatch failed for another reason and this case proved nothing).
+        const agentReviews = { bindRun: jest.fn().mockResolvedValue(undefined) };
+        const svc = makeSvc({ canCommitToRepo: false }, { agentReviews });
         const result = await svc.dispatchAgentRun(makeTask({ workId: 'w-app' }), 'agent-a', {
             reviewId: 'review-1',
         });
 
+        expect(result).toMatchObject({ dispatched: true });
         expect(result.error ?? '').not.toContain('no_commit_permission');
+        expect(agentReviews.bindRun).toHaveBeenCalledWith('review-1', 'r1');
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it('an Agent-session schedule on an App Work is refused the same way, before the session starts (review of #3036)', async () => {
+        const sessionSchedules = { dispatch: jest.fn().mockResolvedValue({ dispatched: true }) };
+        const svc = makeSvc({ canCommitToRepo: false }, { sessionSchedules });
+        const result = await svc.dispatchAgentRun(
+            makeTask({ workId: 'w-app', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+
+        expect(result).toMatchObject({ dispatched: false, runId: null });
+        expect(result.error).toContain(FR9);
+        expect(sessionSchedules.dispatch).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('an Agent-session schedule whose Agent may commit (or on another kind) still starts its session', async () => {
+        const sessionSchedules = { dispatch: jest.fn().mockResolvedValue({ dispatched: true }) };
+        await makeSvc({ canCommitToRepo: true }, { sessionSchedules }).dispatchAgentRun(
+            makeTask({ workId: 'w-app', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+        await makeSvc({ canCommitToRepo: false }, { sessionSchedules }).dispatchAgentRun(
+            makeTask({ workId: 'w-site', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+        expect(sessionSchedules.dispatch).toHaveBeenCalledTimes(2);
     });
 });

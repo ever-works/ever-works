@@ -242,8 +242,15 @@ export class AppWorkIsolationService {
      * `kind = 'app'`). Refuses any other kind before it reaches the database, and writes nothing
      * for an empty patch. Returns whether a row was written. Throws what the database throws —
      * each caller decides what a failed write means for it.
+     *
+     * `opts.onlyIfBaseBranchUnset` is T50's: the write lands only while the row still has no base
+     * branch, so a listener write that raced the backfill's read is never overwritten.
      */
-    async apply(work: Work, patch: AppWorkIsolationPatch): Promise<boolean> {
+    async apply(
+        work: Work,
+        patch: AppWorkIsolationPatch,
+        opts: { onlyIfBaseBranchUnset?: boolean } = {},
+    ): Promise<boolean> {
         if (!work || !isAppWorkKind(work.kind)) return false;
         if (!patch || Object.keys(patch).length === 0) return false;
         if (!work.userId) {
@@ -252,7 +259,7 @@ export class AppWorkIsolationService {
             );
             return false;
         }
-        return this.works.updateAppWorkColumns(work.id, work.userId, patch as Partial<Work>);
+        return this.works.updateAppWorkColumns(work.id, work.userId, patch as Partial<Work>, opts);
     }
 
     /** The column names a patch touches, in a stable order — for an outcome and a log line. */
@@ -332,9 +339,13 @@ export class AppWorkIsolationService {
  *
  * Trimmed; at most {@link APP_WORK_BASE_BRANCH_MAX} characters (the column is `varchar(128)`, the
  * tracked branch `varchar(255)`); no whitespace, no control character and none of the characters
- * git refuses in a ref (`~ ^ : ? * [ \`). Anything else is treated as "this source did not
- * answer", so the next source is asked — a value the column cannot hold must not fail the write
- * of every other column with it.
+ * git refuses in a ref (`~ ^ : ? * [ \`). The rest of `git check-ref-format --branch` too
+ * (review of #3036): no leading `-` (an option to every git call the column reaches), not `@`,
+ * no `@{`, no `..` or `//`, no leading or trailing `/`, no trailing `.`, and no path component
+ * that starts with `.` or ends in `.lock`. APW-03's schema refuses some of these in
+ * `source.branch`, but the tracked branch and the provider's default are read from elsewhere.
+ * Anything else is treated as "this source did not answer", so the next source is asked — a
+ * value the column cannot hold must not fail the write of every other column with it.
  */
 function usableBranch(value: unknown): string | null {
     if (typeof value !== 'string') return null;
@@ -342,6 +353,12 @@ function usableBranch(value: unknown): string | null {
     if (!branch || branch.length > APP_WORK_BASE_BRANCH_MAX) return null;
     // eslint-disable-next-line no-control-regex
     if (/[\s\u0000-\u001f\u007f~^:?*[\\]/.test(branch)) return null;
+    if (branch === '@' || branch.startsWith('-') || branch.includes('@{')) return null;
+    if (branch.includes('..') || branch.includes('//')) return null;
+    if (branch.startsWith('/') || branch.endsWith('/') || branch.endsWith('.')) return null;
+    if (branch.split('/').some((part) => part.startsWith('.') || part.endsWith('.lock'))) {
+        return null;
+    }
     return branch;
 }
 

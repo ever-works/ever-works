@@ -166,6 +166,23 @@ describe('APW-08 T50 — AppWorkIsolationBackfillRunner', () => {
         return pages.reduce((sum, page) => sum + page[key], 0);
     }
 
+    it('never overwrites a base branch the listener wrote between its read and its write (review of #3036)', async () => {
+        const work = await seedWork({ repo: 'raced' });
+        // While the backfill resolves (step 2), an `app.spec.applied` listener writes a newer
+        // branch onto the same row.
+        specStates.findByWorkId.mockImplementationOnce(async (workId: string) => {
+            await dataSource
+                .getRepository(Work)
+                .update({ id: workId }, { taskIsolationBaseBranch: 'from-the-listener' });
+            return { workId, trackedBranch: 'stale-resolution' };
+        });
+
+        const [page] = await runAll(runner());
+
+        expect(page).toMatchObject({ scanned: 1, updated: 0, skipped: 1 });
+        expect((await stored(work.id)).taskIsolationBaseBranch).toBe('from-the-listener');
+    });
+
     it('fills a null column from each of the three sources, in order', async () => {
         const fromSpec = await seedWork({ repo: 'one' });
         specBranches.set(fromSpec.id, 'production');
@@ -458,7 +475,10 @@ describe('APW-08 T50 — AppWorkIsolationBackfillRunner', () => {
                 });
             }
             expect(source).toContain('this.isolation.resolveSourceBranch(work)');
-            expect(source).toContain('this.isolation.apply(work, patch)');
+            // The shared write, made conditional on a still-unset base (review of #3036).
+            expect(source).toContain(
+                'this.isolation.apply(work, patch, { onlyIfBaseBranchUnset: true })',
+            );
         });
     });
 });

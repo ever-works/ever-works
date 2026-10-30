@@ -269,6 +269,42 @@ describe('APW-08 T11 — AppWorkSpecAppliedListener', () => {
             expect((await stored(work.id)).taskIsolationBaseBranch).toBe('main');
         });
 
+        it.each([
+            '-x',
+            '--upload-pack=x',
+            '@',
+            'a@{1}',
+            'a..b',
+            'a//b',
+            '/main',
+            'main/',
+            'main.',
+            '.hidden',
+            'feature/.x',
+            'main.lock',
+            'feature/x.lock',
+        ])(
+            'a ref git refuses (%s) is skipped for the next source, not written (review of #3036)',
+            async (bad) => {
+                const work = await seedWork();
+                trackedBranches.set(work.id, bad);
+                repositoryDefaults.set('acme/shop', 'main');
+
+                await build().listener.onSpecApplied(event({ workId: work.id }));
+
+                expect((await stored(work.id)).taskIsolationBaseBranch).toBe('main');
+            },
+        );
+
+        it('real branch shapes still pass (feature/x, release-1.2, v2.x, user@host)', async () => {
+            for (const good of ['feature/x', 'release-1.2', 'v2.x', 'user@host']) {
+                const work = await seedWork();
+                trackedBranches.set(work.id, good);
+                await build().listener.onSpecApplied(event({ workId: work.id }));
+                expect((await stored(work.id)).taskIsolationBaseBranch).toBe(good);
+            }
+        });
+
         it('an unreadable repository leaves the base column as it is, and still switches isolation on', async () => {
             const work = await seedWork({ taskIsolationBaseBranch: null });
             repositoryDefaults.set('acme/shop', new Error('Bad credentials'));
