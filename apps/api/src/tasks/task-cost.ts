@@ -96,6 +96,8 @@ export interface TaskCostContainmentReads {
         agentId?: string | null;
         tenantId?: string | null;
         organizationId?: string | null;
+        /** Who is looking: Allow / Withdraw are offered only on that viewer's own nodes. */
+        viewerUserId?: string | null;
     }): Promise<Pick<TaskCostView, 'containment' | 'containmentHolds'> | null>;
 }
 

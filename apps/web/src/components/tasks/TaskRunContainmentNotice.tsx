@@ -40,8 +40,13 @@ export function TaskRunContainmentNotice({
     const [pending, setPending] = useState<string | null>(null);
     const [failed, setFailed] = useState(false);
 
-    const held = (holds ?? []).filter((hold) => hold.nodeId);
+    // Every hold is shown; only a node the VIEWER enrolled gets a button (review of #3040): the
+    // route answers 404 for anyone else's node, and a hold that names no node (the owner's node
+    // list could not be read) is information only.
+    const held = holds ?? [];
     if (!containment && held.length === 0) return null;
+    const canAct = (view: TaskRunContainmentView) =>
+        !!workId && !!view.nodeId && view.viewerOwnsNode === true;
 
     const nodeLabel = (view: TaskRunContainmentView) =>
         view.nodeName?.trim() || t('unknownMachine');
@@ -118,19 +123,30 @@ export function TaskRunContainmentNotice({
 
             {held.map((hold) => (
                 <div
-                    key={`hold-${hold.nodeId}`}
+                    key={`hold-${hold.nodeId ?? 'unnamed'}`}
                     className="space-y-2 rounded-lg border border-border/60 dark:border-border-dark/60 p-3"
                     data-testid="task-containment-hold"
                     data-node-id={hold.nodeId ?? ''}
                 >
-                    <p className="font-medium" data-testid="task-containment-hold-copy">
-                        {tRules('containmentDowngrade')}
-                    </p>
-                    <p className="text-text-muted dark:text-text-muted-dark">
-                        {t('nextRun', { node: nodeLabel(hold) })}
-                    </p>
-                    {record(hold)}
-                    {workId && (
+                    {hold.nodeId ? (
+                        <>
+                            <p className="font-medium" data-testid="task-containment-hold-copy">
+                                {tRules('containmentDowngrade')}
+                            </p>
+                            <p className="text-text-muted dark:text-text-muted-dark">
+                                {t('nextRun', { node: nodeLabel(hold) })}
+                            </p>
+                            {record(hold)}
+                        </>
+                    ) : (
+                        <p
+                            className="text-text-muted dark:text-text-muted-dark"
+                            data-testid="task-containment-nodes-unreadable"
+                        >
+                            {t('nodesUnreadable')}
+                        </p>
+                    )}
+                    {canAct(hold) && (
                         <button
                             type="button"
                             onClick={() => void change(hold.nodeId as string, true)}
@@ -167,7 +183,7 @@ export function TaskRunContainmentNotice({
                                     })}
                                 </span>
                             )}
-                            {workId && (
+                            {canAct(containment) && (
                                 <button
                                     type="button"
                                     onClick={() => void change(containment.nodeId as string, false)}

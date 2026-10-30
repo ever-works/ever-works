@@ -77,7 +77,7 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
         return { controller, store, ownership };
     }
 
-    const owner = { userId: 'owner' } as AuthenticatedUser;
+    const owner = { userId: 'owner', authMethod: 'session' } as AuthenticatedUser;
 
     async function refusal(
         promise: Promise<unknown>,
@@ -154,6 +154,37 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
         expect(out.status).toBe(404);
         expect(out.body).toMatchObject({ code: 'not_found' });
         expect(store.setContainmentAllowance).not.toHaveBeenCalled();
+    });
+
+    it('CodeRabbit (#3040): an API-key caller is refused 403 — allow and withdraw alike — and nothing is read or written', async () => {
+        const { controller, store, ownership } = build();
+        const apiKey = { userId: 'owner', authMethod: 'api-key' } as AuthenticatedUser;
+        for (const allow of [true, false]) {
+            const out = await refusal(
+                controller.allowContainment(apiKey, 'w1', { nodeId: NODE, allow }),
+            );
+            expect(out.status).toBe(403);
+        }
+        // A credential with no stamp is not a person either (fail closed).
+        const unstamped = { userId: 'owner' } as AuthenticatedUser;
+        expect(
+            (
+                await refusal(
+                    controller.allowContainment(unstamped, 'w1', { nodeId: NODE, allow: true }),
+                )
+            ).status,
+        ).toBe(403);
+        expect(ownership.ensureCanEdit).not.toHaveBeenCalled();
+        expect(store.setContainmentAllowance).not.toHaveBeenCalled();
+    });
+
+    it('409 conflict when concurrent changes kept the compare-and-set from landing (nothing written)', async () => {
+        const { controller } = build({ result: { status: 'conflict' } });
+        const out = await refusal(
+            controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }),
+        );
+        expect(out.status).toBe(409);
+        expect(out.body).toMatchObject({ code: 'conflict' });
     });
 
     it('503 when the allowance store is not wired', async () => {

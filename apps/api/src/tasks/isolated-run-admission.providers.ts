@@ -1,14 +1,23 @@
 import type { Provider } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { isUUID } from 'class-validator';
 import {
     APP_WORK_RUN_ADMISSION,
     APP_WORK_RUN_CONTAINMENT_RECORDER,
     APP_WORK_TASK_CONTAINMENT_READER,
     IsolatedRunAdmissionService,
     type AdmissionWork,
+    type AppWorkRunAdmissionGate,
     type AppWorkRunPlacementPreview,
 } from '@ever-works/agent/app-works';
 import { AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
-import { FleetJobRepository, FleetJobService, FleetNodeRepository } from '@ever-works/agent/fleet';
+import {
+    FLEET_APP_WORK_LEASE_ADMISSION,
+    FleetAgentNodeAffinityRepository,
+    FleetJobRepository,
+    FleetNodeRepository,
+    type FleetAppWorkLeaseAdmission,
+} from '@ever-works/agent/fleet';
 import {
     AGENT_TASK_EXECUTE_DISPATCHER,
     TaskAssigneeRepository,
@@ -21,17 +30,26 @@ import { FleetPushCredentialService } from '../fleet/fleet-push-credential.servi
  * APW-08 T12 + T48 — the API's binding of isolated-run admission.
  *
  * ONE `IsolatedRunAdmissionService` (agent package, structural reads) built over the platform's
- * own rows and answers, served under the three ports its callers inject `@Optional()`:
+ * own rows and answers, served under the ports its callers inject `@Optional()`:
  *
  * | Token | Asked by |
  * |---|---|
- * | `APP_WORK_RUN_ADMISSION` | `TaskTransitionService.dispatchAgentRun` (T12 site 1, ahead of the gate) |
+ * | `APP_WORK_RUN_ADMISSION` | `TaskTransitionService.dispatchAgentRun` (site 1), the fleet-aware dispatcher (every Fleet enqueue, lazily) and the allowance route |
+ * | `FLEET_APP_WORK_LEASE_ADMISSION` | `FleetJobService.lease` — the node that takes an App Work job (lazily) |
  * | `APP_WORK_RUN_CONTAINMENT_RECORDER` | `FleetAgentTaskReconcilerService` (T48, beside the receipt) |
- * | `APP_WORK_TASK_CONTAINMENT_READER` | `GET /api/tasks/:id/cost` and the allowance route (T48 / T27) |
+ * | `APP_WORK_TASK_CONTAINMENT_READER` | `GET /api/tasks/:id/cost` (T48 / T27) |
  *
  * Provided in `TasksModule` because that is the `@Global()` module that already owns the
  * dispatcher (`previewPlacement`) and imports the fleet graph — the push-credential service and
  * the Fleet repositories this needs.
+ *
+ * ## No construction cycle
+ *
+ * The admission reads placement through the dispatcher, the dispatcher asks the admission on every
+ * Fleet enqueue, and `FleetJobService` (under the router and the push-credential service) asks the
+ * lease half — so the two inbound edges are LAZY proxies over `ModuleRef`, resolved on first call.
+ * The affinity lookup reads `FleetAgentNodeAffinityRepository` directly (the same row
+ * `FleetJobService.resolveAgentTaskTarget` reads) rather than depending on that service.
  *
  * ## The facts, and where each comes from
  *
@@ -55,6 +73,21 @@ import { FleetPushCredentialService } from '../fleet/fleet-push-credential.servi
 /** Jobs of one node scanned for its latest containment report. */
 const NODE_JOBS_SCAN = 25;
 
+/**
+ * The admission, resolved on first use from the module graph (see "No construction cycle").
+ * Exported for the dispatcher factory in `TasksModule`.
+ */
+export function lazyAppWorkRunAdmission(
+    moduleRef: ModuleRef,
+): Pick<AppWorkRunAdmissionGate, 'admit'> {
+    let resolved: IsolatedRunAdmissionService | null = null;
+    const get = () =>
+        (resolved ??= moduleRef.get<IsolatedRunAdmissionService>(APP_WORK_RUN_ADMISSION, {
+            strict: false,
+        }));
+    return { admit: (input) => get().admit(input) };
+}
+
 export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
     {
         provide: APP_WORK_RUN_ADMISSION,
@@ -65,15 +98,15 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
             assignees: TaskAssigneeRepository,
             nodes: FleetNodeRepository,
             jobRows: FleetJobRepository,
-            jobs: FleetJobService,
+            affinities: FleetAgentNodeAffinityRepository,
             pushCredentials: FleetPushCredentialService,
             dispatcher: AgentTaskExecuteDispatcher,
         ) =>
             new IsolatedRunAdmissionService({
                 works: {
                     findById: (id) => works.findById(id) as Promise<AdmissionWork | null>,
-                    updateAppWorkColumns: (id, userId, patch) =>
-                        works.updateAppWorkColumns(id, userId, patch),
+                    casAppRunContainmentAllowances: (id, userId, previous, next) =>
+                        works.casAppRunContainmentAllowances(id, userId, previous, next),
                 },
                 tasks: { findById: (id) => tasks.findById(id) },
                 runs: {
@@ -82,10 +115,15 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
                 },
                 assignees,
                 fleet: {
+                    // Every enrolled node of the owner, ANY status (a paused or enrolling node can
+                    // lease later, so it is a candidate — review of #3040).
                     nodesForUser: (userId) => nodes.findByUser(userId),
                     nodeById: (nodeId) => nodes.findById(nodeId),
-                    pinnedNodeFor: (userId, agentId) =>
-                        jobs.resolveAgentTaskTarget(userId, agentId),
+                    pinnedNodeFor: async (userId, agentId) =>
+                        isUUID(agentId)
+                            ? ((await affinities.findForOwnedAgent(userId, agentId))?.nodeId ??
+                              null)
+                            : null,
                     latestContainment: async (userId, nodeId) => {
                         const rows = await jobRows.findByNodeForUser(
                             userId,
@@ -125,10 +163,26 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
             TaskAssigneeRepository,
             FleetNodeRepository,
             FleetJobRepository,
-            FleetJobService,
+            FleetAgentNodeAffinityRepository,
             FleetPushCredentialService,
             AGENT_TASK_EXECUTE_DISPATCHER,
         ],
+    },
+    {
+        // Lazy: `FleetJobService` sits under the push-credential service and the router, both of
+        // which the admission depends on.
+        provide: FLEET_APP_WORK_LEASE_ADMISSION,
+        useFactory: (moduleRef: ModuleRef): FleetAppWorkLeaseAdmission => {
+            let resolved: IsolatedRunAdmissionService | null = null;
+            return {
+                admitsLease: (input) =>
+                    (resolved ??= moduleRef.get<IsolatedRunAdmissionService>(
+                        APP_WORK_RUN_ADMISSION,
+                        { strict: false },
+                    )).admitsLease(input),
+            };
+        },
+        inject: [ModuleRef],
     },
     { provide: APP_WORK_RUN_CONTAINMENT_RECORDER, useExisting: APP_WORK_RUN_ADMISSION },
     { provide: APP_WORK_TASK_CONTAINMENT_READER, useExisting: APP_WORK_RUN_ADMISSION },
@@ -137,6 +191,7 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
 /** The tokens `TasksModule` exports (it is `@Global()`, so the agent-side injections see them). */
 export const ISOLATED_RUN_ADMISSION_TOKENS = [
     APP_WORK_RUN_ADMISSION,
+    FLEET_APP_WORK_LEASE_ADMISSION,
     APP_WORK_RUN_CONTAINMENT_RECORDER,
     APP_WORK_TASK_CONTAINMENT_READER,
 ];

@@ -1,4 +1,5 @@
 import { Global, Module, type Type } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import {
     TasksDomainModule,
     AGENT_TASK_EXECUTE_DISPATCHER,
@@ -79,6 +80,7 @@ import { isE2eAppLauncherSeedEnabled } from '../app-launcher/e2e-seed.controller
 import {
     ISOLATED_RUN_ADMISSION_PROVIDERS,
     ISOLATED_RUN_ADMISSION_TOKENS,
+    lazyAppWorkRunAdmission,
 } from './isolated-run-admission.providers';
 
 /**
@@ -177,11 +179,22 @@ function tasksControllers(): Type<unknown>[] {
                 // (`runnerKind`), so the Task page can tell a fleet run from a
                 // cloud one. Display-only; from the imported DatabaseModule.
                 runs: AgentRunRepository | undefined,
+                // APW-08 T12 / T48 (review of #3040) — the Fleet half of isolated-run admission
+                // for every Fleet enqueue, resolved LAZILY: the admission reads placement
+                // through this very dispatcher, so an eager injection would be a cycle.
+                moduleRef: ModuleRef,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications, planner, killSwitch, runs },
+                    {
+                        scopeResolver,
+                        notifications,
+                        planner,
+                        killSwitch,
+                        runs,
+                        appWorkAdmission: lazyAppWorkRunAdmission(moduleRef),
+                    },
                 ),
             inject: [
                 FleetRunRouterService,
@@ -190,6 +203,7 @@ function tasksControllers(): Type<unknown>[] {
                 FleetAgentTaskPlannerService,
                 FleetKillSwitchService,
                 { token: AgentRunRepository, optional: true },
+                ModuleRef,
             ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },

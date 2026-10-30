@@ -1690,7 +1690,11 @@ export class TasksController {
         });
         // APW-08 T48 / T12 — the containment the Task's latest Fleet run got and the nodes that
         // hold its next run (App Work Tasks only; every other view is returned unchanged).
-        return withTaskContainment(view, task, this.containment ?? null);
+        return withTaskContainment(
+            view,
+            { ...task, viewerUserId: auth.userId },
+            this.containment ?? null,
+        );
     }
 
     @Get(':id/delivery')

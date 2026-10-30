@@ -1,6 +1,7 @@
 import {
     admitFleetContainment,
     applyAppRunContainmentAllowance,
+    isNodeContainmentAdmissible,
     isNodeContainmentAllowed,
     needsOwnerAllowance,
     normalizeAppRunContainmentAllowances,
@@ -27,6 +28,7 @@ import {
 const OWNER = 'user-1';
 const NODE_A = '11111111-1111-4111-8111-111111111111';
 const NODE_B = '22222222-2222-4222-8222-222222222222';
+const NODE_C = '33333333-3333-4333-8333-333333333333';
 const DECLINED = {
     executionPath: 'ordinary',
     isolatedHome: false,
@@ -89,6 +91,7 @@ describe('run containment — the record, read toward LESS containment', () => {
                 admitFleetContainment([{ nodeId: NODE_A, containment, allowed: false }]),
             ).toEqual({
                 admitted: true,
+                nodeId: NODE_A,
             });
         }
     });
@@ -107,6 +110,13 @@ describe('run containment — the record, read toward LESS containment', () => {
             admitFleetContainment([{ nodeId: NODE_A, containment: declined, allowed: true }]),
         ).toEqual({
             admitted: true,
+            nodeId: NODE_A,
+        });
+        // Review of #3040: an EMPTY candidate set is held (no node named), never admitted.
+        expect(admitFleetContainment([])).toEqual({
+            admitted: false,
+            nodeId: null,
+            containment: null,
         });
     });
 
@@ -139,21 +149,25 @@ describe('run containment — the allowance store (EW-807 pattern)', () => {
         expect(isNodeContainmentAllowed(store, NODE_B)).toBe(false);
         expect(isNodeContainmentAllowed(store, null)).toBe(false);
 
+        // Per node (what the LEASE judges): A is allowed, B is not. Since the review of #3040 the
+        // dispatch-time set is admitted when ANY node is admissible (it names that node), and the
+        // lease keeps B off the job; B alone holds the run.
         const declined = toAppWorkRunContainment(DECLINED);
-        expect(
-            admitFleetContainment([
-                {
-                    nodeId: NODE_A,
-                    containment: declined,
-                    allowed: isNodeContainmentAllowed(store, NODE_A),
-                },
-                {
-                    nodeId: NODE_B,
-                    containment: declined,
-                    allowed: isNodeContainmentAllowed(store, NODE_B),
-                },
-            ]),
-        ).toMatchObject({ admitted: false, nodeId: NODE_B });
+        const facts = (nodeId: string) => ({
+            nodeId,
+            containment: declined,
+            allowed: isNodeContainmentAllowed(store, nodeId),
+        });
+        expect(isNodeContainmentAdmissible(facts(NODE_A))).toBe(true);
+        expect(isNodeContainmentAdmissible(facts(NODE_B))).toBe(false);
+        expect(admitFleetContainment([facts(NODE_B), facts(NODE_A)])).toEqual({
+            admitted: true,
+            nodeId: NODE_A,
+        });
+        expect(admitFleetContainment([facts(NODE_B)])).toMatchObject({
+            admitted: false,
+            nodeId: NODE_B,
+        });
     });
 
     it('is additive, idempotent and withdrawable; a second allow keeps the first author and time', () => {
@@ -227,13 +241,12 @@ describe('run containment — the service: record, Cost view, allowance route', 
         const recordContainment = jest.fn(async (runId: string, record: unknown) => {
             world.runRecords[runId] = record;
         });
-        const updateAppWorkColumns = jest.fn(
-            async (
-                id: string,
-                _userId: string,
-                patch: { appRunContainmentAllowances: unknown },
-            ) => {
-                world.works[id].allowances = patch.appRunContainmentAllowances;
+        // A faithful compare-and-set over the world's column (what `WorkRepository` does in SQL).
+        const casAppRunContainmentAllowances = jest.fn(
+            async (id: string, _userId: string, previous: unknown, next: unknown) => {
+                const current = world.works[id].allowances ?? null;
+                if (JSON.stringify(current) !== JSON.stringify(previous ?? null)) return false;
+                world.works[id].allowances = next;
                 return true;
             },
         );
@@ -251,7 +264,7 @@ describe('run containment — the service: record, Cost view, allowance route', 
                               getWebsiteRepo: () => 'bookings',
                           }
                         : null,
-                updateAppWorkColumns,
+                casAppRunContainmentAllowances,
             },
             tasks: { findById: async (id) => world.tasks[id] ?? null },
             runs: {
@@ -274,9 +287,11 @@ describe('run containment — the service: record, Cost view, allowance route', 
                 nodeById: async (id) =>
                     id === NODE_A
                         ? { id: NODE_A, userId: OWNER, name: 'Maya desktop' }
-                        : id === NODE_B
-                          ? { id: NODE_B, userId: 'someone-else', name: 'Not yours' }
-                          : null,
+                        : id === NODE_C
+                          ? { id: NODE_C, userId: OWNER, name: 'Maya laptop' }
+                          : id === NODE_B
+                            ? { id: NODE_B, userId: 'someone-else', name: 'Not yours' }
+                            : null,
                 latestContainment: async (_userId, nodeId) => world.reports[nodeId] ?? null,
             },
             placementFor: async () => ({ placement: 'fleet', requiredCapabilities: [] }),
@@ -285,7 +300,8 @@ describe('run containment — the service: record, Cost view, allowance route', 
         return {
             service: new IsolatedRunAdmissionService(reads),
             recordContainment,
-            updateAppWorkColumns,
+            casAppRunContainmentAllowances,
+            reads,
         };
     }
 
@@ -310,6 +326,7 @@ describe('run containment — the service: record, Cost view, allowance route', 
                 taskId: 't-app',
                 runId: 't-app-run-1',
                 userId: OWNER,
+                workId: 'w-app',
                 nodeId: NODE_A,
                 rawContainment: DECLINED,
             }),
@@ -324,14 +341,17 @@ describe('run containment — the service: record, Cost view, allowance route', 
         });
     });
 
-    it('…and leaves a non-App Task untouched (nothing written, nothing read beyond its Work)', async () => {
+    it('…and leaves a non-App Task untouched: no job marker, nothing written; its Cost view gains nothing', async () => {
         const w = world();
         const { service, recordContainment } = makeService(w);
+        // The reconciler asks only for a job whose payload names its App Work (`appWorkId`);
+        // without one there is nothing to record, and nothing is read to find out.
         expect(
             await service.recordRunContainment({
                 taskId: 't-site',
                 runId: 't-site-run-1',
                 userId: OWNER,
+                workId: '',
                 nodeId: NODE_A,
                 rawContainment: DECLINED,
             }),
@@ -349,6 +369,7 @@ describe('run containment — the service: record, Cost view, allowance route', 
             taskId: 't-app',
             runId: 't-app-run-1',
             userId: OWNER,
+            workId: 'w-app',
             nodeId: NODE_A,
             rawContainment: DECLINED,
         });
@@ -357,6 +378,7 @@ describe('run containment — the service: record, Cost view, allowance route', 
             id: 't-app',
             userId: OWNER,
             workId: 'w-app',
+            viewerUserId: OWNER,
         });
         expect(before!.containment).toMatchObject({
             runId: 't-app-run-1',
@@ -366,6 +388,7 @@ describe('run containment — the service: record, Cost view, allowance route', 
             needsOwnerAllowance: true,
             allowedByOwner: false,
             reported: true,
+            viewerOwnsNode: true,
         });
         // The next run is held on that node until the owner allows it.
         expect(before!.containmentHolds).toEqual([
@@ -443,5 +466,95 @@ describe('run containment — the service: record, Cost view, allowance route', 
                 actorUserId: OWNER,
             }),
         ).toEqual({ status: 'notAppWork' });
+    });
+
+    it('review of #3040: Allow / Withdraw are offered only on the VIEWER’s own nodes; a node list that cannot be read is a hold naming nothing', async () => {
+        const w = world();
+        const { service, reads } = makeService(w);
+        await service.recordRunContainment({
+            taskId: 't-app',
+            runId: 't-app-run-1',
+            userId: OWNER,
+            workId: 'w-app',
+            nodeId: NODE_A,
+            rawContainment: DECLINED,
+        });
+        const asMember = await service.describeForTask({
+            id: 't-app',
+            userId: OWNER,
+            workId: 'w-app',
+            viewerUserId: 'org-member',
+        });
+        expect(asMember!.containment).toMatchObject({ nodeId: NODE_A, viewerOwnsNode: false });
+        expect(asMember!.containmentHolds).toEqual([
+            expect.objectContaining({ nodeId: NODE_A, viewerOwnsNode: false }),
+        ]);
+
+        reads.fleet!.nodesForUser = async () => {
+            throw new Error('db down');
+        };
+        const unreadable = await service.describeForTask({
+            id: 't-app',
+            userId: OWNER,
+            workId: 'w-app',
+            viewerUserId: OWNER,
+        });
+        expect(unreadable!.containmentHolds).toEqual([
+            expect.objectContaining({ nodeId: null, viewerOwnsNode: false, reported: false }),
+        ]);
+    });
+
+    it('review of #3040: two concurrent allowances for different nodes BOTH land (compare-and-set, retried)', async () => {
+        const w = world();
+        const { service, reads, casAppRunContainmentAllowances } = makeService(w);
+        // Force the race: both calls read the column before either writes.
+        const realFind = reads.works.findById;
+        let arrived = 0;
+        let release!: () => void;
+        const bothRead = new Promise<void>((resolve) => (release = resolve));
+        reads.works.findById = async (id) => {
+            const row = await realFind(id);
+            arrived += 1;
+            if (arrived === 2) release();
+            if (arrived <= 2) await bothRead;
+            return row;
+        };
+
+        const [a, c] = await Promise.all([
+            service.setContainmentAllowance({
+                workId: 'w-app',
+                nodeId: NODE_A,
+                allow: true,
+                actorUserId: OWNER,
+            }),
+            service.setContainmentAllowance({
+                workId: 'w-app',
+                nodeId: NODE_C,
+                allow: true,
+                actorUserId: OWNER,
+            }),
+        ]);
+        expect(a.status).toBe('ok');
+        expect(c.status).toBe('ok');
+        expect(
+            (w.works['w-app'].allowances as Array<{ nodeId: string }>).map((e) => e.nodeId).sort(),
+        ).toEqual([NODE_A, NODE_C].sort());
+        // One of them lost the first compare-and-set and retried on a fresh read.
+        expect(casAppRunContainmentAllowances).toHaveBeenCalledTimes(3);
+    });
+
+    it('review of #3040: a compare-and-set that keeps losing gives up as a conflict and reports no success', async () => {
+        const w = world();
+        const { service, reads } = makeService(w);
+        reads.works.casAppRunContainmentAllowances = jest.fn(async () => false);
+        expect(
+            await service.setContainmentAllowance({
+                workId: 'w-app',
+                nodeId: NODE_A,
+                allow: true,
+                actorUserId: OWNER,
+            }),
+        ).toEqual({ status: 'conflict' });
+        expect(w.works['w-app'].allowances).toBeNull();
     });
 });

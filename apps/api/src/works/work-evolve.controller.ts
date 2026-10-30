@@ -45,6 +45,7 @@ import {
     type UpstreamPullRequestOpenResult,
 } from '@ever-works/agent/upstream-pull-requests';
 import { AuthSessionGuard, CurrentUser } from '../auth';
+import { requireHumanSession } from '../auth/machine-principal';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
     AllowAppRunContainmentDto,
@@ -434,6 +435,12 @@ export class WorkEvolveController {
         description:
             '`not_found` — the Work is missing or not editable; `notFound` — the node is unknown or not yours.',
     })
+    @ApiResponse({
+        status: 403,
+        description:
+            'Not a person: an API key, an automation or a fleet run token cannot decide this.',
+    })
+    @ApiResponse({ status: 409, description: '`conflict` — concurrent changes; nothing written.' })
     @ApiResponse({ status: 422, description: '`notAppWork`.' })
     @ApiResponse({ status: 503, description: '`unavailable` — the allowance store is not wired.' })
     async allowContainment(
@@ -441,6 +448,15 @@ export class WorkEvolveController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: AllowAppRunContainmentDto,
     ): Promise<void> {
+        // CodeRabbit (#3040) — accepting a containment downgrade is a PERSON's decision: an API
+        // key, an integration key, an automation or a fleet run token cannot make it, for an
+        // allowance or a withdrawal alike. Refused before anything is read or written.
+        requireHumanSession(
+            auth,
+            body?.allow === true
+                ? 'allow a containment downgrade'
+                : 'withdraw a containment allowance',
+        );
         const access = await this.authorize(id, auth.userId, 'edit', true);
         if (!this.containmentAllowances) {
             throw new HttpException(
@@ -467,6 +483,17 @@ export class WorkEvolveController {
                     message: `Work ${id} is not an App Work.`,
                 },
                 HttpStatus.UNPROCESSABLE_ENTITY,
+            );
+        }
+        if (result.status === 'conflict') {
+            // Lost the compare-and-set race every attempt: nothing was written; try again.
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'conflict',
+                    message: 'The allowances changed while saving. Try again.',
+                },
+                HttpStatus.CONFLICT,
             );
         }
         if (result.status === 'unavailable') {

@@ -47,6 +47,8 @@ function view(over: Partial<TaskRunContainmentView> = {}): TaskRunContainmentVie
         reportedAt: '2026-10-30T01:00:00.000Z',
         reported: true,
         allowedByOwner: false,
+        // The signed-in viewer enrolled the node (review of #3040: only then are there buttons).
+        viewerOwnsNode: true,
         ...over,
     };
 }
@@ -104,7 +106,9 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
         expect(rules.containmentDowngrade).toBe(
             'This machine runs app changes without an isolated home. Allow it once, or run this Task in an isolated sandbox.',
         );
-        expect(hold.textContent).toContain('Holds the next run on Maya desktop');
+        expect(hold.textContent).toContain(
+            "Won't receive this Task's runs until you allow it: Maya desktop",
+        );
 
         const button = within(hold).getByRole('button', { name: rules.allowOnThisMachine });
         fireEvent.click(button);
@@ -121,7 +125,7 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
             copy.notReported,
         );
         expect(screen.getByTestId('task-containment-hold').textContent).toContain(
-            `Holds the next run on ${copy.unknownMachine}`,
+            `Won't receive this Task's runs until you allow it: ${copy.unknownMachine}`,
         );
         expect(screen.getByTestId('task-containment-allow')).toBeTruthy();
     });
@@ -157,6 +161,30 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
             'polite',
         );
         expect(onChanged).not.toHaveBeenCalled();
+    });
+
+    it('review of #3040: no Allow / Withdraw on a node the VIEWER does not own (the route would answer 404)', () => {
+        renderNotice({
+            holds: [view({ runId: null, viewerOwnsNode: false })],
+            containment: view({ allowedByOwner: true, viewerOwnsNode: false }),
+        });
+        expect(screen.getByTestId('task-containment-hold-copy').textContent).toBe(
+            rules.containmentDowngrade,
+        );
+        expect(screen.queryByTestId('task-containment-allow')).toBeNull();
+        expect(screen.getByTestId('task-containment-allowed').textContent).toContain(copy.allowed);
+        expect(screen.queryByTestId('task-containment-withdraw')).toBeNull();
+    });
+
+    it('review of #3040: a hold that names no node (the machines could not be read) is information only', () => {
+        renderNotice({
+            holds: [view({ runId: null, nodeId: null, nodeName: null, reported: false })],
+        });
+        expect(screen.getByTestId('task-containment-nodes-unreadable').textContent).toBe(
+            copy.nodesUnreadable,
+        );
+        expect(screen.queryByTestId('task-containment-hold-copy')).toBeNull();
+        expect(screen.queryByTestId('task-containment-allow')).toBeNull();
     });
 
     it('offers no action without a Work to address the route to', () => {

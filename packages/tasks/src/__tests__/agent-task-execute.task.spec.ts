@@ -200,13 +200,15 @@ vi.mock('@ever-works/agent/tasks-domain', () => ({
 
 // APW-08 T12 — the REAL cloud pre-flight of isolated-run admission (a leaf: contracts and the T48
 // containment leaf only), so these specs pin what the worker actually refuses.
-vi.mock('@ever-works/agent/app-works', async () => ({
-    appWorkCloudRunRefusal: (
-        await vi.importActual<typeof import('../../../agent/src/app-works/isolated-run-admission')>(
-            '../../../agent/src/app-works/isolated-run-admission',
-        )
-    ).appWorkCloudRunRefusal,
-}));
+vi.mock('@ever-works/agent/app-works', async () => {
+    const leaf = await vi.importActual<
+        typeof import('../../../agent/src/app-works/isolated-run-admission')
+    >('../../../agent/src/app-works/isolated-run-admission');
+    return {
+        appWorkCloudRunRefusal: leaf.appWorkCloudRunRefusal,
+        describeAppWorkUnreadableDispatch: leaf.describeAppWorkUnreadableDispatch,
+    };
+});
 
 vi.mock('../trigger/worker/modules/trigger-internal.module', () => ({
     TriggerInternalModule: StubInternalModule,
@@ -1632,6 +1634,40 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             it('lets a REVIEW run on an App Work through (a review is not a change)', async () => {
                 useWorkTask();
                 works.findById.mockResolvedValue({ id: WORK_ID, kind: 'app' });
+                const REVIEW = { allowedTools: ['submitTaskReview'] };
+                runs.findById.mockResolvedValue(queuedRun({ delegationScope: REVIEW }));
+                isAgentReviewRunScopeMock.mockImplementation((scope: unknown) => scope === REVIEW);
+
+                await registeredConfig.run(runPayload());
+
+                expect(runs.markFailed).not.toHaveBeenCalled();
+                expect(runner.execute).toHaveBeenCalledTimes(1);
+            });
+
+            it('review of #3040 (fail CLOSED): a Work that cannot be READ fails the run as work-unreadable — no workspace, no model call', async () => {
+                useWorkTask();
+                works.findById.mockRejectedValue(new Error('rpc down'));
+                runs.findById.mockResolvedValue(queuedRun());
+
+                const out = await registeredConfig.run(runPayload());
+
+                expect(out).toEqual(
+                    expect.objectContaining({
+                        status: 'failed',
+                        reason: 'app-work-run-not-admitted',
+                    }),
+                );
+                expect(runs.markFailed).toHaveBeenCalledWith(
+                    'run-1',
+                    expect.stringMatching(/^dispatch-failed: work-unreadable: /),
+                );
+                expect(taskWorkspace.provisionForRun).not.toHaveBeenCalled();
+                expect(runner.execute).not.toHaveBeenCalled();
+            });
+
+            it('a REVIEW run is not failed by an unreadable Work (a review is not a change)', async () => {
+                useWorkTask();
+                works.findById.mockRejectedValue(new Error('rpc down'));
                 const REVIEW = { allowedTools: ['submitTaskReview'] };
                 runs.findById.mockResolvedValue(queuedRun({ delegationScope: REVIEW }));
                 isAgentReviewRunScopeMock.mockImplementation((scope: unknown) => scope === REVIEW);

@@ -1305,6 +1305,40 @@ export class FleetAgentTaskReconcilerService {
     }
 
     /**
+     * APW-08 T48 (FR-70, ACC-08-34) — hand the node's RAW containment block to the recorder,
+     * which normalizes it (`normalizeFleetAgentTaskContainment`, toward LESS containment) and
+     * writes `agent_runs.containment`. Asked ONLY for a job whose platform-written payload names
+     * its App Work (`appWorkId`, stamped by the fleet-aware dispatcher once isolated-run
+     * admission admitted the run), so a non-App completion reads nothing more (review of #3040).
+     * The recorder never throws into the reconcile. The record is what the Task's Cost view shows;
+     * a node's latest report also decides its next App Work lease.
+     *
+     * Not yet: T46's run-stop classifier (`classifyAppWorkRunStop`) does not exist on `develop`,
+     * so a downgrade reported by a run that was admitted (an allowed node) is recorded, not
+     * classified; the next lease is judged on it.
+     */
+    private async recordRunContainment(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+    ): Promise<void> {
+        if (!this.containmentRecorder) return;
+        const workId = (event.job.payload as { appWorkId?: unknown } | null | undefined)?.appWorkId;
+        if (typeof workId !== 'string' || workId.length === 0) return;
+        const raw = event.result?.containment;
+        if (raw === undefined || raw === null) return;
+        await this.bestEffort('containment record', () =>
+            this.containmentRecorder!.recordRunContainment({
+                taskId: ctx.taskId,
+                runId: ctx.runId,
+                userId: event.userId,
+                workId,
+                nodeId: event.nodeId,
+                rawContainment: raw,
+            }),
+        );
+    }
+
+    /**
      * Self-build slice AP — append the node's step records to the run's
      * `agent_run_logs` timeline, in the shape the cloud capture writes (see
      * `fleet-run-evidence.ts`).
@@ -1319,35 +1353,6 @@ export class FleetAgentTaskReconcilerService {
      * transaction timestamp would come back in random-uuid order on
      * Postgres.
      */
-    /**
-     * APW-08 T48 (FR-70, ACC-08-34) — hand the node's RAW containment block to the recorder,
-     * which normalizes it (`normalizeFleetAgentTaskContainment`, toward LESS containment), checks
-     * the Task is on an App Work and writes `agent_runs.containment`. A non-App Task is left
-     * untouched, and the recorder never throws into the reconcile. The record is what the Task's
-     * Cost view shows and what T12's admission reads per node for the NEXT run.
-     *
-     * Not yet: T46's run-stop classifier (`classifyAppWorkRunStop`) does not exist on `develop`,
-     * so a downgrade reported by a run that was admitted (an allowed node, or a node whose first
-     * report this is) is recorded, not classified; the next run is held by T12.
-     */
-    private async recordRunContainment(
-        event: FleetJobCompletedEvent,
-        ctx: FleetAgentTaskCorrelation,
-    ): Promise<void> {
-        if (!this.containmentRecorder) return;
-        const raw = event.result?.containment;
-        if (raw === undefined || raw === null) return;
-        await this.bestEffort('containment record', () =>
-            this.containmentRecorder!.recordRunContainment({
-                taskId: ctx.taskId,
-                runId: ctx.runId,
-                userId: event.userId,
-                nodeId: event.nodeId,
-                rawContainment: raw,
-            }),
-        );
-    }
-
     private async recordModelTimeline(runId: string, result: unknown): Promise<void> {
         const runLogs = this.runLogs;
         if (!runLogs) return;

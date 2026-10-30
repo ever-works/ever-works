@@ -95,7 +95,12 @@ export interface AppWorkRunAdmissionPlan {
 
 /** The predicate's answer: admitted, refused (FR-12 / FR-75), or held for the owner (FR-70). */
 export type AppWorkRunAdmission =
-    | { admitted: true; branch: 'fleet' | 'isolated-cloud' }
+    | {
+          admitted: true;
+          branch: 'fleet' | 'isolated-cloud';
+          /** The App Work admitted (set by the gate), for the job's `appWorkId` marker. */
+          workId?: string;
+      }
     | {
           admitted: false;
           outcome: 'refused';
@@ -155,7 +160,7 @@ export const APP_WORK_CONTAINMENT_DOWNGRADE_MESSAGE =
 
 /** Review of #3040 — enrolled machines exist, but none can take this run (tags, pin). */
 export const APP_WORK_NO_ELIGIBLE_NODE_MESSAGE =
-    "None of your machines can take this app change right now: none has what it needs. Set one up, or run this Task in an isolated sandbox.";
+    'None of your machines can take this app change right now: none has what it needs. Set one up, or run this Task in an isolated sandbox.';
 
 /** Review of #3040 — the Task's Work could not be read; nothing was started, and it can be retried. */
 export function describeAppWorkUnreadable(workId: string | null | undefined): string {

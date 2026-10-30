@@ -1974,7 +1974,8 @@
                 "containment": {
                     "title": "Containment",
                     "lastRun": "Latest Fleet run on {node}",
-                    "nextRun": "Holds the next run on {node}",
+                    "nextRun": "Won't receive this Task's runs until you allow it: {node}",
+                    "nodesUnreadable": "Your machines could not be read, so this Task's next Fleet run is held. Try again in a moment.",
                     "unknownMachine": "an unknown machine",
                     "pathHardened": "Hardened executor",
                     "pathOrdinary": "Ordinary command runner",

@@ -15,6 +15,7 @@ const TASK = 'task-1';
 const AGENT = 'agent-1';
 const USER = 'user-1';
 const NODE = '11111111-1111-4111-8111-111111111111';
+const WORK = 'work-app';
 
 const CONTAINMENT = {
     executionPath: 'ordinary',
@@ -23,14 +24,16 @@ const CONTAINMENT = {
     downgrades: [{ control: 'isolated-home', reason: 'modelHomeIsolation=inherit' }],
 };
 
-function job(): FleetJobView {
+function job(payload: Record<string, unknown> = { appWorkId: WORK }): FleetJobView {
     return {
         id: 'job-1',
         kind: 'agent-task',
         status: 'done',
         nodeId: NODE,
         requiredCapabilities: [],
-        payload: { taskId: TASK, runId: RUN, agentId: AGENT, userId: USER },
+        // `appWorkId` is the platform-written marker the fleet-aware dispatcher stamps on an
+        // admitted App Work run (review of #3040: the reconciler reads nothing to find out).
+        payload: { taskId: TASK, runId: RUN, agentId: AGENT, userId: USER, ...payload },
         leaseExpiresAt: null,
         attempts: 1,
         maxAttempts: 3,
@@ -108,8 +111,14 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
             withRecorder ? (recorder as never) : undefined,
         );
 
-    const complete = (svc: FleetAgentTaskReconcilerService, body: Record<string, unknown>) =>
-        svc.onCompleted(new FleetJobCompletedEvent(job(), USER, 'node-report', NODE, body, null));
+    const complete = (
+        svc: FleetAgentTaskReconcilerService,
+        body: Record<string, unknown>,
+        payload?: Record<string, unknown>,
+    ) =>
+        svc.onCompleted(
+            new FleetJobCompletedEvent(job(payload), USER, 'node-report', NODE, body, null),
+        );
 
     beforeEach(() => {
         order = [];
@@ -148,6 +157,7 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
             taskId: TASK,
             runId: RUN,
             userId: USER,
+            workId: WORK,
             nodeId: NODE,
             rawContainment: CONTAINMENT,
         });
@@ -167,6 +177,11 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
 
     it('asks nothing when the node sent no containment block', async () => {
         await complete(build(), result() as never);
+        expect(recorder.recordRunContainment).not.toHaveBeenCalled();
+    });
+
+    it('review of #3040: asks nothing for a job WITHOUT the App Work marker — every non-App completion', async () => {
+        await complete(build(), result({ containment: CONTAINMENT as never }) as never, {});
         expect(recorder.recordRunContainment).not.toHaveBeenCalled();
     });
 

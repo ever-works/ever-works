@@ -17,7 +17,13 @@ import type {
 } from '@ever-works/contracts';
 import { FLEET_BYO_MODEL_PLUGIN_ID_PREFIX, fleetModelPluginId } from '@ever-works/contracts';
 import type { FleetKillSwitchService } from '@ever-works/agent/fleet';
-import type { AppWorkRunPlacementPreview } from '@ever-works/agent/app-works';
+import {
+    APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+    AppWorkRunNotAdmittedError,
+    isAppWorkRunRefusal,
+    type AppWorkRunAdmissionGate,
+    type AppWorkRunPlacementPreview,
+} from '@ever-works/agent/app-works';
 import { FleetDelegationScopeRefusedError } from './fleet-agent-task-plan.error';
 import {
     FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
@@ -224,6 +230,17 @@ export interface FleetAwareDispatcherDeps {
      * failed write, never changes a dispatch.
      */
     runs?: Pick<AgentRunRepository, 'recordDispatchRunner'>;
+    /**
+     * APW-08 T12 / T48 (review of #3040, MAJOR 1) — the Fleet half of isolated-run admission,
+     * asked for EVERY Fleet-bound enqueue: `dispatchAgentRun`'s own, and the ones that never pass
+     * it — the gate's drain and promotion of a parked run, every resume (the CI fix loop, an
+     * answered question), assign-task. Same predicate, same codes as site 1; a refusal or a hold
+     * is thrown as `AppWorkRunNotAdmittedError` (never a cloud fallback) and the enqueue site
+     * records it on the run row. An admitted App Work run is stamped `appWorkId`, which the lease
+     * uses to judge the node that actually takes the job. Absent, nothing is asked and every
+     * enqueue is exactly as before.
+     */
+    appWorkAdmission?: Pick<AppWorkRunAdmissionGate, 'admit'>;
 }
 
 /**
@@ -335,9 +352,12 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             }
 
             let decision: FleetRunRoutingDecision = { target: 'cloud', mode: 'cloud' };
+            // APW-08 T12 — kept for the Fleet half of isolated-run admission below.
+            let scope: FleetExecutionScopeQuery = {};
+            let requirements: FleetAgentTaskRequirements | null = null;
             try {
-                const scope = await resolveScope(deps.scopeResolver, payload.taskId);
-                const requirements = await resolveRequirements(deps.planner, payload);
+                scope = await resolveScope(deps.scopeResolver, payload.taskId);
+                requirements = await resolveRequirements(deps.planner, payload);
                 decision = await router.routeAgentTask(
                     payload,
                     scope,
@@ -382,6 +402,10 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                 if (deps.planner?.refuseAgentReviewRun) {
                     await deps.planner.refuseAgentReviewRun(payload);
                 }
+                // APW-08 T12 / T48 — the Fleet half of isolated-run admission, for every Fleet
+                // enqueue (drained, promoted and resumed runs included), before any job exists.
+                // Outside any try: a refusal propagates and is never a cloud fallback.
+                await refuseUnadmittedAppWorkFleetRun(deps, payload, scope, requirements);
                 const plan = deps.planner ? await deps.planner.plan(payload) : null;
                 markDelegationScopeCleared(payload);
                 const handle = await router.enqueueAgentTask(
@@ -447,6 +471,67 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
         // APW-08 T12 — see `previewAgentTaskPlacement` below.
         previewPlacement: (payload) => previewAgentTaskPlacement(router, deps, payload),
     };
+}
+
+/**
+ * APW-08 T12 / T48 (review of #3040, MAJOR 1) — the Fleet half of isolated-run admission at the
+ * one choke point every Fleet enqueue passes, whoever called `enqueue`.
+ *
+ * The scope lookup already resolved the Task's Work; when it came back without one the gate reads
+ * the Task itself (`workId: undefined`) and a Task it cannot read is refused `work-unreadable`, so
+ * a failed lookup never waves an App Work run through. A Task on any other kind (or with no Work)
+ * is answered `null` and enqueues exactly as before. An admitted App Work run is stamped
+ * `appWorkId` for the router to copy onto the job, so the LEASE judges the node that takes it and
+ * the reconciler records what it got. The gate itself throwing refuses too (fail closed).
+ */
+async function refuseUnadmittedAppWorkFleetRun(
+    deps: FleetAwareDispatcherDeps,
+    payload: AgentTaskExecuteDispatchPayload,
+    scope: FleetExecutionScopeQuery,
+    requirements: FleetAgentTaskRequirements | null,
+): Promise<void> {
+    if (!deps.appWorkAdmission) return;
+    const workId = typeof scope.workId === 'string' && scope.workId ? scope.workId : undefined;
+    let verdict: Awaited<ReturnType<AppWorkRunAdmissionGate['admit']>>;
+    try {
+        verdict = await deps.appWorkAdmission.admit({
+            task: {
+                id: payload.taskId,
+                userId: payload.userId,
+                workId,
+                tenantId: payload.tenantId ?? null,
+                organizationId: payload.organizationId ?? null,
+            },
+            agent: { id: payload.agentId, userId: payload.userId },
+            placement: {
+                placement: 'fleet',
+                ...(requirements
+                    ? { requiredCapabilities: [...requirements.requiredCapabilities] }
+                    : {}),
+            },
+        });
+    } catch (err) {
+        logger.warn(
+            `Fleet admission for task ${payload.taskId} failed — refusing the run (fail closed): ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+        throw new AppWorkRunNotAdmittedError({
+            admitted: false,
+            outcome: 'refused',
+            code: 'noIsolatedRuntime',
+            message: APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+        });
+    }
+    if (!verdict) return;
+    if (isAppWorkRunRefusal(verdict)) {
+        logger.warn(
+            `Fleet enqueue of ${payload.runId ? `run ${payload.runId}` : `task ${payload.taskId}`} refused by isolated-run admission (${verdict.outcome}, ${verdict.code}).`,
+        );
+        throw new AppWorkRunNotAdmittedError(verdict);
+    }
+    const appWorkId = verdict.workId ?? workId;
+    if (typeof appWorkId === 'string' && appWorkId) payload.appWorkId = appWorkId;
 }
 
 /**

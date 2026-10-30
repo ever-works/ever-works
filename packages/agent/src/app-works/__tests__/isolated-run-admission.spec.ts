@@ -3,6 +3,7 @@ import {
     QUEUED_REASON_AGENT_PAUSED,
 } from '../../agents/run-dispatch-gate.service';
 import { TaskTransitionService } from '../../tasks-domain/task-transition.service';
+import { FLEET_SESSION_SCHEDULE_LABEL } from '../../tasks-domain/task-session-schedule.port';
 import {
     APP_WORK_CONTAINMENT_DOWNGRADE_MESSAGE,
     APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
@@ -95,24 +96,38 @@ function makeWorld(over: Partial<World> = {}): World {
     };
 }
 
+/** The Work row as the repository answers it (the entity's repository helpers included). */
+const workOf = (world: World, id: string) =>
+    world.kind[id]
+        ? {
+              id,
+              userId: OWNER,
+              kind: world.kind[id],
+              appRunContainmentAllowances: world.allowances[id] ?? null,
+              getRepoOwner: () => 'maya',
+              getDataRepo: () => 'bookings-data',
+              getWebsiteRepo: () => 'bookings',
+          }
+        : null;
+
 function readsFor(world: World, spies: { push?: jest.Mock } = {}): IsolatedRunAdmissionReads {
-    const work = (id: string) => ({
-        id,
-        userId: OWNER,
-        kind: world.kind[id],
-        appRunContainmentAllowances: world.allowances[id] ?? null,
-        getRepoOwner: () => 'maya',
-        getDataRepo: () => 'bookings-data',
-        getWebsiteRepo: () => 'bookings',
-    });
     const push = spies.push ?? jest.fn(async () => world.installed);
     return {
         works: {
-            findById: jest.fn(async (id: string) => (world.kind[id] ? work(id) : null)),
-            updateAppWorkColumns: jest.fn(async (id: string, _userId: string, patch) => {
-                world.allowances[id] = patch.appRunContainmentAllowances;
-                return true;
-            }),
+            findById: jest.fn(async (id: string) => workOf(world, id)),
+            // A faithful compare-and-set over the world's column.
+            casAppRunContainmentAllowances: jest.fn(
+                async (id: string, _userId: string, previous: unknown, next: unknown[]) => {
+                    if (
+                        JSON.stringify(world.allowances[id] ?? null) !==
+                        JSON.stringify(previous ?? null)
+                    ) {
+                        return false;
+                    }
+                    world.allowances[id] = next;
+                    return true;
+                },
+            ),
         },
         fleet: {
             nodesForUser: jest.fn(async () => world.nodes),
@@ -133,12 +148,19 @@ interface Harness {
     admission: IsolatedRunAdmissionService;
     runs: { createQueued: jest.Mock; markDispatchFailed: jest.Mock; setTriggerRunId: jest.Mock };
     dispatcher: { enqueue: jest.Mock; previewPlacement: jest.Mock };
+    works: { findById: jest.Mock };
     gate?: { admit: jest.Mock };
 }
 
 function makeHarness(
     world: World,
-    opts: { dispatchGate?: unknown; noAdmission?: boolean; reads?: IsolatedRunAdmissionReads } = {},
+    opts: {
+        dispatchGate?: unknown;
+        noAdmission?: boolean;
+        reads?: IsolatedRunAdmissionReads;
+        sessionSchedules?: unknown;
+        works?: { findById: jest.Mock };
+    } = {},
 ): Harness {
     const runs = {
         createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
@@ -149,10 +171,8 @@ function makeHarness(
         enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }),
         previewPlacement: jest.fn(async () => world.placement),
     };
-    const works = {
-        findById: jest.fn(async (id: string) =>
-            world.kind[id] ? { id, kind: world.kind[id] } : null,
-        ),
+    const works = opts.works ?? {
+        findById: jest.fn(async (id: string) => workOf(world, id)),
     };
     const agents = {
         findByIdAndUser: jest.fn(async (id: string, userId: string) => ({
@@ -179,10 +199,10 @@ function makeHarness(
         agents,
         undefined, // agentReviews
         undefined, // domainEvents
-        undefined, // sessionSchedules
+        opts.sessionSchedules, // sessionSchedules
         opts.noAdmission ? undefined : admission,
     );
-    return { svc, admission, runs, dispatcher };
+    return { svc, admission, runs, dispatcher, works };
 }
 
 const task = (workId: string | null = APP_WORK) =>
@@ -442,8 +462,71 @@ describe('isolated-run admission — every other path is unchanged', () => {
     });
 });
 
+describe('isolated-run admission — review of #3040 at site 1', () => {
+    const UNREADABLE =
+        /^dispatch-failed: work-unreadable: The Work w-\w+ of this Task could not be read, so no run was started\. Try again\.$/;
+
+    it('a Work that cannot be read refuses (fail closed, retryable) — for an App Work and for any other kind', async () => {
+        for (const workId of [APP_WORK, SITE_WORK]) {
+            const world = makeWorld();
+            const works = { findById: jest.fn().mockRejectedValue(new Error('db down')) };
+            const h = makeHarness(world, { works });
+            const result = await h.svc.dispatchAgentRun(task(workId), AGENT);
+            expect(result).toMatchObject({ runId: null, dispatched: false, parked: false });
+            expect(result.error).toMatch(UNREADABLE);
+            expectNothingDispatched(h);
+        }
+    });
+
+    it('the Work is read ONCE per dispatch, shared by T49, FR-9 and T12', async () => {
+        const prior = process.env.EVER_WORKS_APP_CHANGES_ENABLED;
+        process.env.EVER_WORKS_APP_CHANGES_ENABLED = 'false';
+        try {
+            const h = makeHarness(makeWorld());
+            const result = await h.svc.dispatchAgentRun(task(SITE_WORK), AGENT);
+            // T49 off (switch off) reads it; T12 reuses that read.
+            expect(result).toMatchObject({ dispatched: true });
+            expect(h.works.findById).toHaveBeenCalledTimes(1);
+        } finally {
+            if (prior === undefined) delete process.env.EVER_WORKS_APP_CHANGES_ENABLED;
+            else process.env.EVER_WORKS_APP_CHANGES_ENABLED = prior;
+        }
+        const h2 = makeHarness(makeWorld());
+        await h2.svc.dispatchAgentRun(task(APP_WORK), AGENT);
+        expect(h2.works.findById).toHaveBeenCalledTimes(1);
+    });
+
+    it('an Agent-session schedule fire on an App Work Task is admitted BEFORE the session branch, judged as a Fleet run', async () => {
+        const sessionSchedules = {
+            dispatch: jest.fn(async () => ({ runId: 's1', dispatched: true, parked: false })),
+        };
+        const sessionTask = () =>
+            ({
+                ...(task(APP_WORK) as object),
+                labels: [FLEET_SESSION_SCHEDULE_LABEL],
+            }) as never;
+
+        const held = makeHarness(makeWorld({ reports: { [NODE_A]: declinedReport() } }), {
+            sessionSchedules,
+        });
+        const refused = await held.svc.dispatchAgentRun(sessionTask(), AGENT);
+        expect(refused.error).toBe(`containmentDowngrade: ${S33}`);
+        expect(sessionSchedules.dispatch).not.toHaveBeenCalled();
+        // A session runs on the pinned computer, not where the router would place a Task run.
+        expect(held.dispatcher.previewPlacement).not.toHaveBeenCalled();
+
+        const ok = makeHarness(makeWorld(), { sessionSchedules });
+        expect(await ok.svc.dispatchAgentRun(sessionTask(), AGENT)).toMatchObject({ runId: 's1' });
+        expect(sessionSchedules.dispatch).toHaveBeenCalledTimes(1);
+    });
+});
+
 describe('isolated-run admission — the predicate and its facts', () => {
-    it('an unpinned run needs EVERY eligible node admissible; the first that holds it is named', async () => {
+    // Rewritten in the review of #3040 (was "an unpinned run needs EVERY eligible node
+    // admissible"): the LEASE now judges the node that actually takes the job
+    // (`admitsLease`, below), so dispatch admits a run some eligible node may take, and the
+    // downgraded sibling is simply never offered it. Every candidate held still holds the run.
+    it('an unpinned run is admitted when ANY eligible node is admissible — the lease keeps the downgraded one off it; all held → the first is named', async () => {
         const world = makeWorld({
             nodes: [
                 { id: NODE_A, userId: OWNER, status: 'online', capabilities: ['git-push'] },
@@ -451,41 +534,129 @@ describe('isolated-run admission — the predicate and its facts', () => {
             ],
             reports: { [NODE_A]: isolatedReport(), [NODE_B]: declinedReport() },
         });
-        const admission = new IsolatedRunAdmissionService(readsFor(world));
-        const verdict = await admission.admit({
+        const reads = readsFor(world);
+        const admission = new IsolatedRunAdmissionService(reads);
+        const input = {
             task: { id: 't1', userId: OWNER, workId: APP_WORK },
             agent: { id: AGENT, userId: OWNER },
             placement: world.placement,
+        };
+        expect(await admission.admit(input)).toEqual({
+            admitted: true,
+            branch: 'fleet',
+            workId: APP_WORK,
         });
-        expect(verdict).toMatchObject({ outcome: 'needs_input', nodeId: NODE_B });
+        // …and the downgraded node is refused at the lease, the isolated one admitted.
+        expect(
+            await admission.admitsLease({
+                userId: OWNER,
+                nodeId: NODE_B,
+                workId: APP_WORK,
+                jobId: 'j1',
+            }),
+        ).toBe(false);
+        expect(
+            await admission.admitsLease({
+                userId: OWNER,
+                nodeId: NODE_A,
+                workId: APP_WORK,
+                jobId: 'j1',
+            }),
+        ).toBe(true);
+
+        world.reports[NODE_A] = declinedReport();
+        expect(await admission.admit(input)).toMatchObject({
+            outcome: 'needs_input',
+            code: 'containmentDowngrade',
+            nodeId: NODE_A,
+        });
     });
 
-    it('a pinned run is judged on its node alone; ineligible nodes (paused, missing tags) never hold it', async () => {
+    // Rewritten in the review of #3040 (was "ineligible nodes (paused, missing tags) never hold
+    // it"): a PAUSED or ENROLLING node can lease later, so it is a candidate now; only a node
+    // without the tags the job requires is not.
+    it('a pinned run is judged on its node alone; paused and enrolling nodes count as candidates, a node without the tags does not', async () => {
         const world = makeWorld({
             nodes: [
-                { id: NODE_A, userId: OWNER, status: 'online', capabilities: ['git-push'] },
                 { id: NODE_B, userId: OWNER, status: 'paused', capabilities: ['git-push'] },
+                { id: 'node-e', userId: OWNER, status: 'enrolling', capabilities: ['git-push'] },
                 { id: 'node-c', userId: OWNER, status: 'online', capabilities: [] },
             ],
-            reports: { [NODE_A]: isolatedReport('hardened'), [NODE_B]: declinedReport() },
+            reports: { [NODE_B]: declinedReport(), 'node-c': isolatedReport('hardened') },
         });
-        const unpinned = new IsolatedRunAdmissionService(readsFor(world));
-        expect(
-            await unpinned.admit({
-                task: { id: 't1', userId: OWNER, workId: APP_WORK },
-                agent: { id: AGENT, userId: OWNER },
-                placement: world.placement,
-            }),
-        ).toEqual({ admitted: true, branch: 'fleet' });
+        const admission = new IsolatedRunAdmissionService(readsFor(world));
+        const input = {
+            task: { id: 't1', userId: OWNER, workId: APP_WORK },
+            agent: { id: AGENT, userId: OWNER },
+            placement: world.placement,
+        };
+        // The isolated node-c lacks the tag, so it is no candidate; the paused and the enrolling
+        // node are, and neither is admissible.
+        expect(await admission.admit(input)).toMatchObject({
+            outcome: 'needs_input',
+            code: 'containmentDowngrade',
+            nodeId: NODE_B,
+        });
+
+        world.allowances[APP_WORK] = [
+            { nodeId: 'node-e', allowedAt: 'x', allowedBy: OWNER, acceptedDowngrade: null },
+        ];
+        expect(await admission.admit(input)).toMatchObject({ admitted: true });
 
         world.pinned = NODE_B;
+        expect(await admission.admit(input)).toMatchObject({
+            outcome: 'needs_input',
+            nodeId: NODE_B,
+        });
+    });
+
+    it('review of #3040: an owner with no enrolled node at all is refused with S15; machines that cannot take it hold the run (never admitted)', async () => {
+        const none = makeWorld({ nodes: [] });
         expect(
-            await unpinned.admit({
+            await new IsolatedRunAdmissionService(readsFor(none)).admit({
                 task: { id: 't1', userId: OWNER, workId: APP_WORK },
                 agent: { id: AGENT, userId: OWNER },
-                placement: world.placement,
+                placement: none.placement,
             }),
-        ).toMatchObject({ outcome: 'needs_input', nodeId: NODE_B });
+        ).toMatchObject({ outcome: 'refused', code: 'noIsolatedRuntime', message: S15 });
+
+        const untagged = makeWorld({
+            nodes: [{ id: NODE_A, userId: OWNER, status: 'online', capabilities: [] }],
+        });
+        expect(
+            await new IsolatedRunAdmissionService(readsFor(untagged)).admit({
+                task: { id: 't1', userId: OWNER, workId: APP_WORK },
+                agent: { id: AGENT, userId: OWNER },
+                placement: untagged.placement,
+            }),
+        ).toMatchObject({ outcome: 'needs_input', code: 'noEligibleNode' });
+    });
+
+    it('the lease: an unreported node, an unreadable Work and a missing Fleet read all refuse; the allowance admits that node only', async () => {
+        const world = makeWorld({ reports: {} });
+        const reads = readsFor(world);
+        const admission = new IsolatedRunAdmissionService(reads);
+        const lease = (nodeId: string) =>
+            admission.admitsLease({ userId: OWNER, nodeId, workId: APP_WORK, jobId: 'j1' });
+        expect(await lease(NODE_A)).toBe(false);
+
+        world.allowances[APP_WORK] = [
+            { nodeId: NODE_A, allowedAt: 'x', allowedBy: OWNER, acceptedDowngrade: null },
+        ];
+        expect(await lease(NODE_A)).toBe(true);
+        expect(await lease(NODE_B)).toBe(false);
+
+        (reads.works.findById as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+        expect(await lease(NODE_A)).toBe(false);
+        // A Work that is not (any longer) an App Work has no containment rule.
+        expect(
+            await admission.admitsLease({
+                userId: OWNER,
+                nodeId: NODE_B,
+                workId: SITE_WORK,
+                jobId: 'j1',
+            }),
+        ).toBe(true);
     });
 
     it('a node that never reported (or whose report is unreadable) is an unknown containment — a downgrade', async () => {
@@ -514,7 +685,7 @@ describe('isolated-run admission — the predicate and its facts', () => {
         expect(verdict).toMatchObject({ admitted: false, outcome: 'needs_input' });
     });
 
-    it('GAP-15: a positive push answer is cached per (Work, owner/repo); a negative one never is', async () => {
+    it('GAP-15: a positive push answer is cached per (user, Work, owner/repo); a negative one never is', async () => {
         const world = makeWorld({ installed: false });
         const push = jest.fn(async () => world.installed);
         const admission = new IsolatedRunAdmissionService(readsFor(world, { push }));
@@ -532,10 +703,42 @@ describe('isolated-run admission — the predicate and its facts', () => {
         expect(push).toHaveBeenCalledTimes(2);
 
         world.installed = true;
-        expect(await admission.admit(input)).toEqual({ admitted: true, branch: 'fleet' });
-        expect(await admission.admit(input)).toEqual({ admitted: true, branch: 'fleet' });
+        expect(await admission.admit(input)).toEqual({
+            admitted: true,
+            branch: 'fleet',
+            workId: APP_WORK,
+        });
+        expect(await admission.admit(input)).toEqual({
+            admitted: true,
+            branch: 'fleet',
+            workId: APP_WORK,
+        });
         expect(push).toHaveBeenCalledTimes(3);
         expect(push).toHaveBeenLastCalledWith(OWNER, 'maya', 'bookings');
+    });
+
+    it('review of #3040: one member’s yes never admits another member’s Task (the cache key carries the Task owner)', async () => {
+        const world = makeWorld();
+        const push = jest.fn(async (userId: string) => userId === OWNER);
+        const admission = new IsolatedRunAdmissionService(readsFor(world, { push }));
+        const forUser = (userId: string) => ({
+            task: { id: 't1', userId, workId: APP_WORK },
+            agent: { id: AGENT, userId },
+            placement: world.placement,
+        });
+        expect(await admission.admit(forUser(OWNER))).toMatchObject({ admitted: true });
+        // The member's own nodes are what their run would lease; give them one.
+        world.nodes.push({
+            id: NODE_B,
+            userId: 'member-2',
+            status: 'online',
+            capabilities: ['git-push'],
+        });
+        world.reports[NODE_B] = isolatedReport();
+        expect(await admission.admit(forUser('member-2'))).toMatchObject({
+            code: 'noPushCredential',
+        });
+        expect(push).toHaveBeenLastCalledWith('member-2', 'maya', 'bookings');
     });
 
     it('a push lookup that throws reads as "cannot mint" (refused)', async () => {
@@ -560,20 +763,39 @@ describe('isolated-run admission — the predicate and its facts', () => {
         expect(reads.environmentNetworking).not.toHaveBeenCalled();
     });
 
-    it('the pure predicate: push first, then containment; no candidate is left to the router', () => {
+    // Rewritten in the review of #3040 (was "no candidate is left to the router", which pinned an
+    // empty candidate set as ADMITTED): with no node able to take it, a machine enrolled later
+    // or a downgraded node unpaused later would be the one to lease it, so an empty set is now
+    // held (`noEligibleNode`, needs_input), and no enrolled machine at all is S15.
+    it('the pure predicate: push first; no enrolled machine is S15; an EMPTY candidate set is held, never admitted', () => {
         const t = { id: 't1', workId: APP_WORK };
+        const push = { owner: 'maya', repo: 'bookings', available: true };
         expect(isAppWorkRunAdmitted(t, { placement: 'fleet', pushCredential: null })).toMatchObject(
-            {
-                code: 'noPushCredential',
-            },
+            { code: 'noPushCredential' },
         );
         expect(
             isAppWorkRunAdmitted(t, {
                 placement: 'fleet',
-                pushCredential: { owner: 'maya', repo: 'bookings', available: true },
+                pushCredential: push,
+                fleetCandidates: [],
+                fleetEnrolledNodes: 0,
+            }),
+        ).toMatchObject({ outcome: 'refused', code: 'noIsolatedRuntime' });
+        expect(
+            isAppWorkRunAdmitted(t, {
+                placement: 'fleet',
+                pushCredential: push,
+                fleetCandidates: [],
+                fleetEnrolledNodes: 2,
+            }),
+        ).toMatchObject({ admitted: false, outcome: 'needs_input', code: 'noEligibleNode' });
+        expect(
+            isAppWorkRunAdmitted(t, {
+                placement: 'fleet',
+                pushCredential: push,
                 fleetCandidates: [],
             }),
-        ).toEqual({ admitted: true, branch: 'fleet' });
+        ).toMatchObject({ admitted: false, code: 'noEligibleNode' });
         expect(
             isAppWorkRunAdmitted(t, {
                 placement: 'unknown',

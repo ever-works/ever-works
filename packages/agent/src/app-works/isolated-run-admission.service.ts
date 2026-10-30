@@ -209,12 +209,17 @@ export class IsolatedRunAdmissionService
                 input.placement,
                 work,
             );
-            return isAppWorkRunAdmitted(input.task, {
-                placement: 'fleet',
-                pushCredential,
-                fleetCandidates: candidates.facts,
-                ...(candidates.enrolled === null ? {} : { fleetEnrolledNodes: candidates.enrolled }),
-            });
+            return withWorkId(
+                isAppWorkRunAdmitted(input.task, {
+                    placement: 'fleet',
+                    pushCredential,
+                    fleetCandidates: candidates.facts,
+                    ...(candidates.enrolled === null
+                        ? {}
+                        : { fleetEnrolledNodes: candidates.enrolled }),
+                }),
+                work.id,
+            );
         }
 
         // 'cloud' / 'unknown': the Environment is read only when the pipeline could admit at all.
@@ -227,11 +232,14 @@ export class IsolatedRunAdmissionService
                       this.reads.environmentNetworking!(input.agent.id),
                   )
                 : null;
-        return isAppWorkRunAdmitted(input.task, {
-            placement: input.placement.placement,
-            pipeline,
-            environmentNetworking,
-        });
+        return withWorkId(
+            isAppWorkRunAdmitted(input.task, {
+                placement: input.placement.placement,
+                pipeline,
+                environmentNetworking,
+            }),
+            work.id,
+        );
     }
 
     // ── The lease: the node that actually takes the job ─────────────────
@@ -344,8 +352,8 @@ export class IsolatedRunAdmissionService
                 reported: true,
                 allowedByOwner: isNodeContainmentAllowed(allowances, record.nodeId),
                 acceptedDowngrade:
-                    allowances.find((entry) => entry.nodeId === record.nodeId)
-                        ?.acceptedDowngrade ?? null,
+                    allowances.find((entry) => entry.nodeId === record.nodeId)?.acceptedDowngrade ??
+                    null,
                 viewerOwnsNode: !!node && !!viewer && node.userId === viewer,
             };
             break;
@@ -355,12 +363,14 @@ export class IsolatedRunAdmissionService
         // minus the push credential (a different refusal with its own copy). Same candidates.
         const agentId =
             runs.find((run) => run.agentId)?.agentId ??
-            (await this.safe('agent assignees', [] as string[], () =>
-                resolveTaskDispatchAgentIds(
-                    { id: task.id, agentId: task.agentId ?? null },
-                    this.reads.assignees,
-                ),
-            ))[0] ??
+            (
+                await this.safe('agent assignees', [] as string[], () =>
+                    resolveTaskDispatchAgentIds(
+                        { id: task.id, agentId: task.agentId ?? null },
+                        this.reads.assignees,
+                    ),
+                )
+            )[0] ??
             null;
         const containmentHolds: TaskRunContainmentView[] = [];
         if (agentId && this.reads.placementFor) {
@@ -610,7 +620,9 @@ export class IsolatedRunAdmissionService
         try {
             return await fn();
         } catch (err) {
-            this.logger.warn(`Isolated-run admission: ${what} could not be read (${describe(err)}).`);
+            this.logger.warn(
+                `Isolated-run admission: ${what} could not be read (${describe(err)}).`,
+            );
             return fallback;
         }
     }
@@ -623,6 +635,11 @@ const UNREPORTED: AppWorkRunContainment = Object.freeze({
     downgrades: [],
     needsOwnerAllowance: true,
 }) as AppWorkRunContainment;
+
+/** An admission names the App Work it admitted (the job's `appWorkId` marker); refusals as-is. */
+function withWorkId(admission: AppWorkRunAdmission, workId: string): AppWorkRunAdmission {
+    return admission.admitted === true ? { ...admission, workId } : admission;
+}
 
 function stripRecord(record: AgentRunContainmentRecord): AppWorkRunContainment {
     return {
