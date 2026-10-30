@@ -1172,6 +1172,18 @@ the `commitToRepo` / `openPullRequest` defects with seven red-first cases in `ap
 | ACC-08-46 | `request_app_change` is reachable on a change-request turn ("add an SMS reminder to my app") and absent on an unrelated one — a registry row with no keyword slot is never shipped.                                                                 | W1 · P1        | unit                                    | T26 — apps/web/src/components/ai/ChatChangeCard.unit.spec.tsx, apps/web/src/lib/ai/tools/generated/registry-parity.unit.spec.ts, packages/agent/src/app-works/**tests**/task-delivery.service.spec.ts                                       |
 | ACC-08-47 | Two identical failures open one follow-up; a user-created Task labelled `app-provision` gets no exemption while a real provisioning Task does, on every APW-04 finalize path; editing or clearing labels changes no follow-up.                      | W1 · P1        | unit                                    | epic `tasks.md` (the id is asserted by the spec §8 tests it names)                                                                                                                                                                          |
 
+**APW-08 T12 / T48 as built (lane L10, 2026-10-30) — appended, no row above changed.** ACC-08-08, -34 and -39
+are covered by `packages/agent/src/app-works/__tests__/isolated-run-admission.spec.ts` (T12's nine cases, end to
+end through `TaskTransitionService.dispatchAgentRun`, the ninth through the real `RunDispatchGateService` with
+the AW-23 brake) and `packages/agent/src/app-works/__tests__/run-containment.spec.ts` (T48: the normalizer's
+coercions read as less contained, `hardened` and `ordinary` admitted with an isolated home, the allowance admits
+one node and not another, the record reaches `TaskCostView`, a non-App Task is untouched). The Cost view half of
+ACC-08-34 is `apps/web/src/components/tasks/TaskRunContainmentNotice.unit.spec.tsx` (the record, its
+downgrades, **Allow on this machine** calling the allowance route), the route is
+`apps/api/src/works/work-evolve.allow-containment.controller.spec.ts`, and the cloud worker's pre-flight is
+`packages/tasks/src/__tests__/agent-task-execute.task.spec.ts` ("isolated-run admission pre-flight"). The
+Playwright half of ACC-08-08 (`e2e/app-works-guard-refusals.spec.ts`, still `test.fixme`) is not built.
+
 ### APW-09 — Upstream pull requests
 
 Exercised by: E2E-04, 08 · NEG-05, 06. Paths: `upr/` = `packages/agent/src/upstream-pull-requests/__tests__/`. P1
