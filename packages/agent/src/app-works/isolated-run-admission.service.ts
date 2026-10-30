@@ -15,6 +15,8 @@ import {
     type TaskAgentAssigneeReader,
 } from '../tasks-domain/task-dispatch-agents';
 import {
+    appWorkRepositorySizeRefusal,
+    appWorkRunStageSizeLimitKb,
     describeAppWorkUnreadable,
     isAppWorkRunAdmitted,
     type AppWorkRunAdmission,
@@ -118,6 +120,17 @@ export interface IsolatedRunAdmissionReads {
     };
     /** GAP-15: can the platform mint a push credential for `owner/repo` for this user? */
     pushCredential?(userId: string, owner: string, repo: string): Promise<boolean>;
+    /**
+     * APW-08 T53 (FR-72) — the Work Repository's provider-reported size in KB (APW-01 Inspect's
+     * reading), or null when it cannot be measured. Asked ONLY while the checkout stage has a
+     * limit in the shared table; today it has none, so it is never called.
+     */
+    repositorySizeKb?(
+        userId: string,
+        owner: string,
+        repo: string,
+        work: AdmissionWork,
+    ): Promise<number | null>;
     /** The pipeline plugin a CLOUD Task run executes through, or null (none — the default). */
     cloudPipeline?(agent: {
         id: string;
@@ -188,6 +201,11 @@ export class IsolatedRunAdmissionService
         }
         if (read.kind === 'none' || !read.work || !isAppWorkKind(read.work.kind)) return null;
         const work = read.work;
+
+        // APW-08 T53 (FR-72, S35) — before anything else is asked: a repository the checkout stage
+        // would refuse runs nowhere, whatever the placement.
+        const tooLarge = await this.repositorySizeRefusal(work, input.task.userId);
+        if (tooLarge) return tooLarge;
 
         if (input.placement.placement === 'fleet') {
             const repository = resolveTaskRepository(work);
@@ -588,6 +606,28 @@ export class IsolatedRunAdmissionService
             });
         }
         return { enrolled: owned.length, facts };
+    }
+
+    /**
+     * APW-08 T53 (FR-72, S35, ACC-08-36) — the refusal for a Work Repository larger than the shared
+     * table allows at the run's checkout stage, or `null`. Reads NOTHING while that stage has no
+     * limit (today), so adding the check costs no provider call. With a limit, a size that cannot
+     * be read — no repository coordinates, no read bound, or a failed read — is unmeasurable and
+     * refused, as the table's own rule says (fail closed).
+     */
+    private async repositorySizeRefusal(
+        work: AdmissionWork,
+        userId: string,
+    ): Promise<AppWorkRunAdmission | null> {
+        if (appWorkRunStageSizeLimitKb() === undefined) return null;
+        const repository = resolveTaskRepository(work);
+        const sizeKb =
+            repository && this.reads.repositorySizeKb
+                ? await this.safe('repository size', null as number | null, () =>
+                      this.reads.repositorySizeKb!(userId, repository.owner, repository.repo, work),
+                  )
+                : null;
+        return appWorkRepositorySizeRefusal({ sizeKb });
     }
 
     /**

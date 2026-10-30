@@ -1,4 +1,10 @@
-import type { AppWorkRunContainment, TaskRunContainmentView } from '@ever-works/contracts';
+import {
+    APP_REPOSITORY_STAGE_LIMITS,
+    firstRefusingRepositoryStage,
+    type AppRepositoryStage,
+    type AppWorkRunContainment,
+    type TaskRunContainmentView,
+} from '@ever-works/contracts';
 
 import {
     admitFleetContainment,
@@ -69,6 +75,9 @@ export const APP_WORK_RUN_REFUSAL_CODES = [
     'noEligibleNode',
     // Review of #3040 (decision: fail CLOSED) — the Task's Work could not be read. Retryable.
     'work-unreadable',
+    // APW-08 T53 (FR-72, S35) — the repository exceeds the shared table's limit for the stage the
+    // run's checkout would use.
+    'repositoryTooLarge',
 ] as const;
 export type AppWorkRunRefusalCode = (typeof APP_WORK_RUN_REFUSAL_CODES)[number];
 
@@ -134,6 +143,18 @@ export type AppWorkRunAdmission =
           outcome: 'refused';
           code: 'work-unreadable';
           message: string;
+      }
+    | {
+          admitted: false;
+          outcome: 'refused';
+          code: 'repositoryTooLarge';
+          /** The stage that refused — the one APW-01's Inspect names as the first to refuse. */
+          stage: AppRepositoryStage;
+          /** The provider-reported size in KB, or `null` when it could not be measured. */
+          sizeKb: number | null;
+          /** That stage's limit, from `APP_REPOSITORY_STAGE_LIMITS` — never a local number. */
+          maxSizeKb: number;
+          message: string;
       };
 
 /** Every refusal of {@link AppWorkRunAdmission} (`refused` or `needs_input`). */
@@ -161,6 +182,62 @@ export const APP_WORK_CONTAINMENT_DOWNGRADE_MESSAGE =
 /** Review of #3040 — enrolled machines exist, but none can take this run (tags, pin). */
 export const APP_WORK_NO_ELIGIBLE_NODE_MESSAGE =
     'None of your machines can take this app change right now: none has what it needs. Set one up, or run this Task in an isolated sandbox.';
+
+/**
+ * APW-08 T53 (FR-72) — the stage of the shared limits table (CONTRACTS §2A) an evolve-loop run's
+ * checkout uses: "the evolve loop's checkout — Fleet or isolated sandbox" is the `sandbox` stage.
+ * A stage NAME, not a limit: the number always comes from `APP_REPOSITORY_STAGE_LIMITS`, and this
+ * epic adds none of its own. Today the table states no size for `sandbox`
+ * (`APP_REPOSITORY_STAGES_WITHOUT_SPEC_LIMIT`), so nothing is refused and nothing is read; the day
+ * a number is entered there, every App Work run checks against it with no change here.
+ */
+export const APP_WORK_RUN_CHECKOUT_STAGE: AppRepositoryStage = 'sandbox';
+
+/** The shared table's size limit for `stage`, in KB, or `undefined` when no spec states one. */
+export function appWorkRunStageSizeLimitKb(
+    stage: AppRepositoryStage = APP_WORK_RUN_CHECKOUT_STAGE,
+): number | undefined {
+    return APP_REPOSITORY_STAGE_LIMITS[stage]?.maxSizeKb;
+}
+
+/** `4.0 GB` — KB as the provider reports it (KiB), shown in GB to one decimal, as S35 does. */
+function formatRepositorySize(kb: number): string {
+    return `${(kb / (1024 * 1024)).toFixed(1)} GB`;
+}
+
+/**
+ * APW-08 T53 (FR-72, S35, ACC-08-36) — the refusal for a repository the stage the run's checkout
+ * uses would refuse, or `null` when it fits (or the stage has no limit). Decided by the shared
+ * table's own `firstRefusingRepositoryStage`, so an UNMEASURABLE size is refused like an
+ * oversized one wherever a limit exists ("we could not measure it" is never "it fits").
+ */
+export function appWorkRepositorySizeRefusal(input: {
+    sizeKb: number | null | undefined;
+    stage?: AppRepositoryStage;
+}): Extract<AppWorkRunAdmission, { code: 'repositoryTooLarge' }> | null {
+    const stage = input.stage ?? APP_WORK_RUN_CHECKOUT_STAGE;
+    const maxSizeKb = appWorkRunStageSizeLimitKb(stage);
+    if (maxSizeKb === undefined) return null;
+    if (firstRefusingRepositoryStage({ sizeKb: input.sizeKb, stages: [stage] }) !== stage) {
+        return null;
+    }
+    const sizeKb =
+        typeof input.sizeKb === 'number' && Number.isFinite(input.sizeKb) && input.sizeKb >= 0
+            ? input.sizeKb
+            : null;
+    return {
+        admitted: false,
+        outcome: 'refused',
+        code: 'repositoryTooLarge',
+        stage,
+        sizeKb,
+        maxSizeKb,
+        message:
+            sizeKb === null
+                ? `This app's repository size could not be measured, so it was not checked out here (this stage allows ${formatRepositorySize(maxSizeKb)}).`
+                : `This app's repository is too big to check out here (${formatRepositorySize(sizeKb)}; this stage allows ${formatRepositorySize(maxSizeKb)}).`,
+    };
+}
 
 /** Review of #3040 — the Task's Work could not be read; nothing was started, and it can be retried. */
 export function describeAppWorkUnreadable(workId: string | null | undefined): string {
