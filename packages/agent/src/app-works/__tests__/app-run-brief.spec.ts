@@ -48,7 +48,7 @@ describe('APW-08 T18 — the rules block (platform text)', () => {
         expect(block).toContain(APP_RUN_BRIEF_PUSH_LINE);
         // APW-08 T12 / T48 (FR-13) — the honest statement of what containment does not cover.
         expect(block).toContain(APP_RUN_BRIEF_REAL_HOME_LINE);
-        expect(block).toContain("real home directory and toolchain");
+        expect(block).toContain('real home directory and toolchain');
         expect(block).toContain('`aaaaaaaaaaaa`');
     });
 

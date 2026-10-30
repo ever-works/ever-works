@@ -43,7 +43,8 @@ export function TaskRunContainmentNotice({
     const held = (holds ?? []).filter((hold) => hold.nodeId);
     if (!containment && held.length === 0) return null;
 
-    const nodeLabel = (view: TaskRunContainmentView) => view.nodeName?.trim() || t('unknownMachine');
+    const nodeLabel = (view: TaskRunContainmentView) =>
+        view.nodeName?.trim() || t('unknownMachine');
 
     const change = async (nodeId: string, allow: boolean) => {
         if (!workId || pending) return;
@@ -73,18 +74,31 @@ export function TaskRunContainmentNotice({
                         {view.executionPath === 'hardened' ? t('pathHardened') : t('pathOrdinary')}
                         {' · '}
                         <span data-testid="task-containment-isolated-home">
-                            {view.isolatedHome ? t('isolatedHomeApplied') : t('isolatedHomeNotApplied')}
+                            {view.isolatedHome
+                                ? t('isolatedHomeApplied')
+                                : t('isolatedHomeNotApplied')}
                         </span>
                     </p>
                     {view.downgrades.length === 0 ? (
-                        <p className="text-text-muted dark:text-text-muted-dark">{t('noDowngrades')}</p>
+                        <p className="text-text-muted dark:text-text-muted-dark">
+                            {t('noDowngrades')}
+                        </p>
                     ) : (
                         <div>
-                            <p className="text-text-muted dark:text-text-muted-dark">{t('downgrades')}</p>
-                            <ul className="list-disc pl-5" data-testid="task-containment-downgrades">
+                            <p className="text-text-muted dark:text-text-muted-dark">
+                                {t('downgrades')}
+                            </p>
+                            <ul
+                                className="list-disc pl-5"
+                                data-testid="task-containment-downgrades"
+                            >
                                 {view.downgrades.map((entry, index) => (
-                                    <li key={`${entry.control}-${index}`} data-testid="task-containment-downgrade">
-                                        <span className="font-mono">{entry.control}</span>: {entry.reason}
+                                    <li
+                                        key={`${entry.control}-${index}`}
+                                        data-testid="task-containment-downgrade"
+                                    >
+                                        <span className="font-mono">{entry.control}</span>:{' '}
+                                        {entry.reason}
                                     </li>
                                 ))}
                             </ul>
@@ -138,14 +152,19 @@ export function TaskRunContainmentNotice({
                     </p>
                     {record(containment)}
                     {containment.allowedByOwner && containment.nodeId && (
-                        <div className="flex flex-wrap items-center gap-2" data-testid="task-containment-allowed">
+                        <div
+                            className="flex flex-wrap items-center gap-2"
+                            data-testid="task-containment-allowed"
+                        >
                             <span>{t('allowed')}</span>
                             {containment.acceptedDowngrade && (
                                 <span
                                     className="text-text-muted dark:text-text-muted-dark"
                                     data-testid="task-containment-accepted"
                                 >
-                                    {t('acceptedDowngrade', { reason: containment.acceptedDowngrade })}
+                                    {t('acceptedDowngrade', {
+                                        reason: containment.acceptedDowngrade,
+                                    })}
                                 </span>
                             )}
                             {workId && (
@@ -165,11 +184,19 @@ export function TaskRunContainmentNotice({
                 </div>
             )}
 
-            <p className="text-text-muted dark:text-text-muted-dark" data-testid="task-containment-real-home">
+            <p
+                className="text-text-muted dark:text-text-muted-dark"
+                data-testid="task-containment-real-home"
+            >
                 {t('realHome')}
             </p>
 
-            <p role="status" aria-live="polite" className="text-xs" data-testid="task-containment-status">
+            <p
+                role="status"
+                aria-live="polite"
+                className="text-xs"
+                data-testid="task-containment-status"
+            >
                 {failed ? t('saveFailed') : ''}
             </p>
         </div>

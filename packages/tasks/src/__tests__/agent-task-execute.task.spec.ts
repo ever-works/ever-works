@@ -202,9 +202,9 @@ vi.mock('@ever-works/agent/tasks-domain', () => ({
 // containment leaf only), so these specs pin what the worker actually refuses.
 vi.mock('@ever-works/agent/app-works', async () => ({
     appWorkCloudRunRefusal: (
-        await vi.importActual<
-            typeof import('../../../agent/src/app-works/isolated-run-admission')
-        >('../../../agent/src/app-works/isolated-run-admission')
+        await vi.importActual<typeof import('../../../agent/src/app-works/isolated-run-admission')>(
+            '../../../agent/src/app-works/isolated-run-admission',
+        )
     ).appWorkCloudRunRefusal,
 }));
 
@@ -1610,7 +1610,10 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 const out = await registeredConfig.run(runPayload());
 
                 expect(out).toEqual(
-                    expect.objectContaining({ status: 'failed', reason: 'app-work-run-not-admitted' }),
+                    expect.objectContaining({
+                        status: 'failed',
+                        reason: 'app-work-run-not-admitted',
+                    }),
                 );
                 expect(runs.markFailed).toHaveBeenCalledWith(
                     'run-1',
@@ -1618,7 +1621,11 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 );
                 expect(taskWorkspace.provisionForRun).not.toHaveBeenCalled();
                 expect(runner.execute).not.toHaveBeenCalled();
-                expect(runDenorm.recordTerminal).toHaveBeenCalledWith(OWNED_TASK_ID, 'run-1', 'failed');
+                expect(runDenorm.recordTerminal).toHaveBeenCalledWith(
+                    OWNED_TASK_ID,
+                    'run-1',
+                    'failed',
+                );
                 expect(dispatchGate.drainForWork).toHaveBeenCalledWith(WORK_ID);
             });
 

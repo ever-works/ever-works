@@ -79,7 +79,9 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
         expect(screen.getByTestId('task-containment-path').textContent).toBe(
             `${copy.pathOrdinary} · ${copy.isolatedHomeNotApplied}`,
         );
-        const downgrades = screen.getAllByTestId('task-containment-downgrade').map((li) => li.textContent);
+        const downgrades = screen
+            .getAllByTestId('task-containment-downgrade')
+            .map((li) => li.textContent);
         expect(downgrades).toEqual([
             'process-containment: ordinary command runner',
             'isolated-home: modelHomeIsolation=inherit',
@@ -96,7 +98,9 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
         renderNotice({ holds: [view({ runId: null })], onChanged });
 
         const hold = screen.getByTestId('task-containment-hold');
-        expect(within(hold).getByTestId('task-containment-hold-copy').textContent).toBe(rules.containmentDowngrade);
+        expect(within(hold).getByTestId('task-containment-hold-copy').textContent).toBe(
+            rules.containmentDowngrade,
+        );
         expect(rules.containmentDowngrade).toBe(
             'This machine runs app changes without an isolated home. Allow it once, or run this Task in an isolated sandbox.',
         );
@@ -113,7 +117,9 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
         renderNotice({
             holds: [view({ runId: null, reported: false, downgrades: [], nodeName: null })],
         });
-        expect(screen.getByTestId('task-containment-not-reported').textContent).toBe(copy.notReported);
+        expect(screen.getByTestId('task-containment-not-reported').textContent).toBe(
+            copy.notReported,
+        );
         expect(screen.getByTestId('task-containment-hold').textContent).toContain(
             `Holds the next run on ${copy.unknownMachine}`,
         );
@@ -123,7 +129,10 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
     it('an allowed node shows the accepted downgrade and Withdraw, which withdraws it', async () => {
         allow.mockResolvedValue({ success: true, data: null });
         renderNotice({
-            containment: view({ allowedByOwner: true, acceptedDowngrade: 'modelHomeIsolation=inherit' }),
+            containment: view({
+                allowedByOwner: true,
+                acceptedDowngrade: 'modelHomeIsolation=inherit',
+            }),
         });
 
         const allowed = screen.getByTestId('task-containment-allowed');
@@ -144,7 +153,9 @@ describe('TaskRunContainmentNotice (APW-08 T27 / T48)', () => {
         await waitFor(() =>
             expect(screen.getByTestId('task-containment-status').textContent).toBe(copy.saveFailed),
         );
-        expect(screen.getByTestId('task-containment-status').getAttribute('aria-live')).toBe('polite');
+        expect(screen.getByTestId('task-containment-status').getAttribute('aria-live')).toBe(
+            'polite',
+        );
         expect(onChanged).not.toHaveBeenCalled();
     });
 

@@ -63,7 +63,9 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
     const build = (withRecorder = true) =>
         new FleetAgentTaskReconcilerService(
             {
-                findById: jest.fn().mockResolvedValue({ id: RUN, userId: USER, agentId: AGENT, workId: 'w' }),
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: RUN, userId: USER, agentId: AGENT, workId: 'w' }),
                 markFailed,
                 markCompleted: jest.fn().mockResolvedValue(undefined),
                 tryMarkCompleted: jest.fn().mockResolvedValue(true),
@@ -75,7 +77,9 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
                 recordFleetCliSession: jest.fn().mockResolvedValue(undefined),
             } as never,
             {
-                findById: jest.fn().mockResolvedValue({ id: TASK, workId: 'w', title: 'T', organizationId: null }),
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: TASK, workId: 'w', title: 'T', organizationId: null }),
             } as never,
             { findById: jest.fn().mockResolvedValue({ id: AGENT, permissions: {} }) } as never,
             {
@@ -92,7 +96,11 @@ describe('FleetAgentTaskReconcilerService — the containment record (APW-08 T48
             { post: jest.fn().mockResolvedValue({}) } as never,
             { drainForWork: jest.fn().mockResolvedValue({ dispatched: false }) } as never,
             { notice: jest.fn().mockResolvedValue(undefined), questionRaised: jest.fn() } as never,
-            { findById: jest.fn().mockResolvedValue({ id: NODE, userId: USER, name: 'everdesk2' }) } as never,
+            {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ id: NODE, userId: USER, name: 'everdesk2' }),
+            } as never,
             pluginUsage as never,
             undefined,
             undefined,

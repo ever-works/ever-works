@@ -260,8 +260,8 @@ export class IsolatedRunAdmissionService
                 reported: true,
                 allowedByOwner: isNodeContainmentAllowed(allowances, record.nodeId),
                 acceptedDowngrade:
-                    allowances.find((entry) => entry.nodeId === record.nodeId)
-                        ?.acceptedDowngrade ?? null,
+                    allowances.find((entry) => entry.nodeId === record.nodeId)?.acceptedDowngrade ??
+                    null,
             };
             break;
         }
@@ -270,12 +270,14 @@ export class IsolatedRunAdmissionService
         // credential (a different refusal with its own copy). Same candidates, same predicate.
         const agentId =
             runs.find((run) => run.agentId)?.agentId ??
-            (await this.safe('agent assignees', [] as string[], () =>
-                resolveTaskDispatchAgentIds(
-                    { id: task.id, agentId: task.agentId ?? null },
-                    this.reads.assignees,
-                ),
-            ))[0] ??
+            (
+                await this.safe('agent assignees', [] as string[], () =>
+                    resolveTaskDispatchAgentIds(
+                        { id: task.id, agentId: task.agentId ?? null },
+                        this.reads.assignees,
+                    ),
+                )
+            )[0] ??
             null;
         const containmentHolds: TaskRunContainmentView[] = [];
         if (agentId && this.reads.placementFor) {
@@ -406,7 +408,9 @@ export class IsolatedRunAdmissionService
                 .filter(
                     (node) =>
                         node.userId === userId &&
-                        !FLEET_NODE_NON_LEASABLE_STATUSES.includes(node.status as FleetNodeStatus) &&
+                        !FLEET_NODE_NON_LEASABLE_STATUSES.includes(
+                            node.status as FleetNodeStatus,
+                        ) &&
                         nodeSatisfiesCapabilities(
                             node.capabilities ?? [],
                             placement.requiredCapabilities ?? [],
@@ -480,7 +484,9 @@ export class IsolatedRunAdmissionService
         try {
             return await fn();
         } catch (err) {
-            this.logger.warn(`Isolated-run admission: ${what} could not be read (${describe(err)}).`);
+            this.logger.warn(
+                `Isolated-run admission: ${what} could not be read (${describe(err)}).`,
+            );
             return fallback;
         }
     }

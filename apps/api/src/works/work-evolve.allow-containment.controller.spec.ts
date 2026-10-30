@@ -37,7 +37,13 @@ import type { AuthenticatedUser } from '../auth/types/auth.types';
  */
 describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
     const NODE = '11111111-1111-4111-8111-111111111111';
-    const appWork = { id: 'w1', userId: 'owner', name: 'Bookings', kind: 'app', organizationId: null };
+    const appWork = {
+        id: 'w1',
+        userId: 'owner',
+        name: 'Bookings',
+        kind: 'app',
+        organizationId: null,
+    };
 
     function build(
         opts: {
@@ -54,7 +60,9 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
             }),
         };
         const store = {
-            setContainmentAllowance: jest.fn(async () => opts.result ?? { status: 'ok', allowances: [] }),
+            setContainmentAllowance: jest.fn(
+                async () => opts.result ?? { status: 'ok', allowances: [] },
+            ),
         };
         const controller = new WorkEvolveController(
             ownership as never,
@@ -71,20 +79,27 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
 
     const owner = { userId: 'owner' } as AuthenticatedUser;
 
-    async function refusal(promise: Promise<unknown>): Promise<{ status: number; body: Record<string, unknown> }> {
+    async function refusal(
+        promise: Promise<unknown>,
+    ): Promise<{ status: number; body: Record<string, unknown> }> {
         try {
             await promise;
         } catch (error) {
             expect(error).toBeInstanceOf(HttpException);
             const http = error as HttpException;
-            return { status: http.getStatus(), body: http.getResponse() as Record<string, unknown> };
+            return {
+                status: http.getStatus(),
+                body: http.getResponse() as Record<string, unknown>,
+            };
         }
         throw new Error('expected a refusal');
     }
 
     it('answers 204 and allows the node on THIS Work, as the caller', async () => {
         const { controller, store, ownership } = build();
-        await expect(controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true })).resolves.toBeUndefined();
+        await expect(
+            controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }),
+        ).resolves.toBeUndefined();
 
         expect(ownership.ensureCanEdit).toHaveBeenCalledWith('w1', 'owner');
         expect(store.setContainmentAllowance).toHaveBeenCalledWith({
@@ -94,7 +109,10 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
             actorUserId: 'owner',
         });
         expect(
-            Reflect.getMetadata(HTTP_CODE_METADATA, WorkEvolveController.prototype.allowContainment),
+            Reflect.getMetadata(
+                HTTP_CODE_METADATA,
+                WorkEvolveController.prototype.allowContainment,
+            ),
         ).toBe(HttpStatus.NO_CONTENT);
     });
 
@@ -102,22 +120,27 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
         const { controller, store } = build();
         await controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: false });
         await controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: 'true' as never });
-        expect(store.setContainmentAllowance.mock.calls.map((call: unknown[]) => (call[0] as { allow: boolean }).allow)).toEqual([
-            false,
-            false,
-        ]);
+        expect(
+            store.setContainmentAllowance.mock.calls.map(
+                (call: unknown[]) => (call[0] as { allow: boolean }).allow,
+            ),
+        ).toEqual([false, false]);
     });
 
     it('an unknown node (or another account’s) is 404 notFound', async () => {
         const { controller } = build({ result: { status: 'notFound' } });
-        const out = await refusal(controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }));
+        const out = await refusal(
+            controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }),
+        );
         expect(out.status).toBe(404);
         expect(out.body).toMatchObject({ code: 'notFound' });
     });
 
     it('a non-App Work is 422 notAppWork, before the store is asked', async () => {
         const { controller, store } = build({ work: { ...appWork, kind: 'directory' } });
-        const out = await refusal(controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }));
+        const out = await refusal(
+            controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }),
+        );
         expect(out.status).toBe(422);
         expect(out.body).toMatchObject({ code: 'notAppWork' });
         expect(store.setContainmentAllowance).not.toHaveBeenCalled();
@@ -125,7 +148,9 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
 
     it('a Work the caller cannot edit is one 404, and the store is never asked', async () => {
         const { controller, store } = build({ denied: true });
-        const out = await refusal(controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }));
+        const out = await refusal(
+            controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }),
+        );
         expect(out.status).toBe(404);
         expect(out.body).toMatchObject({ code: 'not_found' });
         expect(store.setContainmentAllowance).not.toHaveBeenCalled();
@@ -133,7 +158,9 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
 
     it('503 when the allowance store is not wired', async () => {
         const { controller } = build({ noStore: true });
-        const out = await refusal(controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }));
+        const out = await refusal(
+            controller.allowContainment(owner, 'w1', { nodeId: NODE, allow: true }),
+        );
         expect(out.status).toBe(503);
         expect(out.body).toMatchObject({ code: 'unavailable' });
     });
@@ -142,6 +169,8 @@ describe('WorkEvolveController — allow-containment (APW-08 T48)', () => {
         const keys = Reflect.getMetadataKeys(WorkEvolveController.prototype.allowContainment);
         const limitKey = keys.find((key: unknown) => String(key).includes('THROTTLER:LIMIT'));
         expect(limitKey).toBeDefined();
-        expect(Reflect.getMetadata(limitKey, WorkEvolveController.prototype.allowContainment)).toBe(10);
+        expect(Reflect.getMetadata(limitKey, WorkEvolveController.prototype.allowContainment)).toBe(
+            10,
+        );
     });
 });

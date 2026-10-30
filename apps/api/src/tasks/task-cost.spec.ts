@@ -126,7 +126,10 @@ describe('withTaskContainment (APW-08 T48)', () => {
 
     it('adds the record and the holds for an App Work Task', async () => {
         const reader = {
-            describeForTask: jest.fn(async () => ({ containment: record, containmentHolds: [record] })),
+            describeForTask: jest.fn(async () => ({
+                containment: record,
+                containmentHolds: [record],
+            })),
         };
         const out = await withTaskContainment(view, task, reader);
         expect(out).toEqual({ ...view, containment: record, containmentHolds: [record] });
@@ -135,7 +138,9 @@ describe('withTaskContainment (APW-08 T48)', () => {
 
     it('returns every other view exactly as built: no reader, a non-App Task (null), a reader that throws', async () => {
         expect(await withTaskContainment(view, task, null)).toBe(view);
-        expect(await withTaskContainment(view, task, { describeForTask: async () => null })).toBe(view);
+        expect(await withTaskContainment(view, task, { describeForTask: async () => null })).toBe(
+            view,
+        );
         expect(
             await withTaskContainment(view, task, {
                 describeForTask: async () => {

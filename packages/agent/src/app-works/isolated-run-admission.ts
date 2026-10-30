@@ -169,7 +169,10 @@ export function isAppWorkRunAdmitted(
         return { admitted: true, branch: 'fleet' };
     }
     // 'cloud' and 'unknown' — the same branch: fail closed.
-    if (plan.pipeline?.enforcesRuntimeNetworking === true && plan.environmentNetworking === 'limited') {
+    if (
+        plan.pipeline?.enforcesRuntimeNetworking === true &&
+        plan.environmentNetworking === 'limited'
+    ) {
         return { admitted: true, branch: 'isolated-cloud' };
     }
     return {

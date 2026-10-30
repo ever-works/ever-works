@@ -1,4 +1,7 @@
-import { RunDispatchGateService, QUEUED_REASON_AGENT_PAUSED } from '../../agents/run-dispatch-gate.service';
+import {
+    RunDispatchGateService,
+    QUEUED_REASON_AGENT_PAUSED,
+} from '../../agents/run-dispatch-gate.service';
 import { TaskTransitionService } from '../../tasks-domain/task-transition.service';
 import {
     APP_WORK_CONTAINMENT_DOWNGRADE_MESSAGE,
@@ -37,7 +40,8 @@ const NODE_B = '22222222-2222-4222-8222-222222222222';
 
 const S15 = APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE;
 const S33 = APP_WORK_CONTAINMENT_DOWNGRADE_MESSAGE;
-const S28 = "Ever Works can't push to maya/bookings from your machines. Install the Ever Works GitHub App on maya.";
+const S28 =
+    "Ever Works can't push to maya/bookings from your machines. Install the Ever Works GitHub App on maya.";
 
 /** A node report the way `normalizeFleetAgentTaskContainment` expects it from a node. */
 const isolatedReport = (executionPath: 'ordinary' | 'hardened' = 'ordinary') => ({
@@ -72,7 +76,15 @@ function makeWorld(over: Partial<World> = {}): World {
     return {
         kind: { [APP_WORK]: 'app', [SITE_WORK]: 'directory' },
         allowances: {},
-        nodes: [{ id: NODE_A, userId: OWNER, name: 'Maya desktop', status: 'online', capabilities: ['git-push'] }],
+        nodes: [
+            {
+                id: NODE_A,
+                userId: OWNER,
+                name: 'Maya desktop',
+                status: 'online',
+                capabilities: ['git-push'],
+            },
+        ],
         reports: { [NODE_A]: isolatedReport() },
         pinned: null,
         installed: true,
@@ -106,7 +118,9 @@ function readsFor(world: World, spies: { push?: jest.Mock } = {}): IsolatedRunAd
             nodesForUser: jest.fn(async () => world.nodes),
             nodeById: jest.fn(async (id: string) => world.nodes.find((n) => n.id === id) ?? null),
             pinnedNodeFor: jest.fn(async () => world.pinned),
-            latestContainment: jest.fn(async (_userId: string, nodeId: string) => world.reports[nodeId] ?? null),
+            latestContainment: jest.fn(
+                async (_userId: string, nodeId: string) => world.reports[nodeId] ?? null,
+            ),
         },
         pushCredential: push,
         cloudPipeline: jest.fn(async () => world.pipeline),
@@ -135,7 +149,11 @@ function makeHarness(
         enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }),
         previewPlacement: jest.fn(async () => world.placement),
     };
-    const works = { findById: jest.fn(async (id: string) => (world.kind[id] ? { id, kind: world.kind[id] } : null)) };
+    const works = {
+        findById: jest.fn(async (id: string) =>
+            world.kind[id] ? { id, kind: world.kind[id] } : null,
+        ),
+    };
     const agents = {
         findByIdAndUser: jest.fn(async (id: string, userId: string) => ({
             id,
@@ -144,7 +162,9 @@ function makeHarness(
         })),
     };
     const admission = new IsolatedRunAdmissionService(opts.reads ?? readsFor(world));
-    const svc = new (TaskTransitionService as unknown as new (...args: unknown[]) => TaskTransitionService)(
+    const svc = new (TaskTransitionService as unknown as new (
+        ...args: unknown[]
+    ) => TaskTransitionService)(
         { casUpdateStatus: jest.fn(), findById: jest.fn() },
         { findByTaskId: jest.fn().mockResolvedValue([]) },
         { allApproved: jest.fn().mockResolvedValue(true) },
@@ -235,18 +255,24 @@ describe('isolated-run admission — the nine T12 cases (site 1, dispatchAgentRu
 
     it("5. an 'unknown' placement is judged as cloud and refused — also when the adapter cannot answer", async () => {
         const unknown = makeHarness(makeWorld({ placement: { placement: 'unknown' } }));
-        expect((await unknown.svc.dispatchAgentRun(task(), AGENT)).error).toBe(`noIsolatedRuntime: ${S15}`);
+        expect((await unknown.svc.dispatchAgentRun(task(), AGENT)).error).toBe(
+            `noIsolatedRuntime: ${S15}`,
+        );
         expectNothingDispatched(unknown);
 
         const throwing = makeHarness(makeWorld());
         throwing.dispatcher.previewPlacement.mockRejectedValue(new Error('router down'));
-        expect((await throwing.svc.dispatchAgentRun(task(), AGENT)).error).toBe(`noIsolatedRuntime: ${S15}`);
+        expect((await throwing.svc.dispatchAgentRun(task(), AGENT)).error).toBe(
+            `noIsolatedRuntime: ${S15}`,
+        );
         expectNothingDispatched(throwing);
     });
 
     it('6. a Fleet node reporting isolatedHome: false is needs_input, and is admitted once the owner allows it (ACC-08-34)', async () => {
         const world = makeWorld({
-            reports: { [NODE_A]: { executionPath: 'ordinary', isolatedHome: false, downgrades: [] } },
+            reports: {
+                [NODE_A]: { executionPath: 'ordinary', isolatedHome: false, downgrades: [] },
+            },
         });
         const h = makeHarness(world);
 
@@ -280,14 +306,28 @@ describe('isolated-run admission — the nine T12 cases (site 1, dispatchAgentRu
         const world = makeWorld({ reports: { [NODE_A]: declinedReport() } });
         const h = makeHarness(world);
 
-        expect((await h.svc.dispatchAgentRun(task(), AGENT)).error).toBe(`containmentDowngrade: ${S33}`);
+        expect((await h.svc.dispatchAgentRun(task(), AGENT)).error).toBe(
+            `containmentDowngrade: ${S33}`,
+        );
         expectNothingDispatched(h);
 
-        await h.admission.setContainmentAllowance({ workId: APP_WORK, nodeId: NODE_A, allow: true, actorUserId: OWNER });
+        await h.admission.setContainmentAllowance({
+            workId: APP_WORK,
+            nodeId: NODE_A,
+            allow: true,
+            actorUserId: OWNER,
+        });
         expect(await h.svc.dispatchAgentRun(task(), AGENT)).toMatchObject({ dispatched: true });
 
-        await h.admission.setContainmentAllowance({ workId: APP_WORK, nodeId: NODE_A, allow: false, actorUserId: OWNER });
-        expect((await h.svc.dispatchAgentRun(task(), AGENT)).error).toBe(`containmentDowngrade: ${S33}`);
+        await h.admission.setContainmentAllowance({
+            workId: APP_WORK,
+            nodeId: NODE_A,
+            allow: false,
+            actorUserId: OWNER,
+        });
+        expect((await h.svc.dispatchAgentRun(task(), AGENT)).error).toBe(
+            `containmentDowngrade: ${S33}`,
+        );
         expect(h.dispatcher.enqueue).toHaveBeenCalledTimes(1);
     });
 
@@ -312,7 +352,9 @@ describe('isolated-run admission — the nine T12 cases (site 1, dispatchAgentRu
             countInFlightForUser: jest.fn().mockResolvedValue(0),
             countInFlightForOrganization: jest.fn().mockResolvedValue(0),
         };
-        const brake = { shouldHaltForAgent: jest.fn().mockResolvedValue({ halted: true, reason: 'user' }) };
+        const brake = {
+            shouldHaltForAgent: jest.fn().mockResolvedValue({ halted: true, reason: 'user' }),
+        };
         const gate = new RunDispatchGateService(
             gateRuns as never,
             undefined,
@@ -363,7 +405,9 @@ describe('isolated-run admission — every other path is unchanged', () => {
     });
 
     it('with the port unbound, an App Work Task dispatches exactly as before', async () => {
-        const h = makeHarness(makeWorld({ placement: { placement: 'cloud' } }), { noAdmission: true });
+        const h = makeHarness(makeWorld({ placement: { placement: 'cloud' } }), {
+            noAdmission: true,
+        });
         expect(await h.svc.dispatchAgentRun(task(), AGENT)).toMatchObject({ dispatched: true });
         expect(h.dispatcher.previewPlacement).not.toHaveBeenCalled();
     });
@@ -479,7 +523,11 @@ describe('isolated-run admission — the predicate and its facts', () => {
             agent: { id: AGENT, userId: OWNER },
             placement: world.placement,
         };
-        expect(await admission.admit(input)).toMatchObject({ code: 'noPushCredential', owner: 'maya', repo: 'bookings' });
+        expect(await admission.admit(input)).toMatchObject({
+            code: 'noPushCredential',
+            owner: 'maya',
+            repo: 'bookings',
+        });
         expect(await admission.admit(input)).toMatchObject({ code: 'noPushCredential' });
         expect(push).toHaveBeenCalledTimes(2);
 
@@ -514,9 +562,11 @@ describe('isolated-run admission — the predicate and its facts', () => {
 
     it('the pure predicate: push first, then containment; no candidate is left to the router', () => {
         const t = { id: 't1', workId: APP_WORK };
-        expect(isAppWorkRunAdmitted(t, { placement: 'fleet', pushCredential: null })).toMatchObject({
-            code: 'noPushCredential',
-        });
+        expect(isAppWorkRunAdmitted(t, { placement: 'fleet', pushCredential: null })).toMatchObject(
+            {
+                code: 'noPushCredential',
+            },
+        );
         expect(
             isAppWorkRunAdmitted(t, {
                 placement: 'fleet',
@@ -524,7 +574,13 @@ describe('isolated-run admission — the predicate and its facts', () => {
                 fleetCandidates: [],
             }),
         ).toEqual({ admitted: true, branch: 'fleet' });
-        expect(isAppWorkRunAdmitted(t, { placement: 'unknown', pipeline: { enforcesRuntimeNetworking: true }, environmentNetworking: 'limited' })).toEqual({
+        expect(
+            isAppWorkRunAdmitted(t, {
+                placement: 'unknown',
+                pipeline: { enforcesRuntimeNetworking: true },
+                environmentNetworking: 'limited',
+            }),
+        ).toEqual({
             admitted: true,
             branch: 'isolated-cloud',
         });
@@ -534,12 +590,21 @@ describe('isolated-run admission — the predicate and its facts', () => {
 describe('isolated-run admission — site 2, the cloud worker pre-flight', () => {
     it('refuses every App Work run that reaches the cloud executor, with the S15 copy', () => {
         expect(
-            appWorkCloudRunRefusal({ taskId: 't1', workId: APP_WORK, isAppWork: true, reviewRun: false }),
+            appWorkCloudRunRefusal({
+                taskId: 't1',
+                workId: APP_WORK,
+                isAppWork: true,
+                reviewRun: false,
+            }),
         ).toBe(`noIsolatedRuntime: ${S15}`);
     });
 
     it('lets a review run and every other kind through', () => {
-        expect(appWorkCloudRunRefusal({ taskId: 't1', isAppWork: true, reviewRun: true })).toBeNull();
-        expect(appWorkCloudRunRefusal({ taskId: 't1', isAppWork: false, reviewRun: false })).toBeNull();
+        expect(
+            appWorkCloudRunRefusal({ taskId: 't1', isAppWork: true, reviewRun: true }),
+        ).toBeNull();
+        expect(
+            appWorkCloudRunRefusal({ taskId: 't1', isAppWork: false, reviewRun: false }),
+        ).toBeNull();
     });
 });

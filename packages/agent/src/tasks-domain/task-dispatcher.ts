@@ -57,7 +57,9 @@ export interface AgentTaskExecuteDispatcher {
      * which the caller reads as `'unknown'` — treated as `'cloud'`, so the predicate fails closed.
      * `payload.runId` is absent (no run row exists yet).
      */
-    previewPlacement?(payload: AgentTaskExecuteDispatchPayload): Promise<AppWorkRunPlacementPreview>;
+    previewPlacement?(
+        payload: AgentTaskExecuteDispatchPayload,
+    ): Promise<AppWorkRunPlacementPreview>;
 }
 
 export interface AgentChatReplyDispatcher {

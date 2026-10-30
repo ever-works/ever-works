@@ -47,7 +47,9 @@ describe('fleet-aware dispatcher — previewPlacement (APW-08 T12)', () => {
         scopeResolver = { resolve: jest.fn().mockResolvedValue({ workId: 'work-1' }) };
         planner = {
             plan: jest.fn(),
-            requirements: jest.fn().mockResolvedValue({ requiredCapabilities: ['git-push', 'claude-code'] }),
+            requirements: jest
+                .fn()
+                .mockResolvedValue({ requiredCapabilities: ['git-push', 'claude-code'] }),
         };
         killSwitch = undefined;
     });
@@ -63,7 +65,10 @@ describe('fleet-aware dispatcher — previewPlacement (APW-08 T12)', () => {
     it("answers 'fleet' with the job's required tags, through the same routing call enqueue makes", async () => {
         const preview = await build().previewPlacement!(payload);
 
-        expect(preview).toEqual({ placement: 'fleet', requiredCapabilities: ['git-push', 'claude-code'] });
+        expect(preview).toEqual({
+            placement: 'fleet',
+            requiredCapabilities: ['git-push', 'claude-code'],
+        });
         expect(router.routeAgentTask).toHaveBeenCalledWith(
             payload,
             { workId: 'work-1' },
@@ -95,15 +100,24 @@ describe('fleet-aware dispatcher — previewPlacement (APW-08 T12)', () => {
 
     it('answers halted while the global stop flag is set, unreadable, or raised by the router', async () => {
         killSwitch = { isStopped: jest.fn().mockResolvedValue(true) };
-        expect(await build().previewPlacement!(payload)).toEqual({ placement: 'unknown', halted: true });
+        expect(await build().previewPlacement!(payload)).toEqual({
+            placement: 'unknown',
+            halted: true,
+        });
         expect(router.routeAgentTask).not.toHaveBeenCalled();
 
         killSwitch = { isStopped: jest.fn().mockRejectedValue(new Error('db down')) };
-        expect(await build().previewPlacement!(payload)).toEqual({ placement: 'unknown', halted: true });
+        expect(await build().previewPlacement!(payload)).toEqual({
+            placement: 'unknown',
+            halted: true,
+        });
 
         killSwitch = { isStopped: jest.fn().mockResolvedValue(false) };
         router.routeAgentTask.mockRejectedValue(new FleetKillSwitchActiveError('task-1'));
-        expect(await build().previewPlacement!(payload)).toEqual({ placement: 'unknown', halted: true });
+        expect(await build().previewPlacement!(payload)).toEqual({
+            placement: 'unknown',
+            halted: true,
+        });
         expectNoSideEffects();
     });
 });

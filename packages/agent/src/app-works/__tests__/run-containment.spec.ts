@@ -41,7 +41,11 @@ describe('run containment — the record, read toward LESS containment', () => {
             isolatedHome: 'yes',
             downgrades: [],
         });
-        expect(forged).toMatchObject({ executionPath: 'ordinary', isolatedHome: false, needsOwnerAllowance: true });
+        expect(forged).toMatchObject({
+            executionPath: 'ordinary',
+            isolatedHome: false,
+            needsOwnerAllowance: true,
+        });
         expect(forged!.downgrades.map((d) => d.control)).toEqual(['isolated-home']);
 
         const unreadableEntry = toAppWorkRunContainment({
@@ -54,7 +58,8 @@ describe('run containment — the record, read toward LESS containment', () => {
         expect(unreadableEntry!.needsOwnerAllowance).toBe(false);
 
         // Nothing readable at all is no record — which the gate treats as a downgrade.
-        for (const raw of [null, undefined, 'x', 3, []]) expect(toAppWorkRunContainment(raw)).toBeNull();
+        for (const raw of [null, undefined, 'x', 3, []])
+            expect(toAppWorkRunContainment(raw)).toBeNull();
         expect(needsOwnerAllowance(null)).toBe(true);
     });
 
@@ -80,7 +85,9 @@ describe('run containment — the record, read toward LESS containment', () => {
                 ],
             });
             expect(containment).toMatchObject({ executionPath, needsOwnerAllowance: false });
-            expect(admitFleetContainment([{ nodeId: NODE_A, containment, allowed: false }])).toEqual({
+            expect(
+                admitFleetContainment([{ nodeId: NODE_A, containment, allowed: false }]),
+            ).toEqual({
                 admitted: true,
             });
         }
@@ -89,12 +96,16 @@ describe('run containment — the record, read toward LESS containment', () => {
     it('an isolated-home downgrade, or isolatedHome false, needs the owner’s allowance', () => {
         const declined = toAppWorkRunContainment(DECLINED);
         expect(declined!.needsOwnerAllowance).toBe(true);
-        expect(admitFleetContainment([{ nodeId: NODE_A, containment: declined, allowed: false }])).toEqual({
+        expect(
+            admitFleetContainment([{ nodeId: NODE_A, containment: declined, allowed: false }]),
+        ).toEqual({
             admitted: false,
             nodeId: NODE_A,
             containment: declined,
         });
-        expect(admitFleetContainment([{ nodeId: NODE_A, containment: declined, allowed: true }])).toEqual({
+        expect(
+            admitFleetContainment([{ nodeId: NODE_A, containment: declined, allowed: true }]),
+        ).toEqual({
             admitted: true,
         });
     });
@@ -131,8 +142,16 @@ describe('run containment — the allowance store (EW-807 pattern)', () => {
         const declined = toAppWorkRunContainment(DECLINED);
         expect(
             admitFleetContainment([
-                { nodeId: NODE_A, containment: declined, allowed: isNodeContainmentAllowed(store, NODE_A) },
-                { nodeId: NODE_B, containment: declined, allowed: isNodeContainmentAllowed(store, NODE_B) },
+                {
+                    nodeId: NODE_A,
+                    containment: declined,
+                    allowed: isNodeContainmentAllowed(store, NODE_A),
+                },
+                {
+                    nodeId: NODE_B,
+                    containment: declined,
+                    allowed: isNodeContainmentAllowed(store, NODE_B),
+                },
             ]),
         ).toMatchObject({ admitted: false, nodeId: NODE_B });
     });
@@ -208,10 +227,16 @@ describe('run containment — the service: record, Cost view, allowance route', 
         const recordContainment = jest.fn(async (runId: string, record: unknown) => {
             world.runRecords[runId] = record;
         });
-        const updateAppWorkColumns = jest.fn(async (id: string, _userId: string, patch: { appRunContainmentAllowances: unknown }) => {
-            world.works[id].allowances = patch.appRunContainmentAllowances;
-            return true;
-        });
+        const updateAppWorkColumns = jest.fn(
+            async (
+                id: string,
+                _userId: string,
+                patch: { appRunContainmentAllowances: unknown },
+            ) => {
+                world.works[id].allowances = patch.appRunContainmentAllowances;
+                return true;
+            },
+        );
         const reads: IsolatedRunAdmissionReads = {
             works: {
                 findById: async (id) =>
@@ -238,7 +263,13 @@ describe('run containment — the service: record, Cost view, allowance route', 
             },
             fleet: {
                 nodesForUser: async () => [
-                    { id: NODE_A, userId: OWNER, name: 'Maya desktop', status: 'online', capabilities: [] },
+                    {
+                        id: NODE_A,
+                        userId: OWNER,
+                        name: 'Maya desktop',
+                        status: 'online',
+                        capabilities: [],
+                    },
                 ],
                 nodeById: async (id) =>
                     id === NODE_A
@@ -251,12 +282,22 @@ describe('run containment — the service: record, Cost view, allowance route', 
             placementFor: async () => ({ placement: 'fleet', requiredCapabilities: [] }),
             now: () => new Date('2026-10-30T05:00:00.000Z'),
         };
-        return { service: new IsolatedRunAdmissionService(reads), recordContainment, updateAppWorkColumns };
+        return {
+            service: new IsolatedRunAdmissionService(reads),
+            recordContainment,
+            updateAppWorkColumns,
+        };
     }
 
     const world = (): World => ({
-        works: { 'w-app': { kind: 'app', allowances: null }, 'w-site': { kind: 'directory', allowances: null } },
-        tasks: { 't-app': { id: 't-app', workId: 'w-app' }, 't-site': { id: 't-site', workId: 'w-site' } },
+        works: {
+            'w-app': { kind: 'app', allowances: null },
+            'w-site': { kind: 'directory', allowances: null },
+        },
+        tasks: {
+            't-app': { id: 't-app', workId: 'w-app' },
+            't-site': { id: 't-site', workId: 'w-site' },
+        },
         runRecords: {},
         reports: { [NODE_A]: DECLINED },
     });
@@ -296,7 +337,9 @@ describe('run containment — the service: record, Cost view, allowance route', 
             }),
         ).toBe(false);
         expect(recordContainment).not.toHaveBeenCalled();
-        expect(await service.describeForTask({ id: 't-site', userId: OWNER, workId: 'w-site' })).toBeNull();
+        expect(
+            await service.describeForTask({ id: 't-site', userId: OWNER, workId: 'w-site' }),
+        ).toBeNull();
     });
 
     it('the record reaches TaskCostView with the node, the downgrade and the owner’s allowance (ACC-08-34)', async () => {
@@ -310,7 +353,11 @@ describe('run containment — the service: record, Cost view, allowance route', 
             rawContainment: DECLINED,
         });
 
-        const before = await service.describeForTask({ id: 't-app', userId: OWNER, workId: 'w-app' });
+        const before = await service.describeForTask({
+            id: 't-app',
+            userId: OWNER,
+            workId: 'w-app',
+        });
         expect(before!.containment).toMatchObject({
             runId: 't-app-run-1',
             nodeId: NODE_A,
@@ -322,13 +369,27 @@ describe('run containment — the service: record, Cost view, allowance route', 
         });
         // The next run is held on that node until the owner allows it.
         expect(before!.containmentHolds).toEqual([
-            expect.objectContaining({ runId: null, nodeId: NODE_A, needsOwnerAllowance: true, allowedByOwner: false }),
+            expect.objectContaining({
+                runId: null,
+                nodeId: NODE_A,
+                needsOwnerAllowance: true,
+                allowedByOwner: false,
+            }),
         ]);
 
         expect(
-            await service.setContainmentAllowance({ workId: 'w-app', nodeId: NODE_A, allow: true, actorUserId: OWNER }),
+            await service.setContainmentAllowance({
+                workId: 'w-app',
+                nodeId: NODE_A,
+                allow: true,
+                actorUserId: OWNER,
+            }),
         ).toMatchObject({ status: 'ok' });
-        const after = await service.describeForTask({ id: 't-app', userId: OWNER, workId: 'w-app' });
+        const after = await service.describeForTask({
+            id: 't-app',
+            userId: OWNER,
+            workId: 'w-app',
+        });
         expect(after!.containment).toMatchObject({
             nodeId: NODE_A,
             allowedByOwner: true,
@@ -350,17 +411,37 @@ describe('run containment — the service: record, Cost view, allowance route', 
         const w = world();
         w.works['w-app-2'] = { kind: 'app', allowances: null };
         const { service } = makeService(w);
-        await service.setContainmentAllowance({ workId: 'w-app', nodeId: NODE_A, allow: true, actorUserId: OWNER });
+        await service.setContainmentAllowance({
+            workId: 'w-app',
+            nodeId: NODE_A,
+            allow: true,
+            actorUserId: OWNER,
+        });
         expect(w.works['w-app-2'].allowances).toBeNull();
 
         expect(
-            await service.setContainmentAllowance({ workId: 'w-app', nodeId: NODE_B, allow: true, actorUserId: OWNER }),
+            await service.setContainmentAllowance({
+                workId: 'w-app',
+                nodeId: NODE_B,
+                allow: true,
+                actorUserId: OWNER,
+            }),
         ).toEqual({ status: 'notFound' });
         expect(
-            await service.setContainmentAllowance({ workId: 'w-app', nodeId: 'nope', allow: true, actorUserId: OWNER }),
+            await service.setContainmentAllowance({
+                workId: 'w-app',
+                nodeId: 'nope',
+                allow: true,
+                actorUserId: OWNER,
+            }),
         ).toEqual({ status: 'notFound' });
         expect(
-            await service.setContainmentAllowance({ workId: 'w-site', nodeId: NODE_A, allow: true, actorUserId: OWNER }),
+            await service.setContainmentAllowance({
+                workId: 'w-site',
+                nodeId: NODE_A,
+                allow: true,
+                actorUserId: OWNER,
+            }),
         ).toEqual({ status: 'notAppWork' });
     });
 });

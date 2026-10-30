@@ -126,7 +126,8 @@ export class UpstreamPullRequestDto {
  */
 export class AllowAppRunContainmentDto {
     @ApiProperty({
-        description: 'The Fleet node (one of your own enrolled machines) whose containment downgrade you allow.',
+        description:
+            'The Fleet node (one of your own enrolled machines) whose containment downgrade you allow.',
         format: 'uuid',
     })
     @IsUUID()

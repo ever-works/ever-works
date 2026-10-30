@@ -75,11 +75,7 @@ import {
     ownershipRelationScopeOf,
     type OwnershipScope,
 } from '@ever-works/agent/database';
-import {
-    buildTaskCostView,
-    withTaskContainment,
-    type TaskCostContainmentReads,
-} from './task-cost';
+import { buildTaskCostView, withTaskContainment, type TaskCostContainmentReads } from './task-cost';
 import { APP_WORK_TASK_CONTAINMENT_READER } from '@ever-works/agent/app-works';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 // Re-litigation guard (memory upgrades M6) — provided + exported by
