@@ -166,12 +166,15 @@ test.describe('App Works — change-guard refusals on Task detail (APW-08 T29)',
             "This change touches 300 files, which is too many to check against this Work's protected paths. Split it into smaller pull requests.",
         );
 
-        // 299 files is judged normally (and here allowed): the cap is "300 or more".
+        // 299 files is judged normally (and here allowed): the cap is "300 or more". The App's
+        // own file guidance (APW08-G22, default 50, refused past 3×) is set to its maximum so
+        // only the platform's 300-file ceiling is under test here.
         const under = await createWorkTask(request, token, workId, { title: '299 files' });
         const judged = await seedTaskState(request, token, {
             taskId: under.id,
             guard: {
                 protectedPaths: [BRAND],
+                fileGuidance: 500,
                 files: [{ path: 'src/one.ts', additions: 1 }],
                 totalFiles: 299,
             },

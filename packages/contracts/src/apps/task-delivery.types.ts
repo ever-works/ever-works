@@ -206,15 +206,55 @@ export interface WorkCostRollup {
 	periodStart: string;
 	periodEnd: string;
 	currency: string;
-	spendCents: number;
+	/**
+	 * The month's spend in `currency`. `null` = **unknown** (ACC-08-37): the ledger total could not
+	 * be read as an amount. An unknown spend is never shown as `0`, and `remainingCents` and
+	 * `percentUsed` are then unknown (`null`) too.
+	 */
+	spendCents: number | null;
 	/** The Work's global monthly cap, `null` when no budget is set. */
 	capCents: number | null;
-	/** `capCents - spendCents`, never below zero; `null` with no cap. */
+	/** `capCents - spendCents`, never below zero; `null` with no cap, or with an unknown spend. */
 	remainingCents: number | null;
-	/** Rounded percent of the cap spent; `null` with no cap. */
+	/** Rounded percent of the cap spent; `null` with no cap, or with an unknown spend. */
 	percentUsed: number | null;
 	allowOverage: boolean;
 	alert: WorkCostAlert;
+	/**
+	 * APW-08 T56 (FR-62, FR-73) — the month's costliest Tasks of this Work (at most
+	 * {@link WORK_COST_TASKS_LIMIT}, costliest first), so the overview links to each Task's own
+	 * Cost section rather than repeating it. Optional: an answer from a build without it reads as
+	 * "no Task lines".
+	 */
+	tasks?: WorkCostTask[];
+}
+
+/** APW-08 T56 — one Task's share of a Work's month, for the link to that Task's Cost section. */
+export interface WorkCostTask {
+	taskId: string;
+	/** The Task's title, `null` when it could not be read (the link still works). */
+	title: string | null;
+	/** What the Task's usage rows cost this month, in the rollup's currency. */
+	spendCents: number;
+}
+
+/** How many Task lines `GET /api/works/:id/cost` lists. */
+export const WORK_COST_TASKS_LIMIT = 5;
+
+/**
+ * APW-08 T56 (ACC-08-37) — the one totalling rule for App Works cost: the sum when every amount
+ * is known, and **unknown** (`null`) as soon as one is not. A partial sum would read as the whole
+ * cost (and a remaining amount the Work does not have). An empty list is a known zero; `NaN` and
+ * `Infinity` are not amounts, so they are unknown, never `0`. Shared by the agent's budget
+ * booking, the API's rollup and the web summary so the three can never total differently.
+ */
+export function totalCostCents(amounts: ReadonlyArray<number | null | undefined>): number | null {
+	let total = 0;
+	for (const amount of amounts) {
+		if (typeof amount !== 'number' || !Number.isFinite(amount)) return null;
+		total += amount;
+	}
+	return total;
 }
 
 /** `?month=` on `GET /api/works/:id/cost`. */

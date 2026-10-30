@@ -4537,6 +4537,13 @@
             "createButton": "Buat Karya"
         },
         "workDetail": {
+            "appCost": {
+                "unknown": "Unknown",
+                "tasksTitle": "This month's costliest changes",
+                "tasksHint": "What each change cost, with its runs and receipts, is on its Task's Cost section.",
+                "untitledTask": "Untitled Task",
+                "openTaskCost": "Open the Cost section of {title}"
+            },
             "missions": {
                 "title": "Missions",
                 "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",

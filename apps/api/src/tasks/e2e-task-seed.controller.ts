@@ -15,6 +15,8 @@ import { Repository } from 'typeorm';
 import { isAppWorkKind } from '@ever-works/contracts';
 import {
     AppChangeGuard,
+    DEFAULT_FILE_GUIDANCE,
+    MAX_FILES,
     DEFAULT_SIZE_GUIDANCE,
     type AppChangeVerdict,
 } from '@ever-works/agent/app-works';
@@ -192,6 +194,22 @@ export class E2eTaskSeedController {
             additions: file.additions ?? 0,
             deletions: file.deletions ?? 0,
         }));
+        // APW08-G06 — the guard now refuses a file LIST shorter than the provider's count (a
+        // dropped entry can hide a path). A real provider asked for up to 300 files lists every
+        // file of a smaller change, so a fixture that names a few paths and a count under the
+        // ceiling is padded with unlisted zero-line files, exactly what that provider would
+        // have returned. At or over the ceiling nothing is padded: rule 1 refuses either way.
+        const totalFiles = guard.totalFiles ?? files.length;
+        if (totalFiles < MAX_FILES) {
+            for (let index = files.length; index < totalFiles; index += 1) {
+                files.push({
+                    path: `e2e-seed-unlisted/file-${index}.txt`,
+                    status: 'modified',
+                    additions: 0,
+                    deletions: 0,
+                });
+            }
+        }
         return this.guard.evaluate({
             rules: {
                 sourceBranch: null,
@@ -200,11 +218,13 @@ export class E2eTaskSeedController {
                 humanMergePaths: [],
                 instructionFiles: [],
                 sizeGuidance: guard.sizeGuidance ?? DEFAULT_SIZE_GUIDANCE,
+                // APW08-G22 — the App spec's file guidance, as the rules service resolves it.
+                fileGuidance: guard.fileGuidance ?? DEFAULT_FILE_GUIDANCE,
             },
             diff: {
                 files,
                 truncated: false,
-                totalFiles: guard.totalFiles ?? files.length,
+                totalFiles,
                 totalAdditions: files.reduce((sum, file) => sum + file.additions, 0),
                 totalDeletions: files.reduce((sum, file) => sum + file.deletions, 0),
                 patchBytes: 0,

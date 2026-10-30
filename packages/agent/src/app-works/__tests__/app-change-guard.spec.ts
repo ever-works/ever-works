@@ -10,7 +10,12 @@ import {
     PROVISION_LABEL,
     REFUSAL_MULTIPLE,
 } from '../app-change-guard';
-import { DEFAULT_SIZE_GUIDANCE, type AppWorkRules } from '../app-work-rules.service';
+import {
+    DEFAULT_FILE_GUIDANCE,
+    DEFAULT_SIZE_GUIDANCE,
+    MAX_FILE_GUIDANCE,
+    type AppWorkRules,
+} from '../app-work-rules.service';
 
 /**
  * APW-08 T17 — the change guard, every case of plan §9.1.
@@ -22,7 +27,8 @@ import { DEFAULT_SIZE_GUIDANCE, type AppWorkRules } from '../app-work-rules.serv
  * The two that carry the most weight are the rename case — moving a protected
  * file out of the way is invisible in the new path's hunks alone — and the
  * truncation case, where the protected path could be in the part the provider
- * dropped.
+ * dropped. Since APW08-G06 "dropped" means dropped FILE ENTRIES: patch text
+ * past the byte budget hides no path, so `truncated` alone refuses nothing.
  */
 
 function rules(overrides: Partial<AppWorkRules> = {}): AppWorkRules {
@@ -56,24 +62,103 @@ function diff(files: GitDiffFile[], overrides: Partial<GitDiffResult> = {}): Git
 const guard = new AppChangeGuard();
 
 describe('rule 1 — a diff too big to police', () => {
-    it('refuses a TRUNCATED diff, whatever is visible in it', () => {
+    it('refuses a TRUNCATED diff whose file list was cut short, whatever is visible in it', () => {
         // The protected path could be in the part that was dropped, so the
-        // visible files proving nothing is exactly the point.
+        // visible files proving nothing is exactly the point. APW08-G06 keeps
+        // this case: the provider counted two files and listed one, so an
+        // entry — and a path — is missing.
         const verdict = guard.evaluate({
             rules: rules({ protectedPaths: ['infra/**'] }),
-            diff: diff([file('src/app.ts')], { truncated: true }),
+            diff: diff([file('src/app.ts')], { truncated: true, totalFiles: 2 }),
         });
 
         expect(verdict.allowed).toBe(false);
         expect(verdict.code).toBe('diffTooLarge');
     });
 
+    it('still refuses a TRUNCATED diff that reports no file count — nothing else can vouch for its list', () => {
+        // A provider that breaks the `GitDiffResult` contract (no numeric
+        // `totalFiles`) leaves `truncated` as the only signal: fail closed.
+        const verdict = guard.evaluate({
+            rules: rules(),
+            diff: diff([file('src/app.ts')], {
+                truncated: true,
+                totalFiles: undefined as unknown as number,
+            }),
+        });
+
+        expect(verdict.code).toBe('diffTooLarge');
+    });
+
+    it('does NOT refuse on `truncated` alone: a few files with a huge patch pass (APW08-G06)', () => {
+        // `capDiffFiles` also sets `truncated` when PATCH TEXT runs past the
+        // byte budget. A five-file dependency update with a big lockfile patch
+        // lists every path, so refusing it as "over 300 files" was wrong.
+        const verdict = guard.evaluate({
+            rules: rules({ protectedPaths: ['infra/**'] }),
+            diff: diff(
+                [
+                    file('package.json', { additions: 2, deletions: 2 }),
+                    file('apps/web/package.json', { additions: 1, deletions: 1 }),
+                    file('src/app.ts', { additions: 3, deletions: 0 }),
+                    file('src/app.spec.ts', { additions: 4, deletions: 0 }),
+                    file('pnpm-lock.yaml', { additions: 48_000, deletions: 47_000 }),
+                ],
+                { truncated: true, patchBytes: 0 },
+            ),
+        });
+
+        expect(verdict.allowed).toBe(true);
+        expect(verdict.code).toBeNull();
+        // …and every other rule still reads the full list it was given.
+        expect(verdict.changedLines).toBe(13);
+    });
+
+    it('a few files with a huge patch are still judged by the path rules (APW08-G06)', () => {
+        const verdict = guard.evaluate({
+            rules: rules({ protectedPaths: ['infra/**'] }),
+            diff: diff([file('src/app.ts'), file('infra/main.tf')], { truncated: true }),
+        });
+
+        expect(verdict.code).toBe('protectedPath');
+    });
+
     it('refuses at the file cap, and allows one file below it', () => {
+        // The App's own file guidance is set to its maximum here, so only the
+        // platform's ceiling decides (APW08-G22's 3× rule is pinned below). The
+        // list is as long as the count, as a provider asked for 300 files gives
+        // it: since APW08-G06 a list SHORTER than its count refuses on its own.
         const at = (totalFiles: number) =>
-            guard.evaluate({ rules: rules(), diff: diff([file('a.ts')], { totalFiles }) }).allowed;
+            guard.evaluate({
+                rules: rules({ fileGuidance: MAX_FILE_GUIDANCE }),
+                diff: diff(
+                    Array.from({ length: totalFiles }, (_, i) => file(`src/f${i}.ts`)),
+                    { totalFiles },
+                ),
+            }).allowed;
 
         expect(at(MAX_FILES)).toBe(false);
         expect(at(MAX_FILES - 1)).toBe(true);
+    });
+
+    it('refuses EXACTLY 300 files — the provider lists at most 300, so 300 means "300 or more" (FR-21)', () => {
+        const files = Array.from({ length: MAX_FILES }, (_, i) => file(`src/f${i}.ts`));
+        const verdict = guard.evaluate({
+            rules: rules({ fileGuidance: MAX_FILE_GUIDANCE }),
+            diff: diff(files),
+        });
+
+        expect(MAX_FILES).toBe(300);
+        expect(verdict.code).toBe('diffTooLarge');
+    });
+
+    it('refuses a short list below the cap — a provider that dropped entries hid a path', () => {
+        const verdict = guard.evaluate({
+            rules: rules(),
+            diff: diff([file('src/a.ts'), file('src/b.ts')], { totalFiles: 12 }),
+        });
+
+        expect(verdict.code).toBe('diffTooLarge');
     });
 
     it('refuses BEFORE reading the file list, so a huge clean diff still refuses', () => {
@@ -348,7 +433,7 @@ describe('rule 5 — size', () => {
         ).toBe(true);
     });
 
-    it('excludes lockfiles from the count, anywhere in the tree', () => {
+    it('excludes lockfiles from the LINE count, anywhere in the tree', () => {
         // A dependency bump is thousands of lines no human wrote and no
         // reviewer reads. Counting them makes the guidance meaningless for the
         // change that most needs to be small elsewhere.
@@ -363,6 +448,97 @@ describe('rule 5 — size', () => {
 
         expect(verdict.allowed).toBe(true);
         expect(verdict.changedLines).toBe(10);
+    });
+});
+
+describe('rule 5 — the App spec’s own file guidance (APW08-G22)', () => {
+    const many = (count: number) =>
+        Array.from({ length: count }, (_, i) => file(`src/f${i}.ts`, { additions: 1 }));
+
+    it('defaults to 50 when the rules carry no file guidance — never silence', () => {
+        expect(DEFAULT_FILE_GUIDANCE).toBe(50);
+        expect(guard.evaluate({ rules: rules(), diff: diff(many(50)) }).note).toBeNull();
+        expect(guard.evaluate({ rules: rules(), diff: diff(many(51)) }).note).toContain(
+            '51 files, over this Work’s file guidance of 50',
+        );
+        expect(guard.evaluate({ rules: rules(), diff: diff(many(151)) }).code).toBe('tooManyFiles');
+    });
+
+    it('an over-guidance file count is allowed WITH a note', () => {
+        const verdict = guard.evaluate({
+            rules: rules({ fileGuidance: 20 }),
+            diff: diff(many(21)),
+        });
+
+        expect(verdict.allowed).toBe(true);
+        expect(verdict.note).toContain('21 files');
+        expect(verdict.note).toContain('file guidance of 20');
+    });
+
+    it(`an over-${REFUSAL_MULTIPLE}× count is refused; exactly ${REFUSAL_MULTIPLE}× is not`, () => {
+        const at = (count: number) =>
+            guard.evaluate({ rules: rules({ fileGuidance: 20 }), diff: diff(many(count)) });
+
+        expect(at(60).allowed).toBe(true);
+        const refused = at(61);
+        expect(refused.allowed).toBe(false);
+        expect(refused.code).toBe('tooManyFiles');
+        expect(refused.message).toContain('61 files');
+        expect(refused.message).toContain('file guidance of 20');
+    });
+
+    it('counts the provider’s total, lockfiles included (only their LINES are excluded)', () => {
+        const verdict = guard.evaluate({
+            rules: rules({ fileGuidance: 2 }),
+            diff: diff([
+                file('src/a.ts'),
+                file('pnpm-lock.yaml', { additions: 900 }),
+                file('apps/web/package-lock.json', { additions: 900 }),
+            ]),
+        });
+
+        expect(verdict.allowed).toBe(true);
+        expect(verdict.changedLines).toBe(1);
+        expect(verdict.note).toContain('3 files');
+    });
+
+    it('never replaces the 300-file ceiling, whatever the App sets', () => {
+        // 500 × 3 = 1,500, far past the platform's 300: the ceiling still answers first.
+        const verdict = guard.evaluate({
+            rules: rules({ fileGuidance: MAX_FILE_GUIDANCE }),
+            diff: diff([file('a.ts')], { totalFiles: MAX_FILES }),
+        });
+
+        expect(verdict.code).toBe('diffTooLarge');
+    });
+
+    it('carries the line note and the file note together when both apply', () => {
+        const verdict = guard.evaluate({
+            rules: rules({ sizeGuidance: 50, fileGuidance: 2 }),
+            diff: diff([
+                file('src/a.ts', { additions: 40 }),
+                file('src/b.ts', { additions: 40 }),
+                file('src/c.ts', { additions: 1 }),
+            ]),
+        });
+
+        expect(verdict.allowed).toBe(true);
+        expect(verdict.note).toContain('81 lines');
+        expect(verdict.note).toContain('3 files');
+    });
+
+    it('the line refusal still answers before the file refusal', () => {
+        const verdict = guard.evaluate({
+            rules: rules({ sizeGuidance: 50, fileGuidance: 1 }),
+            diff: diff([
+                file('src/a.ts', { additions: 200 }),
+                file('src/b.ts'),
+                file('src/c.ts'),
+                file('src/d.ts'),
+            ]),
+        });
+
+        expect(verdict.code).toBe('tooManyLines');
     });
 });
 

@@ -7,6 +7,10 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
 }));
+// APW-08 T56 — the Task titles behind the `tasks` lines (an optional, trailing dependency).
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    TaskRepository: class TaskRepository {},
+}));
 jest.mock('../auth', () => ({
     AuthSessionGuard: class AuthSessionGuard {},
     CurrentUser: () => () => undefined,
@@ -161,5 +165,119 @@ describe('WorkCostController (APW-08 T56)', () => {
         expect(at(1_500).alert).toBe('100');
         expect(at(1_500, true).alert).toBe('overage');
         expect(at(1_500).remainingCents).toBe(0);
+    });
+
+    it('an amount the ledger could not give as a number is UNKNOWN, never 0 (ACC-08-37)', async () => {
+        // Before T56 a non-numeric total read as 0 spent and the whole cap remaining.
+        for (const unreadable of [Number.NaN, Number.POSITIVE_INFINITY, undefined, null]) {
+            const view = rollup({
+                workId: 'w1',
+                month: '2026-10',
+                start: new Date('2026-10-01T00:00:00Z'),
+                end: new Date('2026-11-01T00:00:00Z'),
+                currency: 'usd',
+                spendCents: unreadable as never,
+                capCents: 1_000,
+                allowOverage: false,
+            });
+            expect(view.spendCents).toBeNull();
+            expect(view.remainingCents).toBeNull();
+            expect(view.percentUsed).toBeNull();
+            expect(view.capCents).toBe(1_000);
+            expect(view.alert).toBe('none');
+        }
+        const { controller, usage } = harness();
+        usage.getTotalSpendCents.mockResolvedValueOnce(Number.NaN as never);
+        await expect(controller.cost(auth, 'w1', '2026-09')).resolves.toMatchObject({
+            spendCents: null,
+            remainingCents: null,
+            capCents: 10_000,
+        });
+    });
+
+    describe('the Task lines the overview links to each Task’s Cost section from (T56, FR-62)', () => {
+        function withTasks(
+            rows: Array<{ taskId: string; costCents: number }>,
+            tasks: Record<string, { id: string; workId: string; userId: string; title?: string }>,
+        ) {
+            const { ownership, usage, budgets } = harness();
+            const lines = {
+                ...usage,
+                getSpendByTaskForWork: jest.fn(async () => rows),
+            };
+            const repository = { findById: jest.fn(async (id: string) => tasks[id] ?? null) };
+            const controller = new WorkCostController(
+                ownership as never,
+                lines as never,
+                budgets as never,
+                repository as never,
+            );
+            return { controller, lines, repository };
+        }
+
+        it('lists the month’s costliest Tasks of THIS Work the viewer owns, costliest first', async () => {
+            const { controller, lines } = withTasks(
+                [
+                    { taskId: 't-big', costCents: 6_000 },
+                    { taskId: 't-other-person', costCents: 2_000 },
+                    { taskId: 't-other-work', costCents: 1_000 },
+                    { taskId: 't-gone', costCents: 150 },
+                    { taskId: 't-small', costCents: 50 },
+                ],
+                {
+                    't-big': { id: 't-big', workId: 'w1', userId: 'u1', title: 'Add dark mode' },
+                    // Record visibility: a Work viewer is not a reader of another person's Task.
+                    't-other-person': {
+                        id: 't-other-person',
+                        workId: 'w1',
+                        userId: 'u2',
+                        title: 'x',
+                    },
+                    't-other-work': { id: 't-other-work', workId: 'w2', userId: 'u1', title: 'y' },
+                    't-small': { id: 't-small', workId: 'w1', userId: 'u1' },
+                },
+            );
+            const view = await controller.cost(auth, 'w1', '2026-09');
+
+            expect(lines.getSpendByTaskForWork).toHaveBeenCalledWith(
+                'w1',
+                new Date('2026-09-01T00:00:00.000Z'),
+                new Date('2026-10-01T00:00:00.000Z'),
+                // The budget's currency, like the total.
+                expect.objectContaining({ currency: 'eur' }),
+            );
+            expect(view.tasks).toEqual([
+                { taskId: 't-big', title: 'Add dark mode', spendCents: 6_000 },
+                { taskId: 't-small', title: null, spendCents: 50 },
+            ]);
+            // The rollup itself is untouched by the lines.
+            expect(view).toMatchObject({
+                spendCents: 9_200,
+                capCents: 10_000,
+                remainingCents: 800,
+            });
+        });
+
+        it('lists at most WORK_COST_TASKS_LIMIT lines', async () => {
+            const rows = Array.from({ length: 9 }, (_, i) => ({
+                taskId: `t${i}`,
+                costCents: 100 - i,
+            }));
+            const tasks = Object.fromEntries(
+                rows.map((row) => [row.taskId, { id: row.taskId, workId: 'w1', userId: 'u1' }]),
+            );
+            const { controller } = withTasks(rows, tasks);
+            const view = await controller.cost(auth, 'w1');
+            expect(view.tasks).toHaveLength(5);
+            expect(view.tasks?.[0]).toMatchObject({ taskId: 't0' });
+        });
+
+        it('a failed read is an empty list, never a failed rollup', async () => {
+            const { controller, lines } = withTasks([], {});
+            lines.getSpendByTaskForWork.mockRejectedValueOnce(new Error('db down'));
+            const view = await controller.cost(auth, 'w1');
+            expect(view.tasks).toEqual([]);
+            expect(view.spendCents).toBe(9_200);
+        });
     });
 });

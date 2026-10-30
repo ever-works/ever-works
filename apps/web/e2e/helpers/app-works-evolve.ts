@@ -152,6 +152,8 @@ export interface TaskSeedBody {
     guard?: {
         protectedPaths?: string[];
         sizeGuidance?: number;
+        /** APW08-G22 — `agents.maxPullRequestChangedFiles`; the seed defaults it to 50. */
+        fileGuidance?: number;
         files: Array<{
             path: string;
             previousPath?: string;

@@ -2,6 +2,7 @@ import type { RunAgentBrake } from './run-agent-brake';
 import type { RunCreditsPrecheck } from './run-credits-precheck';
 import type { RunKillSwitch } from './run-kill-switch';
 import type { RunPlanLimits } from './run-plan-limits';
+import type { RunWorkBudget } from './run-work-budget';
 
 /**
  * Pre-run admission chain (judgment layer G15).
@@ -49,6 +50,18 @@ export const QUEUED_REASON_KILL_SWITCH = 'kill-switch' as const;
  * held by a pause is waiting for a person, not stuck.
  */
 export const QUEUED_REASON_AGENT_PAUSED = 'agent-paused' as const;
+
+/**
+ * APW-08 T56 (XC-19, FR-73, FR-66) — stamped when an App Work's own monthly
+ * budget (its `WorkBudget`, read through `BudgetGuardService`) parks a run.
+ * A budget is a person's decision, not a failure: the run waits, uses no gate
+ * attempt, is never a delivery failure and opens no follow-up. Exempt from the
+ * stuck-run sweeper, and released by the sweeper's tick
+ * (`promoteParked`) once the budget allows — a new period, a raised cap, or
+ * the budget removed. Only the middleware {@link createWorkBudgetAdmission}
+ * stamps it, and only for an App Work.
+ */
+export const QUEUED_REASON_WORK_BUDGET = 'work-budget' as const;
 
 export interface RunAdmissionInput {
     userId: string;
@@ -378,6 +391,63 @@ export const creditsAdmission: RunAdmissionMiddleware = async (context, next) =>
     }
     return next();
 };
+
+/**
+ * APW-08 T56 (XC-19, FR-73, FR-66) — the App Work BUDGET, built as a closure
+ * over its port (see `run-work-budget.ts` for why it is not a context field).
+ *
+ * A run whose Work's budget is spent is parked with `work-budget` — a wait on
+ * FR-66's terms. A run with no Work skips it without asking anything; the port
+ * answers `false` for every Work that is not an App Work, so every other kind
+ * is admitted exactly as before.
+ *
+ * Fail-OPEN, like {@link creditsAdmission}: a broken billing check must never
+ * stop work. (The gate would admit a throwing chain anyway; catching here
+ * keeps the valves after this one running.)
+ */
+export function createWorkBudgetAdmission(budget: RunWorkBudget): RunAdmissionMiddleware {
+    return async (context, next) => {
+        const { input, logger } = context;
+        if (!input.workId) return next();
+        let park: boolean;
+        try {
+            park = await budget.shouldParkForWorkBudget({
+                userId: input.userId,
+                workId: input.workId,
+                agentId: input.agentId ?? null,
+            });
+        } catch (err) {
+            logger.warn(
+                `Dispatch gate: Work ${input.workId} budget could not be read (fail-open): ${err}`,
+            );
+            return next();
+        }
+        if (!park) return next();
+        logger.log(
+            `Dispatch gate: Work ${input.workId} has spent its budget for the period — queueing.`,
+        );
+        return { admitted: false, queuedReason: QUEUED_REASON_WORK_BUDGET };
+    };
+}
+
+/**
+ * APW-08 T56 — `chain` with the Work-budget middleware inserted right after the
+ * per-Agent brake: a stopped platform and a paused Agent keep their own (more
+ * precise) park reasons, and a spent budget parks a run before it is counted
+ * against a concurrency valve. Every other middleware keeps its place.
+ */
+export function withWorkBudgetAdmission(
+    chain: readonly RunAdmissionMiddleware[],
+    budget: RunWorkBudget,
+): RunAdmissionMiddleware[] {
+    const middleware = createWorkBudgetAdmission(budget);
+    const out = [...chain];
+    const brake = out.indexOf(agentBrakeAdmission);
+    const stop = out.indexOf(killSwitchAdmission);
+    const at = brake >= 0 ? brake + 1 : stop >= 0 ? stop + 1 : 0;
+    out.splice(at, 0, middleware);
+    return out;
+}
 
 /**
  * The shipped order. The stop flag outranks everything (a stopped

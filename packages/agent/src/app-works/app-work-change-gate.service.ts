@@ -4,13 +4,14 @@ import type { GitDiffResult } from '@ever-works/plugin';
 
 import { AppSpecService } from '../app-spec/app-spec.service';
 import { GitFacadeService } from '../facades/git.facade';
-import type {
-    AppWorkChangeGate,
-    AppWorkChangeGateInput,
-    AppWorkChangeGateVerdict,
-    AppWorkChangePathsInput,
+import {
+    APP_WORK_COMPARE_DIFF_OPTIONS,
+    type AppWorkChangeGate,
+    type AppWorkChangeGateInput,
+    type AppWorkChangeGateVerdict,
+    type AppWorkChangePathsInput,
 } from '../tasks-domain/app-work-change-gate.port';
-import { APP_SPEC_PATH, AppChangeGuard, MAX_FILES } from './app-change-guard';
+import { APP_SPEC_PATH, AppChangeGuard } from './app-change-guard';
 import { AppSpecUnreadableError, AppWorkRulesService } from './app-work-rules.service';
 import {
     APP_CHANGE_TELEMETRY_EVENTS,
@@ -132,7 +133,11 @@ export class AppWorkChangeGateService implements AppWorkChangeGate {
                 input.repo,
                 input.baseRef,
                 input.branch,
-                { maxFiles: MAX_FILES },
+                // APW08-G06 — paths and counts only: the 300-file ceiling and no
+                // patch text (`maxBytes: 0`). Every rule reads the file list and
+                // the line counts, so patch text would only spend the byte budget
+                // and set `truncated` for a reason no rule cares about.
+                { ...APP_WORK_COMPARE_DIFF_OPTIONS },
                 input.gitOptions,
             );
 
