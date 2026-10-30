@@ -19,12 +19,12 @@ Turn it on and each agent-executed Task gets:
 
 Isolation is a Work setting under **Work → Settings → Tasks & Branches**.
 
-| Setting                   | Values                              | What it does                                                                      |
-| ------------------------- | ----------------------------------- | --------------------------------------------------------------------------------- |
-| `taskIsolation`           | `off` (default) · `worktree`        | Whether agent-executed Tasks under this Work get their own branch + checkout.     |
-| `taskIsolationBaseBranch` | branch name                         | What each Task branch is cut from. Defaults to the repository's default branch.   |
-| `taskIsolationTargetRepo` | `work-output` · `data` · `provider` | Which of the Work's repositories the branch is created in.                        |
-| `taskBranchCleanup`       | `on-merge` (default) · `manual`     | Whether the nightly sweep deletes branches of finished Tasks, or you delete them. |
+| Setting                   | Values                                          | What it does                                                                                                           |
+| ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `taskIsolation`           | `off` (default) · `worktree`                    | Whether agent-executed Tasks under this Work get their own branch + checkout.                                          |
+| `taskIsolationBaseBranch` | branch name                                     | What each Task branch is cut from. Defaults to the repository's default branch.                                        |
+| `taskIsolationTargetRepo` | `work-output` · `data` · `provider` · `website` | Which of the Work's repositories the branch is created in. An App Work always carries `website` (its Work Repository). |
+| `taskBranchCleanup`       | `on-merge` (default) · `manual`                 | Whether the nightly sweep deletes branches of finished Tasks, or you delete them.                                      |
 
 The same fields are writable over the API with `PATCH /api/works/:id`.
 

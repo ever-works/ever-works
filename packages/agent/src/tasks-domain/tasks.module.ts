@@ -85,6 +85,11 @@ import { DatabaseModule } from '../database/database.module';
 // T10 specifies: the apps services sit in this module to avoid a module cycle
 // with `TaskTransitionService`.
 import { AppWorkRulesService } from '../app-works/app-work-rules.service';
+// APW-08 T11 / T50 — the App Work Task columns kept in step with the App spec: the shared
+// resolver + ownership-scoped write, the `app.spec.applied` listener, and the one-off backfill.
+import { AppWorkIsolationService } from '../app-works/app-work-isolation.service';
+import { AppWorkSpecAppliedListener } from '../app-works/app-spec-applied.listener';
+import { AppWorkIsolationBackfillRunner } from '../app-works/app-work-isolation-backfill.runner';
 import { AppChangeGuard } from '../app-works/app-change-guard';
 import { AppWorkChangeGateService } from '../app-works/app-work-change-gate.service';
 import { AppChangeTelemetry } from '../app-works/app-change.telemetry';
@@ -317,6 +322,18 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // above), and posts through `TASK_THREAD_POSTER`.
         TaskLifecyclePostsService,
         { provide: TASK_LIFECYCLE_POSTER, useExisting: TaskLifecyclePostsService },
+        // APW-08 T11 — keep an App Work's Task columns in step with its App spec. The service is
+        // the ONE resolver (spec → tracked branch → Work Repository default) and the ONE
+        // ownership-scoped write; the listener (on `app.spec.applied`, which `AppSpecService`
+        // emits in the API process) and T50's runner both go through it. Reads `WorkRepository`
+        // (provided above), `AppSpecService` + `WorkAppSpecStateRepository` (AppSpecModule),
+        // `GitFacadeService` (FacadesModule), `NotificationService` (NotificationsModule) and
+        // `NotificationRepository` (DatabaseModule) — all imported above.
+        AppWorkIsolationService,
+        AppWorkSpecAppliedListener,
+        // APW-08 T50 — the one-off backfill, reached by the `app-work-isolation-backfill` task over
+        // the internal RPC channel (exported below for the API's `TriggerInternalController`).
+        AppWorkIsolationBackfillRunner,
         { provide: TASK_APP_CHECKS, useClass: TaskAppChecksService }, // APW-08 T16 (lane L9)
     ],
     exports: [
@@ -369,6 +386,8 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         DeliveryFollowUpService,
         TaskDeliveryService,
         TASK_DELIVERY_TRACKER,
+        // APW-08 T50 — for the API's `TriggerInternalController.remoteMap`.
+        AppWorkIsolationBackfillRunner,
     ],
 })
 export class TasksDomainModule {}

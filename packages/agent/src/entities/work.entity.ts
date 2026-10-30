@@ -426,7 +426,14 @@ export class Work {
     taskIsolationBaseBranch?: string | null;
 
     /** Which of the Work's repos the branch/PR flow targets:
-     *  `'work-output' | 'data' | 'provider'`. */
+     *  `'work-output' | 'data' | 'provider' | 'website'`.
+     *
+     *  APW-08 T11 — `'website'` (the Work Repository) is written on every
+     *  App Work by its `app.spec.applied` listener and T50's backfill. The
+     *  repository a Task actually acts on is decided by the Work's KIND
+     *  (`resolveTaskRepository`, `tasks-domain/task-repository.ts`: `app`
+     *  has no `data` role, so it is the `website` role); the column is
+     *  written to say the same thing, never to override it. */
     @Column({ type: 'varchar', length: 16, default: 'work-output' })
     taskIsolationTargetRepo: string;
 

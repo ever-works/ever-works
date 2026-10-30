@@ -1859,4 +1859,52 @@ describe('TriggerInternalController', () => {
             ).rejects.toBeDefined();
         });
     });
+
+    // -------------------------------------------------------------------
+    // APW-08 T50 — the one-shot `app-work-isolation-backfill` task's remote target
+    // -------------------------------------------------------------------
+
+    describe('the APW-08 AppWorkIsolationBackfillRunner remote target', () => {
+        it('reaches run over the hop with the page the worker passed', async () => {
+            const summary = { scanned: 2, updated: 2, done: true, nextAfterId: 'w-2' };
+            const runner = { run: jest.fn().mockResolvedValue(summary) };
+            (controller as any).appWorkIsolationBackfillRunner = runner;
+            controller.onModuleInit();
+
+            const response = await controller.callRemote(VALID_SECRET, {
+                name: 'AppWorkIsolationBackfillRunner',
+                method: 'run',
+                args: superjson.serialize([{ afterId: 'w-0', limit: 25, dryRun: true }]) as any,
+            });
+            expect(runner.run).toHaveBeenCalledWith({ afterId: 'w-0', limit: 25, dryRun: true });
+            expect(superjson.deserialize(response.result as any)).toEqual(summary);
+        });
+
+        it('exposes run ONLY', async () => {
+            const runner = { run: jest.fn(), visit: jest.fn() };
+            (controller as any).appWorkIsolationBackfillRunner = runner;
+            controller.onModuleInit();
+
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppWorkIsolationBackfillRunner',
+                    method: 'visit',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toThrow('Method not in allow-list for AppWorkIsolationBackfillRunner: visit');
+            expect(runner.visit).not.toHaveBeenCalled();
+        });
+
+        it('is an unknown target when the runner is not bound', async () => {
+            (controller as any).appWorkIsolationBackfillRunner = undefined;
+            controller.onModuleInit();
+            await expect(
+                controller.callRemote(VALID_SECRET, {
+                    name: 'AppWorkIsolationBackfillRunner',
+                    method: 'run',
+                    args: superjson.serialize([]) as any,
+                }),
+            ).rejects.toBeDefined();
+        });
+    });
 });
