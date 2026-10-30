@@ -53,6 +53,31 @@ export {
     followUpKeyOf,
 } from '../app-works/delivery-follow-up.service';
 export { decideDelivery } from '../app-works/task-delivery.rules';
+// APW-08 T11 / T50 (provided by TasksDomainModule) — the App Work Task columns kept in step with
+// the App spec, and the one-off backfill behind the `app-work-isolation-backfill` task.
+export {
+    AppWorkIsolationService,
+    APP_WORK_BASE_BRANCH_MAX,
+    type AppWorkIsolationColumn,
+    type AppWorkIsolationPatch,
+    type AppWorkSourceBranchResolution,
+    type AppWorkSourceBranchSource,
+} from '../app-works/app-work-isolation.service';
+export {
+    AppWorkSpecAppliedListener,
+    APP_CHECKS_ADMISSION_ANCHOR,
+    appChecksAdmissionUrl,
+    appChecksNotificationKey,
+    type AppWorkSpecAppliedOutcome,
+} from '../app-works/app-spec-applied.listener';
+export {
+    AppWorkIsolationBackfillRunner,
+    APP_WORK_ISOLATION_BACKFILL_JOB_ID,
+    APP_WORK_ISOLATION_BACKFILL_PAGE,
+    APP_WORK_ISOLATION_BACKFILL_PAGE_MAX,
+    type AppWorkIsolationBackfillOptions,
+    type AppWorkIsolationBackfillSummary,
+} from '../app-works/app-work-isolation-backfill.runner';
 export {
     APP_DELIVERY_DEFAULTS_ENV,
     APP_DELIVERY_DEFAULT_VALUES,

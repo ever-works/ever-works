@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException } from '@nestjs/common';
 import { TaskTransitionService } from '../task-transition.service';
 import { TaskStatus, TaskPriority } from '../../entities/task.entity';
 import type { Task } from '../../entities/task.entity';
+import { FLEET_SESSION_SCHEDULE_LABEL } from '../task-session-schedule.port';
 
 function makeTask(over: Partial<Task> = {}): Task {
     return {
@@ -294,5 +295,149 @@ describe('TaskTransitionService — the predicates the fan-out shares', () => {
             assignees.findAgentAssignees.mockRejectedValue(new Error('db down'));
             await expect(svc.resolveDispatchAgentIds(makeTask())).rejects.toThrow('db down');
         });
+    });
+});
+
+/**
+ * APW-08 T11 (FR-9, ACC-08-07 second half) — an Agent without commit permission cannot be
+ * started on an App Work Task: the dispatch is refused with the FR-9 copy, before any run row
+ * exists, and nothing is enqueued. Every other case dispatches exactly as before.
+ */
+describe('TaskTransitionService.dispatchAgentRun — FR-9 commit permission on an App Work (APW-08 T11)', () => {
+    const KINDS: Record<string, string> = { 'w-app': 'app', 'w-site': 'directory' };
+    const FR9 = "This agent can't commit, and changes to an app always go through a branch.";
+    let runs: {
+        createQueued: jest.Mock;
+        markDispatchFailed: jest.Mock;
+        setTriggerRunId: jest.Mock;
+    };
+    let dispatcher: { enqueue: jest.Mock };
+    let works: { findById: jest.Mock };
+
+    function makeSvc(
+        permissions: Record<string, boolean> | undefined,
+        extras: { agentReviews?: unknown; sessionSchedules?: unknown } = {},
+    ): TaskTransitionService {
+        runs = {
+            createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
+            markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            setTriggerRunId: jest.fn().mockResolvedValue(undefined),
+        };
+        dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+        works = {
+            findById: jest.fn(async (id: string) => (KINDS[id] ? { id, kind: KINDS[id] } : null)),
+        };
+        const agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string) => ({
+                id,
+                userId,
+                ...(permissions ? { permissions } : {}),
+            })),
+        };
+        return new (TaskTransitionService as unknown as new (
+            ...args: unknown[]
+        ) => TaskTransitionService)(
+            { casUpdateStatus: jest.fn(), findById: jest.fn() },
+            { findByTaskId: jest.fn().mockResolvedValue([]) },
+            { allApproved: jest.fn().mockResolvedValue(true) },
+            { findAgentAssignees: jest.fn().mockResolvedValue([]) },
+            runs,
+            dispatcher,
+            undefined, // notifications
+            undefined, // runDenorm
+            undefined, // dispatchGate
+            works,
+            undefined, // terminalSessions
+            agents,
+            extras.agentReviews,
+            undefined, // domainEvents
+            extras.sessionSchedules,
+        );
+    }
+
+    it('refuses an App Work Task whose Agent may not commit, with the FR-9 copy, and dispatches nothing', async () => {
+        const result = await makeSvc({ canCommitToRepo: false }).dispatchAgentRun(
+            makeTask({ workId: 'w-app' }),
+            'agent-a',
+        );
+
+        expect(result).toMatchObject({ runId: null, dispatched: false, parked: false });
+        expect(result.error).toBe(`no_commit_permission: ${FR9}`);
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('dispatches an App Work Task whose Agent may commit — with no Work read at all', async () => {
+        const result = await makeSvc({ canCommitToRepo: true }).dispatchAgentRun(
+            makeTask({ workId: 'w-app' }),
+            'agent-a',
+        );
+
+        expect(result).toMatchObject({ dispatched: true });
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        expect(works.findById).not.toHaveBeenCalled();
+    });
+
+    it('an Agent with no stored permissions is read the way the worker reads it (may commit)', async () => {
+        await expect(
+            makeSvc(undefined).dispatchAgentRun(makeTask({ workId: 'w-app' }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+    });
+
+    it('every other kind, and a Work-less Task, dispatch exactly as before with the same Agent', async () => {
+        const svc = makeSvc({ canCommitToRepo: false });
+        await expect(
+            svc.dispatchAgentRun(makeTask({ workId: 'w-site' }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+        await expect(
+            svc.dispatchAgentRun(makeTask({ workId: null }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+        // An unknown Work cannot be classified as an App Work: as before, it dispatches.
+        await expect(
+            svc.dispatchAgentRun(makeTask({ workId: 'w-gone' }), 'agent-a'),
+        ).resolves.toMatchObject({ dispatched: true });
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(3);
+    });
+
+    it('a review run is not a change: it passes on an App Work with an Agent that may not commit', async () => {
+        // A review run needs its review service to bind the run (review of #3036: without it the
+        // dispatch failed for another reason and this case proved nothing).
+        const agentReviews = { bindRun: jest.fn().mockResolvedValue(undefined) };
+        const svc = makeSvc({ canCommitToRepo: false }, { agentReviews });
+        const result = await svc.dispatchAgentRun(makeTask({ workId: 'w-app' }), 'agent-a', {
+            reviewId: 'review-1',
+        });
+
+        expect(result).toMatchObject({ dispatched: true });
+        expect(result.error ?? '').not.toContain('no_commit_permission');
+        expect(agentReviews.bindRun).toHaveBeenCalledWith('review-1', 'r1');
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+    });
+
+    it('an Agent-session schedule on an App Work is refused the same way, before the session starts (review of #3036)', async () => {
+        const sessionSchedules = { dispatch: jest.fn().mockResolvedValue({ dispatched: true }) };
+        const svc = makeSvc({ canCommitToRepo: false }, { sessionSchedules });
+        const result = await svc.dispatchAgentRun(
+            makeTask({ workId: 'w-app', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+
+        expect(result).toMatchObject({ dispatched: false, runId: null });
+        expect(result.error).toContain(FR9);
+        expect(sessionSchedules.dispatch).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('an Agent-session schedule whose Agent may commit (or on another kind) still starts its session', async () => {
+        const sessionSchedules = { dispatch: jest.fn().mockResolvedValue({ dispatched: true }) };
+        await makeSvc({ canCommitToRepo: true }, { sessionSchedules }).dispatchAgentRun(
+            makeTask({ workId: 'w-app', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+        await makeSvc({ canCommitToRepo: false }, { sessionSchedules }).dispatchAgentRun(
+            makeTask({ workId: 'w-site', labels: [FLEET_SESSION_SCHEDULE_LABEL] }),
+            'agent-a',
+        );
+        expect(sessionSchedules.dispatch).toHaveBeenCalledTimes(2);
     });
 });

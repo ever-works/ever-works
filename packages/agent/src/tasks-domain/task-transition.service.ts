@@ -71,6 +71,8 @@ import { AWAITING_OWNER_LABEL, isAwaitingOwner, withoutAwaitingOwner } from './a
 import { agentBlockLiftRefusal, agentMayLiftBlock } from './agent-block-lift';
 // APW-08 T49 — a leaf (the Nest logger only).
 import { describeAppChangesPaused, readAppWorkSwitches } from '../app-works/app-work-switches';
+// APW-08 T11 (FR-9) — the refusal copy lives in the isolation leaf (contracts only).
+import { describeAppWorkNoCommitPermission } from './task-isolation';
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -1314,6 +1316,32 @@ export class TaskTransitionService {
     }
 
     /**
+     * APW-08 T11 (FR-9, ACC-08-07) — is this Task on an App Work, for the commit-permission
+     * refusal? Asked ONLY after the Agent was found to lack `canCommitToRepo`, so a dispatch
+     * whose Agent may commit (and every Work-less Task) costs no query.
+     *
+     * Fails OPEN — unlike {@link appChangesPausedFor} — and that difference is deliberate. This
+     * refusal fires for an Agent that merely lacks a permission, which is the platform's DEFAULT
+     * (`DEFAULT_AGENT_PERMISSIONS.canCommitToRepo = false`), so a graph without the Work
+     * repository or a failed read would otherwise refuse ordinary Tasks on every other kind. And
+     * nothing unsafe follows from letting one through: an Agent without the permission has no
+     * commit tool, and its run gets no workspace (`resolveTaskIsolation`), so it cannot change
+     * the App's repository at all — the refusal exists to say so up front rather than to guard.
+     */
+    private async isAppWorkTask(task: Pick<Task, 'id' | 'workId'>): Promise<boolean> {
+        if (!task.workId || !this.works) return false;
+        try {
+            const work = await this.works.findById(task.workId);
+            return !!work && isAppWorkKind(work.kind);
+        } catch (err) {
+            this.logger.warn(
+                `Task ${task.id}: the Work could not be read for the FR-9 commit-permission check (${err}); dispatching as before.`,
+            );
+            return false;
+        }
+    }
+
+    /**
      * THE dispatch path for one (Task, Agent) pair — gate admit →
      * pre-created queued run → board denorm → job-runtime enqueue →
      * triggerRunId stamp, with the loud-degradation error handling.
@@ -1417,13 +1445,6 @@ export class TaskTransitionService {
                 error: 'agent-not-found',
             };
         }
-        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
-        // session on the computer the Agent is pinned to — the Fleet starts it
-        // (its own Run, trigger `session`, linked to this Task). Ownership was
-        // checked just above, at the one dispatch choke point.
-        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
-            return this.sessionSchedules.dispatch(task, agentId);
-        }
         // APW-08 T49 (R-30) — the operator's change switch, read HERE, at the one dispatch
         // choke point, so it bites for every surface (board, chat, Goal, recurrence, fan-out)
         // and for Tasks created before it was flipped. Off, an App Work Task gets no new run
@@ -1433,6 +1454,36 @@ export class TaskTransitionService {
             const error = describeAppChangesPaused();
             this.logger.warn(`Task ${task.id}: no run dispatched — ${error}`);
             return { runId: null, dispatched: false, parked: false, error };
+        }
+        // APW-08 T11 (FR-9, ACC-08-07) — an Agent without commit permission cannot be started on
+        // an App Work Task: the App's changes always go through a branch, and isolation (forced on
+        // for an App Work by `resolveTaskIsolation`) only ever cuts one for an Agent that may
+        // commit. Refused HERE, at the one dispatch choke point, before a run row exists — the
+        // alternative was a run that silently did nothing, because the worker gives such an Agent
+        // no workspace. Explicit `false` only, matching the worker's own reading
+        // (`canCommitToRepo !== false`). A review run is not a change (it reads the PR and records
+        // a verdict), so it passes, exactly as it does the T49 switch above.
+        if (
+            !opts.reviewId &&
+            agent.permissions?.canCommitToRepo === false &&
+            (await this.isAppWorkTask(task))
+        ) {
+            const error = describeAppWorkNoCommitPermission();
+            this.logger.warn(`Task ${task.id}: no run dispatched for agent ${agentId} — ${error}`);
+            return { runId: null, dispatched: false, parked: false, error };
+        }
+        // FL-13 P2 (spec FR-8): a fire of an Agent-session schedule is an Agent
+        // session on the computer the Agent is pinned to — the Fleet starts it
+        // (its own Run, trigger `session`, linked to this Task). Ownership was
+        // checked above, at the one dispatch choke point. Placed AFTER the two
+        // App Work refusals above (review of #3036): a session on an App Work
+        // Task is a change like any run, so the operator's T49 switch and the
+        // FR-9 commit permission bite for it too. Both read nothing unless changes
+        // are paused or the Agent may not commit. FR-9 refuses App Work Tasks only
+        // (it fails open). The paused switch fails CLOSED: a Task whose Work is
+        // missing or unreadable is refused too, as every other run already is.
+        if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
+            return this.sessionSchedules.dispatch(task, agentId);
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;

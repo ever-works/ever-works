@@ -104,8 +104,12 @@ export class UpdateWorkDto {
     @MaxLength(128)
     taskIsolationBaseBranch?: string | null;
 
+    // APW-08 T11 — `website` (the Work Repository) is what an App Work's `app.spec.applied`
+    // listener writes, so it is accepted back (an export → import, a client echoing the row).
+    // Additive: the three earlier values are unchanged. The Work's KIND decides the repository
+    // a Task acts on (`resolveTaskRepository`); this column records it.
     @IsOptional()
-    @IsIn(['work-output', 'data', 'provider'])
+    @IsIn(['work-output', 'data', 'provider', 'website'])
     taskIsolationTargetRepo?: string;
 
     @IsOptional()

@@ -809,7 +809,10 @@ export class AccountImportService {
                 }
                 if (
                     typeof dir.taskIsolationTargetRepo === 'string' &&
-                    ['work-output', 'data', 'provider'].includes(dir.taskIsolationTargetRepo)
+                    // APW-08 T11 — `website` is what an App Work carries; additive.
+                    ['work-output', 'data', 'provider', 'website'].includes(
+                        dir.taskIsolationTargetRepo,
+                    )
                 ) {
                     updateData.taskIsolationTargetRepo = dir.taskIsolationTargetRepo;
                 }
@@ -902,7 +905,8 @@ export class AccountImportService {
         }
         if (
             typeof dir.taskIsolationTargetRepo === 'string' &&
-            ['work-output', 'data', 'provider'].includes(dir.taskIsolationTargetRepo)
+            // APW-08 T11 — `website` is what an App Work carries; additive.
+            ['work-output', 'data', 'provider', 'website'].includes(dir.taskIsolationTargetRepo)
         ) {
             createData.taskIsolationTargetRepo = dir.taskIsolationTargetRepo;
         }
