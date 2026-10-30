@@ -329,7 +329,11 @@ describe('run containment — the service: record, Cost view, allowance route', 
             await service.setContainmentAllowance({ workId: 'w-app', nodeId: NODE_A, allow: true, actorUserId: OWNER }),
         ).toMatchObject({ status: 'ok' });
         const after = await service.describeForTask({ id: 't-app', userId: OWNER, workId: 'w-app' });
-        expect(after!.containment).toMatchObject({ nodeId: NODE_A, allowedByOwner: true });
+        expect(after!.containment).toMatchObject({
+            nodeId: NODE_A,
+            allowedByOwner: true,
+            acceptedDowngrade: 'modelHomeIsolation=inherit',
+        });
         expect(after!.containmentHolds).toEqual([]);
         // The accepted downgrade is kept with the allowance, for the Cost view (S33).
         expect(w.works['w-app'].allowances).toEqual([

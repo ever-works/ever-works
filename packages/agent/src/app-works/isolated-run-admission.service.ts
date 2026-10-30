@@ -259,6 +259,9 @@ export class IsolatedRunAdmissionService
                 reportedAt: record.reportedAt,
                 reported: true,
                 allowedByOwner: isNodeContainmentAllowed(allowances, record.nodeId),
+                acceptedDowngrade:
+                    allowances.find((entry) => entry.nodeId === record.nodeId)
+                        ?.acceptedDowngrade ?? null,
             };
             break;
         }
