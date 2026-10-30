@@ -462,6 +462,12 @@ export class FleetRunRouterService {
         if (payload.runId) {
             jobPayload.runId = payload.runId;
         }
+        // APW-08 T12 / T48 — set only by the fleet-aware dispatcher, after isolated-run admission
+        // admitted the run: the lease judges the node that takes this job, and the reconciler
+        // records the containment it got. Absent on every other job.
+        if (typeof payload.appWorkId === 'string' && payload.appWorkId) {
+            jobPayload.appWorkId = payload.appWorkId;
+        }
         if (workspacePath) {
             jobPayload.workspacePath = workspacePath;
         }

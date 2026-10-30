@@ -340,6 +340,42 @@ export class WorkRepository {
     }
 
     /**
+     * APW-08 T48 (review of #3040, minor 7) — compare-and-set of the per-node containment
+     * allowances (`works.appRunContainmentAllowances`, a `simple-json` text column).
+     *
+     * Writes `next` ONLY while the column still holds `previous` — the value the caller read — so
+     * two concurrent **Allow on this machine** for different nodes can never lose one: the loser
+     * writes nothing, answers `false`, and re-reads. `previous` is compared as the exact text
+     * TypeORM stored for it (`JSON.stringify` of the parsed value, which is what `simple-json`
+     * writes), or `IS NULL` for a column never written. Scoped like
+     * {@link updateAppWorkColumns}: `id`, the owner read and `kind = 'app'`, so it can never land
+     * on another kind or a Work whose owner changed. Portable: one conditional UPDATE, the same
+     * on Postgres, SQLite, MySQL and MariaDB.
+     */
+    async casAppRunContainmentAllowances(
+        id: string,
+        userId: string,
+        previous: unknown,
+        next: NonNullable<Work['appRunContainmentAllowances']>,
+    ): Promise<boolean> {
+        if (!id || !userId) return false;
+        const prior = previous === null || previous === undefined ? null : JSON.stringify(previous);
+        const result = await this.repository.update(
+            {
+                id,
+                userId,
+                kind: 'app',
+                appRunContainmentAllowances: Raw(
+                    (column) => (prior === null ? `${column} IS NULL` : `${column} = :prior`),
+                    prior === null ? {} : { prior },
+                ) as unknown as Work['appRunContainmentAllowances'],
+            },
+            { appRunContainmentAllowances: next },
+        );
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * APW-08 T50 — one page of App Work ids whose Task base branch is still unset, in id order
      * after `afterId` (keyset paging, so a Work the backfill has to leave alone is never read
      * twice in one run). `kind = 'app'` is in the query, so no other kind is ever visited, and

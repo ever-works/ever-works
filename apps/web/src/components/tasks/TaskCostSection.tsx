@@ -6,6 +6,7 @@ import type { TaskCostView } from '@ever-works/contracts';
 import { Link } from '@/i18n/navigation';
 import { formatCents } from '@/components/works/app/WorkCostSummary';
 import { getTaskCostAction } from '@/app/actions/tasks';
+import { TaskRunContainmentNotice } from './TaskRunContainmentNotice';
 
 type Load = { kind: 'loading' } | { kind: 'unavailable' } | { kind: 'ready'; cost: TaskCostView };
 
@@ -34,10 +35,19 @@ function receiptHref(url: string | null | undefined): string | null {
  * per-Task Build accounting reports any, and the total. An unpriced amount reads **unknown**,
  * never `$0.00`. Neutral copy only — no status colour on a cost figure.
  */
-export function TaskCostSection({ taskId }: { taskId: string }) {
+export function TaskCostSection({
+    taskId,
+    workId,
+}: {
+    taskId: string;
+    /** APW-08 T48 — the Task's Work, for the containment notice's allowance route. */
+    workId?: string | null;
+}) {
     const t = useTranslations('dashboard.tasksPage.cost');
     const locale = useLocale();
     const [load, setLoad] = useState<Load>({ kind: 'loading' });
+    // APW-08 T48 — bumped after the containment notice changes an allowance, to re-read the view.
+    const [reload, setReload] = useState(0);
 
     useEffect(() => {
         let cancelled = false;
@@ -52,7 +62,7 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
         return () => {
             cancelled = true;
         };
-    }, [taskId]);
+    }, [taskId, reload]);
 
     const money = (cents: number | null | undefined, currency: string) =>
         cents === null || cents === undefined ? t('unknown') : formatCents(cents, currency, locale);
@@ -157,6 +167,16 @@ export function TaskCostSection({ taskId }: { taskId: string }) {
                             {t('runsTruncated', { count: load.cost.runsLimit })}
                         </p>
                     )}
+
+                    {/* APW-08 T27 / T48 (FR-70, S33) — beside the receipts: the containment the
+                        latest Fleet run got, and Allow on this machine for a node holding the
+                        next run. Renders nothing for a Task without either. */}
+                    <TaskRunContainmentNotice
+                        workId={workId}
+                        containment={load.cost.containment}
+                        holds={load.cost.containmentHolds}
+                        onChanged={() => setReload((n) => n + 1)}
+                    />
                 </div>
             )}
         </section>

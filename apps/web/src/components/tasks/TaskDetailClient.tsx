@@ -694,7 +694,7 @@ export function TaskDetailClient({
 
                     {/* APW-08 T27 — Cost, last: the Task's runs, their receipts and the total
                         (`GET /api/tasks/:id/cost`); an unpriced amount reads "unknown". */}
-                    <TaskCostSection taskId={task.id} />
+                    <TaskCostSection taskId={task.id} workId={task.workId ?? null} />
                 </div>
 
                 {/* ---- Right rail: Details + recurring -------------------- */}

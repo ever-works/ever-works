@@ -697,6 +697,15 @@ export interface FleetAgentTaskPayload {
 	/** Owner the run was dispatched for (reporting only). */
 	userId?: string;
 	/**
+	 * APW-08 T12 / T48 — the App Work this run changes, stamped by the fleet-aware dispatcher once
+	 * isolated-run admission has admitted the run for the Fleet. Platform-written (never by a
+	 * node), it is what makes the LEASE judge the node that actually takes the job (its reported
+	 * containment and the owner's allowance) and what tells the reconciler to record the
+	 * containment the run got. Absent on every other job, which leases and reconciles exactly as
+	 * before.
+	 */
+	appWorkId?: string;
+	/**
 	 * Directory ON THE NODE the steps run in. Optional: unlike
 	 * `acceptance-checks` (whose workspace is the checked-out Task
 	 * worktree) an agent task may legitimately run wherever the node

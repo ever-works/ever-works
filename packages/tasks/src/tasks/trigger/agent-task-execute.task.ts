@@ -6,7 +6,13 @@ import type {
     TaskCheckResult,
     TaskGateJudgement,
 } from '@ever-works/contracts';
+import { isAppWorkKind } from '@ever-works/contracts';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
+// APW-08 T12 — the cloud pre-flight of isolated-run admission (a pure leaf, contracts only).
+import {
+    appWorkCloudRunRefusal,
+    describeAppWorkUnreadableDispatch,
+} from '@ever-works/agent/app-works';
 import {
     AgentEscalationService,
     AgentRunService,
@@ -457,8 +463,17 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // never happened rather than dropping the command in silence.
             let resolvedSetup: TaskAcceptanceCheck[] = [];
             const works = appContext.get(WorkRepository);
+            // APW-08 T12 (review of #3040, decision: fail CLOSED) — remembered so the isolated-run
+            // pre-flight below can refuse a run whose Work could not be read.
+            // `as boolean`: it is set inside the `.catch` callback, which narrowing cannot see.
+            let gateWorkUnreadable = false as boolean;
             try {
-                gateWork = taskRow.workId ? await works.findById(taskRow.workId) : null;
+                gateWork = taskRow.workId
+                    ? await works.findById(taskRow.workId).catch((error: unknown) => {
+                          gateWorkUnreadable = true;
+                          throw error;
+                      })
+                    : null;
                 resolvedChecks = resolveAcceptanceChecks(taskRow, gateWork);
                 resolvedSetup = resolveSetupSteps(taskRow, gateWork);
             } catch {
@@ -490,6 +505,36 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // it reads the diff it was handed and records one verdict, and
             // the self-review refusal relies on it never authoring a commit.
             const reviewRun = isAgentReviewRunScope(run.delegationScope);
+            // APW-08 T12 (FR-12) — isolated-run admission, site 2 of 2: this worker IS the cloud
+            // placement, and the platform's tool loop here enforces no network policy and holds
+            // platform credentials, so an App Work run that reaches it — a router fallback from
+            // the Fleet, a drained or resumed run, a path that skipped `dispatchAgentRun` — is
+            // refused BEFORE any workspace is provisioned. A review run is not a change and
+            // passes; every other kind passes untouched. `gateWork` is the Work read above. A
+            // Work that could not be READ (the RPC threw) fails the run CLOSED, for a Task on any
+            // kind (review of #3040): it cannot be shown not to be an App Work. Retryable.
+            const notAdmitted =
+                gateWorkUnreadable && !reviewRun
+                    ? describeAppWorkUnreadableDispatch(taskRow.workId)
+                    : appWorkCloudRunRefusal({
+                          taskId: payload.taskId,
+                          workId: taskRow.workId ?? null,
+                          isAppWork: isAppWorkKind(gateWork?.kind),
+                          reviewRun,
+                      });
+            if (notAdmitted) {
+                await runs.markFailed(run.id, notAdmitted);
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
+                );
+                await drainWork(taskRow.workId);
+                return {
+                    status: 'failed',
+                    reason: 'app-work-run-not-admitted',
+                    runId: run.id,
+                    taskId: payload.taskId,
+                };
+            }
             try {
                 provisioned = reviewRun
                     ? null

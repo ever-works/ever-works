@@ -39,6 +39,18 @@ export const APP_RUN_BRIEF_PUSH_LINE =
     'This Task pushes its branch and opens the pull request for you when your run finishes: never push, ' +
     'merge or open a pull request yourself, and never change the default branch.';
 
+/**
+ * APW-08 T12 / T48 (FR-13, GAP-21) — the honest statement of what containment does NOT cover. A
+ * Fleet node gives the MODEL step an isolated home (environment construction only); the run's
+ * setup steps and App checks deliberately run with the machine's real home and toolchain, so the
+ * owner's admission of each check (FR-14) is their control. Every App Work run that receives this
+ * brief runs on a Fleet node: the cloud executor refuses App Work runs (T12 site 2).
+ */
+export const APP_RUN_BRIEF_REAL_HOME_LINE =
+    "On the owner's machine your model step runs with an isolated home, but this Task's setup steps " +
+    "and App checks run with the machine's real home directory and toolchain; only checks the owner " +
+    'admitted run, and containment never widens your tools, protected paths or target branch.';
+
 /** Why an instruction file was not included. Codes only. */
 export type AppRunInstructionFileRefusal =
     | 'outside-repository'
@@ -134,6 +146,8 @@ export function buildAppRunRulesBlock(
         '',
         APP_RUN_BRIEF_PUSH_LINE,
         '',
+        APP_RUN_BRIEF_REAL_HOME_LINE,
+        '',
         'Protected paths — never create, edit, rename or delete a file matching these; the platform refuses the pull request if you do:',
         // The guard's own always-protected list first (not a copy of it), then the spec's.
         ...ALWAYS_PROTECTED.map((path) => `- ${codePath(path)} (always protected)`),
@@ -169,6 +183,8 @@ export function buildAppRunRulesUnreadableBlock(meta: { branch: string; reason: 
         '# APP RULES (could not be read)',
         '',
         APP_RUN_BRIEF_PUSH_LINE,
+        '',
+        APP_RUN_BRIEF_REAL_HOME_LINE,
         '',
         `The App spec (\`.works/works.yml\`) on ${codePath(meta.branch)} could not be read (${neutralizeControlTokens(meta.reason).slice(0, 200)}), so this App Work's protected paths are unknown and the platform will refuse a pull request until it can read them. Change nothing under \`.github/\` or \`.works/\`, and say in your final message that the App spec needs attention.`,
     ].join('\n');

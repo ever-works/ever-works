@@ -1939,7 +1939,31 @@
                 "noRuns": "No runs yet.",
                 "runLabel": "Run {id}",
                 "receipt": "Receipt",
-                "runsTruncated": "Showing the newest {count} runs."
+                "runsTruncated": "Showing the newest {count} runs.",
+                "containment": {
+                    "title": "Containment",
+                    "lastRun": "Latest Fleet run on {node}",
+                    "nextRun": "Won't receive this Task's runs until you allow it: {node}",
+                    "nodesUnreadable": "Your machines could not be read, so this Task's next Fleet run is held. Try again in a moment.",
+                    "unknownMachine": "an unknown machine",
+                    "pathHardened": "Hardened executor",
+                    "pathOrdinary": "Ordinary command runner",
+                    "isolatedHomeApplied": "Isolated home applied to the model step",
+                    "isolatedHomeNotApplied": "Isolated home not applied to the model step",
+                    "notReported": "This machine hasn't reported its containment yet.",
+                    "downgrades": "Downgrades the machine declared",
+                    "noDowngrades": "No downgrades declared.",
+                    "allowed": "You allowed this machine's downgrade for this app.",
+                    "acceptedDowngrade": "Accepted: {reason}",
+                    "withdraw": "Withdraw",
+                    "saving": "Saving…",
+                    "saveFailed": "Couldn't save the allowance. Try again.",
+                    "realHome": "Setup steps and app checks on your machines run with the machine's real home and toolchain; the checks you admit are what control them."
+                }
+            },
+            "appRules": {
+                "containmentDowngrade": "This machine runs app changes without an isolated home. Allow it once, or run this Task in an isolated sandbox.",
+                "allowOnThisMachine": "Allow on this machine"
             },
             "deliveryPosts": {
                 "runStarted": "Run started.",

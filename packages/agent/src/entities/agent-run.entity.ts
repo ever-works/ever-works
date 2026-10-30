@@ -541,6 +541,28 @@ export class AgentRun {
     @Column({ type: 'simple-json', nullable: true })
     delegationScope?: SubAgentScope | null;
 
+    /**
+     * APW-08 T48 (FR-70, ACC-08-34) — the containment a FLEET run of an App Work Task actually got,
+     * written by the fleet reconciler beside the run's receipt (the usage row it books first):
+     * the node's execution path, whether the per-run isolated home applied, every downgrade the
+     * node declared, the node that ran it and when. Normalized on the way in
+     * (`normalizeFleetAgentTaskContainment`, every coercion toward LESS containment) and read back
+     * through `readAgentRunContainmentRecord`, never trusted raw.
+     *
+     * Written for App Work runs only: every other run keeps NULL, exactly as before T48. The
+     * Task's Cost view shows it (`TaskCostView.containment`); `tasks` gains nothing — the record
+     * rides the run. Migration: `1792340000000-AddAppRunContainment`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    containment?: {
+        executionPath: 'hardened' | 'ordinary';
+        isolatedHome: boolean;
+        downgrades: Array<{ control: string; reason: string }>;
+        needsOwnerAllowance: boolean;
+        nodeId: string | null;
+        reportedAt: string;
+    } | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }
