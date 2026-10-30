@@ -28,5 +28,11 @@ export interface FleetAppWorkLeaseAdmission {
         nodeId: string;
         workId: string;
         jobId: string;
+        /**
+         * APW-08 T51 (FR-61, S36) — the Task the job runs, from its platform-written payload, so a
+         * node whose last run of THIS Task reported a missing tool is not offered it again.
+         * Absent = no such check.
+         */
+        taskId?: string | null;
     }): Promise<boolean>;
 }

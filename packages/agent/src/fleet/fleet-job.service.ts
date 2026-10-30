@@ -282,11 +282,14 @@ export class FleetJobService {
             return false;
         }
         try {
+            const taskId = (candidate.payload as { taskId?: unknown } | null | undefined)?.taskId;
             const admitted = await this.appWorkLeaseAdmission.admitsLease({
                 userId: node.userId,
                 nodeId: node.id,
                 workId,
                 jobId: candidate.id,
+                // APW-08 T51 — so a node that reported a missing tool for this Task is passed over.
+                taskId: typeof taskId === 'string' && taskId.length > 0 ? taskId : null,
             });
             if (!admitted) {
                 this.logger.debug(

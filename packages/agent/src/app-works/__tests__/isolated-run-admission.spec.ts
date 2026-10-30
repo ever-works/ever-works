@@ -730,6 +730,54 @@ describe('isolated-run admission — the predicate and its facts', () => {
         ).toBe(true);
     });
 
+    it('APW-08 T51 (ACC-08-44, second half): a node whose last run of THIS Task reported a missing tool is not offered it again', async () => {
+        const world = makeWorld({ reports: { [NODE_A]: isolatedReport('hardened') } });
+        const reads = readsFor(world);
+        const reported = new Set<string>([`${NODE_A}:t1`]);
+        const since: number[] = [];
+        reads.fleet!.missingToolReportedFor = jest.fn(
+            async (_userId: string, nodeId: string, taskId: string, sinceMs: number) => {
+                since.push(sinceMs);
+                return reported.has(`${nodeId}:${taskId}`);
+            },
+        );
+        const admission = new IsolatedRunAdmissionService({
+            ...reads,
+            now: () => new Date('2026-10-30T12:00:00Z'),
+        });
+        const lease = (taskId: string | null) =>
+            admission.admitsLease({ userId: OWNER, nodeId: NODE_A, workId: APP_WORK, jobId: 'j1', taskId });
+
+        // The node reported the tool missing for t1: passed over for t1 only.
+        expect(await lease('t1')).toBe(false);
+        expect(await lease('t2')).toBe(true);
+        // The window is a day back from now.
+        expect(since[0]).toBe(new Date('2026-10-29T12:00:00Z').getTime());
+        // No task id on the job (an older payload): nothing to check, the containment decides.
+        expect(await lease(null)).toBe(true);
+        // The read failing ADMITS: this passes over a known-bad machine, it is not a safety rule.
+        (reads.fleet!.missingToolReportedFor as jest.Mock).mockRejectedValueOnce(new Error('db down'));
+        expect(await lease('t1')).toBe(true);
+    });
+
+    it('APW-08 T51: a missing-tool report never admits a node the containment rule refuses', async () => {
+        const world = makeWorld({ reports: {} });
+        const reads = readsFor(world);
+        reads.fleet!.missingToolReportedFor = jest.fn(async () => false);
+        const admission = new IsolatedRunAdmissionService(reads);
+        expect(
+            await admission.admitsLease({
+                userId: OWNER,
+                nodeId: NODE_A,
+                workId: APP_WORK,
+                jobId: 'j1',
+                taskId: 't1',
+            }),
+        ).toBe(false);
+        // Refused on containment first; the missing-tool record was not even asked.
+        expect(reads.fleet!.missingToolReportedFor).not.toHaveBeenCalled();
+    });
+
     it('a node that never reported (or whose report is unreadable) is an unknown containment — a downgrade', async () => {
         for (const report of [undefined, 'garbage', ['x']]) {
             const world = makeWorld({ reports: { [NODE_A]: report } });

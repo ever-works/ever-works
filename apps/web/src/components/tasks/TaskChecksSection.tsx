@@ -116,7 +116,10 @@ function CheckRow({
                                 RESULT_TONES[result.status] ?? 'text-text-muted',
                             )}
                         >
-                            {t(`result.${resultKey(result.status)}`)}
+                            {/* APW-08 T51 (S36) — a Fleet node's shell could not find the tool. */}
+                            {result.status === 'error' && result.reason === 'missingTool'
+                                ? t('result.missingTool')
+                                : t(`result.${resultKey(result.status)}`)}
                         </span>
                         <span className="text-[10px] font-mono text-text-muted shrink-0">
                             {t('exit', { code: result.exitCode ?? '—' })}
