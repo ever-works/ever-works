@@ -341,7 +341,14 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
  * were added to APW-06 T71's status line and moved to {@link EXPECTED_WORKER_UNBOUND}, citing it.
  * A new worker gap with no task or decision behind it lands here, never in the expected list.
  */
-const OPEN_WORKER_GAPS: readonly OpenGap[] = [];
+const OPEN_WORKER_GAPS: readonly OpenGap[] = [
+    {
+        key: 'AppUpstreamSyncWorkerModule :: APP_WORKS_TELEMETRY_SINK',
+        reason: "APW-02 T39's fork lifecycle telemetry is emitted in the worker (`app_upstream.sync_finished`, the sync's `app_actions.hygiene`), where no sink exists: `APP_WORKS_TELEMETRY_SINK` is the API's PostHog alias. `AppUpstreamTelemetry` is bound in the worker without one, so an event is counted and dropped, as its docstring says. Measured red 2026-10-30: the class itself was unbound in the worker until then.",
+        source: 'packages/agent/src/app-works/app-upstream.telemetry.ts:32-33; packages/tasks/src/tasks/trigger/app-upstream-sync.task.ts:147-153',
+        routedTo: "Owner decision raised by lane L2 (Gauzy Ever Works #37): give the Trigger worker its own telemetry sink, or relay the worker's events to the API.",
+    },
+];
 
 /* -------------------------------------------------------------------------- *
  * Where things are
