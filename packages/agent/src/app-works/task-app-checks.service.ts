@@ -1,6 +1,8 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { isAppWorkKind } from '@ever-works/contracts';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { TaskRepository } from '../database/repositories/task.repository';
+import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskStatus, type Task } from '../entities/task.entity';
 import { AgentEscalationService } from '../agents/agent-escalation.service';
 import { heuristicConfidence } from '../agents/escalation-confidence';
@@ -34,6 +36,16 @@ import { AppWorkRulesService } from './app-work-rules.service';
  * got past a lost marker could not raise it twice. The Block is best-effort
  * and recorded separately: a Task a person already moved (done, cancelled,
  * blocked) is left where it is, and the escalation is still raised.
+ *
+ * ## …and the way back is real
+ *
+ * The escalation tells the owner they can raise the Work's gate-attempt budget
+ * and unblock the Task. That only works if the fix loop's one-shot stop marker
+ * is released, because `TaskCiAutoResumeService` reads the marker before the
+ * budget. `reopenAfterUnblock` does it — from the two-minute sweep, for an App
+ * Work Task that is red, marked stopped, no longer `BLOCKED`, and whose CI
+ * attempts are now below the budget. Unblocking without raising the budget
+ * releases nothing.
  */
 @Injectable()
 export class TaskAppChecksService implements TaskAppChecks {
@@ -48,6 +60,10 @@ export class TaskAppChecksService implements TaskAppChecks {
         @Optional() private readonly git?: GitFacadeService,
         @Optional() private readonly transitions?: TaskTransitionService,
         @Optional() private readonly escalations?: AgentEscalationService,
+        // The way back (see the class doc). Absent, nothing is ever reopened —
+        // the Task stays out of the loop, which is where it already is.
+        @Optional() private readonly tasks?: TaskRepository,
+        @Optional() private readonly attempts?: TaskCiAutoResumeAttemptRepository,
     ) {}
 
     async resumeBudget(task: Task): Promise<number | null> {
@@ -113,7 +129,7 @@ export class TaskAppChecksService implements TaskAppChecks {
                 `${name}: a required App check on pull request${pr} is still red after ` +
                 `${exhaustion.attemptsUsed} of ${exhaustion.maxAttempts} automatic attempts, so the Task is blocked.`,
             decisionNeeded:
-                'Fix the check, raise the gate-attempt budget and unblock the Task, or close it.',
+                "Fix the check on the branch, or raise this Work's gate-attempt budget and unblock the Task so the agent tries again, or close it.",
             taskId: task.id,
             workId: work.id,
             agentId: task.agentId ?? null,
@@ -126,6 +142,29 @@ export class TaskAppChecksService implements TaskAppChecks {
             confidenceSource: 'heuristic',
         });
         return Boolean(row);
+    }
+
+    async reopenAfterUnblock(task: Task): Promise<boolean> {
+        if (!task.ciAutoResumeNoticedAt || !this.tasks || !this.attempts) return false;
+        // Still blocked (or finished): the owner has not handed it back.
+        if (task.status !== TaskStatus.IN_PROGRESS && task.status !== TaskStatus.IN_REVIEW) {
+            return false;
+        }
+        const work = await this.appWorkOf(task);
+        if (!work) return false;
+        try {
+            const used = await this.attempts.countForTask(task.id, 'ci');
+            if (used >= resolveMaxGateAttempts(task, work)) return false;
+            return await this.tasks.casClearCiAutoResumeNoticed(task.id);
+        } catch (error) {
+            // A budget nobody can count is not a reason to resume.
+            this.logger.warn(
+                `Task ${task.id}: could not decide whether to reopen the CI loop (${
+                    error instanceof Error ? error.message : String(error)
+                }); it stays stopped.`,
+            );
+            return false;
+        }
     }
 
     /** The Task's Work when it is an App Work; `null` otherwise or when unreadable. */

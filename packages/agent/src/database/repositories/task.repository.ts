@@ -1133,6 +1133,29 @@ export class TaskRepository {
     }
 
     /**
+     * APW-08 T16 — release the stop marker {@link casMarkCiAutoResumeNoticed}
+     * claimed. Used only for an App Work Task whose owner unblocked it after
+     * raising the Work's gate-attempt budget
+     * (`TaskAppChecksService.reopenAfterUnblock`).
+     *
+     * `IS NOT NULL` rather than an equality on the timestamp the caller read:
+     * timestamp equality does not survive every driver's round trip, and it
+     * buys nothing here — the marker is only ever SET from NULL, so while it
+     * is non-null it is still the stop the caller saw. Two sweeps clearing
+     * the same marker both succeed, harmlessly.
+     */
+    async casClearCiAutoResumeNoticed(taskId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ ciAutoResumeNoticedAt: null })
+            .where('id = :taskId', { taskId })
+            .andWhere('ciAutoResumeNoticedAt IS NOT NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Reviewer agent stage (slice AD, CodeRabbit CR-2) — take the planning
      * lease for one attempt at the agent reviews this Task is owed.
      *

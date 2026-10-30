@@ -1,5 +1,6 @@
 import {
     FLEET_AGENT_TASK_MAX_SETUP_STEPS,
+    isAppWorkKind,
     isRepoDeclaredCommandAllowed,
     normalizeRepoDeclaredCommand,
     repoDeclaredCommandId,
@@ -132,7 +133,7 @@ export function parseRepoDeclaredCommands(
     if (typeof spec !== 'object' || Array.isArray(spec)) {
         throw new RepoDeclaredCommandsError('.works/works.yml `spec` must be a mapping');
     }
-    if (kind === 'app') {
+    if (isAppWorkKind(kind)) {
         return { setup: [], checks: parseAppSpecChecks((spec as Record<string, unknown>).checks) };
     }
     const tasks = (spec as Record<string, unknown>).tasks;
@@ -409,7 +410,7 @@ export function admitRepoDeclaredCommands(
     const where = input.repositoryId ? ` in ${input.repositoryId}` : '';
     const total = declared.setup.length + declared.checks.length;
     if (total === 0) return { setup: [], checks: [] };
-    const reportNotAdmitted = input.kind === 'app';
+    const reportNotAdmitted = isAppWorkKind(input.kind);
     const notAdmitted: NotAdmittedCheck[] = [];
 
     if (policy.mode !== 'allowlist') {

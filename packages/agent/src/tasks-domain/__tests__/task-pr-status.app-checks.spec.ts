@@ -1,5 +1,5 @@
 import { TaskPrStatusService } from '../task-pr-status.service';
-import { TaskCiAutoResumeService } from '../task-ci-auto-resume.service';
+import { TaskCiAutoResumeService, type CiCheckResultInput } from '../task-ci-auto-resume.service';
 import { TaskLifecyclePostsService } from '../task-lifecycle-posts.service';
 import { TaskAppChecksService } from '../../app-works/task-app-checks.service';
 import { AppWorkRulesService } from '../../app-works/app-work-rules.service';
@@ -56,7 +56,9 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
     let mergeGate: { onPullRequestStatusRefreshed: jest.Mock };
     let chat: { post: jest.Mock };
     let attempts: Record<string, jest.Mock>;
-    let ledger: Array<{ claimKey: string }>;
+    // The attempts ledger, faithfully: one row per claim, with its trigger and failure fingerprint.
+    let ledger: Array<{ claimKey: string; trigger: string; failureKey: string | null }>;
+    let worksRepo: { findById: jest.Mock };
     let steering: { resumeRun: jest.Mock };
     let inbox: { notice: jest.Mock };
     let transitions: { transition: jest.Mock };
@@ -80,7 +82,8 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
     }
 
     function build(): TaskPrStatusService {
-        const works = { findById: jest.fn(async () => work) } as unknown as WorkRepository;
+        worksRepo = { findById: jest.fn(async () => work) };
+        const works = worksRepo as unknown as WorkRepository;
         const rules = new AppWorkRulesService(specs as unknown as AppSpecService);
         const appChecks = new TaskAppChecksService(
             works,
@@ -88,6 +91,8 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
             git as unknown as GitFacadeService,
             transitions as unknown as TaskTransitionService,
             escalations as unknown as AgentEscalationService,
+            tasks as unknown as TaskRepository,
+            attempts as never,
         );
         const runs = {
             findLatestForTask: jest.fn(async () => ({
@@ -201,6 +206,11 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
                 row.ciAutoResumeNoticedAt = new Date();
                 return true;
             }),
+            casClearCiAutoResumeNoticed: jest.fn(async () => {
+                if (!row.ciAutoResumeNoticedAt) return false;
+                row.ciAutoResumeNoticedAt = null;
+                return true;
+            }),
         };
         git = {
             getPullRequestStatus: jest.fn(),
@@ -221,14 +231,26 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         mergeGate = { onPullRequestStatusRefreshed: jest.fn(async () => ({ action: 'skipped' })) };
         chat = { post: jest.fn(async () => ({ id: 'm' })) };
         attempts = {
-            countForTask: jest.fn(async () => ledger.length),
-            // Each attempt here is a new failure; the repeat rule is EW-806's own spec's.
-            hasFailureKey: jest.fn(async () => false),
-            claim: jest.fn(async (input: { claimKey: string }) => {
-                if (ledger.some((entry) => entry.claimKey === input.claimKey)) return null;
-                ledger.push({ claimKey: input.claimKey });
-                return { id: `attempt-${ledger.length}` };
-            }),
+            countForTask: jest.fn(
+                async (_taskId: string, trigger?: string) =>
+                    ledger.filter((entry) => !trigger || entry.trigger === trigger).length,
+            ),
+            // REAL fingerprints (review of #3038): the sweep's key is names-only, so the same red
+            // `type-check` on every push repeats it — exactly what the App rule must not stop on.
+            hasFailureKey: jest.fn(async (_taskId: string, key: string) =>
+                ledger.some((entry) => entry.failureKey === key),
+            ),
+            claim: jest.fn(
+                async (input: { claimKey: string; trigger: string; failureKey: string | null }) => {
+                    if (ledger.some((entry) => entry.claimKey === input.claimKey)) return null;
+                    ledger.push({
+                        claimKey: input.claimKey,
+                        trigger: input.trigger,
+                        failureKey: input.failureKey,
+                    });
+                    return { id: `attempt-${ledger.length}` };
+                },
+            ),
             stampResumedRun: jest.fn().mockResolvedValue(undefined),
         };
         steering = {
@@ -248,6 +270,29 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         if (previousEnv === undefined) delete process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS;
         else process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS = previousEnv;
     });
+
+    /** One CI webhook delivery through the same fix loop the sweep uses. */
+    const deliver = (svc: TaskPrStatusService, over: Partial<CiCheckResultInput>) =>
+        (svc as unknown as { autoResume: TaskCiAutoResumeService }).autoResume.onCheckResult({
+            userId: 'user-1',
+            owner: 'member',
+            repo: 'cal-fork',
+            headSha: 'd'.repeat(40),
+            headBranch: 'task/t-118',
+            prNumbers: [12],
+            prHeads: [{ number: 12, headSha: 'd'.repeat(40) }],
+            observedAt: new Date(),
+            verdict: 'failing',
+            granularity: 'check_run',
+            appSlug: 'github-actions',
+            checkName: E2E,
+            conclusion: 'failure',
+            url: null,
+            outputTitle: null,
+            outputSummary: null,
+            failureKey: null,
+            ...over,
+        });
 
     it('a red required leg reds the gate, re-runs the Agent per attempt up to the Work budget, then Blocks with gate-exhausted (ACC-08-09)', async () => {
         const svc = build();
@@ -290,7 +335,7 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         expect(specs.getEffectiveSpec).toHaveBeenCalledWith('work-app', BASE_SHA);
     });
 
-    it('the budget comes from the Work, not from the env var', async () => {
+    it('the budget comes from the Work, not from the env var — and the SAME red check is retried to it', async () => {
         work.maxGateAttempts = 3;
         process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS = '1';
         const svc = build();
@@ -298,7 +343,12 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
             read('failing', [red(TYPE_CHECK)]);
             await sweep(svc);
         }
+        // One fingerprint for every attempt — the repeat-failure stop would have ended it at one.
+        expect(new Set(ledger.map((entry) => entry.failureKey)).size).toBe(1);
+        expect(ledger.every((entry) => entry.failureKey !== null)).toBe(true);
         expect(steering.resumeRun).toHaveBeenCalledTimes(3);
+        expect(row.status).toBe(TaskStatus.BLOCKED);
+        expect(inbox.notice).not.toHaveBeenCalled();
         expect(escalations.record).toHaveBeenCalledTimes(1);
         expect(escalations.record.mock.calls[0][0].summary).toContain('after 3 of 3');
     });
@@ -344,28 +394,7 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
 
     it('an advisory leg delivered red by the CI webhook does not mark the head red or resume', async () => {
         const svc = build();
-        // `TaskPrStatusService` exposes the fix loop it was built with only through the sweep, so
-        // the webhook half is driven through the same instance the sweep uses.
-        const autoResume = (svc as unknown as { autoResume: TaskCiAutoResumeService }).autoResume;
-        const outcome = await autoResume.onCheckResult({
-            userId: 'user-1',
-            owner: 'member',
-            repo: 'cal-fork',
-            headSha: 'd'.repeat(40),
-            headBranch: 'task/t-118',
-            prNumbers: [12],
-            prHeads: [{ number: 12, headSha: 'd'.repeat(40) }],
-            observedAt: new Date(),
-            verdict: 'failing',
-            granularity: 'check_run',
-            appSlug: 'github-actions',
-            checkName: E2E,
-            conclusion: 'failure',
-            url: null,
-            outputTitle: null,
-            outputSummary: null,
-            failureKey: null,
-        });
+        const outcome = await deliver(svc, { checkName: E2E });
         expect(outcome.reason).toBe('not-a-failure');
         expect(steering.resumeRun).not.toHaveBeenCalled();
         expect(tasks.recordCiHead).toHaveBeenCalledWith(
@@ -392,13 +421,116 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         expect(steering.resumeRun).not.toHaveBeenCalled();
     });
 
+    it('reads the advisory rules at the base the webhook names for this pull request', async () => {
+        const svc = build();
+        await deliver(svc, { checkName: E2E, prBaseRefs: [{ number: 12, baseRef: 'release' }] });
+        expect(git.getLatestCommit).toHaveBeenCalledWith(
+            'member',
+            'cal-fork',
+            'release',
+            expect.objectContaining({ workId: 'work-app' }),
+        );
+    });
+
+    it.each([
+        ['check_suite', 'github-actions'],
+        ['workflow_run', 'Ever Works build'],
+    ] as const)(
+        'a red %s delivery on an App Work Task never reds the head or spends an attempt',
+        async (granularity, checkName) => {
+            const svc = build();
+            const outcome = await deliver(svc, { granularity, checkName });
+            expect(outcome.reason).toBe('not-a-failure');
+            expect(tasks.recordCiHead).toHaveBeenCalledWith(
+                expect.objectContaining({ failing: false }),
+            );
+            expect(attempts.claim).not.toHaveBeenCalled();
+            expect(steering.resumeRun).not.toHaveBeenCalled();
+            expect(transitions.transition).not.toHaveBeenCalled();
+        },
+    );
+
+    it('a red check_suite delivery on any other kind still acts, unchanged', async () => {
+        work.kind = 'directory';
+        const svc = build();
+        const outcome = await deliver(svc, {
+            granularity: 'check_suite',
+            checkName: 'github-actions',
+        });
+        expect(outcome.reason).toBe('resumed');
+        expect(tasks.recordCiHead).toHaveBeenCalledWith(expect.objectContaining({ failing: true }));
+    });
+
+    it('a stopped Task of another kind stays a pure read: no Work read for a red check run', async () => {
+        work.kind = 'directory';
+        row.ciAutoResumeNoticedAt = new Date();
+        const svc = build();
+        const outcome = await deliver(svc, { checkName: 'lint' });
+        expect(outcome.reason).toBe('stopped');
+        expect(worksRepo.findById).not.toHaveBeenCalled();
+    });
+
+    it('reviewer-triggered attempts do not spend the App Work CI budget', async () => {
+        ledger.push({ claimKey: 'review:rej-1', trigger: 'review', failureKey: null });
+        const svc = build();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            read('failing', [red(TYPE_CHECK)]);
+            await sweep(svc);
+        }
+        expect(steering.resumeRun).toHaveBeenCalledTimes(2);
+        expect(escalations.record.mock.calls[0][0].summary).toContain('after 2 of 2');
+    });
+
+    it('unblocking after raising the budget reopens the loop; unblocking without it does not', async () => {
+        const svc = build();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            read('failing', [red(TYPE_CHECK)]);
+            await sweep(svc);
+        }
+        expect(row.status).toBe(TaskStatus.BLOCKED);
+        expect(steering.resumeRun).toHaveBeenCalledTimes(2);
+
+        // The owner unblocks WITHOUT raising the budget: nothing reopens.
+        row.status = TaskStatus.IN_REVIEW;
+        read('failing', [red(TYPE_CHECK)]);
+        await sweep(svc);
+        expect(steering.resumeRun).toHaveBeenCalledTimes(2);
+        expect(row.ciAutoResumeNoticedAt).not.toBeNull();
+
+        // …then raises it to 3, as the escalation says: the Agent is sent back once more.
+        work.maxGateAttempts = 3;
+        read('failing', [red(TYPE_CHECK)]);
+        await sweep(svc);
+        expect(tasks.casClearCiAutoResumeNoticed).toHaveBeenCalledWith('task-1');
+        expect(steering.resumeRun).toHaveBeenCalledTimes(3);
+        expect(escalations.record.mock.calls[0][0].decisionNeeded).toContain(
+            "raise this Work's gate-attempt budget and unblock the Task",
+        );
+    });
+
+    it('any other Work kind keeps the repeat-failure stop and its Inbox notice, unchanged', async () => {
+        work.kind = 'directory';
+        process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS = '3';
+        const svc = build();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            read('failing', [red(TYPE_CHECK)]);
+            await sweep(svc);
+        }
+        // The same fingerprint comes back after one retry: EW-806 stops and files the notice.
+        expect(steering.resumeRun).toHaveBeenCalledTimes(1);
+        expect(inbox.notice).toHaveBeenCalledTimes(1);
+        expect(transitions.transition).not.toHaveBeenCalled();
+        expect(escalations.record).not.toHaveBeenCalled();
+    });
+
     it('any other Work kind keeps the env-var budget and the Inbox notice, unchanged', async () => {
         work.kind = 'directory';
         work.maxGateAttempts = 1;
         process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS = '2';
         const svc = build();
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-            read('failing', [red(TYPE_CHECK), red(E2E)]);
+        // A DIFFERENT failure each push, so only the budget can stop the loop.
+        for (const failing of [TYPE_CHECK, E2E, 'lint']) {
+            read('failing', [red(failing)]);
             await sweep(svc);
         }
         expect(steering.resumeRun).toHaveBeenCalledTimes(2);
@@ -410,5 +542,6 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         expect(
             (row.prChecks as Array<Record<string, unknown>>).some((check) => 'advisory' in check),
         ).toBe(false);
+        expect(attempts.countForTask.mock.calls.every((call) => call.length === 1)).toBe(true);
     });
 });

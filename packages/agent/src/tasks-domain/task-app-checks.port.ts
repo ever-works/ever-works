@@ -70,4 +70,16 @@ export interface TaskAppChecks {
      * this runs at most once per Task.
      */
     escalateExhausted(task: Task, exhaustion: TaskAppChecksExhaustion): Promise<boolean>;
+
+    /**
+     * The owner unblocked an App Work Task whose CI budget was spent AND the
+     * budget now allows another attempt (they raised the Work's gate-attempt
+     * budget): release the fix loop's one-shot stop marker so the next red
+     * leg resumes the Agent again. `true` when the marker was released.
+     *
+     * Asked by the two-minute sweep only for an App Work Task that is red,
+     * marked stopped and no longer `BLOCKED`. Unblocking WITHOUT raising the
+     * budget releases nothing — the Task simply stays out of the loop.
+     */
+    reopenAfterUnblock(task: Task): Promise<boolean>;
 }

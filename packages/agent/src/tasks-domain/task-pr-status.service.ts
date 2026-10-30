@@ -117,6 +117,11 @@ export interface TaskPrRefresh {
     task: Task;
     /** `null` when no provider read happened, or the pull request is gone from the provider. */
     status: GitPullRequestStatus | null;
+    /**
+     * APW-08 T16 — the Work's kind, as the read already resolved it (absent when no read
+     * happened), so the sweep's App-only steps need no second Work read.
+     */
+    workKind?: string | null;
 }
 
 @Injectable()
@@ -330,7 +335,7 @@ export class TaskPrStatusService {
         for (const task of due) {
             try {
                 const before = task.prState;
-                const { task: after, status } = await this.refreshTask(task, task.userId);
+                const { task: after, status, workKind } = await this.refreshTask(task, task.userId);
                 summary.refreshed += 1;
                 if (after.prState === 'merged' && before !== 'merged') {
                     summary.merged += 1;
@@ -340,7 +345,7 @@ export class TaskPrStatusService {
                         summary.completed += 1;
                     }
                 } else {
-                    await this.offerRedGateToFixLoop(after);
+                    await this.offerRedGateToFixLoop(after, workKind);
                 }
             } catch (error) {
                 summary.failed += 1;
@@ -415,9 +420,17 @@ export class TaskPrStatusService {
      * `ci:<headSha>`, so a head the webhook already resumed for is
      * `already-claimed` on every tick thereafter, forever.
      */
-    private async offerRedGateToFixLoop(task: Task): Promise<void> {
+    private async offerRedGateToFixLoop(task: Task, workKind?: string | null): Promise<void> {
         if (!this.autoResume?.onCheckResult) return;
         if (task.ciState !== 'failing' || !task.workId || !task.prNumber) return;
+        // APW-08 T16 — the way back from `gate-exhausted`: an App Work Task the owner unblocked
+        // after raising the Work's gate-attempt budget gets its one-shot stop marker released, so
+        // this very re-offer can resume the Agent. App Works only, from the kind this sweep already
+        // read; every other stopped Task stays a pure read here, as before.
+        if (task.ciAutoResumeNoticedAt && this.appChecks && isAppWorkKind(workKind)) {
+            const reopened = await this.appChecks.reopenAfterUnblock(task).catch(() => false);
+            if (reopened) Object.assign(task, { ciAutoResumeNoticedAt: null });
+        }
         // F8 — only a red check REPORTED BY an allow-listed app may be
         // re-offered: the webhook intake and the evaluator refuse any other
         // reporter, and this safety net must not be the way around them. A
@@ -454,6 +467,8 @@ export class TaskPrStatusService {
                 observedAt: task.ciCheckedAt ?? null,
                 verdict: 'failing',
                 granularity: 'check_suite',
+                // APW-08 T16 — this sweep's own roll-up: advisory App legs are already out of it.
+                fromPullRequestPoll: true,
                 appSlug: failing[0].appSlug ?? null,
                 checkName: failing[0].name,
                 conclusion: failing[0].conclusion ?? 'failure',
@@ -701,7 +716,7 @@ export class TaskPrStatusService {
                         return undefined;
                     });
             }
-            return { task, status: effective };
+            return { task, status: effective, workKind: target.workKind };
         })().finally(() => {
             this.inFlight.delete(task.id);
         });

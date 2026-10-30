@@ -686,6 +686,13 @@ describe('FleetAgentTaskReconcilerService', () => {
             ],
             gateStatus: 'green',
         });
+        // …but it is never counted, or announced, as a check that passed.
+        expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledWith(
+            expect.objectContaining({ gate: { checksPassed: 1 }, gateStatus: 'green' }),
+        );
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('Acceptance checks: 1 of 2 green.');
+        expect(body).not.toContain('Acceptance checks: all');
     });
 
     it('reconciles a successful pushed run: gate results, PR, summary, chat, drain', async () => {

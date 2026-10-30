@@ -227,6 +227,7 @@ describe('TaskPrStatusService — checks thread posts (APW-08 FR-43)', () => {
             resumeBudget: jest.fn(async () => 2),
             advisoryLegs: jest.fn(async () => new Set([ADVISORY])),
             escalateExhausted: jest.fn(async () => false),
+            reopenAfterUnblock: jest.fn(async () => false),
         };
         const withAppChecks = () => {
             service();

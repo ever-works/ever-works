@@ -527,8 +527,9 @@ export class FleetAgentTaskReconcilerService {
         const agent = agentId ? await this.agents.findById(agentId).catch(() => null) : null;
         let primaryPrUrl: string | null = null;
         if (task && result.git && result.git.pushed && !result.git.empty) {
-            const checksPassed =
-                result.gateStatus === 'green' && result.checks ? result.checks.length : 0;
+            // Rows that PASSED, never rows that merely exist: a not-admitted App
+            // check (APW-08 T13) or an advisory red sits under a green gate too.
+            const checksPassed = result.gateStatus === 'green' ? greenCheckCount(result) : 0;
             try {
                 const outcome = await this.taskWorkspace.finalizeRemotePush({
                     task,
@@ -1622,6 +1623,11 @@ function isCheckResult(value: unknown): value is TaskCheckResult {
     );
 }
 
+/** How many reported check rows actually passed (`status: 'green'`). */
+function greenCheckCount(result: FleetAgentTaskResult): number {
+    return (result.checks ?? []).filter((check) => check?.status === 'green').length;
+}
+
 function toGateStatus(value: unknown): GateStatus {
     return value === 'green' || value === 'red' || value === 'skipped' || value === 'none'
         ? value
@@ -1728,8 +1734,16 @@ function composeSuccessMessage(
             `Model spend reported by the CLI: $${result.model.costUsd.toFixed(2)}${result.model.turns ? ` over ${result.model.turns} turn(s)` : ''}.`,
         );
     }
-    if (result.gateStatus === 'green' && result.checks?.length) {
-        lines.push(`Acceptance checks: all ${result.checks.length} green.`);
+    const green = greenCheckCount(result);
+    if (result.gateStatus === 'green' && green > 0) {
+        // APW-08 T13 — "all N green" only when every row IS green; a not-admitted
+        // or advisory row under a green gate is counted, never called green.
+        const total = result.checks?.length ?? 0;
+        lines.push(
+            green === total
+                ? `Acceptance checks: all ${total} green.`
+                : `Acceptance checks: ${green} of ${total} green.`,
+        );
     }
     return lines.join('\n');
 }
