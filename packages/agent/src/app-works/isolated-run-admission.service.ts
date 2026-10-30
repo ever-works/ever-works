@@ -521,9 +521,13 @@ export class IsolatedRunAdmissionService
 
     /**
      * Every node that could lease the run: the pinned node alone, or — unpinned — every enrolled
-     * node of the owner that advertises the tags the job will require, in ANY status (review of
-     * #3040: a `paused` or `enrolling` node can lease later, so it counts). Capped at
-     * {@link APP_WORK_FLEET_CANDIDATES_MAX}. Each with its latest report (normalized) and whether
+     * node of the owner that advertises the tags the job will require, in any status that can
+     * lease again (review of #3040: a `paused` or `enrolling` node can lease later, so it counts;
+     * a `disabled` node cannot, so it does not — an owner whose only admissible node is disabled
+     * gets `noEligibleNode`, not an admitted run that waits out the SLA). Capped at
+     * {@link APP_WORK_FLEET_CANDIDATES_MAX} in a deterministic order — the nodes able to lease now
+     * first (`online`, then `offline`, `paused`, `enrolling`), then by id — so the same Fleet
+     * always yields the same candidate set. Each with its latest report (normalized) and whether
      * this App Work allows its downgrade.
      */
     private async fleetCandidates(
@@ -554,14 +558,28 @@ export class IsolatedRunAdmissionService
                       fleet.pinnedNodeFor!(userId, agentId),
                   )
                 : null);
+        // A pinned run is judged on its node alone and never falls back to another one; a pin to a
+        // DISABLED node is no candidate either (CodeRabbit on #3041), so the run is held
+        // (`noEligibleNode`), not admitted to wait for a lease that cannot come.
+        const pinnedDisabled =
+            !!pinned && owned.some((node) => node.id === pinned && node.status === 'disabled');
         const nodeIds = pinned
-            ? [pinned]
+            ? pinnedDisabled
+                ? []
+                : [pinned]
             : owned
-                  .filter((node) =>
-                      nodeSatisfiesCapabilities(
-                          node.capabilities ?? [],
-                          placement.requiredCapabilities ?? [],
-                      ),
+                  .filter(
+                      (node) =>
+                          node.status !== 'disabled' &&
+                          nodeSatisfiesCapabilities(
+                              node.capabilities ?? [],
+                              placement.requiredCapabilities ?? [],
+                          ),
+                  )
+                  .sort(
+                      (a, b) =>
+                          candidateStatusRank(a.status) - candidateStatusRank(b.status) ||
+                          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
                   )
                   .slice(0, APP_WORK_FLEET_CANDIDATES_MAX)
                   .map((node) => node.id);
@@ -639,6 +657,17 @@ const UNREPORTED: AppWorkRunContainment = Object.freeze({
 /** An admission names the App Work it admitted (the job's `appWorkId` marker); refusals as-is. */
 function withWorkId(admission: AppWorkRunAdmission, workId: string): AppWorkRunAdmission {
     return admission.admitted === true ? { ...admission, workId } : admission;
+}
+
+/**
+ * The candidate order before the cap: nodes that can lease now first. An unknown status sorts
+ * last but still counts (it is not `disabled`).
+ */
+const CANDIDATE_STATUS_ORDER: readonly string[] = ['online', 'offline', 'paused', 'enrolling'];
+
+function candidateStatusRank(status: string | null | undefined): number {
+    const rank = CANDIDATE_STATUS_ORDER.indexOf(String(status ?? ''));
+    return rank === -1 ? CANDIDATE_STATUS_ORDER.length : rank;
 }
 
 function stripRecord(record: AgentRunContainmentRecord): AppWorkRunContainment {

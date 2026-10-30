@@ -280,4 +280,49 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
             });
         });
     });
+
+    describe('findLatestCompletedAgentTasksForNode (APW-08 T48 containment read)', () => {
+        /** A job of `kind` on `nodeId`, completed `minutesAgo` ago (or still open), with `result`. */
+        async function jobOn(
+            nodeId: string,
+            kind: 'agent-task' | 'acceptance-checks',
+            minutesAgo: number | null,
+            result: Record<string, unknown> | null = null,
+        ): Promise<string> {
+            const created = await jobs.create({ userId: OWNER, kind });
+            await rows.update(created.id, {
+                nodeId,
+                completedAt: minutesAgo === null ? null : new Date(Date.now() - minutesAgo * 60_000),
+                result,
+            });
+            return created.id;
+        }
+
+        it('filters to completed agent-task rows BEFORE the limit, so newer jobs of other kinds never hide a report', async () => {
+            const reported = await jobOn(NODE_A, 'agent-task', 60, { containment: { isolatedHome: true } });
+            // Newer than the report: other kinds, an open agent-task, another node's agent-task.
+            for (let i = 0; i < 5; i += 1) await jobOn(NODE_A, 'acceptance-checks', 10 - i);
+            await jobOn(NODE_A, 'agent-task', null);
+            await jobOn(NODE_B, 'agent-task', 1, { containment: { isolatedHome: false } });
+
+            const found = await jobs.findLatestCompletedAgentTasksForNode(OWNER, NODE_A, 3);
+            expect(found.map((row) => row.id)).toEqual([reported]);
+        });
+
+        it('newest completed first, capped at the limit, and owner-scoped', async () => {
+            const older = await jobOn(NODE_A, 'agent-task', 30);
+            const newer = await jobOn(NODE_A, 'agent-task', 5);
+            await jobOn(NODE_A, 'agent-task', 60);
+
+            const found = await jobs.findLatestCompletedAgentTasksForNode(OWNER, NODE_A, 2);
+            expect(found.map((row) => row.id)).toEqual([newer, older]);
+            expect(
+                await jobs.findLatestCompletedAgentTasksForNode(
+                    '55555555-5555-4555-8555-555555555555',
+                    NODE_A,
+                    5,
+                ),
+            ).toEqual([]);
+        });
+    });
 });

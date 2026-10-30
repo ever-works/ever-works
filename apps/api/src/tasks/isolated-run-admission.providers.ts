@@ -70,7 +70,11 @@ import { FleetPushCredentialService } from '../fleet/fleet-push-credential.servi
  *   isolated-cloud branch admits nothing until such an executor binds `cloudPipeline`.
  */
 
-/** Jobs of one node scanned for its latest containment report. */
+/**
+ * Completed `agent-task` jobs of one node scanned for its latest containment report (the
+ * repository filters to those rows before this limit; a node's newest such job normally carries
+ * one, so the scan rarely reads past the first row).
+ */
 const NODE_JOBS_SCAN = 25;
 
 /**
@@ -125,13 +129,14 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
                               null)
                             : null,
                     latestContainment: async (userId, nodeId) => {
-                        const rows = await jobRows.findByNodeForUser(
+                        // Completed `agent-task` rows only, filtered in the query before the
+                        // limit (review of #3040), so newer jobs of other kinds never hide a report.
+                        const rows = await jobRows.findLatestCompletedAgentTasksForNode(
                             userId,
                             nodeId,
                             NODE_JOBS_SCAN,
                         );
                         for (const row of rows) {
-                            if (row.kind !== 'agent-task' || !row.completedAt) continue;
                             const result = row.result as Record<string, unknown> | null;
                             if (result && result.containment != null) return result.containment;
                         }
