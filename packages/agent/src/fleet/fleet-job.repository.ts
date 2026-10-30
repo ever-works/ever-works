@@ -538,6 +538,25 @@ export class FleetJobRepository {
     }
 
     /**
+     * APW-08 T12 / T48 — one node's newest COMPLETED `agent-task` jobs, the only rows that carry
+     * a containment report. Filtered in the query, before the limit (review of #3040): reading
+     * the node's newest jobs of every kind and filtering afterwards let a burst of other work hide
+     * a valid report, and a node that HAS reported then read as unreported (a downgrade). Rides
+     * `idx_fleet_jobs_node_completed` (`nodeId`, `completedAt`). Owner-scoped in the query.
+     */
+    async findLatestCompletedAgentTasksForNode(
+        userId: string,
+        nodeId: string,
+        limit: number,
+    ): Promise<FleetJob[]> {
+        return this.repository.find({
+            where: { userId, nodeId, kind: 'agent-task', completedAt: Not(IsNull()) },
+            order: { completedAt: 'DESC' },
+            take: limit,
+        });
+    }
+
+    /**
      * Return every live claim held by one node to the pool — the write
      * half of DRAINING a node.
      *
