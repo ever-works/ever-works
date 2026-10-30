@@ -10,7 +10,11 @@ import {
     loosenedSpecSwitches,
 } from '../app-spec/app-spec-guarded-blocks';
 // A value import from the ring-free port (it has no runtime imports of its own).
-import { APP_WORK_SPEC_PATH } from '../tasks-domain/app-work-change-gate.port';
+import {
+    APP_WORK_DIFF_MAX_FILES,
+    APP_WORK_SPEC_PATH,
+    appWorkDiffFileListIncomplete,
+} from '../tasks-domain/app-work-change-gate.port';
 import { TASK_ORIGIN_APP_PROVISIONING } from '../entities/task-origin';
 import {
     appProvisioningOutputGuardEnforced,
@@ -21,7 +25,7 @@ import {
     APP_PROVISIONING_MAX_FILES,
     APP_PROVISIONING_MAX_LINES,
 } from './app-provisioning-output.guard';
-import type { AppWorkRules } from './app-work-rules.service';
+import { clampFileGuidance, type AppWorkRules } from './app-work-rules.service';
 
 /**
  * APW-08 T17 — what an evolve run's branch is refused for.
@@ -33,10 +37,17 @@ import type { AppWorkRules } from './app-work-rules.service';
  *
  * ## The rules, in the order they refuse
  *
- * 1. **Too big to read.** `truncated`, or `totalFiles >= {@link MAX_FILES}`.
- *    A diff the provider would not show us whole is a diff we cannot police:
+ * 1. **Too big to read.** `totalFiles >= {@link MAX_FILES}`, or a file list
+ *    shorter than `totalFiles` (`appWorkDiffFileListIncomplete`). A diff whose
+ *    file list the provider would not give us whole is a diff we cannot police:
  *    the protected path could be in the part that was dropped. This refuses
  *    FIRST, because every rule below reads the file list.
+ *    **Never on `truncated` alone (APW08-G06, FR-21).** `capDiffFiles` also
+ *    sets it when it drops PATCH TEXT past the byte budget, which hides no
+ *    path: a five-file dependency update with a large lockfile patch lists all
+ *    five, and refusing it as "too many files" refused exactly the change
+ *    FR-25 and FR-51 must let through. The change gate asks for no patch text
+ *    at all (`APP_WORK_COMPARE_DIFF_OPTIONS`, `maxBytes: 0`).
  * 2. **Protected paths**, matched against BOTH `path` and `previousPath`. A
  *    rename is a change to the old path as well as the new one — moving a
  *    workflow file out of its active location is invisible in the new path's
@@ -56,7 +67,12 @@ import type { AppWorkRules } from './app-work-rules.service';
  * `agents.requireHumanMergePaths` (`humanMergePaths`): such a change may
  * become a pull request, but the merge gate asks a person to merge it.
  * 5. **Size**, past {@link REFUSAL_MULTIPLE}× the guidance. Under it, a note;
- *    over it, a refusal.
+ *    over it, a refusal. Two guidances, judged the same way (APW08-G22):
+ *    changed LINES against `agents.maxPullRequestChangedLines`
+ *    (`sizeGuidance`, lockfiles excluded) and changed FILES against
+ *    `agents.maxPullRequestChangedFiles` (`fileGuidance`, default 50). The file
+ *    guidance is what the App sets for itself; rule 1's 300-file ceiling is the
+ *    platform's and stays, whatever the App sets.
  *
  * ## Why protected paths go through APW-03 and workflows do not
  *
@@ -90,8 +106,12 @@ import type { AppWorkRules } from './app-work-rules.service';
  * their own codes. Off only with `APP_PROVISIONING_OUTPUT_GUARD_ENFORCED=false`.
  */
 
-/** The file cap: a diff bigger than this cannot be policed, so it is refused. */
-export const MAX_FILES = 300;
+/**
+ * The file cap: a diff this big cannot be policed, so it is refused. The port's
+ * literal (`APP_WORK_DIFF_MAX_FILES`), so the change gate's request, this rule
+ * and the finalize path's workflow floor name one number.
+ */
+export const MAX_FILES = APP_WORK_DIFF_MAX_FILES;
 
 /** Always protected, whatever the spec says. See the class docstring. */
 export const ALWAYS_PROTECTED: readonly string[] = Object.freeze(['.github/workflows/**']);
@@ -166,6 +186,8 @@ export type AppChangeRefusalCode =
     | 'workflowPath'
     | 'guardedSpecBlock'
     | 'tooManyLines'
+    /** APW08-G22 — more changed files than 3× the App spec's `agents.maxPullRequestChangedFiles`. */
+    | 'tooManyFiles'
     /** APW-04 FR-28 — a provisioning run wrote outside `.works/works.yml` / `.works/overlay/**`. */
     | 'provisioningPathNotWritable'
     /** APW-04 FR-29 — a provisioning proposal over 12 files or 3,000 lines. */
@@ -185,7 +207,10 @@ export interface AppChangeVerdict {
     readonly paths: readonly string[];
     /** Σ(additions + deletions) over non-lockfile files. */
     readonly changedLines: number;
-    /** Set when the change is allowed but larger than the guidance. */
+    /**
+     * Set when the change is allowed but larger than a guidance — the line guidance, the file
+     * guidance (APW08-G22), or both, one sentence each.
+     */
     readonly note: string | null;
     /**
      * Works-security (2026-10-18) — on an ALLOWED verdict only: the changed
@@ -236,7 +261,9 @@ export class AppChangeGuard {
         const { rules, diff } = input;
 
         // ---- 1 · too big to read -------------------------------------------
-        if (diff.truncated || diff.totalFiles >= MAX_FILES) {
+        // APW08-G06 — the file LIST, never `truncated` alone (see the class
+        // docstring): patch text past the byte budget hides no path.
+        if (appWorkDiffFileListIncomplete(diff)) {
             return refusal(
                 'diffTooLarge',
                 `This change touches ${diff.totalFiles} files, which is too many to check against ` +
@@ -289,17 +316,43 @@ export class AppChangeGuard {
             );
         }
 
+        // APW08-G22 — the App spec's own file guidance, on FR-27's shape: a
+        // note over it, a refusal past REFUSAL_MULTIPLE× it. Counted over every
+        // changed file the provider reported (rule 1 already refused a list it
+        // could not give whole), a lockfile included: unlike its lines, a
+        // lockfile is still one more file a reviewer has to open.
+        const fileGuidance = fileGuidanceOf(rules);
+        const files = changedFileCount(diff);
+        if (files > fileGuidance * REFUSAL_MULTIPLE) {
+            return refusal(
+                'tooManyFiles',
+                `This change touches ${files} files, more than ${REFUSAL_MULTIPLE}× this Work’s ` +
+                    `file guidance of ${fileGuidance}. Split it into smaller pull requests.`,
+                [],
+                lines,
+            );
+        }
+
+        const notes: string[] = [];
+        if (lines > rules.sizeGuidance) {
+            notes.push(
+                `This change is ${lines} lines, over this Work’s guidance of ` +
+                    `${rules.sizeGuidance}. It was allowed, but a smaller change is easier to review.`,
+            );
+        }
+        if (files > fileGuidance) {
+            notes.push(
+                `This change touches ${files} files, over this Work’s file guidance of ` +
+                    `${fileGuidance}. It was allowed, but a smaller change is easier to review.`,
+            );
+        }
         const allowed: AppChangeVerdict = {
             allowed: true,
             code: null,
             message: null,
             paths: [],
             changedLines: lines,
-            note:
-                lines > rules.sizeGuidance
-                    ? `This change is ${lines} lines, over this Work’s guidance of ` +
-                      `${rules.sizeGuidance}. It was allowed, but a smaller change is easier to review.`
-                    : null,
+            note: notes.length > 0 ? notes.join(' ') : null,
         };
         // Works-security (2026-10-18) — allowed, but only a person may MERGE a
         // change to a human-merge path. Named here (the merge gate raises the
@@ -542,6 +595,22 @@ function matchesHumanMerge(rules: AppWorkRules, path: string): boolean {
 /** This guard's own floor, matched with the same library and option. */
 function matchesWorkflow(path: string): boolean {
     return ALWAYS_PROTECTED.some((pattern) => minimatch(path, pattern, { dot: true }));
+}
+
+/**
+ * APW08-G22 — the rules' file guidance, read through the rules service's own clamp so a rules
+ * object built without the field (a fixture, the e2e seed) gets the schema default (50) rather
+ * than no file guidance at all.
+ */
+function fileGuidanceOf(rules: AppWorkRules): number {
+    return clampFileGuidance(rules.fileGuidance);
+}
+
+/** How many files the change touches: the provider's count, else the list it returned. */
+function changedFileCount(diff: GitDiffResult): number {
+    return typeof diff.totalFiles === 'number' && Number.isFinite(diff.totalFiles)
+        ? Math.max(diff.totalFiles, diff.files.length)
+        : diff.files.length;
 }
 
 /** Σ(additions + deletions), lockfiles excluded. */

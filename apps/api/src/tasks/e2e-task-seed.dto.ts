@@ -152,6 +152,16 @@ export class E2eTaskSeedGuardDto {
     @Max(100_000)
     sizeGuidance?: number;
 
+    /**
+     * APW08-G22 — `agents.maxPullRequestChangedFiles`; defaults to the platform's
+     * `DEFAULT_FILE_GUIDANCE` (50), exactly as the rules service resolves an absent value.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(100_000)
+    fileGuidance?: number;
+
     @IsArray()
     @ArrayMaxSize(E2E_TASK_SEED_MAX_FILES)
     @ValidateNested({ each: true })

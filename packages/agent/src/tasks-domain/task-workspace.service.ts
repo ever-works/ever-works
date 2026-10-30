@@ -26,7 +26,9 @@ import { isAppWorkKind } from '@ever-works/contracts';
 // → task-extra-repos → this file; see the port's docstring.
 import {
     APP_WORK_CHANGE_GATE,
+    APP_WORK_COMPARE_DIFF_OPTIONS,
     APP_WORK_SPEC_PATH,
+    appWorkDiffFileListIncomplete,
     type AppWorkChangeGate,
     type AppWorkChangeGateVerdict,
 } from './app-work-change-gate.port';
@@ -3618,11 +3620,22 @@ export class TaskWorkspaceService {
      * is refused (the protected file could be in the part that was dropped); a
      * provider with no compare capability is let through with a warning — the
      * cloud path already checked before its push.
+     *
+     * APW-08 T17 (APW08-G06, FR-21) — for an App Work, "could not be read whole"
+     * means the FILE LIST: the diff is asked for with no patch text
+     * (`APP_WORK_COMPARE_DIFF_OPTIONS`) and refused only when the list is short
+     * or at the 300-file ceiling, never on `truncated` alone, so the five-file
+     * lockfile change the App change gate lets through is not refused here
+     * instead. Every other Work kind asks and refuses exactly as before.
      */
     private async protectedPathsRefusalForBranch(args: {
         task: Task;
-        /** The Work whose operator opt-in (`AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS`) applies. */
-        work: { id: string };
+        /**
+         * The Work whose operator opt-in (`AGENT_WORKFLOW_CHANGES_ALLOWED_WORKS`) applies.
+         * `kind` selects the App Work file-list rule (APW08-G06); absent = the
+         * pre-existing rule.
+         */
+        work: { id: string; kind?: string | null };
         owner: string;
         repo: string;
         gitOptions: { userId: string; providerId: string; workId: string };
@@ -3633,9 +3646,11 @@ export class TaskWorkspaceService {
     }): Promise<string | null> {
         if (workflowChangesAllowedForWork(args.work.id) || !this.gitFacade) return null;
         if (typeof this.gitFacade.getCompareDiff !== 'function') return null;
+        const appWork = isAppWorkKind(args.work.kind);
         let diff: {
             files: ReadonlyArray<{ path: string; previousPath?: string }>;
             truncated: boolean;
+            totalFiles?: number;
         };
         try {
             diff = await this.gitFacade.getCompareDiff(
@@ -3643,7 +3658,7 @@ export class TaskWorkspaceService {
                 args.repo,
                 args.baseRef,
                 args.branch,
-                { maxFiles: 300 },
+                appWork ? { ...APP_WORK_COMPARE_DIFF_OPTIONS } : { maxFiles: 300 },
                 args.gitOptions,
             );
         } catch (error) {
@@ -3659,7 +3674,7 @@ export class TaskWorkspaceService {
                 'workflow or action files. No pull request was opened.'
             );
         }
-        if (diff.truncated) {
+        if (appWork ? appWorkDiffFileListIncomplete(diff) : diff.truncated) {
             return (
                 `The diff of \`${args.branch}\` is too large to check for GitHub workflow or action files. ` +
                 'No pull request was opened.'
