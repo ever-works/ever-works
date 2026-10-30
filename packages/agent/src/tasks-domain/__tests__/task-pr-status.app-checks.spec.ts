@@ -402,6 +402,73 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         );
     });
 
+    // CodeRabbit on #3038 — a NAME is something any app can choose. Only the App-check reporter
+    // (`github-actions`, which runs APW-05's generated workflow) speaks for an App leg; any other
+    // reporter, or none, is an ordinary check and decides as it always did.
+    it.each([
+        ['another app', 'circleci'],
+        ['an unknown reporter (a commit status)', null],
+    ])(
+        'an advisory-named failing check from %s still reds the roll-up and holds the merge',
+        async (_label, appSlug) => {
+            const svc = build();
+            read('failing', [green(TYPE_CHECK), { ...red(E2E), appSlug }]);
+            await sweep(svc);
+
+            expect(row.ciState).toBe('failing');
+            expect(lastMergeGateCiState()).toBe('failing');
+            // Never marked advisory, so it is named as the failure it is.
+            expect(row.prChecks).toEqual([
+                expect.objectContaining({ name: TYPE_CHECK }),
+                expect.not.objectContaining({ advisory: true }),
+            ]);
+            expect(posts()).toEqual([`Checks failed: ${E2E}.`]);
+        },
+    );
+
+    it('an advisory-named failing delivery from ANOTHER trusted app still reds the head and resumes', async () => {
+        const previousTrusted = process.env.GITHUB_TRUSTED_CHECK_APPS;
+        process.env.GITHUB_TRUSTED_CHECK_APPS = 'circleci';
+        try {
+            const svc = build();
+            const outcome = await deliver(svc, { checkName: E2E, appSlug: 'circleci' });
+            expect(outcome.reason).toBe('resumed');
+            expect(tasks.recordCiHead).toHaveBeenCalledWith(
+                expect.objectContaining({ failing: true }),
+            );
+            // …and its own suite is an ordinary CI signal on an App Work Task too.
+            const suite = await deliver(svc, {
+                granularity: 'check_suite',
+                checkName: 'circleci',
+                appSlug: 'circleci',
+                headSha: 'e'.repeat(40),
+                prHeads: [{ number: 12, headSha: 'e'.repeat(40) }],
+            });
+            expect(suite.reason).toBe('resumed');
+        } finally {
+            if (previousTrusted === undefined) delete process.env.GITHUB_TRUSTED_CHECK_APPS;
+            else process.env.GITHUB_TRUSTED_CHECK_APPS = previousTrusted;
+        }
+    });
+
+    it('an exhausted budget whose escalation is NOT recorded still files the Inbox notice', async () => {
+        // e.g. escalation logging off: `AgentEscalationService.record` answers null.
+        escalations.record.mockResolvedValue(null);
+        const svc = build();
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            read('failing', [red(TYPE_CHECK)]);
+            await sweep(svc);
+        }
+        expect(steering.resumeRun).toHaveBeenCalledTimes(2);
+        expect(escalations.record).toHaveBeenCalledTimes(1);
+        // The owner is told, exactly once, through the notice instead.
+        expect(inbox.notice).toHaveBeenCalledTimes(1);
+        expect(inbox.notice).toHaveBeenCalledWith(
+            'user-1',
+            expect.objectContaining({ taskId: 'task-1', workId: 'work-app' }),
+        );
+    });
+
     it('an unreadable App spec at the base classifies nothing advisory: a red advisory leg stays red', async () => {
         specs.getEffectiveSpec.mockResolvedValue({ status: 'unreadable', spec: null });
         const svc = build();

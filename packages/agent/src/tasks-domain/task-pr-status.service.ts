@@ -21,7 +21,7 @@ import { TASK_DELIVERY_TRACKER, type TaskDeliveryTracker } from './task-delivery
 import { TASK_LIFECYCLE_POSTER, type TaskLifecyclePoster } from './task-lifecycle-poster.port';
 import { checksSettledPost } from './task-lifecycle-posts';
 import { TASK_APP_CHECKS, type TaskAppChecks } from './task-app-checks.port';
-import { hasAppCheckLeg, withAppCheckRollUp } from './app-check-legs';
+import { hasAppCheckLeg, isAdvisoryAppCheckLeg, withAppCheckRollUp } from './app-check-legs';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -775,7 +775,9 @@ export class TaskPrStatusService {
                 ...(check.detailsUrl ? { detailsUrl: check.detailsUrl } : {}),
                 // Who reported it (F8) — the fix-loop re-offer reads this.
                 appSlug: check.appSlug ?? null,
-                ...(advisory?.has(check.name) ? { advisory: true } : {}),
+                // Name AND reporter (`isAdvisoryAppCheckLeg`): another app's check named like
+                // an advisory leg is an ordinary check, and is never marked.
+                ...(isAdvisoryAppCheckLeg(check, advisory) ? { advisory: true } : {}),
             })),
         };
     }

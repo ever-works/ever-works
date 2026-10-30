@@ -35,7 +35,7 @@ import type { AgentRun } from '../entities/agent-run.entity';
 import { isAgentReviewRunScope } from './task-agent-review';
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import { TASK_APP_CHECKS, type TaskAppChecks } from './task-app-checks.port';
-import { APP_CHECK_LEG_PREFIX } from './app-check-legs';
+import { APP_CHECK_LEG_PREFIX, APP_CHECK_REPORTER_SLUG, isAdvisoryAppCheckLeg } from './app-check-legs';
 import {
     REVIEW_FEEDBACK_DATA_NOTICE,
     fenceReviewFeedback,
@@ -391,12 +391,13 @@ export class TaskCiAutoResumeService {
         }
 
         // APW-08 T16 (FR-16) — on an App Work Task two kinds of red delivery
-        // are not failures here, and must neither mark the head red nor spend
-        // an attempt: a red ADVISORY `Ever Works check: {name}` leg, and ANY
-        // suite / workflow-level delivery (its `checkName` is an app slug or a
-        // workflow name, so it cannot say which leg failed — the advisory-
-        // adjusted roll-up of the two-minute sweep speaks for it instead).
-        // Anything unreadable keeps the delivery red.
+        // FROM THE APP-CHECK REPORTER (`github-actions`) are not failures here,
+        // and must neither mark the head red nor spend an attempt: a red
+        // ADVISORY `Ever Works check: {name}` leg, and a suite / workflow-level
+        // delivery (its `checkName` is an app slug or a workflow name, so it
+        // cannot say which leg failed — the advisory-adjusted roll-up of the
+        // two-minute sweep speaks for it instead). Any other reporter, and
+        // anything unreadable, keeps the delivery red.
         const appDelivery = await this.classifyAppDelivery(task, input, prNumber);
         const failing = input.verdict === 'failing' && !appDelivery.notAFailure;
         const decision = decideCiHead(task, {
@@ -1122,7 +1123,7 @@ export class TaskCiAutoResumeService {
         // Blocked and escalated (`gate-exhausted`) instead. After the marker,
         // so it happens once however many deliveries rediscover the spend.
         if (appWork && reason === 'budget-spent' && this.appChecks) {
-            return this.appChecks
+            const escalated = await this.appChecks
                 .escalateExhausted(ctx.task, {
                     attemptsUsed,
                     maxAttempts,
@@ -1138,6 +1139,14 @@ export class TaskCiAutoResumeService {
                     );
                     return false;
                 });
+            // Only a RECORDED escalation replaces the notice (CodeRabbit on #3038). The marker is
+            // already claimed, so an escalation that was not recorded — its Work unreadable,
+            // escalation logging off, no escalation service bound — must not leave the owner
+            // with nothing: fall through to the Inbox notice below.
+            if (escalated) return true;
+            this.logger.warn(
+                `Task ${ctx.task.id}: the gate-exhausted escalation was not recorded — filing the Inbox notice instead.`,
+            );
         }
         if (!this.inbox) return false;
 
@@ -1202,6 +1211,11 @@ export class TaskCiAutoResumeService {
      *    `check_run` deliveries and the sweep's advisory-adjusted roll-up are
      *    what act. One Work read, for a red suite / workflow delivery only.
      *
+     * Both rules apply ONLY to deliveries from the App-check reporter
+     * (`APP_CHECK_REPORTER_SLUG`, the app that runs APW-05's generated
+     * workflow). A name or a suite from any other app — trusted or not — is
+     * an ordinary CI signal: an app can call its run `Ever Works check: e2e`.
+     *
      * Green deliveries are never asked about. Anything unreadable answers
      * "a failure", as before this task.
      */
@@ -1213,6 +1227,12 @@ export class TaskCiAutoResumeService {
         if (!this.appChecks || input.verdict !== 'failing' || input.fromPullRequestPoll === true) {
             return { notAFailure: false, appBudget: undefined };
         }
+        // Only the App-check reporter speaks for App legs (CodeRabbit on #3038). Another app on
+        // `GITHUB_TRUSTED_CHECK_APPS` that reports `Ever Works check: …` — or a suite of its own —
+        // stays an ordinary CI signal, exactly as before this task.
+        const fromAppCheckReporter =
+            (input.appSlug ?? '').trim().toLowerCase() === APP_CHECK_REPORTER_SLUG;
+        if (!fromAppCheckReporter) return { notAFailure: false, appBudget: undefined };
         if (input.granularity === 'check_run') {
             const name = typeof input.checkName === 'string' ? input.checkName : '';
             if (!name.startsWith(APP_CHECK_LEG_PREFIX)) {
@@ -1225,7 +1245,10 @@ export class TaskCiAutoResumeService {
                     : undefined) ?? null;
             try {
                 const advisory = await this.appChecks.advisoryLegs(task, baseRef);
-                return { notAFailure: advisory?.has(name) === true, appBudget: undefined };
+                return {
+                    notAFailure: isAdvisoryAppCheckLeg({ name, appSlug: input.appSlug }, advisory),
+                    appBudget: undefined,
+                };
             } catch {
                 return { notAFailure: false, appBudget: undefined };
             }

@@ -28,14 +28,44 @@ import { deriveCiState, MAX_PR_CHECKS } from '@ever-works/plugin';
  *    `failing` — an advisory leg can then hold a merge, never a required one
  *    pass one.
  *  - **Touch a check that is not an App leg.** A leg is matched by its exact
- *    name, `Ever Works check: ` + the App spec `name`; every other check
- *    (another workflow, a third-party app) decides as it always did.
+ *    name, `Ever Works check: ` + the App spec `name`, AND by its REPORTER:
+ *    APW-05's generated workflow runs on GitHub Actions, so a real leg is
+ *    reported by {@link APP_CHECK_REPORTER_SLUG}. A name is something any app
+ *    with checks-write access can choose — another app's failing run named
+ *    `Ever Works check: e2e` must not be waved through as advisory — so a check
+ *    from any other app, or from an unknown reporter (a commit status has no
+ *    app at all), is an ordinary check and decides as it always did.
  *  - **Hide a pending leg.** An advisory leg still running keeps the roll-up
  *    `pending`: it is ignored once it FAILS, not before it has finished.
  */
 
 /** FR-15 / R-9 — the check-run name every App spec check reports under. */
 export const APP_CHECK_LEG_PREFIX = 'Ever Works check: ';
+
+/**
+ * Who reports a real App leg: APW-05's generated workflow runs every App spec
+ * check as a GitHub Actions job, and GitHub reports Actions jobs as check runs
+ * of the `github-actions` app (`GitPullRequestCheck.appSlug`, lower-cased by
+ * the provider). Not `GITHUB_TRUSTED_CHECK_APPS`: that list says who may DRIVE
+ * the fix loop, and an operator may extend it; this says who RUNS App checks,
+ * and nothing else does.
+ */
+export const APP_CHECK_REPORTER_SLUG = 'github-actions';
+
+/**
+ * Is this check an ADVISORY App leg — the right name AND the App-check
+ * reporter? An unknown reporter (`null` / absent) is NOT: fail closed, the
+ * check counts as an ordinary one.
+ */
+export function isAdvisoryAppCheckLeg(
+    check: { name?: string | null; appSlug?: string | null } | null | undefined,
+    advisory: ReadonlySet<string> | null | undefined,
+): boolean {
+    if (!check || !advisory || typeof check.name !== 'string' || !advisory.has(check.name)) {
+        return false;
+    }
+    return (check.appSlug ?? '').trim().toLowerCase() === APP_CHECK_REPORTER_SLUG;
+}
 
 /** `Ever Works check: type-check` for the App spec check named `type-check`. */
 export function appCheckLegName(name: string): string {
@@ -85,7 +115,7 @@ export function rollUpAppCiState(
     const seesEveryCheck = status.checksComplete !== false && checks.length < MAX_PR_CHECKS;
     if (!seesEveryCheck) return status.ciState;
     const effective: GitPullRequestCheck[] = checks.map((check) =>
-        advisory.has(check.name) &&
+        isAdvisoryAppCheckLeg(check, advisory) &&
         check.status === 'completed' &&
         FAILING_CONCLUSIONS.has(String(check.conclusion))
             ? { ...check, conclusion: 'neutral' }
