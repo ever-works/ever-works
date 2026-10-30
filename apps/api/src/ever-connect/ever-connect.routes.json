@@ -17,11 +17,6 @@
     ],
     "routes": [
         {
-            "method": "GET",
-            "path": "/.well-known/ever-connect",
-            "auth": "public"
-        },
-        {
             "method": "POST",
             "path": "/api/ever-connect/connect",
             "auth": "platform-admin"
@@ -45,6 +40,11 @@
             "method": "GET",
             "path": "/api/ever-connect/status",
             "auth": "platform-admin"
+        },
+        {
+            "method": "GET",
+            "path": "/.well-known/ever-connect",
+            "auth": "public"
         }
     ]
 }

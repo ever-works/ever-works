@@ -45,6 +45,8 @@
 export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentPluginPackage',
     'AgentPluginPackageAllowlist',
+    // Self-serve account deletion — the email-link token and the PII-free audit record.
+    'AccountDeletionRequest',
     'ActivityLog',
     // Safety rails (AW-24) — one stored rung per (scope, kind of work).
     'AutonomyGrant',
