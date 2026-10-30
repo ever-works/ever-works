@@ -652,6 +652,27 @@ describe('isolated-run admission — the predicate and its facts', () => {
         expect(reads.fleet!.latestContainment).not.toHaveBeenCalled();
     });
 
+    it('CodeRabbit on #3041: a run PINNED to a disabled node is held, never admitted, and never falls back to another node', async () => {
+        const world = makeWorld({
+            nodes: [
+                { id: NODE_A, userId: OWNER, status: 'disabled', capabilities: ['git-push'] },
+                { id: NODE_B, userId: OWNER, status: 'online', capabilities: ['git-push'] },
+            ],
+            reports: { [NODE_A]: isolatedReport('hardened'), [NODE_B]: isolatedReport('hardened') },
+        });
+        world.pinned = NODE_A;
+        const reads = readsFor(world);
+        expect(
+            await new IsolatedRunAdmissionService(reads).admit({
+                task: { id: 't1', userId: OWNER, workId: APP_WORK },
+                agent: { id: AGENT, userId: OWNER },
+                placement: world.placement,
+            }),
+        ).toMatchObject({ admitted: false, outcome: 'needs_input', code: 'noEligibleNode' });
+        // The admissible online NODE_B was not used as a fallback.
+        expect(reads.fleet!.latestContainment).not.toHaveBeenCalled();
+    });
+
     it('follow-up to #3040: candidates are ordered before the cap — online first, then offline, paused, enrolling, then by id', async () => {
         const world = makeWorld({
             // Ids deliberately ordered AGAINST the statuses, so neither the input order nor the id

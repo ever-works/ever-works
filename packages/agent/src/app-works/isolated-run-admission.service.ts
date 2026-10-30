@@ -558,8 +558,15 @@ export class IsolatedRunAdmissionService
                       fleet.pinnedNodeFor!(userId, agentId),
                   )
                 : null);
+        // A pinned run is judged on its node alone and never falls back to another one; a pin to a
+        // DISABLED node is no candidate either (CodeRabbit on #3041), so the run is held
+        // (`noEligibleNode`), not admitted to wait for a lease that cannot come.
+        const pinnedDisabled =
+            !!pinned && owned.some((node) => node.id === pinned && node.status === 'disabled');
         const nodeIds = pinned
-            ? [pinned]
+            ? pinnedDisabled
+                ? []
+                : [pinned]
             : owned
                   .filter(
                       (node) =>
