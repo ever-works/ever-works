@@ -4,7 +4,11 @@ import { useState, useTransition } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { isAppWorkKind, type TaskAcceptanceCheck, type WorkChecksPolicy } from '@ever-works/contracts';
+import {
+    isAppWorkKind,
+    type TaskAcceptanceCheck,
+    type WorkChecksPolicy,
+} from '@ever-works/contracts';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';

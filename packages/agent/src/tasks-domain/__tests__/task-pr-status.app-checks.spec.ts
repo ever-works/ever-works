@@ -368,7 +368,9 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         });
         expect(outcome.reason).toBe('not-a-failure');
         expect(steering.resumeRun).not.toHaveBeenCalled();
-        expect(tasks.recordCiHead).toHaveBeenCalledWith(expect.objectContaining({ failing: false }));
+        expect(tasks.recordCiHead).toHaveBeenCalledWith(
+            expect.objectContaining({ failing: false }),
+        );
     });
 
     it('an unreadable App spec at the base classifies nothing advisory: a red advisory leg stays red', async () => {

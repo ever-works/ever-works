@@ -218,11 +218,19 @@ export async function getAppSpecChecksAction(workId: string): Promise<AppSpecChe
     await requireAuth();
     try {
         const state = await workAppSpecAPI.get(workId);
-        const checks = (state.effectiveSpec?.checks ?? []).slice(0, 20).flatMap((check) =>
-            typeof check?.name === 'string' && typeof check?.command === 'string'
-                ? [{ name: check.name, command: check.command, required: check.required !== false }]
-                : [],
-        );
+        const checks = (state.effectiveSpec?.checks ?? [])
+            .slice(0, 20)
+            .flatMap((check) =>
+                typeof check?.name === 'string' && typeof check?.command === 'string'
+                    ? [
+                          {
+                              name: check.name,
+                              command: check.command,
+                              required: check.required !== false,
+                          },
+                      ]
+                    : [],
+            );
         return { success: true as const, checks };
     } catch (error) {
         console.error('[getAppSpecChecksAction]', error);

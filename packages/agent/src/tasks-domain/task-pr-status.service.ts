@@ -431,7 +431,8 @@ export class TaskPrStatusService {
                 classifyCheckResult({
                     status: check.status,
                     conclusion: check.conclusion ?? null,
-                }) === 'failing' && isTrustedCheckApp(check.appSlug, trustedApps),
+                }) === 'failing' &&
+                isTrustedCheckApp(check.appSlug, trustedApps),
         );
         if (failing.length === 0) return;
         try {

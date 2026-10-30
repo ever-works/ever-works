@@ -183,9 +183,9 @@ describe('task-lifecycle-posts — the rules', () => {
             ).toEqual(['Ever Works check: type-check', 'lint']);
             expect(failingCheckNames([advisory])).toEqual([]);
             // `advisory: false` (or absent) is an ordinary check, named as before.
-            expect(failingCheckNames([{ ...red('Ever Works check: e2e'), advisory: false }])).toEqual(
-                ['Ever Works check: e2e'],
-            );
+            expect(
+                failingCheckNames([{ ...red('Ever Works check: e2e'), advisory: false }]),
+            ).toEqual(['Ever Works check: e2e']);
         });
 
         it('a red read whose only failing checks are advisory legs names none of them', () => {
@@ -195,7 +195,9 @@ describe('task-lifecycle-posts — the rules', () => {
                     { ciState: 'passing', checks: [] },
                     { ciState: 'failing', checks: [advisory] },
                 ),
-            ).toEqual(checksSettledPost({ ciState: 'passing' }, { ciState: 'failing', checks: [] }));
+            ).toEqual(
+                checksSettledPost({ ciState: 'passing' }, { ciState: 'failing', checks: [] }),
+            );
         });
     });
 });

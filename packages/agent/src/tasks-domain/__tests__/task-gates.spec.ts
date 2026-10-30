@@ -127,7 +127,11 @@ describe('resolveAcceptanceChecks', () => {
         const owner = check({ id: 'lint', kind: 'lint', command: 'pnpm lint' });
         const taskOwn = check({ id: 'smoke', command: 'pnpm smoke' });
         // The id the App spec's `type-check` is always reported under.
-        const appSpec = check({ id: 'repo/check-1', name: 'type-check', command: 'pnpm type-check' });
+        const appSpec = check({
+            id: 'repo/check-1',
+            name: 'type-check',
+            command: 'pnpm type-check',
+        });
 
         it('never resolves an App spec check — only checkDefaults and the Task checks', () => {
             const resolved = resolveAcceptanceChecks(
@@ -136,9 +140,9 @@ describe('resolveAcceptanceChecks', () => {
             );
             expect(resolved).toEqual([owner, taskOwn]);
             expect(resolved.map((entry) => entry.id)).not.toContain('repo/check-1');
-            expect(resolveAcceptanceChecks(null, { kind: 'app', checkDefaults: [appSpec] })).toEqual(
-                [],
-            );
+            expect(
+                resolveAcceptanceChecks(null, { kind: 'app', checkDefaults: [appSpec] }),
+            ).toEqual([]);
         });
 
         it('keeps the owner and Task merge rules for an App Work', () => {

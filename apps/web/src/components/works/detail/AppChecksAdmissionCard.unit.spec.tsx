@@ -122,15 +122,15 @@ describe('AppChecksAdmissionCard', () => {
         await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('admitSaved'));
         expect(refresh).toHaveBeenCalled();
         await waitFor(() =>
-            expect(screen.getByTestId('app-check-row-1').getAttribute('data-admitted')).toBe('true'),
+            expect(screen.getByTestId('app-check-row-1').getAttribute('data-admitted')).toBe(
+                'true',
+            ),
         );
     });
 
     it('turns the allow-list on when the Work had it off, admitting only that command', async () => {
         const user = userEvent.setup();
-        render(
-            <AppChecksAdmissionCard workId="work-app" policy={{ mode: 'off', allow: [] }} />,
-        );
+        render(<AppChecksAdmissionCard workId="work-app" policy={{ mode: 'off', allow: [] }} />);
         await user.click(await screen.findByTestId('app-check-admit-0'));
         expect(updateRepoDeclaredCommands).toHaveBeenCalledWith('work-app', {
             mode: 'allowlist',

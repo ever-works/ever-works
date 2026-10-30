@@ -520,7 +520,10 @@ export function notAdmittedCheckResult(check: Pick<NotAdmittedCheck, 'id'>): Tas
  */
 export function foldNotAdmittedChecks<
     T extends { gateStatus?: GateStatus | string | null; checks?: unknown[] | null },
->(result: T, notAdmitted: readonly Pick<NotAdmittedCheck, 'id' | 'required'>[] | null | undefined): T {
+>(
+    result: T,
+    notAdmitted: readonly Pick<NotAdmittedCheck, 'id' | 'required'>[] | null | undefined,
+): T {
     if (!notAdmitted || notAdmitted.length === 0) return result;
     const known = new Set(
         (result.checks ?? [])

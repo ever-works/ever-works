@@ -327,6 +327,16 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/agent test repo-declared-commands`.
       **Done when**: the new spec and the pre-existing `repo-declared-commands.spec.ts` and
       `task-workspace-repo-declared-commands.spec.ts` are green.
+      **Status (2026-10-30, lane L9, branch `feat/apw08-app-checks`): built, specs green locally, not merged.**
+      `parseRepoDeclaredCommands(spec, kind)` reads `spec.checks` for `app` (first 20, `required` /
+      `timeoutSeconds` honoured, ids stay `repo/check-N`); `admitRepoDeclaredCommands` returns `notAdmitted` for
+      `app` only; `TaskCheckResult.status` gains `'not-admitted'`. The node computes the gate over what it ran, so
+      the planner alone cannot change a verdict: it puts the not-admitted checks on the job
+      (`FleetAgentTaskPayload.notAdmittedChecks`, no command), and the reconciler folds them in with
+      `foldNotAdmittedChecks` (a required one turns `green` into `red`). That needed small additive edits to the
+      router, the plan type and the reconciler as well as the planner. Specs: new 21/21; `repo-declared-commands`
+      27/27 and `task-workspace-repo-declared-commands` 11/11 unchanged; planner 108/108 and reconciler 108/108
+      (2 new cases each).
 
 - [ ] **T14. Review-checks surface.**
       **Create** `apps/web/src/components/works/detail/AppChecksAdmissionCard.tsx` (new) — lists App spec checks with
@@ -338,6 +348,12 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       not-admitted rows render their text; **Admit for my machines** sends exactly the listed command; the card is
       absent for other kinds. Run: `pnpm --filter ever-works-web test AppChecksAdmissionCard`.
       **Done when**: the spec is green.
+      **Status (2026-10-30, lane L9, branch `feat/apw08-app-checks`): built, spec green locally (11/11), not merged.**
+      The card reads the effective spec's `checks` through a new `getAppSpecChecksAction`, writes the allow-list
+      through a new `updateRepoDeclaredCommands` action (`PATCH /api/works/:id`, `mode: 'allowlist'` plus the
+      normalized command), and sits at `#app-checks`, where T11's checks-change notification links.
+      `TaskChecksSection` renders the new `not-admitted` result. 14 leaves were added to `en.json` and mirrored in
+      English into the 20 other locales; there was no parity sync.
 
 - [ ] **T15. App checks in the repository's CI — verification of APW-05 T41 (Resolution R-9, APW08-G05).**
       **Depends on** APW-05 T41, which **owns** `packages/plugins/github-actions-build/src/workflow/checks-job.ts`
@@ -399,6 +415,22 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       from the env var**; **a provider that reports the advisory leg as failed still leaves the gate unchanged**
       (the fallback). Run: `pnpm --filter @ever-works/agent test task-gates task-pr-status`.
       **Done when**: both specs are green and `task-pr-status.service.spec.ts` passes unchanged.
+      **Status (2026-10-30, lane L9, branch `feat/apw08-app-checks`): built, specs green locally, not merged.**
+      A new ring-free port `TASK_APP_CHECKS` (`tasks-domain/task-app-checks.port.ts`) is bound in
+      `TasksDomainModule` to `app-works/task-app-checks.service.ts`. It reads the App rules at the PR base
+      branch's tip. `TaskPrStatusService` re-derives `ciState` with failing advisory legs counted as neutral,
+      but only when the capped check list provably holds every check. It also marks those legs
+      `advisory: true` on `prChecks`, which keeps them out of **Checks failed: {names}.** and the fix-loop
+      re-offer. `TaskCiAutoResumeService` takes an App Work's budget from `resolveMaxGateAttempts`; the env
+      var's `0` still switches the loop off. A red advisory leg from the webhook is not a failure. A spent
+      budget leads to `BLOCKED` plus a `gate-exhausted` escalation, while a repeat failure still files the
+      notice. `resolveAcceptanceChecks` drops `repo/` entries for `app`. The S3 copy note is in `spec.md`.
+      Specs: `task-pr-status.app-checks` 9/9 (new); `task-gates` 24/24 (3 new); `task-pr-status.service` 40/40
+      unchanged; `task-lifecycle-posts` 26/26 and `task-pr-status.lifecycle-posts` 13/13 (L7's specs, extended);
+      `github-check-intake.autoresume.integration` 60/60. **`continue-on-error` fact: unverified.** No failed
+      job-level `continue-on-error` leg was found to read. The repo's one such job (`ci.yml` `skills-oracle`)
+      did not fail in the last 40 `ci.yml` runs; the only non-success was run 40692666617, whose check run
+      reported `cancelled`.
 
 ## P1.5 — Guard, instructions, merge
 

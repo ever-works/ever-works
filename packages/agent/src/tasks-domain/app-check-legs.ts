@@ -55,14 +55,20 @@ export function advisoryAppCheckLegs(
 }
 
 /** Does this status carry any App leg at all? (No leg, no rules read.) */
-export function hasAppCheckLeg(checks: readonly { name?: string | null }[] | null | undefined): boolean {
+export function hasAppCheckLeg(
+    checks: readonly { name?: string | null }[] | null | undefined,
+): boolean {
     return (checks ?? []).some(
         (check) => typeof check?.name === 'string' && check.name.startsWith(APP_CHECK_LEG_PREFIX),
     );
 }
 
 /** The conclusions `deriveCiState` reds on. */
-const FAILING_CONCLUSIONS: ReadonlySet<string> = new Set(['failure', 'timed_out', 'action_required']);
+const FAILING_CONCLUSIONS: ReadonlySet<string> = new Set([
+    'failure',
+    'timed_out',
+    'action_required',
+]);
 
 /**
  * The CI roll-up of an App Work pull request: the provider's, with every

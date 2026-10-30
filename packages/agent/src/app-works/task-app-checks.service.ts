@@ -112,7 +112,8 @@ export class TaskAppChecksService implements TaskAppChecks {
             summary:
                 `${name}: a required App check on pull request${pr} is still red after ` +
                 `${exhaustion.attemptsUsed} of ${exhaustion.maxAttempts} automatic attempts, so the Task is blocked.`,
-            decisionNeeded: 'Fix the check, raise the gate-attempt budget and unblock the Task, or close it.',
+            decisionNeeded:
+                'Fix the check, raise the gate-attempt budget and unblock the Task, or close it.',
             taskId: task.id,
             workId: work.id,
             agentId: task.agentId ?? null,

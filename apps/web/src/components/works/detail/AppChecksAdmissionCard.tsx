@@ -80,7 +80,9 @@ export function AppChecksAdmissionCard({ workId, policy }: AppChecksAdmissionCar
         if (!normalized) return;
         const next: WorkRepoDeclaredCommandPolicy = {
             mode: 'allowlist',
-            allow: current.allow.includes(normalized) ? current.allow : [...current.allow, normalized],
+            allow: current.allow.includes(normalized)
+                ? current.allow
+                : [...current.allow, normalized],
         };
         setPendingCommand(normalized);
         startTransition(async () => {
@@ -110,7 +112,9 @@ export function AppChecksAdmissionCard({ workId, policy }: AppChecksAdmissionCar
             data-testid="app-checks-admission-card"
         >
             <h4 className="text-xs font-medium text-text dark:text-text-dark mb-1">{t('title')}</h4>
-            <p className="text-xs text-text-muted dark:text-text-muted-dark mb-3">{t('subtitle')}</p>
+            <p className="text-xs text-text-muted dark:text-text-muted-dark mb-3">
+                {t('subtitle')}
+            </p>
 
             {checks === null && !loadFailed && (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark flex items-center gap-1.5">
@@ -130,7 +134,8 @@ export function AppChecksAdmissionCard({ workId, policy }: AppChecksAdmissionCar
             {checks !== null && checks.length > 0 && (
                 <ul className="space-y-2" data-testid="app-checks-admission-rows">
                     {checks.map((check, index) => {
-                        const command = normalizeRepoDeclaredCommand(check.command) ?? check.command;
+                        const command =
+                            normalizeRepoDeclaredCommand(check.command) ?? check.command;
                         const admitted = isRepoDeclaredCommandAllowed(command, current);
                         const busy = pendingCommand === command;
                         return (
