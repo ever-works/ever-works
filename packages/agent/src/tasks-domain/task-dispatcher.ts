@@ -11,6 +11,9 @@
  * and the run continues without firing the side-effect.
  */
 
+// Type-only (erased at compile time): this file stays a leaf.
+import type { AppWorkRunPlacementPreview } from '../app-works/isolated-run-admission';
+
 export interface AgentTaskExecuteDispatchPayload {
     agentId: string;
     userId: string;
@@ -44,6 +47,17 @@ export interface AgentChatReplyDispatchPayload {
 
 export interface AgentTaskExecuteDispatcher {
     enqueue(payload: AgentTaskExecuteDispatchPayload): Promise<{ runId: string }>;
+    /**
+     * APW-08 T12 (APW08-G11) — where {@link enqueue} WOULD place this run, decided by the same
+     * routing call, without writing anything: no job row, no run row, no notice. The isolated-
+     * run admission asks it in `dispatchAgentRun`, ahead of the dispatch gate, for a Task on an
+     * App Work only.
+     *
+     * Optional and additive: an adapter that does not route (the Trigger.dev one) has no answer,
+     * which the caller reads as `'unknown'` — treated as `'cloud'`, so the predicate fails closed.
+     * `payload.runId` is absent (no run row exists yet).
+     */
+    previewPlacement?(payload: AgentTaskExecuteDispatchPayload): Promise<AppWorkRunPlacementPreview>;
 }
 
 export interface AgentChatReplyDispatcher {

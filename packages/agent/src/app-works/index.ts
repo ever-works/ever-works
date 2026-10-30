@@ -203,3 +203,10 @@ export * from './app-work-switches';
 export * from './app-run-brief';
 export * from './app-run-brief.port';
 export * from './app-run-brief.service';
+
+// APW-08 T12 + T48 (FR-12, FR-70, FR-75) — isolated-run admission (the predicate, its two sites'
+// ports and the cloud worker's pre-flight), the Fleet containment record and the per-node
+// allowance store, and the service the API binds over them.
+export * from './run-containment';
+export * from './isolated-run-admission';
+export * from './isolated-run-admission.service';

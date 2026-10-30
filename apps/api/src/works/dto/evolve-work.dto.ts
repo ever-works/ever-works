@@ -119,3 +119,20 @@ export class UpstreamPullRequestDto {
     @IsBoolean()
     maintainerCanModify?: boolean;
 }
+
+/**
+ * APW-08 T48 / T12 (plan §4, FR-70, S33) — `POST /api/works/:id/app-runs/allow-containment`
+ * `{ nodeId, allow }`: **Allow on this machine** (`allow: true`) or withdraw it (`allow: false`).
+ */
+export class AllowAppRunContainmentDto {
+    @ApiProperty({
+        description: 'The Fleet node (one of your own enrolled machines) whose containment downgrade you allow.',
+        format: 'uuid',
+    })
+    @IsUUID()
+    nodeId!: string;
+
+    @ApiProperty({ description: '`true` allows the node on this App Work; `false` withdraws it.' })
+    @IsBoolean()
+    allow!: boolean;
+}

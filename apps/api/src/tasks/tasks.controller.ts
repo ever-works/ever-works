@@ -20,6 +20,7 @@ import {
     Header,
     HttpCode,
     HttpStatus,
+    Inject,
     NotFoundException,
     Optional,
     Param,
@@ -74,7 +75,12 @@ import {
     ownershipRelationScopeOf,
     type OwnershipScope,
 } from '@ever-works/agent/database';
-import { buildTaskCostView } from './task-cost';
+import {
+    buildTaskCostView,
+    withTaskContainment,
+    type TaskCostContainmentReads,
+} from './task-cost';
+import { APP_WORK_TASK_CONTAINMENT_READER } from '@ever-works/agent/app-works';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 // Re-litigation guard (memory upgrades M6) — provided + exported by
 // `KnowledgeBaseModule`, which the api-side TasksModule imports.
@@ -329,6 +335,12 @@ export class TasksController {
         // @Optional() so every positional construction keeps compiling; absent, the read answers
         // an untracked chain and the two writes answer 503.
         @Optional() private readonly delivery?: TaskDeliveryService,
+        // APW-08 T48 — the containment half of `GET :id/cost`. Appended LAST + @Optional() so
+        // every positional construction keeps compiling; absent, the view carries no
+        // containment keys (as before T48). Bound by this module's isolated-run providers.
+        @Optional()
+        @Inject(APP_WORK_TASK_CONTAINMENT_READER)
+        private readonly containment?: TaskCostContainmentReads,
     ) {}
 
     /**
@@ -1675,8 +1687,14 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<TaskCostView> {
         // The same cross-account check as `:id/spend` — another account's Task is a 404.
-        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
-        return buildTaskCostView(id, { usage: this.pluginUsage, runs: this.agentRuns ?? null });
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        const view = await buildTaskCostView(id, {
+            usage: this.pluginUsage,
+            runs: this.agentRuns ?? null,
+        });
+        // APW-08 T48 / T12 — the containment the Task's latest Fleet run got and the nodes that
+        // hold its next run (App Work Tasks only; every other view is returned unchanged).
+        return withTaskContainment(view, task, this.containment ?? null);
     }
 
     @Get(':id/delivery')

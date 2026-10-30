@@ -16,6 +16,7 @@ import type {
 } from '@ever-works/contracts';
 import { FLEET_BYO_MODEL_PLUGIN_ID_PREFIX, fleetModelPluginId } from '@ever-works/contracts';
 import type { FleetKillSwitchService } from '@ever-works/agent/fleet';
+import type { AppWorkRunPlacementPreview } from '@ever-works/agent/app-works';
 import { FleetDelegationScopeRefusedError } from './fleet-agent-task-plan.error';
 import {
     FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
@@ -435,7 +436,66 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             await recordDispatchRunner(deps, payload, null);
             return delegate.enqueue(payload);
         },
+        // APW-08 T12 — see `previewAgentTaskPlacement` below.
+        previewPlacement: (payload) => previewAgentTaskPlacement(router, deps, payload),
     };
+}
+
+/**
+ * APW-08 T12 (APW08-G11) — the placement {@link createFleetAwareAgentTaskExecuteDispatcher}'s
+ * `enqueue` WOULD choose for this payload, through the SAME `routeAgentTask` call with the same
+ * scope and requirements, writing nothing: no job, no run-runner stamp, no fallback notice.
+ *
+ * `TaskTransitionService.dispatchAgentRun` asks it for a Task on an App Work only, ahead of the
+ * dispatch gate, and hands it to the isolated-run admission predicate:
+ *
+ * - `fleet` / `fleet-waiting` → `'fleet'`, with the capability tags the job will require (so the
+ *   admission judges only the nodes that could lease it);
+ * - `cloud` → `'cloud'`;
+ * - a routing check that throws → `'unknown'`, because `enqueue` falls back to the platform
+ *   dispatcher on that same throw — and `'unknown'` is judged as cloud, so the answer never
+ *   admits more than `enqueue` would do;
+ * - the global stop flag set or unreadable → `halted`: the dispatch gate parks every run
+ *   `kill-switch` (a wait, FR-66), so the admission defers to it rather than refusing.
+ */
+async function previewAgentTaskPlacement(
+    router: Pick<FleetRunRouterService, 'routeAgentTask'>,
+    deps: FleetAwareDispatcherDeps,
+    payload: AgentTaskExecuteDispatchPayload,
+): Promise<AppWorkRunPlacementPreview> {
+    if (deps.killSwitch) {
+        let stopped: boolean;
+        try {
+            stopped = await deps.killSwitch.isStopped();
+        } catch {
+            stopped = true;
+        }
+        if (stopped) return { placement: 'unknown', halted: true };
+    }
+    try {
+        const scope = await resolveScope(deps.scopeResolver, payload.taskId);
+        const requirements = await resolveRequirements(deps.planner, payload);
+        const decision = await router.routeAgentTask(
+            payload,
+            scope,
+            requirements ? { requiredCapabilities: requirements.requiredCapabilities } : {},
+        );
+        if (decision.target === 'fleet' || decision.target === 'fleet-waiting') {
+            return {
+                placement: 'fleet',
+                requiredCapabilities: requirements ? [...requirements.requiredCapabilities] : [],
+            };
+        }
+        return { placement: 'cloud' };
+    } catch (err) {
+        if (isFleetKillSwitchActiveError(err)) return { placement: 'unknown', halted: true };
+        logger.warn(
+            `Fleet placement preview failed for task ${payload.taskId} — judging it 'unknown': ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+        return { placement: 'unknown' };
+    }
 }
 
 /**

@@ -86,3 +86,40 @@ export async function buildTaskCostView(
         runsTruncated: rows.length > TASK_COST_RUNS_LIMIT,
     };
 }
+
+/** APW-08 T48 — the Cost view's containment half (`AppWorkTaskContainmentReader`), structural. */
+export interface TaskCostContainmentReads {
+    describeForTask(task: {
+        id: string;
+        userId: string;
+        workId?: string | null;
+        agentId?: string | null;
+        tenantId?: string | null;
+        organizationId?: string | null;
+    }): Promise<Pick<TaskCostView, 'containment' | 'containmentHolds'> | null>;
+}
+
+/**
+ * APW-08 T48 / T12 (FR-70, S33, ACC-08-34) — add what the Task's latest Fleet run got and which
+ * nodes hold its next run, for a Task on an App Work. Every other Task's view is returned exactly
+ * as {@link buildTaskCostView} built it (no keys added), and so is any Task whose reader is
+ * unbound or fails: the cost half must never be lost to the containment half.
+ */
+export async function withTaskContainment(
+    view: TaskCostView,
+    task: Parameters<TaskCostContainmentReads['describeForTask']>[0],
+    reader?: TaskCostContainmentReads | null,
+): Promise<TaskCostView> {
+    if (!reader) return view;
+    try {
+        const described = await reader.describeForTask(task);
+        if (!described) return view;
+        return {
+            ...view,
+            containment: described.containment ?? null,
+            containmentHolds: described.containmentHolds ?? [],
+        };
+    } catch {
+        return view;
+    }
+}

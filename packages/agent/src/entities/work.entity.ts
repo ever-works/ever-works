@@ -73,6 +73,7 @@ import {
     type WorkExternalRefs,
     type WorkRepoDeclaredCommandPolicy,
     type WorkKind,
+    type AppRunContainmentAllowance,
 } from '@ever-works/contracts';
 
 export { USER_SELECTABLE_WORK_KINDS, normalizeWorkKind };
@@ -554,6 +555,23 @@ export class Work {
      */
     @Column('simple-json', { nullable: true })
     repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
+
+    /**
+     * APW-08 T48 / T12 (FR-12, FR-70, S33) — the owner's per-node allowances of a Fleet
+     * containment downgrade on THIS App Work: one entry per node, added only by an explicit
+     * **Allow on this machine** (`POST /api/works/:id/app-runs/allow-containment`), removed by
+     * withdrawing it, and never implied — an allowance admits the one node it names, on the one
+     * Work it is stored on. The EW-807 allow-list shape (`repoDeclaredCommands` above): a column
+     * the owner writes, read only through `normalizeAppRunContainmentAllowances`, which drops
+     * anything it cannot use. NULL (every row, every other kind) = nothing allowed.
+     *
+     * An allowance never widens the Agent's tools, protected paths, merge policy or target
+     * branch: containment controls the model step's environment variables only. Written only
+     * through `WorkRepository.updateAppWorkColumns` (`kind = 'app'` in the WHERE).
+     * Migration: `1792340000000-AddAppRunContainment`.
+     */
+    @Column('simple-json', { nullable: true })
+    appRunContainmentAllowances?: AppRunContainmentAllowance[] | null;
 
     // ── Merge policy (Wave 3, founder decision D4) ───────────────────
 

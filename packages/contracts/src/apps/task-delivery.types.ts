@@ -193,6 +193,78 @@ export interface TaskCostView {
 	/** How many of the Task's runs are listed (newest first) and whether there are more. */
 	runsLimit: number;
 	runsTruncated: boolean;
+	/**
+	 * APW-08 T48 (FR-70, ACC-08-34) — the containment the Task's latest Fleet run got, beside the
+	 * run receipts: its execution path, whether the isolated home applied, every downgrade the node
+	 * declared, and whether the owner allows that node's downgrade. `null` for a Task with no
+	 * recorded Fleet run (every non-App Task, every cloud-only Task). Optional so an answer from a
+	 * build without the field reads as "no record".
+	 */
+	containment?: TaskRunContainmentView | null;
+	/**
+	 * APW-08 T12 (S33, FR-12) — the Fleet nodes whose own latest containment report holds this
+	 * Task's NEXT run (`needs_input`) until the owner allows the node: what the Task shows with
+	 * `appRules.containmentDowngrade` and **Allow on this machine**, even before any run of it
+	 * exists. Empty when nothing holds it; absent on a non-App Task.
+	 */
+	containmentHolds?: TaskRunContainmentView[];
+}
+
+/**
+ * APW-08 FR-70 (plan §3.4) — what a Fleet run reported about its own containment, read through
+ * `normalizeFleetAgentTaskContainment` (every coercion toward LESS containment) and narrowed to
+ * what the Task page shows. Containment controls environment variables only: it is not a
+ * filesystem boundary and carries no egress control (FR-12).
+ */
+export interface AppWorkRunContainment {
+	executionPath: 'hardened' | 'ordinary';
+	isolatedHome: boolean;
+	downgrades: Array<{ control: string; reason: string }>;
+	/** True when isolatedHome is false or an `isolated-home` downgrade is present. */
+	needsOwnerAllowance: boolean;
+}
+
+/**
+ * APW-08 T48 — one node's containment as the Task's Cost view shows it: the plan §3.4 record plus
+ * where it came from and the owner's allowance for that node (the EW-807-style per-node store,
+ * `POST /api/works/:id/app-runs/allow-containment`).
+ */
+export interface TaskRunContainmentView extends AppWorkRunContainment {
+	/** The run that reported it; `null` = the node's latest report, not a run of this Task. */
+	runId: string | null;
+	/** The Fleet node that ran (or would run) it; `null` when the record names none. */
+	nodeId: string | null;
+	nodeName: string | null;
+	/** ISO time of the report; `null` when unknown — and for a node that never reported one. */
+	reportedAt: string | null;
+	/** False when the node has never reported a readable containment record (treated as a downgrade). */
+	reported: boolean;
+	/** The Work owner allows this node's downgrade for this App Work (withdrawable). */
+	allowedByOwner: boolean;
+}
+
+/**
+ * APW-08 T48 — one allowance in the per-Work store (`works.appRunContainmentAllowances`), shaped
+ * like the EW-807 allow-list: one entry per node, added only by an explicit owner action, removed
+ * by withdrawing it, never implied by another node or another Work.
+ */
+export interface AppRunContainmentAllowance {
+	nodeId: string;
+	/** ISO time the owner allowed it. */
+	allowedAt: string;
+	/** The user who allowed it. */
+	allowedBy: string;
+	/** The `isolated-home` reason the owner accepted, as the node reported it then (display only). */
+	acceptedDowngrade: string | null;
+}
+
+/** Most allowances one App Work keeps — one per enrolled node, far above any real fleet. */
+export const APP_RUN_CONTAINMENT_ALLOWANCES_MAX = 100;
+
+/** `POST /api/works/:id/app-runs/allow-containment` (plan §4) — `204` on success. */
+export interface AppRunAllowContainmentRequest {
+	nodeId: string;
+	allow: boolean;
 }
 
 /** The Work budget's alert state for the month (EW-602 thresholds). */

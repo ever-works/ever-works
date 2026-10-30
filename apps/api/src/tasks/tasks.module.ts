@@ -75,6 +75,11 @@ import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolve
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
 import { isE2eAppLauncherSeedEnabled } from '../app-launcher/e2e-seed.controller';
+// APW-08 T12 + T48 — isolated-run admission, the containment recorder and the Cost view reader.
+import {
+    ISOLATED_RUN_ADMISSION_PROVIDERS,
+    ISOLATED_RUN_ADMISSION_TOKENS,
+} from './isolated-run-admission.providers';
 
 /**
  * APW-08 T29 — the controllers this module declares. The two product controllers are always
@@ -220,6 +225,10 @@ function tasksControllers(): Type<unknown>[] {
             provide: SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
             useExisting: SubAgentDelegationDepthResolverService,
         },
+        // APW-08 T12 + T48 — HERE because this @Global() module owns the dispatcher whose
+        // `previewPlacement` the admission reads, and imports the fleet graph (push credentials,
+        // nodes, jobs). See `isolated-run-admission.providers.ts`.
+        ...ISOLATED_RUN_ADMISSION_PROVIDERS,
     ],
     exports: [
         AGENT_TASK_EXECUTE_DISPATCHER,
@@ -228,6 +237,7 @@ function tasksControllers(): Type<unknown>[] {
         SUB_AGENT_DELEGATION_RUNNER,
         SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
         WORKFLOW_NODE_RUNNER,
+        ...ISOLATED_RUN_ADMISSION_TOKENS,
     ],
 })
 export class TasksModule {}

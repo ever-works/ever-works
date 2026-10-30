@@ -19,6 +19,10 @@ import {
     FleetNodeRepository,
 } from '@ever-works/agent/fleet';
 import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
+import {
+    APP_WORK_RUN_CONTAINMENT_RECORDER,
+    type AppWorkRunContainmentRecorder,
+} from '@ever-works/agent/app-works';
 import { PluginUsageService } from '@ever-works/agent/usage';
 import {
     TaskChatService,
@@ -162,6 +166,12 @@ export class FleetAgentTaskReconcilerService {
         // @Optional() per the positional-construction rule (handover §5.2):
         // absent, a fleet run simply has no timeline, as before the slice.
         @Optional() private readonly runLogs?: AgentRunLogRepository,
+        // APW-08 T48 (FR-70) — records what an App Work run's containment was, beside the
+        // receipt. Appended LAST and @Optional() per the positional-construction rule: absent,
+        // nothing is recorded, exactly as before T48.
+        @Optional()
+        @Inject(APP_WORK_RUN_CONTAINMENT_RECORDER)
+        private readonly containmentRecorder?: AppWorkRunContainmentRecorder,
     ) {}
 
     /**
@@ -398,6 +408,9 @@ export class FleetAgentTaskReconcilerService {
         // the usage row exists when the terminal CAS settles it, whichever
         // of markCompleted / markFailed / tryMarkCompleted that is.
         await this.accountModelSpend(event, ctx, run, task, agentId, result);
+        // APW-08 T48 — the containment record rides the run, written right after the receipt
+        // (for every verdict below, a question included). App Work Tasks only.
+        await this.recordRunContainment(event, ctx);
 
         // Self-build slice Q — the model asked the owner a question. Taken
         // for ANY status / gate verdict / git error, BEFORE the success-
@@ -1296,6 +1309,35 @@ export class FleetAgentTaskReconcilerService {
      * transaction timestamp would come back in random-uuid order on
      * Postgres.
      */
+    /**
+     * APW-08 T48 (FR-70, ACC-08-34) — hand the node's RAW containment block to the recorder,
+     * which normalizes it (`normalizeFleetAgentTaskContainment`, toward LESS containment), checks
+     * the Task is on an App Work and writes `agent_runs.containment`. A non-App Task is left
+     * untouched, and the recorder never throws into the reconcile. The record is what the Task's
+     * Cost view shows and what T12's admission reads per node for the NEXT run.
+     *
+     * Not yet: T46's run-stop classifier (`classifyAppWorkRunStop`) does not exist on `develop`,
+     * so a downgrade reported by a run that was admitted (an allowed node, or a node whose first
+     * report this is) is recorded, not classified; the next run is held by T12.
+     */
+    private async recordRunContainment(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+    ): Promise<void> {
+        if (!this.containmentRecorder) return;
+        const raw = event.result?.containment;
+        if (raw === undefined || raw === null) return;
+        await this.bestEffort('containment record', () =>
+            this.containmentRecorder!.recordRunContainment({
+                taskId: ctx.taskId,
+                runId: ctx.runId,
+                userId: event.userId,
+                nodeId: event.nodeId,
+                rawContainment: raw,
+            }),
+        );
+    }
+
     private async recordModelTimeline(runId: string, result: unknown): Promise<void> {
         const runLogs = this.runLogs;
         if (!runLogs) return;

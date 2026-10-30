@@ -73,6 +73,16 @@ import { agentBlockLiftRefusal, agentMayLiftBlock } from './agent-block-lift';
 import { describeAppChangesPaused, readAppWorkSwitches } from '../app-works/app-work-switches';
 // APW-08 T11 (FR-9) — the refusal copy lives in the isolation leaf (contracts only).
 import { describeAppWorkNoCommitPermission } from './task-isolation';
+// APW-08 T12 — the isolated-run admission port and its refusal copy. A leaf (contracts and the
+// T48 containment leaf only): the token is read in a parameter decorator below.
+import {
+    APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+    APP_WORK_RUN_ADMISSION,
+    describeAppWorkRunRefusal,
+    isAppWorkRunRefusal,
+    type AppWorkRunAdmissionGate,
+    type AppWorkRunPlacementPreview,
+} from '../app-works/isolated-run-admission';
 
 /**
  * The planning lease one attempt holds (CodeRabbit CR-2). `unavailable`:
@@ -353,6 +363,13 @@ export class TaskTransitionService {
         @Optional()
         @Inject(TASK_SESSION_SCHEDULE_DISPATCHER)
         private readonly sessionSchedules?: TaskSessionScheduleDispatcher,
+        // APW-08 T12 (FR-12, FR-70, FR-75) — isolated-run admission for a Task on an App Work,
+        // asked in `dispatchAgentRun` ahead of the dispatch gate. Appended LAST + @Optional
+        // (positional-spec arity rule); absent, no run is admission-checked and every dispatch is
+        // exactly as before. Bound by the API's @Global() TasksModule.
+        @Optional()
+        @Inject(APP_WORK_RUN_ADMISSION)
+        private readonly appWorkRunAdmission?: AppWorkRunAdmissionGate,
     ) {}
 
     /**
@@ -1342,6 +1359,98 @@ export class TaskTransitionService {
     }
 
     /**
+     * APW-08 T12 (FR-12, FR-70, FR-75) — isolated-run admission, site 1: may this run of an App
+     * Work Task start where the routing adapter would place it?
+     *
+     * 1. Only for a Task on an App Work ({@link isAppWorkTask}, which fails OPEN, like FR-9): a
+     *    Work-less Task asks nothing, and every other kind dispatches exactly as before — no
+     *    placement is computed for it.
+     * 2. The placement comes from the SAME routing call `dispatcher.enqueue` makes
+     *    (`previewPlacement`, APW08-G11). An adapter that cannot answer, or an answer that throws,
+     *    is `'unknown'` — treated as `'cloud'`, so the predicate fails closed.
+     * 3. The platform's global stop flag (`halted`) is NOT a refusal: the admission chain parks
+     *    the run `kill-switch`, which is a wait (FR-66), and no placement could be computed.
+     * 4. The gate gathers the facts (push credential, node containment and the owner's
+     *    allowances, or the cloud pipeline and Environment) and runs the predicate. A gate that
+     *    throws refuses (`noIsolatedRuntime`): an App Work run never starts on an admission no one
+     *    could evaluate.
+     *
+     * `noIsolatedRuntime` / `noPushCredential` are refusals; `containmentDowngrade` is
+     * `needs_input` (the Task's Cost view offers **Allow on this machine** for the node). All three
+     * reach the caller as the dispatch `error` (`code: copy`), before any run row exists, and
+     * leave the Task where it is — the same Task starts once the cause is fixed.
+     */
+    private async refuseUnadmittedAppWorkRun(
+        task: Task,
+        agent: { id: string; userId: string; environmentId?: string | null },
+        dedupKey: string,
+    ): Promise<{ error?: string; appWorkAdmitted: boolean }> {
+        if (!this.appWorkRunAdmission || !(await this.isAppWorkTask(task))) {
+            return { appWorkAdmitted: false };
+        }
+        let placement: AppWorkRunPlacementPreview = { placement: 'unknown' };
+        if (this.dispatcher?.previewPlacement) {
+            try {
+                placement = await this.dispatcher.previewPlacement({
+                    agentId: agent.id,
+                    userId: task.userId,
+                    taskId: task.id,
+                    dedupKey,
+                    tenantId: task.tenantId ?? null,
+                    organizationId: task.organizationId ?? null,
+                });
+            } catch (err) {
+                this.logger.warn(
+                    `Task ${task.id}: the run's placement could not be previewed (${err}); judging it as 'unknown' (cloud).`,
+                );
+                placement = { placement: 'unknown' };
+            }
+        }
+        if (placement.halted) {
+            // The stop flag parks every run (`kill-switch`, a wait); admission is asked again when
+            // the run is dispatched after the flag clears.
+            return { appWorkAdmitted: true };
+        }
+        try {
+            const verdict = await this.appWorkRunAdmission.admit({
+                task: {
+                    id: task.id,
+                    userId: task.userId,
+                    workId: task.workId ?? null,
+                    tenantId: task.tenantId ?? null,
+                    organizationId: task.organizationId ?? null,
+                },
+                agent: {
+                    id: agent.id,
+                    userId: agent.userId,
+                    environmentId: agent.environmentId ?? null,
+                },
+                placement,
+            });
+            if (!verdict) return { appWorkAdmitted: false };
+            if (!isAppWorkRunRefusal(verdict)) return { appWorkAdmitted: true };
+            const error = describeAppWorkRunRefusal(verdict);
+            this.logger.warn(
+                `Task ${task.id}: no run dispatched for agent ${agent.id} (${verdict.outcome}) — ${error}`,
+            );
+            return { error, appWorkAdmitted: false };
+        } catch (err) {
+            this.logger.warn(
+                `Task ${task.id}: isolated-run admission failed (${err}); refusing the App Work run (fail closed).`,
+            );
+            return {
+                error: describeAppWorkRunRefusal({
+                    admitted: false,
+                    outcome: 'refused',
+                    code: 'noIsolatedRuntime',
+                    message: APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+                }),
+                appWorkAdmitted: false,
+            };
+        }
+    }
+
+    /**
      * THE dispatch path for one (Task, Agent) pair — gate admit →
      * pre-created queued run → board denorm → job-runtime enqueue →
      * triggerRunId stamp, with the loud-degradation error handling.
@@ -1487,6 +1596,18 @@ export class TaskTransitionService {
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;
+        // APW-08 T12 (FR-12, FR-70, FR-75; ACC-08-08, -34, -39) — isolated-run admission, site 1
+        // of 2, ahead of `RunDispatchGateService` (Resolution R-17): a refusal, before a run row
+        // exists, never a park. See `refuseUnadmittedAppWorkRun`. `appWorkAdmitted` is true only
+        // for an App Work run the predicate admitted; it is what hands the gate the Agent below.
+        let appWorkAdmitted = false;
+        if (!opts.reviewId && this.appWorkRunAdmission) {
+            const verdict = await this.refuseUnadmittedAppWorkRun(task, agent, dedupKey);
+            if (verdict.error) {
+                return { runId: null, dispatched: false, parked: false, error: verdict.error };
+            }
+            appWorkAdmitted = verdict.appWorkAdmitted;
+        }
         {
             let run: { id: string } | null = null;
             try {
@@ -1533,6 +1654,12 @@ export class TaskTransitionService {
                                 userId: task.userId,
                                 workId: task.workId ?? null,
                                 organizationId: task.organizationId ?? null,
+                                // APW-08 T12 (FR-66, R-17) — an admitted App Work run passes the
+                                // unchanged chain WITH its Agent, so the AW-23 brake parks a
+                                // paused Agent's run `agent-paused` (a wait) instead of it
+                                // starting. Every other dispatch hands the gate exactly the
+                                // three keys it always did.
+                                ...(appWorkAdmitted ? { agentId } : {}),
                             },
                             reserve,
                         );
