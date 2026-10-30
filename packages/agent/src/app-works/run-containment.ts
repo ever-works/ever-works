@@ -187,6 +187,12 @@ export function isolatedHomeDowngradeReason(
 
 // ── The pure admission predicate (T12 calls it for a 'fleet' placement) ──────
 
+/**
+ * The node id a candidate carries when the owner's node list could not be read at all: it holds
+ * the run (fail closed) and names nothing an owner could allow.
+ */
+export const UNREADABLE_FLEET_NODE = 'fleet-nodes-unreadable';
+
 /** One candidate node's facts, as the fleet branch of the T12 predicate reads them. */
 export interface FleetNodeContainmentFacts {
     nodeId: string;
@@ -196,9 +202,22 @@ export interface FleetNodeContainmentFacts {
     allowed: boolean;
 }
 
+/** Is ONE node admissible: an isolated home with no `isolated-home` downgrade, or allowed? */
+export function isNodeContainmentAdmissible(
+    candidate: Pick<FleetNodeContainmentFacts, 'containment' | 'allowed'>,
+): boolean {
+    if (candidate.containment && !candidate.containment.needsOwnerAllowance) return true;
+    return candidate.allowed === true;
+}
+
 export type FleetContainmentAdmission =
-    | { admitted: true }
-    | { admitted: false; nodeId: string; containment: AppWorkRunContainment | null };
+    | { admitted: true; nodeId: string }
+    | {
+          admitted: false;
+          /** The first node that holds the run; `null` = no node could take it at all. */
+          nodeId: string | null;
+          containment: AppWorkRunContainment | null;
+      };
 
 /** Type guard for a held answer (explicit: see `isAppWorkRunRefusal`). */
 export function isFleetContainmentHeld(
@@ -208,30 +227,29 @@ export function isFleetContainmentHeld(
 }
 
 /**
- * T48's predicate: is every node that could take the run admissible?
+ * T48's predicate at DISPATCH: can any node that could take the run take it?
  *
- * A pinned run has ONE candidate (the node its Agent is bound to); an unpinned run can be leased
- * by any eligible node, so EVERY eligible node must be admissible — a run the platform cannot
- * steer away from a downgraded node is not admitted on the strength of its siblings. The first
- * node that holds it is named, so the Task can offer **Allow on this machine** for it.
+ * Admitted when at least one candidate is admissible — an isolated home with no `isolated-home`
+ * downgrade, or a downgrade the owner allowed for that node. That is safe because dispatch is not
+ * the last word: the LEASE judges the node that actually takes the job
+ * (`FleetAppWorkLeaseAdmission`), so a downgraded sibling is never offered it, and a run the
+ * platform could steer to an admissible node is not refused on account of a node that will not
+ * get it. Every candidate held → the first is named, so the Task offers **Allow on this machine**
+ * for it.
  *
- * No candidate at all is admitted HERE: whether a fleet run with no eligible node may wait is the
- * router's decision (`fleet-waiting`, bounded by the queue SLA), and containment has no node to
- * judge. The node that eventually leases it reports its containment on the result, and that
- * report gates the next run.
+ * NO candidate at all is NOT admitted (review of #3040): with no node able to take it, routing
+ * still answers `fleet-waiting`, and a machine enrolled later (never reported) or a downgraded
+ * node unpaused later would be the one to lease it. The caller holds such a run (`needs_input`).
  */
 export function admitFleetContainment(
     candidates: readonly FleetNodeContainmentFacts[],
 ): FleetContainmentAdmission {
-    for (const candidate of candidates) {
-        if (!candidate.containment || candidate.containment.needsOwnerAllowance) {
-            if (candidate.allowed) continue;
-            return {
-                admitted: false,
-                nodeId: candidate.nodeId,
-                containment: candidate.containment,
-            };
-        }
-    }
-    return { admitted: true };
+    if (candidates.length === 0) return { admitted: false, nodeId: null, containment: null };
+    const admissible = candidates.find((candidate) => isNodeContainmentAdmissible(candidate));
+    if (admissible) return { admitted: true, nodeId: admissible.nodeId };
+    return {
+        admitted: false,
+        nodeId: candidates[0].nodeId,
+        containment: candidates[0].containment,
+    };
 }

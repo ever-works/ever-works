@@ -34,6 +34,13 @@ export interface AgentTaskExecuteDispatchPayload {
      */
     tenantId?: string | null;
     organizationId?: string | null;
+    /**
+     * APW-08 T12 / T48 — set by the fleet-aware dispatcher ITSELF, never by a caller, once
+     * isolated-run admission admitted this run for the Fleet: the App Work it changes. The
+     * fleet router copies it onto the job payload, where the lease judges the node that takes
+     * the job and the reconciler knows to record the containment it got.
+     */
+    appWorkId?: string;
 }
 
 export interface AgentChatReplyDispatchPayload {

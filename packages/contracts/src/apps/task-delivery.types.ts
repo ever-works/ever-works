@@ -241,6 +241,12 @@ export interface TaskRunContainmentView extends AppWorkRunContainment {
 	reported: boolean;
 	/** The Work owner allows this node's downgrade for this App Work (withdrawable). */
 	allowedByOwner: boolean;
+	/**
+	 * The signed-in viewer enrolled this node, so **Allow on this machine** / **Withdraw** are
+	 * theirs to press (the route answers 404 for anyone else's node). False for a node the
+	 * record does not name.
+	 */
+	viewerOwnsNode?: boolean;
 	/** With {@link allowedByOwner}: the `isolated-home` reason the owner accepted (S33). */
 	acceptedDowngrade?: string | null;
 }

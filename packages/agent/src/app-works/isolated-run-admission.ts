@@ -19,25 +19,34 @@ import {
  * later, inside `dispatcher.enqueue`, by the fleet routing adapter reading the tenant's job-runtime
  * config. So the predicate takes an explicit {@link AppWorkRunPlacement}, produced by THAT adapter
  * (`AgentTaskExecuteDispatcher.previewPlacement`, the same router call `enqueue` makes), and it is
- * evaluated at TWO sites:
+ * evaluated at TWO sites, plus the Fleet's own choke points:
  *
- * 1. `dispatchAgentRun`, ahead of `RunDispatchGateService` — the refusal site FR-12 needs, before
- *    a run row exists. It is NOT a middleware of `DEFAULT_RUN_ADMISSION_CHAIN` (Resolution R-17):
- *    the chain PARKS (a wait), this REFUSES. An admitted run then passes the unchanged chain, so a
- *    paused Agent's App Work run is still parked `agent-paused`, not refused.
+ * 1. `dispatchAgentRun`, ahead of `RunDispatchGateService` and the Agent-session schedule branch —
+ *    the early, clear refusal FR-12 needs, before a run row exists. It is NOT a middleware of
+ *    `DEFAULT_RUN_ADMISSION_CHAIN` (Resolution R-17): the chain PARKS (a wait), this REFUSES. An
+ *    admitted run then passes the unchanged chain, so a paused Agent's App Work run is still
+ *    parked `agent-paused`, not refused.
  * 2. The cloud worker's pre-flight (`agent-task-execute`), before provisioning — so a router that
- *    falls back from Fleet to cloud between (1) and (2), or a drained / resumed run that reached
- *    the worker without passing (1), cannot start a run the predicate refuses.
+ *    falls back from Fleet to cloud, or a drained / resumed run, cannot start a run the predicate
+ *    refuses.
+ * 3. (Review of #3040, MAJOR 1.) The fleet-aware dispatcher's `enqueue`, for EVERY Fleet-bound
+ *    enqueue — the gate's drain and promotion of a parked run and every resume (the CI fix loop, an
+ *    answered question) reach it without passing site 1 — with the same codes, thrown as
+ *    {@link AppWorkRunNotAdmittedError} and recorded on the run row.
+ * 4. The LEASE (`FleetAppWorkLeaseAdmission`): the node that actually takes the job is judged on
+ *    its own containment and the owner's allowance, so a machine enrolled — or a downgraded node
+ *    unpaused — after dispatch never takes it.
  *
  * `'unknown'` is treated as `'cloud'`: the predicate fails closed.
  *
  * ## The two admissible branches
  *
- * - **Fleet** — admitted while every node that could take the run reports `isolatedHome === true`
- *   and no `isolated-home` downgrade (T48's `admitFleetContainment`), or the owner allowed that
- *   node's downgrade; a downgrade is `needs_input`, not a refusal. And before a Fleet run of the
- *   App Work is admitted, the platform must be able to mint a push credential for the Work
- *   Repository's owner (GAP-15, FR-75), or it is refused with the S28 copy naming that owner.
+ * - **Fleet** — the platform must be able to mint a push credential for the Work Repository's
+ *   owner (GAP-15, FR-75; else the S28 refusal naming that owner), the owner must have a machine
+ *   enrolled (else S15), and some node that could take the run must report `isolatedHome === true`
+ *   with no `isolated-home` downgrade — or carry the owner's allowance (T48's
+ *   `admitFleetContainment`). Every candidate downgraded is `needs_input`; no candidate at all is
+ *   `needs_input` too (`noEligibleNode`), never an admission.
  * - **Isolated cloud** — the resolved pipeline plugin declares
  *   `IPipelinePlugin.enforcesRuntimeNetworking === true` (APW-04, CONTRACTS §3) AND the Agent's
  *   resolved Environment is `limited`. The flag lives on the plugin; no plugin id appears in core
@@ -56,6 +65,10 @@ export const APP_WORK_RUN_REFUSAL_CODES = [
     'noIsolatedRuntime',
     'noPushCredential',
     'containmentDowngrade',
+    // Review of #3040 — a Fleet run no enrolled node can take is held, never admitted.
+    'noEligibleNode',
+    // Review of #3040 (decision: fail CLOSED) — the Task's Work could not be read. Retryable.
+    'work-unreadable',
 ] as const;
 export type AppWorkRunRefusalCode = (typeof APP_WORK_RUN_REFUSAL_CODES)[number];
 
@@ -68,6 +81,11 @@ export interface AppWorkRunAdmissionPlan {
     environmentNetworking?: 'limited' | 'unrestricted' | null;
     /** Fleet branch: every node that could take the run, with its latest report and allowance. */
     fleetCandidates?: readonly FleetNodeContainmentFacts[];
+    /**
+     * Fleet branch: how many nodes the owner has enrolled at all (any status). Zero is S15 —
+     * there is no machine to run on. Omitted = not counted (treated as "some").
+     */
+    fleetEnrolledNodes?: number;
     /**
      * Fleet branch (GAP-15): can the platform mint a push credential for the Work Repository's
      * owner? `null` = the App Work has no repository the question can be asked of (refused).
@@ -99,6 +117,18 @@ export type AppWorkRunAdmission =
           nodeId: string;
           containment: AppWorkRunContainment | null;
           message: string;
+      }
+    | {
+          admitted: false;
+          outcome: 'needs_input';
+          code: 'noEligibleNode';
+          message: string;
+      }
+    | {
+          admitted: false;
+          outcome: 'refused';
+          code: 'work-unreadable';
+          message: string;
       };
 
 /** Every refusal of {@link AppWorkRunAdmission} (`refused` or `needs_input`). */
@@ -122,6 +152,23 @@ export const APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE =
 /** S33 / `appRules.containmentDowngrade`. */
 export const APP_WORK_CONTAINMENT_DOWNGRADE_MESSAGE =
     'This machine runs app changes without an isolated home. Allow it once, or run this Task in an isolated sandbox.';
+
+/** Review of #3040 — enrolled machines exist, but none can take this run (tags, pin). */
+export const APP_WORK_NO_ELIGIBLE_NODE_MESSAGE =
+    "None of your machines can take this app change right now: none has what it needs. Set one up, or run this Task in an isolated sandbox.";
+
+/** Review of #3040 — the Task's Work could not be read; nothing was started, and it can be retried. */
+export function describeAppWorkUnreadable(workId: string | null | undefined): string {
+    return `The Work${workId ? ` ${workId}` : ''} of this Task could not be read, so no run was started. Try again.`;
+}
+
+/**
+ * The dispatch error for an unreadable Work: retryable, under the dispatch-failure family the run
+ * row already uses (`dispatch-failed: work-unreadable: …`), at both sites.
+ */
+export function describeAppWorkUnreadableDispatch(workId: string | null | undefined): string {
+    return `dispatch-failed: work-unreadable: ${describeAppWorkUnreadable(workId)}`;
+}
 
 /** S28 / `appRules.noPushCredential`, naming the Work Repository and its owner. */
 export function describeAppWorkNoPushCredential(owner: string, repo: string): string {
@@ -155,8 +202,26 @@ export function isAppWorkRunAdmitted(
                 message: describeAppWorkNoPushCredential(owner || 'this owner', repo || 'this app'),
             };
         }
+        // Review of #3040 — an owner with no enrolled machine at all has no Fleet to run on (S15).
+        if (plan.fleetEnrolledNodes === 0) {
+            return {
+                admitted: false,
+                outcome: 'refused',
+                code: 'noIsolatedRuntime',
+                message: APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+            };
+        }
         const containment = admitFleetContainment(plan.fleetCandidates ?? []);
         if (isFleetContainmentHeld(containment)) {
+            if (containment.nodeId === null) {
+                // Machines exist, none can take it: held (a wait for a machine), never admitted.
+                return {
+                    admitted: false,
+                    outcome: 'needs_input',
+                    code: 'noEligibleNode',
+                    message: APP_WORK_NO_ELIGIBLE_NODE_MESSAGE,
+                };
+            }
             return {
                 admitted: false,
                 outcome: 'needs_input',
@@ -190,6 +255,25 @@ export function isAppWorkRunAdmitted(
  */
 export function describeAppWorkRunRefusal(admission: AppWorkRunRefusal): string {
     return `${admission.code}: ${admission.message}`;
+}
+
+/**
+ * Review of #3040 (MAJOR 1) — what the fleet-aware dispatcher THROWS for a Fleet enqueue the
+ * admission refuses or holds: a drained, promoted or resumed run reaches `dispatcher.enqueue`
+ * without passing `dispatchAgentRun`, and every enqueue site already records a throw on the run
+ * row (`dispatch-failed: <message>`). The message is the same `code: copy` site 1 returns, so
+ * one reader matches both. Never a cloud fallback: the run does not start anywhere.
+ */
+export class AppWorkRunNotAdmittedError extends Error {
+    readonly code: AppWorkRunRefusal['code'];
+    readonly outcome: AppWorkRunRefusal['outcome'];
+
+    constructor(admission: AppWorkRunRefusal) {
+        super(describeAppWorkRunRefusal(admission));
+        this.name = 'AppWorkRunNotAdmittedError';
+        this.code = admission.code;
+        this.outcome = admission.outcome;
+    }
 }
 
 // ── Site 2: the cloud worker's pre-flight ────────────────────────────────────
@@ -232,8 +316,11 @@ export function appWorkCloudRunRefusal(input: {
 /**
  * The routing adapter's answer for one dispatch, before the job exists
  * (`AgentTaskExecuteDispatcher.previewPlacement`). `halted` = the platform's global stop flag is
- * set: the admission chain will PARK the run (`kill-switch`, a wait — FR-66), so site 1 must not
- * refuse it on a placement nobody could compute.
+ * set: the admission chain will PARK the run (`kill-switch`, a wait — FR-66), so site 1 cannot
+ * judge a placement nobody could compute. That run is NOT let through unchecked: when the flag
+ * clears and the park is promoted, the promotion enqueues through the fleet-aware dispatcher,
+ * which runs the Fleet half of this admission again (and the lease judges the node that takes
+ * it), and a cloud placement meets site 2.
  */
 export interface AppWorkRunPlacementPreview {
     placement: AppWorkRunPlacement;
@@ -244,17 +331,27 @@ export interface AppWorkRunPlacementPreview {
     requiredCapabilities?: readonly string[];
 }
 
-/** What site 1 hands the gate: the Task, the Agent the run is for, and the placement preview. */
+/** What a site hands the gate: the Task, the Agent the run is for, and the placement preview. */
 export interface AppWorkRunAdmissionInput {
     task: {
         id: string;
         userId: string;
+        /**
+         * `null` = the Task has no Work (nothing to admit). `undefined` = not known to the caller
+         * (the fleet-aware dispatcher's scope lookup came back empty): the gate reads the Task
+         * itself, and a Task it cannot read is `work-unreadable` (fail closed).
+         */
         workId?: string | null;
         tenantId?: string | null;
         organizationId?: string | null;
     };
     agent: { id: string; userId: string; environmentId?: string | null };
     placement: AppWorkRunPlacementPreview;
+    /**
+     * The Work, already read by the caller (site 1 reads it ONCE per dispatch and shares it with
+     * T49 and FR-9), so the gate does not read it again. Absent = the gate reads it.
+     */
+    work?: unknown;
 }
 
 /**
@@ -263,7 +360,7 @@ export interface AppWorkRunAdmissionInput {
  * every dispatch is exactly as before. Bound by the API's `@Global()` `TasksModule`.
  */
 export interface AppWorkRunAdmissionGate {
-    /** `null` = the Task is not on an App Work (the gate read the Work itself). */
+    /** `null` = the Task is not on an App Work (or has no Work). */
     admit(input: AppWorkRunAdmissionInput): Promise<AppWorkRunAdmission | null>;
 }
 
@@ -274,10 +371,15 @@ export const APP_WORK_RUN_ADMISSION = Symbol('APP_WORK_RUN_ADMISSION');
  * by the same API module; unbound, the reconciler records nothing (as before T48).
  */
 export interface AppWorkRunContainmentRecorder {
+    /**
+     * Asked ONLY for a job whose platform-written payload names the App Work (`appWorkId`), so a
+     * non-App completion costs no read at all (review of #3040). Writes without reading.
+     */
     recordRunContainment(input: {
         taskId: string;
         runId: string;
         userId: string;
+        workId: string;
         nodeId: string | null;
         rawContainment: unknown;
     }): Promise<boolean>;
@@ -292,6 +394,10 @@ export interface AppWorkTaskContainmentReader {
         userId: string;
         workId?: string | null;
         agentId?: string | null;
+        tenantId?: string | null;
+        organizationId?: string | null;
+        /** Who is looking: Allow / Withdraw are offered only on that viewer's own nodes. */
+        viewerUserId?: string | null;
     }): Promise<{
         containment: TaskRunContainmentView | null;
         containmentHolds: TaskRunContainmentView[];
