@@ -46,6 +46,7 @@ vi.mock('@ever-works/agent/app-works', () => ({
     AppUpstreamPrivateCopyAdapter: class AppUpstreamPrivateCopyAdapter {},
     AppUpstreamStateService: class AppUpstreamStateService {},
     AppUpstreamSyncService: class AppUpstreamSyncService {},
+    AppUpstreamTelemetry: class AppUpstreamTelemetry {},
     appUpstreamWorkerActivitySink: (states: unknown) => ({ __sinkOver: states }),
 }));
 vi.mock('@ever-works/agent/activity-log', () => ({
@@ -102,6 +103,7 @@ import {
     AppUpstreamPrivateCopyAdapter,
     AppUpstreamStateService,
     AppUpstreamSyncService,
+    AppUpstreamTelemetry,
 } from '@ever-works/agent/app-works';
 import { WorkUpstreamStateRepository } from '@ever-works/agent/database';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
@@ -271,6 +273,13 @@ describe('app-upstream-sync (APW-02 T33)', () => {
             expect(providers()).toEqual(
                 expect.arrayContaining([AppUpstreamSyncService, AppActionsHygieneService]),
             );
+        });
+
+        it('binds the fork lifecycle telemetry both services ask for, without a sink (APW-02 T39)', () => {
+            // Unbound, both `@Optional()` asks resolved to `undefined` and the worker's events
+            // were never even counted; bound, they are counted and dropped until the worker
+            // gets a sink (an open owner decision — `OPEN_WORKER_GAPS` in the API's DI spec).
+            expect(providers()).toEqual(expect.arrayContaining([AppUpstreamTelemetry]));
         });
 
         it('binds the private copy capability to its local adapter (APW-02 T48, FR-63)', () => {
