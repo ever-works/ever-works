@@ -224,19 +224,26 @@ describe('checks job — the matrix (T41, R-9, plan §2.4:276–308, §4.14)', (
 		expect(checks.steps[1]?.env).toEqual({ [CHECK_COMMAND_B64_ENV]: '${{ matrix.check.commandB64 }}' });
 	});
 
-	it('runs on a same-repository pull request into the tracked branch, and on nothing else (ACC-05-29)', () => {
-		expect(checks.if).toBe(
-			`github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.ref == 'main'`
-		);
+	// APW-08 FR-76 / T15 (cross-epic request on T41): the trigger set is SETTLED as both legs —
+	// a same-repository pull request into the tracked branch, unchanged, PLUS a push to the
+	// tracked branch. The pin below is exactly as strict as the single-leg one it replaces: the
+	// whole guard is pinned byte for byte, each leg is pinned on its own, and there is exactly
+	// ONE `||`, joining exactly those two legs.
+	it('runs on a same-repository pull request into the tracked branch or a push to it, and on nothing else (ACC-05-29, APW-08 FR-76)', () => {
+		const pullRequestLeg = `github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.ref == 'main'`;
+		const trackedBranchLeg = `github.event_name == 'push' && github.ref == 'refs/heads/main'`;
+		expect(checks.if).toBe(`(${pullRequestLeg}) || (${trackedBranchLeg})`);
 		expect(checks.if).toBe(checksJobCondition('main'));
 		// ACC-05-29: a pull request from another repository runs no check.
 		expect(checks.if).toContain('github.event.pull_request.head.repo.full_name == github.repository');
-		// R-9: same-repository pull requests into the tracked branch — no push, no
-		// workflow_dispatch, and no `||` that could widen the guard again.
-		expect(checks.if).not.toContain('push');
+		// Exactly two legs: one `||`, no workflow_dispatch, no pull_request_target, and the
+		// push leg names the tracked branch's own ref.
+		expect(checks.if.split('||')).toHaveLength(2);
 		expect(checks.if).not.toContain('workflow_dispatch');
-		expect(checks.if).not.toContain('||');
 		expect(checks.if).not.toContain('pull_request_target');
+		expect(checks.if.match(/github\.event_name == /g)).toHaveLength(2);
+		expect(checksJobCondition('feature/x')).toContain("github.ref == 'refs/heads/feature/x'");
+		expect(checksJobCondition("feat/it's")).toContain("github.ref == 'refs/heads/feat/it''s'");
 		// The branch is an **expression** string literal, and the expression grammar
 		// has single quotes only: a `"` anywhere in `if:` is a lex error the runner
 		// and `actionlint` both refuse (`actionlint`: `got unexpected character '"'
