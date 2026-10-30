@@ -480,6 +480,28 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       _Fleet path:_ unchanged — a node still pushes before the platform judges the branch; the per-job push credential
       is `contents: write` only (pinned in `fleet-push-credential.service.spec.ts`, never `workflows`), and the merge
       gate re-judges the head.
+      **Status (2026-10-30, lane L11, branch `feat/apw08-guard-budget`): G06 and G22 built, specs green locally,
+      not merged.** _APW08-G06:_ the ring-free port (`tasks-domain/app-work-change-gate.port.ts`) carries
+      `APP_WORK_COMPARE_DIFF_OPTIONS` (`{ maxFiles: 300, maxBytes: 0 }`) and `appWorkDiffFileListIncomplete`:
+      refuse on `totalFiles >= 300` or a list shorter than its count, never on `truncated` alone (a diff with no
+      numeric `totalFiles` still refuses on `truncated`, fail closed). `AppChangeGuard.evaluate` rule 1 uses it, and
+      the change gate asks with those options. The two always-protected workflow floors that also judge an App Work
+      branch (`TaskWorkspaceService.protectedPathsRefusalForBranch` in finalize, and `openPullRequest`'s floor in
+      `apps/api/src/agents/agents.module.ts`) use the same request and rule for App Works only, so the five-file
+      lockfile change is not refused there instead; every other Work kind asks and refuses exactly as before. The
+      guard spec's "refuses a TRUNCATED diff" case is kept and now names a list cut short (two counted, one listed);
+      new cases: a five-file change with a huge lockfile patch is allowed, exactly 300 files refused, a short list
+      under the cap refused. _APW08-G22:_ `AppWorkRules.fileGuidance` = `agents.maxPullRequestChangedFiles`,
+      default 50, clamped 1–500 (`clampFileGuidance`; a rules object without it reads 50). Guard rule 5 adds a
+      note over it and refuses past 3× it (`tooManyFiles`, telemetry reason `too_large`), after the line refusal;
+      the 300-file ceiling still answers first whatever the App sets; lockfiles count as files (only their lines are
+      excluded). The run brief states the file guidance beside the line guidance. The e2e seed takes
+      `fileGuidance` and pads a fixture list to its count below 300 (what a provider asked for 300 files returns);
+      the 299-file e2e case sets `fileGuidance: 500`. Specs: `app-change-guard` 39/39 (12 new),
+      `app-work-change-gate.service` 33/33 (request assertion now `{ maxFiles: 300, maxBytes: 0 }`),
+      `app-work-rules.service` 18/18 (1 new), `app-run-brief` 15/15 (1 new), `task-workspace.app-change-guard`
+      76/76, `task-workspace-remote-push` 16/16, `task-workspace-mounts` 61/61, `app-change-guard.loosening` 13/13,
+      `app-change.telemetry` 13/13 unchanged.
       **Create** `packages/agent/src/app-works/app-change-guard.ts` (new) — [plan §2.5](./plan.md): compare diff
       (`{ maxFiles: 300, maxBytes: 0 }`, refuse on `totalFiles >= 300` **or** `files.length < totalFiles` — never on
       `truncated` alone, because `capDiffFiles` also sets it when patch text exceeds the 256 KiB default and a
@@ -1218,6 +1240,30 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
 
 - [ ] **T56. Per-App-Work cost rollup against the Work budget (XC-19, FR-73).**
       **Status (2026-10-27, lane B2 `aw-evolve`): the read is done** — `GET /api/works/:id/cost?month=YYYY-MM` (`WorkCostController`, view access, one `404 not_found`, `400 invalidMonth`) answers `WorkCostRollup` from the usage ledger (`getTotalSpendCents`, the budget guard's own query, in the budget's currency) and the Work's existing global `WorkBudget`: spend, cap, remaining (never negative), percent and the EW-602 alert ladder (75 / 90 / 100 / overage). Spec `apps/api/src/works/work-cost.controller.spec.ts`. **Not built:** booking the App Work run paths against the Work's budget through the guard, and `WorkCostSummary` on the App Work overview.
+      **Status (2026-10-30, lane L11, branch `feat/apw08-guard-budget`): booking and the overview half built, specs
+      green locally, not merged.** `AppWorkBudgetService` (`packages/agent/src/app-works/app-work-budget.ts`) is the
+      one booking door: `book({ workId, userId, charge })` calls `BudgetGuardService.checkBudget` with the App
+      Work's own id (never the Agent's Work) for the charges `run` (AI, `app-works-run`), `preparation` (APW-09
+      T44's own capability and plugin id) and `build` (BUILD, `app-works-build`); App Works only — any other kind
+      answers `not-app-work` without reading a budget. No table, no migration, no second spend account: the cap is
+      the Work's global `WorkBudget`, the alert is the guard's `BudgetThresholdCrossedEvent` (once per threshold and
+      period). _Runs:_ `createWorkBudgetAdmission` (`agents/run-admission-chain.ts`) asks the service through the
+      leaf port `agents/run-work-budget.ts`; `AppWorkBudgetAdmissionInstaller` (agent `AgentsModule`, next to the
+      gate) installs it with the gate's documented `withAdmissionChain` seam, right after the Agent brake —
+      `run-dispatch-gate.service.ts` and `DEFAULT_RUN_ADMISSION_CHAIN` are unchanged. A spent budget parks the run
+      `work-budget` on every dispatch and drain of a Task on an App Work (T25 `evolve`, T21 follow-up, the board,
+      chat, a Goal): a queued row that never reaches a runtime, so no gate attempt, no delivery failure and no
+      follow-up. The stuck-run sweeper exempts the reason (SQL and service) and its tick releases it through
+      `promoteParked('work-budget')` once the budget allows. A budget that cannot be read fails open (billing).
+      _Not existing yet:_ T35's Mission dispatch (it will dispatch Task runs through the same chain), APW-09's
+      preparation step (`preparationAvailable: false`), a managed Build (repository-CI Builds are the owner's CI,
+      `payer: workspace`, `costCents: 0`, and are not gated) and any hosting charge. _Read:_
+      `WorkCostRollup.spendCents` is `null` when the ledger total is not a number (ACC-08-37, one rule
+      `totalCostCents` in contracts), and then `remainingCents`/`percentUsed` are `null` too; the rollup adds
+      `tasks` — the month's costliest Tasks of this Work that the viewer owns (≤ 5, `getSpendByTaskForWork`).
+      `WorkCostSummary` (`apps/web/src/components/works/app/`, on `AppWorkOverviewCard`) shows **Unknown** instead
+      of `$0.00` and links each Task line to its Task page, whose last section is the Cost section. Specs:
+      `work-budget` 30/30 (new), `WorkCostSummary.unit` (new), `work-cost.controller` (4 new cases).
       **Modify** `apps/api/src/works/work-evolve.controller.ts` — `GET /api/works/:id/cost` returning
       `WorkCostRollup` (month spend, cap, remaining, alert state) through the **existing** `WorkBudget` /
       `WorkBudgetAlertState` entities and `BudgetGuardService` (`packages/agent/src/entities/work-budget.entity.ts`;
