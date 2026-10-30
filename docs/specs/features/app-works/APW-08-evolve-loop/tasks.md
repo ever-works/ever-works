@@ -1219,6 +1219,19 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       the limit is not refused; no local constant exists (a source-text assertion on the epic's own files)
       (ACC-08-36). Run: `pnpm --filter @ever-works/agent test repo-size-limit`.
       **Done when**: the spec is green.
+      **Status (2026-10-30, lead `43c536` on EVERDESK2, branch `feat/apw08-repo-size-limit`): built, spec green
+      locally, not merged.** `APP_WORK_RUN_CHECKOUT_STAGE = 'sandbox'` (FR-72's "Fleet or isolated sandbox" checkout
+      is the table's `sandbox` stage — a stage name, never a number). `appWorkRepositorySizeRefusal` decides with the
+      shared table's own `firstRefusingRepositoryStage` and answers the new refusal `repositoryTooLarge` (stage, size,
+      limit, the S35 copy; an unmeasurable size is refused wherever a limit exists).
+      `IsolatedRunAdmissionService.admit` asks it FIRST, before any placement rule, so site 1, every Fleet enqueue
+      and the cloud pre-flight all refuse alike. **Today the table states no size for `sandbox`**
+      (`APP_REPOSITORY_STAGES_WITHOUT_SPEC_LIMIT`), so nothing is refused and the size is never read (no provider
+      call added). The day a number lands there, every App Work run checks against it with no change here. The read
+      (`repositorySizeKb`) is APW-01 Inspect's own: `GitFacadeService.getRepository(...).sizeKb`, bound optionally
+      in `apps/api` `isolated-run-admission.providers.ts`. Spec `repo-size-limit` 9/9: the table, the stage Inspect
+      names, the copy, inside the limit, unmeasurable, the no-local-constant source assertion, and through the
+      service: no read today, refusal before placement once a limit is entered, fail closed on a failed read.
 
 - [ ] **T54. Keyed Task-thread posts (APW08-G12, FR-43).**
       **Status (2026-10-29, lane L5, branch `feat/apw08-thread-posts`): built** — migration `1792330000000-AddTaskChatMessageKey` (stamped after the newest App Works migration, like slot `00`; `followUpKey` already shipped with `1792320000000-AddTaskDeliveryState`), `TaskChatMessage.messageKey` / `messageParams`, nullable `authorId` and `TaskChatAuthorType` (`'system'`); `TaskChatService.post` and `TaskWorkspaceService.postSystemMessage` accept a key and params with the English in `body`; the delivery chain posts through the `TASK_THREAD_POSTER` token; the Task page renders a stored key in the reader's locale (`TaskChatMessageText`) and falls back to `body`.

@@ -8,6 +8,7 @@ import {
 import { AgentRunRepository, DatabaseModule } from '@ever-works/agent/database';
 import { AGENT_CONVERSATION_REPLY_DISPATCHER } from '@ever-works/agent/conversations';
 import { UsageModule } from '@ever-works/agent/usage';
+import { FacadesModule } from '@ever-works/agent/facades';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
 // AgentRepository so the TasksController + TaskChatController can
 // inject it for mention-lookup population. Without this import the
@@ -140,6 +141,11 @@ function tasksControllers(): Type<unknown>[] {
         KnowledgeBaseModule,
         FleetApiModule,
         AgentActivityLogModule,
+        // APW-08 T53 (FR-72) — `GitFacadeService`, for the isolated-run admission's repository-size
+        // read (APW-01 Inspect's `getRepository(...).sizeKb`). The same import the App Works and
+        // Works modules use; without it the read would be unbound and, once the checkout stage
+        // has a limit, every App Work run would be refused as unmeasurable.
+        FacadesModule,
     ],
     controllers: tasksControllers(),
     providers: [
