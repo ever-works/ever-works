@@ -117,16 +117,6 @@ export interface IsolatedRunAdmissionReads {
         pinnedNodeFor?(userId: string, agentId: string): Promise<string | null>;
         /** The node's latest RAW containment report (an `agent-task` result block), or null. */
         latestContainment(userId: string, nodeId: string): Promise<unknown>;
-        /**
-         * APW-08 T51 — did the node's latest completed run of `taskId`, finished at or after
-         * `sinceMs`, report a check with `reason: 'missingTool'`?
-         */
-        missingToolReportedFor?(
-            userId: string,
-            nodeId: string,
-            taskId: string,
-            sinceMs: number,
-        ): Promise<boolean>;
     };
     /** GAP-15: can the platform mint a push credential for `owner/repo` for this user? */
     pushCredential?(userId: string, owner: string, repo: string): Promise<boolean>;
@@ -329,15 +319,24 @@ export class IsolatedRunAdmissionService
         nodeId: string;
         taskId?: string | null;
     }): Promise<boolean> {
-        if (!input.taskId || !this.reads.fleet?.missingToolReportedFor) return false;
-        return this.safe('missing-tool report', false, () =>
-            this.reads.fleet!.missingToolReportedFor!(
-                input.userId,
-                input.nodeId,
+        if (!input.taskId || !this.reads.runs?.findRecentForTask) return false;
+        // The Task's own recent runs, newest first — a handful of rows by `taskId` (CodeRabbit on
+        // #3045: scanning the NODE's jobs let 25 other runs push this Task's report out of reach).
+        // The run record the reconciler wrote carries the node and the `missingTool` flag.
+        const since = this.now().getTime() - APP_WORK_MISSING_TOOL_EXCLUSION_MS;
+        return this.safe('missing-tool report', false, async () => {
+            const runs = await this.reads.runs!.findRecentForTask!(
                 input.taskId!,
-                this.now().getTime() - APP_WORK_MISSING_TOOL_EXCLUSION_MS,
-            ),
-        );
+                CONTAINMENT_RUNS_SCAN,
+            );
+            for (const run of runs) {
+                const record = readAgentRunContainmentRecord(run.containment);
+                if (!record || record.nodeId !== input.nodeId) continue;
+                // The node's LATEST recorded run of this Task decides, inside the window only.
+                return record.missingTool === true && Date.parse(record.reportedAt) >= since;
+            }
+            return false;
+        });
     }
 
     // ── T48: the reconciler's record ─────────────────────────────────────
@@ -349,6 +348,8 @@ export class IsolatedRunAdmissionService
         workId: string;
         nodeId: string | null;
         rawContainment: unknown;
+        /** APW-08 T51 — a check on this run reported its tool missing on `nodeId`. */
+        missingTool?: boolean;
     }): Promise<boolean> {
         if (!this.reads.runs?.recordContainment || !input.workId) return false;
         const containment = toAppWorkRunContainment(input.rawContainment);
@@ -360,6 +361,7 @@ export class IsolatedRunAdmissionService
                 ...containment,
                 nodeId: input.nodeId,
                 reportedAt: this.now().toISOString(),
+                ...(input.missingTool === true ? { missingTool: true } : {}),
             });
             return true;
         } catch (err) {

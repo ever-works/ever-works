@@ -112,7 +112,13 @@ function CheckRow({
                     <>
                         <span
                             className={cn(
-                                'text-[10px] font-semibold uppercase tracking-wide shrink-0',
+                                'text-[10px] font-semibold uppercase tracking-wide',
+                                // APW-08 T51 — the missing-tool label is a sentence: it may wrap on a
+                                // narrow Task view, so the exit code and duration stay visible
+                                // (CodeRabbit on #3045). Every other label keeps its single word.
+                                result.status === 'error' && result.reason === 'missingTool'
+                                    ? 'min-w-0 break-words text-right normal-case tracking-normal'
+                                    : 'shrink-0',
                                 RESULT_TONES[result.status] ?? 'text-text-muted',
                             )}
                         >

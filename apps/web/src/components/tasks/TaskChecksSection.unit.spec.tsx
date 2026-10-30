@@ -39,8 +39,11 @@ describe('TaskChecksSection — the missing-tool row (APW-08 T51)', () => {
 
     it('an `error` with reason missingTool reads as a missing tool', () => {
         renderWith({ status: 'error', exitCode: 127, reason: 'missingTool' });
-        expect(screen.getByText('result.missingTool')).toBeTruthy();
+        const label = screen.getByText('result.missingTool');
         expect(screen.queryByText('result.error')).toBeNull();
+        // A sentence, so it may wrap on a narrow view (CodeRabbit on #3045); a word never does.
+        expect(label.className).toContain('min-w-0');
+        expect(label.className).not.toContain('shrink-0');
     });
 
     it('any other `error`, and a red, keep their own labels', () => {

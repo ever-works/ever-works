@@ -1326,6 +1326,18 @@ export class FleetAgentTaskReconcilerService {
         if (typeof workId !== 'string' || workId.length === 0) return;
         const raw = event.result?.containment;
         if (raw === undefined || raw === null) return;
+        // APW-08 T51 (FR-61, S36) — a check on this run whose tool was missing on the node (the
+        // node marks exit 127 / 9009 `reason: 'missingTool'`): recorded on the run, with the node,
+        // so the lease passes that node over for this Task (`IsolatedRunAdmissionService`).
+        const checks = (event.result as { checks?: unknown } | null | undefined)?.checks;
+        const missingTool =
+            Array.isArray(checks) &&
+            checks.some(
+                (check) =>
+                    !!check &&
+                    typeof check === 'object' &&
+                    (check as { reason?: unknown }).reason === 'missingTool',
+            );
         await this.bestEffort('containment record', () =>
             this.containmentRecorder!.recordRunContainment({
                 taskId: ctx.taskId,
@@ -1334,6 +1346,7 @@ export class FleetAgentTaskReconcilerService {
                 workId,
                 nodeId: event.nodeId,
                 rawContainment: raw,
+                ...(missingTool ? { missingTool: true } : {}),
             }),
         );
     }

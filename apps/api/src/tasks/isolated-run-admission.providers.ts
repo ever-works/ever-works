@@ -144,32 +144,6 @@ export const ISOLATED_RUN_ADMISSION_PROVIDERS: Provider[] = [
                         }
                         return null;
                     },
-                    // APW-08 T51 — the node's LATEST completed run of this Task (its own job row),
-                    // inside the window: did a check report `reason: 'missingTool'`?
-                    missingToolReportedFor: async (userId, nodeId, taskId, sinceMs) => {
-                        const rows = await jobRows.findLatestCompletedAgentTasksForNode(
-                            userId,
-                            nodeId,
-                            NODE_JOBS_SCAN,
-                        );
-                        const latest = rows.find(
-                            (row) =>
-                                (row.payload as { taskId?: unknown } | null)?.taskId === taskId,
-                        );
-                        if (!latest?.completedAt || latest.completedAt.getTime() < sinceMs) {
-                            return false;
-                        }
-                        const checks = (latest.result as { checks?: unknown } | null)?.checks;
-                        return (
-                            Array.isArray(checks) &&
-                            checks.some(
-                                (check) =>
-                                    !!check &&
-                                    typeof check === 'object' &&
-                                    (check as { reason?: unknown }).reason === 'missingTool',
-                            )
-                        );
-                    },
                 },
                 pushCredential: async (userId, owner, repo) =>
                     (
