@@ -7186,6 +7186,7 @@
                     "other": "Depo kurulurken bir sorun oluştu."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Work Deposu",
                     "upstream": "Kaynak depo",

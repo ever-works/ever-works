@@ -7186,6 +7186,7 @@
                     "other": "เกิดข้อผิดพลาดระหว่างตั้งค่ารีโพสิทอรี"
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "แอป",
                     "repository": "รีโพสิทอรีของ Work",
                     "upstream": "อัปสตรีม",

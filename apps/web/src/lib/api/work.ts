@@ -1011,6 +1011,16 @@ export const workAPI = {
     },
 
     /**
+     * APW-08 T49 (FR-74, R-30) — the operator's App Works switches, for the read-only banner. The
+     * dispatchers enforce them on their own; this only lets the page say so first.
+     */
+    getAppWorkSwitches: async (): Promise<{ changesEnabled: boolean; autoDeployEnabled: boolean }> => {
+        return serverFetch<{ changesEnabled: boolean; autoDeployEnabled: boolean }>(
+            `/app-works/switches`,
+        );
+    },
+
+    /**
      * **Sync now** (FR-33). Answers as soon as the job is queued; a refusal is
      * an `ApiResponseError` whose `code` is one of `no_upstream`, `not_ready`,
      * `sync_in_progress`, `sync_paused`, `sync_limit_reached` (`plan.md:504-516`).

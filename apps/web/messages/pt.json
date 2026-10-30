@@ -7186,6 +7186,7 @@
                     "other": "Algo deu errado ao configurar o repositório."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "Aplicativo",
                     "repository": "Repositório do Work",
                     "upstream": "Upstream",

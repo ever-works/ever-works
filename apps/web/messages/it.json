@@ -7186,6 +7186,7 @@
                     "other": "Si è verificato un problema durante la configurazione del repository."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Repository del Work",
                     "upstream": "Upstream",

@@ -7255,6 +7255,7 @@
                     "other": "Нещо се обърка при настройването на хранилището."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "Приложение",
                     "repository": "Хранилище на Работата",
                     "upstream": "Upstream",

@@ -7186,6 +7186,7 @@
                     "other": "रिपॉज़िटरी सेट अप करते समय कुछ गलत हो गया।"
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "कार्य रिपॉज़िटरी",
                     "upstream": "अपस्ट्रीम",

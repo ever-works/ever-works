@@ -9444,6 +9444,7 @@
                     "other": "Something went wrong while setting up the repository."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Work Repository",
                     "upstream": "Upstream",

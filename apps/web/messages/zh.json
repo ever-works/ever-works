@@ -7186,6 +7186,7 @@
                     "other": "设置仓库时出现问题。"
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Work 仓库",
                     "upstream": "上游仓库",

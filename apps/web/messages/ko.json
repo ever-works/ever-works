@@ -7186,6 +7186,7 @@
                     "other": "리포지토리를 설정하는 중에 문제가 발생했습니다."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Work 리포지토리",
                     "upstream": "업스트림",

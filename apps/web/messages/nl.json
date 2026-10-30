@@ -7186,6 +7186,7 @@
                     "other": "Er ging iets mis bij het instellen van de repository."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Work-repository",
                     "upstream": "Upstream",

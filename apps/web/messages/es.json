@@ -7255,6 +7255,7 @@
                     "other": "Algo salió mal al configurar el repositorio."
                 },
                 "overview": {
+                    "changesPaused": "Changes to apps are paused by the operator.",
                     "title": "App",
                     "repository": "Repositorio del Trabajo",
                     "upstream": "Upstream",

@@ -1138,6 +1138,14 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       `pnpm --filter @ever-works/agent test app-work-kill-switch`.
       **Done when**: the spec is green and every pre-existing dispatcher spec passes unchanged with the switches at
       their defaults.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-switch-banner`): the web read-only banner
+      built, not merged.** `GET /api/app-works/switches` (`AppWorkSwitchesController`, any signed-in caller — two
+      booleans of installation config, nothing per Work) answers `readAppWorkSwitches()` as the dispatchers read it.
+      The App Work Overview reads it fail-soft: with changes off it shows **"Changes to apps are paused by the
+      operator."** (S34; `role="status"`) and offers no **Request a change** (R-30: the UI is read-only); boards,
+      delivery chains, the chat entry and history stay readable. Specs: `app-work-switches.controller` 3/3,
+      `AppWorkOverviewCard.unit` 2/2 (bite-proven). **Still not built:** park-with-auto-resume (a refused Task is run
+      again by hand) and the Mission tick read (T35).
 
 - [ ] **T50. One-off backfill of App Work isolation columns (APW08-G07).**
       **Status (2026-10-30, lane L8, branch `feat/apw08-app-isolation`): built, NOT run anywhere** — `AppWorkIsolationBackfillRunner.run({ limit, afterId, dryRun })` visits one keyset page of `kind = 'app'` Works with no base branch (`WorkRepository.findAppWorkIdsWithoutIsolationBase`), resolves through T11's `AppWorkIsolationService.resolveSourceBranch` and writes the three columns through its `apply` (no copy of either; a source-text case pins it). Exposed as the one-shot Trigger task `app-work-isolation-backfill` (`packages/tasks/src/tasks/trigger/app-work-isolation-backfill.task.ts`, never scheduled), which loops pages over the internal RPC channel (`TriggerInternalModule` proxy + `TriggerInternalController.remoteMap` entry, `run` only); `{ "dryRun": true }` previews. The checks switches (APW08-G02) are deliberately NOT backfilled — an owner question on the PR. The prod run is the owner's call; `docs/features/app-works.md` records the job (T44's `app-works-evolve.md` does not exist yet).
