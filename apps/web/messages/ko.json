@@ -4278,6 +4278,7 @@
                         "title": "각 값의 출처",
                         "admin": "플러그인 설정",
                         "env": "환경",
+                        "platform": "Ever Platform",
                         "default": "기본값",
                         "unset": "설정되지 않음"
                     },

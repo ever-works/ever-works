@@ -4278,6 +4278,7 @@
                         "title": "Her değerin kaynağı",
                         "admin": "Eklenti ayarları",
                         "env": "Ortam",
+                        "platform": "Ever Platform",
                         "default": "Varsayılan",
                         "unset": "Ayarlanmadı"
                     },

@@ -108,8 +108,8 @@ export interface EverIdLogoutUrlResponse {
     state: string;
 }
 
-/** Where an administrator's setting came from. */
-export type EverIdSettingSource = 'admin' | 'env' | 'default' | 'unset';
+/** Where an administrator's setting came from (`platform`: handed over by Ever Platform). */
+export type EverIdSettingSource = 'admin' | 'env' | 'platform' | 'default' | 'unset';
 
 /** One terminal client allowed to exchange an Ever ID token for a session. */
 export interface EverIdLocalClientSetting {

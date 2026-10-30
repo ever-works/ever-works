@@ -4347,6 +4347,7 @@
                         "title": "Provenance de chaque valeur",
                         "admin": "Paramètres du plugin",
                         "env": "Environnement",
+                        "platform": "Ever Platform",
                         "default": "Par défaut",
                         "unset": "Non défini"
                     },

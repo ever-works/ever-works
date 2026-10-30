@@ -4278,6 +4278,7 @@
                         "title": "Asal setiap nilai",
                         "admin": "Pengaturan plugin",
                         "env": "Lingkungan",
+                        "platform": "Ever Platform",
                         "default": "Bawaan",
                         "unset": "Belum diatur"
                     },

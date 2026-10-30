@@ -128,6 +128,10 @@ export const BACKUP_DROPPED_ENTITIES: readonly string[] = Object.freeze([
     // ACCOUNT, not workspace content, and a restore must never bring back — let
     // alone replay — a deletion request or a still-valid deletion token.
     'AccountDeletionRequest',
+    // Ever Connect: this installation's answers to Ever Platform's deletion and
+    // export requests. They belong to the installation's connection, not to a
+    // workspace, and a restore must never replay an answer to a request.
+    'EverConnectPersonRequest',
 ]);
 
 const DROPPED_ENTITY_SET = new Set(BACKUP_DROPPED_ENTITIES);

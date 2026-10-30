@@ -4278,6 +4278,7 @@
                         "title": "各値の取得元",
                         "admin": "プラグイン設定",
                         "env": "環境",
+                        "platform": "Ever Platform",
                         "default": "既定値",
                         "unset": "未設定"
                     },

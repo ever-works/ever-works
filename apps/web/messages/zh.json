@@ -4278,6 +4278,7 @@
                         "title": "各值的来源",
                         "admin": "插件设置",
                         "env": "环境变量",
+                        "platform": "Ever Platform",
                         "default": "默认值",
                         "unset": "未设置"
                     },

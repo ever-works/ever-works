@@ -6328,6 +6328,7 @@
                         "title": "Where each value comes from",
                         "admin": "Plugin settings",
                         "env": "Environment",
+                        "platform": "Ever Platform",
                         "default": "Default",
                         "unset": "Not set"
                     },

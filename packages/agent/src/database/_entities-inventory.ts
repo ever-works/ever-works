@@ -225,6 +225,8 @@ import { ExternalRecordLink } from '../entities/external-record-link.entity';
 import { IntegrationIdempotencyKey } from '../entities/integration-idempotency-key.entity';
 // Self-serve account deletion — email-link tokens + the audit record.
 import { AccountDeletionRequest } from '../entities/account-deletion-request.entity';
+// Ever Connect — answers to Ever Platform's person deletion and export requests.
+import { EverConnectPersonRequest } from '../entities/ever-connect-person-request.entity';
 
 import {
     PluginEntity,
@@ -593,4 +595,7 @@ export const ENTITIES = [
     // Self-serve account deletion — the email-link token and, once the
     // deletion completes, the PII-free audit record (hashed email + counts).
     AccountDeletionRequest,
+    // Ever Connect — a connected installation's answers to Ever Platform's
+    // deletion and export requests for a person (ids and machine codes only).
+    EverConnectPersonRequest,
 ];

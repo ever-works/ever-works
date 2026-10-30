@@ -96,6 +96,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes (packages + networking) assigned per-Agent.
     'Environment',
+    // Ever Connect — answers to Ever Platform's person deletion and export requests.
+    'EverConnectPersonRequest',
     // Anonymous usage statistics — the one instance row (identity + statistics
     // key), the last 12 send attempts, and the one schedule/lease row.
     'EverInstance',
