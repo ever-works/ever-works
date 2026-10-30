@@ -223,6 +223,11 @@ describe('TaskPrStatusService — checks thread posts (APW-08 FR-43)', () => {
     // never in **Checks failed: {names}.** — and alone it is **Checks passed.**
     describe('advisory App legs (APW-08 T16)', () => {
         const ADVISORY = 'Ever Works check: e2e';
+        // A real App leg is a GitHub Actions job: only that reporter makes a leg advisory.
+        const fromActions = <T extends object>(check: T) => ({
+            ...check,
+            appSlug: 'github-actions',
+        });
         const appChecks = {
             resumeBudget: jest.fn(async () => 2),
             advisoryLegs: jest.fn(async () => new Set([ADVISORY])),
@@ -252,7 +257,7 @@ describe('TaskPrStatusService — checks thread posts (APW-08 FR-43)', () => {
 
         it('names only the required legs when an advisory leg fails beside them', async () => {
             const svc = withAppChecks();
-            read('failing', [red('Ever Works check: type-check'), red(ADVISORY)]);
+            read('failing', [red('Ever Works check: type-check'), fromActions(red(ADVISORY))]);
             await sweep(svc);
 
             expect(chat.post.mock.calls.map((call) => call[1].body)).toEqual([
@@ -262,7 +267,7 @@ describe('TaskPrStatusService — checks thread posts (APW-08 FR-43)', () => {
 
         it('posts Checks passed when the only failing leg is advisory', async () => {
             const svc = withAppChecks();
-            read('failing', [green('Ever Works check: type-check'), red(ADVISORY)]);
+            read('failing', [green('Ever Works check: type-check'), fromActions(red(ADVISORY))]);
             await sweep(svc);
 
             expect(keys()).toEqual(['deliveryPosts.checksPassed']);

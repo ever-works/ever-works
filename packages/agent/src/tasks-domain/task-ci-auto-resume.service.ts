@@ -35,7 +35,11 @@ import type { AgentRun } from '../entities/agent-run.entity';
 import { isAgentReviewRunScope } from './task-agent-review';
 import { resolveTaskDispatchAgentIds } from './task-dispatch-agents';
 import { TASK_APP_CHECKS, type TaskAppChecks } from './task-app-checks.port';
-import { APP_CHECK_LEG_PREFIX, APP_CHECK_REPORTER_SLUG, isAdvisoryAppCheckLeg } from './app-check-legs';
+import {
+    APP_CHECK_LEG_PREFIX,
+    APP_CHECK_REPORTER_SLUG,
+    isAdvisoryAppCheckLeg,
+} from './app-check-legs';
 import {
     REVIEW_FEEDBACK_DATA_NOTICE,
     fenceReviewFeedback,
