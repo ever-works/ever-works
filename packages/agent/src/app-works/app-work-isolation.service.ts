@@ -353,7 +353,10 @@ function usableBranch(value: unknown): string | null {
     if (!branch || branch.length > APP_WORK_BASE_BRANCH_MAX) return null;
     // eslint-disable-next-line no-control-regex
     if (/[\s\u0000-\u001f\u007f~^:?*[\\]/.test(branch)) return null;
-    if (branch === '@' || branch.startsWith('-') || branch.includes('@{')) return null;
+    // `HEAD` is git's own name for the checked-out commit; `--branch` refuses it.
+    if (branch === '@' || branch === 'HEAD' || branch.startsWith('-') || branch.includes('@{')) {
+        return null;
+    }
     if (branch.includes('..') || branch.includes('//')) return null;
     if (branch.startsWith('/') || branch.endsWith('/') || branch.endsWith('.')) return null;
     if (branch.split('/').some((part) => part.startsWith('.') || part.endsWith('.lock'))) {

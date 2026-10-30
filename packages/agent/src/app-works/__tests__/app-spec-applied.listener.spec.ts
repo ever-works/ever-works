@@ -273,6 +273,7 @@ describe('APW-08 T11 — AppWorkSpecAppliedListener', () => {
             '-x',
             '--upload-pack=x',
             '@',
+            'HEAD',
             'a@{1}',
             'a..b',
             'a//b',

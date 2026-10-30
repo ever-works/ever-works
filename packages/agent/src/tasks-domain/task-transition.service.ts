@@ -1479,8 +1479,9 @@ export class TaskTransitionService {
         // App Work refusals above (review of #3036): a session on an App Work
         // Task is a change like any run, so the operator's T49 switch and the
         // FR-9 commit permission bite for it too. Both read nothing unless changes
-        // are paused or the Agent may not commit, and they refuse App Work Tasks
-        // only, so every other session starts as before.
+        // are paused or the Agent may not commit. FR-9 refuses App Work Tasks only
+        // (it fails open). The paused switch fails CLOSED: a Task whose Work is
+        // missing or unreadable is refused too, as every other run already is.
         if (this.sessionSchedules && isFleetSessionScheduleTask(task) && !opts.reviewId) {
             return this.sessionSchedules.dispatch(task, agentId);
         }
