@@ -1,6 +1,6 @@
 import { TASK_COST_RUNS_LIMIT } from '@ever-works/contracts';
 
-import { buildTaskCostView, runReceiptUrl } from './task-cost';
+import { buildTaskCostView, runReceiptUrl, withTaskContainment } from './task-cost';
 
 /**
  * APW-08 T24 (cost half) — `GET /api/tasks/:id/cost` reads the one usage ledger: each run's cost is
@@ -92,5 +92,56 @@ describe('buildTaskCostView (APW-08 T24)', () => {
 
     it('encodes the run id in the receipt link', () => {
         expect(runReceiptUrl('a/b')).toBe('/agents/sessions/a%2Fb');
+    });
+});
+
+/**
+ * APW-08 T48 / T12 (FR-70, S33, ACC-08-34) — the Cost view's containment half: an App Work Task's
+ * latest Fleet run record and the nodes holding its next run. Every other view is returned exactly
+ * as built (no keys added), and a reader that fails never costs the view its cost half.
+ */
+describe('withTaskContainment (APW-08 T48)', () => {
+    const view = {
+        taskId: 't1',
+        runs: [],
+        builds: [],
+        totalCents: 0,
+        currency: 'usd',
+        runsLimit: TASK_COST_RUNS_LIMIT,
+        runsTruncated: false,
+    };
+    const task = { id: 't1', userId: 'u1', workId: 'w1' };
+    const record = {
+        executionPath: 'ordinary' as const,
+        isolatedHome: false,
+        downgrades: [{ control: 'isolated-home', reason: 'inherit' }],
+        needsOwnerAllowance: true,
+        runId: 'r1',
+        nodeId: 'n1',
+        nodeName: 'Maya desktop',
+        reportedAt: '2026-10-30T00:00:00.000Z',
+        reported: true,
+        allowedByOwner: false,
+    };
+
+    it('adds the record and the holds for an App Work Task', async () => {
+        const reader = {
+            describeForTask: jest.fn(async () => ({ containment: record, containmentHolds: [record] })),
+        };
+        const out = await withTaskContainment(view, task, reader);
+        expect(out).toEqual({ ...view, containment: record, containmentHolds: [record] });
+        expect(reader.describeForTask).toHaveBeenCalledWith(task);
+    });
+
+    it('returns every other view exactly as built: no reader, a non-App Task (null), a reader that throws', async () => {
+        expect(await withTaskContainment(view, task, null)).toBe(view);
+        expect(await withTaskContainment(view, task, { describeForTask: async () => null })).toBe(view);
+        expect(
+            await withTaskContainment(view, task, {
+                describeForTask: async () => {
+                    throw new Error('db down');
+                },
+            }),
+        ).toBe(view);
     });
 });
