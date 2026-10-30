@@ -337,14 +337,16 @@ const EXPECTED_WORKER_UNBOUND: readonly Expected[] = [
 
 /**
  * Worker gaps measured RED and NOT wired, whose classification is the OWNER's to make (see
- * {@link OpenGap}). Empty since the owner's C44 ruling (2026-09-30): the 13 measured on 2026-09-26
+ * {@link OpenGap}). Emptied by the owner's C44 ruling (2026-09-30): the 13 measured on 2026-09-26
  * were added to APW-06 T71's status line and moved to {@link EXPECTED_WORKER_UNBOUND}, citing it.
- * A new worker gap with no task or decision behind it lands here, never in the expected list.
+ * One entry since 2026-10-29: the upstream-sync worker's telemetry sink, which waits on an owner
+ * decision. A new worker gap with no task or decision behind it lands here, never in the
+ * expected list.
  */
 const OPEN_WORKER_GAPS: readonly OpenGap[] = [
     {
         key: 'AppUpstreamSyncWorkerModule :: APP_WORKS_TELEMETRY_SINK',
-        reason: "APW-02 T39's fork lifecycle telemetry is emitted in the worker (`app_upstream.sync_finished`, the sync's `app_actions.hygiene`), where no sink exists: `APP_WORKS_TELEMETRY_SINK` is the API's PostHog alias. `AppUpstreamTelemetry` is bound in the worker without one, so an event is counted and dropped, as its docstring says. Measured red 2026-10-30: the class itself was unbound in the worker until then.",
+        reason: "APW-02 T39's fork lifecycle telemetry is emitted in the worker (`app_upstream.sync_finished`, the sync's `app_actions.hygiene`), where no sink exists: `APP_WORKS_TELEMETRY_SINK` is the API's PostHog alias. `AppUpstreamTelemetry` is bound in the worker without one, so an event is counted and dropped, as its docstring says. Measured red 2026-10-29 (UTC): the class itself was unbound in the worker until then.",
         source: 'packages/agent/src/app-works/app-upstream.telemetry.ts:32-33; packages/tasks/src/tasks/trigger/app-upstream-sync.task.ts:147-153',
         routedTo: "Owner decision raised by lane L2 (Gauzy Ever Works #37): give the Trigger worker its own telemetry sink, or relay the worker's events to the API.",
     },
