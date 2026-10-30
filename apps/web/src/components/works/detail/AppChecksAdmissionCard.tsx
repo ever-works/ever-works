@@ -103,6 +103,9 @@ export function AppChecksAdmissionCard({ workId, policy }: AppChecksAdmissionCar
 
     return (
         <div
+            // APW-08 T11 (lane L8, PR #3036) — the checks-change notification links to
+            // `/works/<id>/settings#app-checks`; this anchor is where it lands.
+            id="app-checks"
             className="pt-2 border-t border-card-border dark:border-border-secondary-dark"
             data-testid="app-checks-admission-card"
         >

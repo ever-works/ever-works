@@ -162,6 +162,11 @@ describe('AppChecksAdmissionCard', () => {
         it('is present for an App Work', async () => {
             render(<QualityGatesSettings />);
             expect(screen.getByTestId('app-checks-admission-card')).toBeTruthy();
+            // T11's checks-change notification links to `/works/<id>/settings#app-checks`.
+            expect(screen.getByTestId('app-checks-admission-card').id).toBe('app-checks');
+            expect(document.getElementById('app-checks')).toBe(
+                screen.getByTestId('app-checks-admission-card'),
+            );
             await screen.findByTestId('app-check-row-0');
         });
 
