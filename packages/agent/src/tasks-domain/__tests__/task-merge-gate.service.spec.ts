@@ -397,6 +397,29 @@ describe('TaskMergeGateService', () => {
         );
     });
 
+    // APW-08 T16 — the advisory classification the status read approved on is carried to the
+    // merge, so the facade's LIVE check applies it too. No context, no key: unchanged.
+    it.each([
+        ['an approved merge', { approved: true }],
+        [
+            'a merge no approval is needed for',
+            { policy: { ...NEEDS_APPROVAL, requireHumanApproval: false } },
+        ],
+    ] as const)('hands the App advisory legs on to %s', async (_label, over) => {
+        const { service, taskWorkspace } = build({ ...over, base: 'feature/x' });
+        await service.onPullRequestStatusRefreshed(task(), status(), {
+            advisoryCheckLegs: new Set(['Ever Works check: e2e']),
+        });
+        expect(taskWorkspace.attemptMergeForOpenPullRequest).toHaveBeenCalledWith(
+            expect.objectContaining({ advisoryCheckLegs: ['Ever Works check: e2e'] }),
+        );
+
+        await service.onPullRequestStatusRefreshed(task(), status());
+        expect(taskWorkspace.attemptMergeForOpenPullRequest.mock.calls[1][0]).not.toHaveProperty(
+            'advisoryCheckLegs',
+        );
+    });
+
     // ── everything that stops it ──────────────────────────────────────
 
     it.each([

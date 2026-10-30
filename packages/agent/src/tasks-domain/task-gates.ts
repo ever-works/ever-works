@@ -1,4 +1,6 @@
 import {
+    isAppWorkKind,
+    REPO_DECLARED_COMMAND_ID_PREFIX,
     WORK_CHECKS_POLICIES,
     type GateStatus,
     type GateVerdict,
@@ -27,7 +29,7 @@ export const DEFAULT_GATE_ATTEMPTS = 2;
 
 type TaskChecksSource = Partial<Pick<Task, 'acceptanceChecks'>> | null | undefined;
 type TaskCriteriaSource = Partial<Pick<Task, 'description'>> | null | undefined;
-type WorkChecksSource = Partial<Pick<Work, 'checkDefaults'>> | null | undefined;
+type WorkChecksSource = Partial<Pick<Work, 'checkDefaults' | 'kind'>> | null | undefined;
 type TaskAttemptsSource = Partial<Pick<Task, 'maxGateAttempts'>> | null | undefined;
 type WorkAttemptsSource = Partial<Pick<Work, 'maxGateAttempts'>> | null | undefined;
 type WorkPolicySource = Partial<Pick<Work, 'checksPolicy'>> | null | undefined;
@@ -54,12 +56,28 @@ type WorkPolicySource = Partial<Pick<Work, 'checksPolicy'>> | null | undefined;
  * exactly the conflation the phase exists to remove, so it is removed
  * here, once, rather than at each call site. Use
  * {@link resolveSetupSteps} for the other half.
+ *
+ * AN APP WORK'S APP SPEC CHECKS NEVER RESOLVE HERE (APW-08 T16, FR-13). The
+ * cloud gate runner executes what this returns on shared platform machines,
+ * and FR-13 allows an App spec check to run only on the owner's own Fleet
+ * node or in the App Work's own repository CI. The resolver reads no App spec
+ * today — `checkDefaults` and the Task's checks are owner-authored — so for
+ * `kind: 'app'` this pins that it never gains one: an entry carrying the
+ * `repo/` authorship marker (the only id an App spec check is ever spelled
+ * under, and one the owner-id pattern cannot produce) is dropped, whichever
+ * column a hand-edited row or an import put it in. Every other kind resolves
+ * exactly as before, `repo/` entries included.
  */
 export function resolveAcceptanceChecks(
     task: TaskChecksSource,
     work: WorkChecksSource,
 ): TaskAcceptanceCheck[] {
-    return resolveDeclaredCommands(task, work).filter((check) => check.phase !== 'setup');
+    const checks = resolveDeclaredCommands(task, work).filter((check) => check.phase !== 'setup');
+    if (!isAppWorkKind(work?.kind)) return checks;
+    return checks.filter(
+        (check) =>
+            !(typeof check.id === 'string' && check.id.startsWith(REPO_DECLARED_COMMAND_ID_PREFIX)),
+    );
 }
 
 /**

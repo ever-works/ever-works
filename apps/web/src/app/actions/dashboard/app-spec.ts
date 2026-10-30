@@ -191,3 +191,49 @@ export async function dismissBlueprintUpgradeAction(
         return { success: false as const, data: null, code: blueprintRefusalOf(error) };
     }
 }
+
+/* -------------------------------------------------------------------------- *
+ * APW-08 T14 (lane L9) — the App checks the admission card lists
+ * -------------------------------------------------------------------------- */
+
+/** One App spec check as the admission card shows it — nothing the card does not render. */
+export interface AppSpecCheckRow {
+    name: string;
+    command: string;
+    /** `false` is an advisory check; `true` when the spec leaves it out. */
+    required: boolean;
+}
+
+export type AppSpecChecksActionResult =
+    | { success: true; checks: AppSpecCheckRow[] }
+    | { success: false; checks: null };
+
+/**
+ * The App spec's `checks[]` from the EFFECTIVE spec (`GET /api/works/:id/app-spec`) — the
+ * last evaluation with zero errors (APW-03 FR-20), which is what a run is graded by. At most
+ * 20, the run's own cap, in declared order. A Work with no effective spec yet lists none.
+ * Refusals are never forwarded: the card shows its own copy.
+ */
+export async function getAppSpecChecksAction(workId: string): Promise<AppSpecChecksActionResult> {
+    await requireAuth();
+    try {
+        const state = await workAppSpecAPI.get(workId);
+        const checks = (state.effectiveSpec?.checks ?? [])
+            .slice(0, 20)
+            .flatMap((check) =>
+                typeof check?.name === 'string' && typeof check?.command === 'string'
+                    ? [
+                          {
+                              name: check.name,
+                              command: check.command,
+                              required: check.required !== false,
+                          },
+                      ]
+                    : [],
+            );
+        return { success: true as const, checks };
+    } catch (error) {
+        console.error('[getAppSpecChecksAction]', error);
+        return { success: false as const, checks: null };
+    }
+}

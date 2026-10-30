@@ -621,6 +621,80 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(runDenorm.recordStarted).not.toHaveBeenCalled();
     });
 
+    // APW-08 T13 (FR-14, ACC-08-10) — the node grades only what it ran. The App checks the
+    // planner froze onto the JOB as not admitted are folded in before any reader: the run row,
+    // the finalize gate and the run message all see a gate that is not green.
+    it('folds the job’s not-admitted App checks into the verdict, so a required one keeps it from green', async () => {
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job({
+                    payload: {
+                        taskId: TASK,
+                        runId: RUN,
+                        agentId: AGENT,
+                        userId: USER,
+                        notAdmittedChecks: [
+                            { id: 'repo/check-1', name: 'type-check', required: true },
+                            { id: 'repo/check-2', name: 'e2e', required: false },
+                        ],
+                    },
+                }),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+        expect(runs.updateGateResults).toHaveBeenCalledWith(RUN, {
+            checkResults: [
+                ...successResult.checks!,
+                { id: 'repo/check-1', exitCode: null, status: 'not-admitted', durationMs: 0 },
+                { id: 'repo/check-2', exitCode: null, status: 'not-admitted', durationMs: 0 },
+            ],
+            gateStatus: 'red',
+        });
+        expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledWith(
+            expect.objectContaining({ gateStatus: 'red' }),
+        );
+        // A not-green gate is never announced as "all green" either.
+        expect(taskChat.post.mock.calls[0][1].body).not.toContain('Acceptance checks: all');
+    });
+
+    it('reports a not-admitted ADVISORY check and leaves the gate green', async () => {
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job({
+                    payload: {
+                        taskId: TASK,
+                        runId: RUN,
+                        agentId: AGENT,
+                        userId: USER,
+                        notAdmittedChecks: [{ id: 'repo/check-2', name: 'e2e', required: false }],
+                    },
+                }),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+        // An advisory not-admitted check is reported, and the gate stays green.
+        expect(runs.updateGateResults).toHaveBeenCalledWith(RUN, {
+            checkResults: [
+                ...successResult.checks!,
+                { id: 'repo/check-2', exitCode: null, status: 'not-admitted', durationMs: 0 },
+            ],
+            gateStatus: 'green',
+        });
+        // …but it is never counted, or announced, as a check that passed.
+        expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledWith(
+            expect.objectContaining({ gate: { checksPassed: 1 }, gateStatus: 'green' }),
+        );
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('Acceptance checks: 1 of 2 green.');
+        expect(body).not.toContain('Acceptance checks: all');
+    });
+
     it('reconciles a successful pushed run: gate results, PR, summary, chat, drain', async () => {
         await build().onCompleted(
             new FleetJobCompletedEvent(

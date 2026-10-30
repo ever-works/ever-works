@@ -775,3 +775,93 @@ describe('GitFacadeService.mergePullRequest — merge approval gate (slice AE)',
         );
     });
 });
+
+/**
+ * APW-08 T16 (FR-16; CodeRabbit on #3038) — the merge-time LIVE CI check applies the SAME
+ * required/advisory classification the merge gate approved on. An App Work caller hands the
+ * advisory `Ever Works check: {name}` legs it read at the PR base (`advisoryCheckLegs`); the facade
+ * re-derives the live roll-up over them. It still reads the provider live and still refuses an
+ * incomplete read — only a failing ADVISORY leg reported by `github-actions` stops counting.
+ */
+describe('GitFacadeService.mergePullRequest — App Work advisory legs at merge time (APW-08 T16)', () => {
+    const TYPE_CHECK = 'Ever Works check: type-check';
+    const E2E = 'Ever Works check: e2e';
+    const leg = (
+        name: string,
+        conclusion: 'success' | 'failure',
+        appSlug: string | null = 'github-actions',
+    ) => ({
+        name,
+        status: 'completed' as const,
+        conclusion,
+        appSlug,
+    });
+    const APP_ACTOR = { ...ACTOR, advisoryCheckLegs: [E2E] };
+    const redLive = (checks: ReturnType<typeof leg>[]) =>
+        ({ state: 'open', ciState: 'failing', headSha: HEAD, checks }) as never;
+
+    it('merges an approved App pull request whose only red leg is advisory', async () => {
+        const { facade, plugin } = makeFacade({
+            status: redLive([leg(TYPE_CHECK, 'success'), leg(E2E, 'failure')]),
+        });
+        await expect(
+            facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, APP_ACTOR),
+        ).resolves.toMatchObject({ merged: true });
+        // Still pinned to the live head the check just read.
+        expect(plugin.mergePullRequest).toHaveBeenCalledWith(
+            'o',
+            'r',
+            7,
+            expect.objectContaining({ expectedHeadSha: HEAD }),
+            expect.anything(),
+        );
+    });
+
+    it('still refuses a red REQUIRED leg', async () => {
+        const { facade, plugin } = makeFacade({
+            status: redLive([leg(TYPE_CHECK, 'failure'), leg(E2E, 'success')]),
+        });
+        await expect(
+            facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, APP_ACTOR),
+        ).rejects.toMatchObject({ code: 'pull-request-not-green' });
+        expect(plugin.mergePullRequest).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['another app', 'circleci'],
+        ['an unknown reporter', null],
+    ] as const)('still refuses an advisory-named red check from %s', async (_label, appSlug) => {
+        const { facade, plugin } = makeFacade({
+            status: redLive([leg(TYPE_CHECK, 'success'), leg(E2E, 'failure', appSlug)]),
+        });
+        await expect(
+            facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, APP_ACTOR),
+        ).rejects.toMatchObject({ code: 'pull-request-not-green' });
+        expect(plugin.mergePullRequest).not.toHaveBeenCalled();
+    });
+
+    it('still refuses an incomplete live read, advisory set or not', async () => {
+        const { facade } = makeFacade({
+            status: {
+                ...(redLive([leg(TYPE_CHECK, 'success'), leg(E2E, 'failure')]) as object),
+                checksComplete: false,
+            } as never,
+        });
+        await expect(
+            facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, APP_ACTOR),
+        ).rejects.toMatchObject({ code: 'pull-request-not-green' });
+    });
+
+    it.each([
+        ['no advisory set (every non-App merge)', ACTOR],
+        ['an empty advisory set', { ...ACTOR, advisoryCheckLegs: [] }],
+    ] as const)('keeps the strict provider roll-up with %s', async (_label, actor) => {
+        const { facade, plugin } = makeFacade({
+            status: redLive([leg(TYPE_CHECK, 'success'), leg(E2E, 'failure')]),
+        });
+        await expect(
+            facade.mergePullRequest('o', 'r', 7, undefined, OPTIONS, actor),
+        ).rejects.toMatchObject({ code: 'pull-request-not-green' });
+        expect(plugin.mergePullRequest).not.toHaveBeenCalled();
+    });
+});

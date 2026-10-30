@@ -251,6 +251,24 @@ function prHeads(refs: CheckPullRequestRef[] | undefined): CheckPullRequestHead[
 }
 
 /**
+ * APW-08 T16 — the branch each same-repository pull request merges INTO, as the
+ * provider reports it. The fix loop reads an App Work's advisory legs at this
+ * base (the sweep's `GitPullRequestStatus.baseRef`, on the webhook path).
+ */
+function prBaseRefs(
+    refs: CheckPullRequestRef[] | undefined,
+): { number: number; baseRef: string }[] {
+    return (Array.isArray(refs) ? refs : [])
+        .flatMap((ref) => {
+            const baseRef = nonEmpty(ref?.base?.ref);
+            return typeof ref?.number === 'number' && Number.isFinite(ref.number) && baseRef
+                ? [{ number: ref.number, baseRef }]
+                : [];
+        })
+        .slice(0, 20);
+}
+
+/**
  * Normalize a `check_run` / `check_suite` / `workflow_run` delivery into
  * a `github.check` envelope plus the fix loop's signal, or `null` when
  * the delivery is not a CI result this platform can place.
@@ -299,6 +317,8 @@ export function normalizeGitHubCheck(
     let outputTitle: string | undefined;
     let outputSummary: string | undefined;
     let pulls: CheckPullRequestHead[];
+    // APW-08 T16 — `check_run` only: the per-leg delivery is the one whose base matters.
+    let bases: { number: number; baseRef: string }[] = [];
     let appSlug: string | null;
 
     // ## The head branch is kept only when the delivery PROVES it is ours
@@ -337,6 +357,7 @@ export function normalizeGitHubCheck(
         outputSummary =
             nonEmpty(run.output?.summary ?? undefined) ?? nonEmpty(run.output?.text ?? undefined);
         pulls = prHeads(ownRefs);
+        bases = prBaseRefs(ownRefs);
     } else if (eventName === 'check_suite') {
         const suite = body.check_suite;
         if (!suite) return null;
@@ -462,6 +483,8 @@ export function normalizeGitHubCheck(
             headBranch,
             prNumbers: pulls.map((pull) => pull.number),
             prHeads: pulls,
+            // Conditional key: a delivery naming no base is the signal it always was.
+            ...(bases.length > 0 ? { prBaseRefs: bases } : {}),
             // The PROVIDER's own time, or null. `occurredAt` above is
             // `isoOrNow`-substituted so the envelope is never rejected for
             // a missing timestamp — but a substituted `now` is always the

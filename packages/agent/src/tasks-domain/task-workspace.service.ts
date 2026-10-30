@@ -720,12 +720,21 @@ export class TaskWorkspaceService {
      * import path depends on it), so this is a theoretical gap rather than
      * a live one — but it is a gap, and it is why the FEATURE is opt-in
      * per Work rather than inferred from the file's presence.
+     *
+     * APW-08 T13 — the Work's KIND rides into the parser and the gate. An
+     * App Work's file is the App spec, so its `spec.checks` is read, and a
+     * check the owner has not admitted comes back under `notAdmitted`
+     * instead of refusing the plan (FR-14). Every other kind reads
+     * `spec.tasks` and refuses exactly as before. The opt-in above is NOT
+     * relaxed for an App Work: at the defaults (`repoDeclaredCommands` off)
+     * nothing is read, and switching it on is the `app.spec.applied`
+     * listener's job (T11, APW08-G02), never this reader's.
      */
     async readFleetRepoDeclaredCommands(input: {
         task: Task;
         userId: string;
         workspace: FleetTaskWorkspaceSpec;
-    }): Promise<{ setup: TaskAcceptanceCheck[]; checks: TaskAcceptanceCheck[] }> {
+    }): Promise<ReturnType<typeof admitRepoDeclaredCommands>> {
         const empty = { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] };
         if (!input.task.workId) return empty;
         const work = await this.works.findById(input.task.workId);
@@ -797,12 +806,16 @@ export class TaskWorkspaceService {
             );
         }
 
-        const declared = parseRepoDeclaredCommands((parsed as Record<string, unknown>).spec);
+        const declared = parseRepoDeclaredCommands(
+            (parsed as Record<string, unknown>).spec,
+            work.kind,
+        );
         return admitRepoDeclaredCommands({
             declared,
             policy,
             mountDirs: (input.workspace.mounts ?? []).map((mount) => mount.mountDir),
             repositoryId: `${owner}/${repo}`,
+            kind: work.kind,
         });
     }
 
@@ -2424,6 +2437,12 @@ export class TaskWorkspaceService {
          * {@link AgentMergeActor.requireHumanApproval}.
          */
         requireHumanApproval?: boolean;
+        /**
+         * APW-08 T16 — an App Work pull request's advisory legs, read at the PR
+         * base by the caller; handed to the facade's merge-time CI check
+         * ({@link AgentMergeActor.advisoryCheckLegs}). Absent = strict.
+         */
+        advisoryCheckLegs?: readonly string[] | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task } = input;
         if (!this.gitFacade || !this.mergePolicy) return undefined;
@@ -2467,6 +2486,9 @@ export class TaskWorkspaceService {
             gateStatus: input.gateStatus ?? null,
             headSha: input.headSha ?? task.prHeadSha ?? null,
             requireHumanApproval: input.requireHumanApproval === true,
+            ...(input.advisoryCheckLegs && input.advisoryCheckLegs.length > 0
+                ? { advisoryCheckLegs: input.advisoryCheckLegs }
+                : {}),
         });
     }
 
@@ -2528,6 +2550,8 @@ export class TaskWorkspaceService {
         headSha?: string | null;
         /** Raises the approval requirement; can never clear it (slice AI). */
         requireHumanApproval?: boolean;
+        /** APW-08 T16 — see {@link AgentMergeActor.advisoryCheckLegs}. */
+        advisoryCheckLegs?: readonly string[] | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
         if (!this.mergePolicy || !this.gitFacade) return undefined;
@@ -2598,6 +2622,10 @@ export class TaskWorkspaceService {
                     // requirement — only insist on one the policy did not
                     // ask for.
                     requireHumanApproval: args.requireHumanApproval === true,
+                    // APW-08 T16 — conditional key: every non-App merge's actor is unchanged.
+                    ...(args.advisoryCheckLegs && args.advisoryCheckLegs.length > 0
+                        ? { advisoryCheckLegs: args.advisoryCheckLegs }
+                        : {}),
                 },
             );
 

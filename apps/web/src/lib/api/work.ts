@@ -33,6 +33,7 @@ import type {
     TaskAcceptanceCheck,
     WorkChecksPolicy,
     WorkExternalRefs,
+    WorkRepoDeclaredCommandPolicy,
     AppDeployTargetChoice,
     AppRepositoryMode,
     AppSourceInspectRequest,
@@ -166,6 +167,9 @@ export interface UpdateWorkDto {
     checksPolicy?: WorkChecksPolicy;
     /** Default gate-attempt budget (1..5) for Tasks without their own. */
     maxGateAttempts?: number;
+    /** EW-807 — the commands this Work's machines may run from its repository's own
+     *  declarations (`.works/works.yml`); `null` resets to off. APW-08 T14 writes it. */
+    repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
     /** Merge-policy matrix (Wave 3, D4) — the Work-scoped PARTIAL override.
      *  Omitted fields inherit organization → tenant → platform default;
      *  `null` clears the Work override entirely. */
@@ -404,6 +408,9 @@ export interface Work {
     checkDefaults?: TaskAcceptanceCheck[] | null;
     checksPolicy?: WorkChecksPolicy;
     maxGateAttempts?: number;
+    // EW-807 — repository-declared commands. Absent/null means `off`: nothing
+    // the repository declares is read (APW-08 T14's card reads it).
+    repoDeclaredCommands?: WorkRepoDeclaredCommandPolicy | null;
     // Merge-policy matrix (Wave 3, D4). Absent/null means the Work
     // declares nothing and inherits organization → tenant → default.
     mergePolicy?: MergePolicyOverride | null;
