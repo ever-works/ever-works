@@ -438,6 +438,13 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       var's `0` still switches the loop off. A red advisory leg from the webhook is not a failure. A spent
       budget leads to `BLOCKED` plus a `gate-exhausted` escalation, while a repeat failure still files the
       notice. `resolveAcceptanceChecks` drops `repo/` entries for `app`. The S3 copy note is in `spec.md`.
+      **Review of #3038 (2026-10-30):** for App Works the repeat-failure stop no longer applies; the same red
+      check is retried up to the Work's budget, counted over CI attempts only, then the Task is `BLOCKED`
+      with `gate-exhausted`. A red `check_suite` / `workflow_run` delivery never reds an App Work Task's
+      head; only per-leg `check_run` deliveries, read at the PR base the delivery names, and the sweep's
+      roll-up act. The budget is read below the stop checks. The sweep releases the stop marker when an
+      exhausted App Work Task is unblocked with budget left. Other kinds are unchanged.
+      `task-pr-status.app-checks` is now 17/17.
       Specs: `task-pr-status.app-checks` 9/9 (new); `task-gates` 24/24 (3 new); `task-pr-status.service` 40/40
       unchanged; `task-lifecycle-posts` 26/26 and `task-pr-status.lifecycle-posts` 13/13 (L7's specs, extended);
       `github-check-intake.autoresume.integration` 60/60. **`continue-on-error` fact: unverified.** No failed
