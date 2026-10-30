@@ -382,6 +382,18 @@ default> }`. Without this, `readFleetRepoDeclaredCommands` returns an empty set
       `pnpm --filter @ever-works/github-actions-build-plugin test generator` (the package name APW-05 T7 gives it).
       **Done when**: the spec is green, the golden workflow passes `actionlint` locally, and no diff to
       `generator.ts` is in this task's PR.
+      **Status (2026-10-30, lane L9, branch `test/apw08-app-checks-golden`): golden and assertions green locally, not merged.**
+      `golden/app-checks-two.yml` plus a 9-case block in `generator.spec.ts` (84/84). **One drift was found and
+      fixed in `checks-job.ts`, as the cross-epic request above describes.** APW-05's job-level `if:` guard
+      had only the pull-request leg. It now reads `(<pull-request leg, unchanged>) || (github.event_name ==
+      'push' && github.ref == 'refs/heads/<tracked>')`. APW-05's `checks-job.spec.ts` trigger pin is re-pinned
+      to both legs, just as strictly (17/17), and `golden/checks.yml` changed on that one line only. Every other
+      leg matched the contract: `EW_CHECK_COMMAND_B64`, `contents: read` only, `fail-fast: false`,
+      `max-parallel: 5`, the per-leg name, `persist-credentials: false`, and `continue-on-error` on the
+      advisory leg only. There is no diff to `generator.ts`. **Still open (generator.ts, APW-05 T42):** the
+      checks-only file of `image`/`none` triggers `on: pull_request` alone, so its push leg cannot fire until
+      that file gains `push: branches: [<tracked>]`. `actionlint` is not installed on EVERDESK2, so that leg
+      is unverified here.
 
 - [ ] **T16 (parallel with T15). Cloud gate never runs App checks; required vs advisory legs; the attempt budget.**
       **Modify** `packages/agent/src/tasks-domain/task-gates.ts` `resolveAcceptanceChecks` — for `work.kind === 'app'`,

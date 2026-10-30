@@ -8,6 +8,7 @@ import {
     AppUpstreamPrivateCopyAdapter,
     AppUpstreamStateService,
     AppUpstreamSyncService,
+    AppUpstreamTelemetry,
     appUpstreamWorkerActivitySink,
     type AppUpstreamSyncTrigger,
 } from '@ever-works/agent/app-works';
@@ -143,6 +144,13 @@ const TRIGGERS: readonly AppUpstreamSyncTrigger[] = ['schedule', 'manual', 'dive
             inject: [AppUpstreamStateService],
         },
         AppActionsHygieneService,
+        // APW-02 T39 — `app_upstream.sync_finished` and the sync's `app_actions.hygiene` are
+        // emitted HERE, so both services ask for this class. Bound without a sink: the worker
+        // has none yet (`APP_WORKS_TELEMETRY_SINK` is the API's PostHog alias), so an event is
+        // counted and dropped, as `app-upstream.telemetry.ts` promises. A worker sink, or a relay
+        // to the API, is an open owner decision; binding the class now means only the sink
+        // has to change later.
+        AppUpstreamTelemetry,
         // FR-63 (APW-02 T48) — the private copy's compare and sync-branch move, through the
         // worker's git facade (the provider plugin does the git work; the agent never does).
         AppUpstreamPrivateCopyAdapter,

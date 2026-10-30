@@ -179,7 +179,7 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
   checks:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.ref == 'main'
+    if: (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.base.ref == 'main') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     name: "Ever Works check: ${{ matrix.check.name }}"
     runs-on: "ubuntu-latest"
     timeout-minutes: ${{ matrix.check.timeoutMinutes }}
