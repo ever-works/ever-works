@@ -37,6 +37,11 @@ import { FleetAgentTaskPlannerService } from '../fleet/fleet-agent-task-planner.
 import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-reconciler.service';
 import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksModule } from './tasks.module';
+import { APP_WORK_RUN_ADMISSION } from '@ever-works/agent/app-works';
+import {
+    ISOLATED_RUN_ADMISSION_PROVIDERS,
+    ISOLATED_RUN_ADMISSION_TOKENS,
+} from './isolated-run-admission.providers';
 
 /**
  * TasksModule — the fleet providers' dependencies are actually reachable.
@@ -163,6 +168,28 @@ describe('TasksModule — the fleet providers can resolve their dependencies', (
         // an omission invisible at boot — the routes would just answer 503 —
         // so the export is pinned here instead.
         expect(resolvable.has(TaskBoardService)).toBe(true);
+    });
+
+    it('binds and exports the APW-08 T12 / T48 isolated-run admission ports, over reachable deps', () => {
+        // The agent-side TaskTransitionService, the fleet reconciler and the Cost / allowance
+        // routes inject these @Optional(): unbound or unexported, every App Work run would
+        // dispatch unadmitted and no containment would ever be recorded — with no error.
+        const exported = (Reflect.getMetadata('exports', TasksModule) ?? []) as unknown[];
+        for (const token of ISOLATED_RUN_ADMISSION_TOKENS) {
+            expect(moduleProviders.map(asToken)).toContain(token);
+            expect(exported).toContain(token);
+        }
+        const factory = ISOLATED_RUN_ADMISSION_PROVIDERS.find(
+            (provider) => asToken(provider) === APP_WORK_RUN_ADMISSION,
+        ) as { inject: unknown[] };
+        const unreachable = factory.inject.filter(
+            (dep) => typeof dep === 'function' && !resolvable.has(dep),
+        );
+        expect(unreachable).toEqual([]);
+        // The dispatcher token is this module's own provider.
+        expect(factory.inject.filter((dep) => typeof dep !== 'function')).toEqual(
+            factory.inject.filter((dep) => typeof dep !== 'function' && resolvable.has(dep)),
+        );
     });
 
     it.each(SERVICES)('%s — every class-typed constructor parameter is reachable', (_, Service) => {

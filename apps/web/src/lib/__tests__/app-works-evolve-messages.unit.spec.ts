@@ -23,6 +23,12 @@ import { createTranslator } from 'next-intl';
  *  - the new `dashboard.tasksPage.delivery` leaves (Deploy now's hint, Create a fix Task), inside
  *    the sub-tree already listed.
  *
+ * Lane L10 (T12 / T48, T27's `TaskRunContainmentNotice`) adds:
+ *
+ *  - `dashboard.tasksPage.cost.containment` — the containment notice, inside `cost` above;
+ *  - `dashboard.tasksPage.appRules.containmentDowngrade` / `.allowOnThisMachine` — the S33 copy
+ *    and its action (the rest of `.appRules` is T28's).
+ *
  * `next-intl` falls back per LEAF, but an absent intermediate object collapses the whole subtree
  * into raw key paths, and none of `tsc`, the build or the English e2e lane notices. So:
  *
@@ -44,6 +50,8 @@ const SUBTREES = [
     'dashboard.tasksPage.detail.systemAuthor',
     'dashboard.workDetail.requestChange',
     'dashboard.aiChat.changeCard',
+    'dashboard.tasksPage.appRules.containmentDowngrade',
+    'dashboard.tasksPage.appRules.allowOnThisMachine',
 ] as const;
 
 type Tree = { [key: string]: string | Tree };

@@ -97,6 +97,39 @@ export async function getWorkCostAction(
     }
 }
 
+const nodeIdSchema = z.string().uuid();
+
+/**
+ * APW-08 T48 / T12 (S33, FR-70) — the Task's **Allow on this machine**: accept one Fleet node's
+ * containment downgrade for this App Work (`allow: true`) or withdraw it (`allow: false`). The API
+ * re-checks edit access, that the Work is an App Work and that the node is the caller's own.
+ */
+export async function allowAppRunContainmentAction(
+    workId: string,
+    nodeId: string,
+    allow: boolean,
+): Promise<AppChangeActionResult<null>> {
+    await requireUser();
+    if (
+        !workIdSchema.safeParse(workId).success ||
+        !nodeIdSchema.safeParse(nodeId).success ||
+        typeof allow !== 'boolean'
+    ) {
+        return {
+            success: false,
+            statusCode: 400,
+            code: 'invalid_request',
+            error: 'Invalid request',
+        };
+    }
+    try {
+        await appChangesAPI.allowContainment(workId, { nodeId, allow });
+        return { success: true, data: null };
+    } catch (error) {
+        return failure('change the containment allowance', error);
+    }
+}
+
 /**
  * APW-08 T26 — the names the chat's change card confirms with ("Start a change on Bookings? ·
  * Wren will work on it."): the App Work's and, when the request names one, the Agent's. Both are

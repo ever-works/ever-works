@@ -9,6 +9,8 @@ export * from './fleet-node.repository';
 export * from './fleet-node-credential';
 export * from './fleet-job.service';
 export * from './fleet-job.repository';
+// APW-08 T12 / T48 — the lease half of isolated-run admission (a leaf port).
+export * from './fleet-app-work-lease-admission.port';
 export * from './fleet-execution-preference.service';
 export * from './fleet-execution-preference.repository';
 export * from './fleet-agent-node-affinity.service';

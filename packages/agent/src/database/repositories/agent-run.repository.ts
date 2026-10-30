@@ -1109,6 +1109,18 @@ export class AgentRunRepository {
     }
 
     /**
+     * APW-08 T48 — record the containment a Fleet run of an App Work Task got
+     * (`agent_runs.containment`). Written by the fleet reconciler's recorder, already
+     * normalized; a replayed completion writes the same record again (idempotent).
+     */
+    async recordContainment(
+        runId: string,
+        containment: NonNullable<AgentRun['containment']>,
+    ): Promise<void> {
+        await this.repository.update(runId, { containment });
+    }
+
+    /**
      * Session detail (Feature K) — merge tool-loop-observed file paths
      * into `workspaceMeta.filesTouched`, preserving whatever provision
      * audit is already on the row. Deduplicated, order-preserving, and

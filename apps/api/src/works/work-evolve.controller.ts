@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     Get,
+    HttpCode,
     HttpException,
     HttpStatus,
     Inject,
@@ -25,9 +26,11 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { isAppWorkKind } from '@ever-works/contracts';
 import {
+    APP_WORK_RUN_ADMISSION,
     AppChangeRequestService,
     AppProvisioningService,
     EVOLVE_APP_AGENT_TEMPLATE,
+    type IsolatedRunAdmissionService,
     PROVISION_LABEL,
     type AppChangeRequestResult,
     type AppProvisioningCancelResult,
@@ -42,8 +45,14 @@ import {
     type UpstreamPullRequestOpenResult,
 } from '@ever-works/agent/upstream-pull-requests';
 import { AuthSessionGuard, CurrentUser } from '../auth';
+import { requireHumanSession } from '../auth/machine-principal';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { EvolveWorkDto, ProvisionWorkDto, UpstreamPullRequestDto } from './dto/evolve-work.dto';
+import {
+    AllowAppRunContainmentDto,
+    EvolveWorkDto,
+    ProvisionWorkDto,
+    UpstreamPullRequestDto,
+} from './dto/evolve-work.dto';
 
 /**
  * APW-08 T25 + APW-04 — the App Work's "change it" and "provision it" doors.
@@ -56,6 +65,7 @@ import { EvolveWorkDto, ProvisionWorkDto, UpstreamPullRequestDto } from './dto/e
  * | `POST /api/works/:id/provision/cancel` | APW-04: stop the open provisioning Task and its live runs |
  * | `GET  /api/works/:id/provisioning` | the open and recent `app-provision` Tasks |
  * | `POST /api/works/:id/upstream-pr` | APW-09: offer a fork branch (or a Task's branch) upstream as a draft PR |
+ * | `POST /api/works/:id/app-runs/allow-containment` | APW-08 T48: **Allow on this machine** — one node's containment downgrade, on this App Work (or withdraw it) → `204` |
  *
  * Everything after the Task exists is the existing Task / run machinery: follow a change
  * with `GET /api/tasks/:taskId` (status, `branchRef`, `prUrl`, `prState`, `ciState`), its
@@ -84,6 +94,15 @@ export class WorkEvolveController {
         // waiting for them (a member's request files the Task but never starts the owner's
         // Agent). @Optional() and appended LAST; bound by the api-side @Global() InboxModule.
         @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
+        // APW-08 T48 / T12 — the per-node containment allowance store behind
+        // `app-runs/allow-containment`. @Optional() and appended LAST; bound by the api-side
+        // @Global() TasksModule (`isolated-run-admission.providers.ts`). Absent, the route is 503.
+        @Optional()
+        @Inject(APP_WORK_RUN_ADMISSION)
+        private readonly containmentAllowances?: Pick<
+            IsolatedRunAdmissionService,
+            'setContainmentAllowance'
+        >,
     ) {}
 
     private readonly logger = new Logger(WorkEvolveController.name);
@@ -394,6 +413,104 @@ export class WorkEvolveController {
         });
         response.status(result.httpStatus);
         return result;
+    }
+
+    @Post(':id/app-runs/allow-containment')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Allow (or withdraw) a Fleet machine’s containment downgrade for this App Work',
+        description:
+            'APW-08 FR-12 / FR-70 (S33). A Fleet node that reports its model step ran without the per-run ' +
+            'isolated home — or that has not reported its containment yet — does not receive a new App Work run ' +
+            'until the owner allows it once for that node. `allow: true` adds the allowance (one per node, on ' +
+            'this App Work only, never implied for another node or Work); `allow: false` withdraws it. The node ' +
+            'must be one of your own enrolled machines. An allowance accepts a downgrade of the model step’s ' +
+            'environment only: it never widens the Agent’s tools, protected paths, merge policy or target branch.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 204, description: 'Allowed or withdrawn.' })
+    @ApiResponse({
+        status: 404,
+        description:
+            '`not_found` — the Work is missing or not editable; `notFound` — the node is unknown or not yours.',
+    })
+    @ApiResponse({
+        status: 403,
+        description:
+            'Not a person: an API key, an automation or a fleet run token cannot decide this.',
+    })
+    @ApiResponse({ status: 409, description: '`conflict` — concurrent changes; nothing written.' })
+    @ApiResponse({ status: 422, description: '`notAppWork`.' })
+    @ApiResponse({ status: 503, description: '`unavailable` — the allowance store is not wired.' })
+    async allowContainment(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: AllowAppRunContainmentDto,
+    ): Promise<void> {
+        // CodeRabbit (#3040) — accepting a containment downgrade is a PERSON's decision: an API
+        // key, an integration key, an automation or a fleet run token cannot make it, for an
+        // allowance or a withdrawal alike. Refused before anything is read or written.
+        requireHumanSession(
+            auth,
+            body?.allow === true
+                ? 'allow a containment downgrade'
+                : 'withdraw a containment allowance',
+        );
+        const access = await this.authorize(id, auth.userId, 'edit', true);
+        if (!this.containmentAllowances) {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'unavailable',
+                    message: 'Containment allowances are not available on this server.',
+                },
+                HttpStatus.SERVICE_UNAVAILABLE,
+            );
+        }
+        const result = await this.containmentAllowances.setContainmentAllowance({
+            workId: access.work.id,
+            nodeId: body?.nodeId ?? '',
+            allow: body?.allow === true,
+            actorUserId: auth.userId,
+        });
+        if (result.status === 'ok') return;
+        if (result.status === 'notAppWork') {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'notAppWork',
+                    message: `Work ${id} is not an App Work.`,
+                },
+                HttpStatus.UNPROCESSABLE_ENTITY,
+            );
+        }
+        if (result.status === 'conflict') {
+            // Lost the compare-and-set race every attempt: nothing was written; try again.
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'conflict',
+                    message: 'The allowances changed while saving. Try again.',
+                },
+                HttpStatus.CONFLICT,
+            );
+        }
+        if (result.status === 'unavailable') {
+            throw new HttpException(
+                {
+                    status: 'error',
+                    code: 'unavailable',
+                    message: 'Containment allowances are not available on this server.',
+                },
+                HttpStatus.SERVICE_UNAVAILABLE,
+            );
+        }
+        // Plan §4: an unknown nodeId (or another account's node) is one 404 `notFound`.
+        throw new HttpException(
+            { status: 'error', code: 'notFound', message: 'Fleet node not found.' },
+            HttpStatus.NOT_FOUND,
+        );
     }
 
     /** View/edit access to an App Work, or the one refusal each failure gets. */

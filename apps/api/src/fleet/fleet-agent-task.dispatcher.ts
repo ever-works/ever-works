@@ -17,6 +17,13 @@ import type {
 } from '@ever-works/contracts';
 import { FLEET_BYO_MODEL_PLUGIN_ID_PREFIX, fleetModelPluginId } from '@ever-works/contracts';
 import type { FleetKillSwitchService } from '@ever-works/agent/fleet';
+import {
+    APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+    AppWorkRunNotAdmittedError,
+    isAppWorkRunRefusal,
+    type AppWorkRunAdmissionGate,
+    type AppWorkRunPlacementPreview,
+} from '@ever-works/agent/app-works';
 import { FleetDelegationScopeRefusedError } from './fleet-agent-task-plan.error';
 import {
     FLEET_DELEGATION_SCOPE_UNVERIFIABLE,
@@ -223,6 +230,17 @@ export interface FleetAwareDispatcherDeps {
      * failed write, never changes a dispatch.
      */
     runs?: Pick<AgentRunRepository, 'recordDispatchRunner'>;
+    /**
+     * APW-08 T12 / T48 (review of #3040, MAJOR 1) — the Fleet half of isolated-run admission,
+     * asked for EVERY Fleet-bound enqueue: `dispatchAgentRun`'s own, and the ones that never pass
+     * it — the gate's drain and promotion of a parked run, every resume (the CI fix loop, an
+     * answered question), assign-task. Same predicate, same codes as site 1; a refusal or a hold
+     * is thrown as `AppWorkRunNotAdmittedError` (never a cloud fallback) and the enqueue site
+     * records it on the run row. An admitted App Work run is stamped `appWorkId`, which the lease
+     * uses to judge the node that actually takes the job. Absent, nothing is asked and every
+     * enqueue is exactly as before.
+     */
+    appWorkAdmission?: Pick<AppWorkRunAdmissionGate, 'admit'>;
 }
 
 /**
@@ -334,9 +352,12 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             }
 
             let decision: FleetRunRoutingDecision = { target: 'cloud', mode: 'cloud' };
+            // APW-08 T12 — kept for the Fleet half of isolated-run admission below.
+            let scope: FleetExecutionScopeQuery = {};
+            let requirements: FleetAgentTaskRequirements | null = null;
             try {
-                const scope = await resolveScope(deps.scopeResolver, payload.taskId);
-                const requirements = await resolveRequirements(deps.planner, payload);
+                scope = await resolveScope(deps.scopeResolver, payload.taskId);
+                requirements = await resolveRequirements(deps.planner, payload);
                 decision = await router.routeAgentTask(
                     payload,
                     scope,
@@ -381,6 +402,10 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                 if (deps.planner?.refuseAgentReviewRun) {
                     await deps.planner.refuseAgentReviewRun(payload);
                 }
+                // APW-08 T12 / T48 — the Fleet half of isolated-run admission, for every Fleet
+                // enqueue (drained, promoted and resumed runs included), before any job exists.
+                // Outside any try: a refusal propagates and is never a cloud fallback.
+                await refuseUnadmittedAppWorkFleetRun(deps, payload, scope, requirements);
                 const plan = deps.planner ? await deps.planner.plan(payload) : null;
                 markDelegationScopeCleared(payload);
                 const handle = await router.enqueueAgentTask(
@@ -443,7 +468,127 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             await recordDispatchRunner(deps, payload, null);
             return delegate.enqueue(payload);
         },
+        // APW-08 T12 — see `previewAgentTaskPlacement` below.
+        previewPlacement: (payload) => previewAgentTaskPlacement(router, deps, payload),
     };
+}
+
+/**
+ * APW-08 T12 / T48 (review of #3040, MAJOR 1) — the Fleet half of isolated-run admission at the
+ * one choke point every Fleet enqueue passes, whoever called `enqueue`.
+ *
+ * The scope lookup already resolved the Task's Work; when it came back without one the gate reads
+ * the Task itself (`workId: undefined`) and a Task it cannot read is refused `work-unreadable`, so
+ * a failed lookup never waves an App Work run through. A Task on any other kind (or with no Work)
+ * is answered `null` and enqueues exactly as before. An admitted App Work run is stamped
+ * `appWorkId` for the router to copy onto the job, so the LEASE judges the node that takes it and
+ * the reconciler records what it got. The gate itself throwing refuses too (fail closed).
+ */
+async function refuseUnadmittedAppWorkFleetRun(
+    deps: FleetAwareDispatcherDeps,
+    payload: AgentTaskExecuteDispatchPayload,
+    scope: FleetExecutionScopeQuery,
+    requirements: FleetAgentTaskRequirements | null,
+): Promise<void> {
+    if (!deps.appWorkAdmission) return;
+    const workId = typeof scope.workId === 'string' && scope.workId ? scope.workId : undefined;
+    let verdict: Awaited<ReturnType<AppWorkRunAdmissionGate['admit']>>;
+    try {
+        verdict = await deps.appWorkAdmission.admit({
+            task: {
+                id: payload.taskId,
+                userId: payload.userId,
+                workId,
+                tenantId: payload.tenantId ?? null,
+                organizationId: payload.organizationId ?? null,
+            },
+            agent: { id: payload.agentId, userId: payload.userId },
+            placement: {
+                placement: 'fleet',
+                ...(requirements
+                    ? { requiredCapabilities: [...requirements.requiredCapabilities] }
+                    : {}),
+            },
+        });
+    } catch (err) {
+        logger.warn(
+            `Fleet admission for task ${payload.taskId} failed — refusing the run (fail closed): ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+        throw new AppWorkRunNotAdmittedError({
+            admitted: false,
+            outcome: 'refused',
+            code: 'noIsolatedRuntime',
+            message: APP_WORK_NO_ISOLATED_RUNTIME_MESSAGE,
+        });
+    }
+    if (!verdict) return;
+    if (isAppWorkRunRefusal(verdict)) {
+        logger.warn(
+            `Fleet enqueue of ${payload.runId ? `run ${payload.runId}` : `task ${payload.taskId}`} refused by isolated-run admission (${verdict.outcome}, ${verdict.code}).`,
+        );
+        throw new AppWorkRunNotAdmittedError(verdict);
+    }
+    const appWorkId = verdict.workId ?? workId;
+    if (typeof appWorkId === 'string' && appWorkId) payload.appWorkId = appWorkId;
+}
+
+/**
+ * APW-08 T12 (APW08-G11) — the placement {@link createFleetAwareAgentTaskExecuteDispatcher}'s
+ * `enqueue` WOULD choose for this payload, through the SAME `routeAgentTask` call with the same
+ * scope and requirements, writing nothing: no job, no run-runner stamp, no fallback notice.
+ *
+ * `TaskTransitionService.dispatchAgentRun` asks it for a Task on an App Work only, ahead of the
+ * dispatch gate, and hands it to the isolated-run admission predicate:
+ *
+ * - `fleet` / `fleet-waiting` → `'fleet'`, with the capability tags the job will require (so the
+ *   admission judges only the nodes that could lease it);
+ * - `cloud` → `'cloud'`;
+ * - a routing check that throws → `'unknown'`, because `enqueue` falls back to the platform
+ *   dispatcher on that same throw — and `'unknown'` is judged as cloud, so the answer never
+ *   admits more than `enqueue` would do;
+ * - the global stop flag set or unreadable → `halted`: the dispatch gate parks every run
+ *   `kill-switch` (a wait, FR-66), so the admission defers to it rather than refusing.
+ */
+async function previewAgentTaskPlacement(
+    router: Pick<FleetRunRouterService, 'routeAgentTask'>,
+    deps: FleetAwareDispatcherDeps,
+    payload: AgentTaskExecuteDispatchPayload,
+): Promise<AppWorkRunPlacementPreview> {
+    if (deps.killSwitch) {
+        let stopped: boolean;
+        try {
+            stopped = await deps.killSwitch.isStopped();
+        } catch {
+            stopped = true;
+        }
+        if (stopped) return { placement: 'unknown', halted: true };
+    }
+    try {
+        const scope = await resolveScope(deps.scopeResolver, payload.taskId);
+        const requirements = await resolveRequirements(deps.planner, payload);
+        const decision = await router.routeAgentTask(
+            payload,
+            scope,
+            requirements ? { requiredCapabilities: requirements.requiredCapabilities } : {},
+        );
+        if (decision.target === 'fleet' || decision.target === 'fleet-waiting') {
+            return {
+                placement: 'fleet',
+                requiredCapabilities: requirements ? [...requirements.requiredCapabilities] : [],
+            };
+        }
+        return { placement: 'cloud' };
+    } catch (err) {
+        if (isFleetKillSwitchActiveError(err)) return { placement: 'unknown', halted: true };
+        logger.warn(
+            `Fleet placement preview failed for task ${payload.taskId} — judging it 'unknown': ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+        return { placement: 'unknown' };
+    }
 }
 
 /**
