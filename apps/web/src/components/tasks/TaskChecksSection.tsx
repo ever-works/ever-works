@@ -32,7 +32,16 @@ const RESULT_TONES: Record<TaskCheckResult['status'], string> = {
     red: 'text-red-600 dark:text-red-400',
     timeout: 'text-amber-600 dark:text-amber-400',
     error: 'text-amber-600 dark:text-amber-400',
+    // APW-08 T13 (FR-14) — an App check the owner has not admitted: never run, not green.
+    'not-admitted': 'text-amber-600 dark:text-amber-400',
 };
+
+/** The i18n leaf of a result status — camelCase, never the hyphenated wire value. */
+function resultKey(
+    status: TaskCheckResult['status'],
+): Exclude<TaskCheckResult['status'], 'not-admitted'> | 'notAdmitted' {
+    return status === 'not-admitted' ? 'notAdmitted' : status;
+}
 
 /** Failed REQUIRED checks — what the red gate actually counts. */
 export function countFailedRequired(
@@ -107,7 +116,7 @@ function CheckRow({
                                 RESULT_TONES[result.status] ?? 'text-text-muted',
                             )}
                         >
-                            {t(`result.${result.status}`)}
+                            {t(`result.${resultKey(result.status)}`)}
                         </span>
                         <span className="text-[10px] font-mono text-text-muted shrink-0">
                             {t('exit', { code: result.exitCode ?? '—' })}

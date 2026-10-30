@@ -57,6 +57,7 @@ import {
     type FleetAgentModelExecution,
     type FleetAgentModelResume,
     type FleetAgentTaskMcpBridge,
+    type FleetNotAdmittedCheck,
     type FleetTaskWorkspaceSpec,
     type TaskAcceptanceCheck,
 } from '@ever-works/contracts';
@@ -835,13 +836,32 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // declares commands this Work does not admit, or a config that
         // cannot be read, fails the plan; the alternative is a run that
         // reports green having verified less than the repository asked for.
-        const repoDeclared = checksOff
+        const repoDeclared: Awaited<
+            ReturnType<TaskWorkspaceService['readFleetRepoDeclaredCommands']>
+        > = checksOff
             ? { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] }
             : await this.taskWorkspace.readFleetRepoDeclaredCommands({
                   task,
                   userId: payload.userId,
                   workspace,
               });
+        // APW-08 T13 (FR-14, ACC-08-10) — an App Work's checks the owner has
+        // not admitted. They are NOT in `acceptanceChecks`, so the node never
+        // runs them; they ride the job as ids, labels and `required` only (no
+        // command), and the reconciler folds them into the verdict the node
+        // reports (`foldNotAdmittedChecks`) — otherwise a run whose admitted
+        // checks passed would grade green while a required check never ran.
+        // Empty, and absent from the plan, for every other Work kind.
+        const notAdmittedChecks: FleetNotAdmittedCheck[] = (repoDeclared.notAdmitted ?? []).map(
+            (check) => ({ id: check.id, name: check.name, required: check.required }),
+        );
+        if (notAdmittedChecks.length > 0) {
+            this.logger.log(
+                `Task ${task.slug ?? task.id}: ${notAdmittedChecks.length} App check(s) not admitted for this Work's machines (${notAdmittedChecks
+                    .map((check) => check.id)
+                    .join(', ')}) — reported not-admitted, never executed.`,
+            );
+        }
 
         // Owner-authored entries come FIRST in both phases, and repository
         // ids carry a `repo/` prefix that owner ids cannot spell, so a
@@ -950,6 +970,9 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             workspace,
             acceptanceChecks,
             ...(setup.length > 0 ? { setup } : {}),
+            // APW-08 T13 — conditional key, like `setup`: a plan with nothing
+            // not-admitted is the exact payload it always was.
+            ...(notAdmittedChecks.length > 0 ? { notAdmittedChecks } : {}),
             git: {
                 commit: canCommit,
                 push: canCommit,

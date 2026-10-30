@@ -480,6 +480,13 @@ export class FleetRunRouterService {
             if (plan.setup && plan.setup.length > 0) {
                 jobPayload.setup = plan.setup;
             }
+            // APW-08 T13 — frozen beside the checks that run, for the same
+            // reason: the reconciler folds THESE into the node's verdict, so
+            // a later admission (or a re-read of the App spec) can never
+            // change what this run is graded by. Carries no command.
+            if (plan.notAdmittedChecks && plan.notAdmittedChecks.length > 0) {
+                jobPayload.notAdmittedChecks = plan.notAdmittedChecks;
+            }
             jobPayload.git = plan.git;
             // Self-build slice Z (EW-796) — only when the planner actually
             // enabled the bridge. The node reads THIS field to decide

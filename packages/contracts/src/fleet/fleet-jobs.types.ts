@@ -661,6 +661,20 @@ export interface FleetAgentTaskStep {
 }
 
 /**
+ * APW-08 T13 — one App spec check the owner has not admitted, as the job
+ * carries it (see {@link FleetAgentTaskPayload.notAdmittedChecks}). No
+ * `command` on purpose: nothing a node could be tempted to execute.
+ */
+export interface FleetNotAdmittedCheck {
+	/** `repo/check-N` — the position-derived id it would have run under. */
+	id: string;
+	/** The App spec `name`, for the run report. */
+	name: string;
+	/** A required one keeps the gate from grading green. */
+	required: boolean;
+}
+
+/**
  * Executor input for `agent-task`.
  *
  * `taskId` / `runId` are the platform identities the node reports
@@ -733,6 +747,22 @@ export interface FleetAgentTaskPayload {
 	 * so the reported verdict is comparable with a cloud run's.
 	 */
 	acceptanceChecks?: TaskAcceptanceCheck[] | null;
+	/**
+	 * APW-08 T13 (FR-14, ACC-08-10) — the App spec checks the Work owner has
+	 * NOT admitted for their machines, frozen at plan time beside the checks
+	 * that were.
+	 *
+	 * The node never reads this field and never runs anything from it: it
+	 * carries no command, only the id the check would have run under, its
+	 * label and whether it is required. It rides the job so the PLATFORM can
+	 * fold the `not-admitted` results into the verdict the node reports
+	 * (`foldNotAdmittedChecks` in `@ever-works/agent`), because the node
+	 * computes the gate over what it ran and would otherwise grade a run
+	 * green while a required check was never executed. Absent on every job
+	 * that is not an App Work's, and on an App Work's whose checks were all
+	 * admitted.
+	 */
+	notAdmittedChecks?: FleetNotAdmittedCheck[] | null;
 	/**
 	 * What the node does with the working tree once the model is done.
 	 * Absent = commit + push when a repository workspace was provisioned

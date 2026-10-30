@@ -10,6 +10,7 @@ import type {
     FleetAgentTaskGitPolicy,
     FleetAgentTaskMcpBridge,
     FleetExecutionScopeQuery,
+    FleetNotAdmittedCheck,
     FleetRunRoutingDecision,
     FleetTaskWorkspaceSpec,
     TaskAcceptanceCheck,
@@ -46,6 +47,13 @@ export interface FleetAgentTaskPlan {
      * declares one.
      */
     setup?: TaskAcceptanceCheck[];
+    /**
+     * APW-08 T13 (FR-14) — an App Work's checks the owner has not admitted:
+     * never executed, carried on the job (no command) so the reconciler can
+     * keep the gate from grading green because of them. Absent for every
+     * plan with none, which is every plan that is not an App Work's.
+     */
+    notAdmittedChecks?: FleetNotAdmittedCheck[];
     git: FleetAgentTaskGitPolicy;
     /**
      * Self-build slice Z (EW-796) — the platform-MCP bridge for this run,

@@ -218,6 +218,83 @@ describe('TaskPrStatusService — checks thread posts (APW-08 FR-43)', () => {
         expect(mergeGate.onPullRequestStatusRefreshed).toHaveBeenCalledTimes(1);
     });
 
+    // APW-08 T16 (FR-16) — on an App Work, a failing ADVISORY `Ever Works check: {name}` leg
+    // (read at the PR base through `TASK_APP_CHECKS`) is not a failure of the gate, so it is
+    // never in **Checks failed: {names}.** — and alone it is **Checks passed.**
+    describe('advisory App legs (APW-08 T16)', () => {
+        const ADVISORY = 'Ever Works check: e2e';
+        // A real App leg is a GitHub Actions job: only that reporter makes a leg advisory.
+        const fromActions = <T extends object>(check: T) => ({
+            ...check,
+            appSlug: 'github-actions',
+        });
+        const appChecks = {
+            resumeBudget: jest.fn(async () => 2),
+            advisoryLegs: jest.fn(async () => new Set([ADVISORY])),
+            escalateExhausted: jest.fn(async () => false),
+            reopenAfterUnblock: jest.fn(async () => false),
+        };
+        const withAppChecks = () => {
+            service();
+            return new TaskPrStatusService(
+                tasks as unknown as TaskRepository,
+                works as unknown as WorkRepository,
+                git as unknown as GitFacadeService,
+                undefined,
+                mergeGate as unknown as TaskMergeGateService,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                new TaskLifecyclePostsService(
+                    works as unknown as WorkRepository,
+                    { findById: jest.fn() } as unknown as AgentRunRepository,
+                    chat as unknown as TaskThreadPoster,
+                ),
+                appChecks,
+            );
+        };
+
+        it('names only the required legs when an advisory leg fails beside them', async () => {
+            const svc = withAppChecks();
+            read('failing', [red('Ever Works check: type-check'), fromActions(red(ADVISORY))]);
+            await sweep(svc);
+
+            expect(chat.post.mock.calls.map((call) => call[1].body)).toEqual([
+                'Checks failed: Ever Works check: type-check.',
+            ]);
+        });
+
+        it('posts Checks passed when the only failing leg is advisory', async () => {
+            const svc = withAppChecks();
+            read('failing', [green('Ever Works check: type-check'), fromActions(red(ADVISORY))]);
+            await sweep(svc);
+
+            expect(keys()).toEqual(['deliveryPosts.checksPassed']);
+            expect(row.ciState).toBe('passing');
+        });
+
+        it('another kind with the same port bound is posted to and named exactly as before', async () => {
+            const svc = withAppChecks();
+            works.findById.mockResolvedValue({
+                id: 'work-1',
+                kind: 'website',
+                gitProvider: 'github',
+                taskIsolationBaseBranch: null,
+                getRepoOwner: () => 'acme',
+                getDataRepo: () => 'bookings',
+            });
+            read('failing', [green('Ever Works check: type-check'), red(ADVISORY)]);
+            await sweep(svc);
+
+            expect(row.ciState).toBe('failing');
+            expect(appChecks.advisoryLegs).not.toHaveBeenCalled();
+            expect(chat.post).not.toHaveBeenCalled();
+        });
+
+        beforeEach(() => appChecks.advisoryLegs.mockClear());
+    });
+
     it('without a bound poster a refresh behaves exactly as before (nothing posted, nothing read)', async () => {
         works.findById.mockResolvedValue({
             id: 'work-1',

@@ -89,6 +89,7 @@ import {
 } from '@ever-works/contracts';
 import type { AuthAccount } from '../entities/auth-account.entity';
 import { FacadeError } from './base.facade';
+import { rollUpAppCiState } from '../tasks-domain/app-check-legs';
 import { config } from '@src/config';
 import { requestGitHubAppInstallationAccessTokenDetails } from '@src/utils';
 
@@ -260,6 +261,20 @@ export type GitFacadeOptions = GitFacadeTokenAuth | GitFacadeUserAuth;
  * says who the human is, rather than being exempted by omission.
  */
 export interface AgentMergeActor {
+    /**
+     * APW-08 T16 (FR-16) — the ADVISORY `Ever Works check: {name}` legs of an
+     * App Work pull request, as `TaskAppChecks.advisoryLegs` resolved them from
+     * the App rules at the PR base. When present, the merge-time LIVE CI check
+     * re-derives the provider's roll-up with `rollUpAppCiState`, so a failing
+     * advisory leg reported by the App-check reporter (`github-actions`) does
+     * not refuse a merge the merge gate approved on the same classification.
+     * Everything else about that check is unchanged: it still reads the
+     * provider live, still refuses an incomplete read, and a failing check
+     * from any other app, a required leg, or a check list it cannot see all of
+     * still refuses. Absent or empty — every non-App caller — the check is the
+     * strict provider roll-up it always was.
+     */
+    advisoryCheckLegs?: readonly string[] | null;
     /** The Agent asking to merge. Required — it is what makes this agent-driven. */
     agentId: string;
     /** Narrows the policy chain when the Agent is not itself Work-scoped. */
@@ -1298,7 +1313,16 @@ export class GitFacadeService implements IGitFacade {
         // page budget), so the roll-up is over a SAMPLE and a failure may
         // be hiding in the part nobody read. An authorization input may
         // not be a sample.
-        if (live.ciState !== 'passing' || live.checksComplete === false) {
+        //
+        // APW-08 T16 — an App Work caller hands over the advisory legs it read
+        // at the PR base; the LIVE roll-up is re-derived over them (failing
+        // advisory legs from the App-check reporter count as neutral). No set,
+        // no reclassification: the strict provider roll-up.
+        const liveCiState =
+            agentActor.advisoryCheckLegs && agentActor.advisoryCheckLegs.length > 0
+                ? rollUpAppCiState(live, new Set(agentActor.advisoryCheckLegs))
+                : live.ciState;
+        if (liveCiState !== 'passing' || live.checksComplete === false) {
             throw new MergePolicyRefusedError(
                 {
                     allowed: false,
@@ -1307,7 +1331,7 @@ export class GitFacadeService implements IGitFacade {
                         live.checksComplete === false
                             ? `Provider CI for pull request #${prNumber} could not be read in full, so its ` +
                               "verdict is a sample rather than a roll-up. A merge needs the whole commit's checks."
-                            : `Provider CI for pull request #${prNumber} is '${live.ciState}' at merge time. ` +
+                            : `Provider CI for pull request #${prNumber} is '${liveCiState}' at merge time. ` +
                               'An approval covers a green pull request; this one is not green now.',
                     source: policySource,
                 },

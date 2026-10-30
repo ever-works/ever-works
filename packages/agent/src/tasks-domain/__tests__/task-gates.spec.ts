@@ -119,6 +119,54 @@ describe('resolveAcceptanceChecks', () => {
             ),
         ).toEqual([build]);
     });
+
+    // APW-08 T16 (FR-13) — the cloud gate never runs an App spec check: for an
+    // App Work only the owner's `checkDefaults` and the Task's own checks
+    // resolve, whatever column an App-spec-shaped (`repo/`) entry landed in.
+    describe('an App Work (kind app)', () => {
+        const owner = check({ id: 'lint', kind: 'lint', command: 'pnpm lint' });
+        const taskOwn = check({ id: 'smoke', command: 'pnpm smoke' });
+        // The id the App spec's `type-check` is always reported under.
+        const appSpec = check({
+            id: 'repo/check-1',
+            name: 'type-check',
+            command: 'pnpm type-check',
+        });
+
+        it('never resolves an App spec check — only checkDefaults and the Task checks', () => {
+            const resolved = resolveAcceptanceChecks(
+                { acceptanceChecks: [taskOwn, appSpec] },
+                { kind: 'app', checkDefaults: [owner, appSpec] },
+            );
+            expect(resolved).toEqual([owner, taskOwn]);
+            expect(resolved.map((entry) => entry.id)).not.toContain('repo/check-1');
+            expect(
+                resolveAcceptanceChecks(null, { kind: 'app', checkDefaults: [appSpec] }),
+            ).toEqual([]);
+        });
+
+        it('keeps the owner and Task merge rules for an App Work', () => {
+            const override = check({ id: 'lint', command: 'pnpm lint --max-warnings=0' });
+            expect(
+                resolveAcceptanceChecks(
+                    { acceptanceChecks: [override] },
+                    { kind: 'app', checkDefaults: [owner] },
+                ),
+            ).toEqual([override]);
+        });
+
+        // `directory` / `website` are the template-generated kinds.
+        it('leaves the repo and template kinds unchanged, repo/ entries included', () => {
+            for (const kind of ['repo', 'directory', 'website', undefined] as const) {
+                expect(
+                    resolveAcceptanceChecks(
+                        { acceptanceChecks: [taskOwn, appSpec] },
+                        { kind, checkDefaults: [owner] },
+                    ),
+                ).toEqual([owner, taskOwn, appSpec]);
+            }
+        });
+    });
 });
 
 describe('resolveChecksPolicy', () => {

@@ -32,6 +32,8 @@ import { TASK_DELIVERY_TRACKER } from './task-delivery.port';
 import { TASK_THREAD_POSTER } from './task-thread-poster.port';
 import { TASK_LIFECYCLE_POSTER } from './task-lifecycle-poster.port';
 import { TaskLifecyclePostsService } from './task-lifecycle-posts.service';
+import { TASK_APP_CHECKS } from './task-app-checks.port';
+import { TaskAppChecksService } from '../app-works/task-app-checks.service';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { TaskAgentReviewRepository } from '../database/repositories/task-agent-review.repository';
@@ -332,6 +334,7 @@ import { RecordVisibilityModule } from '../record-visibility/record-visibility.m
         // APW-08 T50 — the one-off backfill, reached by the `app-work-isolation-backfill` task over
         // the internal RPC channel (exported below for the API's `TriggerInternalController`).
         AppWorkIsolationBackfillRunner,
+        { provide: TASK_APP_CHECKS, useClass: TaskAppChecksService }, // APW-08 T16 (lane L9)
     ],
     exports: [
         // Exported as well as provided: the dispatch brief, the Fleet

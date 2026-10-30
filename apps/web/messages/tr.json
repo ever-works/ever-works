@@ -1764,7 +1764,8 @@
                     "green": "Passed",
                     "red": "Failed",
                     "timeout": "Timeout",
-                    "error": "Error"
+                    "error": "Error",
+                    "notAdmitted": "Not admitted"
                 }
             },
             "checksEditor": {
@@ -6352,7 +6353,22 @@
                     "maxAttemptsDescription": "How many times a run may retry after a red gate before it gives up and asks for help (1–5).",
                     "defaultsLabel": "Default checks",
                     "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
-                    "defaultsSave": "Save default checks"
+                    "defaultsSave": "Save default checks",
+                    "appChecks": {
+                        "title": "App checks on your machines",
+                        "subtitle": "The checks this app's App spec declares. A Fleet node runs a check only once you admit its exact command for your machines; until then it is reported Not admitted and the gate is never green because of it.",
+                        "loading": "Loading the App spec checks…",
+                        "loadFailed": "The App spec checks could not be loaded. Try again later.",
+                        "empty": "This App spec declares no checks.",
+                        "required": "required",
+                        "advisory": "advisory",
+                        "admitted": "Admitted",
+                        "notAdmitted": "Not admitted",
+                        "admit": "Admit for my machines",
+                        "admitSaved": "Command admitted for your machines",
+                        "admitFailed": "The command could not be admitted",
+                        "allowListFull": "This Work already admits {max} commands, the most allowed."
+                    }
                 },
                 "externalRefs": {
                     "title": "Ingest routing claims",

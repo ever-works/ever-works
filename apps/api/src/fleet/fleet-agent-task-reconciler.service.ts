@@ -25,6 +25,7 @@ import {
 } from '@ever-works/agent/app-works';
 import { PluginUsageService } from '@ever-works/agent/usage';
 import {
+    foldNotAdmittedChecks,
     TaskChatService,
     TaskRepository,
     TaskRunDenormService,
@@ -378,7 +379,15 @@ export class FleetAgentTaskReconcilerService {
             return;
         }
 
-        const result = parseAgentTaskResult(event.result);
+        // APW-08 T13 (FR-14, ACC-08-10) — the node graded only what it ran.
+        // An App Work's not-admitted checks were frozen onto the JOB by the
+        // planner (never the node's report, which a node cannot forge into
+        // this list), and are folded in here, once, before any reader below:
+        // the run row, the finalize gate and the run message all see one
+        // verdict, and a required not-admitted check keeps it from being
+        // green. A job without the field is returned untouched.
+        const parsed = parseAgentTaskResult(event.result);
+        const result = parsed ? foldNotAdmittedChecks(parsed, plannedNotAdmitted(event.job)) : null;
         const task = await this.tasks.findById(ctx.taskId);
         const agentId = ctx.agentId ?? run.agentId;
 
@@ -531,8 +540,9 @@ export class FleetAgentTaskReconcilerService {
         const agent = agentId ? await this.agents.findById(agentId).catch(() => null) : null;
         let primaryPrUrl: string | null = null;
         if (task && result.git && result.git.pushed && !result.git.empty) {
-            const checksPassed =
-                result.gateStatus === 'green' && result.checks ? result.checks.length : 0;
+            // Rows that PASSED, never rows that merely exist: a not-admitted App
+            // check (APW-08 T13) or an advisory red sits under a green gate too.
+            const checksPassed = result.gateStatus === 'green' ? greenCheckCount(result) : 0;
             try {
                 const outcome = await this.taskWorkspace.finalizeRemotePush({
                     task,
@@ -1655,6 +1665,11 @@ function isCheckResult(value: unknown): value is TaskCheckResult {
     );
 }
 
+/** How many reported check rows actually passed (`status: 'green'`). */
+function greenCheckCount(result: FleetAgentTaskResult): number {
+    return (result.checks ?? []).filter((check) => check?.status === 'green').length;
+}
+
 function toGateStatus(value: unknown): GateStatus {
     return value === 'green' || value === 'red' || value === 'skipped' || value === 'none'
         ? value
@@ -1685,6 +1700,24 @@ function reportedPush(result: FleetAgentTaskResult | null | undefined): string |
     const git = result?.git;
     if (!git || !git.pushed || git.empty) return null;
     return typeof git.branch === 'string' && git.branch.trim() ? git.branch.trim() : null;
+}
+
+/**
+ * APW-08 T13 — the not-admitted App checks the PLANNER put on this job
+ * (`payload.notAdmittedChecks`), shape-checked: an entry without a string id
+ * is dropped, and `required` is anything but an explicit `false` (a check
+ * that cannot be read as advisory keeps the gate from grading green).
+ */
+function plannedNotAdmitted(job: FleetJobView): Array<{ id: string; required: boolean }> {
+    const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
+    // Read as unknown: the job row is JSON, whatever its type says.
+    const raw: unknown = payload?.notAdmittedChecks;
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((entry: unknown) => {
+        if (!entry || typeof entry !== 'object') return [];
+        const { id, required } = entry as { id?: unknown; required?: unknown };
+        return typeof id === 'string' ? [{ id, required: required !== false }] : [];
+    });
 }
 
 /**
@@ -1743,8 +1776,16 @@ function composeSuccessMessage(
             `Model spend reported by the CLI: $${result.model.costUsd.toFixed(2)}${result.model.turns ? ` over ${result.model.turns} turn(s)` : ''}.`,
         );
     }
-    if (result.gateStatus === 'green' && result.checks?.length) {
-        lines.push(`Acceptance checks: all ${result.checks.length} green.`);
+    const green = greenCheckCount(result);
+    if (result.gateStatus === 'green' && green > 0) {
+        // APW-08 T13 — "all N green" only when every row IS green; a not-admitted
+        // or advisory row under a green gate is counted, never called green.
+        const total = result.checks?.length ?? 0;
+        lines.push(
+            green === total
+                ? `Acceptance checks: all ${total} green.`
+                : `Acceptance checks: ${green} of ${total} green.`,
+        );
     }
     return lines.join('\n');
 }

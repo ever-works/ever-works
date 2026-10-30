@@ -736,6 +736,78 @@ describe('a repository-declared command never receives the run env grants', () =
 	});
 });
 
+/**
+ * APW-08 T13 (ACC-08-33's authorship half, ACC-08-41's negative half) — what the node does with
+ * the two shapes the platform plans for an App Work, through the REAL executor:
+ *
+ *  - an App spec check whose `name` equals an owner check's id keeps the platform's `repo/` id,
+ *    so `withRunEnvGrants` withholds the run's grants from it while the owner's check keeps them;
+ *  - an App Work still at the defaults seals NO acceptance check, and a run with none reports the
+ *    gate `none` — never green, because nothing was verified.
+ */
+describe('App Work checks on the node (APW-08 T13)', () => {
+	it('withholds the run env grants from an App spec check named like the owner check it sits beside', async () => {
+		const { descriptor } = await mkLayout();
+		const seen: Array<{ command: string; env: Record<string, string> }> = [];
+		const outcome = await runAgentTaskJob(
+			job({
+				taskId: 't1',
+				workspace: {
+					repositoryId: 'member/cal-fork',
+					repoUrl: 'https://example.invalid/member/cal-fork.git',
+					baseRef: 'main',
+					branch: 'b'
+				},
+				execution: { provider: 'claude-code', instructions: '# Task', envGrants: ['NPM_TOKEN'] },
+				git: { commit: false },
+				acceptanceChecks: [
+					// The owner's own check, from the Work's defaults.
+					{ id: 'type-check', name: 'Type check (owner)', command: 'owner-type-check', required: true },
+					// The App spec check the planner admitted: named `type-check`, id from its position.
+					{ id: 'repo/check-1', name: 'type-check', command: 'app-type-check', required: true }
+				]
+			}),
+			baseIo({
+				parentEnv: { NPM_TOKEN: 'npm_supersecrettokenvalue', PATH: '/usr/bin' },
+				spawnFn: envRecordingSpawn(seen),
+				provisionWorkspace: async () => descriptor
+			})
+		);
+
+		const envFor = (command: string): Record<string, string> =>
+			seen.find((entry) => entry.command === command)?.env ?? {};
+		expect(envFor('owner-type-check').NPM_TOKEN).toBe('npm_supersecrettokenvalue');
+		expect(envFor('app-type-check').NPM_TOKEN).toBeUndefined();
+		expect(envFor('app-type-check').CI).toBe('1');
+		// Both ran, under their own ids: the App check neither replaced nor suppressed the owner's.
+		expect(outcome.checks?.map((check) => check.id)).toEqual(['type-check', 'repo/check-1']);
+	});
+
+	it('reports the gate none, not green, for the empty check set an App Work at the defaults seals (ACC-08-41)', async () => {
+		const { descriptor } = await mkLayout();
+		const outcome = await runAgentTaskJob(
+			job({
+				taskId: 't1',
+				workspace: {
+					repositoryId: 'member/cal-fork',
+					repoUrl: 'https://example.invalid/member/cal-fork.git',
+					baseRef: 'main',
+					branch: 'b'
+				},
+				execution: { provider: 'claude-code', instructions: '# Task' },
+				git: { commit: false },
+				// What `FleetAgentTaskPlannerService.plan` seals when `checksPolicy` is `off` and
+				// `repoDeclaredCommands` is null: no owner check, no App spec check, no not-admitted row.
+				acceptanceChecks: []
+			}),
+			baseIo({ provisionWorkspace: async () => descriptor })
+		);
+		expect(outcome.gateStatus).toBe('none');
+		expect(outcome.gateStatus).not.toBe('green');
+		expect(outcome.checks ?? []).toEqual([]);
+	});
+});
+
 describe('a per-command env grant on the wire is not honoured, on either phase', () => {
 	/**
 	 * `normalizeChecks` never read `envGrants` off an acceptance check, so
