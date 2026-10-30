@@ -117,6 +117,9 @@ import {
     TERMINAL_SESSION_STARTER,
     // APW-08 T17 — the App Work change gate the agent git tools ask.
     APP_WORK_CHANGE_GATE,
+    // APW-08 T17 (APW08-G06) — the App Work diff request and its file-list rule.
+    APP_WORK_COMPARE_DIFF_OPTIONS,
+    appWorkDiffFileListIncomplete,
     type AppWorkChangeGate,
     type AppWorkChangeGateVerdict,
     // APW-08 FR-12 / T12 — the one cloud App Work push gate `finalizeRun` asks.
@@ -1939,11 +1942,20 @@ async function assertRealWriteTarget(
                          * `commitToRepo` still holds for everything an Agent pushes.
                          */
                         const assertPullRequestTouchesNoWorkflows = async (
-                            prTarget: { owner: string; repo: string },
+                            prTarget: {
+                                owner: string;
+                                repo: string;
+                                work?: { kind?: string | null } | null;
+                            },
                             prBase: string,
                             prHead: string,
                             options: { providerId: string; userId: string; workId: string },
                         ): Promise<void> => {
+                            // APW-08 T17 (APW08-G06, FR-21) — an App Work asks for paths and
+                            // counts only and is refused when the FILE LIST cannot be read
+                            // whole, never on `truncated` alone (patch text past the byte
+                            // budget hides no path). Every other kind is unchanged.
+                            const appWork = isAppWorkKind(prTarget.work?.kind);
                             // The operator lifted the floor for this Work.
                             if (workflowChangesAllowedForWork(options.workId)) return;
                             if (typeof git.getCompareDiff !== 'function') {
@@ -1960,7 +1972,9 @@ async function assertRealWriteTarget(
                                     prTarget.repo,
                                     prBase,
                                     prHead,
-                                    { maxFiles: 300 },
+                                    appWork
+                                        ? { ...APP_WORK_COMPARE_DIFF_OPTIONS }
+                                        : { maxFiles: 300 },
                                     options as any,
                                 );
                             } catch (err) {
@@ -1979,7 +1993,7 @@ async function assertRealWriteTarget(
                                         `(${(err as Error)?.message ?? err}). The pull request was not opened.`,
                                 );
                             }
-                            if (diff.truncated) {
+                            if (appWork ? appWorkDiffFileListIncomplete(diff) : diff.truncated) {
                                 throw new Error(
                                     `openPullRequest: the diff between '${prBase}' and '${prHead}' is too large ` +
                                         `to check for workflow files. The pull request was not opened.`,

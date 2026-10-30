@@ -48,6 +48,12 @@ import { AppSpecService, isUsableAppSpecStatus } from '../app-spec/app-spec.serv
  * 3x, a refusal; a nonsensical value should not stop a member's Task from
  * running.
  *
+ * `fileGuidance` (APW08-G22, plan §2.5) is `agents.maxPullRequestChangedFiles`,
+ * defaulted to {@link DEFAULT_FILE_GUIDANCE} and clamped to the schema's 1..500,
+ * on exactly the same terms: guidance in the brief, a note over it, a refusal
+ * past 3x. It sits ALONGSIDE FR-21's shared 300-file ceiling and never replaces
+ * it. An App Work that never sets it gets the schema's default, never silence.
+ *
  * ## An unreadable spec is a refusal, and says which branch
  *
  * `invalid`, `missing` and `unreadable` all throw {@link AppSpecUnreadableError}
@@ -69,6 +75,16 @@ export const DEFAULT_SIZE_GUIDANCE = 500;
 export const MIN_SIZE_GUIDANCE = 50;
 export const MAX_SIZE_GUIDANCE = 5000;
 
+/**
+ * APW08-G22 — `agents.maxPullRequestChangedFiles` when the spec names none (APW-03 schema §18,
+ * `APP_PR_FILES_GUIDANCE_DEFAULT` in plan §3.4).
+ */
+export const DEFAULT_FILE_GUIDANCE = 50;
+
+/** APW08-G22 — the schema's own bounds on `maxPullRequestChangedFiles` (1–500). */
+export const MIN_FILE_GUIDANCE = 1;
+export const MAX_FILE_GUIDANCE = 500;
+
 /** The rules one run is governed by. Frozen; see the class docstring. */
 export interface AppWorkRules {
     /**
@@ -86,6 +102,13 @@ export interface AppWorkRules {
     readonly humanMergePaths: readonly string[];
     readonly instructionFiles: readonly string[];
     readonly sizeGuidance: number;
+    /**
+     * APW08-G22 — `agents.maxPullRequestChangedFiles`, defaulted and clamped. Always set by
+     * {@link AppWorkRulesService.resolve}; optional only so a rules object assembled before
+     * G22 (a fixture, the e2e seed) still type-checks, and the guard reads an absent value as
+     * {@link DEFAULT_FILE_GUIDANCE} — never as "no file guidance".
+     */
+    readonly fileGuidance?: number;
 }
 
 /**
@@ -170,6 +193,7 @@ function freezeRules(spec: AppSpec): AppWorkRules {
             (agents.instructionFiles ?? []).slice(0, MAX_INSTRUCTION_FILES),
         ),
         sizeGuidance: clampGuidance(agents.maxPullRequestChangedLines),
+        fileGuidance: clampFileGuidance(agents.maxPullRequestChangedFiles),
     });
 }
 
@@ -204,4 +228,20 @@ function clampGuidance(value: unknown): number {
               : Number.NaN;
     if (!Number.isFinite(size)) return DEFAULT_SIZE_GUIDANCE;
     return Math.min(MAX_SIZE_GUIDANCE, Math.max(MIN_SIZE_GUIDANCE, Math.floor(size)));
+}
+
+/**
+ * APW08-G22 — `maxPullRequestChangedFiles`, defaulted and clamped to 1..500 with the same
+ * coercion as {@link clampGuidance} (and for the same reason: `Number(null)` is `0`). Exported
+ * so the change guard reads a rules object built without the field the same way.
+ */
+export function clampFileGuidance(value: unknown): number {
+    const files =
+        typeof value === 'number'
+            ? value
+            : typeof value === 'string' && value.trim().length > 0
+              ? Number(value.trim())
+              : Number.NaN;
+    if (!Number.isFinite(files)) return DEFAULT_FILE_GUIDANCE;
+    return Math.min(MAX_FILE_GUIDANCE, Math.max(MIN_FILE_GUIDANCE, Math.floor(files)));
 }

@@ -136,12 +136,14 @@ describe('the rules commit — read by the platform, never supplied', () => {
 
         await gate.evaluate(input());
 
+        // APW08-G06 — paths and counts only: the 300-file ceiling and NO patch
+        // text (`maxBytes: 0`), so patch-text truncation never reaches the guard.
         expect(m.getCompareDiff).toHaveBeenCalledWith(
             'acme',
             'their-app',
             'production',
             'ever-works/task/x',
-            { maxFiles: 300 },
+            { maxFiles: 300, maxBytes: 0 },
             expect.anything(),
         );
     });

@@ -1,6 +1,6 @@
 import { fenceUntrusted, neutralizeControlTokens } from '../utils/untrusted-content';
-import { ALWAYS_PROTECTED } from './app-change-guard';
-import type { AppWorkRules } from './app-work-rules.service';
+import { ALWAYS_PROTECTED, MAX_FILES, REFUSAL_MULTIPLE } from './app-change-guard';
+import { clampFileGuidance, type AppWorkRules } from './app-work-rules.service';
 
 /**
  * APW-08 T18 (FR-20…FR-24, R-17, ACC-08-13) — the App Work run brief, built from the App rules.
@@ -159,9 +159,22 @@ export function buildAppRunRulesBlock(
         ...listOrNone(rules.humanMergePaths, '- (none declared)'),
         '',
         `Size guidance: keep the change under ${rules.sizeGuidance} changed lines. A pull request over ${refusedAt} changed lines is refused; split a larger change into several Tasks.`,
+        // APW08-G22 — the App spec's own file guidance (`agents.maxPullRequestChangedFiles`,
+        // default 50), told the same way, beside FR-21's platform ceiling it never replaces.
+        fileGuidanceLine(rules),
         '',
         'In `.works/works.yml`, never change `source`, `blueprint`, `license` or `upstreamSync`, never remove a protected or human-merge path, and never switch on `upstreamPullRequests.enabled` or `provisioning.autoReprovision`: only a person may.',
     ].join('\n');
+}
+
+/** APW08-G22 — the file-count half of the size guidance, with the guard's own numbers. */
+function fileGuidanceLine(rules: AppWorkRules): string {
+    const files = clampFileGuidance(rules.fileGuidance);
+    return (
+        `File guidance: keep the change to at most ${files} changed files. A pull request touching ` +
+        `more than ${files * REFUSAL_MULTIPLE} files is refused, and one touching ${MAX_FILES} or more ` +
+        'cannot be checked at all; split a larger change into several Tasks.'
+    );
 }
 
 /** The App spec at the base commit could not be read: say so instead of inventing rules. */

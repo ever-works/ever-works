@@ -30,6 +30,10 @@ export {
     killSwitchAdmission,
     orgConcurrencyAdmission,
     workConcurrencyAdmission,
+    // APW-08 T56 (FR-73) — the Work-budget middleware, its insertion helper and its park reason.
+    createWorkBudgetAdmission,
+    withWorkBudgetAdmission,
+    QUEUED_REASON_WORK_BUDGET,
     DEFAULT_RUN_ADMISSION_CHAIN,
     RUN_ADMISSION_ADMITTED,
     type RunAdmissionContext,
@@ -63,6 +67,8 @@ export * from './run-kill-switch';
 // AW-23 — the per-Agent brake port, its implementation, the halt record
 // it reads, the pure status-reason resolver and the credential classifier.
 export * from './run-agent-brake';
+// APW-08 T56 (FR-73) — the Work-budget port the admission chain's budget middleware asks.
+export * from './run-work-budget';
 export * from './agent-brake.service';
 export * from './agent-halt.service';
 export * from './agent-halt-classifier';

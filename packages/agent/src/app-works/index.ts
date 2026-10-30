@@ -124,6 +124,11 @@ export {
     MAX_INSTRUCTION_FILES,
     MAX_SIZE_GUIDANCE,
     MIN_SIZE_GUIDANCE,
+    // APW08-G22 — `agents.maxPullRequestChangedFiles`, the file guidance.
+    DEFAULT_FILE_GUIDANCE,
+    MAX_FILE_GUIDANCE,
+    MIN_FILE_GUIDANCE,
+    clampFileGuidance,
     type AppWorkRules,
     type AppWorkRulesWork,
 } from './app-work-rules.service';
@@ -197,6 +202,10 @@ export * from './app-work-run-classifier';
 
 // APW-08 T49 (XC-10, FR-74, R-30, lane B2) — the evolve loop's operator kill switches.
 export * from './app-work-switches';
+
+// APW-08 T56 (XC-19, FR-73) — one budget per App Work: the booking door every App Work charge
+// goes through, the run-admission port it implements, and the installer that puts it in the gate.
+export * from './app-work-budget';
 
 // APW-08 T18 (lane B2) — the App Work run brief from the App rules at the base commit, and the
 // source both run paths (AgentRunService, the fleet planner) ask for it.

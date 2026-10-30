@@ -141,6 +141,10 @@ export function appChangeGuardRefusedReason(
         case 'diffTooLarge':
             return 'too_many_files';
         case 'tooManyLines':
+        // APW08-G22 — the file guidance's 3× refusal is a SIZE refusal on FR-27's shape, like
+        // the line guidance's; `too_many_files` stays FR-21's "cannot verify" ceiling. The
+        // event's `code` still tells the two apart.
+        case 'tooManyFiles':
             return 'too_large';
         case 'guardedSpecBlock':
             return 'spec_field';

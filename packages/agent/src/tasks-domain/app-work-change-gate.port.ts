@@ -44,6 +44,49 @@ export const APP_WORK_CHANGE_GATE = Symbol('APP_WORK_CHANGE_GATE');
 export const APP_WORK_SPEC_PATH = '.works/works.yml';
 
 /**
+ * APW-08 T17 (APW08-G06, FR-21, plan §2.5) — how many changed files an App Work change may list
+ * before it is "too many to verify protected paths". It is the provider's own list limit
+ * (`HARD_DIFF_MAX_FILES`, and the GitHub compare API lists at most 300 files), so a change of
+ * exactly 300 cannot be told apart from a larger one: the rule is "300 or more".
+ */
+export const APP_WORK_DIFF_MAX_FILES = 300;
+
+/**
+ * APW-08 T17 (APW08-G06) — the compare-diff options every App Work change judgement asks with:
+ * the file ceiling and **no patch text** (`maxBytes: 0`, which `resolveDiffCaps` clamps to
+ * `>= 0`). Every rule that reads the diff needs paths and line counts only, so asking for patch
+ * text would only spend the byte budget and set `truncated` for a reason no rule cares about.
+ *
+ * Declared HERE, in the ring-free port, so the change gate (`app-works/`) and the finalize
+ * path's workflow floor (`tasks-domain/`) ask with one literal.
+ */
+export const APP_WORK_COMPARE_DIFF_OPTIONS: Readonly<{ maxFiles: number; maxBytes: number }> =
+    Object.freeze({ maxFiles: APP_WORK_DIFF_MAX_FILES, maxBytes: 0 });
+
+/**
+ * APW-08 T17 (APW08-G06, FR-21) — could the changed-file list NOT be read in full?
+ *
+ * True when the provider reported {@link APP_WORK_DIFF_MAX_FILES} files or more, or listed fewer
+ * entries than it counted. **Never on `truncated` alone**: `capDiffFiles` sets it both when it
+ * drops whole file entries and when it drops PATCH TEXT past the byte budget, and only the first
+ * hides a path. A five-file dependency update whose lockfile patch is larger than the budget
+ * (exactly the change FR-25 and FR-51 must let through) lists every path, so it is not refused.
+ *
+ * A diff without a numeric `totalFiles` gives the counts nothing to say, so the one signal left
+ * is the old one: `truncated` refuses, exactly as before. That keeps a provider that breaks the
+ * `GitDiffResult` contract failing CLOSED rather than open.
+ */
+export function appWorkDiffFileListIncomplete(diff: {
+    readonly files: readonly unknown[];
+    readonly totalFiles?: number | null;
+    readonly truncated?: boolean | null;
+}): boolean {
+    const total = diff.totalFiles;
+    if (typeof total !== 'number' || !Number.isFinite(total)) return diff.truncated === true;
+    return total >= APP_WORK_DIFF_MAX_FILES || diff.files.length < total;
+}
+
+/**
  * Works-security (2026-10-18) — `agents.requireHumanMergePaths` ("paths whose
  * changes only a person may merge, whatever the merge policy says") was
  * resolved into the Work's rules and then read by nobody, so a Work whose
