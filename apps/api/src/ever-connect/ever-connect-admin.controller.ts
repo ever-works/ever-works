@@ -105,6 +105,7 @@ export class EverConnectAdminController {
 
     @Post('integrations/refresh')
     @HttpCode(HttpStatus.OK)
+    @UseGuards(SessionOnlyGuard)
     @Header('Cache-Control', 'no-store')
     @ApiOperation({ summary: 'Read the integration states from Ever Platform again' })
     async refresh(): Promise<EverConnectIntegrationView[]> {

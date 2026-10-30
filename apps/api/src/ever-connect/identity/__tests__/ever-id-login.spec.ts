@@ -78,7 +78,10 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
 
     it('asks once, reads until ready, stores the secret once and offers it to the sign-in plugin', async () => {
         platform
-            .answer('instanceRequestOidcClient', { status: 'pending', job_id: '01K6A7S2ABCDEFGHJKMNPQRSTV' })
+            .answer('instanceRequestOidcClient', {
+                status: 'pending',
+                job_id: '01K6A7S2ABCDEFGHJKMNPQRSTV',
+            })
             .answer('instanceGetOidcClient', { status: 'pending' }, ready('ics_secret'), ready());
 
         expect(await handler.start()).toBe('pending');
@@ -145,7 +148,11 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
             { status: 'pending' },
             { status: 'pending' },
         );
-        platform.answer('instanceGetOidcClient', ready('ics_1'), problem(403, 'integration_revoked'));
+        platform.answer(
+            'instanceGetOidcClient',
+            ready('ics_1'),
+            problem(403, 'integration_revoked'),
+        );
         expect(await handler.start()).toBe('requesting');
         await jest.advanceTimersByTimeAsync(CLIENT_READ_FIRST_MS);
         expect(handler.getStatus()).toBe('ready');
@@ -172,13 +179,36 @@ describe('EverIdLoginHandler — the Ever ID client hand-off', () => {
     });
 
     it('a secret that cannot be stored is reported as lost, never logged', async () => {
-        const warn = jest.spyOn((handler as unknown as { logger: { error: () => void } }).logger, 'error');
+        const warn = jest.spyOn(
+            (handler as unknown as { logger: { error: () => void } }).logger,
+            'error',
+        );
         integration.failWrites = true;
         platform
             .answer('instanceRequestOidcClient', { status: 'pending' })
             .answer('instanceGetOidcClient', ready('ics_do_not_log'));
         expect(await handler.start()).toBe('secret_lost');
         expect(JSON.stringify(warn.mock.calls)).not.toContain('ics_do_not_log');
+    });
+
+    it('ending while the client is being stored forgets it again', async () => {
+        let finishWrite!: () => void;
+        const write = integration.writeClient.bind(integration);
+        integration.writeClient = async (client) => {
+            await new Promise<void>((resolve) => (finishWrite = resolve));
+            await write(client);
+        };
+        platform
+            .answer('instanceRequestOidcClient', { status: 'pending' })
+            .answer('instanceGetOidcClient', ready('ics_racing'));
+        const started = handler.start();
+        await jest.advanceTimersByTimeAsync(0);
+        await handler.end();
+        finishWrite();
+        await started;
+        expect(integration.stored).toBeNull();
+        expect(handler.getStatus()).toBe('off');
+        expect(reporter.reportExistingLinks).not.toHaveBeenCalled();
     });
 
     it('a revoked client is forgotten', async () => {

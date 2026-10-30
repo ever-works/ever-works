@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, type Repository } from 'typeorm';
+import { In, LessThanOrEqual, MoreThan, type Repository } from 'typeorm';
 import { EverConnectOutbox } from '@ever-works/agent/entities';
 import { EverConnectConnectionChangedEvent } from './ever-connect.events';
 import type {
@@ -52,6 +52,7 @@ export class EverConnectOutboxService implements EverConnectReportQueue {
                 payload: report as unknown as Record<string, unknown>,
                 dedupeKey: `${PERSON_LINK_EVENT}:${report.id}`,
                 seq: nextSeq(),
+                accountRef: report.userRef,
                 state: 'pending',
                 attempts: 0,
                 nextAttemptAt: new Date(),
@@ -95,21 +96,44 @@ export class EverConnectOutboxWorker {
 
     /** One pass. Returns how many reports were delivered. */
     async drainOnce(now = new Date()): Promise<number> {
+        // Only due rows: reports waiting for a retry never hold up the others.
         const rows = await this.outbox.find({
-            where: { state: 'pending', event: PERSON_LINK_EVENT },
+            where: {
+                state: 'pending',
+                event: PERSON_LINK_EVENT,
+                nextAttemptAt: LessThanOrEqual(now),
+            },
             order: { seq: 'ASC', createdAt: 'ASC' },
             take: PASS_SIZE,
         });
-        const waiting = new Set<string>();
+        if (rows.length === 0) return 0;
+
+        // An account's reports wait behind its earliest report that is not due yet.
+        const waitingFrom = new Map<string, bigint>();
+        const accounts = [...new Set(rows.map((row) => accountOf(row)))];
+        const notDue = await this.outbox.find({
+            select: { id: true, accountRef: true, seq: true },
+            where: {
+                state: 'pending',
+                event: PERSON_LINK_EVENT,
+                accountRef: In(accounts),
+                nextAttemptAt: MoreThan(now),
+            },
+        });
+        for (const row of notDue) {
+            const account = row.accountRef as string;
+            const seq = BigInt(String(row.seq));
+            const current = waitingFrom.get(account);
+            if (current === undefined || seq < current) waitingFrom.set(account, seq);
+        }
+
         let sent = 0;
         for (const row of rows) {
             const report = row.payload as unknown as PersonLinkReport;
-            const account = report.userRef;
-            if (waiting.has(account)) continue;
-            if (new Date(row.nextAttemptAt).getTime() > now.getTime()) {
-                waiting.add(account);
-                continue;
-            }
+            const account = accountOf(row);
+            const seq = BigInt(String(row.seq));
+            const blockedFrom = waitingFrom.get(account);
+            if (blockedFrom !== undefined && seq > blockedFrom) continue;
             const outcome = await this.reporter.send(report, row.attempts);
             switch (outcome.outcome) {
                 case 'sent':
@@ -126,7 +150,9 @@ export class EverConnectOutboxWorker {
                     );
                     break;
                 case 'retry':
-                    waiting.add(account);
+                    if (blockedFrom === undefined || seq < blockedFrom) {
+                        waitingFrom.set(account, seq);
+                    }
                     await this.outbox.update(
                         { id: row.id },
                         {
@@ -141,4 +167,9 @@ export class EverConnectOutboxWorker {
         if (sent > 0) this.logger.debug(`Delivered ${sent} Ever ID link report(s)`);
         return sent;
     }
+}
+
+/** The account a row is about (its column, or the report for a row written without it). */
+function accountOf(row: EverConnectOutbox): string {
+    return row.accountRef ?? (row.payload as unknown as PersonLinkReport).userRef;
 }

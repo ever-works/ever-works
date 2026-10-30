@@ -136,6 +136,15 @@ describe('Ever Connect core', () => {
             expect(disconnected.integrations.refresh).not.toHaveBeenCalled();
         });
 
+        it('a resync without a position waits for the next round', async () => {
+            const { feed, instances, connection } = setup(
+                jest.fn().mockRejectedValue(new ProblemError(410, 'resync_required')),
+            );
+            expect(await feed.pollOnce(0)).toEqual({ handled: 0, more: false });
+            expect(instances.ackEvents).not.toHaveBeenCalled();
+            expect(connection.saveFeedCursor).not.toHaveBeenCalled();
+        });
+
         it('reads nothing while not connected', async () => {
             const { feed, connection, instances } = setup(jest.fn());
             connection.client.mockResolvedValue(null);
@@ -224,6 +233,27 @@ describe('Ever Connect core', () => {
             await worker.drainOnce(new Date(now.getTime() + 61_000));
             expect(sent).toEqual(['r1', 'r2']);
             expect(reporter.send).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }), 1);
+        });
+
+        it('reports waiting for a retry never hold up the others', async () => {
+            const repository = dataSource.getRepository(EverConnectOutbox);
+            const queue = new EverConnectOutboxService(repository);
+            for (let i = 0; i < 120; i += 1) await queue.enqueue(link(`w${i}`, `waiting-${i}`));
+            await repository.update(
+                { state: 'pending' },
+                { nextAttemptAt: new Date(Date.now() + 3_600_000) },
+            );
+            await queue.enqueue(link('due', 'zed'));
+
+            const reporter = {
+                send: jest.fn(async () => ({ outcome: 'sent' }) as PersonLinkSendOutcome),
+            };
+            const worker = new EverConnectOutboxWorker(
+                repository,
+                reporter as unknown as PersonLinkReporter,
+            );
+            expect(await worker.drainOnce()).toBe(1);
+            expect(reporter.send).toHaveBeenCalledWith(expect.objectContaining({ id: 'due' }), 0);
         });
 
         it('the connection ending drops what is still owed', async () => {

@@ -250,7 +250,7 @@ export class EverIdLoginHandler implements OnModuleDestroy {
                 this.schedule(() => this.refresh());
                 return this.set('pending');
             case 'ready':
-                return this.ready(answer);
+                return this.ready(answer, generation);
             case 'revoked':
                 await this.integration.clearClient();
                 this.settings.invalidate();
@@ -264,11 +264,14 @@ export class EverIdLoginHandler implements OnModuleDestroy {
         }
     }
 
-    private async ready(answer: {
-        issuer?: unknown;
-        client_id?: unknown;
-        client_secret?: unknown;
-    }): Promise<EverIdLoginClientStatus> {
+    private async ready(
+        answer: {
+            issuer?: unknown;
+            client_id?: unknown;
+            client_secret?: unknown;
+        },
+        generation: number,
+    ): Promise<EverIdLoginClientStatus> {
         const issuer = nonEmpty(answer.issuer);
         const clientId = nonEmpty(answer.client_id);
         const clientSecret = nonEmpty(answer.client_secret);
@@ -284,6 +287,12 @@ export class EverIdLoginHandler implements OnModuleDestroy {
                     }); turn Sign in with Ever ID off and on again in app.ever.co`,
                 );
                 return this.set('secret_lost');
+            }
+            if (generation !== this.generation) {
+                // `ever_id_login` ended while the client was being stored: forget it again.
+                await this.integration.clearClient();
+                this.settings.invalidate();
+                return this.status;
             }
             this.settings.invalidate();
             this.set('ready');

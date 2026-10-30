@@ -261,11 +261,12 @@ export class PersonRequestsHandler {
     ): Promise<Array<Pick<ExternalIdentity, 'id' | 'userId'>>> {
         const found: Array<Pick<ExternalIdentity, 'id' | 'userId'>> = [];
         const repository = this.dataSource.getRepository(ExternalIdentity);
-        let after = '';
+        // No cursor on the first page: `id` is a uuid column (see the reporter).
+        let after: string | null = null;
         for (;;) {
             const page = await repository.find({
                 select: { id: true, userId: true, issuer: true, subject: true },
-                where: { id: MoreThan(after) },
+                where: after ? { id: MoreThan(after) } : {},
                 order: { id: 'ASC' },
                 take: IDENTITY_PAGE,
             });

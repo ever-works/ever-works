@@ -19,6 +19,8 @@ export const FEED_LONGPOLL_WAIT_S = 25;
 export const FEED_INTERVAL_MS = 15 * 60_000;
 /** Between two rounds of the worker (the outbox; the feed in `longpoll` mode). */
 export const WORKER_ROUND_MS = 30_000;
+/** At most this many feed pages are read in one round. */
+export const FEED_PAGES_PER_ROUND = 10;
 
 /**
  * Runs Ever Connect in the background once the API is up:
@@ -96,7 +98,15 @@ export class EverConnectRunner implements OnApplicationBootstrap, OnModuleDestro
             this.lastFeedReadAt = now;
             try {
                 let pass = await this.feed.pollOnce(longpoll ? FEED_LONGPOLL_WAIT_S : 0);
-                while (pass.more && !this.stopped) pass = await this.feed.pollOnce(0);
+                // A long backlog is read over several rounds, so the lease is
+                // renewed and the outbox sent on schedule.
+                for (
+                    let page = 1;
+                    pass.more && !this.stopped && page < FEED_PAGES_PER_ROUND;
+                    page += 1
+                ) {
+                    pass = await this.feed.pollOnce(0);
+                }
             } catch (error) {
                 this.logger.warn(`Reading the Ever Platform feed failed: ${errorName(error)}`);
             }

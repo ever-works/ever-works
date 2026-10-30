@@ -62,8 +62,12 @@ export class EverConnectFeedService {
                 if (lastId) {
                     await client.instances.ackEvents(lastId);
                     await this.connection.saveFeedCursor(lastId);
+                    return { handled: 0, more: true };
                 }
-                return { handled: 0, more: true };
+                // No position to continue from: wait for the next round rather
+                // than asking again at once.
+                this.logger.warn('Ever Platform asked for a resync without a position');
+                return { handled: 0, more: false };
             }
             if (failure.kind === 'problem' && failure.code === 'credential_revoked') {
                 await this.connection.ended('revoked');

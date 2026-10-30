@@ -25,6 +25,7 @@ export type EverConnectOutboxState = 'pending' | 'sent' | 'dropped' | 'failed';
 @Entity({ name: 'ever_connect_outbox' })
 @Index('uq_ever_connect_outbox_dedupe', ['dedupeKey'], { unique: true })
 @Index('idx_ever_connect_outbox_due', ['state', 'nextAttemptAt'])
+@Index('idx_ever_connect_outbox_account', ['accountRef'])
 export class EverConnectOutbox {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -44,6 +45,10 @@ export class EverConnectOutbox {
      */
     @Column({ type: 'bigint', default: 0 })
     seq: string;
+
+    /** The local account a report is about: its reports are delivered in `seq` order. */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    accountRef: string | null;
 
     @Column({ type: 'varchar', length: 16, default: 'pending' })
     state: EverConnectOutboxState;

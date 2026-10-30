@@ -1,6 +1,9 @@
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { PluginPlatformSettingsService } from '@ever-works/agent/plugins';
-import { EVER_ID_LOGIN_INTEGRATION, type EverIdLoginIntegration } from './ever-connect-identity.ports';
+import {
+    EVER_ID_LOGIN_INTEGRATION,
+    type EverIdLoginIntegration,
+} from './ever-connect-identity.ports';
 
 /** The plugin that signs people in with Ever ID (`packages/plugins/oidc-identity`). */
 export const EVER_ID_SIGN_IN_PLUGIN_ID = 'oidc-identity';

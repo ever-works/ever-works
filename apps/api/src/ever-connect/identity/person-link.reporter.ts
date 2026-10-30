@@ -109,10 +109,16 @@ export class PersonLinkReporter {
     async reportExistingLinks(issuer: string): Promise<number> {
         if (!(await this.reportingIssuer())) return 0;
         let queued = 0;
-        let after = '';
+        // No cursor on the first page: `id` is a uuid column, which an empty
+        // string cannot be compared with (PostgreSQL refuses it).
+        let after: string | null = null;
         for (;;) {
             const page = await this.identities().find({
-                where: { issuer, linkedVia: Not('provisioning'), id: MoreThan(after) },
+                where: {
+                    issuer,
+                    linkedVia: Not('provisioning'),
+                    ...(after ? { id: MoreThan(after) } : {}),
+                },
                 order: { id: 'ASC' },
                 take: EXISTING_LINKS_PAGE,
             });
@@ -166,7 +172,8 @@ export class PersonLinkReporter {
                     return this.retryOrFail(report, attempt, failure.code);
                 case 'problem':
                     // Unlinking what is not linked is done.
-                    if (report.op === 'unlink' && failure.status === 404) return { outcome: 'sent' };
+                    if (report.op === 'unlink' && failure.status === 404)
+                        return { outcome: 'sent' };
                     // `ever_id_login` off, revoked, or the installation disconnected.
                     if (failure.status === 403) return { outcome: 'dropped', code: failure.code };
                     // Not (yet) an Ever ID person — also a person whose deletion started.

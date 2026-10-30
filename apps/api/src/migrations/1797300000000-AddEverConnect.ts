@@ -1,4 +1,10 @@
-import { MigrationInterface, QueryRunner, Table, TableIndex, type TableColumnOptions } from 'typeorm';
+import {
+    MigrationInterface,
+    QueryRunner,
+    Table,
+    TableIndex,
+    type TableColumnOptions,
+} from 'typeorm';
 
 /**
  * Ever Connect — the tables of an installation's connection to Ever Platform.
@@ -77,6 +83,7 @@ export class AddEverConnect1797300000000 implements MigrationInterface {
             { name: 'payload', type: 'text' },
             { name: 'dedupeKey', type: 'varchar', length: '128' },
             { name: 'seq', type: 'bigint', default: 0 },
+            { name: 'accountRef', type: 'varchar', length: '128', isNullable: true },
             { name: 'state', type: 'varchar', length: '16', default: "'pending'" },
             { name: 'attempts', type: 'int', default: 0 },
             { name: 'nextAttemptAt', type: 'timestamp' },
@@ -99,6 +106,14 @@ export class AddEverConnect1797300000000 implements MigrationInterface {
             new TableIndex({
                 name: 'idx_ever_connect_outbox_due',
                 columnNames: ['state', 'nextAttemptAt'],
+            }),
+        );
+        await this.createIndex(
+            queryRunner,
+            'ever_connect_outbox',
+            new TableIndex({
+                name: 'idx_ever_connect_outbox_account',
+                columnNames: ['accountRef'],
             }),
         );
 

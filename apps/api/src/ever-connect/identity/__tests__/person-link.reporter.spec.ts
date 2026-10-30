@@ -1,4 +1,4 @@
-import type { DataSource } from 'typeorm';
+import { Repository, type DataSource } from 'typeorm';
 import { ExternalIdentity } from '@ever-works/agent/entities';
 import { EverIdIdentityLinkedEvent, EverIdIdentityUnlinkedEvent } from '@ever-works/agent/events';
 import { PERSON_LINK_RETRY_DELAYS_MS, PersonLinkReporter } from '../person-link.reporter';
@@ -42,8 +42,15 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
         reporter = new PersonLinkReporter(platform, integration, queue, dataSource);
     });
 
-    const linked = (identity: ExternalIdentity, linkedVia: 'sign-up' | 'settings' | 'provisioning' = 'settings') =>
-        new EverIdIdentityLinkedEvent({ identityId: identity.id, userId: identity.userId, linkedVia });
+    const linked = (
+        identity: ExternalIdentity,
+        linkedVia: 'sign-up' | 'settings' | 'provisioning' = 'settings',
+    ) =>
+        new EverIdIdentityLinkedEvent({
+            identityId: identity.id,
+            userId: identity.userId,
+            linkedVia,
+        });
 
     it('queues a link with identifiers only', async () => {
         const identity = await insertIdentity(dataSource, {
@@ -88,7 +95,11 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
         await reporter.onIdentityUnlinked(
             new EverIdIdentityUnlinkedEvent({ identityId: identity.id, userId: identity.userId }),
         );
-        expect(queue.reports[1]).toEqual({ id: expect.any(String), op: 'unlink', userRef: identity.userId });
+        expect(queue.reports[1]).toEqual({
+            id: expect.any(String),
+            op: 'unlink',
+            userRef: identity.userId,
+        });
         expect(await reporter.send(queue.reports[1])).toEqual({ outcome: 'sent' });
         expect(platform.callsOf('instanceDeletePersonLink')[0].input?.path).toEqual({
             ref: identity.userId,
@@ -126,7 +137,10 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
     it("an account that keeps Ever Platform's identity is not unlinked when another goes", async () => {
         const identity = await insertIdentity(dataSource, { issuer: ISSUER, subject: 'sub-ada' });
         await reporter.onIdentityUnlinked(
-            new EverIdIdentityUnlinkedEvent({ identityId: 'another-provider', userId: identity.userId }),
+            new EverIdIdentityUnlinkedEvent({
+                identityId: 'another-provider',
+                userId: identity.userId,
+            }),
         );
         expect(queue.reports).toEqual([]);
     });
@@ -175,17 +189,33 @@ describe('PersonLinkReporter — person links reported to Ever Platform', () => 
         platform.answer('instanceCreatePersonLink', problem(503, 'unavailable'));
         expect(await reporter.send(report, 0)).toMatchObject({ outcome: 'retry' });
         platform.answer('instanceCreatePersonLink', problem(422, 'link_not_found'));
-        expect(await reporter.send(report, 0)).toEqual({ outcome: 'failed', code: 'link_not_found' });
+        expect(await reporter.send(report, 0)).toEqual({
+            outcome: 'failed',
+            code: 'link_not_found',
+        });
     });
 
     it('queues the links that existed before the client was ready, page by page', async () => {
         for (let i = 0; i < 205; i += 1) {
             await insertIdentity(dataSource, { issuer: ISSUER, subject: `sub-${i}` });
         }
-        await insertIdentity(dataSource, { issuer: ISSUER, subject: 'sub-p', linkedVia: 'provisioning' });
-        await insertIdentity(dataSource, { issuer: 'https://other.example.test', subject: 'sub-o' });
+        await insertIdentity(dataSource, {
+            issuer: ISSUER,
+            subject: 'sub-p',
+            linkedVia: 'provisioning',
+        });
+        await insertIdentity(dataSource, {
+            issuer: 'https://other.example.test',
+            subject: 'sub-o',
+        });
 
+        const find = jest.spyOn(Repository.prototype, 'find');
         expect(await reporter.reportExistingLinks(ISSUER)).toBe(205);
+        // The first page has no `id` cursor: an empty string is not a uuid (PostgreSQL).
+        const where = (find.mock.calls[0][0] as { where: Record<string, unknown> }).where;
+        expect(where).not.toHaveProperty('id');
+        expect(find.mock.calls[1][0]).toMatchObject({ where: { id: expect.anything() } });
+        find.mockRestore();
         expect(new Set(queue.reports.map((r) => (r.op === 'link' ? r.subject : '')))).toEqual(
             new Set(Array.from({ length: 205 }, (_, i) => `sub-${i}`)),
         );

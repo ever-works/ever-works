@@ -59,6 +59,28 @@ describe('POST /api/auth/ever-id/backchannel-logout (web)', () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
+    it('stops reading an oversized streamed body that declares no length', async () => {
+        const chunk = new TextEncoder().encode('a'.repeat(4096));
+        let pulled = 0;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                pulled += 1;
+                controller.enqueue(chunk);
+            },
+        });
+        const { POST } = await import('./route');
+        const res = await POST(
+            new NextRequest('https://works.example.test/api/auth/ever-id/backchannel-logout', {
+                method: 'POST',
+                body: stream,
+                duplex: 'half',
+            } as ConstructorParameters<typeof NextRequest>[1]),
+        );
+        expect(res.status).toBe(400);
+        expect(pulled).toBeLessThan(10);
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it('answers 502 when the API cannot be reached', async () => {
         fetchMock.mockRejectedValue(new Error('ECONNREFUSED'));
         const { POST } = await import('./route');

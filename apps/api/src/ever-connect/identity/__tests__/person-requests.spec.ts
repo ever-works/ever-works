@@ -1,7 +1,11 @@
 import { subjectHash } from '@ever-co/connect-sdk';
-import type { DataSource } from 'typeorm';
+import { Repository, type DataSource } from 'typeorm';
 import type { ActivityLogService } from '@ever-works/agent/activity-log';
-import { AuthSession, EverConnectPersonRequest, ExternalIdentity } from '@ever-works/agent/entities';
+import {
+    AuthSession,
+    EverConnectPersonRequest,
+    ExternalIdentity,
+} from '@ever-works/agent/entities';
 import type { PersonDataParticipant } from '../person-data-participant.port';
 import { PersonRequestNotAnsweredError, PersonRequestsHandler } from '../person-requests.handler';
 import { createIdentityDataSource, insertIdentity, insertSession } from './db.helper-spec';
@@ -131,7 +135,11 @@ describe('PersonRequestsHandler — deletion and export requests', () => {
         await expect(h.handle(event)).rejects.toBeInstanceOf(PersonRequestNotAnsweredError);
         // The identity is gone already; the stored answer is sent, not `no_account`.
         const answer = await h.handle(event);
-        expect(answer).toMatchObject({ result: 'failed', reasonCode: 'account_deletion_pending', recorded: true });
+        expect(answer).toMatchObject({
+            result: 'failed',
+            reasonCode: 'account_deletion_pending',
+            recorded: true,
+        });
         const bodies = platform.callsOf('instanceAckRequest').map((call) => call.input?.body);
         expect(bodies[1]).toEqual(bodies[0]);
     });
@@ -182,7 +190,10 @@ describe('PersonRequestsHandler — deletion and export requests', () => {
             deleteAccounts: jest.fn(),
             exportAccounts: jest
                 .fn()
-                .mockResolvedValue({ result: 'exported', exportUrl: 'https://works.example.test/exports/1' }),
+                .mockResolvedValue({
+                    result: 'exported',
+                    exportUrl: 'https://works.example.test/exports/1',
+                }),
         };
         expect(await handler(participant).handle(exportRequest(JOB_2, [hash]))).toMatchObject({
             result: 'exported',
@@ -202,7 +213,10 @@ describe('PersonRequestsHandler — deletion and export requests', () => {
             deleteAccounts: jest.fn(),
             exportAccounts: jest
                 .fn()
-                .mockResolvedValue({ result: 'exported', exportUrl: 'http://works.example.test/x' }),
+                .mockResolvedValue({
+                    result: 'exported',
+                    exportUrl: 'http://works.example.test/x',
+                }),
         };
         expect(
             await handler(participant).handle(exportRequest(JOB, [subjectHash(ISSUER, 'sub-ada')])),
@@ -236,6 +250,16 @@ describe('PersonRequestsHandler — deletion and export requests', () => {
         ).toBeNull();
         expect(await handler().handle({ id: 'evt-2', type: 'other', data: {} })).toBeNull();
         expect(platform.calls).toEqual([]);
+    });
+
+    it('reads the first page of identities without an id cursor (not a uuid)', async () => {
+        const find = jest.spyOn(Repository.prototype, 'find');
+        await handler().handle(deletion(JOB, [subjectHash(ISSUER, 'sub-ada')]));
+        const first = find.mock.calls.find(
+            (call) => (call[0] as { select?: Record<string, unknown> })?.select?.subject,
+        );
+        expect((first?.[0] as { where: Record<string, unknown> }).where).not.toHaveProperty('id');
+        find.mockRestore();
     });
 
     it('stores identifiers only', async () => {
