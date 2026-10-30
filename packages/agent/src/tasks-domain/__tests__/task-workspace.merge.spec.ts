@@ -597,6 +597,28 @@ describe('TaskWorkspaceService — agent merge path (Wave 3 D4)', () => {
         );
     });
 
+    // APW-08 T16 — an App Work caller's advisory legs reach the facade's merge-time CI check;
+    // every other caller's actor carries no such key at all.
+    it("attemptMergeForOpenPullRequest hands an App Work caller's advisory legs to the facade, and nobody else's", async () => {
+        const task = { ...makeTask(), prNumber: 7, prUrl: 'https://x/pull/7' };
+        await build().attemptMergeForOpenPullRequest({
+            task: task as never,
+            agentId: 'agent-1',
+            gateStatus: 'green',
+            advisoryCheckLegs: ['Ever Works check: e2e'],
+        });
+        expect(gitFacade.mergePullRequest.mock.calls[0][5]).toEqual(
+            expect.objectContaining({ advisoryCheckLegs: ['Ever Works check: e2e'] }),
+        );
+
+        await build().attemptMergeForOpenPullRequest({
+            task: task as never,
+            agentId: 'agent-1',
+            gateStatus: 'green',
+        });
+        expect(gitFacade.mergePullRequest.mock.calls[1][5]).not.toHaveProperty('advisoryCheckLegs');
+    });
+
     it('attemptMergeForOpenPullRequest merges into the base the CALLER names, when it names one', async () => {
         // Release promotion lane (slice AI). A promotion's pull request is
         // the first on this platform whose base is not the Work's

@@ -705,16 +705,23 @@ export class TaskPrStatusService {
             // never fails a status refresh, and it is deliberately given
             // the LIVE `status` rather than the Task's cache.
             if (this.mergeGate) {
-                await this.mergeGate
-                    .onPullRequestStatusRefreshed(task, effective)
-                    .catch((error: unknown) => {
-                        this.logger.warn(
-                            `Task ${task.id}: merge gate threw after a PR status refresh: ${
-                                error instanceof Error ? error.message : String(error)
-                            }`,
-                        );
-                        return undefined;
-                    });
+                // APW-08 T16 — an App Work read hands the merge gate the classification it used,
+                // for the facade's LIVE check at merge time. Every other read makes the exact
+                // two-argument call it always made.
+                const gateRead =
+                    advisory && advisory.size > 0
+                        ? this.mergeGate.onPullRequestStatusRefreshed(task, effective, {
+                              advisoryCheckLegs: advisory,
+                          })
+                        : this.mergeGate.onPullRequestStatusRefreshed(task, effective);
+                await gateRead.catch((error: unknown) => {
+                    this.logger.warn(
+                        `Task ${task.id}: merge gate threw after a PR status refresh: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                    return undefined;
+                });
             }
             return { task, status: effective, workKind: target.workKind };
         })().finally(() => {

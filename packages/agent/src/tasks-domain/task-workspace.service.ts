@@ -2437,6 +2437,12 @@ export class TaskWorkspaceService {
          * {@link AgentMergeActor.requireHumanApproval}.
          */
         requireHumanApproval?: boolean;
+        /**
+         * APW-08 T16 — an App Work pull request's advisory legs, read at the PR
+         * base by the caller; handed to the facade's merge-time CI check
+         * ({@link AgentMergeActor.advisoryCheckLegs}). Absent = strict.
+         */
+        advisoryCheckLegs?: readonly string[] | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task } = input;
         if (!this.gitFacade || !this.mergePolicy) return undefined;
@@ -2480,6 +2486,9 @@ export class TaskWorkspaceService {
             gateStatus: input.gateStatus ?? null,
             headSha: input.headSha ?? task.prHeadSha ?? null,
             requireHumanApproval: input.requireHumanApproval === true,
+            ...(input.advisoryCheckLegs && input.advisoryCheckLegs.length > 0
+                ? { advisoryCheckLegs: input.advisoryCheckLegs }
+                : {}),
         });
     }
 
@@ -2541,6 +2550,8 @@ export class TaskWorkspaceService {
         headSha?: string | null;
         /** Raises the approval requirement; can never clear it (slice AI). */
         requireHumanApproval?: boolean;
+        /** APW-08 T16 — see {@link AgentMergeActor.advisoryCheckLegs}. */
+        advisoryCheckLegs?: readonly string[] | null;
     }): Promise<TaskAgentMergeOutcome | undefined> {
         const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
         if (!this.mergePolicy || !this.gitFacade) return undefined;
@@ -2611,6 +2622,10 @@ export class TaskWorkspaceService {
                     // requirement — only insist on one the policy did not
                     // ask for.
                     requireHumanApproval: args.requireHumanApproval === true,
+                    // APW-08 T16 — conditional key: every non-App merge's actor is unchanged.
+                    ...(args.advisoryCheckLegs && args.advisoryCheckLegs.length > 0
+                        ? { advisoryCheckLegs: args.advisoryCheckLegs }
+                        : {}),
                 },
             );
 

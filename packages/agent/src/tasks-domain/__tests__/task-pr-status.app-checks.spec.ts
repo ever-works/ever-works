@@ -371,6 +371,11 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
         // The roll-up, the cache and the live status the merge gate is handed all read green.
         expect(row.ciState).toBe('passing');
         expect(lastMergeGateCiState()).toBe('passing');
+        // …and the gate is handed the classification itself, for the facade's LIVE merge-time
+        // check (CodeRabbit follow-up on #3038), so an approval here is not refused at merge.
+        expect(mergeGate.onPullRequestStatusRefreshed.mock.calls.at(-1)?.[2]).toEqual({
+            advisoryCheckLegs: new Set([E2E]),
+        });
         // The leg is still REPORTED, with its real conclusion, marked advisory.
         expect(row.prChecks).toEqual([
             expect.objectContaining({ name: TYPE_CHECK, conclusion: 'success' }),
@@ -610,5 +615,9 @@ describe('TaskPrStatusService — App checks decide the gate (APW-08 T16)', () =
             (row.prChecks as Array<Record<string, unknown>>).some((check) => 'advisory' in check),
         ).toBe(false);
         expect(attempts.countForTask.mock.calls.every((call) => call.length === 1)).toBe(true);
+        // The merge gate gets the exact two-argument call it always got.
+        expect(
+            mergeGate.onPullRequestStatusRefreshed.mock.calls.every((call) => call.length === 2),
+        ).toBe(true);
     });
 });
