@@ -17,6 +17,7 @@ import {
     type AdmissionNode,
     type IsolatedRunAdmissionReads,
 } from '../isolated-run-admission.service';
+import { readAgentRunContainmentRecord } from '../run-containment';
 
 /**
  * APW-08 T12 (FR-12, FR-70, FR-75; ACC-08-08, ACC-08-34, ACC-08-39) — isolated-run admission.
@@ -728,6 +729,114 @@ describe('isolated-run admission — the predicate and its facts', () => {
                 jobId: 'j1',
             }),
         ).toBe(true);
+    });
+
+    it('APW-08 T51 (ACC-08-44, second half): a node whose last recorded run of THIS Task reported a missing tool is not offered it again', async () => {
+        const world = makeWorld({ reports: { [NODE_A]: isolatedReport('hardened') } });
+        const reads = readsFor(world);
+        const record = (nodeId: string, reportedAt: string, missingTool?: boolean) => ({
+            executionPath: 'hardened',
+            isolatedHome: true,
+            downgrades: [],
+            needsOwnerAllowance: false,
+            nodeId,
+            reportedAt,
+            ...(missingTool ? { missingTool: true } : {}),
+        });
+        // The Task's runs, newest first, as `findRecentForTask` answers them.
+        const runsByTask: Record<string, Array<{ id: string; containment: unknown }>> = {
+            t1: [
+                { id: 'r3', containment: record(NODE_B, '2026-10-30T11:00:00Z') },
+                { id: 'r2', containment: record(NODE_A, '2026-10-30T10:00:00Z', true) },
+                { id: 'r1', containment: record(NODE_A, '2026-10-29T09:00:00Z') },
+            ],
+            // On NODE_A, but more than a day ago: the exclusion has lapsed.
+            t2: [{ id: 'r9', containment: record(NODE_A, '2026-10-29T11:00:00Z', true) }],
+            // The node's LATEST run of t3 passed after an earlier missing tool: no exclusion.
+            t3: [
+                { id: 'r5', containment: record(NODE_A, '2026-10-30T11:30:00Z') },
+                { id: 'r4', containment: record(NODE_A, '2026-10-30T10:30:00Z', true) },
+            ],
+        };
+        const findRecentForTask = jest.fn(async (taskId: string) => runsByTask[taskId] ?? []);
+        const admission = new IsolatedRunAdmissionService({
+            ...reads,
+            runs: { ...(reads.runs ?? {}), findRecentForTask },
+            now: () => new Date('2026-10-30T12:00:00Z'),
+        });
+        const lease = (taskId: string | null, nodeId = NODE_A) =>
+            admission.admitsLease({ userId: OWNER, nodeId, workId: APP_WORK, jobId: 'j1', taskId });
+
+        // NODE_A's latest t1 run (r2, two hours ago) reported the tool missing: passed over.
+        expect(await lease('t1')).toBe(false);
+        // Read by the TASK (a handful of rows), never by scanning the node's jobs.
+        expect(findRecentForTask).toHaveBeenCalledWith('t1', expect.any(Number));
+        // The same Task on another node, a lapsed report, and a later green run all admit.
+        world.reports[NODE_B] = isolatedReport('hardened');
+        expect(await lease('t1', NODE_B)).toBe(true);
+        expect(await lease('t2')).toBe(true);
+        expect(await lease('t3')).toBe(true);
+        // No task id on the job (an older payload): nothing to check, the containment decides.
+        expect(await lease(null)).toBe(true);
+        // The read failing ADMITS: this passes over a known-bad machine, it is not a safety rule.
+        findRecentForTask.mockRejectedValueOnce(new Error('db down'));
+        expect(await lease('t1')).toBe(true);
+    });
+
+    it('APW-08 T51: a missing-tool record never admits a node the containment rule refuses', async () => {
+        const world = makeWorld({ reports: {} });
+        const reads = readsFor(world);
+        const findRecentForTask = jest.fn(async () => []);
+        const admission = new IsolatedRunAdmissionService({
+            ...reads,
+            runs: { ...(reads.runs ?? {}), findRecentForTask },
+        });
+        expect(
+            await admission.admitsLease({
+                userId: OWNER,
+                nodeId: NODE_A,
+                workId: APP_WORK,
+                jobId: 'j1',
+                taskId: 't1',
+            }),
+        ).toBe(false);
+        // Refused on containment first; the Task's runs were not even read.
+        expect(findRecentForTask).not.toHaveBeenCalled();
+    });
+
+    it('APW-08 T51: the reconciler-side record keeps the flag, and reading it back keeps it', async () => {
+        const world = makeWorld();
+        const recordContainment = jest.fn(async () => undefined);
+        const reads = readsFor(world);
+        const admission = new IsolatedRunAdmissionService({
+            ...reads,
+            runs: { ...(reads.runs ?? {}), recordContainment },
+        });
+        await admission.recordRunContainment({
+            taskId: 't1',
+            runId: 'r1',
+            userId: OWNER,
+            workId: APP_WORK,
+            nodeId: NODE_A,
+            rawContainment: isolatedReport('hardened'),
+            missingTool: true,
+        });
+        expect(recordContainment).toHaveBeenCalledWith(
+            'r1',
+            expect.objectContaining({ nodeId: NODE_A, missingTool: true }),
+        );
+        const written = (recordContainment.mock.calls[0] as unknown[])[1];
+        expect(readAgentRunContainmentRecord(written)).toMatchObject({ missingTool: true });
+        // Without the flag nothing is added to the record.
+        await admission.recordRunContainment({
+            taskId: 't1',
+            runId: 'r2',
+            userId: OWNER,
+            workId: APP_WORK,
+            nodeId: NODE_A,
+            rawContainment: isolatedReport('hardened'),
+        });
+        expect((recordContainment.mock.calls[1] as unknown[])[1]).not.toHaveProperty('missingTool');
     });
 
     it('a node that never reported (or whose report is unreadable) is an unknown containment — a downgrade', async () => {

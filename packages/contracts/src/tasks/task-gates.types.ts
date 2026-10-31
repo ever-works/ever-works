@@ -185,6 +185,13 @@ export interface TaskCheckResult {
 	 * checks that did run. Additive: no other Work kind produces it.
 	 */
 	status: 'green' | 'red' | 'timeout' | 'error' | 'not-admitted';
+	/**
+	 * APW-08 T51 (FR-61, S36) — why an `error` is one: `missingTool` when a Fleet node's shell
+	 * answered "command not found" (exit 127 POSIX / 9009 Windows), so the gate row reads "a tool
+	 * this check needs is missing on this machine" and that machine is not offered the Task again.
+	 * Absent otherwise. Additive.
+	 */
+	reason?: 'missingTool';
 	/** Wall-clock duration of the check. */
 	durationMs: number;
 	/** Last lines of combined stdout/stderr, for the run report. */

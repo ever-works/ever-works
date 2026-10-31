@@ -1178,6 +1178,20 @@ _Numbered from T47 so every earlier task id stays stable. All are P1 except wher
       half). Run: `pnpm --filter @ever-works/agent test app-spec-applied` and
       `pnpm --filter @ever-works/node test acceptance-checks`.
       **Done when**: the specs are green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-missing-tool`): the node half built, specs
+      green locally, not merged** (the first half, the checks-change notice, landed with T11 in #3036).
+      `apps/node/.../acceptance-checks.missing-tool.ts` classifies exit 127 (POSIX) and 9009 (`cmd.exe`) — on every
+      platform — as `error` with `reason: 'missingTool'` (`TaskCheckResult.reason`, additive); every other exit code
+      stays red, and the gate treats the error like any other non-green required check. The reconciler passes check
+      rows through whole, so the reason reaches the Task. **Exclusion** reuses #3040's lease check instead of a new
+      store: `admitsLease` (now given the job's `taskId`) passes over a node whose LATEST completed run of THAT Task,
+      within 24 h (`APP_WORK_MISSING_TOOL_EXCLUSION_MS`), reported a missing tool — read from the node's own job rows
+      (`findLatestCompletedAgentTasksForNode`). Bounded so a machine whose owner installs the tool can take the Task
+      again; a failed read admits (a hint, not a safety rule — containment, checked first, fails closed). Web:
+      `TaskChecksSection` labels the row `result.missingTool` (S36's copy, English in all 21 locales). Specs: node
+      acceptance-checks (127 / 9009 → missingTool, 7 other codes stay red), isolated-run-admission 36/36 (2 new:
+      passed over for that Task only, a day back, no task id, fail open; never admits a node containment refuses),
+      `fleet-job.app-work-lease` 4/4 (the call now carries `taskId`), web `TaskChecksSection.unit` 2/2 (new).
 
 - [ ] **T52. Keyboard and accessibility for the P1 surfaces (XC-25, FR-71).**
       **Modify** `apps/web/src/components/tasks/TaskDeliveryChips.tsx`, `TaskDeliverySection.tsx`,

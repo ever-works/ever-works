@@ -197,6 +197,27 @@ describe('runAcceptanceChecksJob — verdict rules mirror the platform gate runn
 			{ ...alwaysExists, spawnFn: fakeSpawn({ signalled: null }) }
 		);
 		expect(outcome.results[0].status).toBe('red');
+		expect(outcome.results[0].reason).toBeUndefined();
+	});
+
+	// APW-08 T51 (FR-61, S36, ACC-08-44) — the shell's "command not found" is a missing TOOL.
+	it.each([127, 9009])('exit %i (a shell that could not find the program) is `error` with reason missingTool', async (code) => {
+		const outcome = await runAcceptanceChecksJob(
+			job({ workspacePath: ABSOLUTE, checks: [{ id: 'cargo', command: 'cargo test', required: true }] }),
+			{ ...alwaysExists, spawnFn: fakeSpawn({ 'cargo test': code }) }
+		);
+		expect(outcome.results[0]).toMatchObject({ status: 'error', exitCode: code, reason: 'missingTool' });
+		// The gate treats it like any other non-green required check.
+		expect(outcome.gateStatus).toBe('red');
+	});
+
+	it.each([1, 2, 126, 128, 255, 9008, 9010])('exit %i stays an ordinary red, with no reason', async (code) => {
+		const outcome = await runAcceptanceChecksJob(
+			job({ workspacePath: ABSOLUTE, checks: [{ id: 'c', command: 'run' }] }),
+			{ ...alwaysExists, spawnFn: fakeSpawn({ run: code }) }
+		);
+		expect(outcome.results[0].status).toBe('red');
+		expect(outcome.results[0].reason).toBeUndefined();
 	});
 });
 

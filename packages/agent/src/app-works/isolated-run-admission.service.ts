@@ -152,6 +152,12 @@ export const APP_WORK_PUSH_CREDENTIAL_CACHE_MS = 10 * 60_000;
 const CONTAINMENT_RUNS_SCAN = 20;
 /** Review of #3040 (minor 8) — the most nodes one admission (or Cost view) scans. */
 export const APP_WORK_FLEET_CANDIDATES_MAX = 50;
+/**
+ * APW-08 T51 — how long a node's missing-tool report keeps the same Task from being offered to it
+ * again. A day: long enough to stop the Fleet handing the Task straight back to a machine without
+ * the tool, short enough that a machine whose owner installs it is not shut out of the Task for good.
+ */
+export const APP_WORK_MISSING_TOOL_EXCLUSION_MS = 24 * 60 * 60_000;
 /** Review of #3040 (minor 7) — attempts of the allowance compare-and-set before giving up. */
 const ALLOWANCE_CAS_ATTEMPTS = 4;
 
@@ -272,6 +278,7 @@ export class IsolatedRunAdmissionService
         nodeId: string;
         workId: string;
         jobId: string;
+        taskId?: string | null;
     }): Promise<boolean> {
         try {
             const work = await this.reads.works.findById(input.workId);
@@ -283,16 +290,53 @@ export class IsolatedRunAdmissionService
                 work.appRunContainmentAllowances,
             );
             const raw = await this.reads.fleet.latestContainment(input.userId, input.nodeId);
-            return isNodeContainmentAdmissible({
+            const admissible = isNodeContainmentAdmissible({
                 containment: toAppWorkRunContainment(raw),
                 allowed: isNodeContainmentAllowed(allowances, input.nodeId),
             });
+            if (!admissible) return false;
+            return !(await this.missingToolReported(input));
         } catch (err) {
             this.logger.warn(
                 `Lease of App Work job ${input.jobId} by node ${input.nodeId} refused — admission could not be read (${describe(err)}).`,
             );
             return false;
         }
+    }
+
+    /**
+     * APW-08 T51 (FR-61, S36, ACC-08-44 second half) — did this node's LAST run of this Task, within
+     * {@link APP_WORK_MISSING_TOOL_EXCLUSION_MS}, report a check whose tool is missing on it? Then the
+     * Task is not offered to it again. The record is the node's own completed job (no new table).
+     *
+     * Bounded, unlike the containment rules: a machine whose owner installs the tool must be able
+     * to take the Task again, so only the latest run of it counts and only for a day. And it fails
+     * OPEN (a read that throws admits): this passes over a known-bad machine, it is not a safety
+     * rule — the containment check above is, and it already failed closed.
+     */
+    private async missingToolReported(input: {
+        userId: string;
+        nodeId: string;
+        taskId?: string | null;
+    }): Promise<boolean> {
+        if (!input.taskId || !this.reads.runs?.findRecentForTask) return false;
+        // The Task's own recent runs, newest first — a handful of rows by `taskId` (CodeRabbit on
+        // #3045: scanning the NODE's jobs let 25 other runs push this Task's report out of reach).
+        // The run record the reconciler wrote carries the node and the `missingTool` flag.
+        const since = this.now().getTime() - APP_WORK_MISSING_TOOL_EXCLUSION_MS;
+        return this.safe('missing-tool report', false, async () => {
+            const runs = await this.reads.runs!.findRecentForTask!(
+                input.taskId!,
+                CONTAINMENT_RUNS_SCAN,
+            );
+            for (const run of runs) {
+                const record = readAgentRunContainmentRecord(run.containment);
+                if (!record || record.nodeId !== input.nodeId) continue;
+                // The node's LATEST recorded run of this Task decides, inside the window only.
+                return record.missingTool === true && Date.parse(record.reportedAt) >= since;
+            }
+            return false;
+        });
     }
 
     // ── T48: the reconciler's record ─────────────────────────────────────
@@ -304,6 +348,8 @@ export class IsolatedRunAdmissionService
         workId: string;
         nodeId: string | null;
         rawContainment: unknown;
+        /** APW-08 T51 — a check on this run reported its tool missing on `nodeId`. */
+        missingTool?: boolean;
     }): Promise<boolean> {
         if (!this.reads.runs?.recordContainment || !input.workId) return false;
         const containment = toAppWorkRunContainment(input.rawContainment);
@@ -315,6 +361,7 @@ export class IsolatedRunAdmissionService
                 ...containment,
                 nodeId: input.nodeId,
                 reportedAt: this.now().toISOString(),
+                ...(input.missingTool === true ? { missingTool: true } : {}),
             });
             return true;
         } catch (err) {
