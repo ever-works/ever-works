@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Nessun Work",
+                "hint": "Facoltativo. Il ciclo registra ogni iterazione su questo Work. In un App Work, ogni iterazione ha il proprio branch e la propria pull request."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Nessun Work",
+                "unnamed": "Un Work che non puoi più aprire",
+                "changeLabel": "Cambia Work",
+                "hint": "Il ciclo registra ogni iterazione su questo Work.",
+                "lockedWhileRunning": "Metti in pausa il ciclo per cambiarne il Work.",
+                "saved": "Work salvato",
+                "saveError": "Impossibile cambiare il Work"
             }
         },
         "sidebar": {

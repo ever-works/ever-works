@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Work yok",
+                "hint": "İsteğe bağlı. Döngü her yinelemeyi bu Work'e kaydeder. Bir App Work'te her yineleme kendi dalını ve pull request'ini alır."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Work yok",
+                "unnamed": "Artık açamadığınız bir Work",
+                "changeLabel": "Work'ü değiştir",
+                "hint": "Döngü her yinelemeyi bu Work'e kaydeder.",
+                "lockedWhileRunning": "Work'ünü değiştirmek için döngüyü duraklatın.",
+                "saved": "Work kaydedildi",
+                "saveError": "Work değiştirilemedi"
             }
         },
         "sidebar": {

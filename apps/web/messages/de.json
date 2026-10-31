@@ -9141,6 +9141,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Kein Work",
+                "hint": "Optional. Die Schleife legt jede Iteration in diesem Work an. Bei einem App Work erhält jede Iteration einen eigenen Branch und Pull Request."
             }
         },
         "goalDetail": {
@@ -9383,6 +9388,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Kein Work",
+                "unnamed": "Ein Work, das Sie nicht mehr öffnen können",
+                "changeLabel": "Work ändern",
+                "hint": "Die Schleife legt jede Iteration in diesem Work an.",
+                "lockedWhileRunning": "Pausieren Sie die Schleife, um ihr Work zu ändern.",
+                "saved": "Work gespeichert",
+                "saveError": "Work konnte nicht geändert werden"
             }
         },
         "sidebar": {

@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Work なし",
+                "hint": "任意。ループは各イテレーションをこの Work に登録します。App Work では、各イテレーションに専用のブランチとプルリクエストが作られます。"
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Work なし",
+                "unnamed": "開けなくなった Work",
+                "changeLabel": "Work を変更",
+                "hint": "ループは各イテレーションをこの Work に登録します。",
+                "lockedWhileRunning": "Work を変更するにはループを一時停止してください。",
+                "saved": "Work を保存しました",
+                "saveError": "Work を変更できませんでした"
             }
         },
         "sidebar": {

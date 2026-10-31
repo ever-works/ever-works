@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "कोई Work नहीं",
+                "hint": "वैकल्पिक। लूप हर iteration इस Work पर दर्ज करता है। App Work पर हर iteration को अपनी branch और pull request मिलती है।"
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "कोई Work नहीं",
+                "unnamed": "ऐसा Work जिसे अब आप खोल नहीं सकते",
+                "changeLabel": "Work बदलें",
+                "hint": "लूप हर iteration इस Work पर दर्ज करता है।",
+                "lockedWhileRunning": "Work बदलने के लिए लूप को रोकें।",
+                "saved": "Work सहेजा गया",
+                "saveError": "Work नहीं बदला जा सका"
             }
         },
         "sidebar": {

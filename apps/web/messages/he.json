@@ -9141,6 +9141,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "ללא Work",
+                "hint": "אופציונלי. הלולאה מתייקת כל איטרציה ב-Work הזה. ב-App Work, כל איטרציה מקבלת ענף ובקשת משיכה משלה."
             }
         },
         "goalDetail": {
@@ -9383,6 +9388,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "ללא Work",
+                "unnamed": "Work שכבר אי אפשר לפתוח",
+                "changeLabel": "שינוי ה-Work",
+                "hint": "הלולאה מתייקת כל איטרציה ב-Work הזה.",
+                "lockedWhileRunning": "השהו את הלולאה כדי לשנות את ה-Work שלה.",
+                "saved": "ה-Work נשמר",
+                "saveError": "לא ניתן היה לשנות את ה-Work"
             }
         },
         "sidebar": {

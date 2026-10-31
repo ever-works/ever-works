@@ -9141,6 +9141,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "العمل",
+                "none": "بلا عمل",
+                "hint": "اختياري. تُسجِّل الحلقة كل تكرار على هذا العمل. في عمل التطبيق، يحصل كل تكرار على فرع وطلب سحب خاصين به."
             }
         },
         "goalDetail": {
@@ -9383,6 +9388,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "العمل",
+                "none": "بلا عمل",
+                "unnamed": "عمل لم يعد بإمكانك فتحه",
+                "changeLabel": "تغيير العمل",
+                "hint": "تُسجِّل الحلقة كل تكرار على هذا العمل.",
+                "lockedWhileRunning": "أوقف الحلقة مؤقتًا لتغيير عملها.",
+                "saved": "تم حفظ العمل",
+                "saveError": "تعذّر تغيير العمل"
             }
         },
         "sidebar": {

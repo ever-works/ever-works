@@ -18,6 +18,7 @@ import {
     type GoalKind,
     type GoalWindow,
 } from '@/lib/api/goals.shared';
+import { WorkSelect } from '@/components/tasks/WorkSelect';
 import { createGoalAction } from './actions';
 import { buildCreateGoalPayload, validateGoalFormFields } from './goal-form-payload';
 
@@ -79,6 +80,8 @@ export function GoalForm() {
     const [checkFrequencyMinutes, setCheckFrequencyMinutes] = useState(
         String(DEFAULT_CHECK_FREQUENCY_MINUTES),
     );
+    // APW-08 T33 (FR-45) — the optional Work the Goal's iterations are filed on. `''` = none.
+    const [workId, setWorkId] = useState('');
 
     const isMetric = kind === 'metric';
 
@@ -115,6 +118,7 @@ export function GoalForm() {
             dodText,
             deadline: null as string | null,
             checkFrequencyMinutes: DEFAULT_CHECK_FREQUENCY_MINUTES,
+            workId,
         };
 
         // Kind-aware: a metric Goal keeps the legacy checks in the legacy
@@ -229,6 +233,19 @@ export function GoalForm() {
                         ))}
                     </Select>
                     <p className={fieldHint}>{t(`kindHints.${kind}`)}</p>
+                </div>
+                <div>
+                    <label className={fieldLabel} htmlFor="goal-work">
+                        {t('work.label')}
+                    </label>
+                    <WorkSelect
+                        id="goal-work"
+                        value={workId}
+                        onValueChange={setWorkId}
+                        noneLabel={t('work.none')}
+                        testId="goal-work-select"
+                    />
+                    <p className={fieldHint}>{t('work.hint')}</p>
                 </div>
             </section>
 

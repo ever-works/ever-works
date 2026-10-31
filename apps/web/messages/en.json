@@ -11382,6 +11382,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "No Work",
+                "hint": "Optional. The loop files every iteration on this Work. On an App Work, each iteration gets its own branch and pull request."
             }
         },
         "goalDetail": {
@@ -11624,6 +11629,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "No Work",
+                "unnamed": "A Work you can no longer open",
+                "changeLabel": "Change the Work",
+                "hint": "The loop files every iteration on this Work.",
+                "lockedWhileRunning": "Pause the loop to change its Work.",
+                "saved": "Work saved",
+                "saveError": "Couldn't change the Work"
             }
         },
         "meetingsPage": {

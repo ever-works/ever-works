@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Work 없음",
+                "hint": "선택 사항. 루프는 각 반복을 이 Work에 등록합니다. App Work에서는 반복마다 자체 브랜치와 풀 리퀘스트가 생성됩니다."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Work 없음",
+                "unnamed": "더 이상 열 수 없는 Work",
+                "changeLabel": "Work 변경",
+                "hint": "루프는 각 반복을 이 Work에 등록합니다.",
+                "lockedWhileRunning": "Work를 변경하려면 루프를 일시 중지하세요.",
+                "saved": "Work가 저장되었습니다",
+                "saveError": "Work를 변경하지 못했습니다"
             }
         },
         "sidebar": {

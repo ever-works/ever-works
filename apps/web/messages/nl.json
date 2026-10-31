@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Geen Work",
+                "hint": "Optioneel. De lus zet elke iteratie op dit Work. Bij een App Work krijgt elke iteratie een eigen branch en pull request."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Geen Work",
+                "unnamed": "Een Work dat je niet meer kunt openen",
+                "changeLabel": "Work wijzigen",
+                "hint": "De lus zet elke iteratie op dit Work.",
+                "lockedWhileRunning": "Pauzeer de lus om het Work te wijzigen.",
+                "saved": "Work opgeslagen",
+                "saveError": "Het Work kon niet worden gewijzigd"
             }
         },
         "sidebar": {

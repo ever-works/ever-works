@@ -9141,6 +9141,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Работа",
+                "none": "Без работа",
+                "hint": "По избор. Цикълът записва всяка итерация в тази Работа. При Работа-приложение всяка итерация получава собствен клон и заявка за сливане."
             }
         },
         "goalDetail": {
@@ -9383,6 +9388,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Работа",
+                "none": "Без работа",
+                "unnamed": "Работа, която вече не можете да отворите",
+                "changeLabel": "Смяна на работата",
+                "hint": "Цикълът записва всяка итерация в тази Работа.",
+                "lockedWhileRunning": "Поставете цикъла на пауза, за да смените Работата му.",
+                "saved": "Работата е запазена",
+                "saveError": "Работата не можа да бъде сменена"
             }
         },
         "sidebar": {

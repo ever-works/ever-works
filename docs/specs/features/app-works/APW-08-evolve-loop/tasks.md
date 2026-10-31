@@ -880,6 +880,19 @@ _Delivers FR-45…FR-55._
       **Test**: extend `apps/web/src/components/goals/GoalForm.unit.spec.tsx` — the Work select sends `workId`, is
       disabled while the loop runs, and clears to `null`. Run: `pnpm --filter ever-works-web test GoalForm`.
       **Done when**: the spec is green.
+      **Status (2026-10-31, lead `43c536` on EVERDESK2, branch `feat/apw08-goal-form-work`, stacked on T32): built.**
+      - **Create form:** an optional Work picker (`WorkSelect`, "No Work" by default) sends `workId` only when one
+        is picked.
+      - **Goal page:** a new `GoalWorkSection` links the Work by name and changes it. "No Work" clears it to
+        `null`. The control is locked while the loop runs, with "Pause the loop to change its Work." (the API's
+        `409 loopRunning`).
+      - **Web types:** `Goal.workId` / `workName` and `workId` on create/update.
+      - **Copy:** `dashboard.goalNew.work` and `dashboard.goalDetail.work`, in all 21 locales.
+      - The loop's log lines come from the orchestrator's own `reasoning` (S10 / S26 copy), so no extra keys
+        were needed.
+
+      Specs: `GoalForm.unit.spec` (3 new), `GoalWorkSection.unit.spec` (4, new); `components/goals` 33/33;
+      `src/lib/__tests__` 15/15; web `tsc` clean.
 
 - [ ] **T34. Mission output — schema and API.**
       **Modify** `packages/agent/src/entities/mission.entity.ts` — append `outputMode`, `taskOutput`,

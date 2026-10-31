@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Brak Work",
+                "hint": "Opcjonalne. Pętla zapisuje każdą iterację w tym Work. W App Work każda iteracja dostaje własną gałąź i pull request."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Brak Work",
+                "unnamed": "Work, którego nie możesz już otworzyć",
+                "changeLabel": "Zmień Work",
+                "hint": "Pętla zapisuje każdą iterację w tym Work.",
+                "lockedWhileRunning": "Wstrzymaj pętlę, aby zmienić jej Work.",
+                "saved": "Work zapisany",
+                "saveError": "Nie udało się zmienić Work"
             }
         },
         "sidebar": {

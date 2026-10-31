@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Tanpa Work",
+                "hint": "Opsional. Loop mencatat setiap iterasi di Work ini. Pada App Work, setiap iterasi mendapat branch dan pull request sendiri."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Tanpa Work",
+                "unnamed": "Work yang tidak bisa Anda buka lagi",
+                "changeLabel": "Ganti Work",
+                "hint": "Loop mencatat setiap iterasi di Work ini.",
+                "lockedWhileRunning": "Jeda loop untuk mengganti Work-nya.",
+                "saved": "Work disimpan",
+                "saveError": "Tidak dapat mengganti Work"
             }
         },
         "sidebar": {

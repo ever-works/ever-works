@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "无 Work",
+                "hint": "可选。循环会把每次迭代记录在此 Work 上。在 App Work 上，每次迭代都有自己的分支和拉取请求。"
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "无 Work",
+                "unnamed": "你已无法打开的 Work",
+                "changeLabel": "更改 Work",
+                "hint": "循环会把每次迭代记录在此 Work 上。",
+                "lockedWhileRunning": "暂停循环后才能更改其 Work。",
+                "saved": "已保存 Work",
+                "saveError": "无法更改 Work"
             }
         },
         "sidebar": {

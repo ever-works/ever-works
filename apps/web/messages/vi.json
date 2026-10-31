@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Không có Work",
+                "hint": "Không bắt buộc. Vòng lặp ghi mỗi lượt lặp vào Work này. Với App Work, mỗi lượt lặp có nhánh và pull request riêng."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Không có Work",
+                "unnamed": "Một Work bạn không còn mở được",
+                "changeLabel": "Đổi Work",
+                "hint": "Vòng lặp ghi mỗi lượt lặp vào Work này.",
+                "lockedWhileRunning": "Tạm dừng vòng lặp để đổi Work.",
+                "saved": "Đã lưu Work",
+                "saveError": "Không thể đổi Work"
             }
         },
         "sidebar": {

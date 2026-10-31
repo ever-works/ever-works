@@ -9073,6 +9073,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Без Work",
+                "hint": "Необязательно. Цикл создаёт каждую итерацию в этом Work. В App Work у каждой итерации своя ветка и пул-реквест."
             }
         },
         "goalDetail": {
@@ -9315,6 +9320,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Без Work",
+                "unnamed": "Work, который вы больше не можете открыть",
+                "changeLabel": "Сменить Work",
+                "hint": "Цикл создаёт каждую итерацию в этом Work.",
+                "lockedWhileRunning": "Приостановите цикл, чтобы сменить его Work.",
+                "saved": "Work сохранён",
+                "saveError": "Не удалось сменить Work"
             }
         },
         "sidebar": {
