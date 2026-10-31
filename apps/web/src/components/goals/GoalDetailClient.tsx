@@ -46,6 +46,7 @@ import { Sparkline } from './Sparkline';
 import { GoalDodPanel } from './GoalDodPanel';
 import { GoalLimitsDialog, type GoalAgentOption } from './GoalLimitsDialog';
 import { GoalOrchestratorLog } from './GoalOrchestratorLog';
+import { GoalWorkSection } from './GoalWorkSection';
 import { GoalSessionsPanel } from './GoalSessionsPanel';
 import { GoalResultsPanel } from './GoalResultsPanel';
 import {
@@ -716,6 +717,9 @@ export function GoalDetailClient({
                                 </DetailRow>
                             </div>
                         </section>
+
+                        {/* APW-08 T33 (FR-45) — the Work the loop files its iterations on. */}
+                        <GoalWorkSection goal={goal} onGoalChange={setGoal} />
 
                         <section className={sectionCard}>
                             <h2 className="text-sm font-semibold text-text dark:text-text-dark mb-1">

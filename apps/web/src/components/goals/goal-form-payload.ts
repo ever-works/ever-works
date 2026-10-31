@@ -39,6 +39,8 @@ export interface GoalFormFields {
     /** Both kinds. */
     deadline: string | null;
     checkFrequencyMinutes: number;
+    /** APW-08 T33 (FR-45) — the Work the Goal works on; `''` / absent = none. */
+    workId?: string;
 }
 
 /**
@@ -110,6 +112,8 @@ export function buildCreateGoalPayload(kind: GoalKind, fields: GoalFormFields): 
         description: fields.description.trim() || null,
         deadline: fields.deadline,
         checkFrequencyMinutes: fields.checkFrequencyMinutes,
+        // APW-08 T33 — only when one was picked, so a Goal without a Work sends what it always did.
+        ...(fields.workId ? { workId: fields.workId } : {}),
     };
     if (kind === 'delivery') {
         return {

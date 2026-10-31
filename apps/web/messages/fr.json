@@ -2361,7 +2361,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Tâches créées sur les App Works de la Mission.",
+                    "no-tasks": "Rien de nouveau à créer sur les App Works de la Mission."
                 }
             },
             "goals": {
@@ -2393,6 +2395,26 @@
                     "detached": "Objectif détaché",
                     "detachError": "Impossible de détacher l'Objectif"
                 }
+            },
+            "output": {
+                "title": "Sortie",
+                "ideas": "Idées",
+                "tasks": "Tâches sur les App Works attachés",
+                "both": "Les deux",
+                "tasksPerTick": "Tâches par cycle",
+                "openCap": "Plafond de tâches ouvertes par Work",
+                "appliesTo": "S’applique aux Works attachés en « Améliore » ou « Exploite ».",
+                "noAppWork": "Attachez un App Work en « Améliore » ou « Exploite » pour y créer des tâches.",
+                "tasksOnWorks": "Tâches sur les Works attachés",
+                "nothingToFile": "Aucun App Work attaché sur lequel créer des tâches.",
+                "tasksOnWorksEmpty": "Aucune tâche créée pour l’instant.",
+                "save": "Enregistrer",
+                "saved": "Sortie enregistrée",
+                "saveError": "Impossible d’enregistrer la sortie",
+                "loading": "Chargement…",
+                "unavailable": "Impossible de charger les tâches.",
+                "previous": "Précédent",
+                "next": "Suivant"
             }
         },
         "ideasPage": {
@@ -9141,6 +9163,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Aucun Work",
+                "hint": "Facultatif. La boucle crée chaque itération dans ce Work. Sur un App Work, chaque itération a sa propre branche et sa pull request."
             }
         },
         "goalDetail": {
@@ -9383,6 +9410,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Aucun Work",
+                "unnamed": "Un Work que vous ne pouvez plus ouvrir",
+                "changeLabel": "Changer de Work",
+                "hint": "La boucle crée chaque itération dans ce Work.",
+                "lockedWhileRunning": "Mettez la boucle en pause pour changer son Work.",
+                "saved": "Work enregistré",
+                "saveError": "Impossible de changer le Work"
             }
         },
         "sidebar": {

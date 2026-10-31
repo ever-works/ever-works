@@ -54,6 +54,37 @@ vi.mock('@/components/ui/select', () => ({
     ),
 }));
 
+// APW-08 T33 — the Work picker reads the account's Works through a server action; a native
+// <select> with two fixed Works stands in for it here.
+vi.mock('@/components/tasks/WorkSelect', () => ({
+    WorkSelect: ({
+        value,
+        onValueChange,
+        disabled,
+        noneLabel,
+        testId,
+        id,
+    }: {
+        value: string;
+        onValueChange: (v: string) => void;
+        disabled?: boolean;
+        noneLabel: string;
+        testId?: string;
+        id?: string;
+    }) => (
+        <select
+            data-testid={testId}
+            id={id}
+            value={value}
+            disabled={disabled}
+            onChange={(e) => onValueChange(e.currentTarget.value)}
+        >
+            <option value="">{noneLabel}</option>
+            <option value="11111111-1111-4111-8111-111111111111">Bookings</option>
+        </select>
+    ),
+}));
+
 import { GoalForm } from './GoalForm';
 import {
     buildCreateGoalPayload,
@@ -355,5 +386,62 @@ describe('goal-form-payload helpers', () => {
         expect('params' in (buildCreateGoalPayload('metric', fields()).metricSource ?? {})).toBe(
             false,
         );
+    });
+});
+
+/** APW-08 T33 (FR-45) — the optional Work on the create form. */
+describe('GoalForm — the Goal’s Work (APW-08 T33)', () => {
+    const WORK = '11111111-1111-4111-8111-111111111111';
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        createGoalAction.mockResolvedValue({ id: 'g-new' });
+    });
+
+    it('offers a Work picker that defaults to no Work, with its hint', () => {
+        render(<GoalForm />);
+        expect(screen.getByTestId('goal-work-select')).toHaveValue('');
+        expect(screen.getByLabelText('work.label')).toBeInTheDocument();
+        expect(screen.getByText('work.hint')).toBeInTheDocument();
+    });
+
+    it('a picked Work is sent as workId; no Work sends no workId key at all', async () => {
+        render(<GoalForm />);
+        switchKind('delivery');
+        setField('fields.title', 'Customer self-service');
+        setField('fields.dodCriteria', 'Customers can cancel online');
+        fireEvent.change(screen.getByTestId('goal-work-select'), { target: { value: WORK } });
+        clickCreate();
+        await waitFor(() => expect(createGoalAction).toHaveBeenCalledTimes(1));
+        expect(createGoalAction.mock.calls[0][0]).toMatchObject({ workId: WORK });
+
+        createGoalAction.mockClear();
+        fireEvent.change(screen.getByTestId('goal-work-select'), { target: { value: '' } });
+        clickCreate();
+        await waitFor(() => expect(createGoalAction).toHaveBeenCalledTimes(1));
+        expect(createGoalAction.mock.calls[0][0]).not.toHaveProperty('workId');
+    });
+
+    it('the payload builder carries the Work only when one was picked', () => {
+        const base: GoalFormFields = {
+            title: 'Customer self-service',
+            description: '',
+            pluginId: '',
+            metricId: '',
+            comparator: 'gte',
+            targetValue: '',
+            unit: '',
+            window: 'month',
+            dodText: 'Customers can cancel online',
+            deadline: null,
+            checkFrequencyMinutes: 60,
+        };
+        expect(buildCreateGoalPayload('delivery', { ...base, workId: WORK })).toMatchObject({
+            workId: WORK,
+        });
+        expect(buildCreateGoalPayload('delivery', { ...base, workId: '' })).not.toHaveProperty(
+            'workId',
+        );
+        expect(buildCreateGoalPayload('delivery', base)).not.toHaveProperty('workId');
     });
 });

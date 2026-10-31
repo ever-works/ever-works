@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "ミッションの App Works にタスクを登録しました。",
+                    "no-tasks": "ミッションの App Works に登録する新しいものはありません。"
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "ゴールを切り離しました",
                     "detachError": "ゴールを切り離せませんでした"
                 }
+            },
+            "output": {
+                "title": "出力",
+                "ideas": "アイデア",
+                "tasks": "添付された App Works のタスク",
+                "both": "両方",
+                "tasksPerTick": "1 回あたりのタスク数",
+                "openCap": "Work ごとの未完了タスク上限",
+                "appliesTo": "「改善」または「運用」として添付された Works に適用されます。",
+                "noAppWork": "タスクを登録するには、App Work を「改善」または「運用」として添付してください。",
+                "tasksOnWorks": "添付された Works のタスク",
+                "nothingToFile": "タスクを登録できる App Work が添付されていません。",
+                "tasksOnWorksEmpty": "まだタスクは登録されていません。",
+                "save": "保存",
+                "saved": "出力を保存しました",
+                "saveError": "出力を保存できませんでした",
+                "loading": "読み込み中…",
+                "unavailable": "タスクを読み込めませんでした。",
+                "previous": "前へ",
+                "next": "次へ"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Work なし",
+                "hint": "任意。ループは各イテレーションをこの Work に登録します。App Work では、各イテレーションに専用のブランチとプルリクエストが作られます。"
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Work なし",
+                "unnamed": "開けなくなった Work",
+                "changeLabel": "Work を変更",
+                "hint": "ループは各イテレーションをこの Work に登録します。",
+                "lockedWhileRunning": "Work を変更するにはループを一時停止してください。",
+                "saved": "Work を保存しました",
+                "saveError": "Work を変更できませんでした"
             }
         },
         "sidebar": {

@@ -2361,7 +2361,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Tasks in den App Works der Mission angelegt.",
+                    "no-tasks": "Nichts Neues für die App Works der Mission."
                 }
             },
             "goals": {
@@ -2393,6 +2395,26 @@
                     "detached": "Ziel getrennt",
                     "detachError": "Ziel konnte nicht getrennt werden"
                 }
+            },
+            "output": {
+                "title": "Ausgabe",
+                "ideas": "Ideen",
+                "tasks": "Tasks in angehängten App Works",
+                "both": "Beides",
+                "tasksPerTick": "Tasks pro Durchlauf",
+                "openCap": "Max. offene Tasks pro Work",
+                "appliesTo": "Gilt für Works, die als „Verbessert“ oder „Betreibt“ angehängt sind.",
+                "noAppWork": "Hängen Sie ein App Work als „Verbessert“ oder „Betreibt“ an, um darin Tasks anzulegen.",
+                "tasksOnWorks": "Tasks in angehängten Works",
+                "nothingToFile": "Kein angehängtes App Work, in dem Tasks angelegt werden können.",
+                "tasksOnWorksEmpty": "Noch keine Tasks angelegt.",
+                "save": "Speichern",
+                "saved": "Ausgabe gespeichert",
+                "saveError": "Ausgabe konnte nicht gespeichert werden",
+                "loading": "Wird geladen…",
+                "unavailable": "Tasks konnten nicht geladen werden.",
+                "previous": "Zurück",
+                "next": "Weiter"
             }
         },
         "ideasPage": {
@@ -9141,6 +9163,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Kein Work",
+                "hint": "Optional. Die Schleife legt jede Iteration in diesem Work an. Bei einem App Work erhält jede Iteration einen eigenen Branch und Pull Request."
             }
         },
         "goalDetail": {
@@ -9383,6 +9410,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Kein Work",
+                "unnamed": "Ein Work, das Sie nicht mehr öffnen können",
+                "changeLabel": "Work ändern",
+                "hint": "Die Schleife legt jede Iteration in diesem Work an.",
+                "lockedWhileRunning": "Pausieren Sie die Schleife, um ihr Work zu ändern.",
+                "saved": "Work gespeichert",
+                "saveError": "Work konnte nicht geändert werden"
             }
         },
         "sidebar": {

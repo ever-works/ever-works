@@ -306,6 +306,14 @@ export function withAgentFanOutSuppressed(
     return { ...opts, suppressAgentFanOut: true };
 }
 
+/**
+ * APW-08 T35 (APW08-G15) — a per-run cap is a positive whole number of cents; anything else is
+ * no cap (never a zero cap that would stop every run before it starts).
+ */
+export function runBudgetCapCents(raw: unknown): number | null {
+    return typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : null;
+}
+
 @Injectable()
 export class TaskTransitionService {
     private readonly logger = new Logger(TaskTransitionService.name);
@@ -1578,6 +1586,11 @@ export class TaskTransitionService {
              */
             seedPendingInput?: string[];
             /**
+             * APW-08 T35 (FR-53, APW08-G15) — this run's own spend cap in cents (a positive
+             * integer), stored on the run row. Omitted = no cap beyond the Agent's settings.
+             */
+            maxBudgetCents?: number;
+            /**
              * Reviewer agent stage (slice AD, EW-811) — the review-ledger
              * row this run is being created for. Bound to the run row
              * right after it is created and BEFORE the seed and the
@@ -1722,6 +1735,9 @@ export class TaskTransitionService {
                                   ? null
                                   : (verdict.queuedReason ?? 'concurrency-limit'),
                               delegationScope: opts.delegationScope ?? null,
+                              ...(runBudgetCapCents(opts.maxBudgetCents) !== null
+                                  ? { budgetCapCents: runBudgetCapCents(opts.maxBudgetCents) }
+                                  : {}),
                           })
                         : null;
                 };

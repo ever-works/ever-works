@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Görevin App Works’üne işler kaydedildi.",
+                    "no-tasks": "Görevin App Works’üne kaydedilecek yeni bir şey yok."
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "Hedef ayrıldı",
                     "detachError": "Hedef ayrılamadı"
                 }
+            },
+            "output": {
+                "title": "Çıktı",
+                "ideas": "Fikirler",
+                "tasks": "Ekli App Works üzerindeki işler",
+                "both": "İkisi de",
+                "tasksPerTick": "Döngü başına iş",
+                "openCap": "Work başına açık iş sınırı",
+                "appliesTo": "“İyileştirir” veya “İşletir” olarak eklenen Works için geçerlidir.",
+                "noAppWork": "İş kaydetmek için bir App Work’ü “İyileştirir” veya “İşletir” olarak ekleyin.",
+                "tasksOnWorks": "Ekli Works üzerindeki işler",
+                "nothingToFile": "İş kaydedilecek ekli bir App Work yok.",
+                "tasksOnWorksEmpty": "Henüz kaydedilmiş iş yok.",
+                "save": "Kaydet",
+                "saved": "Çıktı kaydedildi",
+                "saveError": "Çıktı kaydedilemedi",
+                "loading": "Yükleniyor…",
+                "unavailable": "İşler yüklenemedi.",
+                "previous": "Önceki",
+                "next": "Sonraki"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Work yok",
+                "hint": "İsteğe bağlı. Döngü her yinelemeyi bu Work'e kaydeder. Bir App Work'te her yineleme kendi dalını ve pull request'ini alır."
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Work yok",
+                "unnamed": "Artık açamadığınız bir Work",
+                "changeLabel": "Work'ü değiştir",
+                "hint": "Döngü her yinelemeyi bu Work'e kaydeder.",
+                "lockedWhileRunning": "Work'ünü değiştirmek için döngüyü duraklatın.",
+                "saved": "Work kaydedildi",
+                "saveError": "Work değiştirilemedi"
             }
         },
         "sidebar": {

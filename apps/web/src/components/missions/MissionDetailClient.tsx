@@ -51,6 +51,8 @@ import type {
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { MissionAttachedWorksPanel, type AttachableWorkOption } from './MissionAttachedWorksPanel';
+import { MissionOutputCard } from './MissionOutputCard';
+import { MissionTasksOnWorksPanel } from './MissionTasksOnWorksPanel';
 import { MissionGoalsPanel, type AttachableGoalOption } from './MissionGoalsPanel';
 import { BudgetSummaryCard } from '@/components/budgets';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
@@ -566,6 +568,12 @@ export function MissionDetailClient({
                         attachableWorks={attachableWorks}
                     />
 
+                    {/* ── Tasks on attached Works (APW-08 T36, FR-55) — only once the Mission
+                        files Tasks: an `ideas` Mission has none to list. */}
+                    {mission.outputMode === 'tasks' || mission.outputMode === 'both' ? (
+                        <MissionTasksOnWorksPanel missionId={mission.id} />
+                    ) : null}
+
                     {/* ── Ideas ────────────────────────────────────────── */}
                     <section className={sectionCard}>
                         <SectionHeader
@@ -676,6 +684,17 @@ export function MissionDetailClient({
 
                 {/* ── Context rail ─────────────────────────────────────── */}
                 <aside className="min-w-0 space-y-5 @5xl/main:col-span-4">
+                    {/* ── Output (APW-08 T36, FR-51…FR-53) ─────────────── */}
+                    <MissionOutputCard
+                        mission={mission}
+                        hasAppWork={(workRelations ?? []).some(
+                            (relation) =>
+                                (relation.relation === 'improves' ||
+                                    relation.relation === 'operates') &&
+                                relation.workKind === 'app',
+                        )}
+                        onMissionChange={setMission}
+                    />
                     {/* Record visibility (EW-P1-3): who else can see this Mission. */}
                     <section className={sectionCard} data-testid="mission-visibility">
                         <RecordVisibilityPanel aggregate="mission" id={mission.id} />

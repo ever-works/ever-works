@@ -2361,7 +2361,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "משימות תויקו ב-App Works של המשימה.",
+                    "no-tasks": "אין שום דבר חדש לתייק ב-App Works של המשימה."
                 }
             },
             "goals": {
@@ -2393,6 +2395,26 @@
                     "detached": "היעד נותק",
                     "detachError": "לא ניתן היה לנתק את היעד"
                 }
+            },
+            "output": {
+                "title": "פלט",
+                "ideas": "רעיונות",
+                "tasks": "משימות ב-App Works המצורפים",
+                "both": "שניהם",
+                "tasksPerTick": "משימות לכל מחזור",
+                "openCap": "מכסת משימות פתוחות לכל Work",
+                "appliesTo": "חל על Works המצורפים כ„משפר” או „מפעיל”.",
+                "noAppWork": "צרפו App Work כ„משפר” או „מפעיל” כדי לתייק בו משימות.",
+                "tasksOnWorks": "משימות ב-Works המצורפים",
+                "nothingToFile": "אין App Work מצורף לתיוק משימות.",
+                "tasksOnWorksEmpty": "עדיין לא תויקו משימות.",
+                "save": "שמירה",
+                "saved": "הפלט נשמר",
+                "saveError": "לא ניתן היה לשמור את הפלט",
+                "loading": "טוען…",
+                "unavailable": "לא ניתן היה לטעון את המשימות.",
+                "previous": "הקודם",
+                "next": "הבא"
             }
         },
         "ideasPage": {
@@ -9141,6 +9163,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "ללא Work",
+                "hint": "אופציונלי. הלולאה מתייקת כל איטרציה ב-Work הזה. ב-App Work, כל איטרציה מקבלת ענף ובקשת משיכה משלה."
             }
         },
         "goalDetail": {
@@ -9383,6 +9410,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "ללא Work",
+                "unnamed": "Work שכבר אי אפשר לפתוח",
+                "changeLabel": "שינוי ה-Work",
+                "hint": "הלולאה מתייקת כל איטרציה ב-Work הזה.",
+                "lockedWhileRunning": "השהו את הלולאה כדי לשנות את ה-Work שלה.",
+                "saved": "ה-Work נשמר",
+                "saveError": "לא ניתן היה לשנות את ה-Work"
             }
         },
         "sidebar": {

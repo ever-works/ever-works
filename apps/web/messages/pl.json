@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Zadania zapisane w App Works misji.",
+                    "no-tasks": "Brak nowych zadań do zapisania w App Works misji."
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "Cel odłączony",
                     "detachError": "Nie udało się odłączyć Celu"
                 }
+            },
+            "output": {
+                "title": "Wynik",
+                "ideas": "Pomysły",
+                "tasks": "Zadania w dołączonych App Works",
+                "both": "Oba",
+                "tasksPerTick": "Zadania na cykl",
+                "openCap": "Limit otwartych zadań na Work",
+                "appliesTo": "Dotyczy Works dołączonych jako „Ulepsza” lub „Obsługuje”.",
+                "noAppWork": "Dołącz App Work jako „Ulepsza” lub „Obsługuje”, aby zapisywać w nim zadania.",
+                "tasksOnWorks": "Zadania w dołączonych Works",
+                "nothingToFile": "Brak dołączonego App Work, w którym można zapisać zadania.",
+                "tasksOnWorksEmpty": "Nie zapisano jeszcze żadnych zadań.",
+                "save": "Zapisz",
+                "saved": "Wynik zapisany",
+                "saveError": "Nie udało się zapisać wyniku",
+                "loading": "Ładowanie…",
+                "unavailable": "Nie udało się wczytać zadań.",
+                "previous": "Poprzednia",
+                "next": "Następna"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Brak Work",
+                "hint": "Opcjonalne. Pętla zapisuje każdą iterację w tym Work. W App Work każda iteracja dostaje własną gałąź i pull request."
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Brak Work",
+                "unnamed": "Work, którego nie możesz już otworzyć",
+                "changeLabel": "Zmień Work",
+                "hint": "Pętla zapisuje każdą iterację w tym Work.",
+                "lockedWhileRunning": "Wstrzymaj pętlę, aby zmienić jej Work.",
+                "saved": "Work zapisany",
+                "saveError": "Nie udało się zmienić Work"
             }
         },
         "sidebar": {

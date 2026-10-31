@@ -1,7 +1,7 @@
 import { PromptAssemblerService } from '@ever-works/agent/agents';
 import type { Agent, Task } from '@ever-works/agent/entities';
 import { TaskStatus } from '@ever-works/agent/tasks-domain';
-import { FleetAgentTaskPlannerService } from '../fleet-agent-task-planner.service';
+import { FleetAgentTaskPlannerService, runBudgetCapUsd } from '../fleet-agent-task-planner.service';
 
 /**
  * APW-08 T47 (XC-05, FR-69) — the App Work Task tool policy on the fleet path.
@@ -277,5 +277,63 @@ describe('FleetAgentTaskPlannerService — the App Work Task tool policy withhol
             }).plan(payload);
             expect(plan).not.toBeNull();
         });
+    });
+
+    // APW-08 T35 (FR-53, APW08-G15) — a run's own spend cap reaches the node as maxBudgetUsd.
+    describe('the run budget cap (T35)', () => {
+        const withRun = (budgetCapCents: number | null) =>
+            new FleetAgentTaskPlannerService(
+                tasks as never,
+                agents as never,
+                works as never,
+                {
+                    describeFleetWorkspace: jest.fn().mockResolvedValue(workspace),
+                    resolveFleetRunEnvGrants: jest.fn().mockResolvedValue([]),
+                    readFleetRepoDeclaredCommands: jest
+                        .fn()
+                        .mockResolvedValue({ setup: [], checks: [] }),
+                } as never,
+                new PromptAssemblerService(),
+                undefined,
+                { getResolvedSettings: jest.fn().mockResolvedValue({}) } as never,
+                {
+                    findById: jest.fn().mockResolvedValue({
+                        id: payload.runId,
+                        userId: payload.userId,
+                        budgetCapCents,
+                    }),
+                    findRecentForTask: jest.fn().mockResolvedValue([]),
+                } as never,
+                {
+                    describeScope: jest.fn().mockResolvedValue({
+                        ok: true,
+                        reason: null,
+                        installationEntityId: 'inst-entity-1',
+                        installationId: '9001',
+                        repositoryIds: ['1'],
+                        repositories: ['member/cal-fork'],
+                    }),
+                } as never,
+            );
+
+        it('carries the cap as maxBudgetUsd, rounded down to whole cents', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const plan = await withRun(1599).plan(payload);
+            expect(plan!.execution.maxBudgetUsd).toBe(15.99);
+        });
+
+        it('no cap on the run leaves the plan as it was', async () => {
+            tasks.findById.mockResolvedValue(task({ workId: 'work-site' }));
+            const plan = await withRun(null).plan(payload);
+            expect(plan!.execution.maxBudgetUsd).toBeUndefined();
+        });
+    });
+
+    it('runBudgetCapUsd never raises a cap and ignores nonsense', () => {
+        expect(runBudgetCapUsd(1500)).toBe(15);
+        expect(runBudgetCapUsd(1599.9)).toBe(15.99);
+        for (const raw of [0, -1, null, undefined, Number.NaN, '1500']) {
+            expect(runBudgetCapUsd(raw)).toBeNull();
+        }
     });
 });

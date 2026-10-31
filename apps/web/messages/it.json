@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Task registrati sugli App Works della Missione.",
+                    "no-tasks": "Niente di nuovo da registrare sugli App Works della Missione."
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "Obiettivo scollegato",
                     "detachError": "Impossibile scollegare l'Obiettivo"
                 }
+            },
+            "output": {
+                "title": "Output",
+                "ideas": "Idee",
+                "tasks": "Task sugli App Works allegati",
+                "both": "Entrambi",
+                "tasksPerTick": "Task per ciclo",
+                "openCap": "Limite di task aperti per Work",
+                "appliesTo": "Si applica ai Works allegati come «Migliora» o «Gestisce».",
+                "noAppWork": "Allega un App Work come «Migliora» o «Gestisce» per registrarvi task.",
+                "tasksOnWorks": "Task sui Works allegati",
+                "nothingToFile": "Nessun App Work allegato su cui registrare task.",
+                "tasksOnWorksEmpty": "Nessun task registrato finora.",
+                "save": "Salva",
+                "saved": "Output salvato",
+                "saveError": "Impossibile salvare l’output",
+                "loading": "Caricamento…",
+                "unavailable": "Impossibile caricare i task.",
+                "previous": "Precedente",
+                "next": "Successivo"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Nessun Work",
+                "hint": "Facoltativo. Il ciclo registra ogni iterazione su questo Work. In un App Work, ogni iterazione ha il proprio branch e la propria pull request."
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Nessun Work",
+                "unnamed": "Un Work che non puoi più aprire",
+                "changeLabel": "Cambia Work",
+                "hint": "Il ciclo registra ogni iterazione su questo Work.",
+                "lockedWhileRunning": "Metti in pausa il ciclo per cambiarne il Work.",
+                "saved": "Work salvato",
+                "saveError": "Impossibile cambiare il Work"
             }
         },
         "sidebar": {

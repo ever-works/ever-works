@@ -563,6 +563,16 @@ export class AgentRun {
         reportedAt: string;
     } | null;
 
+    /**
+     * APW-08 T35 (FR-53, APW08-G15) — this run's own spend cap in cents, or NULL (no cap beyond
+     * the Agent's own settings — every run before APW-08 P2). Set at dispatch (a Mission-filed
+     * Task's run carries the Mission's `maxBudgetCentsPerRun`) and kept on the row, so a parked,
+     * drained or resumed run keeps it. On the Fleet path it becomes `execution.maxBudgetUsd`,
+     * rounded DOWN and never above the Agent's own cap. Migration 1792370000000-AddAgentRunBudgetCap.
+     */
+    @Column({ type: 'int', nullable: true })
+    budgetCapCents?: number | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

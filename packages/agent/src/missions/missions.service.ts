@@ -1,3 +1,14 @@
+import { isAppWorkKind } from '@ever-works/contracts';
+import {
+    DEFAULT_MISSION_OUTPUT_MODE,
+    isMissionOutputMode,
+    missionFilesTasks,
+    MISSION_NO_APP_WORK_RELATION,
+    MISSION_OUTPUT_MODES,
+    MISSION_TASK_OUTPUT_RELATIONS,
+    normalizeMissionTaskOutput,
+    type MissionOutputMode,
+} from './mission-task-output';
 import {
     BadRequestException,
     Injectable,
@@ -112,6 +123,10 @@ export interface CreateMissionInput {
     visibility?: 'team' | 'organization';
     /** EW-P2-5 — Teams (`team_resources` type `mission`) of the Mission's Organization. */
     teamIds?: string[];
+    /** APW-08 T34 (FR-51) — omitted = `ideas`. */
+    outputMode?: string;
+    /** APW-08 T34 — stored normalized; omitted / `null` = the defaults. */
+    taskOutput?: Record<string, unknown> | null;
 }
 
 /**
@@ -128,6 +143,10 @@ export interface UpdateMissionInput {
     outstandingIdeasCap?: number | null;
     guardrailsOverride?: MissionGuardrailsOverride | null;
     missionTemplateRepo?: string | null;
+    /** APW-08 T34 (FR-51). */
+    outputMode?: string;
+    /** APW-08 T34 — `null` resets to the defaults. */
+    taskOutput?: Record<string, unknown> | null;
 }
 
 export interface ListMissionsFilter {
@@ -402,6 +421,12 @@ export class MissionsService {
                 missionTemplateRepo: this.normalizeTemplateRepo(input.missionTemplateRepo),
                 missionRepo: null, // Phase 8 PR X scaffolder sets this.
                 sourceMissionId: null, // Mission Clone (PR HH) sets this.
+                // APW-08 T34 (FR-51) — validated, never stored raw.
+                outputMode: this.assertOutputMode(input.outputMode),
+                taskOutput:
+                    input.taskOutput === undefined || input.taskOutput === null
+                        ? null
+                        : normalizeMissionTaskOutput(input.taskOutput),
                 ...(input.createdBy
                     ? { createdByType: input.createdBy.type, createdById: input.createdBy.id }
                     : {}),
@@ -439,7 +464,7 @@ export class MissionsService {
             missionId: saved.id,
             title: saved.title,
         });
-        return toMissionDto(saved);
+        return this.withTaskOutputWarnings(toMissionDto(saved), userId, scope);
     }
 
     /**
@@ -578,6 +603,14 @@ export class MissionsService {
         if (input.missionTemplateRepo !== undefined)
             // Security: validate/normalize before persisting (SSRF defense-in-depth).
             existing.missionTemplateRepo = this.normalizeTemplateRepo(input.missionTemplateRepo);
+        // APW-08 T34 (FR-51) — validated, never stored raw.
+        if (input.outputMode !== undefined) {
+            existing.outputMode = this.assertOutputMode(input.outputMode);
+        }
+        if (input.taskOutput !== undefined) {
+            existing.taskOutput =
+                input.taskOutput === null ? null : normalizeMissionTaskOutput(input.taskOutput);
+        }
 
         const changedFields = Object.keys(input).filter(
             (key) => (input as Record<string, unknown>)[key] !== undefined,
@@ -585,7 +618,43 @@ export class MissionsService {
         const saved = await this.persist(existing, (publisher, manager, row) =>
             publisher.changed(manager, 'mission', row.id, 'mission.updated', { changedFields }),
         );
-        return toMissionDto(saved);
+        return this.withTaskOutputWarnings(toMissionDto(saved), userId, scope);
+    }
+
+    /** APW-08 T34 (FR-51) — a known mode, or `400`; omitted = `ideas`. */
+    private assertOutputMode(raw: string | undefined): MissionOutputMode {
+        if (raw === undefined) return DEFAULT_MISSION_OUTPUT_MODE;
+        if (!isMissionOutputMode(raw)) {
+            throw new BadRequestException(
+                `outputMode must be one of ${MISSION_OUTPUT_MODES.join(', ')}.`,
+            );
+        }
+        return raw;
+    }
+
+    /**
+     * APW-08 T34 (plan §5, S27) — a Mission that files Tasks but has no App Work attached as
+     * Improves or Operates is accepted, and the answer says `noAppWorkRelation` so the form can
+     * point at the fix. Unbound relation reads (a trimmed graph) warn nothing.
+     */
+    private async withTaskOutputWarnings(
+        dto: MissionDto,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionDto> {
+        if (!missionFilesTasks(dto.outputMode) || !this.missionWorks) return dto;
+        let relations: Awaited<ReturnType<MissionWorkRepository['listForMissionWithWork']>>;
+        try {
+            relations = await this.missionWorks.listForMissionWithWork(dto.id, userId, scope);
+        } catch {
+            return dto;
+        }
+        const hasAppWork = relations.some(
+            (relation) =>
+                (MISSION_TASK_OUTPUT_RELATIONS as readonly string[]).includes(relation.relation) &&
+                isAppWorkKind(relation.workKind ?? null),
+        );
+        return hasAppWork ? dto : { ...dto, warnings: [MISSION_NO_APP_WORK_RELATION] };
     }
 
     /**
@@ -786,11 +855,15 @@ export class MissionsService {
             | 'spawned'
             | 'cap-hit'
             | 'no-ideas'
+            | 'tasks-filed'
+            | 'no-tasks'
             | 'failed'
             | 'cron-no-match';
         missionId: string;
         ideasCreated?: number;
         ideasQueued?: number;
+        /** APW-08 T35 — Tasks filed on the Mission's App Works. */
+        tasksFiled?: number;
         message?: string;
     }> {
         const mission = await this.findOrThrow(userId, missionId, scope);
@@ -811,6 +884,7 @@ export class MissionsService {
             missionId,
             ideasCreated: result.ideasCreated,
             ideasQueued: result.ideasQueued,
+            tasksFiled: result.tasksFiled,
             message: result.message,
         };
     }

@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Taken aangemaakt op de App Works van de Missie.",
+                    "no-tasks": "Niets nieuws om aan te maken op de App Works van de Missie."
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "Doel losgekoppeld",
                     "detachError": "Kan Doel niet loskoppelen"
                 }
+            },
+            "output": {
+                "title": "Uitvoer",
+                "ideas": "Ideeën",
+                "tasks": "Taken op gekoppelde App Works",
+                "both": "Beide",
+                "tasksPerTick": "Taken per ronde",
+                "openCap": "Max. open taken per Work",
+                "appliesTo": "Geldt voor Works die als ‘Verbetert’ of ‘Beheert’ zijn gekoppeld.",
+                "noAppWork": "Koppel een App Work als ‘Verbetert’ of ‘Beheert’ om er taken op aan te maken.",
+                "tasksOnWorks": "Taken op gekoppelde Works",
+                "nothingToFile": "Geen gekoppeld App Work om taken op aan te maken.",
+                "tasksOnWorksEmpty": "Nog geen taken aangemaakt.",
+                "save": "Opslaan",
+                "saved": "Uitvoer opgeslagen",
+                "saveError": "De uitvoer kon niet worden opgeslagen",
+                "loading": "Laden…",
+                "unavailable": "De taken konden niet worden geladen.",
+                "previous": "Vorige",
+                "next": "Volgende"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Geen Work",
+                "hint": "Optioneel. De lus zet elke iteratie op dit Work. Bij een App Work krijgt elke iteratie een eigen branch en pull request."
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Geen Work",
+                "unnamed": "Een Work dat je niet meer kunt openen",
+                "changeLabel": "Work wijzigen",
+                "hint": "De lus zet elke iteratie op dit Work.",
+                "lockedWhileRunning": "Pauzeer de lus om het Work te wijzigen.",
+                "saved": "Work opgeslagen",
+                "saveError": "Het Work kon niet worden gewijzigd"
             }
         },
         "sidebar": {

@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Задачи созданы в App Works миссии.",
+                    "no-tasks": "Нечего нового создать в App Works миссии."
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "Цель откреплена",
                     "detachError": "Не удалось открепить Цель"
                 }
+            },
+            "output": {
+                "title": "Результат",
+                "ideas": "Идеи",
+                "tasks": "Задачи в прикреплённых App Works",
+                "both": "И то и другое",
+                "tasksPerTick": "Задач за цикл",
+                "openCap": "Лимит открытых задач на Work",
+                "appliesTo": "Относится к Works, прикреплённым как «Улучшает» или «Эксплуатирует».",
+                "noAppWork": "Прикрепите App Work как «Улучшает» или «Эксплуатирует», чтобы создавать в нём задачи.",
+                "tasksOnWorks": "Задачи в прикреплённых Works",
+                "nothingToFile": "Нет прикреплённого App Work, в котором можно создавать задачи.",
+                "tasksOnWorksEmpty": "Задач пока нет.",
+                "save": "Сохранить",
+                "saved": "Результат сохранён",
+                "saveError": "Не удалось сохранить результат",
+                "loading": "Загрузка…",
+                "unavailable": "Не удалось загрузить задачи.",
+                "previous": "Назад",
+                "next": "Далее"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Без Work",
+                "hint": "Необязательно. Цикл создаёт каждую итерацию в этом Work. В App Work у каждой итерации своя ветка и пул-реквест."
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Без Work",
+                "unnamed": "Work, который вы больше не можете открыть",
+                "changeLabel": "Сменить Work",
+                "hint": "Цикл создаёт каждую итерацию в этом Work.",
+                "lockedWhileRunning": "Приостановите цикл, чтобы сменить его Work.",
+                "saved": "Work сохранён",
+                "saveError": "Не удалось сменить Work"
             }
         },
         "sidebar": {

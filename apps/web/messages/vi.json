@@ -2330,7 +2330,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Đã ghi các tác vụ vào App Works của Nhiệm vụ.",
+                    "no-tasks": "Không có gì mới để ghi vào App Works của Nhiệm vụ."
                 }
             },
             "goals": {
@@ -2362,6 +2364,26 @@
                     "detached": "Đã gỡ Mục tiêu",
                     "detachError": "Không thể gỡ Mục tiêu"
                 }
+            },
+            "output": {
+                "title": "Đầu ra",
+                "ideas": "Ý tưởng",
+                "tasks": "Tác vụ trên các App Works đính kèm",
+                "both": "Cả hai",
+                "tasksPerTick": "Tác vụ mỗi lượt",
+                "openCap": "Giới hạn tác vụ mở mỗi Work",
+                "appliesTo": "Áp dụng cho các Works được đính kèm dưới dạng “Cải thiện” hoặc “Vận hành”.",
+                "noAppWork": "Đính kèm một App Work dưới dạng “Cải thiện” hoặc “Vận hành” để ghi tác vụ vào đó.",
+                "tasksOnWorks": "Tác vụ trên các Works đính kèm",
+                "nothingToFile": "Không có App Work đính kèm để ghi tác vụ.",
+                "tasksOnWorksEmpty": "Chưa có tác vụ nào được ghi.",
+                "save": "Lưu",
+                "saved": "Đã lưu đầu ra",
+                "saveError": "Không thể lưu đầu ra",
+                "loading": "Đang tải…",
+                "unavailable": "Không thể tải các tác vụ.",
+                "previous": "Trước",
+                "next": "Tiếp"
             }
         },
         "ideasPage": {
@@ -9073,6 +9095,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "Không có Work",
+                "hint": "Không bắt buộc. Vòng lặp ghi mỗi lượt lặp vào Work này. Với App Work, mỗi lượt lặp có nhánh và pull request riêng."
             }
         },
         "goalDetail": {
@@ -9315,6 +9342,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "Không có Work",
+                "unnamed": "Một Work bạn không còn mở được",
+                "changeLabel": "Đổi Work",
+                "hint": "Vòng lặp ghi mỗi lượt lặp vào Work này.",
+                "lockedWhileRunning": "Tạm dừng vòng lặp để đổi Work.",
+                "saved": "Đã lưu Work",
+                "saveError": "Không thể đổi Work"
             }
         },
         "sidebar": {

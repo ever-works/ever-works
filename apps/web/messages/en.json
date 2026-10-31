@@ -3688,7 +3688,9 @@
                     "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
+                    "cron-no-match": "Tick ran (cron skipped)",
+                    "tasks-filed": "Tasks filed on the Mission’s App Works.",
+                    "no-tasks": "Nothing new to file on the Mission’s App Works."
                 }
             },
             "goals": {
@@ -3720,6 +3722,26 @@
                     "detached": "Goal detached",
                     "detachError": "Couldn't detach Goal"
                 }
+            },
+            "output": {
+                "title": "Output",
+                "ideas": "Ideas",
+                "tasks": "Tasks on attached App Works",
+                "both": "Both",
+                "tasksPerTick": "Tasks per tick",
+                "openCap": "Open Tasks cap per Work",
+                "appliesTo": "Applies to Works attached as Improves or Operates.",
+                "noAppWork": "Attach an App Work as Improves or Operates to file Tasks on it.",
+                "tasksOnWorks": "Tasks on attached Works",
+                "nothingToFile": "No attached App Work to file Tasks on.",
+                "tasksOnWorksEmpty": "No Tasks filed yet.",
+                "save": "Save",
+                "saved": "Output saved",
+                "saveError": "Couldn't save the output",
+                "loading": "Loading…",
+                "unavailable": "Couldn't load the Tasks.",
+                "previous": "Previous",
+                "next": "Next"
             }
         },
         "ideasPage": {
@@ -4601,6 +4623,7 @@
                 "missionResumed": "<b>{actor}</b> resumed {hasSubject, select, yes {the mission “{subject}”} other {a mission}}",
                 "missionTick": "<b>{actor}</b> ran a mission tick{hasCount, select, yes { and created {count, plural, =0 {no ideas} one {# idea} other {# ideas}}} other {}}",
                 "missionTickCapped": "<b>{actor}</b> held a mission tick back at its limit",
+                "missionNothingToFile": "<b>{actor}</b> found nothing new to file on a Mission’s App Works today",
                 "taskCreated": "<b>{actor}</b> created {hasSubject, select, yes {the task “{subject}”} other {a task}}",
                 "taskAssigned": "<b>{actor}</b> assigned a task",
                 "taskTransitioned": "<b>{actor}</b> moved a task to {to, select, backlog {Backlog} todo {To do} in_progress {In progress} in_review {In review} blocked {Blocked} done {Done} cancelled {Cancelled} other {a new status}}",
@@ -11382,6 +11405,11 @@
             "actions": {
                 "create": "Create Goal",
                 "cancel": "Cancel"
+            },
+            "work": {
+                "label": "Work",
+                "none": "No Work",
+                "hint": "Optional. The loop files every iteration on this Work. On an App Work, each iteration gets its own branch and pull request."
             }
         },
         "goalDetail": {
@@ -11624,6 +11652,16 @@
                 "empty": "No session summary yet",
                 "emptyHint": "The summary of the most recent finished session appears here.",
                 "cost": "Cost"
+            },
+            "work": {
+                "title": "Work",
+                "none": "No Work",
+                "unnamed": "A Work you can no longer open",
+                "changeLabel": "Change the Work",
+                "hint": "The loop files every iteration on this Work.",
+                "lockedWhileRunning": "Pause the loop to change its Work.",
+                "saved": "Work saved",
+                "saveError": "Couldn't change the Work"
             }
         },
         "meetingsPage": {

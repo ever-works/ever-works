@@ -302,6 +302,30 @@ export class Mission {
     @Column({ type: 'varchar', length: 64, nullable: true })
     createdById?: string | null;
 
+    /**
+     * APW-08 T34 (FR-51) — what the Mission's tick files: `ideas` (every Mission before P2),
+     * `tasks` (Tasks on its attached App Works) or `both`. Read through
+     * `normalizeMissionOutputMode` (`missions/mission-task-output.ts`); migration
+     * 1792360000000-AddMissionTaskOutput.
+     */
+    @Column({ type: 'varchar', length: 8, default: 'ideas' })
+    outputMode: 'ideas' | 'tasks' | 'both';
+
+    /**
+     * APW-08 T34 — the bounds of the Task output: `{ tasksPerTick 1..3, openTasksCap 1..10,
+     * agentId? }`. Read through `normalizeMissionTaskOutput` on every use (fails toward the
+     * defaults). NULL = the defaults.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    taskOutput?: { tasksPerTick?: number; openTasksCap?: number; agentId?: string } | null;
+
+    /**
+     * APW-08 T34 (FR-54, APW08-G21) — when the once-per-day "No attached App Work to file Tasks
+     * on." notice was last recorded. NULL = never.
+     */
+    @PortableDateColumn({ nullable: true })
+    taskOutputNoticeAt?: Date | null;
+
     @CreateDateColumn()
     createdAt: Date;
 

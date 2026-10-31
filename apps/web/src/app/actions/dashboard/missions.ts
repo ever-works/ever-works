@@ -8,6 +8,7 @@ import {
     type MissionOutcome,
     type UpdateMissionInput,
 } from '@/lib/api/missions';
+import { tasksAPI, type Task } from '@/lib/api/tasks';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 
@@ -117,4 +118,25 @@ export async function detachMissionAttachmentAction(missionId: string, attachmen
     const result = await missionsAPI.removeAttachment(missionId, attachmentId);
     revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
     return result;
+}
+
+/**
+ * APW-08 T36 (FR-55) — one page of the Tasks a Mission filed on its App Works (the
+ * `mission-task` label), 20 per page.
+ */
+export async function listMissionTasksOnWorksAction(
+    missionId: string,
+    offset = 0,
+): Promise<{ rows: Task[]; total: number }> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const page = await tasksAPI.list({
+        missionId,
+        label: 'mission-task',
+        limit: 20,
+        offset: Math.max(0, Math.trunc(offset)),
+    });
+    return { rows: page.data, total: page.meta?.total ?? page.data.length };
 }
