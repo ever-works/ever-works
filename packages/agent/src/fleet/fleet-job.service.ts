@@ -268,6 +268,22 @@ export class FleetJobService {
      * Work `agent-task` (no query at all). For one that is, the port judges THIS node; a port
      * that is missing or throws refuses (fail closed): the job stays queued for another node.
      */
+    /**
+     * APW-08 T43 — an App Work job this node just WON: tell the admission binding, which emits
+     * `app.change.run_admitted`. Fire-and-forget — telemetry never delays or fails a lease — and
+     * only for a job the platform marked `appWorkId`, so every other lease asks nothing.
+     */
+    private reportAppWorkLeased(candidate: FleetJob, node: { id: string; userId: string }): void {
+        if (candidate.kind !== 'agent-task' || !this.appWorkLeaseAdmission?.onLeased) return;
+        const payload = candidate.payload as { appWorkId?: unknown; taskId?: unknown } | null | undefined;
+        const workId = payload?.appWorkId;
+        if (typeof workId !== 'string' || workId.length === 0) return;
+        const taskId = typeof payload?.taskId === 'string' && payload.taskId.length > 0 ? payload.taskId : null;
+        void this.appWorkLeaseAdmission
+            .onLeased({ userId: node.userId, nodeId: node.id, workId, jobId: candidate.id, taskId })
+            .catch(() => undefined);
+    }
+
     private async appWorkLeaseAdmits(
         candidate: FleetJob,
         node: { id: string; userId: string },
@@ -657,6 +673,7 @@ export class FleetJobService {
                 FleetJobLeasedEvent.EVENT_NAME,
                 new FleetJobLeasedEvent(view, node.id, node.userId),
             );
+            this.reportAppWorkLeased(candidate, node);
         }
 
         return leased;

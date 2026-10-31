@@ -730,6 +730,29 @@ describe('isolated-run admission — the predicate and its facts', () => {
         ).toBe(true);
     });
 
+    it('APW-08 T43: run_admitted describes the containment the winning node runs under — and whether only an allowance admitted it', async () => {
+        const world = makeWorld({
+            reports: { [NODE_A]: isolatedReport('hardened'), [NODE_B]: declinedReport() },
+        });
+        const admission = new IsolatedRunAdmissionService(readsFor(world));
+        const payload = (nodeId: string, taskId: string | null = 't1', workId = APP_WORK) =>
+            admission.runAdmittedPayload({ userId: OWNER, nodeId, workId, taskId });
+
+        expect(await payload(NODE_A)).toEqual({
+            workId: APP_WORK,
+            taskId: 't1',
+            placement: 'fleet',
+            containmentPath: 'hardened',
+            isolatedHome: true,
+            downgraded: false,
+        });
+        // NODE_B declined isolation: it runs only under the owner's allowance — a downgrade.
+        expect(await payload(NODE_B)).toMatchObject({ isolatedHome: false, downgraded: true });
+        // Nothing honest to report: no Task id, or not an App Work.
+        expect(await payload(NODE_A, null)).toBeNull();
+        expect(await payload(NODE_A, 't1', SITE_WORK)).toBeNull();
+    });
+
     it('a node that never reported (or whose report is unreadable) is an unknown containment — a downgrade', async () => {
         for (const report of [undefined, 'garbage', ['x']]) {
             const world = makeWorld({ reports: { [NODE_A]: report } });

@@ -10,6 +10,7 @@ import {
 
 import type { FleetAppWorkLeaseAdmission } from '../fleet/fleet-app-work-lease-admission.port';
 import { resolveTaskRepository, type TaskRepositoryWork } from '../tasks-domain/task-repository';
+import type { AppChangeTelemetryPayloads } from './app-change.telemetry';
 import {
     resolveTaskDispatchAgentIds,
     type TaskAgentAssigneeReader,
@@ -292,6 +293,43 @@ export class IsolatedRunAdmissionService
                 `Lease of App Work job ${input.jobId} by node ${input.nodeId} refused — admission could not be read (${describe(err)}).`,
             );
             return false;
+        }
+    }
+
+    /**
+     * APW-08 T43 (plan §8.1, XC-06) — the `app.change.run_admitted` payload for a node that just
+     * WON an App Work job: the containment it runs under, and whether it runs only because the
+     * owner allowed a downgrade there. `null` when there is nothing honest to report (no Task id
+     * on the job, the Work gone or no longer an App Work). Never throws.
+     */
+    async runAdmittedPayload(input: {
+        userId: string;
+        nodeId: string;
+        workId: string;
+        taskId: string | null;
+    }): Promise<AppChangeTelemetryPayloads['app.change.run_admitted'] | null> {
+        if (!input.taskId) return null;
+        try {
+            const work = await this.reads.works.findById(input.workId);
+            if (!work || !isAppWorkKind(work.kind)) return null;
+            const raw = this.reads.fleet
+                ? await this.reads.fleet.latestContainment(input.userId, input.nodeId)
+                : null;
+            const containment = toAppWorkRunContainment(raw);
+            return {
+                workId: input.workId,
+                taskId: input.taskId,
+                placement: 'fleet',
+                containmentPath: containment?.executionPath ?? 'unknown',
+                isolatedHome: containment?.isolatedHome === true,
+                // Admissible on its own report, or only because the owner allowed it there.
+                downgraded: !isNodeContainmentAdmissible({ containment, allowed: false }),
+            };
+        } catch (err) {
+            this.logger.warn(
+                `run_admitted for App Work ${input.workId} on node ${input.nodeId} could not be described (${describe(err)}).`,
+            );
+            return null;
         }
     }
 

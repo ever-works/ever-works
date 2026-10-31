@@ -29,4 +29,16 @@ export interface FleetAppWorkLeaseAdmission {
         workId: string;
         jobId: string;
     }): Promise<boolean>;
+    /**
+     * APW-08 T43 — the node WON the claim of an App Work job (called once, after the CAS, never
+     * for a claim lost to another node). The binding emits `app.change.run_admitted` with the
+     * containment that node runs it under. Best-effort: never throws, never delays the lease.
+     */
+    onLeased?(input: {
+        userId: string;
+        nodeId: string;
+        workId: string;
+        jobId: string;
+        taskId: string | null;
+    }): Promise<void>;
 }
